@@ -140,6 +140,10 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/db-proxy',
   },
   // code-review
+  'bitbucket-webhook-tunnel': {
+    group: 'code-review',
+    dependsOn: ['nextjs'],
+  },
   'cloudflare-code-review-infra': {
     group: 'code-review',
     dependsOn: ['cloud-agent-next', 'nextjs'],
@@ -298,6 +302,25 @@ function getNextjsTargetPort(): number {
 
 const nextjsTargetPort = getNextjsTargetPort();
 
+// When a port offset is active the web app binds to a non-3000 port, but
+// .env.local still hardcodes NEXTAUTH_URL=http://localhost:3000, so NextAuth
+// sign-in/out redirects land on :3000. Return the offset-aware localhost URL so
+// the caller can inject it as a process env var (which overrides .env files).
+// Returns undefined — leaving .env.local authoritative — when there's no offset
+// (e.g. mobile/manual host overrides) or when a tunnel is running, since
+// start-tunnel rewrites NEXTAUTH_URL to the public origin.
+export function resolveSessionNextAuthUrl(args: {
+  portOffset: number;
+  serviceNames: string[];
+  nextjsPort: number;
+}): string | undefined {
+  const { portOffset, serviceNames, nextjsPort } = args;
+  if (portOffset <= 0) return undefined;
+  if (!serviceNames.includes('nextjs')) return undefined;
+  if (serviceNames.includes('kiloclaw-tunnel')) return undefined;
+  return `http://localhost:${nextjsPort}`;
+}
+
 // ---------------------------------------------------------------------------
 // Wrangler config discovery
 // ---------------------------------------------------------------------------
@@ -418,7 +441,7 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/storybook',
         port: 6006 + portOffset,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'storybook', '--', '-p', String(6006 + portOffset)],
+        command: ['pnpm', 'run', 'storybook', '-p', String(6006 + portOffset)],
         group: meta.group,
       });
       continue;
@@ -480,6 +503,23 @@ function buildServiceDefs(): ServiceDef[] {
           String(nextjsTargetPort),
           String(kiloclawPort),
           String(kiloChatPort),
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'bitbucket-webhook-tunnel') {
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: 0,
+        dependsOn: meta.dependsOn,
+        command: [
+          'tsx',
+          'dev/local/scripts/start-bitbucket-webhook-tunnel.ts',
+          String(nextjsTargetPort),
         ],
         group: meta.group,
       });

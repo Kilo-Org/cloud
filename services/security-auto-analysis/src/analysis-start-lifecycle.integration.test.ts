@@ -1,7 +1,20 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
-import { kilocode_users, security_analysis_queue, security_findings } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  security_analysis_queue,
+  security_audit_log,
+  security_findings,
+} from '@kilocode/db/schema';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
+import {
+  deriveSecurityFindingAuditEventKey,
+  SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+} from '@kilocode/worker-utils/security-finding-audit';
 import { eq, inArray } from 'drizzle-orm';
 import {
   transitionAnalysisCallbackLifecycle,
@@ -33,6 +46,7 @@ describe('analysis start lifecycle durable transitions', () => {
     await client.db
       .delete(security_analysis_queue)
       .where(inArray(security_analysis_queue.finding_id, ids));
+    await client.db.delete(security_audit_log).where(inArray(security_audit_log.finding_id, ids));
     await client.db.delete(security_findings).where(inArray(security_findings.id, ids));
   });
 
@@ -83,6 +97,34 @@ describe('analysis start lifecycle durable transitions', () => {
       .from(security_analysis_queue)
       .where(eq(security_analysis_queue.finding_id, findingId));
     expect(queueRows).toEqual([{ status: 'completed' }]);
+
+    const auditRows = await getFindingAuditRows(findingId);
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAnalysisCompleted,
+      finding_id: findingId,
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      event_key: deriveSecurityFindingAuditEventKey([
+        `user:${testUserId}`,
+        findingId,
+        SecurityAuditLogAction.FindingAnalysisCompleted,
+        'manual-triage-claim',
+      ]),
+      schema_version: SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+      source_context: SecurityFindingAuditSourceContext.AnalysisWorker,
+      before_state: { analysis_status: 'pending' },
+      after_state: {
+        analysis_status: 'completed',
+        suggested_action: 'manual_review',
+        confidence: 'high',
+      },
+      finding_snapshot: expect.objectContaining({
+        finding_id: findingId,
+        repo_full_name: 'kilo/manual-triage-complete',
+      }),
+    });
+    expect(auditRows[0]?.occurred_at).toEqual(expect.any(String));
   });
 
   it('terminalizes completed callbacks with queue and finding state settled together', async () => {
@@ -93,7 +135,7 @@ describe('analysis start lifecycle durable transitions', () => {
       jobId: 'callback-completed-job',
       queueStatus: 'running',
     });
-    const analysis = createAnalysis('callback-completed');
+    const analysis = createSandboxAnalysis('callback-completed', 'succeeded');
 
     await expect(
       transitionAnalysisCallbackLifecycle(client.db as never, {
@@ -128,6 +170,70 @@ describe('analysis start lifecycle durable transitions', () => {
       .from(security_analysis_queue)
       .where(eq(security_analysis_queue.finding_id, findingId));
     expect(queueRows).toEqual([{ status: 'completed', failureCode: null }]);
+
+    const auditRows = await getFindingAuditRows(findingId);
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAnalysisCompleted,
+      finding_id: findingId,
+      resource_id: findingId,
+      event_key: deriveSecurityFindingAuditEventKey([
+        `user:${testUserId}`,
+        findingId,
+        SecurityAuditLogAction.FindingAnalysisCompleted,
+        'callback-completed-claim',
+      ]),
+      schema_version: SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+      source_context: SecurityFindingAuditSourceContext.AnalysisWorker,
+      before_state: { analysis_status: 'running' },
+      after_state: {
+        analysis_status: 'completed',
+        structured_extraction_status: 'succeeded',
+        suggested_action: 'dismiss',
+        is_exploitable: false,
+      },
+      finding_snapshot: expect.objectContaining({
+        finding_id: findingId,
+        repo_full_name: 'kilo/callback-completed',
+        status: 'open',
+      }),
+    });
+    expect(auditRows[0]?.occurred_at).toEqual(expect.any(String));
+  });
+
+  it('records structured extraction failures without claiming an exploitability result', async () => {
+    const findingId = await insertFinding('callback-extraction-failed', 'running');
+    await insertQueueClaim({
+      findingId,
+      claimToken: 'callback-extraction-failed-claim',
+      jobId: 'callback-extraction-failed-job',
+      queueStatus: 'running',
+    });
+    const analysis = createSandboxAnalysis('callback-extraction-failed', 'failed');
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        attemptToken: 'callback-extraction-failed-claim',
+        outcome: {
+          type: 'completed',
+          analysis,
+        },
+      })
+    ).resolves.toEqual({ status: 'completed' });
+
+    const auditRows = await getFindingAuditRows(findingId);
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAnalysisCompleted,
+      after_state: {
+        analysis_status: 'completed',
+        structured_extraction_status: 'failed',
+        suggested_action: 'manual_review',
+      },
+    });
+    expect(auditRows[0]?.after_state).not.toHaveProperty('is_exploitable');
+    expect(auditRows[0]?.after_state).not.toHaveProperty('confidence');
   });
 
   it('terminalizes failed callbacks with queue and finding failure state settled together', async () => {
@@ -171,6 +277,28 @@ describe('analysis start lifecycle durable transitions', () => {
     expect(queueRows).toEqual([
       { status: 'failed', failureCode: 'UPSTREAM_5XX', lastError: 'upstream 503' },
     ]);
+
+    const auditRows = await getFindingAuditRows(findingId);
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAnalysisFailed,
+      finding_id: findingId,
+      resource_id: findingId,
+      event_key: deriveSecurityFindingAuditEventKey([
+        `user:${testUserId}`,
+        findingId,
+        SecurityAuditLogAction.FindingAnalysisFailed,
+        'callback-failed-claim',
+      ]),
+      schema_version: SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+      source_context: SecurityFindingAuditSourceContext.AnalysisWorker,
+      before_state: { analysis_status: 'running' },
+      after_state: { analysis_status: 'failed' },
+      metadata: { failure_code: 'UPSTREAM_5XX' },
+      finding_snapshot: expect.objectContaining({ finding_id: findingId }),
+    });
+    expect(auditRows[0]?.occurred_at).toEqual(expect.any(String));
+    expect(JSON.stringify(auditRows[0])).not.toContain('upstream 503');
   });
 
   it('clears superseded callback capacity while settling its queue row', async () => {
@@ -342,6 +470,52 @@ describe('analysis start lifecycle durable transitions', () => {
     expect(queueRows).toEqual([{ status: 'running', attemptCount: 1 }]);
   });
 
+  it('records terminal analysis start failures with current audit evidence', async () => {
+    const findingId = await insertFinding('scheduled-terminal-failure', 'running');
+    const queueRowId = await insertQueueClaim({
+      findingId,
+      claimToken: 'scheduled-terminal-failure-claim',
+      jobId: 'scheduled-terminal-failure-job',
+      queueStatus: 'running',
+    });
+
+    await expect(
+      transitionAnalysisStartLifecycle(client.db as never, {
+        claim: {
+          source: 'scheduled',
+          findingId,
+          queueRowId,
+          claimToken: 'scheduled-terminal-failure-claim',
+        },
+        outcome: {
+          type: 'start-failed',
+          errorMessage: 'permanent permission failure',
+          queueStatus: 'failed',
+          failureCode: 'PERMISSION_DENIED_PERMANENT',
+          incrementAttempt: true,
+          nextRetryAt: null,
+        },
+      })
+    ).resolves.toEqual({ transitioned: true });
+
+    const auditRows = await getFindingAuditRows(findingId);
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      action: SecurityAuditLogAction.FindingAnalysisFailed,
+      finding_id: findingId,
+      event_key: deriveSecurityFindingAuditEventKey([
+        `user:${testUserId}`,
+        findingId,
+        SecurityAuditLogAction.FindingAnalysisFailed,
+        'scheduled-terminal-failure-claim',
+      ]),
+      schema_version: SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+      source_context: SecurityFindingAuditSourceContext.AnalysisWorker,
+      metadata: { failure_code: 'PERMISSION_DENIED_PERMANENT' },
+    });
+    expect(JSON.stringify(auditRows[0])).not.toContain('permanent permission failure');
+  });
+
   it('requeues retryable scheduled start failures after running promotion without split state', async () => {
     const findingId = await insertFinding('scheduled-retryable-failure', 'running');
     const queueRowId = await insertQueueClaim({
@@ -379,8 +553,8 @@ describe('analysis start lifecycle durable transitions', () => {
       .where(eq(security_findings.id, findingId));
     expect(findingRows).toEqual([
       {
-        analysisStatus: 'failed',
-        analysisError: 'prepareSession timed out',
+        analysisStatus: null,
+        analysisError: null,
       },
     ]);
 
@@ -403,8 +577,16 @@ describe('analysis start lifecycle durable transitions', () => {
         claimToken: null,
       },
     ]);
+    expect(await getFindingAuditRows(findingId)).toEqual([]);
   });
 });
+
+function getFindingAuditRows(findingId: string) {
+  return client.db
+    .select()
+    .from(security_audit_log)
+    .where(eq(security_audit_log.finding_id, findingId));
+}
 
 async function insertFinding(
   suffix: string,
@@ -468,5 +650,38 @@ function createAnalysis(suffix: string): SecurityFindingAnalysis {
     analysisModel: 'analysis/model',
     triggeredByUserId: testUserId,
     correlationId: `correlation-${suffix}`,
+  };
+}
+
+function createSandboxAnalysis(
+  suffix: string,
+  extractionStatus: 'succeeded' | 'failed'
+): SecurityFindingAnalysis {
+  const extractionFailed = extractionStatus === 'failed';
+  return {
+    ...createAnalysis(suffix),
+    triage: {
+      needsSandboxAnalysis: true,
+      needsSandboxReasoning: `Sandbox required for ${suffix}`,
+      suggestedAction: 'analyze_codebase',
+      confidence: 'low',
+      triageAt: '2026-05-19T08:00:00.000Z',
+    },
+    sandboxAnalysis: {
+      isExploitable: extractionFailed ? 'unknown' : false,
+      extractionStatus,
+      exploitabilityReasoning: extractionFailed
+        ? 'Extraction failed. Review raw analysis.'
+        : 'No reachable usage.',
+      usageLocations: [],
+      suggestedFix: extractionFailed ? 'Review raw analysis.' : 'Remove the unused dependency.',
+      suggestedAction: extractionFailed ? 'manual_review' : 'dismiss',
+      summary: extractionFailed
+        ? 'Analysis completed but structured extraction failed.'
+        : 'Dependency is not exploitable.',
+      rawMarkdown: '# Raw analysis',
+      analysisAt: '2026-05-19T08:01:00.000Z',
+      modelUsed: 'analysis/model',
+    },
   };
 }

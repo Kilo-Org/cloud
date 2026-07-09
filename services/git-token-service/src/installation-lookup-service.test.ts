@@ -33,9 +33,17 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
     expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
     expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
-    expect(query.params.filter(param => param === 'user-1')).toHaveLength(3);
+    expect(query.params.filter(param => param === 'user-1')).toHaveLength(4);
     expect(query.params).toContain('00000000-0000-4000-8000-000000000001');
     expect(query.params).toContain(2);
+  });
+
+  it('requires current membership for every organization-scoped credential candidate', () => {
+    const query = buildQuery();
+
+    expect(query.sql).toContain('exists (select');
+    expect(query.params.filter(param => param === params.orgId)).toHaveLength(2);
+    expect(query.params.filter(param => param === params.userId)).toHaveLength(4);
   });
 
   it('loads up to ten authorized repair candidates without relying on stale account login metadata', () => {

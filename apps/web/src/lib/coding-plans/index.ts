@@ -1,17 +1,26 @@
 import 'server-only';
 
-import { createHash, createHmac } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { addDays } from 'date-fns';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
 import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { validateTokenPlanPlusCredential } from '@/lib/coding-plans/inventory-validation';
+import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
+import {
+  type MiniMaxCodingPlanCredentialValidationInput,
+  validateMiniMaxCodingPlanCredential,
+} from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { db } from '@/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
+import {
+  captureCostInsightSpend,
+  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+} from '@kilocode/db/cost-insights-rollups';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -42,13 +51,6 @@ type SubscriptionOutcome = {
 
 function idempotencyFingerprint(idempotencyKey: string): string {
   return createHash('sha256').update(idempotencyKey).digest('hex');
-}
-
-function credentialFingerprint(apiKey: string): string {
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw new Error('BYOK encryption is not configured');
-  }
-  return createHmac('sha256', BYOK_ENCRYPTION_KEY).update(apiKey).digest('hex');
 }
 
 async function evaluateUsageBonus(userId: string): Promise<void> {
@@ -118,7 +120,7 @@ export async function subscribeToCodingPlan(
       .where(
         and(
           eq(coding_plan_subscriptions.user_id, userId),
-          eq(coding_plan_subscriptions.plan_id, plan.planId),
+          eq(coding_plan_subscriptions.provider_id, plan.providerId),
           inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
         )
       )
@@ -126,7 +128,7 @@ export async function subscribeToCodingPlan(
 
     if (liveSubscription) {
       throw new Error(
-        'Token Plan Plus already has a live subscription. Later billing periods are purchased through renewal.'
+        `${plan.providerName} Coding Plan already has a live subscription. Cancel the current plan and wait until access ends before subscribing to another ${plan.providerName} Coding Plan.`
       );
     }
 
@@ -139,7 +141,7 @@ export async function subscribeToCodingPlan(
       .limit(1);
     if (existingProviderKey) {
       throw new Error(
-        'Remove your existing MiniMax BYOK key from /byok before subscribing to Token Plan Plus.'
+        `Remove your existing ${plan.providerName} BYOK key from /byok before subscribing to a ${plan.providerName} Coding Plan.`
       );
     }
 
@@ -169,6 +171,19 @@ export async function subscribeToCodingPlan(
       credit_category: `coding-plan:${plan.planId}:${requestKey}`,
       check_category_uniqueness: true,
       original_baseline_microdollars_used: lockedUser.microdollars_used,
+      created_at: periodStartIso,
+    });
+    await captureCostInsightSpend(tx, {
+      owner: { type: 'user', id: userId },
+      actorUserId: userId,
+      occurredAt: periodStartIso,
+      amountMicrodollars: plan.costMicrodollars,
+      category: 'scheduled',
+      source: 'coding_plan',
+      productKey: COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+      featureKey: 'activation',
+      modelOrPlanKey: plan.planId,
+      providerKey: plan.providerId,
     });
 
     const { rows: inventoryRows } = await tx.execute<{
@@ -209,7 +224,7 @@ export async function subscribeToCodingPlan(
       .returning({ id: byok_api_keys.id });
     if (!installedByok) {
       throw new Error(
-        'Remove your existing MiniMax BYOK key from /byok before subscribing to Token Plan Plus.'
+        `Remove your existing ${plan.providerName} BYOK key from /byok before subscribing to a ${plan.providerName} Coding Plan.`
       );
     }
 
@@ -252,6 +267,7 @@ export async function subscribeToCodingPlan(
 
   if (outcome.charged) {
     await evaluateUsageBonus(userId);
+    scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: userId });
   }
   logInfo('Coding plan purchase processed', {
     user_id: userId,
@@ -347,7 +363,9 @@ export async function terminateCodingPlanImmediately(
   });
 }
 
-type InventoryCredentialValidator = (apiKey: string) => Promise<boolean>;
+type InventoryCredentialValidator = (
+  input: MiniMaxCodingPlanCredentialValidationInput
+) => Promise<boolean>;
 
 type InventoryUploadOptions = {
   validateCredential?: InventoryCredentialValidator;
@@ -361,20 +379,25 @@ type InventoryCredentialEntry = {
 function parseInventoryCredentialEntry(entry: string): InventoryCredentialEntry {
   const segments = entry.split('::');
   if (segments.length !== 2) {
-    throw new Error('Each MiniMax inventory entry must use the format <api key>::<plan id>.');
+    throw new Error(
+      'Each MiniMax inventory entry must use the format <api key>::<upstream plan id>.'
+    );
   }
 
   const [rawApiKey, rawUpstreamPlanId] = segments;
   const apiKey = rawApiKey?.trim();
   const upstreamPlanId = rawUpstreamPlanId?.trim();
   if (!apiKey || !upstreamPlanId) {
-    throw new Error('Each MiniMax inventory entry must use the format <api key>::<plan id>.');
+    throw new Error(
+      'Each MiniMax inventory entry must use the format <api key>::<upstream plan id>.'
+    );
   }
 
   return { apiKey, upstreamPlanId };
 }
 
 export async function uploadKeysToInventory(
+  providerId: string,
   planId: CodingPlanId,
   rawEntries: string[],
   options: InventoryUploadOptions = {}
@@ -383,15 +406,26 @@ export async function uploadKeysToInventory(
   if (!plan) {
     throw new Error(`Plan "${planId}" is not available as a coding plan.`);
   }
+  if (plan.providerId !== providerId) {
+    throw new Error(`Plan "${planId}" does not match provider "${providerId}".`);
+  }
   if (!BYOK_ENCRYPTION_KEY) {
     throw new Error('BYOK encryption is not configured');
   }
 
   const entries = rawEntries.map(parseInventoryCredentialEntry);
-  const validateCredential = options.validateCredential ?? validateTokenPlanPlusCredential;
+  const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
   const limit = pLimit(INVENTORY_VALIDATION_CONCURRENCY);
   const validationResults = await Promise.all(
-    entries.map(entry => limit(() => validateCredential(entry.apiKey)))
+    entries.map(entry =>
+      limit(() =>
+        validateCredential({
+          apiKey: entry.apiKey,
+          planId: plan.planId,
+          upstreamPlanId: entry.upstreamPlanId,
+        })
+      )
+    )
   );
   if (validationResults.some(isValid => !isValid)) {
     throw new Error(
@@ -405,10 +439,10 @@ export async function uploadKeysToInventory(
       .values(
         entries.map(entry => ({
           plan_id: plan.planId,
-          provider_id: plan.providerId,
+          provider_id: providerId,
           upstream_plan_id: entry.upstreamPlanId,
           encrypted_api_key: encryptApiKey(entry.apiKey, BYOK_ENCRYPTION_KEY),
-          credential_fingerprint: credentialFingerprint(entry.apiKey),
+          credential_fingerprint: codingPlanCredentialFingerprint(entry.apiKey),
           status: 'available' as const,
         }))
       )
@@ -477,15 +511,21 @@ export async function requestCodingPlanAvailabilityNotification(
 
 export async function getKeyInventoryCounts(
   planId?: CodingPlanId
-): Promise<Array<{ planId: string; status: string; count: number }>> {
-  const { rows } = await db.execute<{ plan_id: string; status: string; count: string }>(sql`
-    SELECT plan_id, status, COUNT(*) AS count
+): Promise<Array<{ providerId: string; planId: string; status: string; count: number }>> {
+  const { rows } = await db.execute<{
+    provider_id: string;
+    plan_id: string;
+    status: string;
+    count: string;
+  }>(sql`
+    SELECT provider_id, plan_id, status, COUNT(*) AS count
     FROM coding_plan_key_inventory
     ${planId ? sql`WHERE plan_id = ${planId}` : sql``}
-    GROUP BY plan_id, status
-    ORDER BY plan_id, status
+    GROUP BY provider_id, plan_id, status
+    ORDER BY provider_id, plan_id, status
   `);
   return rows.map(row => ({
+    providerId: row.provider_id,
     planId: row.plan_id,
     status: row.status,
     count: Number.parseInt(row.count, 10),

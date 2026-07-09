@@ -206,85 +206,127 @@ export async function getBalanceForOrganizationUser(
   return { balance: fromMicrodollars(cappedBalance), settings, plan };
 }
 
-export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
-  const { cost, kilo_user_id, organization_id } = usage;
+export type OrganizationUsageMutationResult = {
+  crossedMinimumBalance: boolean;
+  recipients: string[];
+  minimumBalanceMicrodollars: number | null;
+};
 
-  if (!organization_id) return;
-  return await db.transaction(async tx => {
-    // Get current balance and settings before the update
-    const [orgData] = await tx
-      .select({
-        total_microdollars_acquired: organizations.total_microdollars_acquired,
-        microdollars_used: organizations.microdollars_used,
-        settings: organizations.settings,
-      })
-      .from(organizations)
-      .where(eq(organizations.id, organization_id))
-      .limit(1);
+const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
+  crossedMinimumBalance: false,
+  recipients: [],
+  minimumBalanceMicrodollars: null,
+};
 
-    const currentBalance =
-      (orgData?.total_microdollars_acquired ?? 0) - (orgData?.microdollars_used ?? 0);
+export type OrganizationUsageMutationInput = Pick<
+  MicrodollarUsage,
+  'kilo_user_id' | 'organization_id' | 'cost' | 'created_at'
+>;
 
-    const minimumBalance = orgData?.settings?.minimum_balance
-      ? toMicrodollars(orgData?.settings?.minimum_balance)
-      : null;
+export async function mutateOrganizationUsage(
+  tx: DrizzleTransaction,
+  usage: OrganizationUsageMutationInput
+): Promise<OrganizationUsageMutationResult> {
+  const { cost, kilo_user_id, organization_id, created_at } = usage;
+  if (!organization_id) return NO_ORGANIZATION_BALANCE_ALERT;
 
-    const newBalance = currentBalance - cost;
-
-    // Check if balance is crossing the minimum_balance threshold
-    if (minimumBalance != null && currentBalance >= minimumBalance && newBalance < minimumBalance) {
-      const alertEmails = orgData?.settings?.minimum_balance_alert_email ?? [];
-      logExceptInTest(
-        `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organization_id}: currentBalance=${fromMicrodollars(currentBalance)} newBalance=${fromMicrodollars(newBalance)} threshold=${fromMicrodollars(minimumBalance)} recipients=${alertEmails.length}`
-      );
-      // Send email notification about low balance (don't block the transaction, but do make Vercel wait on the Promise before shutting down)
-      after(
-        sendBalanceAlertEmail({
-          organizationId: organization_id,
-          minimum_balance: fromMicrodollars(minimumBalance),
-          to: alertEmails,
-        }).catch(err => {
-          console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
-        })
-      );
-    }
-
-    // Update organization usage (always happens regardless of membership)
-    await tx
-      .update(organizations)
-      .set({
-        microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
-        microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
-      })
-      .where(eq(organizations.id, organization_id));
-
-    const limitType: OrganizationUserLimitType = 'daily';
-    // Track user usage only if they are a member of the organization
-    // Use INSERT with a subquery that only inserts if the user is a member
-    await tx.execute(sql`
-      INSERT INTO ${organization_user_usage} (
-        organization_id,
-        kilo_user_id,
-        usage_date,
-        limit_type,
-        microdollar_usage,
-        created_at,
-        updated_at
+  const limitType: OrganizationUserLimitType = 'daily';
+  await tx.execute(sql`
+    INSERT INTO ${organization_user_usage} (
+      organization_id,
+      kilo_user_id,
+      usage_date,
+      limit_type,
+      microdollar_usage,
+      created_at,
+      updated_at
+    )
+    SELECT
+      ${organization_id},
+      ${kilo_user_id},
+      (${created_at}::timestamptz AT TIME ZONE 'UTC')::date,
+      ${limitType},
+      ${cost},
+      NOW(),
+      NOW()
+    WHERE EXISTS (
+      SELECT 1
+      FROM ${organization_memberships}
+      WHERE ${organization_memberships.organization_id} = ${organization_id}
+        AND ${organization_memberships.kilo_user_id} = ${kilo_user_id}
+    )
+      AND EXISTS (
+        SELECT 1
+        FROM ${organizations}
+        WHERE ${organizations.id} = ${organization_id}
       )
-      SELECT
-        ${organization_id},
-        ${kilo_user_id},
-        CURRENT_DATE,
-        ${limitType},
-        ${cost},
-        NOW(),
-        NOW()
-      ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
-      DO UPDATE SET
-        microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
-        updated_at = NOW()
-    `);
-  });
+    ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
+    DO UPDATE SET
+      microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
+      updated_at = NOW()
+  `);
+
+  const [orgData] = await tx
+    .update(organizations)
+    .set({
+      microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
+      microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
+    })
+    .where(eq(organizations.id, organization_id))
+    .returning({
+      total_microdollars_acquired: organizations.total_microdollars_acquired,
+      previous_microdollars_used: sql<number>`${organizations.microdollars_used} - ${cost}`.mapWith(
+        Number
+      ),
+      new_microdollars_used: organizations.microdollars_used,
+      settings: organizations.settings,
+    });
+
+  if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
+
+  const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;
+  const newBalance = orgData.total_microdollars_acquired - orgData.new_microdollars_used;
+  const minimumBalance = orgData.settings?.minimum_balance
+    ? toMicrodollars(orgData.settings.minimum_balance)
+    : null;
+  const crossedMinimumBalance =
+    minimumBalance != null && currentBalance >= minimumBalance && newBalance < minimumBalance;
+  const recipients = crossedMinimumBalance
+    ? (orgData.settings?.minimum_balance_alert_email ?? [])
+    : [];
+
+  return {
+    crossedMinimumBalance,
+    recipients,
+    minimumBalanceMicrodollars: minimumBalance,
+  };
+}
+
+export function scheduleOrganizationLowBalanceAlert(
+  organizationId: Organization['id'],
+  result: OrganizationUsageMutationResult
+): void {
+  const { crossedMinimumBalance, minimumBalanceMicrodollars, recipients } = result;
+  if (!crossedMinimumBalance || minimumBalanceMicrodollars == null) return;
+
+  logExceptInTest(
+    `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organizationId}: threshold=${fromMicrodollars(minimumBalanceMicrodollars)} recipients=${recipients.length}`
+  );
+  after(() =>
+    sendBalanceAlertEmail({
+      organizationId,
+      minimum_balance: fromMicrodollars(minimumBalanceMicrodollars),
+      to: recipients,
+    }).catch(err => {
+      console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
+    })
+  );
+}
+
+export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
+  if (!usage.organization_id) return;
+  const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+  scheduleOrganizationLowBalanceAlert(usage.organization_id, result);
 }
 
 const MAX_DAILY_LIMIT_USD = 2000;

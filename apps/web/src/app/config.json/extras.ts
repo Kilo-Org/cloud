@@ -15,6 +15,7 @@
  *   3. Paste that shape into the right bucket below:
  *        - Top-level: `top`
  *        - New primary agent: `agents`
+ *        - Permission key: `permissions`
  *        - Under `experimental`: `experimental`
  *        - Anywhere else nested: add a new bucket here AND extend the merge
  *          logic in `./route.ts` to overlay that section.
@@ -92,9 +93,23 @@ export const kiloExtras = {
     debug: agentConfig,
     orchestrator: agentConfig,
   },
+  permissions: {
+    notebook_read: { $ref: '#/$defs/PermissionRuleConfig' },
+    notebook_edit: { $ref: '#/$defs/PermissionRuleConfig' },
+    notebook_execute: { $ref: '#/$defs/PermissionRuleConfig' },
+  },
   experimental: {
     codebase_search: {
       description: 'Enable AI-powered codebase search',
+      type: 'boolean',
+    },
+    agent_requirements: {
+      description:
+        'Require declared agent skills, MCPs, and VS Code extensions before VS Code prompts can run',
+      type: 'boolean',
+    },
+    native_notebook_tools: {
+      description: 'Enable native tools for reading, editing, and executing VS Code notebooks',
       type: 'boolean',
     },
     openTelemetry: {

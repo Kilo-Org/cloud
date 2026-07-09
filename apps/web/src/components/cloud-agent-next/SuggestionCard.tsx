@@ -3,7 +3,6 @@
 import { useState, useCallback, createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import { Sparkles, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { SuggestionAction } from '@/lib/cloud-agent-sdk';
 
@@ -119,15 +118,13 @@ export function SuggestionCard({ requestId, text, actions }: SuggestionCardProps
               <Button
                 key={`${action.label}-${index}`}
                 size="sm"
+                variant={index === 0 ? 'default' : 'outline'}
                 onClick={() => {
                   void onAccept(index);
                 }}
                 disabled={pending !== null}
                 title={action.description}
-                className={cn(
-                  'gap-1.5',
-                  !isPending && 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-                )}
+                className="gap-1.5"
               >
                 {isPending && <Loader2 className="h-3 w-3 animate-spin" />}
                 {action.label}

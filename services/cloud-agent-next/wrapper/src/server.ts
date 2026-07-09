@@ -14,7 +14,11 @@
  */
 
 import type { WrapperState, SessionContext } from './state.js';
-import type { WrapperKiloClient, WrapperPtySize } from './kilo-api.js';
+import {
+  isKiloServerUnreachableError,
+  type WrapperKiloClient,
+  type WrapperPtySize,
+} from './kilo-api.js';
 import { createLogUploader } from './log-uploader.js';
 import { configureCommitCoAuthorHook } from './commit-co-author-hook.js';
 import { logToFile } from './utils.js';
@@ -28,7 +32,9 @@ import {
   type WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
 import { createProxyRequest } from '../../src/shared/http-proxy.js';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
+import type { ToolCgroupHealth } from './tool-cgroup.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +82,15 @@ export type ServerDependencies = {
   ) => Promise<void>;
   /** Called after a fresh or changed session binding has been stored. */
   onSessionBound?: (feedPolicy: SessionBoundFeedPolicy) => void | Promise<void>;
+  /** Snapshot of the tool-subprocess memory cgroup, null when inactive. */
+  toolCgroupHealth?: () => ToolCgroupHealth | null;
+  /**
+   * Force-restarts the Kilo runtime (kills and re-spawns the kilo server
+   * process). Called after a prompt/command call fails because the server
+   * process itself is gone, so the *next* attempt hits a live server instead
+   * of repeating the same connection failure. See MEMORY_CGROUPS_PLAN.md (W5).
+   */
+  restartKiloRuntime?: () => Promise<void>;
 };
 
 export type SessionBinding = {
@@ -144,6 +159,7 @@ const WORKSPACE_TERMINAL_ENV = {
   // Shell startup files may replace inherited PS1, so reapply it before each prompt.
   PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
   PS1: '\\n\\W\\n\\$ ',
+  [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
 } satisfies Record<string, string>;
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -373,8 +389,13 @@ export async function bindSessionContext(
 // Route Handlers
 // ---------------------------------------------------------------------------
 
-function createHealthHandler(config: ServerConfig, state: WrapperState) {
+function createHealthHandler(
+  config: ServerConfig,
+  state: WrapperState,
+  toolCgroupHealth?: () => ToolCgroupHealth | null
+) {
   return (): Response => {
+    const toolCgroup = toolCgroupHealth?.() ?? null;
     return jsonResponse({
       healthy: true,
       state: state.isActive ? 'active' : 'idle',
@@ -385,6 +406,7 @@ function createHealthHandler(config: ServerConfig, state: WrapperState) {
         ? { wrapperInstanceGeneration: config.wrapperInstanceGeneration }
         : {}),
       pendingMessages: state.pendingMessageIds.length,
+      ...(toolCgroup ? { toolCgroup } : {}),
     });
   };
 }
@@ -393,6 +415,27 @@ function createStatusHandler(state: WrapperState) {
   return (): Response => {
     return jsonResponse(state.getStatus());
   };
+}
+
+/**
+ * When a kilo client call fails because the server process itself is gone,
+ * proactively restart the runtime so the next attempt hits a live server
+ * instead of repeating the same connection failure. Fire-and-forget from the
+ * caller's perspective — the restart can take as long as a full kilo server
+ * startup, and the failing HTTP response should not wait on it. `restartKiloRuntime`
+ * is responsible for deduping concurrent calls into a single in-flight restart.
+ */
+function restartRuntimeIfServerUnreachable(
+  error: unknown,
+  deps: ServerDependencies,
+  logContext: string
+): void {
+  if (!isKiloServerUnreachableError(error)) return;
+  logToFile(`${logContext}: kilo server appears unreachable, restarting runtime`);
+  deps.restartKiloRuntime?.().catch(restartError => {
+    const msg = restartError instanceof Error ? restartError.message : String(restartError);
+    logToFile(`${logContext}: runtime restart after unreachable server failed: ${msg}`);
+  });
 }
 
 export function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
@@ -502,6 +545,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       acknowledgeDelivery('failed');
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/prompt: failed to send: ${msg}`);
+      restartRuntimeIfServerUnreachable(error, deps, 'job/prompt');
       return errorResponse('SEND_ERROR', `Failed to send prompt: ${msg}`, 500);
     }
 
@@ -617,6 +661,7 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
       acknowledgeDelivery('failed');
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/command: failed: ${msg}`);
+      restartRuntimeIfServerUnreachable(error, deps, 'job/command');
       return errorResponse('COMMAND_ERROR', `Failed to send command: ${msg}`, 500);
     }
   };
@@ -1092,7 +1137,7 @@ export function createFetchHandler(
   const { state } = deps;
 
   // Create route handlers
-  const healthHandler = createHealthHandler(config, state);
+  const healthHandler = createHealthHandler(config, state, deps.toolCgroupHealth);
   const statusHandler = createStatusHandler(state);
   const promptHandler = createPromptHandler(config, deps);
   const commandHandler = createCommandHandler(config, deps);

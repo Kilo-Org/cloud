@@ -28,6 +28,14 @@ export type SessionRepositoryRequest =
       branch?: string;
     }
   | {
+      type: 'bitbucket';
+      url: string;
+      workspaceUuid: string;
+      repositoryUuid: string;
+      bitbucketIntegrationId?: string;
+      branch?: string;
+    }
+  | {
       type: 'git';
       url: string;
       token?: string;

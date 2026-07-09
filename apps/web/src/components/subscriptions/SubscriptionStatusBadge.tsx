@@ -18,7 +18,7 @@ const statusStyles: Record<string, string> = {
 };
 
 function formatStatusLabel(status: string): string {
-  if (status === 'pending_cancellation') return 'Cancellation Scheduled';
+  if (status === 'pending_cancellation') return 'Cancellation Pending';
   return status.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
 }
 

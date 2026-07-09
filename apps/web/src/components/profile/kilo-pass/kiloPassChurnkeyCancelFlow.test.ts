@@ -80,8 +80,8 @@ function buildCancelFlowParams(overrides: Partial<OpenKiloPassChurnkeyCancelFlow
     fallbackCancelSubscription: () => {
       directFallbackCancellations.push('fallback');
     },
-    confirmFallbackCancel: message => {
-      confirmations.push(message);
+    confirmFallbackCancel: () => {
+      confirmations.push('fallback-confirm');
       return true;
     },
     notifyCancellationScheduled: () => {
@@ -188,9 +188,7 @@ describe('createKiloPassChurnkeyCancelFlow', () => {
 
     expect(calls.openedFlows).toHaveLength(0);
     expect(calls.errors).toEqual(['CHURNKEY_API_SECRET is not configured']);
-    expect(calls.confirmations).toEqual([
-      'Are you sure you want to cancel your Kilo Pass subscription?',
-    ]);
+    expect(calls.confirmations).toEqual(['fallback-confirm']);
     expect(calls.directFallbackCancellations).toEqual(['fallback']);
     expect(coordinator.getIsInFlight()).toBe(false);
   });
@@ -216,17 +214,15 @@ describe('createKiloPassChurnkeyCancelFlow', () => {
       getChurnkeyAuthHash: async () => {
         throw new Error('auth unavailable');
       },
-      confirmFallbackCancel: message => {
-        calls.confirmations.push(message);
+      confirmFallbackCancel: () => {
+        calls.confirmations.push('fallback-confirm');
         return false;
       },
     });
 
     await coordinator.openCancelFlow(params);
 
-    expect(calls.confirmations).toEqual([
-      'Are you sure you want to cancel your Kilo Pass subscription?',
-    ]);
+    expect(calls.confirmations).toEqual(['fallback-confirm']);
     expect(calls.directFallbackCancellations).toHaveLength(0);
   });
 

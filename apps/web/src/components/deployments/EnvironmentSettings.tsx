@@ -2,6 +2,16 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/Button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { EnvVarInputValue } from './EnvVarInput';
 import { EnvVarInput } from './EnvVarInput';
 import { Loader2, Plus, EyeOff, Pencil, Trash2, AlertCircle } from 'lucide-react';
@@ -305,17 +315,17 @@ export function EnvironmentSettings({ deploymentId }: EnvironmentSettingsProps) 
                         originalKey: envVar.key,
                       })
                     }
-                    className="gap-1.5"
+                    className="border-border text-foreground hover:bg-surface-hover hover:text-foreground active:bg-surface-selected focus:ring-ring gap-1.5"
                     aria-label="Edit variable"
                   >
                     <Pencil className="size-4" />
                     Edit
                   </Button>
                   <Button
-                    variant="danger"
+                    variant="outline"
                     size="sm"
                     onClick={() => setDeleteConfirm(envVar.key)}
-                    className="gap-1.5"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive focus:ring-destructive/30 gap-1.5"
                     aria-label="Delete variable"
                   >
                     <Trash2 className="size-4" />
@@ -338,47 +348,48 @@ export function EnvironmentSettings({ deploymentId }: EnvironmentSettingsProps) 
       )}
 
       {/* Delete Confirmation Dialog */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg border border-gray-700 bg-gray-900 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-100">Delete Environment Variable</h3>
-            <p className="mt-4 text-sm text-gray-400">
-              Are you sure you want to delete the environment variable{' '}
-              <code className="rounded bg-gray-700 px-1.5 py-0.5 font-mono text-gray-100">
+      <AlertDialog
+        open={deleteConfirm !== null}
+        onOpenChange={open => {
+          if (!open && !deleteEnvVarMutation.isPending) setDeleteConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this environment variable?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes{' '}
+              <code className="bg-surface-overlay text-foreground rounded px-1.5 py-0.5 font-mono">
                 {deleteConfirm}
-              </code>
-              ? This action cannot be undone.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setDeleteConfirm(null)}
-                disabled={deleteEnvVarMutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => handleDeleteVariable(deleteConfirm)}
-                disabled={deleteEnvVarMutation.isPending}
-                className="gap-1.5"
-              >
-                {deleteEnvVarMutation.isPending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="size-4" />
-                    Delete Variable
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+              </code>{' '}
+              and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteEnvVarMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleteConfirm) handleDeleteVariable(deleteConfirm);
+              }}
+              disabled={deleteEnvVarMutation.isPending}
+              className="gap-1.5"
+            >
+              {deleteEnvVarMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="size-4" />
+                  Delete variable
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

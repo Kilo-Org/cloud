@@ -34,6 +34,7 @@ import {
   cloneGitRepo,
   updateGitAuthor,
   updateGitRemoteToken,
+  updateGitRemoteUrl,
   checkDiskSpace,
   checkDiskAndCleanBeforeSetup,
   cleanupStaleWorkspaces,
@@ -576,6 +577,27 @@ describe('disk space checking', () => {
       );
     });
 
+    it('should use x-token-auth username for bitbucket platform', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+      mockGitCheckout.mockResolvedValue({ success: true, exitCode: 0 });
+
+      await cloneGitRepo(
+        fakeSession,
+        '/workspace',
+        'https://bitbucket.org/acme/repo.git',
+        'test-token',
+        undefined,
+        { platform: 'bitbucket' }
+      );
+
+      expect(mockGitCheckout).toHaveBeenCalledWith(
+        expect.stringContaining('x-token-auth:test-token'),
+        expect.any(Object)
+      );
+    });
+
     it('should use x-access-token username for github platform', async () => {
       mockExec
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
@@ -733,6 +755,23 @@ describe('disk space checking', () => {
     });
   });
 
+  describe('updateGitRemoteUrl', () => {
+    it('replaces a tokenized origin with the credential-free canonical URL', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitRemoteUrl(
+        fakeSession,
+        '/workspace',
+        'https://x-token-auth:managed-token@bitbucket.org/acme/repo.git'
+      );
+
+      const command = String(mockExec.mock.calls[0]?.[0]);
+      expect(command).toContain("git remote set-url origin 'https://bitbucket.org/acme/repo.git'");
+      expect(command).not.toContain('managed-token');
+      expect(command).not.toContain('@bitbucket.org');
+    });
+  });
+
   describe('updateGitRemoteToken', () => {
     it('should use oauth2 username for gitlab platform', async () => {
       mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
@@ -747,6 +786,23 @@ describe('disk space checking', () => {
 
       expect(mockExec).toHaveBeenCalledWith(
         expect.stringContaining('oauth2:new-token'),
+        expect.any(Object)
+      );
+    });
+
+    it('should use x-token-auth username for bitbucket platform', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitRemoteToken(
+        fakeSession,
+        '/workspace',
+        'https://bitbucket.org/acme/repo.git',
+        'new-token',
+        'bitbucket'
+      );
+
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('x-token-auth:new-token'),
         expect.any(Object)
       );
     });

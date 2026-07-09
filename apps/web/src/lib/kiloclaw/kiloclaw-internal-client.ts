@@ -90,7 +90,11 @@ export type FileWriteResponse =
       outcome: 'openclaw-validation-warning';
       valid: false;
       reason: 'invalid' | 'validation-unavailable';
-      issues: Array<{ path: string; message: string; allowedValues?: string[] }>;
+      issues: Array<{
+        path: string;
+        message: string;
+        allowedValues?: string[];
+      }>;
     };
 
 /**
@@ -297,7 +301,11 @@ export class KiloClawInternalClient {
   async provision(
     userId: string,
     config: ProvisionInput,
-    opts?: { instanceId?: string; orgId?: string; bootstrapSubscription?: boolean }
+    opts?: {
+      instanceId?: string;
+      orgId?: string;
+      bootstrapSubscription?: boolean;
+    }
   ): Promise<{ sandboxId: string; instanceId: string }> {
     return this.request(
       '/api/platform/provision',
@@ -336,7 +344,12 @@ export class KiloClawInternalClient {
         method: 'POST',
         // The acknowledgement is threaded from the admin UI's break-glass
         // confirmation through tRPC; the worker requires it to be exactly `true`.
-        body: JSON.stringify({ userId, instanceId, orgId, acknowledgeCleanupVerified }),
+        body: JSON.stringify({
+          userId,
+          instanceId,
+          orgId,
+          acknowledgeCleanupVerified,
+        }),
       },
       { userId }
     );
@@ -378,7 +391,10 @@ export class KiloClawInternalClient {
       `/api/platform/start-async${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
@@ -400,7 +416,10 @@ export class KiloClawInternalClient {
       `/api/platform/stop${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
@@ -416,7 +435,10 @@ export class KiloClawInternalClient {
       `/api/platform/destroy${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
@@ -915,7 +937,11 @@ export class KiloClawInternalClient {
       `/api/platform/openclaw-config${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, config, ...(etag !== undefined && { etag }) }),
+        body: JSON.stringify({
+          userId,
+          config,
+          ...(etag !== undefined && { etag }),
+        }),
       },
       { userId }
     );
@@ -1097,6 +1123,43 @@ export class KiloClawInternalClient {
       method: 'POST',
       body: JSON.stringify({ userId, files }),
     });
+  }
+
+  /**
+   * Export the OpenClaw workspace as a binary archive. Returns the raw worker
+   * Response (binary body + X-Openclaw-Export-* headers) so callers can stream
+   * it straight to the browser without buffering. The optional passphrase is
+   * passed in the POST body (never the URL) and is never stored or logged.
+   */
+  async exportOpenclawWorkspace(
+    userId: string,
+    request: { format: 'tar.gz' | 'zip'; password?: string },
+    instanceId?: string
+  ): Promise<Response> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    const res = await fetch(
+      `${this.baseUrl}/api/platform/files/export-openclaw-workspace${params}`,
+      {
+        method: 'POST',
+        headers: {
+          'x-internal-api-key': this.apiSecret,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, ...request }),
+      }
+    );
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(
+        `KiloClaw API error (${res.status}) POST /files/export-openclaw-workspace:`,
+        body,
+        `userId=${userId}`
+      );
+      throw new KiloClawApiError(res.status, body);
+    }
+
+    return res;
   }
 
   async updateGoogleCredentials(
@@ -1302,7 +1365,11 @@ export class KiloClawInternalClient {
   async setAdminMachineSizeOverride(
     userId: string,
     payload: {
-      size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+      size: {
+        cpus: number;
+        memory_mb: number;
+        cpu_kind?: 'shared' | 'performance';
+      };
       reason: string;
       actorId: string;
       actorEmail: string;

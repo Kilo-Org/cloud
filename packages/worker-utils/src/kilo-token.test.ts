@@ -158,6 +158,23 @@ describe('verifyKiloToken', () => {
     await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
   });
 
+  it('requires the expected audience when one is specified', async () => {
+    const token = await new SignJWT({ version: 3, kiloUserId: 'user-123' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .setAudience('git-token-service:bitbucket-repositories')
+      .sign(encode(SECRET));
+
+    await expect(
+      verifyKiloToken(token, SECRET, {
+        audience: 'git-token-service:bitbucket-repositories',
+      })
+    ).resolves.toMatchObject({ kiloUserId: 'user-123' });
+    await expect(verifyKiloToken(token, SECRET, { audience: 'another-service' })).rejects.toThrow();
+    await expect(verifyKiloToken(token, SECRET)).rejects.toThrow();
+  });
+
   it('rejects wrong secret', async () => {
     const token = await sign({ version: 3, kiloUserId: 'user-123' });
     await expect(

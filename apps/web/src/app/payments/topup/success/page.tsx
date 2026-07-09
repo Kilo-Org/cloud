@@ -2,87 +2,81 @@
 
 import type { CreditTransaction } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { fetchCreditTransactionIdForStripeSession, getPaymentReturnUrl } from './actions';
 import BigLoader from '@/components/BigLoader';
 import { fromMicrodollars } from '@/lib/utils';
-import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@/lib/organizations/constants';
+import {
+  TOPUP_AMOUNT_QUERY_STRING_KEY,
+  TOPUP_STATUS_PENDING,
+  TOPUP_STATUS_QUERY_STRING_KEY,
+  TOPUP_TRANSACTION_QUERY_STRING_KEY,
+} from '@/lib/organizations/constants';
 import { PageContainer } from '@/components/layouts/PageContainer';
 
-function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: string | null) {
-  // If there's a valid return URL from the cookie, use it
+const MAX_TRANSACTION_LOOKUP_ATTEMPTS = 15;
+
+export function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: string | null) {
   if (returnUrl) {
     return returnUrl;
   }
 
-  // Otherwise, use the existing logic
-  if (!txn || !txn.organization_id) {
-    return '/payments/topup/thank-you';
-  }
   const params = new URLSearchParams();
+  if (!txn) {
+    params.set(TOPUP_STATUS_QUERY_STRING_KEY, TOPUP_STATUS_PENDING);
+    return `/credits?${params.toString()}`;
+  }
+  if (!txn.organization_id) {
+    params.set(TOPUP_TRANSACTION_QUERY_STRING_KEY, txn.id);
+    return `/credits?${params.toString()}`;
+  }
   params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amount_microdollars).toString());
   return `/organizations/${txn.organization_id}?${params.toString()}`;
 }
 
 export default function TopUpSuccessPage() {
-  const [creditTransaction, setCreditTransaction] = useState<CreditTransaction>();
-  const [tries, setTries] = useState(0);
-  const [hasExceededMaxTries, setHasExceededMaxTries] = useState(false);
-  const [returnUrl, setReturnUrl] = useState<string | null>(null);
-
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const sessionId = searchParams.get('session_id') as string;
+    let cancelled = false;
 
-    // we intententionally listen to tries because we want to set a timeout after each try
-    if (tries > 14) {
-      setHasExceededMaxTries(true);
-      return;
-    }
-
-    const timeoutId = setTimeout(async function () {
-      console.info(`Attempt ${tries + 1} to fetch credit transaction ID`);
-
-      const transaction = await fetchCreditTransactionIdForStripeSession(sessionId);
-
-      if (transaction) {
-        setCreditTransaction(transaction);
-      } else {
-        setTries(prev => prev + 1);
-      }
-    }, tries * 100);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [tries]);
-
-  // Fetch the return URL from the cookie on mount
-  useEffect(() => {
-    void (async function () {
-      const url = await getPaymentReturnUrl();
-      setReturnUrl(url);
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (creditTransaction || hasExceededMaxTries) {
+    const processPayment = async () => {
       const searchParams = new URLSearchParams(window.location.search);
-      const origin = searchParams.get('origin') as string;
-      if (origin === 'extension') {
-        redirect(`/sign-in-to-editor?path=profile`);
-      } else {
-        const redirectUrl = getRedirectUrl(creditTransaction, returnUrl);
-        redirect(redirectUrl);
+      const sessionId = searchParams.get('session_id') ?? '';
+      const returnUrlPromise = getPaymentReturnUrl().catch(() => null);
+      const findCreditTransaction = async (
+        attempt: number
+      ): Promise<CreditTransaction | undefined> => {
+        if (attempt >= MAX_TRANSACTION_LOOKUP_ATTEMPTS || cancelled) return undefined;
+
+        await new Promise(resolve => setTimeout(resolve, attempt * 100));
+        if (cancelled) return undefined;
+
+        console.info(`Attempt ${attempt + 1} to fetch credit transaction ID`);
+        const transaction = await fetchCreditTransactionIdForStripeSession(sessionId);
+        return transaction ?? findCreditTransaction(attempt + 1);
+      };
+
+      const [creditTransaction, returnUrl] = await Promise.all([
+        findCreditTransaction(0),
+        returnUrlPromise,
+      ]);
+      if (cancelled) return;
+
+      if (searchParams.get('origin') === 'extension') {
+        redirect('/sign-in-to-editor?path=profile');
       }
-    }
-  }, [creditTransaction, hasExceededMaxTries, returnUrl]);
+      redirect(getRedirectUrl(creditTransaction, returnUrl));
+    };
+
+    void processPayment();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <PageContainer>
       <div className="flex min-h-screen flex-col items-center justify-center gap-12">
         <BigLoader title="Processing Payment" />
-        {creditTransaction?.id}
       </div>
     </PageContainer>
   );

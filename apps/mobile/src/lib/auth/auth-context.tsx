@@ -9,9 +9,13 @@ import {
   useState,
 } from 'react';
 
+import { resetAnalyticsUser } from '@/lib/analytics/posthog';
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   AUTH_TOKEN_KEY,
@@ -61,6 +65,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
+    await clearLastActiveInstance();
+    clearAgentModelPreference();
+    clearReasoningPreference();
+    resetAnalyticsUser();
     queryClient.clear();
     setToken(undefined);
   }, []);

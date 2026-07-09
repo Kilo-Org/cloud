@@ -1,13 +1,14 @@
 import * as z from 'zod';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@/lib/maybe-result';
-import { CompanyDomainSchema } from './company-domain';
+import { CompanyDomainSchema, isValidDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
   OrganizationRole,
   OrganizationPlan,
   OrganizationSettings,
+  OrganizationAutoModelSettings,
   OrganizationModeConfig,
   EditGroupConfig,
 } from './organization-base-types';
@@ -15,11 +16,14 @@ export {
   OrganizationPlanSchema,
   OrganizationModeConfigSchema,
   OrganizationSettingsSchema,
+  OrganizationAutoModelSettingsSchema,
 } from './organization-base-types';
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
 import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
+
+export const OrganizationRoleSchema = z.enum(['owner', 'member', 'billing_manager']);
 
 // API-facing billing cycle values: 'monthly' | 'annual'
 // The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.
@@ -69,6 +73,7 @@ export const OrganizationSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   deleted_at: z.string().nullable(),
   sso_domain: z.string().nullable(),
+  parent_organization_id: z.string().nullable(),
   plan: z.enum(['teams', 'enterprise']),
   free_trial_end_at: z.string().nullable(),
   company_domain: z.string().nullable(),
@@ -89,6 +94,18 @@ export type UserOrganizationWithSeats = {
   };
 };
 
+export const InvitedOrganizationMemberSchema = z.object({
+  email: z.string(),
+  role: OrganizationRoleSchema,
+  inviteDate: z.string().nullable(),
+  inviteToken: z.string(),
+  inviteId: z.string(),
+  status: z.literal('invited'),
+  inviteUrl: z.string(),
+  dailyUsageLimitUsd: z.number().nullable(),
+  currentDailyUsageUsd: z.number().nullable(),
+});
+
 type InvitedMember = {
   email: string;
   role: OrganizationRole;
@@ -101,6 +118,17 @@ type InvitedMember = {
   currentDailyUsageUsd: number | null;
 };
 
+export const ActiveOrganizationMemberSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: OrganizationRoleSchema,
+  status: z.literal('active'),
+  inviteDate: z.string().nullable(),
+  dailyUsageLimitUsd: z.number().nullable(),
+  currentDailyUsageUsd: z.number().nullable(),
+});
+
 type ActiveMember = {
   id: string;
   name: string;
@@ -110,12 +138,60 @@ type ActiveMember = {
   inviteDate: string | null;
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
+  childOrganizationMemberships?: ChildOrganizationMembership[];
 };
 
 export type OrganizationMember = InvitedMember | ActiveMember;
 
+export const OrganizationMemberSchema = z.discriminatedUnion('status', [
+  ActiveOrganizationMemberSchema,
+  InvitedOrganizationMemberSchema,
+]);
+
+export const PublicInvitedOrganizationMemberSchema = InvitedOrganizationMemberSchema.omit({
+  inviteToken: true,
+  inviteId: true,
+  inviteUrl: true,
+  dailyUsageLimitUsd: true,
+  currentDailyUsageUsd: true,
+});
+
+export const PublicActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
+  dailyUsageLimitUsd: true,
+  currentDailyUsageUsd: true,
+});
+
+export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
+  PublicActiveOrganizationMemberSchema,
+  PublicInvitedOrganizationMemberSchema,
+]);
+
+export const PublicOrganizationMembersSchema = z.array(PublicOrganizationMemberSchema);
+
+export const OrganizationWithMembersSchema = OrganizationSchema.extend({
+  members: z.array(OrganizationMemberSchema),
+});
+
+export type ChildOrganizationSummary = {
+  id: string;
+  name: string;
+};
+
+export type ChildOrganizationMembership = ChildOrganizationSummary & {
+  role: OrganizationRole;
+};
+
+export type OrganizationSsoPolicyView = {
+  required: boolean;
+  source: 'self' | 'direct_parent' | null;
+  domain: string | null;
+  configurationError: boolean;
+};
+
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
+  childOrganizations: ChildOrganizationSummary[];
+  effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
 
 export type AcceptInviteResult = Result<
@@ -201,6 +277,11 @@ const OpenRouterModelSchema = z.object({
   isFree: z.boolean().optional(),
   mayTrainOnYourPrompts: z.boolean().optional(),
   hasUserByokAvailable: z.boolean().optional(),
+  autoRouting: z
+    .object({
+      models: z.array(z.string()),
+    })
+    .optional(),
   terminalBench: z
     .object({
       overallScore: z.number(),
@@ -251,9 +332,9 @@ export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSc
 
 export const OrganizationSSODomainSchema = z
   .string()
-  .min(1, 'Domain cannot be empty')
-  .lowercase()
-  .trim();
+  .trim()
+  .toLowerCase()
+  .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
 
 export type OrgTrialStatus =
   | 'subscribed' // Has active paid subscription

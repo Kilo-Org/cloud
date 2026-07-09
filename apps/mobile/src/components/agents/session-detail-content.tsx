@@ -1,6 +1,7 @@
+/* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -8,6 +9,7 @@ import { toast } from 'sonner-native';
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -24,24 +26,37 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AnalyticsSurface,
+  captureEvent,
+  MESSAGE_SENT_EVENT,
+  SESSION_VIEWED_EVENT,
+} from '@/lib/analytics/posthog';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import {
+  createRemoteModelOverride,
+  revalidateLegacyGatewayOverride,
+  useSessionModelOptions,
+} from '@/lib/hooks/use-session-model-options';
+import {
+  areModelPickerSelectionScopesEqual,
+  type ModelPickerSelection,
+  type ModelPickerSelectionScope,
+} from '@/lib/picker-bridge';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
 };
 
-function getComposerPlaceholder(cloudStatusType: CloudStatus['type'] | undefined) {
-  if (cloudStatusType === 'preparing') {
-    return 'Setting up environment...';
-  }
-
-  if (cloudStatusType === 'finalizing') {
-    return 'Wrapping up...';
-  }
-
-  return 'Message...';
-}
+const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
+  preparing: 'Setting up environment...',
+  finalizing: 'Wrapping up...',
+};
 
 export function SessionDetailContent({ sessionId }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
@@ -56,11 +71,16 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
+  const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
+  const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
+  const observedModel = useAtomValue(manager.atoms.observedModel);
+  const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -75,7 +95,44 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
 
   const organizationId = fetchedData?.organizationId ?? undefined;
 
-  const { models: modelOptions } = useAvailableModels(organizationId);
+  const { saveModel: savePersistedModel } = usePersistedAgentModel();
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const { models: gatewayModels, isLoading: gatewayModelsLoading } =
+    useAvailableModels(organizationId);
+  const sessionModels = useSessionModelOptions({
+    activeSessionType,
+    remoteModelState,
+    observedModel,
+    remoteModelOverride,
+    gatewayModels,
+    gatewayModelsLoading,
+    organizationId,
+  });
+  const modelOptions = sessionModels.options;
+  const catalogGenerationIdentity =
+    remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
+  const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
+    () => ({
+      sessionId,
+      ownerConnectionId: remoteModelState.ownerConnectionId,
+      protocol: remoteModelState.protocol,
+      catalogGenerationIdentity,
+    }),
+    [
+      catalogGenerationIdentity,
+      remoteModelState.ownerConnectionId,
+      remoteModelState.protocol,
+      sessionId,
+    ]
+  );
+  const liveModelPickerSelectionScopeRef = useRef(modelPickerSelectionScope);
+  liveModelPickerSelectionScopeRef.current = modelPickerSelectionScope;
+  const isModelPickerSelectionCurrent = useCallback(
+    (selectionScope: ModelPickerSelectionScope) =>
+      areModelPickerSelectionScopesEqual(liveModelPickerSelectionScopeRef.current, selectionScope),
+    []
+  );
 
   const {
     currentMode,
@@ -84,7 +141,14 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     setCurrentMode,
     setCurrentModel,
     setCurrentVariant,
-  } = useSessionConfigSync({ fetchedData, sessionConfig, modelOptions });
+  } = useSessionConfigSync({
+    activeSessionType,
+    fetchedData,
+    sessionConfig,
+    modelOptions,
+    selectedModel: sessionModels.selectedValue,
+    selectedVariant: sessionModels.selectedVariant,
+  });
 
   const {
     flatListRef,
@@ -97,9 +161,47 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     handleMomentumScrollEnd,
   } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
 
+  const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
+    ? 'cloud-agent'
+    : 'remote-session';
+
+  const viewTrackedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+      return;
+    }
+    viewTrackedRef.current = sessionId;
+    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface });
+  }, [fetchedData, sessionId, analyticsSurface]);
+
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  useEffect(() => {
+    if (
+      activeSessionType !== 'remote' ||
+      remoteModelState.protocol !== 'legacy' ||
+      fetchedData?.kiloSessionId !== sessionId ||
+      gatewayModelsLoading
+    ) {
+      return;
+    }
+
+    const revalidatedOverride = revalidateLegacyGatewayOverride(remoteModelOverride, gatewayModels);
+    if (revalidatedOverride !== remoteModelOverride) {
+      manager.setRemoteModelOverride(revalidatedOverride);
+    }
+  }, [
+    activeSessionType,
+    fetchedData?.kiloSessionId,
+    gatewayModels,
+    gatewayModelsLoading,
+    manager,
+    remoteModelOverride,
+    remoteModelState.protocol,
+    sessionId,
+  ]);
 
   const lastAssistantIndex = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -117,9 +219,10 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         isLastAssistantMessage={index === lastAssistantIndex}
         isSessionStreaming={isStreaming}
         getChildMessages={getChildMessages}
+        defaultReasoningExpanded={reasoningDefaultExpanded}
       />
     ),
-    [lastAssistantIndex, isStreaming, getChildMessages]
+    [lastAssistantIndex, isStreaming, getChildMessages, reasoningDefaultExpanded]
   );
 
   const handleStop = useCallback(async () => {
@@ -129,6 +232,42 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
       toast.error('Failed to stop execution');
     }
   }, [manager]);
+
+  const handleModelSelect = useCallback(
+    (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
+      if (activeSessionType === 'remote') {
+        const selectedOption = pickerSelection?.option;
+        const selectedRef = selectedOption?.modelRef;
+        const option = selectedRef
+          ? modelOptions.find(
+              candidate =>
+                candidate.overrideSource === selectedOption.overrideSource &&
+                candidate.modelRef?.providerID === selectedRef.providerID &&
+                candidate.modelRef.modelID === selectedRef.modelID
+            )
+          : modelOptions.find(candidate => candidate.id === value);
+        if (option) {
+          manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
+        }
+        return;
+      }
+
+      setCurrentModel(value);
+      setCurrentVariant(variant);
+      savePersistedModel(organizationId, { model: value, variant });
+      persistServerLastSelected({ model: value, ...(variant ? { variant } : {}) });
+    },
+    [
+      activeSessionType,
+      manager,
+      modelOptions,
+      organizationId,
+      persistServerLastSelected,
+      savePersistedModel,
+      setCurrentModel,
+      setCurrentVariant,
+    ]
+  );
 
   const shouldShowLoading =
     isLoading ||
@@ -158,11 +297,12 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     Boolean(activeQuestion) ||
     (requiresModel && !currentModel);
   const showInteractionCards = activeQuestion ?? activePermission;
-  const composerPlaceholder = getComposerPlaceholder(cloudStatus?.type);
+  const composerPlaceholder =
+    (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, attachments?: AgentAttachmentWire) => {
       if (requiresModel && !currentModel) {
         toast.error('Select a model before sending');
         return;
@@ -176,12 +316,22 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
             model: currentModel,
             variant: currentVariant || undefined,
           },
+          ...(supportsAttachments && attachments ? { attachments } : {}),
         });
+        captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
       } catch {
         toast.error('Failed to send message. Please try again.');
       }
     },
-    [manager, currentMode, currentModel, currentVariant, requiresModel]
+    [
+      manager,
+      currentMode,
+      currentModel,
+      currentVariant,
+      requiresModel,
+      supportsAttachments,
+      analyticsSurface,
+    ]
   );
 
   return (
@@ -249,22 +399,28 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               </Text>
             </View>
           ) : (
-            <ChatComposer
-              onSend={handleSend}
-              onStop={handleStop}
-              disabled={isComposerDisabled}
-              isStreaming={isStreaming}
-              placeholder={composerPlaceholder}
-              mode={currentMode}
-              onModeChange={setCurrentMode}
-              model={currentModel}
-              variant={currentVariant}
-              modelOptions={modelOptions}
-              onModelSelect={(modelId, newVariant) => {
-                setCurrentModel(modelId);
-                setCurrentVariant(newVariant);
-              }}
-            />
+            <>
+              <ModelPickerSelectionScopeProvider
+                selectionScope={modelPickerSelectionScope}
+                isSelectionCurrent={isModelPickerSelectionCurrent}
+              >
+                <ChatComposer
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  disabled={isComposerDisabled}
+                  isStreaming={isStreaming}
+                  placeholder={composerPlaceholder}
+                  mode={currentMode}
+                  onModeChange={setCurrentMode}
+                  model={currentModel}
+                  variant={currentVariant}
+                  modelOptions={modelOptions}
+                  onModelSelect={handleModelSelect}
+                  organizationId={organizationId}
+                  attachmentsEnabled={supportsAttachments}
+                />
+              </ModelPickerSelectionScopeProvider>
+            </>
           ))}
       </>
     );

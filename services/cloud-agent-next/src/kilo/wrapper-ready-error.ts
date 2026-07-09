@@ -42,6 +42,7 @@ export function parseWrapperSessionReadyErrorResponse(
   if (
     value.error !== 'INVALID_REQUEST' &&
     value.error !== 'WRAPPER_FINALIZING' &&
+    value.error !== 'WORKSPACE_RECONCILIATION_FAILED' &&
     value.error !== 'WORKSPACE_SETUP_FAILED' &&
     value.error !== 'KILO_SERVER_FAILED'
   ) {

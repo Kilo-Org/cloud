@@ -1,9 +1,13 @@
+import { presenceContextForPlatform } from '@kilocode/event-service';
 import {
   sendCloudAgentSessionNotificationInputSchema,
+  sendSessionReadyNotificationInputSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type SendCloudAgentSessionNotificationParams,
   type SendCloudAgentSessionNotificationResult,
+  type SendSessionReadyNotificationParams,
+  type SendSessionReadyNotificationResult,
 } from '@kilocode/notifications';
 
 type CloudAgentNotificationSession = {
@@ -20,12 +24,20 @@ export type DispatchCloudAgentSessionPushDeps = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
 };
 
-export async function dispatchCloudAgentSessionPush(
-  params: SendCloudAgentSessionNotificationParams,
+type SessionPushContent = {
+  presenceContext: string | null;
+  idempotencyKey: string;
+  title: string;
+  body: string;
+};
+
+async function dispatchSessionPush(
+  userId: string,
+  cliSessionId: string,
+  buildContent: (session: CloudAgentNotificationSession) => SessionPushContent,
   deps: DispatchCloudAgentSessionPushDeps
 ): Promise<SendCloudAgentSessionNotificationResult> {
-  const parsed = sendCloudAgentSessionNotificationInputSchema.parse(params);
-  const session = await deps.getSession(parsed.userId, parsed.cliSessionId);
+  const session = await deps.getSession(userId, cliSessionId);
 
   if (!session) {
     return { dispatched: false, reason: 'missing_session' };
@@ -33,20 +45,21 @@ export async function dispatchCloudAgentSessionPush(
 
   if (
     session.organizationId &&
-    !(await deps.hasOrganizationAccess(parsed.userId, session.organizationId))
+    !(await deps.hasOrganizationAccess(userId, session.organizationId))
   ) {
     return { dispatched: false, reason: 'missing_session' };
   }
 
+  const content = buildContent(session);
   const outcome = await deps.dispatchPush({
-    userId: parsed.userId,
-    presenceContext: null,
-    idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
+    userId,
+    presenceContext: content.presenceContext,
+    idempotencyKey: content.idempotencyKey,
     badge: null,
     push: {
-      title: session.title ?? 'Agent session',
-      body: parsed.body,
-      data: { type: 'cloud_agent_session', cliSessionId: parsed.cliSessionId },
+      title: content.title,
+      body: content.body,
+      data: { type: 'cloud_agent_session', cliSessionId },
       sound: 'default',
       priority: 'high',
     },
@@ -57,4 +70,45 @@ export async function dispatchCloudAgentSessionPush(
   }
 
   return { dispatched: true };
+}
+
+export async function dispatchCloudAgentSessionPush(
+  params: SendCloudAgentSessionNotificationParams,
+  deps: DispatchCloudAgentSessionPushDeps
+): Promise<SendCloudAgentSessionNotificationResult> {
+  const parsed = sendCloudAgentSessionNotificationInputSchema.parse(params);
+  return dispatchSessionPush(
+    parsed.userId,
+    parsed.cliSessionId,
+    session => ({
+      presenceContext: null,
+      idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
+      title: session.title ?? 'Agent session',
+      body: parsed.body,
+    }),
+    deps
+  );
+}
+
+/**
+ * Push sent when a CLI session first registers with session-ingest, telling
+ * the user they can take over the session from their phone. Suppressed while
+ * the user is actively in the mobile app (they already see the session list).
+ */
+export async function dispatchSessionReadyPush(
+  params: SendSessionReadyNotificationParams,
+  deps: DispatchCloudAgentSessionPushDeps
+): Promise<SendSessionReadyNotificationResult> {
+  const parsed = sendSessionReadyNotificationInputSchema.parse(params);
+  return dispatchSessionPush(
+    parsed.userId,
+    parsed.cliSessionId,
+    () => ({
+      presenceContext: presenceContextForPlatform('app'),
+      idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
+      title: 'Kilo session ready',
+      body: 'Your Kilo session is ready to control from your phone',
+    }),
+    deps
+  );
 }

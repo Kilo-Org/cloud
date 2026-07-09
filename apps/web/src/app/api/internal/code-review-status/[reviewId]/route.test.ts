@@ -180,7 +180,7 @@ jest.mock('@/lib/constants', () => ({
 }));
 
 jest.mock('@/lib/integrations/core/constants', () => ({
-  PLATFORM: { GITHUB: 'github', GITLAB: 'gitlab' },
+  PLATFORM: { GITHUB: 'github', GITLAB: 'gitlab', BITBUCKET: 'bitbucket' },
 }));
 
 // --- Helpers ---
@@ -249,6 +249,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_truncated: false,
     previous_summary_body: null,
     previous_summary_head_sha: null,
+    manual_config: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,
@@ -539,6 +540,50 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it('ignores stale analytics enrollment on Bitbucket completion', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({
+          platform: 'bitbucket',
+          check_run_id: null,
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ analytics_enabled_at_dispatch: true })
+      );
+      mockGetIntegrationById.mockResolvedValue(
+        makeIntegration({
+          platform: 'bitbucket',
+          integration_type: 'workspace_access_token',
+          platform_installation_id: null,
+        })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          sessionId: 'agent-bitbucket',
+          lastAssistantMessageText:
+            '<!-- kilo-review-analytics:v1 {"schemaVersion":1,"taxonomyVersion":1} -->',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockFinalizeCompletedCodeReviewWithAnalytics).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ codeReviewId: REVIEW_ID, status: 'completed' })
+      );
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'completed',
+        expect.any(Object)
+      );
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockSetCommitStatus).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockAddReactionToMR).not.toHaveBeenCalled();
+    });
+
     it('does not replay provider completion side effects for analytics repair', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
       mockGetLatestCodeReviewAttempt.mockResolvedValue(
@@ -792,6 +837,49 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         }),
         'https://gitlab.com'
       );
+    });
+
+    it('uses Bitbucket action-required config without GitHub provider mutation', async () => {
+      const errorMessage =
+        'prepareSession failed: Selected model is not available for this cloud agent session';
+      mockGetBotUserId.mockResolvedValue('bitbucket-review-bot');
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({
+          owned_by_user_id: null,
+          owned_by_organization_id: '123e4567-e89b-12d3-a456-426614174099',
+          platform: 'bitbucket',
+          check_run_id: null,
+        })
+      );
+      mockGetIntegrationById.mockResolvedValue(
+        makeIntegration({
+          platform: 'bitbucket',
+          integration_type: 'workspace_access_token',
+          platform_installation_id: null,
+        })
+      );
+
+      const response = await POST(
+        makeRequest({ status: 'failed', errorMessage }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith({
+        owner: {
+          type: 'org',
+          id: '123e4567-e89b-12d3-a456-426614174099',
+          userId: 'bitbucket-review-bot',
+        },
+        platform: 'bitbucket',
+        reviewId: REVIEW_ID,
+        reason: 'selected_model_unavailable',
+        errorMessage,
+      });
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockSetCommitStatus).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockAddReactionToMR).not.toHaveBeenCalled();
     });
 
     it('infers selected-model-unavailable callbacks as action-required failures', async () => {
@@ -1365,6 +1453,39 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not retry assistant authorization failures as infra failures', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000207',
+        retryAttemptId: '00000000-0000-0000-0000-000000000208',
+        sessionId: 'agent-auth-failed-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Assistant request was not authorized',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage: 'Assistant request was not authorized',
+          terminalReason: 'upstream_error',
+        })
+      );
     });
 
     it.each([

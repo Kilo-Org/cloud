@@ -182,7 +182,7 @@ const pluginBase = createChannelPluginBase({
       '- Kilo Chat uses the shared `message` tool. Prefer `target` for explicit conversation destinations; omit it to act in the current conversation when supported.',
       '- `send`: pass `message` plus `target`; `conversationId` and `groupId` are accepted compatibility aliases. To send any attachment, pass base64 `buffer`, `filename`, and `contentType`, or pass a local workspace path with `filePath`/`media` and a caption in `message`.',
       '- For generated text files or arbitrary local file types, prefer `send` with `filePath`/`media`, or `upload-file` with base64 `buffer`. Do not use `upload-file` with a local `filePath` for plain text or unknown file types.',
-      '- `upload-file`: use for direct file uploads when you already have base64 `buffer`, `filename`, and `contentType`; local `media`/`path`/`filePath` is best for images, audio, video, PDF, and Office documents.',
+      '- `upload-file`: use for direct file uploads when you already have base64 `buffer`, `filename`, and `contentType`; local `media`/`path`/`filePath` is best for images, audio, video, PDF, and Office documents. Prefer absolute file paths (e.g. `/root/clawd/report.md`).',
       '- Kilo Chat actions: `channel-list` lists conversations with optional `limit`; `channel-create` creates a conversation with optional `name`.',
       '- `read`: omit `target` for the current conversation, or pass `target`/`conversationId`; use `limit` and `before` for pagination.',
       '- `react`: pass `messageId` and the actual emoji in `emoji`; set `remove=true` to remove that emoji. If `messageId` is omitted, the current inbound message is used when available.',

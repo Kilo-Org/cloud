@@ -32,7 +32,7 @@ describe('getSecurityAgentInvalidationScopesForCommand', () => {
     const scopes = getSecurityAgentInvalidationScopesForCommand('apply_auto_remediation');
 
     expect(scopes).toEqual(
-      expect.arrayContaining(['findings', 'findingDetails', 'stats', 'dashboardStats'])
+      expect.arrayContaining(['findings', 'findingDetails', 'analysis', 'stats', 'dashboardStats'])
     );
     expect(scopes).not.toContain('repositories');
     expect(scopes).not.toContain('permissionStatus');

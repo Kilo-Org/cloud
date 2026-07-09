@@ -380,6 +380,16 @@ export function useSignInFlow({
           lastLogin: new Date().toISOString(),
         });
         setFlowState('magic-link-sent');
+      } else if (result.ssoOrganizationId) {
+        saveHint({
+          lastEmail: email,
+          lastAuthMethod: 'workos',
+          orgId: result.ssoOrganizationId,
+          lastLogin: new Date().toISOString(),
+        });
+        setFlowState('redirecting');
+        const callbackUrl = getSignInCallbackUrl(params);
+        await signIn('workos', { callbackUrl }, { organization: result.ssoOrganizationId });
       } else {
         setError(result.error);
       }

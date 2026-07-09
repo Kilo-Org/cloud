@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { isDeploymentFinished, isDeploymentInProgress } from '@/lib/user-deployments/types';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/confirm';
 import Link from 'next/link';
 
 type DeploymentDetailsProps = {
@@ -26,6 +27,7 @@ type DeploymentDetailsProps = {
 export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentDetailsProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'environment' | 'password'>('overview');
   const { queries, mutations, organizationId } = useDeploymentQueries();
+  const confirm = useConfirm();
 
   // Check if password features are available (org-only)
   const hasPasswordFeature = !!mutations.setPassword;
@@ -62,10 +64,18 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
     );
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!latestBuild) return;
 
-    if (window.confirm('Are you sure you want to cancel this build?')) {
+    if (
+      await confirm({
+        title: 'Cancel this build?',
+        description: 'The in-progress build will stop. You can redeploy afterwards.',
+        confirmLabel: 'Cancel build',
+        cancelLabel: 'Keep building',
+        destructive: true,
+      })
+    ) {
       cancelBuildMutation.mutate(
         { deploymentId, buildId: latestBuild.id },
         {
@@ -80,11 +90,14 @@ export function DeploymentDetails({ deploymentId, isOpen, onClose }: DeploymentD
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (
-      window.confirm(
-        'Are you sure you want to delete this deployment? This action cannot be undone.'
-      )
+      await confirm({
+        title: 'Delete this deployment?',
+        description: 'This permanently removes the deployment and cannot be undone.',
+        confirmLabel: 'Delete deployment',
+        destructive: true,
+      })
     ) {
       deleteDeploymentMutation.mutate(
         { id: deploymentId },

@@ -291,10 +291,14 @@ http://localhost:3000/users/sign_in?fakeUser=someone@example.com&callbackPath=/p
 
 ### Admin access
 
-Some features (e.g., admin panels) are only visible to users with `is_admin = true`. The admin flag is set at user-creation time based on the email address:
+Some features (e.g., admin panels) are only visible to users with `is_admin = true`.
 
-- **Real OAuth:** emails ending in `@kilocode.ai` with the `kilocode.ai` hosted domain are admins.
-- **Fake login:** emails must end in `@admin.example.com` to get admin access.
+- **Real OAuth:** new `@kilocode.ai` signups are never automatically made admins. An existing
+  qualifying `@kilocode.ai` admin must grant access explicitly from `/admin/admins`.
+- **Fake login:** emails must end in `@admin.example.com` to get admin access automatically at
+  signup. This bootstrap only applies in environments where fake login is enabled; note that a
+  fake-login `someone@kilocode.ai` user does not qualify for production-domain admin grants
+  because its hosted domain is `@@fake@@`, not `kilocode.ai`.
 
 To sign in as a fake admin:
 
@@ -372,7 +376,7 @@ AI inference works locally without any extra services. The Next.js app includes 
 
 ### Running workers locally
 
-Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
+Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_NEXT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
 
 The easiest way to run workers is with `pnpm dev:start` (see [Common Development Commands](#common-development-commands)), which starts groups of related services in a tmux dashboard.
 
@@ -457,7 +461,7 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 - **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
-- **Cloudflare Containers** (used by cloud-agent, cloud-agent-next, app-builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
+- **Cloudflare Containers** (used by Cloud Agent Next and App Builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.
 
 ### What works without running any workers

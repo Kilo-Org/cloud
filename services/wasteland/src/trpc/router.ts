@@ -28,6 +28,7 @@ import {
   RpcWastelandConfigOutput,
   RpcWastelandCredentialStatusOutput,
   RpcConnectedTownOutput,
+  RpcWantedBoardCountsOutput,
   RpcWantedBoardRowOutput,
   RpcInboxItemOutput,
   RpcUpstreamAdminVerifyOutput,
@@ -39,6 +40,8 @@ import {
   RpcForkBranchOutput,
   RpcMyPullOutput,
   RpcPublishBranchOutput,
+  WantedBoardBrowseInput,
+  WantedBoardCountsInput,
   WantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -1005,16 +1008,53 @@ export const wastelandRouter = router({
   // ── Wanted Board ──────────────────────────────────────────────────
 
   browseWantedBoard: procedure
-    .input(z.object({ wastelandId: z.string().uuid() }))
+    .input(WantedBoardBrowseInput)
     .output(z.array(RpcWantedBoardRowOutput))
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId);
+        const filter =
+          input.status || input.search || input.sort || input.limit
+            ? {
+                status: input.status,
+                search: input.search,
+                sort: input.sort,
+                limit: input.limit,
+              }
+            : undefined;
+        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId, {
+          filter,
+          includeForkBranches: input.includeForkBranches,
+        });
       } catch (err) {
         // Browse degrades to empty list if not yet configured
         if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
           return [];
+        }
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  getWantedBoardCounts: procedure
+    .input(WantedBoardCountsInput)
+    .output(RpcWantedBoardCountsOutput)
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.getWantedBoardCounts(ctx.env, input.wastelandId, ctx.userId, {
+          search: input.search,
+          includeForkBranches: input.includeForkBranches,
+        });
+      } catch (err) {
+        if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
+          return {
+            open: 0,
+            claimed: 0,
+            in_review: 0,
+            completed: 0,
+            validated: 0,
+            withdrawn: 0,
+          };
         }
         return wantedBoardErrorToTRPC(err);
       }

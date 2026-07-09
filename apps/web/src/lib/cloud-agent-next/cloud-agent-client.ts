@@ -105,7 +105,9 @@ export type PrepareSessionInput = {
   gitUrl?: string;
   gitToken?: string;
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
   // Common params
   kilocodeOrganizationId?: string;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
@@ -260,7 +262,7 @@ export type GetSessionOutput = {
   // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
 
   // Execution params
   prompt?: string;
@@ -806,4 +808,29 @@ export function createAppBuilderCloudAgentNextClient(authToken: string): CloudAg
   return new CloudAgentNextClient(authToken, {
     skipBalanceCheck: true,
   });
+}
+
+/**
+ * Pick a Cloud Agent Next client for a session start based on whether the
+ * chosen model is free or BYOK-billable for the caller.
+ *
+ * Free models (and BYOK-capable models, where the user provides their own key
+ * and the model is therefore not billed against their balance) cost the user
+ * nothing, so we mirror AppBuilder and set `x-skip-balance-check: true` to
+ * allow $0-balance users to still create sessions when their selected model
+ * is free. Paid models stay on the default client so the worker balance
+ * middleware can still enforce the $1 minimum on paid-model sessions.
+ *
+ * The decision is made from caller-supplied booleans rather than re-querying
+ * model metadata, so the helper can be unit-tested without a database and
+ * matches the values the NewSessionPanel model picker already filters on.
+ */
+export function createCloudAgentNextClientForModel(
+  authToken: string,
+  model: { isFree: boolean; hasUserByokAvailable: boolean }
+): CloudAgentNextClient {
+  if (model.isFree || model.hasUserByokAvailable) {
+    return createAppBuilderCloudAgentNextClient(authToken);
+  }
+  return createCloudAgentNextClient(authToken);
 }

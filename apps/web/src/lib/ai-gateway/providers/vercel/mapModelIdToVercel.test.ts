@@ -15,6 +15,7 @@ import {
   GPT_MINI_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/openai';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
 
 describe('mapModelIdToVercel', () => {
   describe('tilde-prefixed latest aliases', () => {
@@ -28,6 +29,7 @@ describe('mapModelIdToVercel', () => {
       ['~moonshotai/kimi-latest', KIMI_CURRENT_VERCEL_MODEL_ID],
       ['~google/gemini-pro-latest', GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
       ['~google/gemini-flash-latest', GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
+      ['~x-ai/grok-latest', GROK_CURRENT_VERCEL_MODEL_ID],
     ])('maps %s to the current Vercel model id', (input, expected) => {
       expect(mapModelIdToVercel(input, false)).toBe(expected);
     });

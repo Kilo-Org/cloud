@@ -53,6 +53,18 @@ function encryptValue(keyBase64: string, plaintext: string): string {
 
 // ---- Fake deps ----
 
+/**
+ * Optional hook to make the fake `execFileSync` throw for specific calls.
+ * Returning an Error simulates a non-zero exit (e.g. gh refusing to persist
+ * credentials while a token env var is present); returning null/undefined
+ * lets the call succeed.
+ */
+type FakeExecBehavior = (
+  cmd: string,
+  args: string[],
+  opts?: { input?: string; env?: NodeJS.ProcessEnv }
+) => Error | null | undefined;
+
 function fakeDeps(): {
   deps: BootstrapDeps;
   mkdirCalls: string[];
@@ -60,18 +72,22 @@ function fakeDeps(): {
   chdirCalls: string[];
   copyCalls: { src: string; dest: string }[];
   execCalls: { cmd: string; args: string[]; input?: string }[];
+  execEnvCalls: { cmd: string; args: string[]; env?: NodeJS.ProcessEnv }[];
   writeCalls: { path: string; data: string }[];
   renameCalls: { from: string; to: string }[];
   setConfigExists: (v: boolean) => void;
+  setExecBehavior: (fn: FakeExecBehavior | null) => void;
 } {
   const mkdirCalls: string[] = [];
   const chmodCalls: { path: string; mode: number }[] = [];
   const chdirCalls: string[] = [];
   const copyCalls: { src: string; dest: string }[] = [];
   const execCalls: { cmd: string; args: string[]; input?: string }[] = [];
+  const execEnvCalls: { cmd: string; args: string[]; env?: NodeJS.ProcessEnv }[] = [];
   const writeCalls: { path: string; data: string }[] = [];
   const renameCalls: { from: string; to: string }[] = [];
   let configExists = false;
+  let execBehavior: FakeExecBehavior | null = null;
 
   return {
     deps: {
@@ -104,20 +120,29 @@ function fakeDeps(): {
       unlinkSync: vi.fn(),
       readdirSync: vi.fn(() => [] as string[]),
       statSync: vi.fn(() => ({ isDirectory: () => false })),
-      execFileSync: vi.fn((cmd: string, args: string[], opts?: { input?: string }) => {
-        execCalls.push({ cmd, args, input: opts?.input });
-        return '';
-      }),
+      execFileSync: vi.fn(
+        (cmd: string, args: string[], opts?: { input?: string; env?: NodeJS.ProcessEnv }) => {
+          execCalls.push({ cmd, args, input: opts?.input });
+          execEnvCalls.push({ cmd, args, env: opts?.env });
+          const err = execBehavior?.(cmd, args, opts);
+          if (err) throw err;
+          return '';
+        }
+      ),
     },
     mkdirCalls,
     chmodCalls,
     chdirCalls,
     copyCalls,
     execCalls,
+    execEnvCalls,
     writeCalls,
     renameCalls,
     setConfigExists(v: boolean) {
       configExists = v;
+    },
+    setExecBehavior(fn: FakeExecBehavior | null) {
+      execBehavior = fn;
     },
   };
 }
@@ -518,6 +543,109 @@ describe('configureGitHub', () => {
       args: ['auth', 'setup-git'],
       input: undefined,
     });
+  });
+
+  it('runs gh with GH_TOKEN/GITHUB_TOKEN stripped so credentials persist to disk', () => {
+    // Regression guard for the env-conflict bug: `gh` refuses to write
+    // ~/.config/gh/hosts.yml while a token env var is present, and OpenClaw
+    // strips those vars from the agent's exec env — so the persisted store is
+    // the agent's only path to auth. Model gh's real refusal: throw when the
+    // login call still sees GH_TOKEN/GITHUB_TOKEN in its child env.
+    const { deps, execEnvCalls, setExecBehavior } = fakeDeps();
+    setExecBehavior((cmd, args, opts) => {
+      if (
+        cmd === 'gh' &&
+        args.includes('login') &&
+        (opts?.env?.GITHUB_TOKEN || opts?.env?.GH_TOKEN)
+      ) {
+        return new Error(
+          'The value of the GITHUB_TOKEN environment variable is being used for authentication.'
+        );
+      }
+      return null;
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {
+      GITHUB_TOKEN: 'ghp_token123',
+      GH_TOKEN: 'ghp_token123',
+      PATH: '/usr/bin',
+    };
+
+    configureGitHub(env, deps);
+
+    const ghLogin = execEnvCalls.find(c => c.cmd === 'gh' && c.args.includes('login'));
+    const ghSetupGit = execEnvCalls.find(c => c.cmd === 'gh' && c.args.includes('setup-git'));
+
+    // Both gh bootstrap calls run with the token vars removed from the child env...
+    expect(ghLogin).toBeDefined();
+    expect(ghLogin?.env?.GITHUB_TOKEN).toBeUndefined();
+    expect(ghLogin?.env?.GH_TOKEN).toBeUndefined();
+    expect(ghSetupGit?.env?.GITHUB_TOKEN).toBeUndefined();
+    expect(ghSetupGit?.env?.GH_TOKEN).toBeUndefined();
+    // ...but ordinary env is still inherited so gh can resolve its binary/config.
+    expect(ghLogin?.env?.PATH).toBe('/usr/bin');
+    // With the tokens stripped, gh no longer refuses → no failure warning.
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('reports setup-git failure distinctly and still logs login success', () => {
+    // Guards against the shared-try regression: if `gh auth login` succeeds
+    // (hosts.yml written) but `gh auth setup-git` fails, gh still works — the
+    // failure must not be mislabeled "gh auth login failed" and the login
+    // success log must still be emitted.
+    const { deps, setExecBehavior } = fakeDeps();
+    setExecBehavior((cmd, args) => {
+      if (cmd === 'gh' && args.includes('setup-git')) {
+        const err = new Error('Command failed') as Error & { stderr?: string };
+        err.stderr = 'git: command not found';
+        return err;
+      }
+      return null;
+    });
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    configureGitHub({ GITHUB_TOKEN: 'ghp_token123' }, deps);
+
+    const logged = logSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    const warned = warnSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(logged).toContain('gh CLI authenticated'); // login success still reported
+    expect(warned).toContain('gh auth setup-git failed'); // accurate, named failure
+    expect(warned).not.toContain('gh auth login failed'); // not mislabeled
+
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('surfaces gh stderr on failure with the token scrubbed and skips setup-git', () => {
+    const { deps, execCalls, setExecBehavior } = fakeDeps();
+    setExecBehavior((cmd, args) => {
+      if (cmd === 'gh' && args.includes('login')) {
+        const err = new Error('Command failed') as Error & { stderr?: string };
+        err.stderr = 'error: token ghp_token123 is invalid or expired';
+        return err;
+      }
+      return null;
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    configureGitHub({ GITHUB_TOKEN: 'ghp_token123' }, deps);
+
+    const logged = warnSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(logged).toContain('gh auth login failed');
+    expect(logged).toContain('is invalid or expired'); // diagnostic surfaced
+    expect(logged).not.toContain('ghp_token123'); // secret scrubbed
+    // When login fails, setup-git must NOT run — otherwise a second,
+    // differently-labeled warning would surface for the same root cause.
+    expect(execCalls.some(c => c.cmd === 'gh' && c.args.includes('setup-git'))).toBe(false);
+    expect(logged).not.toContain('setup-git failed');
+
+    warnSpy.mockRestore();
   });
 
   it('sets git user.name and user.email when provided', () => {
@@ -1037,6 +1165,60 @@ describe('runOnboardOrDoctor', () => {
     );
     expect(preDoctorConfig.plugins?.allow).not.toContain('openclaw-channel-streamchat');
     expect(preDoctorConfig.plugins?.entries).not.toHaveProperty('openclaw-channel-streamchat');
+  });
+
+  it('removes a stale kilocode-provider plugin path before running doctor when the plugin is not installed', () => {
+    // Regression for the downgrade/reprovision case: an instance whose persisted
+    // config carries the externalized-provider path is moved onto a pre-2026.6.9
+    // openclaw where the plugin is absent (existsSync default returns false for
+    // the path). doctor validates the persisted config first, so the stale path
+    // must be pruned BEFORE doctor or doctor fails and bootstrap aborts into
+    // degraded mode — the exact failure this branch fixes.
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        plugins: {
+          load: {
+            paths: [
+              '/usr/local/lib/node_modules/@openclaw/kilocode-provider',
+              '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+            ],
+          },
+        },
+      })
+    );
+
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'test-key',
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    runOnboardOrDoctor(env, harness.deps);
+
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+
+    const preDoctorWriteIndex = (
+      harness.deps.writeFileSync as ReturnType<typeof vi.fn>
+    ).mock.invocationCallOrder.findIndex(order => order < doctorCallOrder);
+    expect(preDoctorWriteIndex).not.toBe(-1);
+
+    const preDoctorConfig = JSON.parse(harness.writeCalls[preDoctorWriteIndex].data) as {
+      plugins?: { load?: { paths?: string[] } };
+    };
+    expect(preDoctorConfig.plugins?.load?.paths).not.toContain(
+      '/usr/local/lib/node_modules/@openclaw/kilocode-provider'
+    );
+    // Unrelated plugin paths survive the prune.
+    expect(preDoctorConfig.plugins?.load?.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
   });
 
   it('back-fills hooks.allowRequestSessionKey on existing configs before doctor', () => {

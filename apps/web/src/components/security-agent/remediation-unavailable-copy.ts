@@ -1,17 +1,23 @@
-const REMEDIATION_UNAVAILABLE_COPY: Record<string, string> = {
+import {
+  SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS,
+  type SecurityRemediationAdmissionRejectionReason,
+} from '@kilocode/worker-utils/security-remediation-policy';
+
+const REMEDIATION_UNAVAILABLE_COPY: Record<SecurityRemediationAdmissionRejectionReason, string> = {
+  finding_not_found: 'Security finding no longer exists.',
   finding_not_open: 'Finding is no longer open.',
   repo_not_in_scope: 'Repository is not selected for Security Agent.',
   analysis_required: 'Run codebase analysis before starting remediation.',
   sandbox_analysis_required: 'Run codebase analysis before starting remediation.',
   stale_analysis: 'Finding changed after analysis. Rerun analysis before starting remediation.',
-  not_exploitable: 'Analysis marked this finding not exploitable in this repository.',
+  not_exploitable: 'Analysis found no reachable vulnerable path. Auto Remediation is unavailable.',
   exploitability_unknown:
     'Analysis could not confirm exploitability. Manual review is required before one-click remediation.',
   manual_review_required:
     'Analysis recommends manual review, so one-click remediation is unavailable.',
   monitor_required: 'Analysis recommends monitoring instead of opening a PR.',
   triage_only: 'Only triage has completed. Run codebase analysis before starting remediation.',
-  action_not_concrete: 'Analysis did not return a concrete PR fix path.',
+  action_not_concrete: 'No concrete dependency patch or suggested fix is available.',
   remediation_active: 'A remediation attempt is already active.',
   pr_already_opened: 'A remediation PR is already open.',
   duplicate_analysis_result: 'This analysis result already produced remediation work.',
@@ -26,7 +32,23 @@ const REMEDIATION_UNAVAILABLE_COPY: Record<string, string> = {
     'Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.',
 };
 
+function isRemediationAdmissionRejectionReason(
+  reason: string
+): reason is SecurityRemediationAdmissionRejectionReason {
+  return SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS.some(candidate => candidate === reason);
+}
+
+export function isCodebaseAnalysisRequiredReason(reason: string | null | undefined): boolean {
+  return (
+    reason === 'analysis_required' ||
+    reason === 'sandbox_analysis_required' ||
+    reason === 'triage_only'
+  );
+}
+
 export function getRemediationUnavailableCopy(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') return null;
-  return REMEDIATION_UNAVAILABLE_COPY[reason] ?? 'Remediation is unavailable for this finding.';
+  return isRemediationAdmissionRejectionReason(reason)
+    ? REMEDIATION_UNAVAILABLE_COPY[reason]
+    : 'Remediation is unavailable for this finding.';
 }

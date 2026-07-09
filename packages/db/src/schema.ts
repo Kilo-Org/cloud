@@ -40,6 +40,8 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
   KiloClawPlan,
@@ -83,6 +85,13 @@ import {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CostInsightSpendCategory,
+  CostInsightSpendSource,
+  CostInsightRollupDegradedReason,
+  CostInsightEventType,
+  CostInsightAlertKind,
+  CostInsightSuggestionKind,
+  CostInsightNotificationStatus,
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
@@ -100,6 +109,7 @@ import {
   MCPGatewayRouteStatus,
   MCPGatewayInstanceStatus,
   MCPGatewayProviderGrantStatus,
+  MCPGatewayOAuthGrantStatus,
   MCPGatewaySecretKind,
   MCPGatewayOAuthClientAuthMethod,
   MCPGatewayAuthorizationRequestStatus,
@@ -133,6 +143,8 @@ import type {
   BuildStatus,
   Provider,
   CodeReviewAgentConfig,
+  ManualCodeReviewConfig,
+  CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
@@ -189,6 +201,10 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
+  SecurityFindingNotificationKind,
+  SecurityFindingNotificationStatus,
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
@@ -228,6 +244,13 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CostInsightSpendCategory,
+  CostInsightSpendSource,
+  CostInsightRollupDegradedReason,
+  CostInsightEventType,
+  CostInsightAlertKind,
+  CostInsightSuggestionKind,
+  CostInsightNotificationStatus,
   CodeReviewAnalyticsCaptureStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
@@ -421,6 +444,7 @@ export const kilocode_users = pgTable(
       mode: 'string',
     }),
     openrouter_upstream_safety_identifier: text(),
+    openrouter_downstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
     signup_ip: text(),
@@ -428,6 +452,8 @@ export const kilocode_users = pgTable(
 
     normalized_email: text(),
     email_domain: text(),
+
+    personal_account_disabled: boolean().default(false).notNull(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -443,6 +469,10 @@ export const kilocode_users = pgTable(
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
       .where(sql`${table.openrouter_upstream_safety_identifier} IS NOT NULL`),
+    uniqueIndex('UQ_kilocode_users_openrouter_downstream_safety_identifier')
+      .on(table.openrouter_downstream_safety_identifier)
+      .concurrently()
+      .where(sql`${table.openrouter_downstream_safety_identifier} IS NOT NULL`),
     uniqueIndex('UQ_kilocode_users_vercel_downstream_safety_identifier')
       .on(table.vercel_downstream_safety_identifier)
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
@@ -2194,6 +2224,22 @@ export const api_request_log = pgTable(
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
+export const api_request_compress_log = pgTable(
+  'api_request_compress_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    session_id: text(),
+    provider: text().notNull(),
+    model: text().notNull(),
+    request: jsonb().notNull(),
+    result: jsonb().notNull(),
+  },
+  table => [index('idx_api_request_compress_log_created_at').on(table.created_at)]
+);
+
 export const http_user_agent = pgTable(
   'http_user_agent',
   {
@@ -2622,17 +2668,863 @@ export const organizations = pgTable(
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
+    parent_organization_id: uuid().references((): AnyPgColumn => organizations.id, {
+      onDelete: 'restrict',
+    }),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
+    check(
+      'organizations_not_parented_by_self_check',
+      sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
+    ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
+    index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]
 );
 
 export type Organization = typeof organizations.$inferSelect;
+
+export const cost_insight_owner_hour_totals = pgTable(
+  'cost_insight_owner_hour_totals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
+    total_microdollars: bigint({ mode: 'number' }).notNull(),
+    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_hour_totals_user')
+      .on(table.owned_by_user_id, table.hour_start, table.spend_category)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_hour_totals_org')
+      .on(table.owned_by_organization_id, table.hour_start, table.spend_category)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_hour_totals_hour').on(table.hour_start),
+    check(
+      'cost_insight_owner_hour_totals_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    enumCheck(
+      'cost_insight_owner_hour_totals_category_check',
+      table.spend_category,
+      CostInsightSpendCategory
+    ),
+    check(
+      'cost_insight_owner_hour_totals_amount_positive_check',
+      sql`${table.total_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_amount_safe_check',
+      sql`${table.total_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_count_positive_check',
+      sql`${table.spend_record_count} > 0`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_count_safe_check',
+      sql`${table.spend_record_count} <= 9007199254740991`
+    ),
+  ]
+);
+
+export type CostInsightOwnerHourTotal = typeof cost_insight_owner_hour_totals.$inferSelect;
+
+export const cost_insight_owner_hour_driver_buckets = pgTable(
+  'cost_insight_owner_hour_driver_buckets',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
+    driver_key: text().notNull(),
+    source: text().$type<CostInsightSpendSource>().notNull(),
+    product_key: text().notNull(),
+    feature_key: text().notNull(),
+    model_or_plan_key: text().notNull(),
+    provider_key: text().notNull(),
+    actor_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onUpdate: 'cascade' }),
+    total_microdollars: bigint({ mode: 'number' }).notNull(),
+    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_driver_buckets_user')
+      .on(table.owned_by_user_id, table.hour_start, table.spend_category, table.driver_key)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_driver_buckets_org')
+      .on(table.owned_by_organization_id, table.hour_start, table.spend_category, table.driver_key)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_driver_buckets_hour').on(table.hour_start),
+    check(
+      'cost_insight_driver_buckets_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_driver_buckets_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    enumCheck(
+      'cost_insight_driver_buckets_category_check',
+      table.spend_category,
+      CostInsightSpendCategory
+    ),
+    enumCheck('cost_insight_driver_buckets_source_check', table.source, CostInsightSpendSource),
+    check(
+      'cost_insight_driver_buckets_driver_key_check',
+      sql`${table.driver_key} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      'cost_insight_driver_buckets_product_key_check',
+      sql`char_length(${table.product_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_feature_key_check',
+      sql`char_length(${table.feature_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_model_key_check',
+      sql`char_length(${table.model_or_plan_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_provider_key_check',
+      sql`char_length(${table.provider_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_amount_positive_check',
+      sql`${table.total_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_driver_buckets_amount_safe_check',
+      sql`${table.total_microdollars} <= 9007199254740991`
+    ),
+    check('cost_insight_driver_buckets_count_positive_check', sql`${table.spend_record_count} > 0`),
+    check(
+      'cost_insight_driver_buckets_count_safe_check',
+      sql`${table.spend_record_count} <= 9007199254740991`
+    ),
+  ]
+);
+
+export type CostInsightOwnerHourDriverBucket =
+  typeof cost_insight_owner_hour_driver_buckets.$inferSelect;
+
+export const cost_insight_evaluation_dirty_owners = pgTable(
+  'cost_insight_evaluation_dirty_owners',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    generation: bigint({ mode: 'number' })
+      .default(sql`'1'`)
+      .notNull(),
+    dirty_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
+    attempt_count: integer().default(0).notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_evaluation_dirty_owners_user')
+      .on(table.owned_by_user_id)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_evaluation_dirty_owners_org')
+      .on(table.owned_by_organization_id)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_evaluation_dirty_owners_claim').on(
+      table.next_attempt_at,
+      table.claimed_at,
+      table.dirty_at,
+      table.id
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_generation_check',
+      sql`${table.generation} > 0 AND ${table.generation} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_attempt_count_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightEvaluationDirtyOwner =
+  typeof cost_insight_evaluation_dirty_owners.$inferSelect;
+
+export const cost_insight_hourly_sweep_checkpoints = pgTable(
+  'cost_insight_hourly_sweep_checkpoints',
+  {
+    job_name: text().primaryKey().notNull(),
+    cycle_id: uuid(),
+    cycle_as_of: timestamp({ withTimezone: true, mode: 'string' }),
+    cohort_created_before: timestamp({ withTimezone: true, mode: 'string' }),
+    cursor_owner_type: text().$type<'user' | 'organization'>(),
+    cursor_owner_id: text(),
+    lease_token: uuid(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('cost_insight_hourly_sweep_job_name_check', sql`${table.job_name} <> ''`),
+    check(
+      'cost_insight_hourly_sweep_cursor_owner_type_check',
+      sql`${table.cursor_owner_type} IS NULL OR ${table.cursor_owner_type} IN ('user', 'organization')`
+    ),
+    check(
+      'cost_insight_hourly_sweep_cursor_check',
+      sql`(${table.cursor_owner_type} IS NULL AND ${table.cursor_owner_id} IS NULL) OR (${table.cursor_owner_type} IS NOT NULL AND ${table.cursor_owner_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_hourly_sweep_lease_check',
+      sql`(${table.lease_token} IS NULL AND ${table.lease_expires_at} IS NULL) OR (${table.lease_token} IS NOT NULL AND ${table.lease_expires_at} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_hourly_sweep_cycle_check',
+      sql`(${table.cycle_id} IS NULL AND ${table.cycle_as_of} IS NULL AND ${table.cohort_created_before} IS NULL AND ${table.started_at} IS NULL) OR (${table.cycle_id} IS NOT NULL AND ${table.cycle_as_of} IS NOT NULL AND ${table.cohort_created_before} IS NOT NULL AND ${table.started_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightHourlySweepCheckpoint =
+  typeof cost_insight_hourly_sweep_checkpoints.$inferSelect;
+
+export const cost_insight_rollup_coverage = pgTable(
+  'cost_insight_rollup_coverage',
+  {
+    rollup_version: smallint().primaryKey().notNull(),
+    live_capture_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
+    coverage_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
+    last_reconciled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('cost_insight_rollup_coverage_version_check', sql`${table.rollup_version} > 0`),
+    check(
+      'cost_insight_rollup_coverage_live_hour_check',
+      sql`${table.live_capture_start_hour} IS NULL OR ${table.live_capture_start_hour} = date_trunc('hour', ${table.live_capture_start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_coverage_start_hour_check',
+      sql`${table.coverage_start_hour} IS NULL OR ${table.coverage_start_hour} = date_trunc('hour', ${table.coverage_start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_coverage_range_check',
+      sql`${table.coverage_start_hour} IS NULL OR (${table.live_capture_start_hour} IS NOT NULL AND ${table.coverage_start_hour} <= ${table.live_capture_start_hour})`
+    ),
+  ]
+);
+
+export type CostInsightRollupCoverage = typeof cost_insight_rollup_coverage.$inferSelect;
+
+export const cost_insight_rollup_degraded_intervals = pgTable(
+  'cost_insight_rollup_degraded_intervals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    start_hour: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    end_hour_exclusive: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    source: text().$type<CostInsightSpendSource>(),
+    reason: text().$type<CostInsightRollupDegradedReason>().notNull(),
+    detected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    resolved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cost_insight_degraded_intervals_unresolved')
+      .on(table.start_hour, table.end_hour_exclusive)
+      .where(isNull(table.resolved_at)),
+    check(
+      'cost_insight_degraded_intervals_start_hour_check',
+      sql`${table.start_hour} = date_trunc('hour', ${table.start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_degraded_intervals_end_hour_check',
+      sql`${table.end_hour_exclusive} = date_trunc('hour', ${table.end_hour_exclusive}, 'UTC')`
+    ),
+    check(
+      'cost_insight_degraded_intervals_range_check',
+      sql`${table.end_hour_exclusive} > ${table.start_hour}`
+    ),
+    check(
+      'cost_insight_degraded_intervals_resolution_check',
+      sql`${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.detected_at}`
+    ),
+    enumCheck('cost_insight_degraded_intervals_source_check', table.source, CostInsightSpendSource),
+    enumCheck(
+      'cost_insight_degraded_intervals_reason_check',
+      table.reason,
+      CostInsightRollupDegradedReason
+    ),
+  ]
+);
+
+export type CostInsightRollupDegradedInterval =
+  typeof cost_insight_rollup_degraded_intervals.$inferSelect;
+
+const CostInsightSafeIntegerSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const CostInsightPositiveSafeIntegerSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER);
+const CostInsightTimestampSchema = z.string().refine(value => Number.isFinite(Date.parse(value)), {
+  message: 'Expected parseable timestamp.',
+});
+const CostInsightDriverDimensionSchema = z.string().min(1).max(128);
+
+export const CostInsightEventSnapshotSchema = z.object({
+  thresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  thresholdWindow: z.enum(['rolling_24h', 'rolling_7d', 'rolling_30d']).optional(),
+  rolling24HourMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  rolling7DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  rolling30DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  currentHourVariableMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  anomalyBaselineMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  anomalyThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  topDrivers: z
+    .array(
+      z.object({
+        spendCategory: z.enum(['variable', 'scheduled']),
+        source: z.enum(['ai_gateway', 'kiloclaw', 'coding_plan', 'other']),
+        productKey: CostInsightDriverDimensionSchema,
+        featureKey: CostInsightDriverDimensionSchema,
+        modelOrPlanKey: CostInsightDriverDimensionSchema,
+        providerKey: CostInsightDriverDimensionSchema,
+        actorUserId: z.string().min(1).nullable(),
+        totalMicrodollars: CostInsightPositiveSafeIntegerSchema,
+        spendRecordCount: CostInsightPositiveSafeIntegerSchema,
+      })
+    )
+    .max(5)
+    .optional(),
+  topDriversWindow: z
+    .object({
+      startInclusive: CostInsightTimestampSchema,
+      endExclusive: CostInsightTimestampSchema,
+      spendCategory: z.enum(['variable', 'scheduled']).optional(),
+    })
+    .refine(value => Date.parse(value.endExclusive) > Date.parse(value.startInclusive), {
+      message: 'Expected topDriversWindow endExclusive to be after startInclusive.',
+    })
+    .optional(),
+  changedFields: z.record(z.string(), z.object({ old: z.unknown(), new: z.unknown() })).optional(),
+  settings: z
+    .object({
+      spendAlertsEnabled: z.boolean(),
+      anomalyAlertsEnabled: z.boolean(),
+      costSuggestionsEnabled: z.boolean(),
+      spendThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+      spend7DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+      spend30DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+    })
+    .optional(),
+  suggestion: z
+    .object({
+      suggestionKey: z.string().regex(/^[0-9a-f]{64}$/),
+      evidenceWindowStart: CostInsightTimestampSchema,
+      evidenceWindowEnd: CostInsightTimestampSchema,
+      observedMicrodollars: CostInsightPositiveSafeIntegerSchema,
+      ctaHref: z.string().min(1),
+    })
+    .refine(value => Date.parse(value.evidenceWindowEnd) > Date.parse(value.evidenceWindowStart), {
+      message: 'Expected suggestion evidence window end to be after start.',
+    })
+    .optional(),
+});
+
+export type CostInsightEventSnapshot = z.infer<typeof CostInsightEventSnapshotSchema>;
+
+export const cost_insight_owner_configs = pgTable(
+  'cost_insight_owner_configs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    spend_alerts_enabled: boolean().default(false).notNull(),
+    anomaly_alerts_enabled: boolean().default(true).notNull(),
+    cost_suggestions_enabled: boolean().default(true).notNull(),
+    spend_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_7_day_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_30_day_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_alerts_enabled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_configs_user')
+      .on(table.owned_by_user_id)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_configs_org')
+      .on(table.owned_by_organization_id)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_configs_evaluation')
+      .on(table.updated_at, table.id)
+      .where(sql`${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE`),
+    index('IDX_cost_insight_owner_configs_user_active')
+      .on(table.owned_by_user_id)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
+      ),
+    index('IDX_cost_insight_owner_configs_org_active')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
+      ),
+    check(
+      'cost_insight_owner_configs_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_configs_threshold_positive_check',
+      sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_threshold_safe_check',
+      sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_7_day_threshold_positive_check',
+      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_7_day_threshold_safe_check',
+      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_30_day_threshold_positive_check',
+      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_30_day_threshold_safe_check',
+      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_enabled_at_check',
+      sql`${table.spend_alerts_enabled} = TRUE OR ${table.spend_alerts_enabled_at} IS NULL`
+    ),
+  ]
+);
+
+export type CostInsightOwnerConfig = typeof cost_insight_owner_configs.$inferSelect;
+export type NewCostInsightOwnerConfig = typeof cost_insight_owner_configs.$inferInsert;
+
+export const cost_insight_active_suggestions = pgTable(
+  'cost_insight_active_suggestions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    suggestion_kind: text().$type<CostInsightSuggestionKind>().notNull(),
+    suggestion_key: text().notNull(),
+    title: text().notNull(),
+    description: text().notNull(),
+    cta_label: text().notNull(),
+    cta_href: text().notNull(),
+    evidence_window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    evidence_window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    observed_microdollars: bigint({ mode: 'number' }).notNull(),
+    benefit_label: text().notNull(),
+    benefit_detail: text().notNull(),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_active_suggestions_user_key')
+      .on(table.owned_by_user_id, table.suggestion_key)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_active_suggestions_org_key')
+      .on(table.owned_by_organization_id, table.suggestion_key)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_active_suggestions_user_active')
+      .on(table.owned_by_user_id, table.created_at.desc())
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.dismissed_at} IS NULL`),
+    index('IDX_cost_insight_active_suggestions_org_active')
+      .on(table.owned_by_organization_id, table.created_at.desc())
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.dismissed_at} IS NULL`),
+    check(
+      'cost_insight_active_suggestions_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    enumCheck(
+      'cost_insight_active_suggestions_kind_check',
+      table.suggestion_kind,
+      CostInsightSuggestionKind
+    ),
+    check(
+      'cost_insight_active_suggestions_key_check',
+      sql`${table.suggestion_key} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      'cost_insight_active_suggestions_window_check',
+      sql`${table.evidence_window_end} > ${table.evidence_window_start}`
+    ),
+    check(
+      'cost_insight_active_suggestions_observed_positive_check',
+      sql`${table.observed_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_active_suggestions_observed_safe_check',
+      sql`${table.observed_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_active_suggestions_dismissed_by_check',
+      sql`${table.dismissed_at} IS NOT NULL OR ${table.dismissed_by_user_id} IS NULL`
+    ),
+  ]
+);
+
+export type CostInsightActiveSuggestion = typeof cost_insight_active_suggestions.$inferSelect;
+export type NewCostInsightActiveSuggestion = typeof cost_insight_active_suggestions.$inferInsert;
+
+export const cost_insight_events = pgTable(
+  'cost_insight_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    event_type: text().$type<CostInsightEventType>().notNull(),
+    alert_kind: text().$type<CostInsightAlertKind>(),
+    suggestion_kind: text().$type<CostInsightSuggestionKind>(),
+    active_suggestion_id: uuid().references(() => cost_insight_active_suggestions.id, {
+      onDelete: 'set null',
+    }),
+    actor_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    title: text().notNull(),
+    description: text().notNull(),
+    snapshot: jsonb().$type<CostInsightEventSnapshot>().default({}).notNull(),
+    dedupe_key: text(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_cost_insight_events_user_occurred').on(
+      table.owned_by_user_id,
+      table.occurred_at.desc(),
+      table.id
+    ),
+    index('IDX_cost_insight_events_org_occurred').on(
+      table.owned_by_organization_id,
+      table.occurred_at.desc(),
+      table.id
+    ),
+    index('IDX_cost_insight_events_occurred').on(table.occurred_at),
+    uniqueIndex('UQ_cost_insight_events_user_dedupe')
+      .on(table.owned_by_user_id, table.dedupe_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.dedupe_key} IS NOT NULL`),
+    uniqueIndex('UQ_cost_insight_events_org_dedupe')
+      .on(table.owned_by_organization_id, table.dedupe_key)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.dedupe_key} IS NOT NULL`
+      ),
+    check(
+      'cost_insight_events_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    enumCheck('cost_insight_events_type_check', table.event_type, CostInsightEventType),
+    enumCheck('cost_insight_events_alert_kind_check', table.alert_kind, CostInsightAlertKind),
+    enumCheck(
+      'cost_insight_events_suggestion_kind_check',
+      table.suggestion_kind,
+      CostInsightSuggestionKind
+    ),
+    check(
+      'cost_insight_events_alert_kind_presence_check',
+      sql`(${table.event_type} IN ('anomaly_alert', 'threshold_crossed', 'alert_reviewed') AND ${table.alert_kind} IS NOT NULL) OR (${table.event_type} NOT IN ('anomaly_alert', 'threshold_crossed', 'alert_reviewed') AND ${table.alert_kind} IS NULL)`
+    ),
+    check(
+      'cost_insight_events_suggestion_kind_presence_check',
+      sql`(${table.event_type} IN ('suggestion_created', 'suggestion_dismissed') AND ${table.suggestion_kind} IS NOT NULL) OR (${table.event_type} NOT IN ('suggestion_created', 'suggestion_dismissed') AND ${table.suggestion_kind} IS NULL)`
+    ),
+  ]
+);
+
+export type CostInsightEvent = typeof cost_insight_events.$inferSelect;
+export type NewCostInsightEvent = typeof cost_insight_events.$inferInsert;
+
+export const cost_insight_owner_states = pgTable(
+  'cost_insight_owner_states',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    last_evaluated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    active_anomaly_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_anomaly_episode_id: uuid(),
+    active_anomaly_hour_start: timestamp({ withTimezone: true, mode: 'string' }),
+    active_anomaly_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    active_anomaly_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    threshold_crossing_active: boolean().default(false).notNull(),
+    active_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_threshold_episode_id: uuid(),
+    threshold_crossing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    active_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_7_day_threshold_crossing_active: boolean().default(false).notNull(),
+    active_rolling_7_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_rolling_7_day_threshold_episode_id: uuid(),
+    rolling_7_day_threshold_crossing_started_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
+    active_rolling_7_day_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    rolling_7_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_7_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_30_day_threshold_crossing_active: boolean().default(false).notNull(),
+    active_rolling_30_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_rolling_30_day_threshold_episode_id: uuid(),
+    rolling_30_day_threshold_crossing_started_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
+    active_rolling_30_day_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    rolling_30_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_30_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_states_user')
+      .on(table.owned_by_user_id)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_states_org')
+      .on(table.owned_by_organization_id)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_states_unreviewed_user')
+      .on(table.owned_by_user_id, table.updated_at)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ((${table.active_anomaly_episode_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_episode_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
+      ),
+    index('IDX_cost_insight_owner_states_unreviewed_org')
+      .on(table.owned_by_organization_id, table.updated_at)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ((${table.active_anomaly_episode_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_episode_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
+      ),
+    check(
+      'cost_insight_owner_states_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_anomaly_hour_check',
+      sql`${table.active_anomaly_hour_start} IS NULL OR ${table.active_anomaly_hour_start} = date_trunc('hour', ${table.active_anomaly_hour_start}, 'UTC')`
+    ),
+    check(
+      'cost_insight_owner_states_threshold_active_check',
+      sql`${table.threshold_crossing_active} = TRUE OR (${table.active_threshold_event_id} IS NULL AND ${table.active_threshold_episode_id} IS NULL AND ${table.threshold_crossing_started_at} IS NULL AND ${table.active_threshold_snapshot} IS NULL AND ${table.threshold_reviewed_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_7_day_threshold_active_check',
+      sql`${table.rolling_7_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_7_day_threshold_event_id} IS NULL AND ${table.active_rolling_7_day_threshold_episode_id} IS NULL AND ${table.rolling_7_day_threshold_crossing_started_at} IS NULL AND ${table.active_rolling_7_day_threshold_snapshot} IS NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_30_day_threshold_active_check',
+      sql`${table.rolling_30_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_30_day_threshold_event_id} IS NULL AND ${table.active_rolling_30_day_threshold_episode_id} IS NULL AND ${table.rolling_30_day_threshold_crossing_started_at} IS NULL AND ${table.active_rolling_30_day_threshold_snapshot} IS NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL)`
+    ),
+  ]
+);
+
+export type CostInsightOwnerState = typeof cost_insight_owner_states.$inferSelect;
+export type NewCostInsightOwnerState = typeof cost_insight_owner_states.$inferInsert;
+
+export const cost_insight_notification_deliveries = pgTable(
+  'cost_insight_notification_deliveries',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    event_id: uuid()
+      .notNull()
+      .references(() => cost_insight_events.id, { onDelete: 'cascade' }),
+    recipient_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    channel: text().default('email').notNull(),
+    status: text().$type<CostInsightNotificationStatus>().default('pending').notNull(),
+    attempt_count: integer().default(0).notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_notification_deliveries_event_recipient_channel').on(
+      table.event_id,
+      table.recipient_user_id,
+      table.channel
+    ),
+    index('IDX_cost_insight_notification_deliveries_claim').on(
+      table.status,
+      table.next_attempt_at,
+      table.id
+    ),
+    index('IDX_cost_insight_notification_deliveries_event').on(table.event_id),
+    check('cost_insight_notification_deliveries_channel_check', sql`${table.channel} = 'email'`),
+    enumCheck(
+      'cost_insight_notification_deliveries_status_check',
+      table.status,
+      CostInsightNotificationStatus
+    ),
+    check(
+      'cost_insight_notification_deliveries_attempt_count_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'cost_insight_notification_deliveries_terminal_check',
+      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL) OR (${table.status} <> 'sent' AND ${table.sent_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_notification_deliveries_failure_check',
+      sql`(${table.status} = 'failed' AND ${table.failed_at} IS NOT NULL) OR (${table.status} <> 'failed' AND ${table.failed_at} IS NULL)`
+    ),
+  ]
+);
+
+export type CostInsightNotificationDelivery =
+  typeof cost_insight_notification_deliveries.$inferSelect;
+export type NewCostInsightNotificationDelivery =
+  typeof cost_insight_notification_deliveries.$inferInsert;
 
 export const organization_memberships = pgTable(
   'organization_memberships',
@@ -2688,6 +3580,10 @@ export const organization_invitations = pgTable(
     token: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    authentication_requirement: text().$type<'default' | 'workos'>().default('default').notNull(),
+    sso_source_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'restrict',
+    }),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()
@@ -2967,7 +3863,7 @@ export const platform_integrations = pgTable(
 
     // Repository access (GitHub's value: 'all' or 'selected')
     repository_access: text(), // nullable for pending installations
-    repositories: jsonb().$type<PlatformRepository[]>(),
+    repositories: jsonb().$type<PlatformRepository<number | string>[]>(),
     repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_reason: text(),
@@ -3011,6 +3907,14 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_user_bitbucket')
+      .on(table.owned_by_user_id)
+      .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_org_bitbucket')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
+      ),
     index('IDX_platform_integrations_owned_by_org_id').on(table.owned_by_organization_id),
     index('IDX_platform_integrations_owned_by_user_id').on(table.owned_by_user_id),
     index('IDX_platform_integrations_platform_inst_id').on(table.platform_installation_id),
@@ -3086,6 +3990,82 @@ export const user_github_app_tokens = pgTable(
 
 export type UserGitHubAppToken = typeof user_github_app_tokens.$inferSelect;
 export type NewUserGitHubAppToken = typeof user_github_app_tokens.$inferInsert;
+
+export const platform_oauth_credentials = pgTable(
+  'platform_oauth_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    platform: text().notNull(),
+    authorized_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    provider_subject_id: text().notNull(),
+    provider_subject_login: text().notNull(),
+    access_token_encrypted: text().notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_token_encrypted: text().notNull(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credential_version: integer().notNull().default(1),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_platform_oauth_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    index('IDX_platform_oauth_credentials_authorized_by_user_id').on(table.authorized_by_user_id),
+  ]
+);
+
+export type PlatformOAuthCredential = typeof platform_oauth_credentials.$inferSelect;
+export type NewPlatformOAuthCredential = typeof platform_oauth_credentials.$inferInsert;
+
+export const platform_access_token_credentials = pgTable(
+  'platform_access_token_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid().notNull(),
+    owned_by_organization_id: uuid().notNull(),
+    platform: text().notNull().$type<'bitbucket'>(),
+    integration_type: text().notNull().$type<'workspace_access_token'>(),
+    token_encrypted: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    provider_credential_type: text().notNull().$type<'workspace_access_token'>(),
+    provider_scopes: text().array().notNull(),
+    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    credential_version: integer().notNull().default(1),
+    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_platform_access_token_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    foreignKey({
+      columns: [table.platform_integration_id],
+      foreignColumns: [platform_integrations.id],
+      name: 'FK_platform_access_token_credentials_parent',
+    }).onDelete('cascade'),
+  ]
+);
+
+export type PlatformAccessTokenCredential = typeof platform_access_token_credentials.$inferSelect;
+export type NewPlatformAccessTokenCredential =
+  typeof platform_access_token_credentials.$inferInsert;
 
 // User Deployments
 
@@ -3412,6 +4392,33 @@ export const agent_configs = pgTable(
     ),
   ]
 );
+
+// Per-organization dismissals of adoption recommendations. The recommendation
+// rules themselves live in code; this table only records which suggestions an
+// organization has explicitly dismissed so we stop showing them.
+export const organization_recommendation_dismissals = pgTable(
+  'organization_recommendation_dismissals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    // Stable recommendation rule key (defined in code), e.g. 'org-sso-not-configured'.
+    recommendation_key: text().notNull(),
+    // Who dismissed it. Nullable + set null on user delete so the dismissal persists.
+    dismissed_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_org_recommendation_dismissals_org_key').on(
+      table.owned_by_organization_id,
+      table.recommendation_key
+    ),
+  ]
+);
+
+export type OrganizationRecommendationDismissal =
+  typeof organization_recommendation_dismissals.$inferSelect;
 
 export const webhook_events = pgTable(
   'webhook_events',
@@ -3923,6 +4930,9 @@ export const cloud_agent_code_reviews = pgTable(
       onDelete: 'set null',
     }),
 
+    // Immutable per-job manual review snapshot. Null means webhook-created review.
+    manual_config: jsonb('manual_config').$type<ManualCodeReviewConfig>(),
+
     // PR information
     repo_full_name: text().notNull(), // e.g., "owner/repo"
     pr_number: integer().notNull(),
@@ -3935,7 +4945,7 @@ export const cloud_agent_code_reviews = pgTable(
     head_sha: text().notNull(), // Latest commit SHA
 
     // Platform (github, gitlab, etc.)
-    platform: text().notNull().default('github'),
+    platform: text().$type<CodeReviewPlatform>().notNull().default('github'),
 
     // Platform-specific project ID (e.g., GitLab numeric project ID)
     platform_project_id: integer(),
@@ -3982,12 +4992,16 @@ export const cloud_agent_code_reviews = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Unique constraint: one review per repo+PR+SHA combination
-    uniqueIndex('UQ_cloud_agent_code_reviews_repo_pr_sha').on(
+    uniqueIndex('UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha')
+      .on(table.platform_integration_id, table.repo_full_name, table.pr_number, table.head_sha)
+      .where(sql`${table.manual_config} IS NULL`),
+    uniqueIndex('UQ_cloud_agent_code_reviews_active_provider_publisher').on(
+      table.platform_integration_id,
       table.repo_full_name,
-      table.pr_number,
-      table.head_sha
-    ),
+      table.pr_number
+    ).where(sql`${table.platform_integration_id} IS NOT NULL
+        AND ${table.status} IN ('pending', 'queued', 'running')
+        AND (${table.manual_config} IS NULL OR ${table.manual_config}->>'outputMode' = 'provider')`),
     // Indexes for ownership lookups
     index('idx_cloud_agent_code_reviews_owned_by_org_id').on(table.owned_by_organization_id),
     index('idx_cloud_agent_code_reviews_owned_by_user_id').on(table.owned_by_user_id),
@@ -5573,12 +6587,20 @@ export const security_audit_log = pgTable(
     actor_id: text(),
     actor_email: text(),
     actor_name: text(),
+    actor_type: text().$type<SecurityAuditLogActorType>(),
     action: text().$type<SecurityAuditLogAction>().notNull(),
     resource_type: text().notNull(),
     resource_id: text().notNull(),
     before_state: jsonb().$type<Record<string, unknown>>(),
     after_state: jsonb().$type<Record<string, unknown>>(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    finding_id: uuid(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    source_occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    event_key: text(),
+    schema_version: smallint(),
+    finding_snapshot: jsonb().$type<Record<string, unknown>>(),
+    source_context: text().$type<SecurityFindingAuditSourceContext>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -5587,6 +6609,12 @@ export const security_audit_log = pgTable(
       sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
     ),
     enumCheck('security_audit_log_action_check', table.action, SecurityAuditLogAction),
+    enumCheck('security_audit_log_actor_type_check', table.actor_type, SecurityAuditLogActorType),
+    enumCheck(
+      'security_audit_log_source_context_check',
+      table.source_context,
+      SecurityFindingAuditSourceContext
+    ),
     index('IDX_security_audit_log_org_created').on(
       table.owned_by_organization_id,
       table.created_at
@@ -5595,6 +6623,20 @@ export const security_audit_log = pgTable(
     index('IDX_security_audit_log_resource').on(table.resource_type, table.resource_id),
     index('IDX_security_audit_log_actor').on(table.actor_id, table.created_at),
     index('IDX_security_audit_log_action').on(table.action, table.created_at),
+    uniqueIndex('UQ_security_audit_log_org_event_key')
+      .on(table.owned_by_organization_id, table.event_key)
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    uniqueIndex('UQ_security_audit_log_user_event_key')
+      .on(table.owned_by_user_id, table.event_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    index('IDX_security_audit_log_org_occurred')
+      .on(table.owned_by_organization_id, table.occurred_at, table.id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`
+      ),
+    index('IDX_security_audit_log_user_occurred')
+      .on(table.owned_by_user_id, table.occurred_at, table.id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`),
   ]
 );
 
@@ -7600,6 +8642,9 @@ export const coding_plan_subscriptions = pgTable(
     uniqueIndex('UQ_coding_plan_sub_live_user_plan')
       .on(table.user_id, table.plan_id)
       .where(sql`${table.status} IN ('active', 'past_due')`),
+    uniqueIndex('UQ_coding_plan_sub_live_user_provider')
+      .on(table.user_id, table.provider_id)
+      .where(sql`${table.status} IN ('active', 'past_due')`),
     index('IDX_coding_plan_sub_status').on(table.status),
     index('IDX_coding_plan_sub_renewal').on(table.credit_renewal_at),
     index('IDX_coding_plan_sub_inventory').on(table.key_inventory_id),
@@ -8360,6 +9405,68 @@ export const mcp_gateway_oauth_clients = pgTable(
 export type MCPGatewayOAuthClient = typeof mcp_gateway_oauth_clients.$inferSelect;
 export type NewMCPGatewayOAuthClient = typeof mcp_gateway_oauth_clients.$inferInsert;
 
+export const mcp_gateway_oauth_grants = pgTable(
+  'mcp_gateway_oauth_grants',
+  {
+    oauth_grant_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    connect_resource_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connect_resources.connect_resource_id, { onDelete: 'cascade' }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    redirect_uri: text().notNull(),
+    granted_scopes: text().array().notNull(),
+    execution_context: jsonb().$type<Record<string, unknown>>().notNull(),
+    config_version: integer().notNull(),
+    grant_status: text()
+      .$type<MCPGatewayOAuthGrantStatus>()
+      .notNull()
+      .default(MCPGatewayOAuthGrantStatus.Active),
+    approved_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_oauth_grants_active_binding')
+      .on(table.oauth_client_id, table.kilo_user_id, table.connect_resource_id, table.redirect_uri)
+      .where(sql`${table.revoked_at} is null and ${table.grant_status} in ('pending', 'active')`),
+    index('IDX_mcp_gateway_oauth_grants_client').on(table.oauth_client_id),
+    index('IDX_mcp_gateway_oauth_grants_user').on(table.kilo_user_id),
+    index('IDX_mcp_gateway_oauth_grants_config').on(table.config_id),
+    index('IDX_mcp_gateway_oauth_grants_owner').on(table.owner_scope, table.owner_id),
+    index('IDX_mcp_gateway_oauth_grants_resource').on(table.connect_resource_id),
+    index('IDX_mcp_gateway_oauth_grants_instance').on(table.instance_id),
+    index('IDX_mcp_gateway_oauth_grants_revoked_at').on(table.revoked_at),
+    check('mcp_gateway_oauth_grants_config_version_positive', sql`${table.config_version} > 0`),
+    enumCheck('mcp_gateway_oauth_grants_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
+    enumCheck('mcp_gateway_oauth_grants_status', table.grant_status, MCPGatewayOAuthGrantStatus),
+  ]
+);
+
+export type MCPGatewayOAuthGrant = typeof mcp_gateway_oauth_grants.$inferSelect;
+export type NewMCPGatewayOAuthGrant = typeof mcp_gateway_oauth_grants.$inferInsert;
+
 export const mcp_gateway_authorization_requests = pgTable(
   'mcp_gateway_authorization_requests',
   {
@@ -8371,6 +9478,9 @@ export const mcp_gateway_authorization_requests = pgTable(
     oauth_client_id: uuid()
       .notNull()
       .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     client_id: text().notNull(),
     owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
     owner_id: text().notNull(),
@@ -8407,6 +9517,9 @@ export const mcp_gateway_authorization_requests = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_authorization_requests_state_hash').on(table.request_state_hash),
     index('IDX_mcp_gateway_authorization_requests_config').on(table.config_id),
+    index('IDX_mcp_gateway_authorization_requests_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_authorization_requests_user').on(table.kilo_user_id),
     index('IDX_mcp_gateway_authorization_requests_expires_at').on(table.expires_at),
     enumCheck(
@@ -8442,6 +9555,9 @@ export const mcp_gateway_authorization_codes = pgTable(
     oauth_client_id: uuid()
       .notNull()
       .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     client_id: text().notNull(),
     owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
     owner_id: text().notNull(),
@@ -8469,6 +9585,9 @@ export const mcp_gateway_authorization_codes = pgTable(
     uniqueIndex('UQ_mcp_gateway_authorization_codes_code_hash').on(table.code_hash),
     index('IDX_mcp_gateway_authorization_codes_expires_at').on(table.expires_at),
     index('IDX_mcp_gateway_authorization_codes_client').on(table.oauth_client_id),
+    index('IDX_mcp_gateway_authorization_codes_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     enumCheck(
       'mcp_gateway_authorization_codes_owner_scope',
       table.owner_scope,
@@ -8492,6 +9611,9 @@ export const mcp_gateway_refresh_tokens = pgTable(
     oauth_client_id: uuid()
       .notNull()
       .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     client_id: text().notNull(),
     owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
     owner_id: text().notNull(),
@@ -8515,6 +9637,9 @@ export const mcp_gateway_refresh_tokens = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_refresh_tokens_token_hash').on(table.token_hash),
     index('IDX_mcp_gateway_refresh_tokens_user').on(table.kilo_user_id),
+    index('IDX_mcp_gateway_refresh_tokens_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_refresh_tokens_config').on(table.config_id),
     index('IDX_mcp_gateway_refresh_tokens_consumed_at').on(table.consumed_at),
     enumCheck('mcp_gateway_refresh_tokens_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
@@ -8536,6 +9661,9 @@ export const mcp_gateway_pending_provider_authorizations = pgTable(
       () => mcp_gateway_authorization_requests.authorization_request_id,
       { onDelete: 'cascade' }
     ),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     config_id: uuid()
       .notNull()
       .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
@@ -8571,6 +9699,9 @@ export const mcp_gateway_pending_provider_authorizations = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_pending_provider_authorizations_state_hash').on(table.state_hash),
     index('IDX_mcp_gateway_pending_provider_authorizations_config').on(table.config_id),
+    index('IDX_mcp_gateway_pending_provider_authorizations_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_pending_provider_authorizations_expires_at').on(table.expires_at),
     check(
       'mcp_gateway_pending_provider_authorizations_config_version_positive',
@@ -8651,6 +9782,9 @@ export const mcp_gateway_audit_events = pgTable(
     instance_id: uuid().references(() => mcp_gateway_connection_instances.instance_id, {
       onDelete: 'set null',
     }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'set null',
+    }),
     event_type: text().notNull(),
     outcome: text().$type<MCPGatewayAuditOutcome>().notNull(),
     correlation_metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
@@ -8658,6 +9792,9 @@ export const mcp_gateway_audit_events = pgTable(
   },
   table => [
     index('IDX_mcp_gateway_audit_events_config').on(table.config_id),
+    index('IDX_mcp_gateway_audit_events_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_audit_events_owner').on(table.owner_scope, table.owner_id),
     index('IDX_mcp_gateway_audit_events_created_at').on(table.created_at),
     enumCheck('mcp_gateway_audit_events_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
@@ -8668,3 +9805,32 @@ export const mcp_gateway_audit_events = pgTable(
 export type MCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferSelect;
 export type NewMCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferInsert;
 export type NewModelExperimentRequest = typeof model_experiment_request.$inferInsert;
+
+export type UserModelPreferenceLastSelected = {
+  model: string;
+  variant?: string;
+};
+
+export const user_model_preferences = pgTable(
+  'user_model_preferences',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    favorites: jsonb().$type<string[]>().notNull().default([]),
+    last_selected: jsonb().$type<UserModelPreferenceLastSelected | null>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('UQ_user_model_preferences_user_id').on(table.user_id)]
+);
+
+export type UserModelPreference = typeof user_model_preferences.$inferSelect;
+export type NewUserModelPreference = typeof user_model_preferences.$inferInsert;

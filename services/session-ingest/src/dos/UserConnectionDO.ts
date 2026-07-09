@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Env } from '../env';
+import { getSessionIngestDO } from './SessionIngestDO';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
@@ -20,11 +21,61 @@ type HeartbeatSession = {
 };
 
 type WSAttachment =
-  | { role: 'cli'; connectionId: string; sessions: HeartbeatSession[] }
+  | {
+      role: 'cli';
+      connectionId: string;
+      sessions: HeartbeatSession[];
+      // Undefined means no protocolVersion has been reported yet — either the
+      // CLI hasn't sent its first heartbeat, or it's a legacy build that
+      // predates this field entirely. Both cases fall back to legacy behavior.
+      protocolVersion?: string;
+      // Set from the authenticated /user/cli route; undefined on sockets
+      // accepted before this field existed. Needed for the session-ready push.
+      kiloUserId?: string;
+    }
   | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
+
+export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
+
+const SESSION_OWNER_CHANGED_ERROR = {
+  source: 'relay',
+  code: 'SESSION_OWNER_CHANGED',
+  message: 'Session owner changed',
+};
+
+const CATALOG_TOO_LARGE_ERROR = {
+  source: 'relay',
+  code: 'CATALOG_TOO_LARGE',
+  message: 'Model catalog response is too large',
+};
+
+const CATALOG_REQUEST_PENDING_ERROR = {
+  source: 'relay',
+  code: 'CATALOG_REQUEST_PENDING',
+  message: 'Model catalog request already pending',
+};
+
+const PENDING_COMMAND_LIMIT_ERROR = {
+  source: 'relay',
+  code: 'PENDING_COMMAND_LIMIT',
+  message: 'Too many pending commands',
+};
+
+const COMMAND_EXPIRED_ERROR = {
+  source: 'relay',
+  code: 'COMMAND_EXPIRED',
+  message: 'Command expired',
+};
+
+const CLI_COMMAND_ERROR = {
+  source: 'cli',
+  message: 'Command failed',
+};
 
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
+  private static readonly PENDING_COMMAND_TTL_MS = 35_000;
+  private static readonly MAX_PENDING_COMMANDS = 128;
 
   // Which CLI connection owns each session
   private sessionOwners = new Map<string, string>();
@@ -32,10 +83,21 @@ export class UserConnectionDO extends DurableObject<Env> {
   private webSubscriptions = new Map<string, Set<WebSocket>>();
   // Sessions per CLI connection (from heartbeat)
   private connectionSessions = new Map<string, HeartbeatSession[]>();
+  // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
+  private connectionProtocolVersion = new Map<string, string | undefined>();
   // Pending command responses: correlationId → originating web socket
   private pendingCommands = new Map<
     string,
-    { ws: WebSocket; sessionId?: string; originalId: string; targetCliWs: WebSocket }
+    {
+      ws: WebSocket;
+      sessionId?: string;
+      originalId: string;
+      command: string;
+      expectedOwnerConnectionId?: string;
+      targetConnectionId: string;
+      expiresAt: number;
+      targetCliWs: WebSocket;
+    }
   >();
   // Last heartbeat timestamp per CLI connectionId (for staleness eviction)
   private lastHeartbeatAt = new Map<string, number>();
@@ -55,8 +117,9 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       if (attachment.role === 'cli') {
         cliCount++;
-        const { connectionId, sessions } = attachment;
+        const { connectionId, sessions, protocolVersion } = attachment;
         this.connectionSessions.set(connectionId, sessions);
+        this.connectionProtocolVersion.set(connectionId, protocolVersion);
         sessionCount += sessions.length;
         for (const session of sessions) {
           this.sessionOwners.set(session.id, connectionId);
@@ -105,11 +168,13 @@ export class UserConnectionDO extends DurableObject<Env> {
       // Close any stale socket from a previous connection with the same ID (CLI reconnect)
       const reconnect = this.closeStaleSocket(connectionId);
 
-      const attachment: WSAttachment = { role: 'cli', connectionId, sessions: [] };
+      const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
+      const attachment: WSAttachment = { role: 'cli', connectionId, sessions: [], kiloUserId };
       this.ctx.acceptWebSocket(server, ['cli']);
       server.serializeAttachment(attachment);
-      this.lastHeartbeatAt.set(connectionId, Date.now());
-      this.scheduleStaleCheck();
+      const now = Date.now();
+      this.lastHeartbeatAt.set(connectionId, now);
+      this.scheduleNextAlarm(now);
 
       console.log('CLI socket connected', {
         connectionId,
@@ -152,23 +217,28 @@ export class UserConnectionDO extends DurableObject<Env> {
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): void {
     this.ensureState();
 
-    const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      console.warn('Failed to parse WebSocket message as JSON');
-      return;
-    }
-
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     if (!attachment) {
       console.warn('WebSocket message from socket with no attachment');
       return;
     }
 
+    const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
+    const binaryByteCount = typeof message === 'string' ? undefined : message.byteLength;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.warn('Failed to parse WebSocket message as JSON', {
+        role: attachment.role,
+        connectionId: attachment.connectionId,
+        byteCount: binaryByteCount ?? new TextEncoder().encode(raw).byteLength,
+      });
+      return;
+    }
+
     if (attachment.role === 'cli') {
-      this.handleCliMessage(ws, attachment, parsed);
+      this.handleCliMessage(ws, attachment, parsed, raw, binaryByteCount);
     } else if (!attachment.replaced) {
       this.handleWebMessage(ws, attachment, parsed);
     }
@@ -200,10 +270,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.ensureState();
 
     const now = Date.now();
+    this.expirePendingCommands(now);
     const staleConnectionIds: string[] = [];
 
     for (const [connectionId, lastSeen] of this.lastHeartbeatAt) {
-      if (now - lastSeen > UserConnectionDO.HEARTBEAT_TIMEOUT_MS) {
+      if (now - lastSeen >= UserConnectionDO.HEARTBEAT_TIMEOUT_MS) {
         staleConnectionIds.push(connectionId);
       }
     }
@@ -222,10 +293,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // via the webSocketClose callback
     }
 
-    // If there are still active CLI connections, schedule another check
-    if (this.lastHeartbeatAt.size > staleConnectionIds.length) {
-      this.scheduleStaleCheck();
-    }
+    this.scheduleNextAlarm(now);
   }
 
   // ---------------------------------------------------------------------------
@@ -235,14 +303,17 @@ export class UserConnectionDO extends DurableObject<Env> {
   private handleCliMessage(
     ws: WebSocket,
     attachment: WSAttachment & { role: 'cli' },
-    parsed: unknown
+    parsed: unknown,
+    raw: string,
+    binaryByteCount: number | undefined
   ): void {
     const result = CLIOutboundMessageSchema.safeParse(parsed);
     if (!result.success) {
       console.warn('CLI message parse failed', {
+        role: 'cli',
         connectionId: attachment.connectionId,
-        errors: result.error.issues.map(i => i.message),
-        raw: JSON.stringify(parsed).slice(0, 500),
+        byteCount: binaryByteCount ?? new TextEncoder().encode(raw).byteLength,
+        issues: result.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
       });
       return;
     }
@@ -250,13 +321,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'heartbeat':
-        this.handleHeartbeat(ws, attachment, msg.sessions);
+        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion);
         break;
       case 'event':
         this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
         break;
       case 'response':
-        this.handleCliResponse(msg.id, msg.result, msg.error);
+        this.handleCliResponse(ws, msg.id, msg.result, msg.error);
         break;
     }
   }
@@ -264,11 +335,14 @@ export class UserConnectionDO extends DurableObject<Env> {
   private handleHeartbeat(
     ws: WebSocket,
     attachment: WSAttachment & { role: 'cli' },
-    sessions: HeartbeatSession[]
+    sessions: HeartbeatSession[],
+    protocolVersion: string | undefined
   ): void {
     const { connectionId } = attachment;
-    this.lastHeartbeatAt.set(connectionId, Date.now());
-    this.scheduleStaleCheck();
+    const now = Date.now();
+    this.lastHeartbeatAt.set(connectionId, now);
+    this.connectionProtocolVersion.set(connectionId, protocolVersion);
+    this.scheduleNextAlarm(now);
 
     // Remove sessions this connection previously owned but no longer reports
     const previousSessions = this.connectionSessions.get(connectionId) ?? [];
@@ -276,12 +350,23 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const prev of previousSessions) {
       if (!currentIds.has(prev.id) && this.sessionOwners.get(prev.id) === connectionId) {
         this.sessionOwners.delete(prev.id);
+        this.failPendingCommandsForOwnerChange(prev.id, undefined);
       }
     }
 
     // Update ownership
     this.connectionSessions.set(connectionId, sessions);
     for (const session of sessions) {
+      const previousOwner = this.sessionOwners.get(session.id);
+      if (previousOwner && previousOwner !== connectionId) {
+        this.failPendingCommandsForOwnerChange(session.id, connectionId);
+      }
+      // First sight of a main session on this DO means it just became
+      // remote-controllable — the only moment the session-ready push fires.
+      // The durable claim in SessionIngestDO makes reconnect re-sights no-ops.
+      if (!previousOwner && !session.parentSessionId && attachment.kiloUserId) {
+        this.claimSessionReadyPush(attachment.kiloUserId, session.id);
+      }
       this.sessionOwners.set(session.id, connectionId);
     }
 
@@ -294,7 +379,13 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     // Persist to attachment for hibernation recovery
-    const updatedAttachment: WSAttachment = { role: 'cli', connectionId, sessions };
+    const updatedAttachment: WSAttachment = {
+      role: 'cli',
+      connectionId,
+      sessions,
+      protocolVersion,
+      kiloUserId: attachment.kiloUserId,
+    };
     ws.serializeAttachment(updatedAttachment);
 
     // Send heartbeat only to web clients subscribed to sessions from this connection.
@@ -314,7 +405,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const msg: WebInboundMessage = {
         type: 'system',
         event: 'sessions.heartbeat',
-        data: { connectionId, sessions },
+        data: { connectionId, protocolVersion, sessions },
       };
       for (const ws2 of subscribers) {
         this.sendToWeb(ws2, msg);
@@ -322,6 +413,22 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });
+  }
+
+  /**
+   * Fire-and-forget "session ready to control from your phone" push via the
+   * session's SessionIngestDO, which holds the durable once-ever claim.
+   */
+  private claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+    const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+    this.ctx.waitUntil(
+      stub.claimSessionReadyPush(kiloUserId, sessionId).catch((error: unknown) => {
+        console.error('Failed to claim session-ready push (non-fatal)', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
   }
 
   private handleCliEvent(
@@ -351,16 +458,36 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  private handleCliResponse(id: string, result: unknown, error: unknown): void {
+  private handleCliResponse(
+    respondingWs: WebSocket,
+    id: string,
+    result: unknown,
+    error: unknown
+  ): void {
     const entry = this.pendingCommands.get(id);
-    if (!entry) return;
+    if (!entry || entry.targetCliWs !== respondingWs) return;
     this.pendingCommands.delete(id);
+
+    if (entry.command === 'list_models' && result !== undefined) {
+      const serializedResult = JSON.stringify(result);
+      const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
+      if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
+        this.sendToWeb(entry.ws, {
+          type: 'response',
+          id: entry.originalId,
+          error: CATALOG_TOO_LARGE_ERROR,
+        });
+        return;
+      }
+    }
 
     this.sendToWeb(entry.ws, {
       type: 'response',
       id: entry.originalId,
       ...(result !== undefined ? { result } : {}),
-      ...(error !== undefined ? { error } : {}),
+      ...(error !== undefined
+        ? { error: typeof error === 'string' ? error : CLI_COMMAND_ERROR }
+        : {}),
     });
   }
 
@@ -468,18 +595,24 @@ export class UserConnectionDO extends DurableObject<Env> {
     ws: WebSocket,
     msg: { id: string; command: string; sessionId?: string; connectionId?: string; data?: unknown }
   ): void {
+    const now = Date.now();
+    this.expirePendingCommands(now);
+
     // Find target CLI
     let targetCli: WebSocket | undefined;
 
-    if (msg.connectionId) {
-      // Route to specific CLI by connectionId
-      for (const cliWs of this.ctx.getWebSockets('cli')) {
-        const att = cliWs.deserializeAttachment() as WSAttachment | null;
-        if (att?.role === 'cli' && att.connectionId === msg.connectionId) {
-          targetCli = cliWs;
-          break;
-        }
+    if (msg.sessionId && msg.connectionId) {
+      targetCli = this.findCliByConnectionId(msg.connectionId);
+      if (this.sessionOwners.get(msg.sessionId) !== msg.connectionId || !targetCli) {
+        this.sendToWeb(ws, {
+          type: 'response',
+          id: msg.id,
+          error: SESSION_OWNER_CHANGED_ERROR,
+        });
+        return;
       }
+    } else if (msg.connectionId) {
+      targetCli = this.findCliByConnectionId(msg.connectionId);
     } else if (msg.sessionId) {
       targetCli = this.findCliForSession(msg.sessionId);
     } else {
@@ -493,13 +626,51 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    const targetAttachment = targetCli.deserializeAttachment() as WSAttachment | null;
+    if (targetAttachment?.role !== 'cli') return;
+    const expectedOwnerConnectionId =
+      msg.sessionId && msg.connectionId ? msg.connectionId : undefined;
+    const targetConnectionId = targetAttachment.connectionId;
+
+    if (
+      msg.command === 'list_models' &&
+      [...this.pendingCommands.values()].some(
+        entry =>
+          entry.ws === ws &&
+          entry.command === 'list_models' &&
+          entry.sessionId === msg.sessionId &&
+          entry.targetConnectionId === targetConnectionId
+      )
+    ) {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: CATALOG_REQUEST_PENDING_ERROR,
+      });
+      return;
+    }
+
+    if (this.pendingCommands.size >= UserConnectionDO.MAX_PENDING_COMMANDS) {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: PENDING_COMMAND_LIMIT_ERROR,
+      });
+      return;
+    }
+
     const correlationId = crypto.randomUUID();
     this.pendingCommands.set(correlationId, {
       ws,
       sessionId: msg.sessionId,
       originalId: msg.id,
+      command: msg.command,
+      expectedOwnerConnectionId,
+      targetConnectionId,
+      expiresAt: now + UserConnectionDO.PENDING_COMMAND_TTL_MS,
       targetCliWs: targetCli,
     });
+    this.scheduleNextAlarm(now);
 
     this.sendToCli(targetCli, {
       type: 'command',
@@ -545,6 +716,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
     this.connectionSessions.delete(connectionId);
+    this.connectionProtocolVersion.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
 
     console.log('CLI socket disconnected', {
@@ -604,7 +776,9 @@ export class UserConnectionDO extends DurableObject<Env> {
   // RPC
   // ---------------------------------------------------------------------------
 
-  getActiveSessions(): Array<HeartbeatSession & { connectionId: string }> {
+  getActiveSessions(): Array<
+    HeartbeatSession & { connectionId: string; protocolVersion?: string }
+  > {
     this.ensureState();
     return this.aggregateSessions();
   }
@@ -670,6 +844,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const att = ws.deserializeAttachment() as WSAttachment | null;
       if (att?.role === 'cli' && att.connectionId === connectionId) {
         console.log('Closing stale CLI socket for reconnect', { connectionId });
+        this.failPendingCommandsForSocket(ws);
         // Preserve session ownership — the reconnecting CLI still owns these sessions
         ws.close(1000, 'replaced by reconnect');
         return true;
@@ -705,10 +880,13 @@ export class UserConnectionDO extends DurableObject<Env> {
   private findCliForSession(sessionId: string): WebSocket | undefined {
     const ownerConnectionId = this.sessionOwners.get(sessionId);
     if (!ownerConnectionId) return undefined;
+    return this.findCliByConnectionId(ownerConnectionId);
+  }
 
+  private findCliByConnectionId(connectionId: string): WebSocket | undefined {
     for (const ws of this.ctx.getWebSockets('cli')) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
-      if (attachment?.role === 'cli' && attachment.connectionId === ownerConnectionId) {
+      if (attachment?.role === 'cli' && attachment.connectionId === connectionId) {
         return ws;
       }
     }
@@ -721,20 +899,66 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.sendToWeb(entry.ws, {
           type: 'response',
           id: entry.originalId,
-          error: 'CLI disconnected',
+          error: entry.expectedOwnerConnectionId ? SESSION_OWNER_CHANGED_ERROR : 'CLI disconnected',
         });
         this.pendingCommands.delete(id);
       }
     }
   }
 
-  private scheduleStaleCheck(): void {
-    // Schedule an alarm to run after the timeout period.
-    // setAlarm is idempotent if one is already scheduled sooner.
-    void this.ctx.storage.setAlarm(Date.now() + UserConnectionDO.HEARTBEAT_TIMEOUT_MS);
+  private failPendingCommandsForOwnerChange(
+    sessionId: string,
+    nextOwnerConnectionId: string | undefined
+  ): void {
+    for (const [id, entry] of this.pendingCommands) {
+      if (entry.sessionId !== sessionId || entry.targetConnectionId === nextOwnerConnectionId) {
+        continue;
+      }
+      this.pendingCommands.delete(id);
+      this.sendToWeb(entry.ws, {
+        type: 'response',
+        id: entry.originalId,
+        error: SESSION_OWNER_CHANGED_ERROR,
+      });
+    }
   }
 
-  private aggregateSessions(): Array<HeartbeatSession & { connectionId: string }> {
+  private expirePendingCommands(now: number): void {
+    for (const [id, entry] of this.pendingCommands) {
+      if (entry.expiresAt > now) continue;
+      this.pendingCommands.delete(id);
+      this.sendToWeb(entry.ws, {
+        type: 'response',
+        id: entry.originalId,
+        error: COMMAND_EXPIRED_ERROR,
+      });
+    }
+  }
+
+  private scheduleNextAlarm(now: number): void {
+    let nextAlarmAt: number | undefined;
+
+    for (const lastSeen of this.lastHeartbeatAt.values()) {
+      const staleAt = lastSeen + UserConnectionDO.HEARTBEAT_TIMEOUT_MS;
+      if (staleAt > now && (nextAlarmAt === undefined || staleAt < nextAlarmAt)) {
+        nextAlarmAt = staleAt;
+      }
+    }
+
+    for (const entry of this.pendingCommands.values()) {
+      if (entry.expiresAt > now && (nextAlarmAt === undefined || entry.expiresAt < nextAlarmAt)) {
+        nextAlarmAt = entry.expiresAt;
+      }
+    }
+
+    if (nextAlarmAt !== undefined) {
+      void this.ctx.storage.setAlarm(nextAlarmAt);
+    }
+  }
+
+  private aggregateSessions(): Array<
+    HeartbeatSession & { connectionId: string; protocolVersion?: string }
+  > {
     // Build set of connectionIds that still have a live CLI WebSocket.
     // This guards against stale entries that persist if a close event is delayed.
     const liveConnectionIds = new Set<string>();
@@ -743,12 +967,13 @@ export class UserConnectionDO extends DurableObject<Env> {
       if (att?.role === 'cli') liveConnectionIds.add(att.connectionId);
     }
 
-    const result: Array<HeartbeatSession & { connectionId: string }> = [];
+    const result: Array<HeartbeatSession & { connectionId: string; protocolVersion?: string }> = [];
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
+      const protocolVersion = this.connectionProtocolVersion.get(connectionId);
       for (const session of sessions) {
         if (session.parentSessionId) continue;
-        result.push({ ...session, connectionId });
+        result.push({ ...session, connectionId, ...(protocolVersion ? { protocolVersion } : {}) });
       }
     }
     return result;

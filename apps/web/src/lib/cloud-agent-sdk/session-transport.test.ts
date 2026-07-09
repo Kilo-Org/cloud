@@ -1,5 +1,7 @@
 import { createCloudAgentSession, type CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
+import type { KiloSessionId } from './types';
+import type { UserWebSystemEvent } from './user-web-connection';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,58 @@ async function connectSession(session: CloudAgentSession): Promise<void> {
   mockWs.onopen?.(new Event('open'));
 }
 
+function createUserWebConnection() {
+  let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
+  return {
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    destroy: jest.fn(),
+    subscribeToCliSession: jest.fn(() => jest.fn()),
+    sendCommand: jest.fn((_sessionId: string, command: string) =>
+      Promise.resolve(
+        command === 'list_models'
+          ? { protocolVersion: 1, providers: [], truncated: false }
+          : { ok: true }
+      )
+    ),
+    onCliEvent: jest.fn(() => jest.fn()),
+    onSystemEvent: jest.fn((listener: (event: UserWebSystemEvent) => void) => {
+      systemListener = listener;
+      return jest.fn();
+    }),
+    onReconnect: jest.fn(() => jest.fn()),
+    onSessionEvent: jest.fn(() => jest.fn()),
+    emitSystem(event: UserWebSystemEvent) {
+      systemListener?.(event);
+    },
+  };
+}
+
+function emitSessionsListOwner(
+  connection: ReturnType<typeof createUserWebConnection>,
+  sessionId: KiloSessionId
+): void {
+  connection.emitSystem({
+    event: 'sessions.list',
+    data: {
+      sessions: [{ id: sessionId, status: 'active', title: 'Remote', connectionId: 'owner' }],
+    },
+  });
+}
+
+function emitHeartbeatOwner(
+  connection: ReturnType<typeof createUserWebConnection>,
+  sessionId: KiloSessionId
+): void {
+  connection.emitSystem({
+    event: 'sessions.heartbeat',
+    data: {
+      connectionId: 'owner',
+      sessions: [{ id: sessionId, status: 'active', title: 'Remote' }],
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -98,12 +152,19 @@ describe('session transport delegation (cloud agent)', () => {
     const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await session.send({ payload: { type: 'prompt', prompt: 'hello', mode: 'auto' } });
+    await session.send({
+      payload: {
+        type: 'prompt',
+        prompt: 'hello',
+        mode: 'auto',
+        model: { providerID: 'kilo', modelID: 'test/model-1' },
+      },
+    });
 
     expect(api.send).toHaveBeenCalledTimes(1);
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
-      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto', model: 'test/model-1' },
     });
 
     session.destroy();
@@ -119,13 +180,18 @@ describe('session transport delegation (cloud agent)', () => {
 
     await connectSession(session);
     await session.send({
-      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      payload: {
+        type: 'prompt',
+        prompt: 'hello',
+        mode: 'auto',
+        model: { providerID: 'kilo', modelID: 'test/model-1' },
+      },
       attachments,
     });
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
-      payload: { type: 'prompt', prompt: 'hello', mode: 'auto' },
+      payload: { type: 'prompt', prompt: 'hello', mode: 'auto', model: 'test/model-1' },
       attachments,
     });
 
@@ -288,20 +354,6 @@ describe('session transport missing command methods (read-only session)', () => 
 describe('remote session send via typed transport methods', () => {
   const cliKiloSessionId = kiloId('ses_cli-live-session');
 
-  function createUserWebConnection() {
-    return {
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      destroy: jest.fn(),
-      subscribeToCliSession: jest.fn(() => jest.fn()),
-      sendCommand: jest.fn(() => Promise.resolve({ ok: true })),
-      onCliEvent: jest.fn(() => jest.fn()),
-      onSystemEvent: jest.fn(() => jest.fn()),
-      onReconnect: jest.fn(() => jest.fn()),
-      onSessionEvent: jest.fn(() => jest.fn()),
-    };
-  }
-
   it('uses the required user web connection without constructing a viewer socket', async () => {
     const userWebConnection = createUserWebConnection();
     const session = createCloudAgentSession({
@@ -313,6 +365,8 @@ describe('remote session send via typed transport methods', () => {
     session.connect();
     await new Promise(r => setTimeout(r, 0));
     await new Promise(r => setTimeout(r, 0));
+    emitSessionsListOwner(userWebConnection, cliKiloSessionId);
+    await Promise.resolve();
 
     await session.send({ payload: { type: 'prompt', prompt: 'Hello remote' } });
 
@@ -320,7 +374,8 @@ describe('remote session send via typed transport methods', () => {
     expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
       cliKiloSessionId,
       'send_message',
-      expect.objectContaining({ sessionID: cliKiloSessionId })
+      expect.objectContaining({ sessionID: cliKiloSessionId }),
+      'owner'
     );
     expect(jest.mocked(global.WebSocket)).not.toHaveBeenCalled();
     session.destroy();
@@ -339,17 +394,28 @@ describe('remote session send via typed transport methods', () => {
 
     session.connect();
     await new Promise(r => setTimeout(r, 0));
+    emitHeartbeatOwner(userWebConnection, cliKiloSessionId);
+    await Promise.resolve();
 
     await session.send({
-      payload: { type: 'prompt', prompt: 'Hello world', mode: 'code', model: 'test/model-1' },
+      payload: {
+        type: 'prompt',
+        prompt: 'Hello world',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'test/model-1' },
+      },
     });
 
-    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(cliKiloSessionId, 'send_message', {
-      sessionID: cliKiloSessionId,
-      parts: [{ type: 'text', text: 'Hello world' }],
-      agent: 'code',
-      model: 'test/model-1',
-    });
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      cliKiloSessionId,
+      'send_message',
+      {
+        sessionID: cliKiloSessionId,
+        parts: [{ type: 'text', text: 'Hello world' }],
+        agent: 'code',
+      },
+      'owner'
+    );
     session.destroy();
   });
 });
@@ -370,32 +436,22 @@ describe('session capabilities', () => {
     session.destroy();
   });
 
-  it('canSend is true after connecting a remote session', async () => {
+  it('canSend is true after a remote session owner is observed', async () => {
+    const cliKiloSessionId = kiloId('ses_cli-live');
+    const userWebConnection = createUserWebConnection();
     const session = createCloudAgentSession({
-      kiloSessionId: kiloId('ses_cli-live'),
+      kiloSessionId: cliKiloSessionId,
       resolveSession: async () => ({
         type: 'remote' as const,
-        kiloSessionId: kiloId('ses_cli-live'),
+        kiloSessionId: cliKiloSessionId,
       }),
-      transport: {
-        userWebConnection: {
-          connect: jest.fn(),
-          disconnect: jest.fn(),
-          destroy: jest.fn(),
-          subscribeToCliSession: jest.fn(() => jest.fn()),
-          sendCommand: jest.fn(() => Promise.resolve()),
-          onCliEvent: jest.fn(() => jest.fn()),
-          onSystemEvent: jest.fn(() => jest.fn()),
-          onReconnect: jest.fn(() => jest.fn()),
-          onSessionEvent: jest.fn(() => jest.fn()),
-        },
-      },
+      transport: { userWebConnection },
     });
 
     session.connect();
     await new Promise(r => setTimeout(r, 0));
     await new Promise(r => setTimeout(r, 0));
-    await new Promise(r => setTimeout(r, 0));
+    emitSessionsListOwner(userWebConnection, cliKiloSessionId);
 
     expect(session.canSend).toBe(true);
     session.destroy();

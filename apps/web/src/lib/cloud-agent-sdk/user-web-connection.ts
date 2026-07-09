@@ -6,6 +6,7 @@ import {
 import { cloudAgentSdkRuntime } from './runtime';
 import {
   sessionEventPayloadSchema,
+  userWebCommandErrorDataSchema,
   webInboundMessageSchema,
   type SessionEventPayload,
   type WebInboundMessage,
@@ -25,6 +26,16 @@ type UserWebSessionEventData<T extends UserWebSessionEventName> = Extract<
 type CliEvent = Omit<Extract<WebInboundMessage, { type: 'event' }>, 'type'>;
 type SystemEvent = Omit<Extract<WebInboundMessage, { type: 'system' }>, 'type'>;
 
+class UserWebCommandError extends Error {
+  readonly code: string;
+
+  constructor(error: { code: string; message: string }) {
+    super(error.message);
+    this.name = 'UserWebCommandError';
+    this.code = error.code;
+  }
+}
+
 type UserWebConnectionConfig = {
   websocketUrl: string;
   getAuthToken: () => string | Promise<string>;
@@ -42,7 +53,12 @@ type UserWebConnection = {
   disconnect: () => void;
   destroy: () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
-  sendCommand: (sessionId: string, command: string, data: unknown) => Promise<unknown>;
+  sendCommand: (
+    sessionId: string,
+    command: string,
+    data: unknown,
+    expectedOwnerConnectionId?: string
+  ) => Promise<unknown>;
   onCliEvent: (sessionId: string, listener: (event: CliEvent) => void) => () => void;
   onSystemEvent: (listener: (event: SystemEvent) => void) => () => void;
   onReconnect: (listener: () => void) => () => void;
@@ -51,6 +67,14 @@ type UserWebConnection = {
     listener: (data: UserWebSessionEventData<T>) => void
   ) => () => void;
 };
+
+function parseCommandError(error: unknown): Error {
+  if (typeof error === 'string') return new Error(error);
+
+  const parsed = userWebCommandErrorDataSchema.safeParse(error);
+  if (parsed.success) return new UserWebCommandError(parsed.data);
+  return new Error('Command failed');
+}
 
 function createUserWebConnection(
   config: UserWebConnectionConfig
@@ -291,8 +315,7 @@ function createUserWebConnection(
     if (!pending) return;
     clearTimeout(pending.timer);
     pendingCommands.delete(msg.id);
-    if (msg.error)
-      pending.reject(new Error(typeof msg.error === 'string' ? msg.error : 'Command failed'));
+    if (msg.error) pending.reject(parseCommandError(msg.error));
     else pending.resolve(msg.result);
   }
 
@@ -474,7 +497,7 @@ function createUserWebConnection(
         releaseConnection();
       };
     },
-    sendCommand(sessionId, command, data) {
+    sendCommand(sessionId, command, data, expectedOwnerConnectionId) {
       const hasOwnerLifetime = retainCount > commandRetainCount;
       const releaseCommandLifetime = hasOwnerLifetime ? null : retainConnection();
       if (releaseCommandLifetime) commandRetainCount += 1;
@@ -512,7 +535,16 @@ function createUserWebConnection(
               rejectCommand(new Error('Command timed out'));
             }, COMMAND_TIMEOUT_MS);
             pendingCommands.set(id, { resolve: resolveCommand, reject: rejectCommand, timer });
-            ws.send(JSON.stringify({ type: 'command', id, command, sessionId, data }));
+            ws.send(
+              JSON.stringify({
+                type: 'command',
+                id,
+                command,
+                sessionId,
+                connectionId: expectedOwnerConnectionId,
+                data,
+              })
+            );
           },
           reason => {
             rejectCommand(
@@ -551,7 +583,7 @@ function createUserWebConnection(
   };
 }
 
-export { createUserWebConnection };
+export { createUserWebConnection, UserWebCommandError };
 export type {
   UserWebConnection,
   UserWebConnectionConfig,

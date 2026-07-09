@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
 import {
   verifyUserOwnsSessionV2ByCloudAgentId,
@@ -38,7 +37,7 @@ function handleTRPCError(error: unknown): NextResponse {
  *
  * Supports both personal and organization contexts:
  * - Personal: verifies the user owns the session
- * - Organization: verifies org membership and that the org owns the session
+ * - Organization: verifies the user owns the session and is a current org member
  *
  * The ticket includes:
  * - type: 'stream_ticket' to identify ticket type
@@ -82,9 +81,6 @@ export async function POST(request: Request) {
     const { cloudAgentSessionId, organizationId } = validation.data;
 
     if (organizationId) {
-      // Organization context: verify membership then session ownership
-      await ensureOrganizationAccess({ user }, organizationId);
-
       const sessionOwnership = await verifyOrgOwnsSessionV2ByCloudAgentId(
         db,
         organizationId,

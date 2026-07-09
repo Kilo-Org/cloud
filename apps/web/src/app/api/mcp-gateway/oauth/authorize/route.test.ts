@@ -20,6 +20,9 @@ const mockPreviewAuthorization = jest.fn<
     endpointHost: string;
     contextName: string;
     ownerScope: 'personal' | 'organization';
+    ownerId: string;
+    configId: string;
+    connectResourceId: string;
     scopes: string[];
     executionContext: { type: string; organizationId?: string };
   }>
@@ -27,6 +30,7 @@ const mockPreviewAuthorization = jest.fn<
 const mockAuthorize =
   jest.fn<(params: unknown) => Promise<{ kind: 'provider_redirect'; authorizationUrl: string }>>();
 const mockRouteAuthorize = jest.fn();
+const mockAuditRecord = jest.fn();
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: mockGetUserFromAuth,
@@ -51,9 +55,19 @@ jest.mock('@/lib/mcp-gateway/services', () => ({
         },
         resolved: {},
       }),
-      resolveRouteParams: async () => ({}),
+      resolveRouteParams: async () => ({
+        config: {
+          owner_scope: 'organization',
+          owner_id: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+          config_id: '316e173c-1007-4f8a-b805-18fe4d95c203',
+        },
+        route: {
+          connect_resource_id: 'c8e51d69-e76f-4f3f-89fd-95d2980f7c9c',
+        },
+      }),
       authorize: mockRouteAuthorize,
     },
+    auditService: { record: mockAuditRecord },
     authorizationService: {
       previewAuthorization: mockPreviewAuthorization,
       authorize: mockAuthorize,
@@ -90,6 +104,9 @@ function organizationPreview() {
     endpointHost: 'mcp.github.example',
     contextName: 'Acme Engineering',
     ownerScope: 'organization' as const,
+    ownerId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+    configId: '316e173c-1007-4f8a-b805-18fe4d95c203',
+    connectResourceId: 'c8e51d69-e76f-4f3f-89fd-95d2980f7c9c',
     scopes: ['mcp:access'],
     executionContext: {
       type: 'organization',
@@ -222,6 +239,17 @@ describe('POST /api/mcp-gateway/oauth/authorize', () => {
     expect(redirect.searchParams.get('error')).toBe('access_denied');
     expect(redirect.searchParams.get('state')).toBe('client-state');
     expect(mockAuthorize).not.toHaveBeenCalled();
+    expect(mockAuditRecord).toHaveBeenCalledWith({
+      actorUserId: mockUser.id,
+      ownerScope: 'organization',
+      ownerId: '2ea138dc-8680-4edf-bfb7-3979329b5a7f',
+      configId: '316e173c-1007-4f8a-b805-18fe4d95c203',
+      connectResourceId: 'c8e51d69-e76f-4f3f-89fd-95d2980f7c9c',
+      instanceId: null,
+      oauthGrantId: null,
+      eventType: 'authorization_denied',
+      outcome: 'blocked',
+    });
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
   });

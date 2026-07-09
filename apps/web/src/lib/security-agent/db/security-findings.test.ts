@@ -119,7 +119,14 @@ describe('upsertSecurityFinding', () => {
     expect(first.wasInserted).toBe(true);
 
     const second = await upsertSecurityFinding({
-      ...makeFinding({ source_id: '10', status: 'fixed', severity: 'critical' }),
+      ...makeFinding({
+        source_id: '10',
+        status: 'fixed',
+        severity: 'critical',
+        package_name: 'lodash-es',
+        package_ecosystem: 'npm-v2',
+        manifest_path: 'apps/web/package.json',
+      }),
       owner,
       repoFullName: repo,
     });
@@ -135,6 +142,9 @@ describe('upsertSecurityFinding', () => {
 
     expect(row.status).toBe('fixed');
     expect(row.severity).toBe('critical');
+    expect(row.package_name).toBe('lodash-es');
+    expect(row.package_ecosystem).toBe('npm-v2');
+    expect(row.manifest_path).toBe('apps/web/package.json');
   });
 
   it('returns the same row for concurrent first upserts on the same source key', async () => {

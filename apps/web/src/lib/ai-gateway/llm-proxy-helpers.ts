@@ -7,7 +7,12 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import {
+  APP_URL,
+  FIRST_TOPUP_BONUS_AMOUNT,
+  INCEPTION_PROMO_MODEL,
+  INCEPTION_PROMO_RUNNING,
+} from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
@@ -23,12 +28,7 @@ import type {
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  type FraudDetectionHeaders,
-  getFraudDetectionHeaders,
-  isRooCodeBasedClient,
-  toMicrodollars,
-} from '@/lib/utils';
+import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
@@ -277,19 +277,12 @@ export function modelNotAllowedResponse() {
   );
 }
 
-export function forbiddenFreeModelResponse(header: FraudDetectionHeaders) {
-  const errorType = ProxyErrorType.discontinued_free_model;
-  if (isRooCodeBasedClient(header)) {
-    // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
-    const error = `The alpha period for this model has ended.`;
-    return NextResponse.json(
-      { error: error, error_type: errorType, message: error },
-      { status: 404 }
-    );
-  } else {
-    const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
-    return NextResponse.json({ error, error_type: errorType, message: error }, { status: 404 });
-  }
+export function forbiddenFreeModelResponse() {
+  const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.discontinued_free_model, message: error },
+    { status: 404 }
+  );
 }
 
 export function modelDoesNotExistResponse() {
@@ -308,6 +301,17 @@ export function noFreeModelsAvailableResponse() {
   return NextResponse.json(
     { error, error_type: ProxyErrorType.no_free_models_available, message: error },
     { status: 503 }
+  );
+}
+
+export function organizationAutoConfigurationResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: 'Organization Auto configuration error',
+      error_type: ProxyErrorType.organization_auto_configuration,
+      message,
+    },
+    { status: 400 }
   );
 }
 
@@ -733,8 +737,12 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      const isInceptionPromoRequest =
+        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
+
+      if (isInceptionPromoRequest || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
+        usageStats.cacheDiscount_mUsd = 0;
       }
 
       // Use the same logMicrodollarUsage as OpenRouter!
@@ -870,11 +878,14 @@ export function countAndStoreEditUsage(
       usageStats.market_cost = usageStats.cost_mUsd;
 
       // Mirror the canonical chat path in `processOpenRouterUsage`: when the
-      // request is BYOK we don't bill the user, so the cache discount we
-      // would otherwise have given them must be zeroed too. Otherwise the
-      // usage row would claim a discount on spend that never happened and
-      // distort "money saved by caching" reporting.
-      if (usageContext.user_byok) {
+      // promotion is running or the request is BYOK we don't bill the user, so
+      // the cache discount we would otherwise have given them must be zeroed
+      // too. Otherwise the usage row would claim a discount on spend that never
+      // happened and distort "money saved by caching" reporting.
+      const isInceptionPromoRequest =
+        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
+
+      if (isInceptionPromoRequest || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }

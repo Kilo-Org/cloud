@@ -16,11 +16,13 @@ import {
   getAnalysisActorById,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
+  prepareActiveAnalysisRestart,
   transitionManualAnalysisQueueFromStart,
   type SecurityFindingRecord,
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
+import { generateApiToken } from './token.js';
 import {
   resolveSecurityAgentModels,
   SECURITY_ANALYSIS_OWNER_CAP,
@@ -51,6 +53,7 @@ export const ManualAnalysisStartCommandSchema = z.object({
     .optional(),
   forceSandbox: z.boolean().optional(),
   retrySandboxOnly: z.boolean().optional(),
+  restartActive: z.boolean().optional(),
 });
 
 export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema.omit({
@@ -76,6 +79,36 @@ function findingMatchesOwner(
     : finding.owned_by_user_id === owner.id;
 }
 
+async function interruptActiveAnalysisSession(params: {
+  env: CloudflareEnv;
+  authToken: string;
+  cloudAgentSessionId: string;
+  commandId: string;
+}): Promise<void> {
+  try {
+    const response = await params.env.CLOUD_AGENT_NEXT.fetch(
+      new Request('https://cloud-agent-next/trpc/interruptSession', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${params.authToken}`,
+        },
+        body: JSON.stringify({ sessionId: params.cloudAgentSessionId }),
+      })
+    );
+    if (!response.ok) {
+      console.warn('Cloud Agent analysis restart interrupt returned non-OK status', {
+        command_id: params.commandId,
+        status: response.status,
+      });
+    }
+  } catch {
+    console.warn('Cloud Agent analysis restart interrupt failed', {
+      command_id: params.commandId,
+    });
+  }
+}
+
 export async function processManualAnalysisStart(params: {
   db: WorkerDb;
   env: CloudflareEnv;
@@ -96,34 +129,89 @@ export async function processManualAnalysisStart(params: {
   if (!finding || !findingMatchesOwner(finding, owner)) {
     return { status: 'finding-missing' };
   }
-  const inflight = await countOwnerInflightAnalyses(params.db, owner);
-  if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
+  const isActiveRestart = params.command.restartActive === true;
+  if (!isActiveRestart) {
+    const inflight = await countOwnerInflightAnalyses(params.db, owner);
+    if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
+  }
+
   const actor = await getAnalysisActorById(params.db, params.command.actorUserId);
   if (!actor) return { status: 'actor-missing' };
 
-  const claimToken = randomUUID();
-  const jobId = `manual:${claimToken}`;
-  if (!(await ensureManualAnalysisQueueRow(params.db, { finding, claimToken, jobId }))) {
-    return { status: 'duplicate' };
-  }
+  let claimToken: string;
+  let tokenResult: GitTokenForRepoResult;
+  let config: Awaited<ReturnType<typeof getSecurityAgentConfigForOwner>>;
+  let nextAuthSecret: string;
+  let internalApiSecret: string;
+  let callbackTokenSecret: string;
 
-  const tokenResult = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
-    githubRepo: finding.repo_full_name,
-    userId: actor.id,
-    orgId: owner.type === 'org' ? owner.id : undefined,
-  });
-  if (!tokenResult.success) {
-    await transitionManualAnalysisQueueFromStart(params.db, {
+  if (isActiveRestart) {
+    [tokenResult, config, nextAuthSecret, internalApiSecret, callbackTokenSecret] =
+      await Promise.all([
+        params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+          githubRepo: finding.repo_full_name,
+          userId: actor.id,
+          orgId: owner.type === 'org' ? owner.id : undefined,
+        }),
+        getSecurityAgentConfigForOwner(params.db, owner),
+        params.env.NEXTAUTH_SECRET.get(),
+        params.env.INTERNAL_API_SECRET.get(),
+        params.env.CALLBACK_TOKEN_SECRET.get(),
+      ]);
+    if (!tokenResult.success) return { status: 'token-missing' };
+
+    const authToken = await generateApiToken(
+      actor,
+      nextAuthSecret,
+      params.env.ENVIRONMENT === 'production' ? 'production' : 'development'
+    );
+    const restart = await prepareActiveAnalysisRestart(params.db, {
       findingId: finding.id,
-      claimToken,
-      status: 'failed',
-      failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
-      errorMessage: 'GitHub token unavailable',
+      owner,
+      commandId: params.command.commandId,
     });
-    return { status: 'token-missing' };
+    if (restart.status !== 'ready') return { status: 'duplicate' };
+
+    claimToken = restart.claimToken;
+    if (restart.oldCloudAgentSessionId) {
+      await interruptActiveAnalysisSession({
+        env: params.env,
+        authToken,
+        cloudAgentSessionId: restart.oldCloudAgentSessionId,
+        commandId: params.command.commandId,
+      });
+    }
+  } else {
+    claimToken = randomUUID();
+    const jobId = `manual:${claimToken}`;
+    if (!(await ensureManualAnalysisQueueRow(params.db, { finding, claimToken, jobId }))) {
+      return { status: 'duplicate' };
+    }
+
+    tokenResult = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+      githubRepo: finding.repo_full_name,
+      userId: actor.id,
+      orgId: owner.type === 'org' ? owner.id : undefined,
+    });
+    if (!tokenResult.success) {
+      await transitionManualAnalysisQueueFromStart(params.db, {
+        findingId: finding.id,
+        claimToken,
+        status: 'failed',
+        failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
+        errorMessage: 'GitHub token unavailable',
+      });
+      return { status: 'token-missing' };
+    }
+
+    config = await getSecurityAgentConfigForOwner(params.db, owner);
+    [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
+      params.env.NEXTAUTH_SECRET.get(),
+      params.env.INTERNAL_API_SECRET.get(),
+      params.env.CALLBACK_TOKEN_SECRET.get(),
+    ]);
   }
 
-  const config = await getSecurityAgentConfigForOwner(params.db, owner);
   const resolvedModels = resolveSecurityAgentModels(config);
   const triageModel =
     params.command.requestedModels?.triageModel ??
@@ -133,11 +221,6 @@ export async function processManualAnalysisStart(params: {
     params.command.requestedModels?.analysisModel ??
     params.command.requestedModels?.model ??
     resolvedModels.analysisModel;
-  const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-    params.env.NEXTAUTH_SECRET.get(),
-    params.env.INTERNAL_API_SECRET.get(),
-    params.env.CALLBACK_TOKEN_SECRET.get(),
-  ]);
   let result: Awaited<ReturnType<typeof startSecurityAnalysis>>;
   try {
     result = await startSecurityAnalysis({
@@ -153,8 +236,8 @@ export async function processManualAnalysisStart(params: {
       nextAuthSecret,
       internalApiSecret,
       callbackTokenSecret,
-      forceSandbox: params.command.forceSandbox,
-      retrySandboxOnly: params.command.retrySandboxOnly,
+      forceSandbox: isActiveRestart ? true : params.command.forceSandbox,
+      retrySandboxOnly: isActiveRestart ? true : params.command.retrySandboxOnly,
       lifecycleClaim: {
         source: 'manual',
         findingId: finding.id,
@@ -226,9 +309,13 @@ export async function processManualAnalysisStart(params: {
       analysisModel,
       analysisMode: config.analysis_mode,
       triageOnly: result.triageOnly ?? false,
+      ...(isActiveRestart ? { restartActive: true } : {}),
     },
   });
-  return { status: 'started' };
+  return {
+    status: 'started',
+    resultCode: isActiveRestart ? 'ANALYSIS_RESTART_STARTED' : undefined,
+  };
 }
 
 function manualAnalysisCommandTerminalState(result: {
@@ -244,7 +331,10 @@ function manualAnalysisCommandTerminalState(result: {
 }): { status: 'succeeded' | 'failed' | 'no_op'; resultCode: string } {
   switch (result.status) {
     case 'started':
-      return { status: 'succeeded', resultCode: 'ANALYSIS_LAUNCH_STARTED' };
+      return {
+        status: 'succeeded',
+        resultCode: result.resultCode ?? 'ANALYSIS_LAUNCH_STARTED',
+      };
     case 'duplicate':
       return { status: 'no_op', resultCode: 'ALREADY_IN_PROGRESS' };
     case 'owner-cap':

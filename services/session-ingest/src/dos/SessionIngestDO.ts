@@ -37,7 +37,8 @@ type IngestMetaKey =
   | 'ingestVersion'
   | 'closeReason'
   | 'metricsEmitted'
-  | 'deleted';
+  | 'deleted'
+  | 'sessionReadyNotified';
 
 type ExtractableMetaKey =
   | 'title'
@@ -302,6 +303,41 @@ export class SessionIngestDO extends DurableObject<Env> {
     return {
       changes,
     };
+  }
+
+  /**
+   * Push "session ready to control from your phone" the first time it is
+   * claimed for this session. The caller (UserConnectionDO) invokes this when
+   * a CLI heartbeat first reports the session as remote-controllable; the
+   * `sessionReadyNotified` meta row here makes the push once-ever durable —
+   * CLI reconnects and UserConnectionDO evictions can't re-arm it. Push
+   * failures are non-fatal: log and move on.
+   */
+  claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+    const deletedRow = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, 'deleted'))
+      .get();
+    if (deletedRow?.value === 'true') return;
+
+    const notified = writeIngestMetaIfChanged(this.db, {
+      key: 'sessionReadyNotified',
+      incomingValue: 'true',
+    });
+    if (!notified.changed) return;
+
+    this.ctx.waitUntil(
+      this.env.NOTIFICATIONS.sendSessionReadyNotification({
+        userId: kiloUserId,
+        cliSessionId: sessionId,
+      }).catch((error: unknown) => {
+        console.error('Failed to send session-ready push (non-fatal)', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
   }
 
   async readKiloSdkSessionSnapshot(): Promise<KiloSdkSessionSnapshotRead> {

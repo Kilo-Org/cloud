@@ -21,6 +21,7 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
+import { useConfirm } from '@/components/ui/confirm';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
@@ -54,6 +55,7 @@ export function SlackIntegrationDetails({
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
 
   // Fetch Slack installation status
@@ -160,8 +162,15 @@ export function SlackIntegrationDetails({
     window.location.href = getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
   };
 
-  const handleUninstall = () => {
-    if (confirm('Are you sure you want to disconnect Slack?')) {
+  const handleUninstall = async () => {
+    if (
+      await confirm({
+        title: 'Disconnect Slack?',
+        description: 'Kilo will stop responding in your Slack workspace. You can reconnect later.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      })
+    ) {
       uninstallApp.mutate(input, {
         onSuccess: async () => {
           toast.success('Slack disconnected');
@@ -176,9 +185,14 @@ export function SlackIntegrationDetails({
     }
   };
 
-  const handleDevRemoveDbRowOnly = () => {
+  const handleDevRemoveDbRowOnly = async () => {
     if (
-      confirm('This will remove the database row but keep the Slack app installed. Are you sure?')
+      await confirm({
+        title: 'Remove database row?',
+        description: 'This removes the database row but keeps the Slack app installed.',
+        confirmLabel: 'Remove row',
+        destructive: true,
+      })
     ) {
       devRemoveDbRowOnly.mutate(input, {
         onSuccess: async () => {

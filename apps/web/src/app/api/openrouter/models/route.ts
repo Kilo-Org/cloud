@@ -11,6 +11,7 @@ import { filterByFeature } from '@/lib/ai-gateway/models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
+import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 
 async function tryGetUserFromAuth() {
   try {
@@ -37,7 +38,7 @@ export async function GET(
     if (result) {
       return NextResponse.json({
         ...result,
-        data: filterByFeature(result.data, feature),
+        data: await addAutoRoutingModels(filterByFeature(result.data, feature)),
       });
     }
 
@@ -45,10 +46,11 @@ export async function GET(
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
+    const models = await addAutoRoutingModels(filterByFeature(data.data, feature));
     if (!auth?.user) {
       const experimentModels = await listAvailableExperimentModels();
       return NextResponse.json({
-        data: filterByFeature(data.data.concat(experimentModels), feature),
+        data: models.concat(filterByFeature(experimentModels, feature)),
       });
     }
 
@@ -58,13 +60,13 @@ export async function GET(
       getUserByokProviderIds(readDb, auth.user.id),
     ]);
     const modelsWithByokAvailability = await addUserByokAvailability(
-      data.data,
+      models,
       enabledByokProviderIds
     );
     return NextResponse.json({
-      data: filterByFeature(
-        modelsWithByokAvailability.concat(byokModels, experimentModels),
-        feature
+      data: modelsWithByokAvailability.concat(
+        filterByFeature(byokModels, feature),
+        filterByFeature(experimentModels, feature)
       ),
     });
   } catch (error) {

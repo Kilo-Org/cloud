@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 describe('Coding Plan MiniMax BYOK routing', () => {
-  it('loads a Token Plan Plus-installed key through ordinary MiniMax routing', async () => {
+  it('loads a MiniMax Coding Plan-installed key through ordinary MiniMax routing', async () => {
     const user = await seedMiniMaxKey('coding_plan');
 
     const byok = await getBYOKforUser(db, user.id, ['minimax']);

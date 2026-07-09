@@ -20,14 +20,13 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
+import { type FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
-  repairTools,
+  repairChatCompletionsTools,
   repairMessagesTools,
   sanitizeBinaryToolResults,
 } from '@/lib/ai-gateway/tool-calling';
-import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
   addCacheBreakpoints,
   enableReasoningSummaries,
@@ -42,6 +41,12 @@ import {
 } from '@/lib/ai-gateway/schema-rewrite';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
+  if (isFableModel(requestedModel)) {
+    return [
+      // our bedrock account doesn't have the required data retention enabled
+      OpenRouterInferenceProviderIdSchema.enum.anthropic,
+    ];
+  }
   if (isClaudeModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
@@ -110,7 +115,7 @@ export function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function applyProviderSpecificLogic(
+export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -118,6 +123,8 @@ export function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
+  organizationId: string | null,
+  sessionId: string | null,
   taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
@@ -127,14 +134,7 @@ export function applyProviderSpecificLogic(
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
-
-    // Mostly a workaround for bugs in the old extension.
-    repairTools(requestToMutate.body);
-
-    if (isOpenCodeBasedClient(originalHeaders)) {
-      // Workaround for bugs in the chat completions client.
-      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
-    }
+    repairChatCompletionsTools(requestToMutate.body);
   }
 
   if (requestToMutate.kind === 'messages') {
@@ -189,12 +189,15 @@ export function applyProviderSpecificLogic(
     requestToMutate.body.thinking = { type: 'disabled' };
   }
 
-  provider.transformRequest({
+  await provider.transformRequest({
     provider,
     model: requestedModel,
     request: requestToMutate,
     originalHeaders,
     extraHeaders,
     userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
   });
 }

@@ -5,6 +5,9 @@ import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks'
 import { useTRPC } from '@/lib/trpc/utils';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import type { StripeSubscriptionStatusValue } from '@/lib/admin/stripe-subscription-statuses';
+import { useEffect } from 'react';
+
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 export function useDeleteOrganization() {
   const queryClient = useQueryClient();
@@ -125,6 +128,81 @@ export function useAdminOrganizationDetails(organizationId: string) {
   );
 }
 
+export function useAdminOrganizationHierarchy(organizationId: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.getHierarchy.queryOptions(
+      {
+        organizationId,
+      },
+      { enabled }
+    )
+  );
+}
+
+export function useSearchAdminOrganizations(
+  search: string,
+  limit = 10,
+  childOfOrganizationId?: string
+) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.search.queryOptions(
+      {
+        search,
+        limit,
+        childOfOrganizationId,
+      },
+      { enabled: search.trim().length > 0 }
+    )
+  );
+}
+
+export function useSetParentOrganization(organizationId: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateAllOrganizationData();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.organizations.admin.setParent.mutationOptions({
+      onSuccess: (_data, variables) => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getHierarchy.queryKey({ organizationId }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getHierarchy.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void invalidate();
+      },
+    })
+  );
+}
+
+export function useCreateAdminOrganization(parentOrganizationId?: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateAllOrganizationData();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.organizations.admin.create.mutationOptions({
+      onSuccess: () => {
+        if (parentOrganizationId) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.organizations.admin.getHierarchy.queryKey({
+              organizationId: parentOrganizationId,
+            }),
+          });
+        }
+        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void invalidate();
+      },
+    })
+  );
+}
+
 export function useAdminOrganizationCreditTransactions(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
@@ -132,4 +210,39 @@ export function useAdminOrganizationCreditTransactions(organizationId: string) {
       organizationId,
     })
   );
+}
+
+export function useAdminOrganizationNextCreditExpiration(organizationId: string) {
+  const trpc = useTRPC();
+  const query = useQuery(
+    trpc.organizations.admin.nextCreditExpiration.queryOptions({
+      organizationId,
+    })
+  );
+  const nextExpirationAt = query.data?.next_credit_expiration_at;
+  const refetch = query.refetch;
+
+  useEffect(() => {
+    if (!nextExpirationAt) return;
+
+    const expirationTime = new Date(nextExpirationAt).getTime();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleRefetch = () => {
+      const remainingMs = expirationTime - Date.now();
+      if (remainingMs <= 0) {
+        void refetch();
+        return;
+      }
+
+      timeoutId = setTimeout(scheduleRefetch, Math.min(remainingMs + 100, MAX_TIMEOUT_MS));
+    };
+
+    scheduleRefetch();
+    return () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
+  }, [nextExpirationAt, refetch]);
+
+  return query;
 }

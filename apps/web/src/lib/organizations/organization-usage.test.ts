@@ -1,9 +1,15 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
+import { after } from 'next/server';
+import { sendBalanceAlertEmail } from '@/lib/email';
 import { db } from '@/lib/drizzle';
-import { organizations, organization_user_usage } from '@kilocode/db/schema';
+import {
+  organizations,
+  organization_memberships,
+  organization_user_usage,
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   createOrganization,
   addUserToOrganization,
@@ -13,9 +19,16 @@ import {
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,
+  mutateOrganizationUsage,
+  scheduleOrganizationLowBalanceAlert,
   updateOrganizationUserLimit,
 } from './organization-usage';
 import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helper';
+
+jest.mock('@/lib/email', () => ({
+  ...jest.requireActual('@/lib/email'),
+  sendBalanceAlertEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => {
@@ -30,6 +43,7 @@ jest.mock('next/server', () => {
 
 describe('Organization Usage Functions', () => {
   afterEach(async () => {
+    jest.clearAllMocks();
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
   });
@@ -165,6 +179,107 @@ describe('Organization Usage Functions', () => {
       // Verify balance unchanged
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(0.04); // 40000 microdollars = 0.04 USD (unchanged)
+    });
+
+    test('separates low-balance mutation from exactly-once post-commit scheduling', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Balance Alert Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: ['billing@example.com'],
+      });
+      const usage = await createOrganizationUsage(20_000, user.id, organization.id);
+
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      expect(result).toEqual({
+        crossedMinimumBalance: true,
+        recipients: ['billing@example.com'],
+        minimumBalanceMicrodollars: 40_000,
+      });
+      expect(jest.mocked(after)).not.toHaveBeenCalled();
+      expect(jest.mocked(sendBalanceAlertEmail)).not.toHaveBeenCalled();
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+
+      expect(jest.mocked(after)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledWith({
+        organizationId: organization.id,
+        minimum_balance: 0.04,
+        to: ['billing@example.com'],
+      });
+    });
+
+    test('does not report low-balance crossing when usage stays above threshold', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Balance Alert Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: ['billing@example.com'],
+      });
+      const usage = await createOrganizationUsage(5_000, user.id, organization.id);
+
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      expect(result).toEqual({
+        crossedMinimumBalance: false,
+        recipients: [],
+        minimumBalanceMicrodollars: 40_000,
+      });
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+
+      expect(jest.mocked(after)).not.toHaveBeenCalled();
+      expect(jest.mocked(sendBalanceAlertEmail)).not.toHaveBeenCalled();
+    });
+
+    test('returns no organization balance alert result for missing organization', async () => {
+      const user = await insertTestUser();
+      const missingOrganizationId = '00000000-0000-0000-0000-000000000000';
+      await db.insert(organization_memberships).values({
+        organization_id: missingOrganizationId,
+        kilo_user_id: user.id,
+        role: 'member',
+      });
+      const usage = await createOrganizationUsage(5_000, user.id, missingOrganizationId);
+
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      expect(result).toEqual({
+        crossedMinimumBalance: false,
+        recipients: [],
+        minimumBalanceMicrodollars: null,
+      });
+
+      const usageRows = await db
+        .select({ id: organization_user_usage.id })
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, missingOrganizationId));
+
+      expect(usageRows).toEqual([]);
+    });
+
+    test('increments organization user usage for same daily bucket', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('User Usage Org', user.id, 50_000);
+      const firstUsage = await createOrganizationUsage(5_000, user.id, organization.id);
+      const secondUsage = await createOrganizationUsage(7_000, user.id, organization.id);
+
+      await db.transaction(tx => mutateOrganizationUsage(tx, firstUsage));
+      await db.transaction(tx => mutateOrganizationUsage(tx, secondUsage));
+
+      const usageRows = await db
+        .select({ microdollar_usage: organization_user_usage.microdollar_usage })
+        .from(organization_user_usage)
+        .where(
+          and(
+            eq(organization_user_usage.organization_id, organization.id),
+            eq(organization_user_usage.kilo_user_id, user.id),
+            eq(organization_user_usage.limit_type, 'daily')
+          )
+        );
+
+      expect(usageRows).toHaveLength(1);
+      expect(usageRows[0]?.microdollar_usage).toBe(12_000);
     });
 
     test('should handle large cost usage', async () => {

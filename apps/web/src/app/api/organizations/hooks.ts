@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrgTrialStatus, TimePeriod } from '@/lib/organizations/organization-types';
+import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
 import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -20,6 +20,52 @@ export function useOrganizationWithMembers(id: string, options?: { enabled?: boo
         },
       }
     )
+  );
+}
+
+export function useOrganizationChildren(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.childOrganizations.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
+export function useOrganizationChildBalances(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.funds.childBalances.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
+export function useDistributeFundsToChildren() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.funds.distribute.mutationOptions({
+      onSuccess: async () => {
+        // Balances change on both the parent and the children, so refresh all
+        // organization-scoped queries.
+        await queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
   );
 }
 
@@ -43,42 +89,6 @@ export const useInvalidateAllOrganizationData = () => {
   };
 };
 
-export function useOrganizationUsageDetails(
-  organizationId: string,
-  timePeriod: string = 'week',
-  userFilter: string = 'all',
-  groupByModel: boolean = false
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.get.queryOptions({
-      organizationId,
-      period: timePeriod as 'week' | 'month' | 'year' | 'all',
-      userFilter: userFilter as 'all' | 'me',
-      groupByModel,
-    })
-  );
-}
-
-export function useOrganizationUsageTimeseries(
-  organizationId: string,
-  startDate: string,
-  endDate: string,
-  options?: { enabled?: boolean }
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.getTimeSeries.queryOptions(
-      {
-        organizationId,
-        startDate,
-        endDate,
-      },
-      options
-    )
-  );
-}
-
 export function useOrganizationCreditTransactions(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.creditTransactions.queryOptions({ organizationId }));
@@ -87,19 +97,6 @@ export function useOrganizationCreditTransactions(organizationId: string) {
 export function useOrganizationUsageStats(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.usageStats.queryOptions({ organizationId }));
-}
-
-export function useOrganizationAutocompleteMetrics(
-  organizationId: string,
-  period: TimePeriod = 'month'
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.getAutocomplete.queryOptions({
-      organizationId,
-      period,
-    })
-  );
 }
 
 export function useOrganizationInvoices(organizationId: string, timePeriod: string = 'year') {
@@ -153,6 +150,16 @@ export function useInviteMember() {
   );
 }
 
+export function useSetChildMemberships() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationAndMembers();
+  return useMutation(
+    trpc.organizations.members.setChildMemberships.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
 export function useUpdateOrganizationName() {
   const trpc = useTRPC();
   const onSuccess = useInvalidateOrganizationAndMembers();
@@ -173,30 +180,63 @@ export function useUpdateCompanyDomain() {
   );
 }
 
-export function useUpdateOrganizationSettings() {
+const useInvalidateOrganizationDataAndDefaults = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  return function (_: unknown, { organizationId }: { organizationId: Organization['id'] }) {
+    void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+    void queryClient.invalidateQueries({ queryKey: ['organization-defaults', organizationId] });
+  };
+};
+
+export function useUpdateOrganizationSettings() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
 
   return useMutation(
     trpc.organizations.settings.updateAllowLists.mutationOptions({
-      onSuccess: () => {
-        // lazy-mode invalidate everything related to an org if settings change
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useUpdateDefaultModel() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
 
   return useMutation(
     trpc.organizations.settings.updateDefaultModel.mutationOptions({
-      onSuccess: () => {
-        // lazy-mode invalidate everything related to an org if settings change
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
+      onSuccess,
+    })
+  );
+}
+
+export function useConfigureOrganizationDefaultBehavior() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.configureOrganizationDefaultBehavior.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useSetOrganizationAutoRoute() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.setOrganizationAutoRoute.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useClearOrganizationAutoRoute() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.clearOrganizationAutoRoute.mutationOptions({
+      onSuccess,
     })
   );
 }
@@ -279,6 +319,21 @@ export function useUpdateMinimumBalanceAlert() {
     trpc.organizations.settings.updateMinimumBalanceAlert.mutationOptions({
       onSuccess: () => {
         // Invalidate organization data to refresh settings
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
+export function useUpdateRecommendationsDigest() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.organizations.settings.updateRecommendationsDigest.mutationOptions({
+      onSuccess: () => {
+        // Invalidate organization data to refresh settings (shared with the
+        // spending-alerts surface, so both stay in sync).
         void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
       },
     })
@@ -492,56 +547,61 @@ export function useOrganizationModeById(organizationId: string, modeId: string) 
   );
 }
 
-export function useCreateOrganizationMode() {
+function useInvalidateOrganizationModes() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  return async (_: unknown, variables: { organizationId: Organization['id']; modeId?: string }) => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.modes.list.queryKey({
+          organizationId: variables.organizationId,
+        }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.withMembers.queryKey({
+          organizationId: variables.organizationId,
+        }),
+      }),
+      ...(variables.modeId
+        ? [
+            queryClient.invalidateQueries({
+              queryKey: trpc.organizations.modes.getById.queryKey({
+                organizationId: variables.organizationId,
+                modeId: variables.modeId,
+              }),
+            }),
+          ]
+        : []),
+    ]);
+  };
+}
+
+export function useCreateOrganizationMode() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationModes();
   return useMutation(
     trpc.organizations.modes.create.mutationOptions({
-      onSuccess: (_, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.list.queryKey({
-            organizationId: variables.organizationId,
-          }),
-        });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useUpdateOrganizationMode() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationModes();
   return useMutation(
     trpc.organizations.modes.update.mutationOptions({
-      onSuccess: (_, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.list.queryKey({
-            organizationId: variables.organizationId,
-          }),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.getById.queryKey({
-            organizationId: variables.organizationId,
-            modeId: variables.modeId,
-          }),
-        });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useDeleteOrganizationMode() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationModes();
   return useMutation(
     trpc.organizations.modes.delete.mutationOptions({
-      onSuccess: (_, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.list.queryKey({
-            organizationId: variables.organizationId,
-          }),
-        });
-      },
+      onSuccess,
     })
   );
 }

@@ -42,6 +42,7 @@ import {
   resolveKiloClawEnrollmentPriceVersion,
   maySelectKiloClawCommit,
   PersonalSubscriptionCollapseUQConflictError,
+  type KiloClawPriceVersion,
 } from '@kilocode/db';
 import {
   kiloclaw_version_pins,
@@ -1607,6 +1608,12 @@ const KiloclawCustomerPortalInputSchema = KiloclawInstanceInputSchema.extend({
   returnUrl: z.url().optional(),
 });
 const KiloclawMutationResultSchema = z.object({ success: z.boolean() });
+const KiloclawReprovisionCreditEnrollmentResultSchema = z.object({
+  success: z.boolean(),
+  status: z.enum(['activated', 'action_required']),
+  instanceId: z.string().uuid().nullable(),
+  message: z.string().optional(),
+});
 
 type KiloclawSubscriptionReferralRewards = z.infer<
   typeof KiloclawSubscriptionReferralRewardsSchema
@@ -1622,6 +1629,31 @@ type KiloclawPersonalSubscriptionRow = {
     destroyedAt: string | null;
   };
 };
+
+type CreditReprovisionRecoveryPreview = {
+  eligible: boolean;
+  plan: 'standard';
+  costMicrodollars: number;
+  projectedKiloPassBonusMicrodollars: number;
+  effectiveBalanceMicrodollars: number;
+  shortfallMicrodollars: number;
+};
+
+type CreditReprovisionRecoveryEligibility =
+  | (CreditReprovisionRecoveryPreview & {
+      eligible: true;
+      subscription: typeof kiloclaw_subscriptions.$inferSelect;
+      priceVersion: KiloClawPriceVersion;
+    })
+  | (CreditReprovisionRecoveryPreview & {
+      eligible: false;
+      reason:
+        | 'no_current_subscription'
+        | 'subscription_not_canceled'
+        | 'instance_not_destroyed'
+        | 'active_instance_exists'
+        | 'insufficient_credits';
+    });
 
 // ── Personal subscription helpers ──────────────────────────────────────
 
@@ -2044,6 +2076,18 @@ async function getPersonalBillingStatus(user: {
         commitCostMicrodollars: commitCreditCostMicrodollars,
       }),
     ]);
+  const creditReprovisionRecovery = await getCreditReprovisionRecoveryEligibility({
+    user,
+    currentRow:
+      sub && currentPersonalInstance
+        ? {
+            subscription: sub,
+            instance: { destroyedAt: currentPersonalInstance.destroyed_at },
+          }
+        : null,
+    activeInstance: await getActiveInstance(user.id),
+    kiloPassState,
+  });
 
   return {
     hasAccess,
@@ -2065,12 +2109,311 @@ async function getPersonalBillingStatus(user: {
         ...commitCreditEnrollmentPreview,
       },
     },
+    creditReprovisionRecovery: {
+      eligible: creditReprovisionRecovery.eligible,
+      plan: 'standard',
+      costMicrodollars: creditReprovisionRecovery.costMicrodollars,
+      projectedKiloPassBonusMicrodollars:
+        creditReprovisionRecovery.projectedKiloPassBonusMicrodollars,
+      effectiveBalanceMicrodollars: creditReprovisionRecovery.effectiveBalanceMicrodollars,
+      shortfallMicrodollars: creditReprovisionRecovery.shortfallMicrodollars,
+    },
     kiloPassUpsellPreview,
     trial: trialData,
     subscription: subscriptionData,
     earlybird: earlybirdData,
     instance: instanceData,
   } satisfies ClawBillingStatus;
+}
+
+async function getCreditReprovisionRecoveryEligibility(params: {
+  user: {
+    id: string;
+    total_microdollars_acquired: number;
+    microdollars_used: number;
+    kilo_pass_threshold: number | null;
+  };
+  currentRow: {
+    subscription: typeof kiloclaw_subscriptions.$inferSelect;
+    instance: { destroyedAt: string | null } | null;
+  } | null;
+  activeInstance: ActiveKiloClawInstance | null;
+  kiloPassState?: KiloPassSubscriptionState | null;
+}): Promise<CreditReprovisionRecoveryEligibility> {
+  const priceVersion = resolveKiloClawEnrollmentPriceVersion(
+    params.currentRow
+      ? {
+          status: params.currentRow.subscription.status,
+          kiloclawPriceVersion: params.currentRow.subscription.kiloclaw_price_version,
+        }
+      : null
+  );
+  const costMicrodollars = getKiloClawPlanCostMicrodollars({
+    priceVersion,
+    plan: 'standard',
+  });
+  const balanceMicrodollars =
+    params.user.total_microdollars_acquired - params.user.microdollars_used;
+  const preview = await getEffectiveCreditBalancePreview({
+    userId: params.user.id,
+    balanceMicrodollars,
+    microdollarsUsed: params.user.microdollars_used,
+    kiloPassThreshold: params.user.kilo_pass_threshold,
+    costMicrodollars,
+    subscription: params.kiloPassState,
+  });
+  const base = {
+    plan: 'standard' as const,
+    costMicrodollars,
+    projectedKiloPassBonusMicrodollars: preview.projectedKiloPassBonusMicrodollars,
+    effectiveBalanceMicrodollars: preview.effectiveBalanceMicrodollars,
+    shortfallMicrodollars: Math.max(0, costMicrodollars - preview.effectiveBalanceMicrodollars),
+  };
+
+  if (!params.currentRow) {
+    return { ...base, eligible: false, reason: 'no_current_subscription' };
+  }
+  if (params.currentRow.subscription.status !== 'canceled') {
+    return { ...base, eligible: false, reason: 'subscription_not_canceled' };
+  }
+  if (!params.currentRow.instance?.destroyedAt) {
+    return { ...base, eligible: false, reason: 'instance_not_destroyed' };
+  }
+  if (params.activeInstance) {
+    return { ...base, eligible: false, reason: 'active_instance_exists' };
+  }
+  if (preview.effectiveBalanceMicrodollars < costMicrodollars) {
+    return { ...base, eligible: false, reason: 'insufficient_credits' };
+  }
+
+  return {
+    ...base,
+    eligible: true,
+    subscription: params.currentRow.subscription,
+    priceVersion,
+  };
+}
+
+function getCreditReprovisionRecoveryUnavailableMessage(
+  eligibility: Exclude<CreditReprovisionRecoveryEligibility, { eligible: true }>
+) {
+  return eligibility.reason === 'insufficient_credits'
+    ? 'Effective credit balance is insufficient to activate Standard hosting.'
+    : 'Credit-funded reprovision recovery is not available for this KiloClaw state.';
+}
+
+function throwCreditReprovisionRecoveryUnavailable(
+  eligibility: Exclude<CreditReprovisionRecoveryEligibility, { eligible: true }>
+): never {
+  const message = getCreditReprovisionRecoveryUnavailableMessage(eligibility);
+  throw new TRPCError({
+    code: eligibility.reason === 'insufficient_credits' ? 'BAD_REQUEST' : 'CONFLICT',
+    message,
+  });
+}
+
+async function linkDestroyedSubscriptionToCreditRecoverySuccessor(params: {
+  userId: string;
+  predecessorSubscriptionId: string;
+  successorInstanceId: string;
+}) {
+  await db.transaction(async tx => {
+    const [predecessor] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, params.predecessorSubscriptionId),
+          eq(kiloclaw_subscriptions.user_id, params.userId)
+        )
+      )
+      .for('update')
+      .limit(1);
+
+    if (!predecessor) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Previous KiloClaw billing state changed before recovery could finish.',
+      });
+    }
+    if (predecessor.transferred_to_subscription_id) {
+      return;
+    }
+
+    const [successor] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, params.userId),
+          eq(kiloclaw_subscriptions.instance_id, params.successorInstanceId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .for('update')
+      .limit(1);
+
+    if (!successor || successor.status !== 'active' || successor.payment_source !== 'credits') {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Credit activation finished but the new billing row could not be linked.',
+      });
+    }
+
+    const [after] = await tx
+      .update(kiloclaw_subscriptions)
+      .set({ transferred_to_subscription_id: successor.id })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, predecessor.id),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .returning();
+
+    if (!after) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Previous KiloClaw billing state changed before recovery could finish.',
+      });
+    }
+
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: predecessor.id,
+      actor: {
+        actorType: 'user',
+        actorId: params.userId,
+      },
+      action: 'reassigned',
+      reason: 'credit_reprovision_recovery',
+      before: predecessor,
+      after,
+    });
+  });
+}
+
+async function tryLinkDestroyedSubscriptionToCreditRecoverySuccessor(params: {
+  userId: string;
+  predecessorSubscriptionId: string;
+  successorInstanceId: string;
+  context: 'post_activation_recovery' | 'post_enrollment_success';
+}) {
+  try {
+    await linkDestroyedSubscriptionToCreditRecoverySuccessor(params);
+    return true;
+  } catch (error) {
+    logBillingWarning('KiloClaw credit reprovision successor linking failed after activation', {
+      user_id: params.userId,
+      predecessor_subscription_id: params.predecessorSubscriptionId,
+      successor_instance_id: params.successorInstanceId,
+      context: params.context,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
+async function getActivatedCreditRecoverySuccessor(params: { userId: string; instanceId: string }) {
+  const [successor] = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      )
+    )
+    .limit(1);
+
+  return successor ?? null;
+}
+
+async function getCompetingCreditRecoveryActivation(params: {
+  userId: string;
+  instanceId: string;
+}): Promise<
+  { status: 'activated'; instanceId: string } | { status: 'in_progress'; instanceId: string } | null
+> {
+  const [activeSuccessor] = await db
+    .select({ instanceId: kiloclaw_subscriptions.instance_id })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        ne(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  if (activeSuccessor?.instanceId) {
+    return { status: 'activated', instanceId: activeSuccessor.instanceId };
+  }
+
+  const [activeInstance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, params.userId),
+        ne(kiloclaw_instances.id, params.instanceId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  return activeInstance ? { status: 'in_progress', instanceId: activeInstance.id } : null;
+}
+
+async function cleanupFailedCreditRecoveryProvision(params: {
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+}) {
+  const [destroyed] = await db
+    .update(kiloclaw_instances)
+    .set({ destroyed_at: new Date().toISOString() })
+    .where(
+      and(
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.userId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .returning({ id: kiloclaw_instances.id });
+
+  if (!destroyed) {
+    return false;
+  }
+
+  try {
+    const client = new KiloClawInternalClient();
+    await client.destroy(
+      params.userId,
+      workerInstanceId({ id: params.instanceId, sandboxId: params.sandboxId }),
+      {
+        reason: 'stale_provision_cleanup',
+      }
+    );
+  } catch (error) {
+    logBillingWarning('KiloClaw credit reprovision cleanup failed after DB quarantine', {
+      user_id: params.userId,
+      instance_id: params.instanceId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return true;
 }
 
 function maskCustomerEmail(email: string | null): string | null {
@@ -5259,6 +5602,156 @@ export const kiloclawRouter = createTRPCRouter({
         });
         throw new TRPCError({ code, message, cause: error });
       }
+    }),
+
+  reprovisionAndEnrollWithCredits: baseProcedure
+    .input(z.object({ plan: z.literal('standard').optional() }).optional())
+    .output(KiloclawReprovisionCreditEnrollmentResultSchema)
+    .mutation(async ({ ctx, input }) => {
+      const plan = input?.plan ?? 'standard';
+      const currentRow = await (async () => {
+        try {
+          return await resolveCurrentPersonalSubscriptionRow({
+            userId: ctx.user.id,
+            dbOrTx: db,
+          });
+        } catch (error) {
+          mapCurrentSubscriptionResolutionError(error);
+        }
+      })();
+      const [activeInstance, kiloPassState] = await Promise.all([
+        getActiveInstance(ctx.user.id),
+        getKiloPassStateForUser(db, ctx.user.id),
+      ]);
+      const eligibility = await getCreditReprovisionRecoveryEligibility({
+        user: ctx.user,
+        currentRow,
+        activeInstance,
+        kiloPassState,
+      });
+
+      if (!eligibility.eligible) {
+        throwCreditReprovisionRecoveryUnavailable(eligibility);
+      }
+
+      const provisioned = await provisionInstance(
+        ctx.user,
+        {},
+        {
+          instanceId: null,
+          bootstrapSubscription: false,
+        }
+      );
+
+      const competingRecovery = await getCompetingCreditRecoveryActivation({
+        userId: ctx.user.id,
+        instanceId: provisioned.instanceId,
+      });
+      if (competingRecovery) {
+        const cleanedUp = await cleanupFailedCreditRecoveryProvision({
+          userId: ctx.user.id,
+          instanceId: provisioned.instanceId,
+          sandboxId: provisioned.sandboxId,
+        });
+        logBillingWarning('KiloClaw credit reprovision skipped duplicate concurrent provision', {
+          user_id: ctx.user.id,
+          instance_id: provisioned.instanceId,
+          competing_instance_id: competingRecovery.instanceId,
+          competing_status: competingRecovery.status,
+          cleanup: cleanedUp ? 'destroyed' : 'not_needed_or_already_destroyed',
+        });
+        if (competingRecovery.status === 'activated') {
+          return {
+            success: true,
+            status: 'activated',
+            instanceId: competingRecovery.instanceId,
+          };
+        }
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'KiloClaw credit-funded reprovision recovery is already in progress.',
+        });
+      }
+
+      try {
+        await enrollWithCreditsImpl({
+          userId: ctx.user.id,
+          instanceId: provisioned.instanceId,
+          plan,
+          hadPaidSubscription: true,
+          expectedPriceVersion: eligibility.priceVersion,
+          actor: {
+            actorType: 'user',
+            actorId: ctx.user.id,
+          },
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'KiloClaw was reprovisioned, but credit activation did not finish.';
+        const activatedSuccessor = await getActivatedCreditRecoverySuccessor({
+          userId: ctx.user.id,
+          instanceId: provisioned.instanceId,
+        });
+        if (activatedSuccessor) {
+          const linked = await tryLinkDestroyedSubscriptionToCreditRecoverySuccessor({
+            userId: ctx.user.id,
+            predecessorSubscriptionId: eligibility.subscription.id,
+            successorInstanceId: provisioned.instanceId,
+            context: 'post_activation_recovery',
+          });
+          logBillingWarning(
+            'KiloClaw credit reprovision enrollment threw after activation; returning activated state',
+            {
+              user_id: ctx.user.id,
+              instance_id: provisioned.instanceId,
+              subscription_id: eligibility.subscription.id,
+              successor_subscription_id: activatedSuccessor.id,
+              successor_linked: linked,
+              error: message,
+            }
+          );
+          return {
+            success: true,
+            status: 'activated',
+            instanceId: provisioned.instanceId,
+          };
+        }
+
+        const cleanedUp = await cleanupFailedCreditRecoveryProvision({
+          userId: ctx.user.id,
+          instanceId: provisioned.instanceId,
+          sandboxId: provisioned.sandboxId,
+        });
+        logBillingWarning('KiloClaw credit reprovision enrollment failed after provisioning', {
+          user_id: ctx.user.id,
+          instance_id: provisioned.instanceId,
+          subscription_id: eligibility.subscription.id,
+          error: message,
+          cleanup: cleanedUp ? 'destroyed' : 'not_needed_or_already_destroyed',
+        });
+        return {
+          success: false,
+          status: 'action_required',
+          instanceId: null,
+          message:
+            'Credit activation did not finish, so the new KiloClaw was rolled back. Retry activation or contact support.',
+        };
+      }
+
+      await tryLinkDestroyedSubscriptionToCreditRecoverySuccessor({
+        userId: ctx.user.id,
+        predecessorSubscriptionId: eligibility.subscription.id,
+        successorInstanceId: provisioned.instanceId,
+        context: 'post_enrollment_success',
+      });
+
+      return {
+        success: true,
+        status: 'activated',
+        instanceId: provisioned.instanceId,
+      };
     }),
 
   createKiloPassUpsellCheckout: baseProcedure

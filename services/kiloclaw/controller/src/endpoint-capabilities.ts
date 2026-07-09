@@ -21,6 +21,7 @@ export const CONTROLLER_ENDPOINT_CAPABILITIES = [
   'files.write',
   'files.write-openclaw-config',
   'files.import-openclaw-workspace',
+  'files.export-openclaw-workspace',
   'profile.bot-identity',
   'profile.user-profile',
   'gateway.lifecycle',

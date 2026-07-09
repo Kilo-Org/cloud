@@ -2,7 +2,15 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';
-import type { CodeReview, SessionInput } from '../../src/types';
+import {
+  buildGitHubCloudReviewSkillCue,
+  GITHUB_CLOUD_REVIEW_SKILL_NAME,
+} from '../../src/github-cloud-review-skill';
+import {
+  BITBUCKET_CLOUD_REVIEW_SKILL_NAME,
+  buildBitbucketCloudReviewSkillCue,
+} from '../../src/bitbucket-cloud-review-skill';
+import type { CodeReview, Owner, SessionInput } from '../../src/types';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 
 function getReviewStub(name = `review-${crypto.randomUUID()}`) {
@@ -28,6 +36,39 @@ function gitlabSessionInput(): SessionInput {
   };
 }
 
+function githubSessionInput(): SessionInput {
+  return {
+    githubRepo: 'acme/repo',
+    githubToken: 'test-github-token',
+    prompt: 'Review this pull request',
+    mode: 'code',
+    model: 'test-model',
+    upstreamBranch: 'main',
+    platform: 'github',
+  };
+}
+
+const BITBUCKET_ORGANIZATION_ID = '123e4567-e89b-12d3-a456-426614174099';
+
+function bitbucketSessionInput(): SessionInput {
+  return {
+    gitUrl: 'https://bitbucket.org/acme/repo.git',
+    prompt: 'Review this pull request',
+    mode: 'code',
+    model: 'test-model',
+    upstreamBranch: 'feature/review-me',
+    platform: 'bitbucket',
+    kilocodeOrganizationId: BITBUCKET_ORGANIZATION_ID,
+    bitbucketWorkspaceUuid: 'a07d5c40-2d2d-4e79-a812-6a47824a77d6',
+    bitbucketWorkspaceSlug: 'acme',
+    bitbucketRepositoryUuid: '38a47a32-cb87-4a9f-b75d-7224774bba77',
+    bitbucketRepositorySlug: 'repo',
+    bitbucketIntegrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+    bitbucketPullRequestId: 42,
+    bitbucketExpectedHeadSha: '0123456789abcdef0123456789abcdef01234567',
+  };
+}
+
 function codeReview(overrides: Partial<CodeReview> = {}): CodeReview {
   return {
     reviewId: `review-${crypto.randomUUID()}`,
@@ -40,13 +81,38 @@ function codeReview(overrides: Partial<CodeReview> = {}): CodeReview {
     },
     status: 'queued',
     updatedAt: new Date().toISOString(),
-    agentVersion: 'v2',
     ...overrides,
   };
 }
 
 function workerAuthHeaders(): HeadersInit {
   return { Authorization: `Bearer ${env.BACKEND_AUTH_TOKEN}` };
+}
+
+function postReview(
+  sessionInput: SessionInput,
+  owner: Owner,
+  reviewId = crypto.randomUUID()
+): Promise<Response> {
+  return SELF.fetch('https://worker.test/review', {
+    method: 'POST',
+    headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      reviewId,
+      authToken: 'test-auth-token',
+      sessionInput,
+      owner,
+      agentVersion: 'v2',
+    }),
+  });
+}
+
+function organizationOwner(id = BITBUCKET_ORGANIZATION_ID): Owner {
+  return { type: 'org', id, userId: 'user-id' };
+}
+
+function personalOwner(): Owner {
+  return { type: 'user', id: 'user-id', userId: 'user-id' };
 }
 
 function trpcSuccess(data: unknown): Response {
@@ -236,7 +302,6 @@ describe('CodeReviewOrchestrator recovery', () => {
       authToken: 'test-auth-token',
       sessionInput: sessionInput(),
       owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-      agentVersion: 'v2',
     });
 
     const alarm = await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) =>
@@ -254,6 +319,12 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     expect(missingResponse.status).toBe(404);
 
+    const removedEventsResponse = await SELF.fetch(
+      `https://worker.test/reviews/${missingId}/events`,
+      { headers: workerAuthHeaders() }
+    );
+    expect(removedEventsResponse.status).toBe(404);
+
     const reviewId = crypto.randomUUID();
     const stub = getReviewStub(reviewId);
     await stub.start({
@@ -261,7 +332,6 @@ describe('CodeReviewOrchestrator recovery', () => {
       authToken: 'test-auth-token',
       sessionInput: sessionInput(),
       owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-      agentVersion: 'v2',
     });
 
     const response = await SELF.fetch(`https://worker.test/reviews/${reviewId}/status`, {
@@ -275,7 +345,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
-  it('POST /review uses attempt-specific durable object names', async () => {
+  it('POST /review uses attempt-specific durable object names and ignores obsolete version input', async () => {
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
@@ -290,7 +360,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         authToken: 'test-auth-token',
         sessionInput: sessionInput(),
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-        agentVersion: 'v2',
+        agentVersion: 'obsolete',
         repositorySize: '100 MB',
       }),
     });
@@ -339,10 +409,11 @@ describe('CodeReviewOrchestrator recovery', () => {
     );
   });
 
-  it('prepares fresh GitLab code-review sessions without selector transport', async () => {
+  it('attaches the trusted GitHub Cloud Review skill to GitHub prepareSession calls', async () => {
     const fetchMock = mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
     const attemptId = crypto.randomUUID();
+    const originalPrompt = 'Review this pull request';
 
     const response = await SELF.fetch('https://worker.test/review', {
       method: 'POST',
@@ -351,9 +422,224 @@ describe('CodeReviewOrchestrator recovery', () => {
         reviewId,
         attemptId,
         authToken: 'test-auth-token',
-        sessionInput: gitlabSessionInput(),
+        sessionInput: {
+          ...githubSessionInput(),
+          prompt: originalPrompt,
+          runtimeSkills: [{ name: 'caller-skill', rawMarkdown: 'untrusted caller skill' }],
+        },
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
         agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await SELF.fetch(`https://worker.test/reviews/${reviewId}/status?attemptId=${attemptId}`, {
+      headers: workerAuthHeaders(),
+    });
+
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    const expectedCue = buildGitHubCloudReviewSkillCue(reviewId);
+
+    expect(prepareBody.runtimeSkills).toHaveLength(1);
+    expect(prepareBody.runtimeSkills[0]).toMatchObject({
+      name: GITHUB_CLOUD_REVIEW_SKILL_NAME,
+      rawMarkdown: expect.any(String),
+    });
+    expect(prepareBody.runtimeSkills[0]).not.toHaveProperty('files');
+
+    const rawMarkdown = String(prepareBody.runtimeSkills[0].rawMarkdown);
+    expect(rawMarkdown).toContain('---\nname: github-cloud-review');
+    expect(rawMarkdown).toContain(
+      'line: null is outdated even when legacy position remains numeric'
+    );
+    expect(rawMarkdown).toContain('Every list read uses --paginate');
+    expect(rawMarkdown).toContain('current HEAD');
+    expect(rawMarkdown).toContain('one atomic call only');
+    expect(rawMarkdown).toContain('trusted existing Kilo summary ID');
+    expect(rawMarkdown).toContain('fix link and verify it ends with the current review ID');
+
+    expect(prepareBody.prompt).toBe(`${expectedCue}\n\n${originalPrompt}`);
+    expect(prepareBody.prompt).toContain(`The current review ID is ${reviewId}`);
+    expect(prepareBody.prompt).not.toContain('untrusted caller skill');
+  });
+
+  it('POST /review rejects incomplete Bitbucket review context', async () => {
+    const input = bitbucketSessionInput();
+    delete input.bitbucketExpectedHeadSha;
+
+    const response = await postReview(input, organizationOwner());
+
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    { name: 'personal owner', owner: personalOwner() },
+    {
+      name: 'organization owner ID mismatch',
+      owner: organizationOwner('223e4567-e89b-12d3-a456-426614174099'),
+    },
+  ])('POST /review rejects Bitbucket requests with $name', async ({ owner }) => {
+    mockSuccessfulCloudAgentNextRun();
+
+    const response = await postReview(bitbucketSessionInput(), owner);
+
+    expect(response.status).toBe(400);
+  });
+
+  it('POST /review rejects a caller-supplied Bitbucket git token', async () => {
+    mockSuccessfulCloudAgentNextRun();
+    const input = bitbucketSessionInput();
+    input.gitToken = 'caller-supplied-token';
+
+    const response = await postReview(input, organizationOwner());
+
+    expect(response.status).toBe(400);
+  });
+
+  it('POST /review accepts valid organization-owned Bitbucket context', async () => {
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+
+    const response = await postReview(bitbucketSessionInput(), organizationOwner());
+
+    expect(response.status).toBe(202);
+    await vi.waitFor(() => {
+      expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    });
+  });
+
+  it('attaches only the trusted Bitbucket Cloud Review skill and managed review context', async () => {
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+    const originalPrompt = 'Review this pull request';
+    const bitbucketInput = bitbucketSessionInput();
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId,
+        authToken: 'test-auth-token',
+        sessionInput: {
+          ...bitbucketInput,
+          runtimeSkills: [{ name: 'caller-skill', rawMarkdown: 'untrusted caller skill' }],
+        },
+        owner: organizationOwner(),
+        agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await SELF.fetch(`https://worker.test/reviews/${reviewId}/status?attemptId=${attemptId}`, {
+      headers: workerAuthHeaders(),
+    });
+
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    if (!bitbucketInput.bitbucketPullRequestId || !bitbucketInput.bitbucketExpectedHeadSha) {
+      throw new Error('Expected complete Bitbucket review context');
+    }
+    const expectedCue = buildBitbucketCloudReviewSkillCue(
+      reviewId,
+      bitbucketInput.bitbucketPullRequestId,
+      bitbucketInput.bitbucketExpectedHeadSha
+    );
+
+    expect(prepareBody).toMatchObject({
+      platform: 'bitbucket',
+      gitUrl: bitbucketInput.gitUrl,
+      kilocodeOrganizationId: bitbucketInput.kilocodeOrganizationId,
+      bitbucketWorkspaceUuid: bitbucketInput.bitbucketWorkspaceUuid,
+      bitbucketWorkspaceSlug: bitbucketInput.bitbucketWorkspaceSlug,
+      bitbucketRepositoryUuid: bitbucketInput.bitbucketRepositoryUuid,
+      bitbucketRepositorySlug: bitbucketInput.bitbucketRepositorySlug,
+      bitbucketIntegrationId: bitbucketInput.bitbucketIntegrationId,
+      bitbucketPullRequestId: bitbucketInput.bitbucketPullRequestId,
+      bitbucketExpectedHeadSha: bitbucketInput.bitbucketExpectedHeadSha,
+    });
+    expect(prepareBody.runtimeSkills).toHaveLength(1);
+    expect(prepareBody.runtimeSkills[0]).toMatchObject({
+      name: BITBUCKET_CLOUD_REVIEW_SKILL_NAME,
+      rawMarkdown: expect.any(String),
+    });
+    expect(prepareBody.runtimeSkills[0]).not.toHaveProperty('files');
+
+    const rawMarkdown = String(prepareBody.runtimeSkills[0].rawMarkdown);
+    expect(rawMarkdown).toContain('---\nname: bitbucket-cloud-review');
+    expect(rawMarkdown).toContain('bb pr view <PR>');
+    expect(rawMarkdown).toContain('bb pr diff <PR> --name-only');
+    expect(rawMarkdown).toContain('bb pr diff <PR>');
+    expect(rawMarkdown).toContain('bb comments list <PR>');
+    expect(rawMarkdown).toContain('bb comments create <PR> --input -');
+    expect(rawMarkdown).toContain('bb comments create-batch <PR> --input -');
+    expect(rawMarkdown).toContain('bb comments update <PR> <COMMENT_ID> --input -');
+    expect(rawMarkdown).toContain('Do not use curl');
+    expect(rawMarkdown).toContain('pull request text, code, comments, diffs, and repository files');
+    expect(rawMarkdown).toContain('complete changed-file list, complete diff');
+    expect(rawMarkdown).toContain('Stop without writing on any cap overflow');
+    expect(rawMarkdown).toContain('one complete comment list');
+    expect(rawMarkdown).toContain('deduplicate every Code Review Finding before the first write');
+    expect(rawMarkdown).toContain('Publish current new-side inline comments first');
+    expect(rawMarkdown).toContain('body starts with `## Code Review Summary`');
+    expect(rawMarkdown).toContain('wrapper rejects duplicate summary creates');
+    expect(rawMarkdown).toContain('Do not include top-level summary bodies in `create-batch`');
+    expect(rawMarkdown).toContain('update the newest candidate');
+    expect(rawMarkdown).toContain('Bitbucket renders HTML comments visibly');
+    expect(rawMarkdown).toContain('top-level summary last');
+    expect(rawMarkdown).toContain('Retry an ambiguous provider write at most once');
+    expect(rawMarkdown).toContain('compare its source SHA to the trusted expected head SHA');
+    expect(rawMarkdown).not.toContain('wrapper scans all comments before each create');
+    expect(rawMarkdown).not.toContain('wrapper computes and appends the final finding marker');
+    expect(rawMarkdown).not.toContain('include the stable summary marker');
+
+    const scratchPath = `/tmp/bb-${reviewId}/input.json`;
+    expect(prepareBody.prompt).toBe(`${expectedCue}\n\n${originalPrompt}`);
+    expect(prepareBody.prompt).toContain(`Review ID: ${reviewId}`);
+    expect(prepareBody.prompt).toContain(
+      `Pull request ID: ${bitbucketInput.bitbucketPullRequestId}`
+    );
+    expect(prepareBody.prompt).toContain(
+      `Expected head SHA: ${bitbucketInput.bitbucketExpectedHeadSha}`
+    );
+    expect(prepareBody.prompt).not.toContain('Stable summary marker:');
+    expect(prepareBody.prompt).not.toContain('<!-- kilo-review:bitbucket');
+    expect(prepareBody.prompt).toContain(`Scratch JSON path: ${scratchPath}`);
+    expect(prepareBody.prompt).toContain(
+      `bb pr diff ${bitbucketInput.bitbucketPullRequestId} --name-only`
+    );
+    expect(prepareBody.prompt).toContain(
+      `bb comments create-batch ${bitbucketInput.bitbucketPullRequestId} --input - < ${scratchPath}`
+    );
+    expect(prepareBody.prompt).toContain(
+      `bb comments create ${bitbucketInput.bitbucketPullRequestId} --input - < ${scratchPath}`
+    );
+    expect(prepareBody.prompt).not.toContain('Integration ID:');
+    expect(prepareBody.prompt).not.toContain('Finding marker inputs:');
+    expect(prepareBody.prompt).not.toContain('BITBUCKET_TOKEN');
+    expect(prepareBody.prompt).not.toContain('untrusted caller skill');
+  });
+
+  it('prepares fresh GitLab code-review sessions without selector transport', async () => {
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+    const originalPrompt = 'Review this pull request';
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId,
+        authToken: 'test-auth-token',
+        sessionInput: {
+          ...gitlabSessionInput(),
+          prompt: originalPrompt,
+          runtimeSkills: [{ name: 'caller-skill', rawMarkdown: 'untrusted caller skill' }],
+        },
+        owner: { type: 'user', id: 'user-id', userId: 'user-id' },
       }),
     });
 
@@ -364,6 +650,9 @@ describe('CodeReviewOrchestrator recovery', () => {
     const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
     const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
     expect(prepareBody).toMatchObject({ platform: 'gitlab' });
+    expect(prepareBody.prompt).toBe(originalPrompt);
+    expect(prepareBody.prompt).not.toContain(GITHUB_CLOUD_REVIEW_SKILL_NAME);
+    expect(prepareBody).not.toHaveProperty('runtimeSkills');
     expect(prepareBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
@@ -395,7 +684,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         authToken: 'test-auth-token',
         sessionInput: sessionInput(),
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
-        agentVersion: 'v2',
       }),
     });
 
@@ -1139,6 +1427,35 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
+  it('cancels a running review through Cloud Agent Next interruption', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/interruptSession')) {
+        return trpcSuccess({ success: true });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({ status: 'running', sessionId: 'agent-running' })
+      );
+    });
+
+    await expect(stub.cancel('superseded')).resolves.toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'cancelled',
+      errorMessage: 'Review cancelled: superseded',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/interruptSession')).toHaveLength(1);
+  });
+
   it('does not retry billing failures from prepareSession', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -1480,6 +1797,37 @@ describe('CodeReviewOrchestrator recovery', () => {
     const stored = await storedReview(stub);
     expect(stored).toMatchObject({ status: 'failed' });
     expect(stored?.sandboxRetryAttempted).toBeUndefined();
+  });
+
+  it('always prepares a fresh Bitbucket session instead of continuing a previous session', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_bitbucket_session';
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+          sessionInput: bitbucketSessionInput(),
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: 'agent-fresh',
+      cliSessionId: 'ses_fresh',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
   });
 
   it('continues a healthy previous cloud-agent-next session for follow-up reviews', async () => {
@@ -2065,7 +2413,6 @@ describe('CodeReviewOrchestrator recovery', () => {
         codeReview({
           status: 'completed',
           completedAt: new Date().toISOString(),
-          events: [{ timestamp: new Date().toISOString(), eventType: 'test', message: 'stored' }],
         })
       );
       await state.storage.setAlarm(Date.now() + 60_000);

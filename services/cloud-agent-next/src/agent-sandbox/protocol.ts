@@ -1,5 +1,6 @@
 import type { WrapperClient } from '../kilo/wrapper-client.js';
 import type { TerminalWrapperClient } from '../terminal/access.js';
+import type { WrapperSessionReadyRequest } from '../shared/wrapper-bootstrap.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -7,6 +8,10 @@ import type {
 } from '../execution/types.js';
 
 export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery';
+
+export const WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON =
+  'wrapper_discovery_list_processes_timeout';
+export type WrapperInspectionFailureReason = typeof WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON;
 
 export type WrapperInstanceLease = {
   instanceId: string;
@@ -24,7 +29,11 @@ export type ObservedWrapper = {
 export type WrapperObservation =
   | { status: 'absent' }
   | { status: 'present'; observed: ObservedWrapper[] }
-  | { status: 'inspection-failed'; error: string };
+  | {
+      status: 'inspection-failed';
+      error: string;
+      reason?: WrapperInspectionFailureReason;
+    };
 
 export type WrapperStopTarget =
   | { kind: 'instance'; instance: WrapperInstanceLease }
@@ -35,6 +44,8 @@ export type WrapperStopReason =
   | 'startup-failed'
   | 'unhealthy-wrapper'
   | 'terminal-failed'
+  | 'terminal-completed'
+  | 'terminal-ended'
   | 'terminal-interrupted'
   | 'idle-timeout'
   | 'keep-warm-expired'
@@ -46,7 +57,11 @@ export type WrapperStopReason =
 export type StopWrappersResult =
   | { status: 'absent'; stoppedInstanceIds?: string[] }
   | { status: 'still-present'; observed: ObservedWrapper[]; error?: string }
-  | { status: 'inspection-failed'; error: string };
+  | {
+      status: 'inspection-failed';
+      error: string;
+      reason?: WrapperInspectionFailureReason;
+    };
 
 export type TerminalClientResult =
   | { status: 'ready'; client: TerminalWrapperClient }
@@ -64,6 +79,7 @@ export type EnsureWrapperRequest = {
   prepared: {
     ready: WorkspaceReady;
     context: { workspacePath: string };
+    readyRequest?: WrapperSessionReadyRequest;
   };
   onProgress?: (step: string, message: string) => void;
 };

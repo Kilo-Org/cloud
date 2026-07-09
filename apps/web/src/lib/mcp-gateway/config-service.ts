@@ -9,13 +9,14 @@ import {
   GatewayErrorCode,
   GatewayAuthMode,
 } from '@kilocode/mcp-gateway';
-import type { MCPGatewayProviderScopeSource } from '@kilocode/db/schema-types';
+import { type MCPGatewayProviderScopeSource } from '@kilocode/db/schema-types';
 import {
   mcp_gateway_assignments,
   mcp_gateway_config_secrets,
   mcp_gateway_configs,
   mcp_gateway_connect_resources,
   mcp_gateway_connection_instances,
+  mcp_gateway_oauth_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_provider_grants,
 } from '@kilocode/db/schema';
@@ -27,6 +28,7 @@ import { configSecretAad, nowIso, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
 import type { GatewayDiscoveryService } from './discovery-service';
 import { createAuditService } from './audit-service';
+import { revokeGrantIdsWithTx } from './oauth-grant-service';
 
 const secretScheme = 'mcp-gateway-credential-rsa-aes-256-gcm';
 
@@ -353,6 +355,70 @@ export function createConfigService(params: {
     });
   }
 
+  async function revokeOAuthGrantsForConfig(
+    tx: GatewayRepository['database'],
+    configId: string,
+    reason: string
+  ) {
+    const grants = await tx
+      .select({ oauth_grant_id: mcp_gateway_oauth_grants.oauth_grant_id })
+      .from(mcp_gateway_oauth_grants)
+      .where(
+        and(
+          eq(mcp_gateway_oauth_grants.config_id, configId),
+          isNull(mcp_gateway_oauth_grants.revoked_at)
+        )
+      );
+    await revokeGrantIdsWithTx(
+      tx,
+      grants.map(g => g.oauth_grant_id),
+      reason
+    );
+  }
+
+  async function revokeOAuthGrantsForResource(
+    tx: GatewayRepository['database'],
+    connectResourceId: string,
+    reason: string
+  ) {
+    const grants = await tx
+      .select({ oauth_grant_id: mcp_gateway_oauth_grants.oauth_grant_id })
+      .from(mcp_gateway_oauth_grants)
+      .where(
+        and(
+          eq(mcp_gateway_oauth_grants.connect_resource_id, connectResourceId),
+          isNull(mcp_gateway_oauth_grants.revoked_at)
+        )
+      );
+    await revokeGrantIdsWithTx(
+      tx,
+      grants.map(g => g.oauth_grant_id),
+      reason
+    );
+  }
+
+  async function revokeOAuthGrantsForInstances(
+    tx: GatewayRepository['database'],
+    instanceIds: string[],
+    reason: string
+  ) {
+    if (instanceIds.length === 0) return;
+    const grants = await tx
+      .select({ oauth_grant_id: mcp_gateway_oauth_grants.oauth_grant_id })
+      .from(mcp_gateway_oauth_grants)
+      .where(
+        and(
+          inArray(mcp_gateway_oauth_grants.instance_id, instanceIds),
+          isNull(mcp_gateway_oauth_grants.revoked_at)
+        )
+      );
+    await revokeGrantIdsWithTx(
+      tx,
+      grants.map(g => g.oauth_grant_id),
+      reason
+    );
+  }
+
   async function revokeConfigGrants(tx: GatewayRepository['database'], configId: string) {
     const activeInstances = await tx
       .select({ instance_id: mcp_gateway_connection_instances.instance_id })
@@ -436,6 +502,7 @@ export function createConfigService(params: {
         })
         .returning();
       if (materialChange) {
+        await revokeOAuthGrantsForConfig(tx, input.configId, 'config_material_changed');
         await revokeConfigGrants(tx, input.configId);
         await tx
           .update(mcp_gateway_configs)
@@ -493,6 +560,7 @@ export function createConfigService(params: {
             currentScopes?.every((scope, index) => scope === nextScopes?.[index]);
       const nextSource: MCPGatewayProviderScopeSource = nextScopes ? 'override' : 'none';
       if (sameScopes && config.provider_scope_source === nextSource) return config;
+      await revokeOAuthGrantsForConfig(tx, input.configId, 'config_material_changed');
       await revokeConfigGrants(tx, input.configId);
       const [updated] = await tx
         .update(mcp_gateway_configs)
@@ -531,6 +599,7 @@ export function createConfigService(params: {
       if (!activeRoute) {
         throw createGatewayError(GatewayErrorCode.NotFound, 'Active route not found', 404);
       }
+      await revokeOAuthGrantsForResource(tx, activeRoute.connect_resource_id, 'route_rotated');
       await tx
         .update(mcp_gateway_connect_resources)
         .set({ route_status: 'rotated', rotated_at: nowIso() })
@@ -606,6 +675,7 @@ export function createConfigService(params: {
       )
       .returning({ instance_id: mcp_gateway_connection_instances.instance_id });
     const instanceIds = instances.map(instance => instance.instance_id);
+    await revokeOAuthGrantsForInstances(tx, instanceIds, 'assignment_removed');
     if (instanceIds.length > 0) {
       await tx
         .update(mcp_gateway_provider_grants)
@@ -713,22 +783,25 @@ export function createConfigService(params: {
   }
 
   async function disableConfig(configId: string) {
-    const rows = await params.repository.database
-      .update(mcp_gateway_configs)
-      .set({ enabled: false, config_version: sql`${mcp_gateway_configs.config_version} + 1` })
-      .where(eq(mcp_gateway_configs.config_id, configId))
-      .returning();
-    const config = rows[0] ?? null;
-    if (config) {
-      await createAuditService(params.repository).record({
-        ownerScope: config.owner_scope,
-        ownerId: config.owner_id,
-        configId: config.config_id,
-        eventType: 'config_disabled',
-        outcome: 'success',
-      });
-    }
-    return config;
+    return await params.repository.database.transaction(async tx => {
+      await revokeOAuthGrantsForConfig(tx, configId, 'config_disabled');
+      const rows = await tx
+        .update(mcp_gateway_configs)
+        .set({ enabled: false, config_version: sql`${mcp_gateway_configs.config_version} + 1` })
+        .where(eq(mcp_gateway_configs.config_id, configId))
+        .returning();
+      const config = rows[0] ?? null;
+      if (config) {
+        await createAuditService(createGatewayRepository(tx)).record({
+          ownerScope: config.owner_scope,
+          ownerId: config.owner_id,
+          configId: config.config_id,
+          eventType: 'config_disabled',
+          outcome: 'success',
+        });
+      }
+      return config;
+    });
   }
 
   async function deleteConfig(configId: string) {
@@ -754,6 +827,7 @@ export function createConfigService(params: {
             eq(mcp_gateway_connect_resources.route_status, 'active')
           )
         );
+      await revokeOAuthGrantsForConfig(tx, configId, 'config_deleted');
       await revokeConfigGrants(tx, configId);
       await tx
         .update(mcp_gateway_connection_instances)

@@ -23,6 +23,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useConfirm } from '@/components/ui/confirm';
 import { motion, AnimatePresence } from 'motion/react';
 import Link from 'next/link';
 
@@ -39,6 +40,7 @@ export function RigDetailPageClient({
 }: RigDetailPageClientProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const trpc = useGastownTRPC();
+  const confirm = useConfirm();
   const [isCreateBeadOpen, setIsCreateBeadOpen] = useState(false);
   const [convoysCollapsed, setConvoysCollapsed] = useState(false);
   const { open: openDrawer } = useDrawerStack();
@@ -233,9 +235,18 @@ export function RigDetailPageClient({
               beads={beads}
               isLoading={beadsQuery.isLoading}
               onDeleteBead={beadId => {
-                if (confirm('Delete this bead?')) {
-                  deleteBead.mutate({ rigId, beadId });
-                }
+                void (async () => {
+                  if (
+                    await confirm({
+                      title: 'Delete this bead?',
+                      description: 'This permanently removes the bead and cannot be undone.',
+                      confirmLabel: 'Delete bead',
+                      destructive: true,
+                    })
+                  ) {
+                    deleteBead.mutate({ rigId, beadId });
+                  }
+                })();
               }}
               onSelectBead={bead => openDrawer({ type: 'bead', beadId: bead.bead_id, rigId })}
               onStartBead={beadId => startBead.mutate({ rigId, beadId })}
@@ -284,9 +295,18 @@ export function RigDetailPageClient({
                     isSelected={false}
                     onSelect={() => openDrawer({ type: 'agent', agentId: agent.id, rigId, townId })}
                     onDelete={() => {
-                      if (confirm(`Delete agent "${agent.name}"?`)) {
-                        deleteAgent.mutate({ rigId, agentId: agent.id });
-                      }
+                      void (async () => {
+                        if (
+                          await confirm({
+                            title: `Delete agent "${agent.name}"?`,
+                            description: 'This permanently removes the agent and cannot be undone.',
+                            confirmLabel: 'Delete agent',
+                            destructive: true,
+                          })
+                        ) {
+                          deleteAgent.mutate({ rigId, agentId: agent.id });
+                        }
+                      })();
                     }}
                   />
                 </motion.div>

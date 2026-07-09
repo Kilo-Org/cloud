@@ -131,11 +131,14 @@ export enum CliSessionSharedState {
  */
 export enum SecurityAuditLogAction {
   FindingCreated = 'security.finding.created',
+  FindingSeverityChanged = 'security.finding.severity_changed',
   FindingStatusChange = 'security.finding.status_change',
   FindingDismissed = 'security.finding.dismissed',
   FindingAutoDismissed = 'security.finding.auto_dismissed',
+  FindingSuperseded = 'security.finding.superseded',
   FindingAnalysisStarted = 'security.finding.analysis_started',
   FindingAnalysisCompleted = 'security.finding.analysis_completed',
+  FindingAnalysisFailed = 'security.finding.analysis_failed',
   RemediationQueued = 'security.remediation.queued',
   RemediationStarted = 'security.remediation.started',
   RemediationPrOpened = 'security.remediation.pr_opened',
@@ -151,6 +154,21 @@ export enum SecurityAuditLogAction {
   SyncTriggered = 'security.sync.triggered',
   SyncCompleted = 'security.sync.completed',
   AuditLogExported = 'security.audit_log.exported',
+  AuditReportGenerated = 'security.audit_report.generated',
+}
+
+export enum SecurityFindingAuditSourceContext {
+  SecuritySync = 'security_sync',
+  Web = 'web',
+  AnalysisWorker = 'analysis_worker',
+  RemediationCallback = 'remediation_callback',
+  RolloutBaseline = 'rollout_baseline',
+}
+
+export enum SecurityAuditLogActorType {
+  CustomerUser = 'customer_user',
+  KiloAdmin = 'kilo_admin',
+  System = 'system',
 }
 
 // --- KiloClaw enums ---
@@ -577,6 +595,75 @@ export const CodingPlanTermKind = {
 
 export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
 
+// --- Cost Insights enums ---
+
+export const CostInsightSpendCategory = {
+  Variable: 'variable',
+  Scheduled: 'scheduled',
+} as const;
+
+export type CostInsightSpendCategory =
+  (typeof CostInsightSpendCategory)[keyof typeof CostInsightSpendCategory];
+
+export const CostInsightSpendSource = {
+  AiGateway: 'ai_gateway',
+  KiloClaw: 'kiloclaw',
+  CodingPlan: 'coding_plan',
+  Other: 'other',
+} as const;
+
+export type CostInsightSpendSource =
+  (typeof CostInsightSpendSource)[keyof typeof CostInsightSpendSource];
+
+export const CostInsightRollupDegradedReason = {
+  CaptureBypass: 'capture_bypass',
+  ReconciliationMismatch: 'reconciliation_mismatch',
+  LateSourceData: 'late_source_data',
+} as const;
+
+export type CostInsightRollupDegradedReason =
+  (typeof CostInsightRollupDegradedReason)[keyof typeof CostInsightRollupDegradedReason];
+
+export const CostInsightEventType = {
+  ConfigChanged: 'config_changed',
+  AnomalyAlert: 'anomaly_alert',
+  ThresholdCrossed: 'threshold_crossed',
+  AlertReviewed: 'alert_reviewed',
+  SuggestionCreated: 'suggestion_created',
+  SuggestionDismissed: 'suggestion_dismissed',
+  Disabled: 'disabled',
+} as const;
+
+export type CostInsightEventType = (typeof CostInsightEventType)[keyof typeof CostInsightEventType];
+
+export const CostInsightAlertKind = {
+  Anomaly: 'anomaly',
+  Threshold: 'threshold',
+  Threshold7Day: 'threshold_7d',
+  Threshold30Day: 'threshold_30d',
+} as const;
+
+export type CostInsightAlertKind = (typeof CostInsightAlertKind)[keyof typeof CostInsightAlertKind];
+
+export const CostInsightSuggestionKind = {
+  CodingPlan: 'coding_plan',
+  KiloPass: 'kilo_pass',
+} as const;
+
+export type CostInsightSuggestionKind =
+  (typeof CostInsightSuggestionKind)[keyof typeof CostInsightSuggestionKind];
+
+export const CostInsightNotificationStatus = {
+  Pending: 'pending',
+  Sending: 'sending',
+  Sent: 'sent',
+  Failed: 'failed',
+  Skipped: 'skipped',
+} as const;
+
+export type CostInsightNotificationStatus =
+  (typeof CostInsightNotificationStatus)[keyof typeof CostInsightNotificationStatus];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',
@@ -715,12 +802,47 @@ export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 
 export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
+export const ORGANIZATION_AUTO_MODEL_ID = 'kilo-auto/org';
+export const MAX_ORGANIZATION_AUTO_ROUTES = 100;
+
+const OrganizationAutoModelRouteSlugSchema = z
+  .string()
+  .min(1, 'Organization Auto route slug is required')
+  .max(50, 'Organization Auto route slug must be less than 50 characters')
+  .regex(
+    /^[a-z0-9-]+$/,
+    'Organization Auto route slug must contain only lowercase letters, numbers, and hyphens'
+  );
+
+const OrganizationAutoModelTargetSchema = z
+  .string()
+  .min(1, 'Organization Auto route target is required')
+  .max(200, 'Organization Auto route target must be less than 200 characters')
+  .refine(value => !value.endsWith('/*'), {
+    message: 'Organization Auto route target must be a concrete model identifier',
+  })
+  .refine(value => value !== ORGANIZATION_AUTO_MODEL_ID, {
+    message: 'Organization Auto cannot target itself',
+  });
+
+export const OrganizationAutoModelSettingsSchema = z.object({
+  routes: z
+    .record(OrganizationAutoModelRouteSlugSchema, OrganizationAutoModelTargetSchema)
+    .refine(routes => Object.keys(routes).length <= MAX_ORGANIZATION_AUTO_ROUTES, {
+      message: `Organization Auto supports at most ${MAX_ORGANIZATION_AUTO_ROUTES} routes`,
+    }),
+  fallback_model: OrganizationAutoModelTargetSchema,
+});
+
+export type OrganizationAutoModelSettings = z.infer<typeof OrganizationAutoModelSettingsSchema>;
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
 
   default_model: z.string().optional(),
+  org_auto_model: OrganizationAutoModelSettingsSchema.optional(),
   data_collection: z.enum(['allow', 'deny']).nullable().optional(),
   // null means they were grandfathered in and so they have usage limits enabled
   enable_usage_limits: z.boolean().optional(),
@@ -728,6 +850,11 @@ const OrganizationSettingsSchema = z.object({
   projects_ui_enabled: z.boolean().optional(),
   minimum_balance: z.number().optional(),
   minimum_balance_alert_email: z.array(z.email()).optional(),
+  // Whether the weekly enterprise recommendations digest email is enabled. When on,
+  // the digest is emailed to the organization's owners. Enterprise-only feature.
+  // Named "recommendations" (not "adoption") to avoid confusion with AI adoption
+  // usage data and the Feature adoption tab.
+  recommendations_digest_enabled: z.boolean().optional(),
   suppress_trial_messaging: z.boolean().optional(),
   // OSS Sponsorship fields
   // null/undefined = not an OSS org, values: 1, 2, or 3
@@ -765,7 +892,6 @@ export const OrganizationModeConfigSchema = z.object({
   description: z.string().optional(),
   customInstructions: z.string().optional(),
   groups: z.array(GroupEntrySchema),
-  defaultModel: z.string().min(1, 'Default model cannot be empty').optional(),
 });
 
 export type OrganizationModeConfig = z.infer<typeof OrganizationModeConfigSchema>;
@@ -891,6 +1017,7 @@ export const AuditLogAction = z.enum([
   'organization.promo_credit_granted', // ✅
   'organization.member.remove', // ✅
   'organization.member.change_role', // ✅
+  'organization.member.admin_add',
   'organization.sso.auto_provision', // ✅
   'organization.sso.set_domain', // ✅
   'organization.sso.remove_domain', // ✅
@@ -899,6 +1026,7 @@ export const AuditLogAction = z.enum([
   'organization.mode.delete', // ✅
   'organization.created', // ✅
   'organization.token.generate', // ✅
+  'organization.funds.distribute_to_children', // ✅
 ]);
 
 // --- EncryptedData ---
@@ -950,11 +1078,12 @@ export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
 
 export type IntegrationPermissions = Record<string, string>;
 
-export type PlatformRepository = {
-  id: number;
+export type PlatformRepository<TId extends number | string = number> = {
+  id: TId;
   name: string;
   full_name: string;
   private: boolean;
+  default_branch?: string;
 };
 
 export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;
@@ -1092,6 +1221,9 @@ export type CodeReviewFindingSecurityClass =
 
 // --- CodeReviewAgentConfig ---
 
+export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
+export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];
+
 export const ManuallyAddedRepositorySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -1115,7 +1247,7 @@ export const CodeReviewAgentConfigSchema = z.object({
     .nullable()
     .optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
-  selected_repository_ids: z.array(z.number()).optional(),
+  selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
   disable_review_md: z.boolean().optional(),
@@ -1131,6 +1263,16 @@ export const CodeReviewAgentConfigSchema = z.object({
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
+
+export const ManualCodeReviewConfigSchema = z
+  .object({
+    agentConfig: CodeReviewAgentConfigSchema,
+    instructions: z.string().max(4_000).nullable(),
+    outputMode: z.enum(['provider', 'kilo']),
+  })
+  .strict();
+
+export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
 
 // --- Security types ---
 
@@ -1239,6 +1381,7 @@ export type SandboxSuggestedAction =
 
 export type SecurityFindingSandboxAnalysis = {
   isExploitable: boolean | 'unknown';
+  extractionStatus?: 'succeeded' | 'failed';
   exploitabilityReasoning: string;
   usageLocations: string[];
   suggestedFix: string;
@@ -1249,9 +1392,32 @@ export type SecurityFindingSandboxAnalysis = {
   modelUsed?: string;
 };
 
+export type SecurityFindingAnalysisInput = {
+  schemaVersion: 1;
+  source: string;
+  sourceId: string;
+  sourceUpdatedAt: string | null;
+  repoFullName: string;
+  status: string;
+  severity: string | null;
+  packageName: string;
+  packageEcosystem: string;
+  dependencyScope: string | null;
+  cveId: string | null;
+  ghsaId: string | null;
+  cweIds: string[];
+  cvssScore: string | null;
+  title: string;
+  description: string | null;
+  vulnerableVersionRange: string | null;
+  patchedVersion: string | null;
+  manifestPath: string | null;
+};
+
 export type SecurityFindingAnalysis = {
   triage?: SecurityFindingTriage;
   sandboxAnalysis?: SecurityFindingSandboxAnalysis;
+  findingDataSnapshot?: SecurityFindingAnalysisInput;
   rawMarkdown?: string;
   analyzedAt: string;
   modelUsed?: string;
@@ -1287,6 +1453,12 @@ export const OpenRouterEndpoint = z.object({
   provider_display_name: z.string(),
   is_free: z.boolean(),
   pricing: OpenRouterPricing,
+  data_policy: z
+    .object({
+      training: z.boolean().optional(),
+      retainsPrompts: z.boolean().optional(),
+    })
+    .nullish(),
 });
 
 export type OpenRouterModel = z.infer<typeof OpenRouterModel>;
@@ -1443,6 +1615,15 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const CustomLlmCompressionSchema = z.object({
+  enabled: z.literal(true),
+  base_url: z.url().optional(),
+  api_key: z.string().optional(),
+  model_alias: z.string(),
+});
+
+export type CustomLlmCompression = z.infer<typeof CustomLlmCompressionSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
@@ -1452,6 +1633,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
+  compression: CustomLlmCompressionSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -1481,7 +1663,7 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
-  context_length: z.number(),
+  context_length: z.number().optional(),
   pricing: z
     .object({
       prompt: z.string(),
@@ -1637,6 +1819,15 @@ export const MCPGatewayProviderGrantStatus = {
 
 export type MCPGatewayProviderGrantStatus =
   (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewayOAuthGrantStatus = {
+  Pending: 'pending',
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayOAuthGrantStatus =
+  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
 
 export const MCPGatewaySecretKind = {
   StaticProviderCredentials: 'static_provider_credentials',

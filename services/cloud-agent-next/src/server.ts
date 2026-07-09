@@ -5,7 +5,7 @@ import { appRouter } from './router.js';
 import type { Env } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
-import { validateStreamTicket, validateKiloToken } from './auth.js';
+import { resolveSecret, validateStreamTicket, validateKiloToken } from './auth.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
@@ -19,6 +19,7 @@ import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
 import { hasDuplicateQueryParameters } from './shared/http-query.js';
+import { projectSessionAccessHttpError, requireCurrentSessionAccess } from './session-access.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -67,7 +68,8 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Missing ticket', { status: 401 });
   }
 
-  const ticketResult = validateStreamTicket(ticket, env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const ticketResult = validateStreamTicket(ticket, nextAuthSecret);
   if (!ticketResult.success) {
     logger
       .withFields({ cloudAgentSessionId, error: ticketResult.error })
@@ -98,6 +100,18 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
   if (ticketResult.payload.ptyId !== ptyId) {
     logger.withFields({ cloudAgentSessionId, userId, ptyId }).warn('/terminal: PTY mismatch');
     return new Response('PTY mismatch', { status: 403 });
+  }
+
+  try {
+    await requireCurrentSessionAccess({
+      env,
+      kiloUserId: userId,
+      cloudAgentSessionId,
+      expectedOrganizationId: ticketResult.payload.organizationId ?? null,
+      expectedKiloSessionId: ticketResult.payload.kiloSessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
   }
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
@@ -173,10 +187,8 @@ async function routeToUserKiloFacade(
 }
 
 async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
-  const authResult = await validateKiloToken(
-    c.req.header('Authorization') ?? null,
-    c.env.NEXTAUTH_SECRET
-  );
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
@@ -206,7 +218,8 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Missing ticket', 401);
   }
 
-  const ticketResult = validateStreamTicket(ticket, c.env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const ticketResult = validateStreamTicket(ticket, nextAuthSecret);
   if (!ticketResult.success) {
     logger
       .withFields({ cloudAgentSessionId, error: ticketResult.error })
@@ -232,6 +245,18 @@ app.get('/stream', async (c: Context<HonoContext>) => {
       .withFields({ cloudAgentSessionId, ticketCloudAgentSessionId })
       .warn('/stream: Session mismatch between URL and ticket');
     return c.text('Session mismatch', 403);
+  }
+
+  try {
+    await requireCurrentSessionAccess({
+      env: c.env,
+      kiloUserId: userId,
+      cloudAgentSessionId,
+      expectedOrganizationId: ticketResult.payload.organizationId ?? null,
+      expectedKiloSessionId: ticketResult.payload.kiloSessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
   }
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
@@ -264,10 +289,8 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     return c.text('Invalid userId encoding', 400);
   }
 
-  const authResult = await validateKiloToken(
-    c.req.header('Authorization') ?? null,
-    c.env.NEXTAUTH_SECRET
-  );
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
@@ -293,6 +316,17 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     !wrapperConnectionId
   ) {
     return c.text('Invalid global feed producer identity', 400);
+  }
+
+  try {
+    await requireCurrentSessionAccess({
+      env: c.env,
+      kiloUserId: userId,
+      cloudAgentSessionId,
+      expectedKiloSessionId: kiloSessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
   }
 
   const sessionDoId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
@@ -344,12 +378,23 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
   }
 
   const authHeader = c.req.header('Authorization');
-  const authResult = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(authHeader ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
   if (authResult.userId !== userId) {
     return c.text('Token does not match session user', 403);
+  }
+
+  try {
+    await requireCurrentSessionAccess({
+      env: c.env,
+      kiloUserId: userId,
+      cloudAgentSessionId: sessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
   }
 
   const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -386,12 +431,23 @@ app.put(
     }
 
     const authHeader = c.req.header('Authorization');
-    const authResult = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+    const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+    const authResult = await validateKiloToken(authHeader ?? null, nextAuthSecret);
     if (!authResult.success) {
       return c.text(authResult.error, 401);
     }
     if (authResult.userId !== userId) {
       return c.text('Token does not match session user', 403);
+    }
+
+    try {
+      await requireCurrentSessionAccess({
+        env: c.env,
+        kiloUserId: userId,
+        cloudAgentSessionId: sessionId,
+      });
+    } catch (error) {
+      return projectSessionAccessHttpError(error);
     }
 
     const contentLength = parseInt(c.req.header('Content-Length') ?? '', 10);
@@ -442,6 +498,7 @@ app.use(
       userId: c.get('userId'),
       authToken: c.get('authToken'),
       botId: c.get('botId'),
+      validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {

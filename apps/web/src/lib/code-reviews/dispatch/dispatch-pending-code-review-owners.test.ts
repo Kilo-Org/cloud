@@ -85,6 +85,7 @@ describe('dispatch pending code review owners', () => {
     createdAt: string;
     updatedAt?: string;
     startedAt?: string | null;
+    platform?: 'github' | 'gitlab' | 'bitbucket';
   }) {
     const sequence = reviewSequence++;
     return {
@@ -98,6 +99,7 @@ describe('dispatch pending code review owners', () => {
       base_ref: 'main',
       head_ref: `feature/owner-drain-${sequence}`,
       head_sha: `owner-drain-sha-${sequence}`,
+      platform: params.platform ?? 'github',
       status: params.status,
       created_at: params.createdAt,
       updated_at: params.updatedAt ?? params.createdAt,
@@ -170,6 +172,33 @@ describe('dispatch pending code review owners', () => {
     });
   });
 
+  it('excludes Bitbucket owners before applying the candidate limit', async () => {
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner: { type: 'user', id: firstUser.id },
+        status: 'pending',
+        platform: 'bitbucket',
+        createdAt: minutesAgo(30),
+      }),
+      reviewValues({
+        owner: { type: 'user', id: secondUser.id },
+        status: 'pending',
+        platform: 'github',
+        createdAt: minutesAgo(20),
+      }),
+    ]);
+
+    const result = await listDispatchableCodeReviewOwnerCandidates({
+      limit: 1,
+      excludeBitbucket: true,
+    });
+
+    expect(result).toEqual({
+      owners: [{ type: 'user', id: secondUser.id }],
+      hasMore: false,
+    });
+  });
+
   it('bounds cron pending discovery by created_at while still recovering stale queued work', async () => {
     const tooRecentPendingTimestamp = minutesAgo(30);
     const eligiblePendingTimestamp = minutesAgo(65);
@@ -217,6 +246,59 @@ describe('dispatch pending code review owners', () => {
       ],
       hasMore: false,
     });
+  });
+
+  it('drains Bitbucket owners during cron dispatch', async () => {
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner: { type: 'user', id: firstUser.id },
+        status: 'pending',
+        platform: 'bitbucket',
+        createdAt: minutesAgo(68),
+      }),
+      reviewValues({
+        owner: { type: 'user', id: secondUser.id },
+        status: 'pending',
+        platform: 'github',
+        createdAt: minutesAgo(65),
+      }),
+    ]);
+    mockTryDispatchPendingReviews.mockResolvedValue({
+      dispatched: 1,
+      notDispatched: 0,
+      activeCount: 1,
+    });
+
+    const summary = await dispatchPendingCodeReviewOwners();
+
+    expect(summary).toEqual({
+      ownersConsidered: 2,
+      ownersProcessed: 2,
+      ownersWithNoNewDispatch: 0,
+      ownersSkippedMissingBotUsers: 0,
+      coordinatorFailures: 0,
+      reviewsDispatched: 2,
+      hasMoreCandidateOwners: false,
+    });
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(2);
+    expect(mockTryDispatchPendingReviews).toHaveBeenNthCalledWith(
+      1,
+      {
+        type: 'user',
+        id: firstUser.id,
+        userId: firstUser.id,
+      },
+      expect.objectContaining({ pendingCreatedAtWindow: expect.anything() })
+    );
+    expect(mockTryDispatchPendingReviews).toHaveBeenNthCalledWith(
+      2,
+      {
+        type: 'user',
+        id: secondUser.id,
+        userId: secondUser.id,
+      },
+      expect.objectContaining({ pendingCreatedAtWindow: expect.anything() })
+    );
   });
 
   it('drains owners with pending work inside the cron window and skips outside-window pending owners', async () => {

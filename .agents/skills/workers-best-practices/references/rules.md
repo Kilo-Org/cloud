@@ -268,6 +268,36 @@ async fetch(request: Request, env: Env): Promise<Response> {
 
 **Retrieve**: `/hyperdrive/` for current configuration and supported databases.
 
+### Repo rule: never cache DB clients/pools in module scope (Workers or Durable Objects)
+
+This repo's Workers and Durable Objects must not cache database clients, pools, or other transport-owning/request-context-bound SDK objects in module scope. Workers reuse isolates across requests, and Durable Object classes in the same Worker can share module memory across object instances — stale module-scope I/O state causes cross-context runtime failures, not just the generic "stale request state" anti-pattern above.
+
+**Check**: no `const client = new Client(...)` (or Drizzle/pg pool equivalent) declared at module scope, even for "read-only" or "singleton" convenience.
+
+- Create external database clients through the approved per-use helper, `getWorkerDb(...)`; let Hyperdrive own pooling.
+- Only cache pure data or context-independent values in module scope (e.g. static config objects, parsed constants).
+- Durable Object **instance fields** are fine for object-local state created from constructor inputs — for example, SQLite/Drizzle wrappers over `state.storage`. That is per-object state, not shared module state.
+- If an optimization appears to require module-scope client caching, stop and document why lifetime, transport ownership, binding freshness, and Cloudflare runtime behavior make it safe before implementing it.
+
+```ts
+// Correct: per-request/per-call helper owns client lifecycle
+export async function handler(env: Env) {
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+  return db.select().from(users);
+}
+```
+
+Anti-pattern:
+
+```ts
+// Module-scope client — shared across isolate reuse and (for DOs) across instances
+const db = drizzle(new Client({ connectionString: env.HYPERDRIVE.connectionString }));
+
+export async function handler() {
+  return db.select().from(users); // stale/leaked connection risk
+}
+```
+
 ---
 
 ## Observability

@@ -8,6 +8,7 @@ import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import type { CloudAgentSessionId } from './types';
+import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 type CloudAgentStreamTicket = {
   ticket: string;
@@ -21,6 +22,13 @@ type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
 type TransportSink = {
   onChatEvent: (event: ChatEvent) => void;
   onServiceEvent: (event: ServiceEvent) => void;
+  /**
+   * Fired once a connect/reconnect cycle has finished replaying history and
+   * has switched to delivering live events. Lets consumers distinguish a
+   * historical `message.updated` (replayed from a snapshot, may be stale)
+   * from a live one (happened just now, authoritative).
+   */
+  onReplayComplete?: () => void;
 };
 
 /**
@@ -33,7 +41,7 @@ type SendPromptPayload = {
   type: 'prompt';
   prompt: string;
   mode?: string;
-  model?: string;
+  model?: ModelRef;
   variant?: string;
 };
 type SendCommandPayload = {
@@ -44,6 +52,23 @@ type SendCommandPayload = {
 };
 type TransportSendPayload = SendPromptPayload | SendCommandPayload;
 
+type CloudAgentPromptPayload = {
+  type: 'prompt';
+  prompt: string;
+  mode: string;
+  model: string;
+  variant?: string;
+};
+type CloudAgentSendPayload = CloudAgentPromptPayload | SendCommandPayload;
+
+type TransportSendInput = {
+  payload: TransportSendPayload;
+  messageId?: string;
+  attachments?: CloudAgentAttachments;
+  images?: Images;
+  remoteModelOverride?: RemoteModelOverride;
+};
+
 /** Lifecycle interface for a transport. */
 type Transport = {
   connect(): void;
@@ -51,12 +76,9 @@ type Transport = {
   destroy(): void;
 
   // Commands — present only on interactive transports
-  send?: (payload: {
-    payload: TransportSendPayload;
-    messageId?: string;
-    attachments?: CloudAgentAttachments;
-    images?: Images;
-  }) => Promise<unknown>;
+  send?: (payload: TransportSendInput) => Promise<unknown>;
+  canSend?: () => boolean;
+  retryRemoteModels?: () => void;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;
@@ -81,7 +103,7 @@ type TransportFactory = (sink: TransportSink) => Transport;
 type CloudAgentApi = {
   send: (payload: {
     sessionId: CloudAgentSessionId;
-    payload: TransportSendPayload;
+    payload: CloudAgentSendPayload;
     messageId?: string;
     attachments?: CloudAgentAttachments;
     images?: Images;
@@ -102,11 +124,14 @@ type CloudAgentApi = {
 
 export type {
   CloudAgentApi,
+  CloudAgentPromptPayload,
+  CloudAgentSendPayload,
   CloudAgentStreamTicket,
   CloudAgentStreamTicketResult,
   TransportFactory,
   TransportSink,
   Transport,
+  TransportSendInput,
   TransportSendPayload,
   SendPromptPayload,
   SendCommandPayload,

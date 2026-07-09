@@ -7,6 +7,7 @@
 
 import 'server-only';
 import PostHogClient from '@/lib/posthog';
+import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { captureException } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();
@@ -98,6 +99,67 @@ type SecurityAgentFullSyncEvent = {
   totalErrors: number;
   durationMs: number;
 };
+
+type SecurityAgentUiInteractionEvent = BaseSecurityAgentEvent & {
+  interaction: SecurityAgentUiInteraction;
+};
+
+type SecurityAgentRemediationActionEvent = BaseSecurityAgentEvent & {
+  action: 'start' | 'retry' | 'cancel';
+};
+
+export function trackSecurityAgentUiInteraction(properties: SecurityAgentUiInteractionEvent): void {
+  const eventProperties = {
+    interaction: properties.interaction,
+    feature: 'security-agent',
+    operation: 'ui_interaction',
+    userId: properties.userId,
+    ...(properties.organizationId !== undefined
+      ? { organizationId: properties.organizationId }
+      : {}),
+  };
+
+  try {
+    posthogClient.capture({
+      distinctId: properties.distinctId,
+      event: 'security_agent_ui_interaction',
+      properties: eventProperties,
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'posthog_security_agent_ui_interaction' },
+      extra: { properties: eventProperties },
+    });
+  }
+}
+
+export function trackSecurityAgentRemediationAction(
+  properties: SecurityAgentRemediationActionEvent
+): void {
+  const eventProperties = {
+    action: properties.action,
+    phase: 'accepted',
+    feature: 'security-agent',
+    operation: 'remediation_action',
+    userId: properties.userId,
+    ...(properties.organizationId !== undefined
+      ? { organizationId: properties.organizationId }
+      : {}),
+  };
+
+  try {
+    posthogClient.capture({
+      distinctId: properties.distinctId,
+      event: 'security_agent_remediation_action',
+      properties: eventProperties,
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'posthog_security_agent_remediation_action' },
+      extra: { properties: eventProperties },
+    });
+  }
+}
 
 /**
  * Track security agent enabled/disabled

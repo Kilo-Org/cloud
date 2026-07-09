@@ -26,7 +26,7 @@ PORT=$(node -e "
       server.listen(port);
     });
   }
-  tryPort(${TARGET_PORT}, 10).then(p => console.log(p));
+  tryPort(${TARGET_PORT}, 10).then(p => console.log(String(p)));
 ")
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -42,6 +42,11 @@ for envfile in .env.local .env.development.local; do
   fi
 done
 
+# Read a value from the local env files without sourcing them. These exports
+# happen before `next dev` starts, and exported process env always beats
+# Next's own .env loading — so without this passthrough, APP_URL_OVERRIDE /
+# NEXTAUTH_URL set in .env.local (e.g. a LAN IP for phone testing) are
+# silently shadowed by the localhost default below.
 read_env_value() {
   local key="$1"
   local file
@@ -69,14 +74,13 @@ export PORT
 export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
 export UPSTASH_REDIS_REST_URL="${UPSTASH_REDIS_REST_URL:-http://localhost:8079}"
 export UPSTASH_REDIS_REST_TOKEN="${UPSTASH_REDIS_REST_TOKEN:-example_token}"
-APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
-NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"
 NEXT_DEV_HOSTNAME="${NEXT_DEV_HOSTNAME:-0.0.0.0}"
-# Only export APP_URL_OVERRIDE when set; an empty export becomes "" in
-# process.env and defeats the `??` fallback in apps/web/src/lib/constants.ts.
-if [ -n "$APP_URL_OVERRIDE" ]; then
-  export APP_URL_OVERRIDE
-fi
+# Precedence: shell env > .env files > live dev port (auto-increment aware).
+APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
+APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-http://localhost:$PORT}"
+NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"
+NEXTAUTH_URL="${NEXTAUTH_URL:-$APP_URL_OVERRIDE}"
+export APP_URL_OVERRIDE
 export NEXT_DEV_HOSTNAME
-export NEXTAUTH_URL="${NEXTAUTH_URL:-${APP_URL_OVERRIDE:-http://localhost:$PORT}}"
+export NEXTAUTH_URL
 exec next dev -H "$NEXT_DEV_HOSTNAME" -p "$PORT" "$@"

@@ -12,6 +12,7 @@ import {
 } from '@/routers/app-builder/schemas';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
+import { buildAccessLevelEligibility } from '@/lib/access-level-eligibility';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 
 export const appBuilderRouter = createTRPCRouter({
@@ -109,19 +110,7 @@ export const appBuilderRouter = createTRPCRouter({
    */
   checkEligibility: baseProcedure.query(async ({ ctx }) => {
     const { balance } = await getBalanceForUser(ctx.user);
-
-    // Determine access level based on balance
-    // Currently only 'full' or 'limited' - change to 'blocked' if we need to restrict entirely
-    const accessLevel: 'full' | 'limited' | 'blocked' =
-      balance >= MIN_BALANCE_FOR_APP_BUILDER ? 'full' : 'limited';
-
-    return {
-      balance,
-      minBalance: MIN_BALANCE_FOR_APP_BUILDER,
-      accessLevel,
-      // Keep isEligible for backwards compatibility (true if full access)
-      isEligible: accessLevel === 'full',
-    };
+    return buildAccessLevelEligibility(balance, MIN_BALANCE_FOR_APP_BUILDER);
   }),
 
   /**

@@ -4,7 +4,10 @@
  * Instead of testing through createCloudAgentSession (which requires a WebSocket),
  * we wire the same components directly — mirroring session.ts's event routing logic.
  */
-import { createTestSession } from './test-helpers';
+import { createTestSession, kiloId } from './test-helpers';
+import { createCloudAgentSession } from './session';
+import type { RemoteModelState } from './remote-model-catalog';
+import type { UserWebSystemEvent } from './user-web-connection';
 import {
   createEventHelpers,
   sessionInfo,
@@ -356,5 +359,74 @@ describe('session pipeline integration', () => {
       feedEvent(createEvent('some_future_event', { foo: 'bar' }));
       expect(storage.getMessageIds()).toEqual([]);
     });
+  });
+});
+
+describe('remote session transport state', () => {
+  it('publishes owner-scoped model state and dynamic send capability', async () => {
+    let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
+    const onRemoteModelStateChange = jest.fn<void, [RemoteModelState]>();
+    const onTransportCapabilityChange = jest.fn();
+    const userWebConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      destroy: jest.fn(),
+      subscribeToCliSession: jest.fn(() => jest.fn()),
+      sendCommand: jest.fn(() =>
+        Promise.resolve({
+          all: [],
+          default: {},
+          connected: [],
+          failed: [],
+          protocolVersion: 1,
+          truncated: false,
+        })
+      ),
+      onCliEvent: jest.fn(() => jest.fn()),
+      onSystemEvent: jest.fn((listener: (event: UserWebSystemEvent) => void) => {
+        systemListener = listener;
+        return jest.fn();
+      }),
+      onReconnect: jest.fn(() => jest.fn()),
+      onSessionEvent: jest.fn(() => jest.fn()),
+    };
+    const kiloSessionId = kiloId('ses-remote');
+    const session = createCloudAgentSession({
+      kiloSessionId,
+      resolveSession: () => Promise.resolve({ type: 'remote', kiloSessionId }),
+      transport: { userWebConnection },
+      onRemoteModelStateChange,
+      onTransportCapabilityChange,
+    });
+
+    session.connect();
+    await Promise.resolve();
+    expect(session.canSend).toBe(false);
+
+    systemListener?.({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          {
+            id: kiloSessionId,
+            status: 'active',
+            title: 'Remote',
+            connectionId: 'owner',
+          },
+        ],
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(session.canSend).toBe(true);
+    expect(onTransportCapabilityChange).toHaveBeenCalled();
+    expect(onRemoteModelStateChange).toHaveBeenLastCalledWith({
+      ownerConnectionId: 'owner',
+      protocol: 'v1',
+      catalog: { protocolVersion: 1, providers: [], truncated: false },
+      refresh: 'idle',
+    });
+    session.destroy();
   });
 });

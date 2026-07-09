@@ -12,28 +12,54 @@
  */
 
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { z } from 'zod';
 import * as wantedBoard from './wanted-board/wanted-board-ops-sdk';
 import { WantedBoardOpError } from './wanted-board/errors';
+import { WastelandRpcBrowseWantedBoardInput } from './trpc/schemas';
 
 export type WastelandRpcResult<T> =
   | { success: true; data: T }
   | { success: false; code: WantedBoardOpError['code']; message: string };
 
-function wrap<T>(fn: () => Promise<T>): Promise<WastelandRpcResult<T>> {
-  return fn().then(
-    data => ({ success: true as const, data }),
-    err => {
-      if (err instanceof WantedBoardOpError) {
-        return { success: false as const, code: err.code, message: err.message };
-      }
-      throw err;
+async function wrap<T>(fn: () => Promise<T>): Promise<WastelandRpcResult<T>> {
+  try {
+    return { success: true as const, data: await fn() };
+  } catch (err) {
+    if (err instanceof WantedBoardOpError) {
+      return { success: false as const, code: err.code, message: err.message };
     }
-  );
+    if (err instanceof z.ZodError) {
+      return {
+        success: false as const,
+        code: 'PRECONDITION_FAILED',
+        message: 'Invalid RPC input',
+      };
+    }
+    throw err;
+  }
 }
 
 export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
-  async browseWantedBoard(params: { wastelandId: string; userId: string }) {
-    return wrap(() => wantedBoard.browseWantedBoard(this.env, params.wastelandId, params.userId));
+  async browseWantedBoard(params: z.input<typeof WastelandRpcBrowseWantedBoardInput>) {
+    return wrap(() => {
+      const input = WastelandRpcBrowseWantedBoardInput.parse(params);
+      const filter =
+        input.status !== undefined ||
+        input.search !== undefined ||
+        input.sort !== undefined ||
+        input.limit !== undefined
+          ? {
+              status: input.status,
+              search: input.search,
+              sort: input.sort,
+              limit: input.limit,
+            }
+          : undefined;
+      return wantedBoard.browseWantedBoard(this.env, input.wastelandId, input.userId, {
+        filter,
+        includeForkBranches: input.includeForkBranches,
+      });
+    });
   }
 
   async claimWantedItem(params: {

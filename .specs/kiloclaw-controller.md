@@ -736,6 +736,7 @@ running. When forwarding, it MUST authenticate to gog with
 | GET | `/_kilo/files/tree` | List immediate safe file-tree children under controller root, or under `?path=<directory>` when `files.tree.path` is advertised |
 | GET | `/_kilo/files/read` | Read a safe file path |
 | POST | `/_kilo/files/import-openclaw-workspace` | Import OpenClaw workspace files |
+| POST | `/_kilo/files/export-openclaw-workspace` | Export the workspace Markdown + installed-skill inventory as an archive (`.tar.gz` or `.zip`) when `files.export-openclaw-workspace` is advertised |
 | POST | `/_kilo/files/write` | Write a safe file path |
 | POST | `/_kilo/files/write-openclaw-config` | Validate and write `openclaw.json`, with explicit invalid override support |
 
@@ -746,6 +747,17 @@ running. When forwarding, it MUST authenticate to gog with
 3. When the controller advertises `files.tree.path`, clients MAY pass `?path=<directory>` to list immediate children under that safe relative directory.
 4. Requested directory paths MUST use the same safe-path protections as file reads and writes: reject absolute paths, root escapes, symlinks, non-directory paths, and controller-owned internal validation artifacts.
 5. Directory nodes MAY omit `children`; clients MUST treat omitted `children` as not loaded yet, not as proof that the directory is empty.
+
+##### OpenClaw workspace export
+
+1. `POST /_kilo/files/export-openclaw-workspace` MUST be advertised as `files.export-openclaw-workspace`; clients MUST NOT infer this behavior from controller CalVer.
+2. The request body MUST select a `format` of `tar.gz` or `zip` and MAY include an optional `password`. A `password` combined with `format: tar.gz` MUST be rejected (`openclaw_export_encryption_unsupported`) — encryption is supported only for `zip` (AES-256).
+3. The export is text-only and host-portable: the controller MUST export every Markdown (`.md`) file under the workspace root (persona/instruction files and the `memory/` tree), with paths relative to the workspace root. It MUST NOT export the `skills/` or `canvas/` payloads (potentially many gigabytes of binaries/dependencies) or any non-Markdown file, and MUST exclude credentials, `openclaw.json`, sessions, and other state outside the workspace, `.git/`, `node_modules/`, symlinks, and OS-junk files.
+4. The controller MUST add a generated `INSTALLED_SKILLS.md` inventory listing installed skills by name (with description when present in each `workspace/skills/<name>/SKILL.md` frontmatter). This inventory is a reference, not a backup: skill code is not exported. The inventory MUST be omitted when no readable skills exist, and a user file named `INSTALLED_SKILLS.md` MUST NOT shadow it.
+5. The controller MUST apply the same safe-path protections as file reads (reject root escapes and symlinked ancestors) and MUST enforce per-file, total-size, and file-count caps, returning bounded structured errors (`openclaw_export_too_large`, `openclaw_export_too_many_files`) rather than silently truncating.
+6. The produced archive MUST stay within the Durable Object RPC return limit; an archive exceeding the bound MUST fail with `openclaw_export_too_large`.
+7. On success the controller MUST return the archive bytes with the matching `Content-Type` (`application/gzip` or `application/zip`) and the `X-Openclaw-Export-File-Count`, `X-Openclaw-Export-Total-Bytes`, and `X-Openclaw-Export-Skipped` metadata headers. An empty workspace MUST return `openclaw_export_no_files`.
+8. The passphrase MUST be used transiently to encrypt and MUST NOT be stored or logged.
 
 ##### Validation-aware `openclaw.json` file writes
 

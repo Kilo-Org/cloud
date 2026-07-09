@@ -325,6 +325,194 @@ describe('Worker GitHub auth-invalid sync', () => {
     expect(thrown).toEqual(new Error('GitHub API error 500 for acme/widgets'));
     expect(thrown).not.toHaveProperty('message', expect.stringContaining('Service unavailable'));
   });
+
+  it('records a v1 finding-created audit event when importing a new alert', async () => {
+    const { db } = createFakeDb();
+    const gitTokenService = createGitTokenService();
+    const auditRows: Array<Record<string, unknown>> = [];
+    const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    let executeCount = 0;
+    const mutableDb = db as unknown as {
+      execute: () => Promise<{ rows: unknown[] }>;
+      insert: () => {
+        values: (values: Record<string, unknown>) => {
+          onConflictDoNothing: () => { returning: () => Promise<Array<{ id: string }>> };
+          onConflictDoUpdate: () => Promise<undefined>;
+        };
+      };
+    };
+
+    mutableDb.execute = async () => {
+      executeCount++;
+      if (executeCount === 1) {
+        return {
+          rows: [
+            {
+              findingId,
+              wasInserted: true,
+              previousStatus: null,
+              previousSeverity: null,
+              effectiveStatus: 'open',
+              effectiveSeverity: 'high',
+              findingCreatedAt: '2026-05-18T10:00:00.000Z',
+              ownedByUserId: 'user-1',
+              ownedByOrganizationId: null,
+              source: 'dependabot',
+              sourceId: '23',
+              repoFullName: 'acme/widgets',
+              title: 'Prototype pollution in lodash',
+              packageName: 'lodash',
+              packageEcosystem: 'npm',
+              manifestPath: 'package.json',
+              patchedVersion: '4.17.21',
+              ghsaId: 'GHSA-1234-5678-90ab',
+              cveId: null,
+              cweIds: ['CWE-1321'],
+              cvssScore: '7.5',
+              dependabotHtmlUrl: 'https://github.com/acme/widgets/security/dependabot/23',
+              firstDetectedAt: '2026-05-18T10:00:00.000Z',
+              fixedAt: null,
+              slaDueAt: '2026-06-17T10:00:00.000Z',
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    };
+    mutableDb.insert = () => ({
+      values: (values: Record<string, unknown>) => ({
+        onConflictDoNothing: () => ({
+          returning: async () => {
+            auditRows.push(values);
+            return [{ id: 'audit-row-1' }];
+          },
+        }),
+        onConflictDoUpdate: async () => undefined,
+      }),
+    });
+    stubFetch(new Response(JSON.stringify([createDependabotAlert()]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({ synced: 1, errors: 0 });
+
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]).toMatchObject({
+      action: 'security.finding.created',
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      finding_id: findingId,
+      event_key:
+        'security_finding_audit:v1:user%3Auser-1:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb:security.finding.created:2026-05-18T10%3A00%3A00Z',
+      schema_version: 1,
+      source_context: 'security_sync',
+      finding_snapshot: expect.objectContaining({
+        finding_id: findingId,
+        source: 'dependabot',
+        repo_full_name: 'acme/widgets',
+      }),
+    });
+  });
+
+  it('does not let unsafe source snapshot values block finding sync', async () => {
+    const { db } = createFakeDb();
+    const gitTokenService = createGitTokenService();
+    const auditRows: Array<Record<string, unknown>> = [];
+    const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    let executeCount = 0;
+    const mutableDb = db as unknown as {
+      execute: () => Promise<{ rows: unknown[] }>;
+      insert: () => {
+        values: (values: Record<string, unknown>) => {
+          onConflictDoNothing: () => { returning: () => Promise<Array<{ id: string }>> };
+          onConflictDoUpdate: () => Promise<undefined>;
+        };
+      };
+    };
+
+    mutableDb.execute = async () => {
+      executeCount++;
+      if (executeCount === 1) {
+        return {
+          rows: [
+            {
+              findingId,
+              wasInserted: true,
+              previousStatus: null,
+              previousSeverity: null,
+              effectiveStatus: 'open',
+              effectiveSeverity: 'high',
+              findingCreatedAt: '2026-05-18T10:00:00.000Z',
+              ownedByUserId: 'user-1',
+              ownedByOrganizationId: null,
+              source: 'dependabot',
+              sourceId: '23',
+              repoFullName: 'acme/widgets',
+              title: 'Contact security@example.com or support@example.com about lodash',
+              packageName: 'lodash',
+              packageEcosystem: 'npm',
+              manifestPath: 'package.json',
+              patchedVersion: '4.17.21',
+              ghsaId: 'GHSA-1234-5678-90ab',
+              cveId: null,
+              cweIds: ['CWE-1321'],
+              cvssScore: '7.5',
+              dependabotHtmlUrl: 'not a valid url',
+              firstDetectedAt: '2026-05-18T10:00:00.000Z',
+              fixedAt: null,
+              slaDueAt: '2026-06-17T10:00:00.000Z',
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    };
+    mutableDb.insert = () => ({
+      values: (values: Record<string, unknown>) => ({
+        onConflictDoNothing: () => ({
+          returning: async () => {
+            auditRows.push(values);
+            return [{ id: 'audit-row-1' }];
+          },
+        }),
+        onConflictDoUpdate: async () => undefined,
+      }),
+    });
+    stubFetch(
+      new Response(
+        JSON.stringify([
+          createDependabotAlert({
+            html_url: 'not a valid url',
+            security_advisory: {
+              ...createDependabotAlert().security_advisory,
+              summary: 'Contact security@example.com or support@example.com about lodash',
+            },
+          }),
+        ]),
+        { status: 200 }
+      )
+    );
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({ synced: 1, errors: 0 });
+
+    expect(auditRows).toHaveLength(1);
+    expect(auditRows[0]?.finding_snapshot).toMatchObject({
+      title: 'Contact [redacted-email] or [redacted-email] about lodash',
+    });
+    expect(auditRows[0]?.finding_snapshot).not.toHaveProperty('dependabot_html_url');
+  });
 });
 
 describe('Worker auto-analysis queue sync', () => {

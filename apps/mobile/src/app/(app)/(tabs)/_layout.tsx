@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
-import { Bot, House, MessageSquare } from 'lucide-react-native';
+import { Bot, House, MessageSquare, UserRound } from 'lucide-react-native';
 import { Platform, type TextStyle, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,8 +16,8 @@ const TAB_BAR_ICON_STYLE = {
 } satisfies ViewStyle;
 const TAB_BAR_LABEL_STYLE = {
   fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 10,
-  letterSpacing: 0,
+  fontSize: 11,
+  letterSpacing: 0.2,
   marginTop: 2,
   minWidth: TAB_BAR_ITEM_CONTENT_WIDTH,
   textAlign: 'center',
@@ -108,6 +108,21 @@ export default function TabsLayout() {
           tabBarLabel: 'Agents',
           tabBarIcon: ({ color, focused }) => (
             <Bot size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
+          ),
+        }}
+        listeners={{
+          tabPress: () => {
+            void Haptics.selectionAsync();
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="(3_profile)"
+        options={{
+          title: 'Profile',
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <UserRound size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
         listeners={{

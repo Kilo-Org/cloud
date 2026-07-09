@@ -10,6 +10,7 @@ import {
   resolveGroups,
   topologicalSort,
   portOffset,
+  resolveSessionNextAuthUrl,
   services,
 } from './services';
 import { syncEnvVars } from './env-sync';
@@ -192,7 +193,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   const logDir = path.join(repoRoot, 'dev', 'logs');
   fs.mkdirSync(logDir, { recursive: true });
   for (const entry of fs.readdirSync(logDir)) {
-    fs.unlinkSync(path.join(logDir, entry));
+    fs.rmSync(path.join(logDir, entry), { recursive: true, force: true });
   }
 
   // --- Create tmux session ---
@@ -221,6 +222,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   if (process.env.PORT !== undefined && process.env.PORT !== '') {
     sessionEnv.PORT = String(getService('nextjs').port);
   }
+  const sessionNextAuthUrl = resolveSessionNextAuthUrl({
+    portOffset,
+    serviceNames,
+    nextjsPort: getService('nextjs').port,
+  });
+  if (sessionNextAuthUrl !== undefined) {
+    sessionEnv.NEXTAUTH_URL = sessionNextAuthUrl;
+  }
   if (process.env.DEBUG_SHOW_DEV_UI !== undefined && process.env.DEBUG_SHOW_DEV_UI !== '') {
     sessionEnv.DEBUG_SHOW_DEV_UI = process.env.DEBUG_SHOW_DEV_UI;
   }
@@ -239,7 +248,12 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'stripe', 'app-builder-tunnel']);
+  const captureServiceSet = new Set([
+    'kiloclaw-tunnel',
+    'stripe',
+    'app-builder-tunnel',
+    'bitbucket-webhook-tunnel',
+  ]);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
   const startedServices: string[] = [];
@@ -266,6 +280,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
       const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
       oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
       oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
+    }
+    if (captureServices.includes('bitbucket-webhook-tunnel')) {
+      const appEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
+      oldValues.set(
+        'bitbucket-webhook-tunnel',
+        readEnvValue(appEnvPath, 'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL')
+      );
+      oldMtimes.set('bitbucket-webhook-tunnel', readEnvMtime(appEnvPath));
     }
 
     for (const name of captureServices) {
@@ -359,6 +381,26 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
           } else {
             console.warn(
               '  App builder tunnel URL not captured after 30s - check app-builder-tunnel window'
+            );
+          }
+        })
+      );
+    }
+
+    if (captureServices.includes('bitbucket-webhook-tunnel')) {
+      waits.push(
+        waitForEnvValueChange(
+          path.join(repoRoot, 'apps/web/.env.development.local'),
+          'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL',
+          oldValues.get('bitbucket-webhook-tunnel'),
+          CAPTURE_TIMEOUT_MS,
+          oldMtimes.get('bitbucket-webhook-tunnel')
+        ).then(ready => {
+          if (ready) {
+            console.log('  Bitbucket webhook tunnel URL captured');
+          } else {
+            console.warn(
+              '  Bitbucket webhook tunnel URL not captured after 30s - check bitbucket-webhook-tunnel window'
             );
           }
         })
@@ -473,18 +515,59 @@ function writeManifest(
     wranglerRegistryPath,
     services: serviceNames.map(name => {
       const svc = getService(name);
-      return { name, port: svc.port, group: svc.group, type: svc.type };
+      const port = name === 'nextjs' ? (readNextjsDevPort(repoRoot) ?? svc.port) : svc.port;
+      return { name, port, group: svc.group, type: svc.type };
     }),
   };
   const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 }
 
+function readManifest(repoRoot: string): Manifest | undefined {
+  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
+  try {
+    const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    if (
+      typeof raw?.session !== 'string' ||
+      typeof raw?.portOffset !== 'number' ||
+      !Array.isArray(raw?.services)
+    ) {
+      return undefined;
+    }
+    return raw;
+  } catch {
+    return undefined;
+  }
+}
+
+function readNextjsDevPort(repoRoot: string): number | undefined {
+  try {
+    const raw = fs.readFileSync(path.join(repoRoot, '.dev-port'), 'utf-8').trim();
+    const port = Number(raw);
+    if (Number.isInteger(port) && port > 0 && port <= 65535) return port;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function getManifestEntry(
+  manifest: Manifest | undefined,
+  serviceName: string
+): ManifestEntry | undefined {
+  return manifest?.services.find(entry => entry.name === serviceName);
+}
+
 async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   const sessionName = getSessionName();
+  const manifest = readManifest(repoRoot);
+  const activeManifest = manifest?.session === sessionName ? manifest : undefined;
+  const statusPortOffset = activeManifest?.portOffset ?? portOffset;
   if (!sessionExists(sessionName)) {
     if (isJson) {
-      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+      console.log(
+        JSON.stringify({ session: sessionName, portOffset: statusPortOffset, services: [] })
+      );
     } else {
       console.log('No dev session running');
     }
@@ -497,7 +580,9 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   });
   if (runningServices.length === 0) {
     if (isJson) {
-      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+      console.log(
+        JSON.stringify({ session: sessionName, portOffset: statusPortOffset, services: [] })
+      );
     } else {
       console.log('No services running');
     }
@@ -507,20 +592,24 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   const entries: StatusEntry[] = await Promise.all(
     runningServices.map(async ({ name, pane }): Promise<StatusEntry> => {
       const svc = getService(name);
-      const port = svc.port;
+      const manifestEntry = getManifestEntry(activeManifest, name);
+      const port =
+        name === 'nextjs'
+          ? (readNextjsDevPort(repoRoot) ?? manifestEntry?.port ?? svc.port)
+          : (manifestEntry?.port ?? svc.port);
       const isUp = port === 0 ? isPaneRunningCommand(sessionName, pane) : await probePort(port);
       const status: ServiceStatus = isUp ? 'up' : 'down';
       return {
         name,
         port,
         status,
-        group: svc.group,
+        group: manifestEntry?.group ?? svc.group,
       };
     })
   );
 
   if (isJson) {
-    const result = { session: sessionName, portOffset, services: entries };
+    const result = { session: sessionName, portOffset: statusPortOffset, services: entries };
     console.log(JSON.stringify(result));
     return;
   }
@@ -534,7 +623,7 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
-async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
+async function cmdRestart(serviceName: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
     process.exit(1);
@@ -558,7 +647,12 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
     process.exit(1);
   }
 
-  restartServiceInTmux(sessionName, serviceName);
+  console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);
+  const outcome = await restartServiceInTmux(sessionName, serviceName);
+  if (outcome === 'gave-up') {
+    console.error(`${serviceName} did not shut down in time; not relaunched`);
+    process.exit(1);
+  }
   console.log(`Restarted ${serviceName}`);
 }
 
@@ -627,7 +721,7 @@ Usage:
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
 
-Targets: app, app-builder, agents, security-agent, mobile, all, or any service/group name
+Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
 
@@ -656,7 +750,7 @@ async function main() {
         console.error('Usage: dev:restart <service>');
         process.exit(1);
       }
-      await cmdRestart(serviceName, repoRoot);
+      await cmdRestart(serviceName);
       break;
     }
     case 'env':

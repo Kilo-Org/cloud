@@ -13,7 +13,7 @@ describe('submitManualFindingDismissal', () => {
     mockFetch.mockReset();
   });
 
-  it('submits dismissal actor context and returns accepted correlation ids', async () => {
+  it('submits only stable dismissal actor identity and returns accepted correlation ids', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 202,
@@ -30,7 +30,7 @@ describe('submitManualFindingDismissal', () => {
     await expect(
       submitManualFindingDismissal({
         owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-        actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
+        actor: { id: 'user-123' },
         findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         installationId: 'installation-123',
         reason: 'not_used',
@@ -53,5 +53,10 @@ describe('submitManualFindingDismissal', () => {
         },
       })
     );
+    const request = mockFetch.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      actor: { id: 'user-123' },
+    });
+    expect(JSON.parse(String(request.body)).actor).toEqual({ id: 'user-123' });
   });
 });

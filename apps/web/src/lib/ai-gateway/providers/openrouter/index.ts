@@ -19,7 +19,7 @@ import {
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
-import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
+import { AUTO_MODELS, type AutoModel } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -27,57 +27,52 @@ import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrou
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
-import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { addMonths } from 'date-fns';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
-function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.map(m => {
-    const input_modalities = ['text'];
-    if (m.supports_images) {
-      input_modalities.push('image');
-    }
-    if (m.supports_pdf) {
-      input_modalities.push('pdf');
-    }
-    return {
-      id: m.id,
-      name: m.name,
-      created: 0,
-      description: m.description,
-      architecture: {
-        input_modalities: input_modalities,
-        output_modalities: ['text'],
-        tokenizer: 'Other',
-      },
-      top_provider: {
-        is_moderated: false,
-        context_length: m.context_length,
-        max_completion_tokens: m.max_completion_tokens,
-      },
-      pricing: {
-        prompt: m.prompt_price,
-        completion: m.completion_price,
-        input_cache_read: m.input_cache_read_price,
-        input_cache_write: m.input_cache_write_price,
-        request: '0',
-        image: '0',
-        web_search: '0',
-        internal_reasoning: '0',
-      },
+export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
+  const input_modalities = ['text'];
+  if (m.supports_images) {
+    input_modalities.push('image');
+  }
+  if (m.supports_pdf) {
+    input_modalities.push('pdf');
+  }
+  return {
+    id: m.id,
+    name: m.name,
+    created: 0,
+    description: m.description,
+    architecture: {
+      input_modalities: input_modalities,
+      output_modalities: ['text'],
+      tokenizer: 'Other',
+    },
+    top_provider: {
+      is_moderated: false,
       context_length: m.context_length,
-      supported_parameters: [
-        'max_tokens',
-        'temperature',
-        'tools',
-        'reasoning',
-        'include_reasoning',
-      ],
-      opencode: m.opencode_settings,
-    };
-  });
+      max_completion_tokens: m.max_completion_tokens,
+    },
+    pricing: {
+      prompt: m.prompt_price,
+      completion: m.completion_price,
+      input_cache_read: m.input_cache_read_price,
+      input_cache_write: m.input_cache_write_price,
+      request: '0',
+      image: '0',
+      web_search: '0',
+      internal_reasoning: '0',
+    },
+    context_length: m.context_length,
+    supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
+    opencode: m.opencode_settings,
+  };
+}
+
+function buildAutoModels(): OpenRouterModel[] {
+  return AUTO_MODELS.map(buildAutoModelCatalogEntry);
 }
 
 export function formatName(model: OpenRouterModel, preferredIndex: number) {
@@ -123,6 +118,13 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
   return model.status !== 'disabled' || model.pricing === null;
 }
 
+const unavailableModels = [
+  // these models are not available in the EU
+  'grok-latest',
+  'grok-4.5',
+  'sakana/fugu',
+];
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
@@ -135,7 +137,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isForbiddenFreeModel(model.id) &&
-          !isFableModel(model.id)
+          !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);

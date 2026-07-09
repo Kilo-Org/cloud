@@ -5,8 +5,10 @@ import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
-import { cachedPosthogQuery } from '@/lib/posthog-query';
-import * as z from 'zod';
+import {
+  getByokProviderNotificationLabel,
+  getByokProvidersForUser,
+} from '@/lib/notifications/byok-provider-cache';
 
 import { fromMicrodollars } from '@/lib/utils';
 
@@ -31,11 +33,39 @@ export type KiloNotification = {
   showIn?: ('extension' | 'extension-native' | 'cli')[];
   // ISO 8601 timestamp after which this notification should no longer be shown
   expiresAt?: string;
+  // When true, only show to the legacy ("Roo-based") Kilo Code extension, identified by
+  // its axios User-Agent. Used to target end-of-life notices at legacy-extension users.
+  showOnlyOnLegacyExtension?: boolean;
 };
+
+/**
+ * Decide whether a legacy-targeted notification should be shown to a client.
+ * Notifications flagged showOnlyOnLegacyExtension are shown only when the request
+ * came from the legacy extension (detected via its axios User-Agent).
+ */
+export function passesLegacyExtensionGate(
+  notification: Pick<KiloNotification, 'showOnlyOnLegacyExtension'>,
+  isLegacyExtension: boolean
+): boolean {
+  if (!notification.showOnlyOnLegacyExtension) return true;
+  return isLegacyExtension;
+}
 
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
+  {
+    id: 'legacy-upgrade-june-2026',
+    title: 'Kilo Code 5.x: End of Life July 31, 2026',
+    message:
+      'Kilo Code extension version 5.x reaches end of life on July 31, 2026. After that date, it will no longer receive updates, bug fixes, or security patches. Upgrade to the latest version for continued support.',
+    action: {
+      actionText: 'See End of Life Notice',
+      actionURL: 'https://github.com/Kilo-Org/kilocode-legacy#legacy-ide-extensions-end-of-life',
+    },
+    showIn: ['extension'],
+    showOnlyOnLegacyExtension: true,
+  },
   {
     id: 'star-giveaway-june-2026',
     title: 'GitHub Star Giveaway',
@@ -111,7 +141,10 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   },
 ];
 
-export async function generateUserNotifications(user: User): Promise<KiloNotification[]> {
+export async function generateUserNotifications(
+  user: User,
+  { isLegacyExtension = false }: { isLegacyExtension?: boolean } = {}
+): Promise<KiloNotification[]> {
   // Pre-fetch shared data once to avoid duplicate DB queries across generators.
   // This eliminates ~5 redundant queries per request (2× userHasOrganizations,
   // 3× getUserOrganizationsWithSeats, 2× getBalanceForUser → 1+1 queries).
@@ -145,9 +178,11 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
   ).flat();
 
   const now = new Date();
-  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(
-    n => !n.expiresAt || new Date(n.expiresAt) > now
-  );
+  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(n => {
+    if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
+    if (!passesLegacyExtensionGate(n, isLegacyExtension)) return false;
+    return true;
+  });
 }
 
 async function generateLowCreditNotification(
@@ -256,112 +291,32 @@ async function generateTeamsTrialNotification(
   ];
 }
 
-const getByokProviderUsers = cachedPosthogQuery(
-  z.array(
-    z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
-  )
-);
-
 async function generateByokProvidersNotification(
   user: User,
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
   try {
-    const byokProviderUsers = await getByokProviderUsers(
-      'byok-provider-usage-users',
-      'select id, apiProvider from notification_byok_providers_jan_19 limit 5e5'
-    );
-
-    const provider = byokProviderUsers.find(p => p.userId === user.id)?.provider;
-    if (!provider) {
+    // Per-user provider ids are written daily to Redis by the
+    // `sync-byok-provider-notifications` cron, so this read is tiny.
+    const providers = await getByokProvidersForUser(user.id);
+    if (providers.length === 0) {
       console.debug('[generateByokProvidersNotification] not using a BYOK supported provider');
       return [];
     }
 
-    // Maps an extension `apiProvider` id to a user-facing label. Multiple ids can
-    // refer to the same underlying service (regional/plan/legacy variants), and we
-    // only list ids for services we actually support BYOK for via Kilo Gateway
-    // (see UserByokProviderIdSchema).
-    const names = {
-      // Anthropic / Claude
-      anthropic: 'Claude API Key',
-      claude: 'Claude API Key',
-
-      // Amazon Bedrock
-      bedrock: 'Amazon Bedrock API Key',
-      'amazon-bedrock': 'Amazon Bedrock API Key',
-
-      // Chutes
-      chutes: 'Chutes API Key',
-
-      // DeepSeek
-      deepseek: 'DeepSeek API Key',
-      deepseek1: 'DeepSeek API Key',
-      'deepseek-v4': 'DeepSeek API Key',
-      'deepseek-v4-pro': 'DeepSeek API Key',
-
-      // Fireworks
-      fireworks: 'Fireworks API Key',
-      'fireworks-ai': 'Fireworks API Key',
-
-      // Google AI (Gemini)
-      gemini: 'Google AI API Key',
-      google: 'Google AI API Key',
-
-      // OpenAI
-      'openai-native': 'OpenAI API Key',
-      openai: 'OpenAI API Key',
-      'openai-responses': 'OpenAI API Key',
-
-      // Moonshot AI / Kimi
-      moonshot: 'Moonshot AI API Key',
-      moonshotai: 'Moonshot AI API Key',
-      kimi: 'Moonshot AI API Key',
-      'kimi-for-coding': 'Kimi Code Plan',
-
-      // MiniMax
-      minimax: 'MiniMax Coding Plan',
-      'minimax-coding-plan': 'MiniMax Coding Plan',
-
-      // Mistral
-      mistral: 'Mistral AI API Key',
-
-      // Novita
-      novita: 'Novita AI API Key',
-
-      // xAI
-      xai: 'xAI API Key',
-
-      // Z.ai / Zhipu (GLM)
-      zai: 'GLM Coding Plan',
-      'z-ai': 'GLM Coding Plan',
-      'zai-coding-plan': 'GLM Coding Plan',
-      glm: 'GLM Coding Plan',
-      zhipuai: 'GLM Coding Plan',
-      'zhipuai-coding-plan': 'GLM Coding Plan',
-
-      // Xiaomi MiMo
-      xiaomi: 'Xiaomi MiMo API Key',
-      'xiaomi-mimo': 'Xiaomi MiMo API Key',
-      xiaomimimo: 'Xiaomi MiMo API Key',
-      mimo: 'Xiaomi MiMo API Key',
-      'xiaomi-token-plan-sgp': 'Xiaomi Token Plan',
-      'xiaomi-token-plan-ams': 'Xiaomi Token Plan',
-
-      // Ollama Cloud
-      'ollama-cloud': 'Ollama Cloud API Key',
-    } as Record<string, string>;
-
-    const providerName = names[provider];
+    // A user may have used several providers; show the first one we have a label for.
+    const providerName = providers
+      .map(provider => getByokProviderNotificationLabel(provider))
+      .find(name => Boolean(name));
     if (!providerName) {
       console.debug(
-        `[generateByokProvidersNotification] unknown BYOK supported provider ${provider}`
+        `[generateByokProvidersNotification] no BYOK supported provider among ${providers.join(', ')}`
       );
       return [];
     }
 
     console.debug(
-      `[generateByokProvidersNotification] has used BYOK supported provider ${provider}`
+      `[generateByokProvidersNotification] has used BYOK supported provider(s) ${providers.join(', ')}`
     );
     return [
       {

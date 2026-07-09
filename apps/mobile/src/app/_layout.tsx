@@ -28,7 +28,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
-import { useAppsFlyerConsentGate } from '@/lib/hooks/use-appsflyer-consent-gate';
+import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
@@ -81,6 +81,7 @@ function RootLayoutNav() {
   const router = useRouter();
   const {
     userId,
+    email,
     isLoading: userIdLoading,
     isError: userIdError,
     refetch: refetchUserId,
@@ -157,7 +158,7 @@ function RootLayoutNav() {
   }, [token, userId]);
 
   useTrackingPermissionPrompt(!isLoading);
-  useAppsFlyerConsentGate({ hasToken: token != null, consentChecked, needsConsent });
+  useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
 
   useEffect(() => {
     if (isLoading) {
@@ -217,7 +218,7 @@ function RootLayoutNav() {
       // Navigate to pending notification deep link (cold start / background tap)
       const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
       if (pendingNavigation) {
-        router.replace(pendingNavigation.href as Href);
+        router.navigate(pendingNavigation.href as Href);
       }
     }
   }, [

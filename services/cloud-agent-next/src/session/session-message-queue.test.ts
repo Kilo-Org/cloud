@@ -30,7 +30,10 @@ import {
   putSessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
-import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
+import {
+  WrapperCleanupBlockedError,
+  type WrapperCleanupBlock,
+} from './wrapper-cleanup-blocked-error.js';
 
 type QueueEvent = {
   sessionId: string;
@@ -124,7 +127,7 @@ function createQueueHarness(options?: {
   failAlarmOnce?: boolean;
   failTerminalizationOnce?: boolean;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
-  getDeliveryBlock?: () => Promise<{ retryAt: number } | null>;
+  getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -592,7 +595,7 @@ describe('SessionMessageQueue', () => {
   it('repairs queued effects without consuming delivery attempts while delivery is blocked', async () => {
     const retryAt = 50_000;
     const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt }),
+      getDeliveryBlock: async () => ({ kind: 'retryable', retryAt }),
     });
     await storePendingSessionMessage(
       harness.storage,
@@ -617,7 +620,7 @@ describe('SessionMessageQueue', () => {
   it('fails the second sandbox attempt when wrapper cleanup remains blocked', async () => {
     const now = 200_000;
     const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+      getDeliveryBlock: async () => ({ kind: 'retryable', retryAt: now + 300_000 }),
     });
     await storePendingSessionMessage(
       harness.storage,
@@ -656,7 +659,7 @@ describe('SessionMessageQueue', () => {
     const now = 200_000;
     const retryAt = now + 5_000;
     const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+      getDeliveryBlock: async () => ({ kind: 'retryable', retryAt: now + 300_000 }),
     });
     await storePendingSessionMessage(
       harness.storage,
@@ -688,7 +691,7 @@ describe('SessionMessageQueue', () => {
     const retryAt = 50_000;
     const harness = createQueueHarness({
       deliver: async () => {
-        throw new WrapperCleanupBlockedError(retryAt);
+        throw new WrapperCleanupBlockedError({ kind: 'retryable', retryAt });
       },
     });
     await harness.queue.admitSubmittedMessage({
@@ -705,11 +708,31 @@ describe('SessionMessageQueue', () => {
     expect(pending?.lastFlushError).toBeUndefined();
   });
 
+  it('retains a queued message without scheduling another cleanup after quarantine', async () => {
+    const harness = createQueueHarness({
+      deliver: async () => {
+        throw new WrapperCleanupBlockedError({ kind: 'exhausted' });
+      },
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'wait in quarantine' },
+    });
+
+    const drain = await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 1 });
+    expect(pending?.messageId).toBe(FIRST_MESSAGE_ID);
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
+  });
+
   it('fails the second sandbox attempt when delivery discovers blocked cleanup', async () => {
     const now = 200_000;
     const harness = createQueueHarness({
       deliver: async () => {
-        throw new WrapperCleanupBlockedError(now + 300_000);
+        throw new WrapperCleanupBlockedError({ kind: 'retryable', retryAt: now + 300_000 });
       },
     });
     await storePendingSessionMessage(

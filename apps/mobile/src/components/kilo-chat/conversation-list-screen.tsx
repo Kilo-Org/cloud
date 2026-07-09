@@ -9,7 +9,6 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -218,7 +217,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
             >
               <Settings2 size={20} color={colors.foreground} strokeWidth={1.75} />
             </Pressable>
-            <ProfileAvatarButton />
           </View>
         }
       />

@@ -155,9 +155,7 @@ export function KiloPassSubscribeCard(props: {
                   <Loader2 className="size-3.5 animate-spin" />
                   Processing
                 </Badge>
-              ) : (
-                <Badge variant="secondary">Subscribe</Badge>
-              )}
+              ) : null}
             </div>
           </div>
         </CardHeader>

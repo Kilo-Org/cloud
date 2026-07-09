@@ -51,6 +51,26 @@ export type {
 } from './cloud-agent-next-client.js';
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
+export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from './internal-service-token-audiences.js';
+export {
+  BITBUCKET_ACCESS_TOKEN_FAMILY_PREFIX,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_SCHEME,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_VERSION,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
+  buildBitbucketWorkspaceAccessTokenAad,
+  hasBitbucketAccessTokenFamilyPrefix,
+  hasRequiredBitbucketWorkspaceAccessTokenScopes,
+  normalizeBitbucketWorkspaceAccessTokenScopes,
+} from './bitbucket-workspace-access-token.js';
+export type {
+  BitbucketWorkspaceAccessTokenAadInput,
+  BitbucketWorkspaceAccessTokenInvalidationReason,
+  BitbucketWorkspaceAccessTokenRequiredScope,
+} from './bitbucket-workspace-access-token.js';
 export {
   signKiloToken,
   verifyKiloToken,
@@ -112,3 +132,33 @@ export type {
   CloudAgentQueueReport,
   CloudAgentRunStateReport,
 } from './cloud-agent-queue-report.js';
+
+export {
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+  SECURITY_FINDING_AUDIT_EVENT_KEY_PREFIX,
+  SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  SecurityFindingAuditActorSchema,
+  SecurityFindingAuditEventSchema,
+  SecurityFindingAuditHumanActorSchema,
+  SecurityFindingAuditOwnerSchema,
+  SecurityFindingAuditSnapshotSchema,
+  buildSecurityFindingAuditHumanActor,
+  buildSecurityFindingAuditLogValues,
+  buildSecurityFindingAuditSnapshot,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+} from './security-finding-audit.js';
+export type {
+  NewSecurityFindingAuditLogValues,
+  SecurityFindingAuditActor,
+  SecurityFindingAuditEventFinding,
+  SecurityFindingAuditEventInput,
+  SecurityFindingAuditHumanActor,
+  SecurityFindingAuditLogEntry,
+  SecurityFindingAuditOwner,
+  SecurityFindingAuditSnapshot,
+  SecurityFindingAuditSnapshotExtras,
+  SecurityFindingAuditSnapshotSource,
+  SecurityFindingAuditWriterDb,
+} from './security-finding-audit.js';

@@ -1,15 +1,14 @@
 'use client';
 
-import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarRail } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
 import { useKiloClawNavState } from '@/hooks/useKiloClaw';
 import { useState } from 'react';
 import {
-  Code,
+  ChartColumnIncreasing,
   Coins,
   Receipt,
   User,
-  UserCog,
   Building2,
   Plus,
   Rocket,
@@ -20,8 +19,6 @@ import {
   List,
   Shield,
   ListChecks,
-  Download,
-  BookOpen,
   Key,
   Wrench,
   Webhook,
@@ -33,6 +30,7 @@ import {
   Gift,
   ChevronLeft,
   ChevronRight,
+  ChartLine,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -48,6 +46,10 @@ import { useTRPC } from '@/lib/trpc/utils';
 
 const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
+function formatReviewItemBadge(count: number | undefined): string | undefined {
+  return count && count > 0 ? count.toLocaleString('en-US') : undefined;
+}
+
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
@@ -58,6 +60,12 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
     })
   );
+  const { data: costInsightsAttention } = useQuery({
+    ...trpc.costInsights.getAttentionState.queryOptions(),
+    enabled: Boolean(user?.is_admin),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -70,6 +78,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
+    badge?: string;
     className?: string;
   }> = [
     {
@@ -84,9 +93,19 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
     {
       title: 'Usage',
-      icon: Code,
+      icon: ChartColumnIncreasing,
       url: '/usage',
     },
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Cost Insights',
+            icon: ChartLine,
+            url: '/cost-insights',
+            badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
+          },
+        ]
+      : []),
   ];
 
   // KiloClaw group
@@ -227,7 +246,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
-    badge?: string;
     className?: string;
   }> = [
     {
@@ -255,33 +273,9 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       url: '/credits',
     },
     {
-      title: 'Connected Accounts',
-      icon: UserCog,
-      url: '/connected-accounts',
-    },
-    {
       title: 'Bring Your Own Key (BYOK)',
       icon: Key,
       url: '/byok',
-    },
-  ];
-
-  // Start group
-  const startItems: Array<{
-    title: string;
-    icon: React.ElementType;
-    url: string;
-    className?: string;
-  }> = [
-    {
-      title: 'Install',
-      icon: Download,
-      url: '/install',
-    },
-    {
-      title: 'Learn',
-      icon: BookOpen,
-      url: '/learn',
     },
   ];
 
@@ -348,13 +342,12 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     ...kiloClawItems,
     ...cloudItems,
     ...accountItems,
-    ...startItems,
   ].map(i => (typeof i === 'string' ? i : i.url));
 
   return (
     <Sidebar {...props}>
       <SidebarHeader className="p-4">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3">
             <HeaderLogo href="/profile" />
           </div>
@@ -378,13 +371,13 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}
             <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
-            <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
           </>
         )}
       </SidebarContent>
 
       {sidebarPromoEligibility?.showPromoBanner && <SidebarPromoBanner />}
       <SidebarUserFooter user={user} isLoading={isLoading} />
+      <SidebarRail />
     </Sidebar>
   );
 }

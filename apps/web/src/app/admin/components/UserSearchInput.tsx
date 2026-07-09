@@ -10,6 +10,16 @@ interface UserSearchInputProps {
   onChange: (value: string) => void;
   isLoading?: boolean;
   placeholder?: string;
+  /** Forwarded to the underlying input so a visible <Label htmlFor> can bind to it. */
+  id?: string;
+  /**
+   * Explicit accessible name. Only pass this when there is no visible
+   * <Label htmlFor>, since aria-label overrides an associated label. When
+   * neither is provided the placeholder is used as a last-resort name.
+   */
+  'aria-label'?: string;
+  /** Forwarded to the input so helper text can be associated for screen readers. */
+  'aria-describedby'?: string;
 }
 
 export function UserSearchInput({
@@ -17,7 +27,14 @@ export function UserSearchInput({
   onChange,
   isLoading = false,
   placeholder = 'Search by email...',
+  id,
+  'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedby,
 }: UserSearchInputProps) {
+  // Don't let the placeholder fall back into aria-label when the input is
+  // bound to a visible <Label htmlFor id> — that would override the visible
+  // label's text as the accessible name.
+  const resolvedAriaLabel = ariaLabel ?? (id ? undefined : placeholder);
   const [localValue, setLocalValue] = useState(value);
 
   // Update local value when prop value changes
@@ -55,8 +72,11 @@ export function UserSearchInput({
       <div className="relative">
         <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
         <Input
+          id={id}
           type="text"
           placeholder={placeholder}
+          aria-label={resolvedAriaLabel}
+          aria-describedby={ariaDescribedby}
           value={localValue}
           onChange={e => setLocalValue(e.target.value)}
           onKeyDown={handleKeyDown}

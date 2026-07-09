@@ -1,0 +1,57 @@
+import { defineConfig } from 'wxt';
+import tailwindcss from '@tailwindcss/vite';
+
+// See https://wxt.dev/api/config.html
+export default defineConfig({
+  manifest: ({ browser }) => ({
+    action: {
+      default_title: 'Kilo',
+    },
+    browser_specific_settings: {
+      gecko: {
+        data_collection_permissions: {
+          required: ['none'],
+        },
+        id: 'kilo-extension@kilocode.ai',
+      },
+    },
+    description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
+    host_permissions: [
+      '<all_urls>',
+      'file:///*',
+      'https://app.kilo.ai/*',
+      'http://127.0.0.1/*',
+      'http://localhost/*',
+    ],
+    name: 'Kilo Code',
+    permissions:
+      browser === 'firefox'
+        ? ['identity', 'scripting', 'storage', 'tabs']
+        : ['debugger', 'identity', 'scripting', 'storage'],
+  }),
+  modules: ['@wxt-dev/module-react'],
+  vite: () => ({
+    plugins: [tailwindcss()],
+  }),
+  zip: {
+    includeSources: [
+      'package.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'patches/**',
+      'apps/extension/AGENTS.md',
+      'apps/extension/SOURCE_CODE_REVIEW.md',
+      'apps/extension/package.json',
+      'apps/extension/playwright.config.ts',
+      'apps/extension/tsconfig.json',
+      'apps/extension/vitest.config.ts',
+      'apps/extension/wxt.config.ts',
+      'apps/extension/entrypoints/**',
+      'apps/extension/public/**',
+      'apps/extension/scripts/**',
+      'apps/extension/src/**',
+      'apps/extension/tests/e2e/**',
+    ],
+    sourcesRoot: '../..',
+  },
+});

@@ -4,7 +4,7 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import type { Owner } from '@/lib/integrations/core/types';
+import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { updateRepositoriesForIntegration } from '@/lib/integrations/db/platform-integrations';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -180,8 +180,9 @@ export async function listGitLabRepositories(
     });
   }
 
+  const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
   // If forceRefresh, no cached repos, or never synced before, fetch from GitLab and update cache
-  if (forceRefresh || !integration.repositories?.length || !integration.repositories_synced_at) {
+  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const accessToken = await getValidGitLabToken(integration);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
     const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
@@ -197,7 +198,7 @@ export async function listGitLabRepositories(
 
   // Return cached repos
   return {
-    repositories: integration.repositories,
+    repositories: cachedRepositories,
     syncedAt: integration.repositories_synced_at,
   };
 }

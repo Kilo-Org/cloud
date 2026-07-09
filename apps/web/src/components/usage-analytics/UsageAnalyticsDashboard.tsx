@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,7 @@ import {
   formatLargeNumber,
 } from '@/lib/utils';
 import { Download, SlidersHorizontal } from 'lucide-react';
+import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
@@ -41,7 +43,11 @@ import {
   type UsageFilters,
   type ViewAs,
 } from './hooks';
-import { useUsageDashboardState } from './useUsageDashboardState';
+import {
+  ORG_SCOPE_ALL_ORGS,
+  ORG_SCOPE_SELF,
+  useUsageDashboardState,
+} from './useUsageDashboardState';
 import {
   DIMENSION_LABELS,
   type CostSource,
@@ -53,24 +59,43 @@ import {
 } from './types';
 import { formatDollarsFromMicrodollars, humanize } from './format';
 import { exportUsageTableToCsv } from './csvExport';
+import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
+import { FeatureAdoptionView } from './FeatureAdoptionView';
+import { RecommendationsView } from './RecommendationsView';
+import { UsageViewNavigation } from './UsageViewNavigation';
 
-type UsageAnalyticsDashboardProps = {
-  context: 'personal' | 'organization';
-  organizationId: string | null;
-  /**
-   * Organization display name (org context). Used in the "Entire {name}"
-   * toggle label when the caller can view the entire org.
-   */
-  organizationName?: string;
-  /**
-   * Caller's role in `organizationId`. Required for the `organization` context
-   * to decide whether to render the "My Usage / Entire Organization" toggle.
-   * Ignored in personal context (role is resolved per-org via `organizations.list`).
-   */
-  callerRole?: OrganizationRole;
-  /** Page title override. */
-  title?: string;
-};
+/**
+ * Personal usage never targets a single organization, so org-only props
+ * (`organizationId`, `organizationName`, `callerRole`, `organizationPlan`) are
+ * meaningless there; organization usage always targets a concrete org. Modeling
+ * these as a discriminated union stops callers from mixing the two — e.g.
+ * passing `context="organization"` with a null org id, or leaking org-only
+ * props into the personal page.
+ */
+type UsageAnalyticsDashboardProps =
+  | {
+      context: 'personal';
+      /** Page title override. */
+      title?: string;
+    }
+  | {
+      context: 'organization';
+      /** Target organization. Always present in organization context. */
+      organizationId: string;
+      /**
+       * Organization display name (org context). Used in the "Entire {name}"
+       * toggle label when the caller can view the entire org.
+       */
+      organizationName?: string;
+      /**
+       * Caller's role in `organizationId`. Decides whether to render the
+       * "My Usage / Entire Organization" toggle.
+       */
+      callerRole?: OrganizationRole;
+      organizationPlan?: Organization['plan'];
+      /** Page title override. */
+      title?: string;
+    };
 
 /** Sentinel written by DBT rollups for rows with NULL project_id. */
 const PROJECT_SENTINEL_NONE = '';
@@ -101,18 +126,57 @@ const METRIC_OPTIONS: MetricKey[] = [
   'outputInputRatio',
 ];
 
-export function UsageAnalyticsDashboard({
-  context,
-  organizationId,
-  organizationName,
-  callerRole,
-  title,
-}: UsageAnalyticsDashboardProps) {
+export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
+  const { context, title } = props;
+  // Narrow the discriminated union once: personal context has no target org, so
+  // the org-only fields collapse to a single nullable object. The rest of the
+  // component reads these locals (with `organizationId: string | null`) without
+  // re-narrowing the union.
+  const org = props.context === 'organization' ? props : null;
+  const organizationId = org?.organizationId ?? null;
+  const organizationName = org?.organizationName;
+  const callerRole = org?.callerRole;
+
   const trpc = useTRPC();
-  const { state, setState } = useUsageDashboardState();
-  const { period, granularity, costSource, chartMetric, filters, groupBy, personalView, viewAs } =
-    state;
+  // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
+  // new `scope` model so existing bookmarks keep opening an org-wide view
+  // instead of silently collapsing to "My Usage". Only applied when no explicit
+  // `scope` is present.
+  const searchParams = useSearchParams();
+  const legacyOrgWideScope =
+    organizationId && searchParams.get('scope') == null && searchParams.get('viewAs') === 'org-wide'
+      ? organizationId
+      : undefined;
+  const { state, setState } = useUsageDashboardState(
+    legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined
+  );
+  const {
+    period,
+    granularity,
+    costSource,
+    chartMetric,
+    filters,
+    groupBy,
+    personalView,
+    orgScope,
+    usageView,
+  } = state;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isOrgContext = context === 'organization';
+  // Owners/billing_managers are the only roles that may view org-wide usage and
+  // (via inheritance) child-org usage, so only they get the expanded scope list.
+  // Keep the narrowed org variant (not just a boolean) so a non-null `adminOrg`
+  // carries the concrete `organizationId`; downstream org-admin queries then
+  // read a guaranteed string id without re-checking it for null.
+  const adminOrg =
+    org && (org.callerRole === 'owner' || org.callerRole === 'billing_manager') ? org : null;
+  const isOrgAdmin = adminOrg !== null;
+  // Enterprise orgs get the dedicated feature-adoption / AI-usage views. Same
+  // pattern as `adminOrg`: a non-null `enterpriseOrg` carries the concrete org
+  // id those views require, so callers don't re-check the nullable local.
+  const enterpriseOrg = org?.organizationPlan === 'enterprise' ? org : null;
+  const hasEnterpriseUsageViews = enterpriseOrg !== null;
+  const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 
   // `organizations.list` is always available to the caller and returns the
   // caller's role per org. We need it in both personal context (for the Scope
@@ -122,6 +186,17 @@ export function UsageAnalyticsDashboard({
     ...trpc.organizations.list.queryOptions(),
     enabled: context === 'personal',
   });
+
+  // Parent/child hierarchy for the org-context Scope selector. Only fetched for
+  // owners/billing_managers; members never see the expanded scope list.
+  const scopeOrgsQuery = useQuery(
+    trpc.usageAnalytics.getScopeOrganizations.queryOptions(
+      adminOrg ? { organizationId: adminOrg.organizationId } : skipToken
+    )
+  );
+  const scopeOrgs = scopeOrgsQuery.data;
+  const childOrganizations = useMemo(() => scopeOrgs?.children ?? [], [scopeOrgs]);
+  const isParentOrg = childOrganizations.length > 0;
 
   const dateRange = useMemo(() => periodToDateRange(period), [period]);
   const granularityOptions = useMemo(() => granularityOptionsForPeriod(period), [period]);
@@ -133,40 +208,84 @@ export function UsageAnalyticsDashboard({
     [setState]
   );
 
-  const effectiveOrgId =
-    context === 'organization'
+  // ---- Effective query scope ----------------------------------------------
+  // Personal context: the org (if any) chosen in the personal Scope dropdown.
+  const personalEffectiveOrgId =
+    personalView !== PERSONAL_VIEW_PERSONAL_ONLY && personalView !== PERSONAL_VIEW_ALL_USAGE
+      ? personalView
+      : null;
+
+  // The set of scope values the caller is allowed to pick in org context:
+  // 'self', the page org (org-wide), each child org, and the all-orgs aggregate.
+  const validOrgScopeValues = useMemo(() => {
+    const values = new Set<string>([ORG_SCOPE_SELF]);
+    if (organizationId) values.add(organizationId);
+    for (const child of childOrganizations) values.add(child.organizationId);
+    if (childOrganizations.length > 0) values.add(ORG_SCOPE_ALL_ORGS);
+    return values;
+  }, [organizationId, childOrganizations]);
+
+  // Clamp the stored scope to something the caller may actually see. Non-admins
+  // and any stale/unknown scope (e.g. a deep link to a sibling org) collapse to
+  // "My Usage". The server independently enforces access regardless.
+  //
+  // While the scope list is still loading we optimistically honor the URL scope
+  // rather than clamp: otherwise a deep link like `?scope=<child-id>&group=user`
+  // would momentarily resolve to 'self', and the cleanup effect below would wipe
+  // (and persist) the deep-linked grouping/user filters before validation runs.
+  // Keyed off `isLoading` (not `!data`) so a failed scope-list fetch falls back
+  // to clamping instead of honoring a stale/unknown scope indefinitely.
+  const scopeListPending = adminOrg != null && scopeOrgsQuery.isLoading;
+  const resolvedOrgScope = !isOrgAdmin
+    ? ORG_SCOPE_SELF
+    : scopeListPending || validOrgScopeValues.has(orgScope)
+      ? orgScope
+      : ORG_SCOPE_SELF;
+  const isAllOrgsScope = isOrgContext && resolvedOrgScope === ORG_SCOPE_ALL_ORGS;
+  const isSelfOrgScope = resolvedOrgScope === ORG_SCOPE_SELF;
+
+  // Single org targeted by a query: the page org for 'self', the selected org
+  // for a specific pick, and none for the all-orgs aggregate.
+  const orgContextOrgId: string | null = isAllOrgsScope
+    ? null
+    : isSelfOrgScope
       ? organizationId
-      : personalView !== PERSONAL_VIEW_PERSONAL_ONLY && personalView !== PERSONAL_VIEW_ALL_USAGE
-        ? personalView
-        : null;
+      : resolvedOrgScope;
+
+  const effectiveOrgId: string | null = isOrgContext ? orgContextOrgId : personalEffectiveOrgId;
+
+  // Org ids aggregated by the "All Organizations" scope (parent + children).
+  // This scope is reachable only in organization context, so the page org id is
+  // always present; the precondition guard both documents that and narrows the
+  // nullable local to a string. Keyed on the stable `organizationId` primitive
+  // (not the per-render `props`/`org` object) to preserve memoization.
+  const effectiveOrganizationIds = useMemo<string[] | null>(() => {
+    if (!isAllOrgsScope || organizationId == null) return null;
+    const ids = new Set<string>([organizationId]);
+    for (const child of childOrganizations) ids.add(child.organizationId);
+    return Array.from(ids);
+  }, [isAllOrgsScope, organizationId, childOrganizations]);
+
   const effectivePersonalScope: 'personal-only' | 'include-orgs' =
-    context === 'organization' || personalView === PERSONAL_VIEW_ALL_USAGE
-      ? 'include-orgs'
-      : 'personal-only';
+    isOrgContext || personalView === PERSONAL_VIEW_ALL_USAGE ? 'include-orgs' : 'personal-only';
+
+  // Any non-self org scope (a specific org or the all-orgs aggregate) is
+  // org-wide. Personal context is always 'self'.
+  const effectiveViewAs: ViewAs = isOrgContext && !isSelfOrgScope ? 'org-wide' : 'self';
 
   // Role in the effective org drives whether the caller may see all users.
   // - Organization context: prop `callerRole` from the server layout.
   // - Personal context with an org selected: look it up via organizations.list.
-  // - Personal context with no org selected: no role; toggle hidden.
   const roleForEffectiveOrg: OrganizationRole | undefined = useMemo(() => {
-    if (context === 'organization') return callerRole;
-    if (!effectiveOrgId) return undefined;
-    const match = organizations?.find(o => o.organizationId === effectiveOrgId);
-    return match?.role;
-  }, [context, callerRole, effectiveOrgId, organizations]);
+    if (isOrgContext) return callerRole;
+    if (!personalEffectiveOrgId) return undefined;
+    return organizations?.find(o => o.organizationId === personalEffectiveOrgId)?.role;
+  }, [isOrgContext, callerRole, personalEffectiveOrgId, organizations]);
 
-  const canViewAllOrgUsers =
-    !!effectiveOrgId &&
-    (roleForEffectiveOrg === 'owner' || roleForEffectiveOrg === 'billing_manager');
-
-  // Per plan: the view-as toggle is hidden on the personal page entirely.
-  // Personal page users picking an org always get "my usage in that org".
-  const showViewAsSelector = context === 'organization' && canViewAllOrgUsers;
-
-  // Effective viewAs: only honor the toggle when it's allowed + shown.
-  // Server still enforces this; client-side gating avoids sending requests
-  // that would be rejected.
-  const effectiveViewAs: ViewAs = showViewAsSelector && viewAs === 'org-wide' ? 'org-wide' : 'self';
+  const canViewAllOrgUsers = isOrgContext
+    ? isOrgAdmin
+    : !!personalEffectiveOrgId &&
+      (roleForEffectiveOrg === 'owner' || roleForEffectiveOrg === 'billing_manager');
 
   /**
    * Whether the current effective view includes data from multiple users.
@@ -176,43 +295,42 @@ export function UsageAnalyticsDashboard({
    */
   const isOrgWideView = canViewAllOrgUsers && effectiveViewAs === 'org-wide';
 
-  // Reset viewAs to 'self' whenever the effective org changes (e.g. personal
-  // user switches org in the Scope dropdown). Only fires on actual org changes
-  // to avoid a redundant state update on initial mount.
-  const prevEffectiveOrgId = useRef(effectiveOrgId);
-  useEffect(() => {
-    if (prevEffectiveOrgId.current !== effectiveOrgId) {
-      setState({ viewAs: 'self' });
-      prevEffectiveOrgId.current = effectiveOrgId;
+  // Orgs to resolve user ids against for display labels. For the all-orgs
+  // aggregate this spans the parent and its children.
+  const userResolutionOrgIds = useMemo<string[]>(() => {
+    if (effectiveOrganizationIds && effectiveOrganizationIds.length > 0) {
+      return effectiveOrganizationIds;
     }
-  }, [effectiveOrgId, setState]);
+    return effectiveOrgId ? [effectiveOrgId] : [];
+  }, [effectiveOrganizationIds, effectiveOrgId]);
 
-  // When the view collapses to a single user ('self'), drop any stale
-  // user-dimension state that no longer makes sense:
-  // - Reset `groupBy: 'user'` to 'none' so the chart splits by time only.
-  // - Clear user include/exclude filters (the server would otherwise reject
-  //   self-scope requests carrying userIds referring to someone else).
+  // When the scope changes, drop user-dimension state that no longer applies:
+  // - 'self' has no other users, so reset `groupBy: 'user'` and clear user
+  //   filters (the server rejects self-scope requests carrying others' ids).
+  // - Switching between orgs invalidates user filters that referenced the
+  //   previous org's members.
+  const prevResolvedScope = useRef(resolvedOrgScope);
   useEffect(() => {
-    if (isOrgWideView) return;
+    const scopeChanged = prevResolvedScope.current !== resolvedOrgScope;
+    prevResolvedScope.current = resolvedOrgScope;
+    if (isOrgWideView && !scopeChanged) return;
     const updates: Partial<ReturnType<typeof useUsageDashboardState>['state']> = {};
-    if (groupBy === 'user') updates.groupBy = 'none';
-    if (filters.userIds.length > 0 || filters.excludedUserIds.length > 0) {
+    if (groupBy === 'user' && !isOrgWideView) updates.groupBy = 'none';
+    if (
+      (filters.userIds.length > 0 || filters.excludedUserIds.length > 0) &&
+      (!isOrgWideView || scopeChanged)
+    ) {
       updates.filters = { ...filters, userIds: [], excludedUserIds: [] };
     }
     if (Object.keys(updates).length > 0) {
       setState(updates);
     }
-  }, [isOrgWideView, groupBy, filters, setState]);
-
-  const effectiveOrganizationName = useMemo(() => {
-    if (context === 'organization') return organizationName ?? null;
-    if (!effectiveOrgId) return null;
-    return organizations?.find(o => o.organizationId === effectiveOrgId)?.organizationName ?? null;
-  }, [context, organizationName, effectiveOrgId, organizations]);
+  }, [resolvedOrgScope, isOrgWideView, groupBy, filters, setState]);
 
   const commonArgs = useMemo(
     () => ({
       organizationId: effectiveOrgId,
+      organizationIds: effectiveOrganizationIds,
       dateRange,
       granularity,
       costSource,
@@ -222,6 +340,7 @@ export function UsageAnalyticsDashboard({
     }),
     [
       effectiveOrgId,
+      effectiveOrganizationIds,
       dateRange,
       granularity,
       costSource,
@@ -231,13 +350,17 @@ export function UsageAnalyticsDashboard({
     ]
   );
 
-  const { data: summary, isLoading: summaryLoading } = useUsageSummary(commonArgs);
+  const { data: summary, isLoading: summaryLoading } = useUsageSummary({
+    ...commonArgs,
+    enabled: showDetailedUsage,
+  });
 
   const splitByDimension = groupBy !== 'none' ? groupBy : undefined;
   const { data: timeseries, isLoading: timeseriesLoading } = useUsageTimeseries({
     ...commonArgs,
     metric: chartMetric,
     splitBy: splitByDimension,
+    enabled: showDetailedUsage,
   });
 
   const { data: featureBreakdown, isLoading: featureBreakdownLoading } = useUsageBreakdown({
@@ -245,25 +368,28 @@ export function UsageAnalyticsDashboard({
     dimension: 'feature',
     metric: 'cost',
     limit: 20,
+    enabled: showDetailedUsage,
   });
   const { data: modelBreakdown, isLoading: modelBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'model',
     metric: 'cost',
     limit: 10,
+    enabled: showDetailedUsage,
   });
   const { data: projectBreakdown, isLoading: projectBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'project',
     metric: 'cost',
     limit: 10,
+    enabled: showDetailedUsage,
   });
   const { data: userBreakdown, isLoading: userBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'user',
     metric: 'cost',
     limit: 10,
-    enabled: isOrgWideView,
+    enabled: isOrgWideView && showDetailedUsage,
   });
 
   const tableGroupBy = useMemo<Dimension[]>(() => (groupBy === 'none' ? [] : [groupBy]), [groupBy]);
@@ -272,6 +398,7 @@ export function UsageAnalyticsDashboard({
     ...commonArgs,
     groupBy: tableGroupBy,
     limit: 500,
+    enabled: showDetailedUsage,
   });
 
   // Resolve user ID -> email for labels whenever there is an effective org
@@ -280,7 +407,7 @@ export function UsageAnalyticsDashboard({
   // resolve labels correctly; today that path is hidden in the UI, but the
   // resolver should not depend on UI gating.
   const userIds = useMemo(() => {
-    if (!effectiveOrgId) return [];
+    if (userResolutionOrgIds.length === 0) return [];
     const fromBreakdown = userBreakdown?.breakdown.map(b => b.key) ?? [];
     const fromFilters = [...filters.userIds, ...filters.excludedUserIds];
     const fromTable =
@@ -289,8 +416,8 @@ export function UsageAnalyticsDashboard({
         return userId ? [userId] : [];
       }) ?? [];
     return Array.from(new Set([...fromBreakdown, ...fromFilters, ...fromTable]));
-  }, [userBreakdown, effectiveOrgId, filters.userIds, filters.excludedUserIds, tableData]);
-  const { data: userResolution } = useResolveOrgUsers(effectiveOrgId, userIds);
+  }, [userBreakdown, userResolutionOrgIds, filters.userIds, filters.excludedUserIds, tableData]);
+  const { data: userResolution } = useResolveOrgUsers(userResolutionOrgIds, userIds);
   const userLabelFor = useCallback(
     (value: string) => {
       const match = userResolution?.users.find(u => u.id === value);
@@ -305,13 +432,13 @@ export function UsageAnalyticsDashboard({
 
   const labelForDimensionValue = useCallback(
     (dim: Dimension, value: string): string => {
-      if (dim === 'user' && effectiveOrgId) return userLabelFor(value);
+      if (dim === 'user' && userResolutionOrgIds.length > 0) return userLabelFor(value);
       if (dim === 'feature') return featureLabelFor(value);
       if (dim === 'mode') return modeLabelFor(value);
       if (dim === 'project') return projectLabelFor(value);
       return value;
     },
-    [effectiveOrgId, userLabelFor, featureLabelFor, modeLabelFor, projectLabelFor]
+    [userResolutionOrgIds, userLabelFor, featureLabelFor, modeLabelFor, projectLabelFor]
   );
 
   const activeFilters = useMemo((): ActiveFilter[] => {
@@ -467,22 +594,25 @@ export function UsageAnalyticsDashboard({
     });
   }, [tableData, tableGroupBy, granularity, period, costSource, labelForDimensionValue]);
 
-  const isOrgContext = context === 'organization';
-
   const sidebar = (
     <UsageAnalyticsSidebar
       context={context}
       organizationId={effectiveOrgId}
+      organizationIds={effectiveOrganizationIds}
       dateRange={dateRange}
       personalScope={effectivePersonalScope}
       personalView={personalView}
       onPersonalViewChange={(v: PersonalView) => setState({ personalView: v })}
       organizations={organizations ?? []}
       viewAs={effectiveViewAs}
-      onViewAsChange={(v: ViewAs) => setState({ viewAs: v })}
+      orgScope={resolvedOrgScope}
+      onOrgScopeChange={(v: string) => setState({ orgScope: v })}
+      pageOrganizationId={organizationId}
+      pageOrganizationName={organizationName ?? null}
+      childOrganizations={childOrganizations}
+      isParentOrg={isParentOrg}
       canViewAllOrgUsers={canViewAllOrgUsers}
       isOrgWideView={isOrgWideView}
-      effectiveOrganizationName={effectiveOrganizationName}
       period={period}
       onPeriodChange={handlePeriodChange}
       granularity={granularity}
@@ -506,129 +636,183 @@ export function UsageAnalyticsDashboard({
 
   const pageTitle = title ?? 'Usage Analytics';
 
+  const showUsageControls = !hasEnterpriseUsageViews || usageView === 'ai-usage';
+
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] w-full overflow-hidden">
       {typeof pageTitle === 'string' && <SetPageTitle title={pageTitle} />}
 
-      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-80 p-0 lg:hidden">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Filters & Controls</SheetTitle>
-          </SheetHeader>
-          {sidebar}
-        </SheetContent>
-      </Sheet>
+      {showUsageControls && (
+        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+          <SheetContent side="left" className="w-80 p-0 lg:hidden">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Filters & Controls</SheetTitle>
+            </SheetHeader>
+            {sidebar}
+          </SheetContent>
+        </Sheet>
+      )}
 
-      <div className="hidden w-80 shrink-0 border-r lg:block">{sidebar}</div>
+      {showUsageControls && <div className="hidden w-80 shrink-0 border-r lg:block">{sidebar}</div>}
 
       <div className="flex h-full flex-1 flex-col overflow-hidden">
-        <div className="bg-background/90 flex items-center gap-3 border-b px-4 py-2 backdrop-blur lg:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMobileSidebarOpen(true)}
-            className="gap-2"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-          </Button>
-        </div>
+        {showUsageControls && (
+          <div className="bg-background/90 flex items-center gap-3 border-b px-4 py-2 backdrop-blur lg:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="gap-2"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+            </Button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-            <UsageWarning />
-
-            {isOrgContext && organizationId && (
-              <AIAdoptionScoreCard organizationId={organizationId} dateRange={dateRange} />
-            )}
-
-            <SummarySection
-              summary={summary}
-              loading={summaryLoading}
-              costSource={costSource}
-              showActiveUsers={isOrgWideView}
-            />
-
-            <BreakdownPieChart
-              title="Features"
-              dimension="feature"
-              data={featureBreakdown}
-              loading={featureBreakdownLoading}
-              labelFor={featureLabelFor}
-            />
-            <BreakdownBarChart
-              title="Models"
-              dimension="model"
-              data={modelBreakdown}
-              loading={modelBreakdownLoading}
-              metric="cost"
-            />
-            <BreakdownBarChart
-              title="Top Projects"
-              dimension="project"
-              data={projectBreakdown}
-              loading={projectBreakdownLoading}
-              metric="cost"
-              labelFor={projectLabelFor}
-            />
-            {isOrgWideView && (
-              <BreakdownBarChart
-                title="Users"
-                dimension="user"
-                data={userBreakdown}
-                loading={userBreakdownLoading}
-                metric="cost"
-                labelFor={userLabelFor}
-              />
-            )}
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Trends</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PrimaryChart
-                  metric={chartMetric}
-                  costSource={costSource}
-                  data={timeseries}
-                  loading={timeseriesLoading}
-                  splitByLabel={
-                    splitByDimension ? DIMENSION_LABELS[splitByDimension as Dimension] : undefined
-                  }
-                  seriesLabelFor={
-                    splitByDimension ? v => labelForDimensionValue(splitByDimension, v) : undefined
-                  }
-                  period={period}
-                  granularity={granularity}
+            {hasEnterpriseUsageViews && (
+              <div className="space-y-4">
+                <div>
+                  <h1 className="text-2xl font-bold">Usage</h1>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Track feature adoption and AI assisted work across {organizationName}.
+                  </p>
+                </div>
+                <UsageViewNavigation
+                  value={usageView}
+                  onValueChange={nextView => setState({ usageView: nextView })}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
-            <UsageTableBase
-              title="Detailed Breakdown"
-              columns={tableColumns}
-              data={tableRows}
-              emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
-              sortable
-              defaultSort={{ key: 'datetime', direction: 'desc' }}
-              headerActions={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleExportCsv}
-                  disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
-                  Download CSV
-                </Button>
-              }
-            />
+            {enterpriseOrg && usageView === 'overview' ? (
+              <>
+                <UsageWarning />
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+                  <FeatureAdoptionView
+                    organizationId={enterpriseOrg.organizationId}
+                    compact
+                    onViewDetails={() => setState({ usageView: 'feature-adoption' })}
+                  />
+                  <AIAdoptionSummaryCard
+                    organizationId={enterpriseOrg.organizationId}
+                    dateRange={dateRange}
+                    onViewDetails={() => setState({ usageView: 'ai-usage' })}
+                  />
+                </div>
+              </>
+            ) : enterpriseOrg && usageView === 'feature-adoption' ? (
+              <div className="space-y-6">
+                <FeatureAdoptionView organizationId={enterpriseOrg.organizationId} />
+                <RecommendationsView
+                  organizationId={enterpriseOrg.organizationId}
+                  canDismiss={callerRole === 'owner'}
+                />
+              </div>
+            ) : (
+              <>
+                <UsageWarning />
 
-            {isOrgContext &&
-              organizationId &&
-              (callerRole === 'owner' || callerRole === 'billing_manager') && (
-                <ActiveKiloclawsTable organizationId={organizationId} />
-              )}
+                {/* Org-level panels follow the selected single org so they
+                    don't mix scopes; hidden in the All Organizations aggregate
+                    (effectiveOrgId is null) which they cannot represent. */}
+                {isOrgContext && effectiveOrgId && (
+                  <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
+                )}
+
+                <SummarySection
+                  summary={summary}
+                  loading={summaryLoading}
+                  costSource={costSource}
+                  showActiveUsers={isOrgWideView}
+                />
+
+                <BreakdownPieChart
+                  title="Features"
+                  dimension="feature"
+                  data={featureBreakdown}
+                  loading={featureBreakdownLoading}
+                  labelFor={featureLabelFor}
+                />
+                <BreakdownBarChart
+                  title="Models"
+                  dimension="model"
+                  data={modelBreakdown}
+                  loading={modelBreakdownLoading}
+                  metric="cost"
+                />
+                <BreakdownBarChart
+                  title="Top Projects"
+                  dimension="project"
+                  data={projectBreakdown}
+                  loading={projectBreakdownLoading}
+                  metric="cost"
+                  labelFor={projectLabelFor}
+                />
+                {isOrgWideView && (
+                  <BreakdownBarChart
+                    title="Users"
+                    dimension="user"
+                    data={userBreakdown}
+                    loading={userBreakdownLoading}
+                    metric="cost"
+                    labelFor={userLabelFor}
+                  />
+                )}
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Trends</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PrimaryChart
+                      metric={chartMetric}
+                      costSource={costSource}
+                      data={timeseries}
+                      loading={timeseriesLoading}
+                      splitByLabel={
+                        splitByDimension
+                          ? DIMENSION_LABELS[splitByDimension as Dimension]
+                          : undefined
+                      }
+                      seriesLabelFor={
+                        splitByDimension
+                          ? value => labelForDimensionValue(splitByDimension, value)
+                          : undefined
+                      }
+                      period={period}
+                      granularity={granularity}
+                    />
+                  </CardContent>
+                </Card>
+
+                <UsageTableBase
+                  title="Detailed Breakdown"
+                  columns={tableColumns}
+                  data={tableRows}
+                  emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
+                  sortable
+                  defaultSort={{ key: 'datetime', direction: 'desc' }}
+                  headerActions={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleExportCsv}
+                      disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
+                    >
+                      <Download className="mr-1.5 h-3.5 w-3.5" />
+                      Download CSV
+                    </Button>
+                  }
+                />
+
+                {isOrgAdmin && effectiveOrgId && (
+                  <ActiveKiloclawsTable organizationId={effectiveOrgId} />
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

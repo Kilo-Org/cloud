@@ -13,6 +13,6 @@ describe('ensureProfileAfterKiloPassPurchase', () => {
 
     ensureProfileAfterKiloPassPurchase(router);
 
-    expect(routes).toEqual(['/(app)/profile']);
+    expect(routes).toEqual(['/(app)/(tabs)/(3_profile)']);
   });
 });

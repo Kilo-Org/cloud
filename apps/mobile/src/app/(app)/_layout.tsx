@@ -62,13 +62,6 @@ export default function AppLayout() {
                 }}
               />
               <Stack.Screen
-                name="profile"
-                options={{
-                  presentation: 'modal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
                 name="kilo-pass"
                 options={{
                   presentation: 'modal',

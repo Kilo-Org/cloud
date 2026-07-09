@@ -1,5 +1,8 @@
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import {
+  buildAutoModelCatalogEntry,
+  getEnhancedOpenRouterModels,
+} from '@/lib/ai-gateway/providers/openrouter';
 import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
@@ -10,6 +13,8 @@ import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/d
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { isOrganizationAutoEnabled } from '@/lib/organizations/organization-auto-model';
 import { addUserByokAvailability, getOrganizationByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
 
@@ -53,6 +58,10 @@ export async function getAvailableModelsForOrganization(
 
   if (organization.plan !== 'enterprise' && organization.settings.data_collection !== 'deny') {
     filteredModels.push(...(await listAvailableExperimentModels()));
+  }
+
+  if (isOrganizationAutoEnabled(organization)) {
+    filteredModels.push(buildAutoModelCatalogEntry(ORG_AUTO_MODEL));
   }
 
   filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));

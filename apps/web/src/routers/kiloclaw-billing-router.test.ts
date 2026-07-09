@@ -23,20 +23,29 @@ import {
   kiloclaw_subscription_change_log,
   kilocode_users,
   credit_transactions,
+  kilo_pass_issuance_items,
+  kilo_pass_issuances,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassTier,
+  KiloPassCadence,
+  KiloPassPaymentProvider,
+  KiloPassIssuanceItemKind,
+  KiloPassIssuanceSource,
+} from '@/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import type { CaptureCostInsightSpendInput } from '@kilocode/db/cost-insights-rollups';
 
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
   LEGACY_KILOCLAW_PRICE_VERSION;
@@ -46,12 +55,25 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 
 type KiloclawInternalClientMockShape = {
   __provisionMock: AnyMock;
+  __destroyMock: AnyMock;
   __startAsyncMock: AnyMock;
 };
 
 jest.setTimeout(15_000);
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
+
+jest.mock('@kilocode/db/cost-insights-rollups', () => ({
+  captureCostInsightSpend: jest.fn(async () => undefined),
+  COST_INSIGHT_DRIVER_FALLBACK: 'other',
+  COST_INSIGHT_KILOCLAW_PRODUCT_KEY: 'kiloclaw-hosting',
+}));
+
+const captureCostInsightSpendMock = jest.requireMock<{
+  captureCostInsightSpend: jest.Mock<
+    (tx: unknown, input: CaptureCostInsightSpendInput) => Promise<void>
+  >;
+}>('@kilocode/db/cost-insights-rollups').captureCostInsightSpend;
 
 jest.mock('@/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
@@ -123,12 +145,14 @@ jest.mock('next/server', () => {
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const fn = jest.fn as (...args: unknown[]) => AnyMock;
   const provisionMock = fn().mockResolvedValue({});
+  const destroyMock = fn().mockResolvedValue(undefined);
   const startAsyncMock = fn().mockResolvedValue(undefined);
   return {
     KiloClawInternalClient: fn().mockImplementation(() => ({
       start: fn().mockResolvedValue(undefined),
       startAsync: startAsyncMock,
       stop: fn().mockResolvedValue(undefined),
+      destroy: destroyMock,
       provision: provisionMock,
       getStatus: fn().mockResolvedValue({}),
     })),
@@ -142,6 +166,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __provisionMock: provisionMock,
+    __destroyMock: destroyMock,
     __startAsyncMock: startAsyncMock,
   };
 });
@@ -276,8 +301,11 @@ beforeEach(async () => {
   stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
   kiloclawInternalClientMock.__provisionMock.mockReset();
   kiloclawInternalClientMock.__provisionMock.mockResolvedValue(defaultProvisionResult);
+  kiloclawInternalClientMock.__destroyMock.mockReset();
+  kiloclawInternalClientMock.__destroyMock.mockResolvedValue(undefined);
   kiloclawInternalClientMock.__startAsyncMock.mockReset();
   kiloclawInternalClientMock.__startAsyncMock.mockResolvedValue(undefined);
+  captureCostInsightSpendMock.mockClear();
   posthogCaptureMock.mockReset();
 
   // Default mock returns for live-fetch calls
@@ -6819,6 +6847,67 @@ describe('enrollWithCredits', () => {
     return instance;
   }
 
+  async function createActiveYearlyTier49KiloPassWithBaseIssuance(userId: string) {
+    const providerSubscriptionId = `kp-recovery-${crypto.randomUUID()}`;
+    const [subscription] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: userId,
+        provider_subscription_id: providerSubscriptionId,
+        stripe_subscription_id: providerSubscriptionId,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: '2026-07-01T00:00:00.000Z',
+        current_streak_months: 1,
+        next_yearly_issue_at: '2026-08-01T00:00:00.000Z',
+      })
+      .returning();
+
+    if (!subscription) {
+      throw new Error('Failed to insert Kilo Pass subscription');
+    }
+
+    const [baseCreditTransaction] = await db
+      .insert(credit_transactions)
+      .values({
+        kilo_user_id: userId,
+        amount_microdollars: 49_000_000,
+        is_free: false,
+        description: 'Kilo Pass Pro yearly base credits',
+        credit_category: `kilo-pass-base:${providerSubscriptionId}:2026-07`,
+        check_category_uniqueness: true,
+      })
+      .returning();
+
+    if (!baseCreditTransaction) {
+      throw new Error('Failed to insert Kilo Pass base credit transaction');
+    }
+
+    const [issuance] = await db
+      .insert(kilo_pass_issuances)
+      .values({
+        kilo_pass_subscription_id: subscription.id,
+        issue_month: '2026-07-01',
+        source: KiloPassIssuanceSource.Cron,
+      })
+      .returning();
+
+    if (!issuance) {
+      throw new Error('Failed to insert Kilo Pass issuance');
+    }
+
+    await db.insert(kilo_pass_issuance_items).values({
+      kilo_pass_issuance_id: issuance.id,
+      kind: KiloPassIssuanceItemKind.Base,
+      credit_transaction_id: baseCreditTransaction.id,
+      amount_usd: 49,
+    });
+
+    return { subscription, issuance };
+  }
+
   it('clears destruction fields and records resume retry state when credit enrollment activates a suspended trial', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 60_000_000);
@@ -6969,6 +7058,22 @@ describe('enrollWithCredits', () => {
     expect(deduction).toBeDefined();
     expect(deduction!.amount_microdollars).toBe(-4_000_000);
     expect(deduction!.credit_category).toContain('kiloclaw-subscription:');
+    expect(captureCostInsightSpendMock).toHaveBeenCalledWith(expect.anything(), {
+      owner: { type: 'user', id: user.id },
+      actorUserId: user.id,
+      occurredAt: expect.any(String),
+      amountMicrodollars: 4_000_000,
+      category: 'scheduled',
+      source: 'kiloclaw',
+      productKey: 'kiloclaw-hosting',
+      featureKey: 'enrollment',
+      modelOrPlanKey: 'standard',
+      providerKey: 'other',
+    });
+    const captureInput = captureCostInsightSpendMock.mock.calls[0]?.[1] as
+      | { occurredAt: string }
+      | undefined;
+    expect(new Date(deduction!.created_at).toISOString()).toBe(captureInput?.occurredAt);
 
     // Verify credit spend recorded at intro amount
     const [updatedUser] = await db
@@ -7274,6 +7379,36 @@ describe('enrollWithCredits', () => {
     );
   });
 
+  it('rolls back credit enrollment when scheduled-spend capture fails', async () => {
+    await createCreditEnrollmentAnchor(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    captureCostInsightSpendMock.mockImplementationOnce(async () => {
+      throw new Error('rollup unavailable');
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'rollup unavailable'
+    );
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+    const [updatedUser] = await db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    const transactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+
+    expect(subscription.status).toBe('trialing');
+    expect(updatedUser.used).toBe(0);
+    expect(transactions).toHaveLength(0);
+  });
+
   it('rejects enrollment when subscription is active', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 50_000_000);
@@ -7331,6 +7466,378 @@ describe('enrollWithCredits', () => {
     await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
       'Reprovision KiloClaw before enrolling hosting with credits.'
     );
+  });
+
+  it('reprovisions a destroyed canceled Standard subscription and activates with Kilo Pass projected bonus credits', async () => {
+    setTestSystemTime('2026-07-01T12:00:00.000Z');
+    const destroyedInstance = await createInstance(user.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 43_710_000,
+        microdollars_used: 0,
+        kilo_pass_threshold: 49_000_000,
+      })
+      .where(eq(kilocode_users.id, user.id));
+    const { issuance } = await createActiveYearlyTier49KiloPassWithBaseIssuance(user.id);
+    const [oldSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'canceled',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        current_period_start: '2026-05-30T00:00:00.000Z',
+        current_period_end: '2026-06-30T00:00:00.000Z',
+        credit_renewal_at: '2026-06-30T00:00:00.000Z',
+      })
+      .returning();
+    const freshInstance = {
+      id: crypto.randomUUID(),
+      sandboxId: `ki_${crypto.randomUUID()}`,
+    };
+    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
+      await db.insert(kiloclaw_instances).values({
+        id: freshInstance.id,
+        user_id: user.id,
+        sandbox_id: freshInstance.sandboxId,
+      });
+      return {
+        instanceId: freshInstance.id,
+        sandboxId: freshInstance.sandboxId,
+      };
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const beforeStatus = await caller.kiloclaw.getBillingStatus();
+    expect(beforeStatus.creditReprovisionRecovery).toEqual({
+      eligible: true,
+      plan: 'standard',
+      costMicrodollars: 55_000_000,
+      projectedKiloPassBonusMicrodollars: 24_500_000,
+      effectiveBalanceMicrodollars: 68_210_000,
+      shortfallMicrodollars: 0,
+    });
+
+    const result = await caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' });
+
+    expect(result).toEqual({
+      success: true,
+      status: 'activated',
+      instanceId: freshInstance.id,
+    });
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+    const predecessor = subscriptions.find(subscription => subscription.id === oldSubscription?.id);
+    const successor = subscriptions.find(
+      subscription => subscription.instance_id === freshInstance.id
+    );
+
+    expect(successor).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        payment_source: 'credits',
+        plan: 'standard',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        credit_renewal_at: expect.any(String),
+      })
+    );
+    expect(predecessor?.transferred_to_subscription_id).toBe(successor?.id);
+
+    const [updatedUser] = await db
+      .select({
+        acquired: kilocode_users.total_microdollars_acquired,
+        used: kilocode_users.microdollars_used,
+        threshold: kilocode_users.kilo_pass_threshold,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id))
+      .limit(1);
+    expect(updatedUser).toEqual({
+      acquired: 68_210_000,
+      used: 55_000_000,
+      threshold: null,
+    });
+
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+      columns: {
+        kind: true,
+        amount_usd: true,
+        bonus_percent_applied: true,
+      },
+    });
+    expect(bonusItem).toEqual(
+      expect.objectContaining({
+        kind: KiloPassIssuanceItemKind.Bonus,
+        amount_usd: 24.5,
+        bonus_percent_applied: 0.5,
+      })
+    );
+
+    const deductions = await db
+      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(deductions.map(row => row.amountMicrodollars)).toContain(-55_000_000);
+  });
+
+  it('rolls back a duplicate fresh provision when another recovery activates first', async () => {
+    setTestSystemTime('2026-07-01T12:00:00.000Z');
+    const destroyedInstance = await createInstance(user.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 120_000_000,
+        microdollars_used: 0,
+        kilo_pass_threshold: null,
+      })
+      .where(eq(kilocode_users.id, user.id));
+    const [oldSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'canceled',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        current_period_start: '2026-05-30T00:00:00.000Z',
+        current_period_end: '2026-06-30T00:00:00.000Z',
+        credit_renewal_at: '2026-06-30T00:00:00.000Z',
+      })
+      .returning();
+    const oldSubscriptionId = oldSubscription?.id;
+    if (!oldSubscriptionId) throw new Error('Expected old subscription fixture');
+    const winningInstance = {
+      id: crypto.randomUUID(),
+      sandboxId: `ki_${crypto.randomUUID()}`,
+    };
+    const freshInstance = {
+      id: crypto.randomUUID(),
+      sandboxId: `ki_${crypto.randomUUID()}`,
+    };
+    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
+      await db.insert(kiloclaw_instances).values({
+        id: winningInstance.id,
+        user_id: user.id,
+        sandbox_id: winningInstance.sandboxId,
+      });
+      const [winningSubscription] = await db
+        .insert(kiloclaw_subscriptions)
+        .values({
+          user_id: user.id,
+          instance_id: winningInstance.id,
+          payment_source: 'credits',
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+          current_period_start: '2026-07-01T12:00:00.000Z',
+          current_period_end: '2026-08-01T12:00:00.000Z',
+          credit_renewal_at: '2026-08-01T12:00:00.000Z',
+        })
+        .returning();
+      const winningSubscriptionId = winningSubscription?.id;
+      if (!winningSubscriptionId) throw new Error('Expected winning subscription fixture');
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ transferred_to_subscription_id: winningSubscriptionId })
+        .where(eq(kiloclaw_subscriptions.id, oldSubscriptionId));
+      await db.insert(kiloclaw_instances).values({
+        id: freshInstance.id,
+        user_id: user.id,
+        sandbox_id: freshInstance.sandboxId,
+      });
+      return {
+        instanceId: freshInstance.id,
+        sandboxId: freshInstance.sandboxId,
+      };
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' })
+    ).resolves.toEqual({
+      success: true,
+      status: 'activated',
+      instanceId: winningInstance.id,
+    });
+
+    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledTimes(1);
+
+    const [freshRow] = await db
+      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, freshInstance.id))
+      .limit(1);
+    expect(freshRow?.destroyedAt).toEqual(expect.any(String));
+
+    const freshSubscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, freshInstance.id));
+    expect(freshSubscriptions).toEqual([]);
+    expect(kiloclawInternalClientMock.__destroyMock).toHaveBeenCalledWith(
+      user.id,
+      freshInstance.id,
+      { reason: 'stale_provision_cleanup' }
+    );
+
+    const [predecessor] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, oldSubscriptionId))
+      .limit(1);
+    expect(predecessor).toEqual(
+      expect.objectContaining({
+        transferred_to_subscription_id: expect.any(String),
+      })
+    );
+  });
+
+  it('rolls back the fresh instance when destroyed-subscription credit recovery enrollment fails', async () => {
+    setTestSystemTime('2026-07-01T12:00:00.000Z');
+    const destroyedInstance = await createInstance(user.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 60_000_000,
+        microdollars_used: 0,
+        kilo_pass_threshold: null,
+      })
+      .where(eq(kilocode_users.id, user.id));
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: destroyedInstance.id,
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'canceled',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+    const freshInstance = {
+      id: crypto.randomUUID(),
+      sandboxId: `ki_${crypto.randomUUID()}`,
+    };
+    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
+      await db.insert(kiloclaw_instances).values({
+        id: freshInstance.id,
+        user_id: user.id,
+        sandbox_id: freshInstance.sandboxId,
+      });
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        amount_microdollars: -55_000_000,
+        is_free: false,
+        description: 'Duplicate KiloClaw enrollment deduction',
+        credit_category: `kiloclaw-subscription:${freshInstance.id}:2026-07`,
+        check_category_uniqueness: true,
+      });
+      return {
+        instanceId: freshInstance.id,
+        sandboxId: freshInstance.sandboxId,
+      };
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.getBillingStatus()).resolves.toMatchObject({
+      creditReprovisionRecovery: {
+        eligible: true,
+        effectiveBalanceMicrodollars: 60_000_000,
+        shortfallMicrodollars: 0,
+      },
+    });
+
+    const result = await caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' });
+
+    expect(result).toEqual({
+      success: false,
+      status: 'action_required',
+      instanceId: null,
+      message:
+        'Credit activation did not finish, so the new KiloClaw was rolled back. Retry activation or contact support.',
+    });
+    const [rolledBackInstance] = await db
+      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, freshInstance.id))
+      .limit(1);
+    expect(rolledBackInstance?.destroyedAt).toEqual(expect.any(String));
+    const freshSubscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, freshInstance.id));
+    expect(freshSubscriptions).toEqual([]);
+    await expect(caller.kiloclaw.getBillingStatus()).resolves.toMatchObject({
+      creditReprovisionRecovery: {
+        eligible: true,
+        effectiveBalanceMicrodollars: 60_000_000,
+        shortfallMicrodollars: 0,
+      },
+    });
+    expect(kiloclawInternalClientMock.__destroyMock).toHaveBeenCalledWith(
+      user.id,
+      freshInstance.id,
+      { reason: 'stale_provision_cleanup' }
+    );
+  });
+
+  it('does not offer or run destroyed-subscription credit recovery when effective balance is insufficient', async () => {
+    const destroyedInstance = await createInstance(user.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 43_710_000,
+        microdollars_used: 0,
+        kilo_pass_threshold: null,
+      })
+      .where(eq(kilocode_users.id, user.id));
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: destroyedInstance.id,
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'canceled',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const status = await caller.kiloclaw.getBillingStatus();
+    expect(status.creditReprovisionRecovery).toEqual({
+      eligible: false,
+      plan: 'standard',
+      costMicrodollars: 55_000_000,
+      projectedKiloPassBonusMicrodollars: 0,
+      effectiveBalanceMicrodollars: 43_710_000,
+      shortfallMicrodollars: 11_290_000,
+    });
+    await expect(
+      caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' })
+    ).rejects.toThrow('Effective credit balance is insufficient');
+    expect(kiloclawInternalClientMock.__provisionMock).not.toHaveBeenCalled();
   });
 
   it('rejects canceled legacy credit enrollment without rewriting historical lineage', async () => {
@@ -7584,6 +8091,149 @@ describe('enrollWithCredits', () => {
     );
   });
 
+  it('serializes intro eligibility so only one concurrent legacy trial enrollment is discounted', async () => {
+    await giveUserCredits(user.id, 13_000_000);
+    const [firstInstance, secondInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: user.id,
+          sandbox_id: `ki_concurrent_intro_first_${user.id}`,
+        },
+        {
+          user_id: user.id,
+          sandbox_id: `ki_concurrent_intro_second_${user.id}`,
+        },
+      ])
+      .returning();
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: user.id,
+        instance_id: firstInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      },
+      {
+        user_id: user.id,
+        instance_id: secondInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      },
+    ]);
+
+    const { enrollWithCredits } = await import('@/lib/kiloclaw/credit-billing');
+    await expect(
+      Promise.all([
+        enrollWithCredits({
+          userId: user.id,
+          instanceId: firstInstance.id,
+          plan: 'standard',
+          hadPaidSubscription: false,
+        }),
+        enrollWithCredits({
+          userId: user.id,
+          instanceId: secondInstance.id,
+          plan: 'standard',
+          hadPaidSubscription: false,
+        }),
+      ])
+    ).resolves.toEqual([undefined, undefined]);
+
+    const deductions = await db
+      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(
+      deductions
+        .filter(row => row.amountMicrodollars < 0)
+        .map(row => row.amountMicrodollars)
+        .sort((a, b) => a - b)
+    ).toEqual([-9_000_000, -4_000_000]);
+  });
+
+  it('serializes concurrent enrollment balance decisions for different instances', async () => {
+    await giveUserCredits(user.id, 55_000_000);
+    const [firstInstance, secondInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: user.id,
+          sandbox_id: `ki_concurrent_first_${user.id}`,
+        },
+        {
+          user_id: user.id,
+          sandbox_id: `ki_concurrent_second_${user.id}`,
+        },
+      ])
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: user.id,
+        instance_id: firstInstance.id,
+        plan: 'standard',
+        status: 'canceled',
+        payment_source: 'credits',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      },
+      {
+        user_id: user.id,
+        instance_id: secondInstance.id,
+        plan: 'standard',
+        status: 'canceled',
+        payment_source: 'credits',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      },
+    ]);
+
+    const { enrollWithCredits } = await import('@/lib/kiloclaw/credit-billing');
+    const results = await Promise.allSettled([
+      enrollWithCredits({
+        userId: user.id,
+        instanceId: firstInstance.id,
+        plan: 'standard',
+        hadPaidSubscription: true,
+      }),
+      enrollWithCredits({
+        userId: user.id,
+        instanceId: secondInstance.id,
+        plan: 'standard',
+        hadPaidSubscription: true,
+      }),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(results.find(result => result.status === 'rejected')).toEqual(
+      expect.objectContaining({
+        reason: expect.objectContaining({ reason: 'insufficient_credits' }),
+      })
+    );
+
+    const [updatedUser] = await db
+      .select({ microdollarsUsed: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(updatedUser.microdollarsUsed).toBe(55_000_000);
+
+    const deductions = await db
+      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(deductions.filter(row => row.amountMicrodollars < 0)).toHaveLength(1);
+
+    const subscriptions = await db
+      .select({ status: kiloclaw_subscriptions.status })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+    expect(subscriptions.filter(subscription => subscription.status === 'active')).toHaveLength(1);
+    expect(subscriptions.filter(subscription => subscription.status === 'canceled')).toHaveLength(
+      1
+    );
+  });
+
   it('deduction is idempotent via credit_category uniqueness', async () => {
     await createCreditEnrollmentAnchor(user.id);
     await giveUserCredits(user.id, 50_000_000);
@@ -7604,6 +8254,7 @@ describe('enrollWithCredits', () => {
     await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
       'Enrollment already processed for this billing period'
     );
+    expect(captureCostInsightSpendMock).toHaveBeenCalledTimes(1);
   });
 });
 

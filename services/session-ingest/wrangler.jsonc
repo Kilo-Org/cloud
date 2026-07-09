@@ -96,6 +96,11 @@
       "binding": "O11Y",
       "service": "o11y",
     },
+    {
+      "binding": "NOTIFICATIONS",
+      "service": "notifications",
+      "entrypoint": "NotificationsService",
+    },
   ],
   "secrets_store_secrets": [
     {

@@ -2,13 +2,14 @@ import 'server-only';
 
 import { db } from '@/lib/drizzle';
 import { kilocode_users, organization_memberships, type User } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import crypto from 'crypto';
 import type { BotType } from './types';
 import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './types';
 import {
+  generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
@@ -30,6 +31,34 @@ export async function getBotUserId(
     .limit(1);
 
   return bot?.id ?? null;
+}
+
+export async function getUnblockedBotUserForOrg(
+  organizationId: string,
+  botType: BotType
+): Promise<User | null> {
+  const botId = generateBotUserId(organizationId, botType);
+  const [bot] = await db
+    .select({ user: kilocode_users })
+    .from(kilocode_users)
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, kilocode_users.id)
+      )
+    )
+    .where(
+      and(
+        eq(kilocode_users.id, botId),
+        eq(kilocode_users.is_bot, true),
+        isNull(kilocode_users.blocked_at),
+        isNull(kilocode_users.blocked_reason)
+      )
+    )
+    .limit(1);
+
+  return bot?.user ?? null;
 }
 
 /**
@@ -62,6 +91,7 @@ async function createBotUser(organizationId: string, botType: BotType): Promise<
       is_admin: false,
       auto_top_up_enabled: false,
       openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(botId),
+      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(botId),
       vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(botId),
     })
     .returning();
@@ -130,6 +160,9 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
     let botUser: User;
 
     if (existingBot) {
+      if (existingBot.blocked_at !== null || existingBot.blocked_reason !== null) {
+        throw new Error(`Cannot use blocked bot user ${botId}`);
+      }
       logExceptInTest('[ensureBotUserForOrg] Using existing bot user', {
         botId,
         organizationId,

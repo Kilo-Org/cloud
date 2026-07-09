@@ -83,6 +83,15 @@ const LEGACY_STREAM_CHAT_PLUGIN_PATH =
   '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
 const KILO_CHAT_PLUGIN_ID = 'kilo-chat';
 const KILO_CHAT_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
+// KiloCode provider was externalized from openclaw core into a standalone plugin
+// (openclaw #93470, 2026.6.9). On 2026.6.9+ it is installed globally by the
+// Dockerfile and must be loaded explicitly — an explicit `models.providers.kilocode`
+// entry alone no longer loads it now that it is not bundled. On older openclaw
+// versions (still selectable at provision time) the provider is in-core and this
+// path does not exist, so generateBaseConfig only wires it when it is installed
+// (see the presence check where plugins.load.paths is built).
+const KILOCODE_PROVIDER_PLUGIN_ID = 'kilocode';
+const KILOCODE_PROVIDER_PLUGIN_PATH = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -157,6 +166,37 @@ export function sanitizeLegacyStreamChatConfig(config: ConfigObject): void {
         (pluginId: unknown) => pluginId !== LEGACY_STREAM_CHAT_PLUGIN_ID
       );
     }
+  }
+}
+
+// The externalized kilocode-provider plugin path is only valid on openclaw
+// >= 2026.6.9, where the Dockerfile installs the plugin on disk. On older
+// openclaw versions (still selectable at provision time) the provider is
+// in-core and the path does not exist; a persisted plugins.load.paths entry
+// pointing at the missing plugin fails openclaw config validation — and
+// therefore `openclaw doctor` — which aborts bootstrap into degraded mode and
+// prevents the gateway from starting. Prune it so the persisted config is valid
+// for the openclaw version actually running. No-op on 2026.6.9+ images (the
+// plugin exists; generateBaseConfig (re)adds the path).
+export function pruneUninstalledKilocodeProviderPath(
+  config: ConfigObject,
+  existsSync: (path: string) => boolean
+): void {
+  if (existsSync(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    return;
+  }
+  if (
+    config.plugins &&
+    typeof config.plugins === 'object' &&
+    !Array.isArray(config.plugins) &&
+    config.plugins.load &&
+    typeof config.plugins.load === 'object' &&
+    !Array.isArray(config.plugins.load) &&
+    Array.isArray(config.plugins.load.paths)
+  ) {
+    config.plugins.load.paths = config.plugins.load.paths.filter(
+      (pluginPath: unknown) => pluginPath !== KILOCODE_PROVIDER_PLUGIN_PATH
+    );
   }
 }
 
@@ -284,10 +324,12 @@ export function generateBaseConfig(
     );
   }
 
-  // KiloCode provider entry. The bundled openclaw kilocode plugin only loads
-  // when an explicit `models.providers.kilocode` entry exists in the config —
-  // without it, the plugin's catalog hook never runs and live gateway model
-  // discovery never populates `kilo-auto/*` and the rest of the dynamic
+  // KiloCode provider entry. The kilocode provider is an external plugin
+  // (openclaw #93470) — it is installed by the Dockerfile and loaded via
+  // `plugins.load.paths` (see KILOCODE_PROVIDER_PLUGIN_PATH above). It still only
+  // activates when an explicit `models.providers.kilocode` entry exists in the
+  // config — without it, the plugin's catalog hook never runs and live gateway
+  // model discovery never populates `kilo-auto/*` and the rest of the dynamic
   // catalog. So we always include this entry (production baseUrl, empty
   // `models` so live discovery owns the catalog).
   //
@@ -406,6 +448,32 @@ export function generateBaseConfig(
     : [];
   if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
     (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
+  }
+  // KiloCode provider became an external plugin only in openclaw 2026.6.9
+  // (#93470). On 2026.6.9+ the Dockerfile installs it at
+  // KILOCODE_PROVIDER_PLUGIN_PATH and it must be loaded explicitly via
+  // plugins.load.paths. On older openclaw versions — still selectable at
+  // provision time — the provider is in-core and no plugin file exists, so add
+  // the path only when the plugin is present.
+  //
+  // The stale-path removal for the downgrade/reprovision case runs BEFORE doctor
+  // in bootstrap (pruneUninstalledKilocodeProviderPath), because doctor
+  // validates the persisted config first and a missing plugin path fails
+  // validation. This else-branch is the steady-state guard on the post-doctor
+  // config rewrite.
+  if (deps.existsSync(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    const pluginPaths = config.plugins.load.paths as string[];
+    if (!pluginPaths.includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+      pluginPaths.push(KILOCODE_PROVIDER_PLUGIN_PATH);
+    }
+  } else {
+    pruneUninstalledKilocodeProviderPath(config, deps.existsSync);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCODE_PROVIDER_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCODE_PROVIDER_PLUGIN_ID);
   }
   if (
     Array.isArray(config.plugins.allow) &&

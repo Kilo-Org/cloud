@@ -74,6 +74,11 @@
     "O11Y_API_BASE_URL": "https://api.kilo.ai",
   },
   /**
+   * Alert deployment requirements:
+   * - O11Y_CF_AE_API_TOKEN needs account Analytics Read access.
+   * - O11Y_SLACK_WEBHOOK_TICKET must deliver to #o11y-alerts.
+   */
+  /**
    * Secrets Store
    * https://developers.cloudflare.com/workers/configuration/secrets/#secrets-store
    */

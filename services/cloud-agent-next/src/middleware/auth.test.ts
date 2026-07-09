@@ -1,11 +1,16 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as AuthModule from '../auth.js';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
 
-vi.mock('../auth.js', () => ({
-  validateKiloToken: vi.fn(),
-}));
+vi.mock('../auth.js', async () => {
+  const actual = await vi.importActual<typeof AuthModule>('../auth.js');
+  return {
+    ...actual,
+    validateKiloToken: vi.fn(),
+  };
+});
 
 vi.mock('../logger.js', () => {
   const logger = {
@@ -60,5 +65,29 @@ describe('authMiddleware', () => {
         retryable: false,
       },
     });
+  });
+
+  it('resolves NEXTAUTH_SECRET from Secrets Store before validating the token', async () => {
+    vi.mocked(validateKiloToken).mockResolvedValue({
+      success: true,
+      userId: 'user-1',
+      token: 'token-1',
+    });
+    const secretBinding = { get: vi.fn(async () => 'secret-from-store') };
+    const app = new Hono<HonoContext>();
+    app.use('/trpc/*', authMiddleware);
+    app.post('/trpc/:procedure', c => c.json({ ok: true }));
+
+    const response = await app.fetch(
+      new Request('https://worker.test/trpc/send', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer token-1' },
+      }),
+      { NEXTAUTH_SECRET: secretBinding } as unknown as Env
+    );
+
+    expect(response.status).toBe(200);
+    expect(secretBinding.get).toHaveBeenCalledOnce();
+    expect(validateKiloToken).toHaveBeenCalledWith('Bearer token-1', 'secret-from-store');
   });
 });

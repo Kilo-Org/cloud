@@ -31,6 +31,15 @@ type MaybeHasOpenRouterProvider = {
   provider?: string | null;
 };
 
+type MessagesApiStreamErrorEvent = {
+  type: 'error';
+  error?: {
+    type?: string | null;
+    error_type?: string | null;
+    message?: string | null;
+  };
+};
+
 // Anthropic usage combined with OpenRouter cost fields
 // ref: https://docs.anthropic.com/en/api/messages
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -105,7 +114,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
-  const reportedError = statusCode >= 400;
+  let reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
   let usage: MessagesApiUsage | null = null;
@@ -128,12 +137,27 @@ export async function parseMessagesMicrodollarUsageFromStream(
         return;
       }
 
-      const json = JSON.parse(event.data) as Anthropic.Messages.MessageStreamEvent;
+      const json = JSON.parse(event.data) as
+        | Anthropic.Messages.MessageStreamEvent
+        | MessagesApiStreamErrorEvent;
 
       if (!json) {
         captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
           extra: { event },
         });
+        return;
+      }
+
+      if (json.type === 'error') {
+        reportedError = true;
+        finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
+        captureException(
+          new Error(`Messages API stream error: ${json.error?.message ?? 'unknown'}`),
+          {
+            tags: { source: 'messages_sse_processing' },
+            extra: { json, event },
+          }
+        );
         return;
       }
 

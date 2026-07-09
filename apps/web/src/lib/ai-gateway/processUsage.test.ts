@@ -1,4 +1,4 @@
-import { test, describe, expect } from '@jest/globals';
+import { test, describe, expect, jest } from '@jest/globals';
 import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
 import {
   extractPromptInfo,
@@ -7,6 +7,7 @@ import {
   parseMicrodollarUsageFromString,
   mapToUsageStats,
   logMicrodollarUsage,
+  insertUsageRecord,
   processOpenRouterUsage,
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
@@ -14,20 +15,28 @@ import {
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
 import { insertTestUser } from '../../tests/helpers/user.helper';
-import { insertUsageWithOverrides } from '../../tests/helpers/microdollar-usage.helper';
+import {
+  defineMicrodollarUsage,
+  insertUsageWithOverrides,
+} from '../../tests/helpers/microdollar-usage.helper';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
 import {
+  cost_insight_owner_hour_driver_buckets,
+  cost_insight_owner_hour_totals,
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_metadata,
+  organization_user_usage,
+  organizations,
 } from '@kilocode/db/schema';
 import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
 import { findUserById } from '../user';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
 // Note: Legacy banned_ja4/whitelist_ja4 tests removed - abuse classification
 // is now handled by the external abuse detection service (src/lib/abuse-service.ts)
@@ -378,6 +387,23 @@ describe('logMicrodollarUsage', () => {
       ttfb_ms: null,
     }) satisfies MicrodollarUsageContext;
 
+  async function waitForExpectation(expectation: () => Promise<void>): Promise<void> {
+    const deadline = Date.now() + 2000;
+    let lastError: unknown;
+
+    while (Date.now() < deadline) {
+      try {
+        await expectation();
+        return;
+      } catch (error) {
+        lastError = error;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+
+    throw lastError;
+  }
+
   test('stores usage data and increments user microdollars for positive cost', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-1',
@@ -418,6 +444,34 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(false);
     expect(usageRecord?.created_at).toBeTruthy();
     expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
+
+    await waitForExpectation(async () => {
+      const [total] = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+      expect(total).toMatchObject({
+        owned_by_organization_id: null,
+        spend_category: 'variable',
+        total_microdollars: 500,
+        spend_record_count: 1,
+      });
+
+      const [driver] = await db
+        .select()
+        .from(cost_insight_owner_hour_driver_buckets)
+        .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
+      expect(driver).toMatchObject({
+        source: 'ai_gateway',
+        product_key: 'vscode-extension',
+        feature_key: 'chat_completions',
+        model_or_plan_key: 'anthropic/claude-3.7-sonnet',
+        provider_key: 'Provider',
+        actor_user_id: user.id,
+        total_microdollars: 500,
+        spend_record_count: 1,
+      });
+    });
   });
 
   test('stores session_id when provided', async () => {
@@ -525,6 +579,81 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(true);
     expect(usageRecord?.model).toBe('openai/gpt-4.1');
     expect(metadataRecord?.has_middle_out_transform).toBe(false);
+
+    const totals = await db
+      .select()
+      .from(cost_insight_owner_hour_totals)
+      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+    expect(totals).toHaveLength(0);
+  });
+
+  test('keeps AI source rows when post-commit cost insight capture fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { core, metadata } = await defineMicrodollarUsage();
+    const missingUserId = `missing-ai-user-${crypto.randomUUID()}`;
+
+    try {
+      const result = await insertUsageRecord(
+        { ...core, kilo_user_id: missingUserId, cost: 1000 },
+        metadata
+      );
+
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, missingUserId));
+      expect(sourceRows).toHaveLength(1);
+
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+
+      const totals = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
+      expect(totals).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  test('keeps usage and balance write when post-commit cost insight capture fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const user = await insertTestUser({
+      id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
+      microdollars_used: 0,
+      google_user_email: 'cost-insight-failure@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+
+    try {
+      const result = await insertUsageRecord(
+        { ...core, kilo_user_id: user.id, organization_id: null, cost: 1000 },
+        metadata
+      );
+
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: 1000 });
+      const updatedUser = await findUserById(user.id);
+      expect(updatedUser?.microdollars_used).toBe(1000);
+
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(sourceRows).toHaveLength(1);
+
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+
+      const totals = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+      expect(totals).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   test('stores 3 usage records with overlapping data and tests metadata deduplication', async () => {
@@ -661,6 +790,7 @@ describe('logMicrodollarUsage', () => {
       google_user_email: 'orguser@example.com',
     });
 
+    const organization = await createTestOrganization('AI usage organization', user.id, 10_000);
     const usageStats: MicrodollarUsageStats = {
       ...BASE_USAGE_STATS,
       messageId: 'test-org-msg-123',
@@ -668,7 +798,7 @@ describe('logMicrodollarUsage', () => {
 
     const usageContext: MicrodollarUsageContext = {
       ...createBaseUsageContext(user),
-      organizationId: '12345678-1234-1234-1234-123456789abc', // This triggers data minimization
+      organizationId: organization.id,
     };
 
     await logMicrodollarUsage(usageStats, usageContext);
@@ -685,7 +815,7 @@ describe('logMicrodollarUsage', () => {
 
     expect(usageRecord).toBeTruthy();
     expect(usageRecord?.kilo_user_id).toBe('test-org-user-1');
-    expect(usageRecord?.organization_id).toBe('12345678-1234-1234-1234-123456789abc');
+    expect(usageRecord?.organization_id).toBe(organization.id);
     expect(usageRecord?.cost).toBe(500);
 
     // Verify data minimization: sensitive prompt data should be null for organizations
@@ -697,6 +827,34 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.output_tokens).toBe(50);
     expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
     expect(usageRecord?.provider).toBe('openrouter');
+
+    await waitForExpectation(async () => {
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(chargedOrganization.microdollars_used).toBe(500);
+
+      const [memberUsage] = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      expect(memberUsage).toMatchObject({
+        kilo_user_id: user.id,
+        microdollar_usage: 500,
+      });
+
+      const [total] = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
+      expect(total).toMatchObject({
+        owned_by_user_id: null,
+        spend_category: 'variable',
+        total_microdollars: 500,
+        spend_record_count: 1,
+      });
+    });
   });
 
   test('insertUsageRecord updates user balance atomically via insertUsageWithOverrides', async () => {
@@ -752,10 +910,12 @@ describe('logMicrodollarUsage', () => {
       google_user_email: 'insertorg@example.com',
     });
 
+    const organization = await createTestOrganization('Insert usage organization', user.id, 10_000);
+
     // Insert usage record with organization_id (should not update user balance)
     await insertUsageWithOverrides({
       kilo_user_id: user.id,
-      organization_id: '12345678-1234-1234-1234-123456789abc',
+      organization_id: organization.id,
       cost: 2000,
     });
 
@@ -823,7 +983,8 @@ describe('logMicrodollarUsage', () => {
       microdollars_used: 0,
       google_user_email: 'daily-org-scope@example.com',
     });
-    const orgId = '11111111-1111-1111-1111-111111111111';
+    const organization = await createTestOrganization('Daily usage organization', user.id, 10_000);
+    const orgId = organization.id;
 
     await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 500 });
     await insertUsageWithOverrides({

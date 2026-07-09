@@ -2,7 +2,48 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-import { getAlwaysOnGroupIds, getService, resolveGroups } from './services';
+import {
+  getAlwaysOnGroupIds,
+  getService,
+  resolveGroups,
+  resolveSessionNextAuthUrl,
+} from './services';
+
+test('points NEXTAUTH_URL at the offset port when the web app runs without a tunnel', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 2900,
+    serviceNames: ['nextjs', 'postgres', 'redis'],
+    nextjsPort: 5900,
+  });
+  assert.equal(url, 'http://localhost:5900');
+});
+
+test('leaves NEXTAUTH_URL to .env.local when there is no port offset', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 0,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3000,
+  });
+  assert.equal(url, undefined);
+});
+
+test('does not override NEXTAUTH_URL when a tunnel rewrites it to a public origin', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 2900,
+    serviceNames: ['nextjs', 'kiloclaw-tunnel'],
+    nextjsPort: 5900,
+  });
+  assert.equal(url, undefined);
+});
+
+test('skips NEXTAUTH_URL when the web app is not being started', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 2900,
+    serviceNames: ['postgres', 'redis'],
+    nextjsPort: 5900,
+  });
+  assert.equal(url, undefined);
+});
 
 test('keeps auto routing workers in their own opt-in group', () => {
   const service = getService('auto-routing');
@@ -36,6 +77,12 @@ test('keeps auto routing package dev script compatible with local launcher flags
   assert.equal(scriptFlags.filter(part => part === '--env').length, 0);
   assert.equal(scriptFlags.filter(part => part === '-e').length, 0);
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
+});
+
+test('starts Storybook with Storybook v10 port flags', () => {
+  const service = getService('storybook');
+
+  assert.deepEqual(service.command, ['pnpm', 'run', 'storybook', '-p', '6006']);
 });
 
 test('preserves auto routing backend auth secret name', () => {

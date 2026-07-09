@@ -16,7 +16,13 @@ const ONBOARD_CONFIG = JSON.stringify({
   plugins: { entries: { telegram: { enabled: false }, discord: { enabled: false } } },
 });
 
-function fakeDeps(existingConfig?: string) {
+const KILOCODE_PROVIDER_PLUGIN_PATH = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
+
+function fakeDeps(existingConfig?: string, opts?: { kilocodeProviderInstalled?: boolean }) {
+  // Default to a modern (openclaw >= 2026.6.9) image where the externalized
+  // kilocode provider plugin is installed on disk. Pass
+  // { kilocodeProviderInstalled: false } to simulate a pre-2026.6.9 image.
+  const kilocodeProviderInstalled = opts?.kilocodeProviderInstalled ?? true;
   const written: { path: string; data: string }[] = [];
   const copied: { src: string; dest: string }[] = [];
   const renamed: { from: string; to: string }[] = [];
@@ -54,6 +60,7 @@ function fakeDeps(existingConfig?: string) {
       }),
       existsSync: vi.fn((filePath: string) => {
         if (filePath.endsWith('openclaw.json')) return existingConfig !== undefined;
+        if (filePath === KILOCODE_PROVIDER_PLUGIN_PATH) return kilocodeProviderInstalled;
         return false;
       }),
       execFileSync: vi.fn(
@@ -762,6 +769,96 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.allow).toContain('kiloclaw-customizer');
     expect(config.plugins.allow).toContain('kiloclaw-morning-briefing');
     expect(config.plugins.allow).toContain('kilo-chat');
+  });
+
+  it('loads the externalized kilocode provider plugin via plugins.load.paths', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // openclaw #93470 externalized the kilocode provider; it is no longer bundled
+    // and must be loaded explicitly by path or model routing breaks.
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@openclaw/kilocode-provider'
+    );
+  });
+
+  it('adds kilocode to an existing plugin allowlist that does not include it', () => {
+    // Regression guard: the append-when-missing branch for the kilocode provider.
+    // The managed-allowlist test above pre-seeds 'kilocode', so it never exercises
+    // this path; start from an allowlist WITHOUT it.
+    const existing = JSON.stringify({
+      plugins: {
+        load: { paths: [] },
+        allow: ['telegram', 'browser'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.allow).toContain('kilocode');
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@openclaw/kilocode-provider'
+    );
+  });
+
+  it('does not duplicate the kilocode provider plugin path on repeated generateBaseConfig calls', () => {
+    const providerPath = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
+    const existing = JSON.stringify({
+      plugins: {
+        load: { paths: [providerPath] },
+        allow: ['kilocode'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    const paths = config.plugins.load.paths as string[];
+    expect(paths.filter(p => p === providerPath)).toHaveLength(1);
+    expect((config.plugins.allow as string[]).filter(a => a === 'kilocode')).toHaveLength(1);
+  });
+
+  it('does NOT add the kilocode provider plugin path on a pre-2026.6.9 image where the plugin is not installed', () => {
+    // Older openclaw versions are still selectable at provision time; the
+    // provider is in-core and no plugin file exists. Adding a non-existent
+    // plugin path fails openclaw config validation and prevents the gateway
+    // from starting, so the controller must omit it.
+    const { deps } = fakeDeps(undefined, { kilocodeProviderInstalled: false });
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.load.paths).not.toContain(KILOCODE_PROVIDER_PLUGIN_PATH);
+    // The in-core provider still activates from the models.providers.kilocode
+    // entry, so that must remain regardless of plugin externalization.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    // The always-present customizer plugin path is unaffected.
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
+  });
+
+  it('prunes a stale kilocode provider plugin path when downgraded to a pre-2026.6.9 image', () => {
+    // Migration case: an instance whose persisted openclaw.json still carries
+    // the provider path (written on a >= 2026.6.9 image) is reprovisioned /
+    // downgraded onto an older openclaw where the plugin is absent. The path
+    // must be actively removed so the gateway can start again.
+    const existing = JSON.stringify({
+      plugins: {
+        load: {
+          paths: [
+            KILOCODE_PROVIDER_PLUGIN_PATH,
+            '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+          ],
+        },
+        allow: ['kilocode'],
+      },
+    });
+    const { deps } = fakeDeps(existing, { kilocodeProviderInstalled: false });
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.load.paths).not.toContain(KILOCODE_PROVIDER_PLUGIN_PATH);
+    // Unrelated plugin paths survive the prune.
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
   });
 
   it('configures Telegram channel', () => {

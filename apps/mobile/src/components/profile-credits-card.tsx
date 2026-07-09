@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
+import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -149,7 +150,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-      {enabled && !selectedOrgId && <KiloPassSubscriptionCard />}
+      {enabled && !selectedOrgId ? (
+        <>
+          <KiloPassSubscriptionCard />
+          <RestorePurchasesButton />
+        </>
+      ) : null}
     </View>
   );
 }

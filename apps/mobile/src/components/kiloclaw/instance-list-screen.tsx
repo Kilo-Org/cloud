@@ -6,7 +6,6 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { badgeBucketForInstance } from '@kilocode/notifications';
 
 import { KiloClawCard } from '@/components/kiloclaw/instance-card';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -101,13 +100,7 @@ export function InstanceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title="KiloClaw"
-        size="large"
-        showBackButton={false}
-        className="px-[22px]"
-        headerRight={<ProfileAvatarButton />}
-      />
+      <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <ScrollView
           className="flex-1"

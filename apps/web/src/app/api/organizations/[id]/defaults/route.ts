@@ -8,8 +8,9 @@ import {
   hasActiveModelRestrictions,
 } from '@/lib/model-allow.server';
 import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_FREE_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { isOrganizationAutoConfigured } from '@/lib/organizations/organization-auto-model';
 
 type DefaultsResponse = {
   defaultModel: string;
@@ -67,8 +68,17 @@ export async function GET(
     return undefined;
   };
 
-  // If organization has a default model set, validate it against allowed models
-  if (defaultModel && (defaultModel.endsWith('/*') || !(await isAllowed(defaultModel)))) {
+  // If organization has a default model set, validate it against allowed models.
+  // Organization Auto is a virtual organization-only default, so its eligibility
+  // is validated from persisted organization settings rather than provider policy.
+  if (defaultModel === ORG_AUTO_MODEL.id && !isOrganizationAutoConfigured(organization)) {
+    console.warn('organization_auto_invalid_default', { organizationId: organization.id });
+    defaultModel = undefined;
+  } else if (
+    defaultModel &&
+    defaultModel !== ORG_AUTO_MODEL.id &&
+    (defaultModel.endsWith('/*') || !(await isAllowed(defaultModel)))
+  ) {
     // Organization's configured default model is not permitted; fall back to a safe default.
     defaultModel = undefined;
   }

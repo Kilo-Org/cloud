@@ -2,7 +2,6 @@ import { db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
-  cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_sessions,
   kilocode_users,
@@ -82,20 +81,6 @@ describe('adminCloudAgentNextRouter', () => {
         created_at: '2025-01-10T00:20:00.000Z',
       },
     ]);
-    await db.insert(cli_sessions_v2).values([
-      {
-        session_id: 'ses_admin_outcomes_mapped',
-        kilo_user_id: adminUser.id,
-        cloud_agent_session_id: ids.mapped,
-        created_on_platform: 'vscode',
-      },
-      {
-        session_id: 'ses_admin_setup_failed_later',
-        kilo_user_id: adminUser.id,
-        cloud_agent_session_id: ids.setupFailedLater,
-        created_on_platform: ' code-review ',
-      },
-    ]);
     await db.insert(cloud_agent_session_runs).values([
       {
         cloud_agent_session_id: ids.mapped,
@@ -139,7 +124,6 @@ describe('adminCloudAgentNextRouter', () => {
   });
 
   afterEach(async () => {
-    await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, adminUser.id));
     await db
       .delete(cloud_agent_sessions)
       .where(inArray(cloud_agent_sessions.cloud_agent_session_id, Object.values(ids)));
@@ -153,12 +137,9 @@ describe('adminCloudAgentNextRouter', () => {
   it('requires admin access and rejects invalid or overlong intervals', async () => {
     const regularCaller = await createCallerForUser(regularUser.id);
     const adminCaller = await createCallerForUser(adminUser.id);
-    await expect(regularCaller.admin.cloudAgentNext.listHealthPlatforms()).rejects.toThrow(
+    await expect(regularCaller.admin.cloudAgentNext.getHealthOverview(interval())).rejects.toThrow(
       'Admin access required'
     );
-    await expect(
-      regularCaller.admin.cloudAgentNext.getHealthOverview({ ...interval(), bucket: 'hour' })
-    ).rejects.toThrow('Admin access required');
     await expect(
       regularCaller.admin.cloudAgentNext.listHealthErrorSessions({
         ...interval(),
@@ -169,24 +150,21 @@ describe('adminCloudAgentNextRouter', () => {
     ).rejects.toThrow('Admin access required');
     await expect(
       adminCaller.admin.cloudAgentNext.getHealthOverview({
-        ...interval({ startDate: END_DATE, endDate: END_DATE }),
-        bucket: 'hour',
+        startDate: END_DATE,
+        endDate: END_DATE,
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     await expect(
       adminCaller.admin.cloudAgentNext.getHealthOverview({
-        ...interval({ endDate: '2035-04-11T00:00:00.000Z' }),
-        bucket: 'day',
+        startDate: START_DATE,
+        endDate: '2035-04-11T00:00:00.000Z',
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
-  it('summarizes hourly health and ranks operational errors without interruptions', async () => {
+  it('summarizes health and ranks operational errors without interruptions', async () => {
     const caller = await createCallerForUser(adminUser.id);
-    const health = await caller.admin.cloudAgentNext.getHealthOverview({
-      ...interval(),
-      bucket: 'hour',
-    });
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
     expect(health.summary).toEqual({
       completedRuns: 1,
@@ -194,58 +172,6 @@ describe('adminCloudAgentNextRouter', () => {
       interruptedRuns: 1,
       setupFailures: 2,
     });
-    expect(health.series).toHaveLength(24);
-    expect(health.series.slice(0, 7)).toEqual([
-      {
-        bucketStart: '2035-01-10T00:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 1,
-      },
-      {
-        bucketStart: '2035-01-10T01:00:00.000Z',
-        completedRuns: 1,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: '2035-01-10T02:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 1,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: '2035-01-10T03:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 1,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: '2035-01-10T04:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 1,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: '2035-01-10T05:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 1,
-      },
-      {
-        bucketStart: '2035-01-10T06:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-    ]);
     expect(health.topErrors).toEqual(
       expect.arrayContaining([
         {
@@ -262,189 +188,13 @@ describe('adminCloudAgentNextRouter', () => {
     expect(JSON.stringify(health.topErrors)).not.toContain('wrapper_start_failed');
   });
 
-  it('filters health and error drilldowns by exact or unknown created platform', async () => {
+  it('excludes runs whose session falls outside the 90-day retention window', async () => {
     const caller = await createCallerForUser(adminUser.id);
-    const platforms = await caller.admin.cloudAgentNext.listHealthPlatforms();
-    const vscodeHealth = await caller.admin.cloudAgentNext.getHealthOverview({
-      ...interval(),
-      bucket: 'hour',
-      createdOnPlatform: 'vscode',
-    });
-    const legacyRawPlatformHealth = await caller.admin.cloudAgentNext.getHealthOverview({
-      ...interval(),
-      bucket: 'hour',
-      createdOnPlatform: ' code-review ',
-    });
-    await db
-      .update(cli_sessions_v2)
-      .set({ created_on_platform: 'unknown' })
-      .where(eq(cli_sessions_v2.cloud_agent_session_id, ids.setupFailedLater));
-    const platformsAfterStoredUnknown = await caller.admin.cloudAgentNext.listHealthPlatforms();
-    const unknownHealth = await caller.admin.cloudAgentNext.getHealthOverview({
-      ...interval(),
-      bucket: 'hour',
-      createdOnPlatform: null,
-    });
-    const vscodeRunSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
-      ...interval(),
-      source: 'run',
-      stage: 'pre_dispatch',
-      code: 'workspace_setup_failed',
-      createdOnPlatform: 'vscode',
-    });
-    const unknownSetupSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
-      ...interval(),
-      source: 'setup',
-      stage: 'initial_admission',
-      code: 'initial_admission_rejected',
-      createdOnPlatform: null,
-    });
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
 
-    expect(platforms).toEqual([' code-review ', 'vscode']);
-    expect(platformsAfterStoredUnknown).toEqual(['vscode']);
-    expect(vscodeHealth.summary).toEqual({
-      completedRuns: 1,
-      failedRuns: 1,
-      interruptedRuns: 0,
-      setupFailures: 0,
-    });
-    expect(vscodeHealth.topErrors).toEqual([
-      { source: 'run', stage: 'pre_dispatch', code: 'workspace_setup_failed', count: 1 },
-    ]);
-    expect(legacyRawPlatformHealth.summary).toEqual({
-      completedRuns: 0,
-      failedRuns: 0,
-      interruptedRuns: 0,
-      setupFailures: 1,
-    });
-    expect(unknownHealth.summary).toEqual({
-      completedRuns: 0,
-      failedRuns: 1,
-      interruptedRuns: 1,
-      setupFailures: 2,
-    });
-    expect(vscodeRunSessions.rows).toEqual([
-      expect.objectContaining({ cloudAgentSessionId: ids.mapped }),
-    ]);
-    expect(unknownSetupSessions).toMatchObject({ totalSessions: 2 });
-    expect(unknownSetupSessions.rows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ cloudAgentSessionId: ids.setupFailed }),
-        expect.objectContaining({ cloudAgentSessionId: ids.setupFailedLater }),
-      ])
-    );
-  });
-
-  it('summarizes longer health ranges into daily UTC buckets', async () => {
-    const caller = await createCallerForUser(adminUser.id);
-    const health = await caller.admin.cloudAgentNext.getHealthOverview({
-      startDate: '2035-01-10T00:00:00.000Z',
-      endDate: '2035-01-12T00:00:00.000Z',
-      bucket: 'day',
-    });
-
-    expect(health.series).toEqual([
-      {
-        bucketStart: '2035-01-10T00:00:00.000Z',
-        completedRuns: 1,
-        failedRuns: 2,
-        interruptedRuns: 1,
-        setupFailures: 2,
-      },
-      {
-        bucketStart: '2035-01-11T00:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-    ]);
-  });
-
-  it('summarizes rolling health intervals across partial daily UTC buckets', async () => {
-    const caller = await createCallerForUser(adminUser.id);
-    const health = await caller.admin.cloudAgentNext.getHealthOverview({
-      startDate: '2035-01-09T12:00:00.000Z',
-      endDate: at(5, 30),
-      bucket: 'day',
-    });
-
-    expect(health.series).toEqual([
-      {
-        bucketStart: '2035-01-09T00:00:00.000Z',
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: START_DATE,
-        completedRuns: 1,
-        failedRuns: 2,
-        interruptedRuns: 1,
-        setupFailures: 2,
-      },
-    ]);
-  });
-
-  it('summarizes rolling health intervals across partial hourly UTC buckets', async () => {
-    const caller = await createCallerForUser(adminUser.id);
-    const health = await caller.admin.cloudAgentNext.getHealthOverview({
-      startDate: at(0, 30),
-      endDate: at(5, 30),
-      bucket: 'hour',
-    });
-
-    expect(health.summary).toEqual({
-      completedRuns: 1,
-      failedRuns: 2,
-      interruptedRuns: 1,
-      setupFailures: 1,
-    });
-    expect(health.series).toEqual([
-      {
-        bucketStart: at(0),
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: at(1),
-        completedRuns: 1,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: at(2),
-        completedRuns: 0,
-        failedRuns: 1,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: at(3),
-        completedRuns: 0,
-        failedRuns: 1,
-        interruptedRuns: 0,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: at(4),
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 1,
-        setupFailures: 0,
-      },
-      {
-        bucketStart: at(5),
-        completedRuns: 0,
-        failedRuns: 0,
-        interruptedRuns: 0,
-        setupFailures: 1,
-      },
-    ]);
+    expect(health.summary.failedRuns).toBe(2);
+    expect(health.summary.completedRuns).toBe(1);
+    expect(JSON.stringify(health.topErrors)).not.toContain('wrapper_start_failed');
   });
 
   it('lists affected sessions for an exact top-error source and occurrence interval', async () => {

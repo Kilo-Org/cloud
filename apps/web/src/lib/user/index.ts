@@ -32,10 +32,12 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_audit_logs,
+  organization_recommendation_dismissals,
   magic_link_tokens,
   device_auth_requests,
   auto_top_up_configs,
   platform_integrations,
+  platform_oauth_credentials,
   byok_api_keys,
   agent_configs,
   webhook_events,
@@ -96,7 +98,7 @@ import {
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
@@ -105,6 +107,7 @@ import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import {
+  generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
@@ -239,21 +242,6 @@ async function checkNormalizedEmailUnique(
   });
 
   return failureResult('EMAIL-ALREADY-USED');
-}
-
-/**
- * Determines if a user should have admin privileges based on their email and hosted domain.
- * Centralized logic ensures all auth providers (Google, magic link, GitHub, etc.) get
- * consistent admin status based on the same rules.
- */
-function shouldBeAdmin(email: string, hosted_domain: string | null): boolean {
-  return (
-    (hosted_domain === hosted_domain_specials.kilocode_admin &&
-      email.endsWith('@' + hosted_domain_specials.kilocode_admin)) ||
-    (allow_fake_login &&
-      hosted_domain === hosted_domain_specials.fake_devonly &&
-      email.endsWith('@admin.example.com'))
-  );
 }
 
 export type CreateOrUpdateUserArgs = {
@@ -549,18 +537,38 @@ export async function createOrUpdateUser(
       (onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider)));
 
     if (shouldLink) {
-      // WorkOS SSO: Remove existing OAuth providers to enforce single sign-on
-      if (args.provider === 'workos' && !hasNoProviders) {
-        await db
-          .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+      let linkedUser = userByEmail;
+      if (args.provider === 'workos') {
+        linkedUser = await db.transaction(async tx => {
+          await tx
+            .delete(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+          await tx.insert(user_auth_provider).values({
+            kilo_user_id: userByEmail.id,
+            provider: args.provider,
+            provider_account_id: args.provider_account_id,
+            email: args.google_user_email,
+            avatar_url: args.google_user_image_url,
+            display_name: args.display_name ?? null,
+            hosted_domain: args.hosted_domain,
+          });
+          const [updatedUser] = await tx
+            .update(kilocode_users)
+            .set({
+              web_session_pepper: randomUUID(),
+            })
+            .where(eq(kilocode_users.id, userByEmail.id))
+            .returning();
+          if (!updatedUser) throw new Error('Failed to rotate web sessions for WorkOS user');
+          return updatedUser;
+        });
+      } else {
+        const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
+        if (!linkResult.success) {
+          return { success: false, error: linkResult.error };
+        }
       }
-
-      const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
-      if (!linkResult.success) {
-        return { success: false, error: linkResult.error };
-      }
-      void fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
+      void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
@@ -577,7 +585,7 @@ export async function createOrUpdateUser(
           new_hosted_domain: args.hosted_domain,
         },
       });
-      return successResult({ user: userByEmail, isNew: false });
+      return successResult({ user: linkedUser, isNew: false });
     } else {
       // User signed in with a different ID, but same email
       posthogClient.capture({
@@ -621,10 +629,16 @@ export async function createOrUpdateUser(
     google_user_name: args.google_user_name,
     google_user_image_url: args.google_user_image_url,
     hosted_domain: args.hosted_domain,
-    is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
+    is_admin: shouldAutoProvisionPlatformAdmin(
+      args.google_user_email,
+      args.hosted_domain,
+      allow_fake_login
+    ),
     stripe_customer_id: stripeCustomer.id,
     signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+    openrouter_downstream_safety_identifier:
+      generateOpenRouterDownstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
     email_domain: extractEmailDomain(args.google_user_email),
@@ -800,7 +814,7 @@ export class SoftDeletePreconditionError extends Error {
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)
- * - stytch_fingerprints (abuse detection)
+ * - stytch_fingerprints and provider safety identifiers (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  * - model_experiment_request (experiment attribution and prompt hashes retained
@@ -833,6 +847,9 @@ export class SoftDeletePreconditionError extends Error {
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
  * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
  *   immediate cleanup scheduled)
+ * - Recommendation dismissal actor references (nulled)
+ * - platform_oauth_credentials (encrypted OAuth tokens and provider identity;
+ *   authorizations created by the user are removed, including organization grants)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -1030,6 +1047,10 @@ export async function softDeleteUser(userId: string) {
       .update(organization_membership_removals)
       .set({ removed_by: null })
       .where(eq(organization_membership_removals.removed_by, userId));
+    await tx
+      .update(organization_recommendation_dismissals)
+      .set({ dismissed_by_user_id: null })
+      .where(eq(organization_recommendation_dismissals.dismissed_by_user_id, userId));
     // Delete invitations sent BY this user and invitations sent TO this user's email
     await tx
       .delete(organization_invitations)
@@ -1056,6 +1077,21 @@ export async function softDeleteUser(userId: string) {
       .delete(agent_environment_profiles)
       .where(eq(agent_environment_profiles.owned_by_user_id, userId));
 
+    const authorizedOAuthIntegrationIds = tx
+      .select({ id: platform_oauth_credentials.platform_integration_id })
+      .from(platform_oauth_credentials)
+      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+    await tx
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .where(inArray(platform_integrations.id, authorizedOAuthIntegrationIds));
+    await tx
+      .delete(platform_oauth_credentials)
+      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
@@ -1513,8 +1549,8 @@ export async function getAllUserProviders(email: string): Promise<{
 
 /**
  * Look up WorkOS organization by domain.
- * Returns the organization if exactly one is found, or the first one if multiple exist.
- * Logs warnings for edge cases (multiple orgs, zero orgs).
+ * Returns the organization only when exactly one is found.
+ * Multiple organizations are an ambiguous security configuration and fail closed.
  *
  * @param domain - The domain to look up
  * @returns The WorkOS organization, or null if not found
@@ -1530,10 +1566,10 @@ export async function getWorkOSOrganization(domain: string) {
 
   if (orgResult.data.length > 1) {
     captureMessage(
-      `Multiple WorkOS organizations found for domain, using first one: ${domain} (count: ${orgResult.data.length})`,
+      `Multiple WorkOS organizations found for domain: ${domain} (count: ${orgResult.data.length})`,
       'warning'
     );
-    return orgResult.data[0];
+    return null;
   }
 
   return null;

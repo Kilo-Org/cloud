@@ -5,12 +5,15 @@ import {
   useUpdateOrganizationMode,
   useOrganizationModes,
   useDeleteOrganizationMode,
+  useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
 import { ModeForm, type ModeFormData } from './ModeForm';
 import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
 import { toast } from 'sonner';
 import { DEFAULT_MODES } from './default-modes';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { hasActiveOrganizationModelPolicy } from '@/lib/organizations/organization-auto-model-shared';
 
 type EditModeFormProps = {
   organizationId: string;
@@ -18,6 +21,7 @@ type EditModeFormProps = {
   defaultModeSlug?: string;
   isDefaultModelConfigEnabled?: boolean;
   canSetDefaultModel?: boolean;
+  canMaintainRoutedMode?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 };
@@ -31,7 +35,17 @@ function normalizeGroups(groups: unknown): string[] | undefined {
     return undefined;
   }
 
-  return groups.map(group => JSON.stringify(group)).sort();
+  return groups
+    .map(group => {
+      if (Array.isArray(group) && group[0] === 'edit') {
+        return JSON.stringify([
+          'edit',
+          { fileRegex: group[1]?.fileRegex ?? '', description: group[1]?.description ?? '' },
+        ]);
+      }
+      return JSON.stringify(group);
+    })
+    .sort();
 }
 
 export function matchesBuiltInModeState(formData: ModeFormData, defaultModeSlug: string): boolean {
@@ -58,6 +72,7 @@ export function EditModeForm({
   defaultModeSlug,
   isDefaultModelConfigEnabled = false,
   canSetDefaultModel = true,
+  canMaintainRoutedMode = true,
   onSuccess,
   onCancel,
 }: EditModeFormProps) {
@@ -65,28 +80,35 @@ export function EditModeForm({
   const { data: modesData } = useOrganizationModes(organizationId);
   const updateMutation = useUpdateOrganizationMode();
   const deleteMutation = useDeleteOrganizationMode();
+  const { data: organizationData, isLoading: isOrganizationLoading } =
+    useOrganizationWithMembers(organizationId);
+  const currentRouteModel = defaultModeSlug
+    ? organizationData?.settings.org_auto_model?.routes[defaultModeSlug]
+    : data?.mode
+      ? organizationData?.settings.org_auto_model?.routes[data.mode.slug]
+      : undefined;
+  const isOrganizationAutoDefaultActive =
+    organizationData?.settings.default_model === ORG_AUTO_MODEL.id;
+  const hasActiveModelPolicy = hasActiveOrganizationModelPolicy(organizationData?.settings);
 
   const handleSubmit = async (formData: ModeFormData) => {
     try {
-      if (
-        defaultModeSlug &&
-        !formData.defaultModel &&
-        matchesBuiltInModeState(formData, defaultModeSlug)
-      ) {
+      const nextRouteModel = formData.defaultModel || undefined;
+      if (defaultModeSlug && matchesBuiltInModeState(formData, defaultModeSlug)) {
+        if (currentRouteModel && !canMaintainRoutedMode) {
+          toast.error('Organization owners must revert a routed built-in mode.');
+          return;
+        }
         await deleteMutation.mutateAsync({
           organizationId,
           modeId,
+          preserve_route: true,
+          ...(nextRouteModel === currentRouteModel ? {} : { route_model: nextRouteModel ?? null }),
         });
         toast.success(`Mode "${formData.name}" reverted successfully`);
         onSuccess?.();
         return;
       }
-
-      const persistedDefaultModel = data?.mode?.config.defaultModel ?? '';
-      const defaultModelUpdate =
-        formData.defaultModel === persistedDefaultModel
-          ? {}
-          : { defaultModel: formData.defaultModel || null };
 
       await updateMutation.mutateAsync({
         organizationId,
@@ -99,8 +121,8 @@ export function EditModeForm({
           whenToUse: formData.whenToUse,
           groups: formData.groups as ('read' | 'edit' | 'browser' | 'command' | 'mcp')[],
           customInstructions: formData.customInstructions,
-          ...defaultModelUpdate,
         },
+        ...(nextRouteModel === currentRouteModel ? {} : { route_model: nextRouteModel ?? null }),
       });
       toast.success(`Mode "${formData.name}" updated successfully`);
       onSuccess?.();
@@ -130,14 +152,17 @@ export function EditModeForm({
     <ModeForm
       organizationId={organizationId}
       mode={data.mode}
+      routeModel={currentRouteModel}
       onSubmit={handleSubmit}
-      isSubmitting={updateMutation.isPending || deleteMutation.isPending}
+      isSubmitting={isOrganizationLoading || updateMutation.isPending || deleteMutation.isPending}
       isEditingBuiltIn={!!defaultModeSlug}
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+      isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
       canSetDefaultModel={canSetDefaultModel}
+      hasActiveModelPolicy={hasActiveModelPolicy}
+      disableSlug={!!currentRouteModel && !canMaintainRoutedMode}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
-      renderButtons={() => null}
     />
   );
 }

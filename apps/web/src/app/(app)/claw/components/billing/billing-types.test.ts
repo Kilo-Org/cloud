@@ -55,6 +55,14 @@ function createBillingStatus(overrides?: BillingStatusOverrides): ClawBillingSta
         effectiveBalanceMicrodollars: 0,
       },
     },
+    creditReprovisionRecovery: {
+      eligible: false,
+      plan: 'standard',
+      costMicrodollars: 55_000_000,
+      projectedKiloPassBonusMicrodollars: 0,
+      effectiveBalanceMicrodollars: 0,
+      shortfallMicrodollars: 55_000_000,
+    },
     kiloPassUpsellPreview: {
       standard: {
         monthly: { '19': emptyUpsellPreview, '49': emptyUpsellPreview, '199': emptyUpsellPreview },

@@ -11,7 +11,9 @@ import {
   SendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
+  branchNameSchema,
 } from './schemas.js';
+import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
@@ -156,9 +158,142 @@ describe('grouped unified session input contracts', () => {
 
     expect(SendMessageInput.parse(input)).toEqual(input);
   });
+
+  it('requires stable workspace and repository UUIDs for Bitbucket starts', () => {
+    const repository = {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    };
+    expect(StartSessionInput.safeParse({ ...baseStartInput, repository }).success).toBe(true);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: { type: 'bitbucket', url: repository.url },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts an optional integration id on Bitbucket starts', () => {
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: {
+          type: 'bitbucket' as const,
+          url: 'https://bitbucket.org/acme/repo.git',
+          workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+          repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+          bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        },
+      }).success
+    ).toBe(true);
+  });
 });
 
 describe('legacy live attachment input compatibility', () => {
+  it('accepts shell-safe Git branch punctuation used by current-branch reviews', () => {
+    const branch = 'feature/alex+metadata@v2,fix=1#manual';
+
+    expect(branchNameSchema.safeParse(branch).success).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Review the current branch',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        upstreamBranch: branch,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects Git-invalid or shell-unsafe branch names', () => {
+    const invalidBranches = ['feature/a..b', 'feature/@{bad', "feature/unsafe'quote"];
+
+    for (const branch of invalidBranches) {
+      expect(branchNameSchema.safeParse(branch).success).toBe(false);
+    }
+  });
+
+  it('requires paired Bitbucket identity fields on prepareSession', () => {
+    const input = {
+      prompt: 'Update the repository',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      gitUrl: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      bitbucketWorkspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      bitbucketRepositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    };
+    expect(PrepareSessionInput.safeParse(input).success).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({ ...input, bitbucketRepositoryUuid: undefined }).success
+    ).toBe(false);
+    expect(PrepareSessionInput.safeParse({ ...input, platform: 'gitlab' }).success).toBe(false);
+  });
+
+  it('requires complete fenced context only for Bitbucket code-review sessions', () => {
+    const input = {
+      prompt: 'Review the pull request',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      gitUrl: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket' as const,
+      kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174099',
+      bitbucketWorkspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      bitbucketWorkspaceSlug: 'acme',
+      bitbucketRepositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketRepositorySlug: 'repo',
+      bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      bitbucketPullRequestId: 42,
+      bitbucketExpectedHeadSha: '0123456789abcdef0123456789abcdef01234567',
+      createdOnPlatform: 'code-review',
+      callbackTarget: {
+        url: 'https://kilo.example/api/internal/code-review-status/123e4567-e89b-12d3-a456-426614174023?attemptId=attempt-1',
+      },
+    };
+
+    expect(PrepareSessionInput.safeParse(input).success).toBe(true);
+    for (const field of [
+      'kilocodeOrganizationId',
+      'bitbucketWorkspaceSlug',
+      'bitbucketRepositorySlug',
+      'bitbucketIntegrationId',
+      'bitbucketPullRequestId',
+      'bitbucketExpectedHeadSha',
+      'callbackTarget',
+    ] as const) {
+      expect(PrepareSessionInput.safeParse({ ...input, [field]: undefined }).success).toBe(false);
+    }
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        gitUrl: 'https://bitbucket.org/acme/repo',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        bitbucketRepositorySlug: 'different-repo',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        createdOnPlatform: 'cloud-agent-web',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        platform: 'gitlab',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        bitbucketWorkspaceUuid: undefined,
+        bitbucketRepositoryUuid: undefined,
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts document attachments on prepareSession while retaining images', () => {
     const basePrepareInput = {
       prompt: 'Summarize this document',
@@ -235,6 +370,16 @@ describe('sendMessageV2 input compatibility', () => {
         }).success
       ).toBe(false);
     }
+  });
+});
+
+describe('Bitbucket clone URL parsing', () => {
+  it('keeps canonical Bitbucket repository identity limited to HTTPS clone URLs', () => {
+    expect(parseCanonicalBitbucketCloneUrl('https://bitbucket.org/acme/repo.git')).toEqual({
+      workspaceSlug: 'acme',
+      repositorySlug: 'repo',
+    });
+    expect(parseCanonicalBitbucketCloneUrl('ssh://git@bitbucket.org/acme/repo.git')).toBeNull();
   });
 });
 

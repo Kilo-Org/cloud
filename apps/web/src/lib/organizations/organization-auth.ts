@@ -14,6 +14,9 @@ import z from 'zod';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
+const parentOrganizationAccessRoles = ['owner', 'billing_manager'] satisfies OrganizationRole[];
+const rolePriority = ['owner', 'billing_manager', 'member'] satisfies OrganizationRole[];
+
 type UserWithRole = User & {
   readonly role: OrganizationRole;
 };
@@ -22,6 +25,17 @@ type DataOrNextError<T> = CustomResult<
   { data: T; nextResponse?: never },
   { data?: never; nextResponse: NextResponse<{ error: string }> }
 >;
+
+function allowedRole(
+  rows: { role: OrganizationRole }[],
+  roles?: OrganizationRole[]
+): OrganizationRole | null {
+  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  return (
+    rolePriority.find(role => allowedRoles.includes(role) && rows.some(row => row.role === role)) ??
+    null
+  );
+}
 
 export async function getAuthorizedOrgContext(
   id: Organization['id'],
@@ -63,8 +77,7 @@ export async function getAuthorizedOrgContext(
       },
     });
   }
-  // if roles are provided, check if the user has one of those roles
-  const rows = await db
+  const directRows = await db
     .select({
       role: organization_memberships.role,
       organization: organizations,
@@ -75,20 +88,37 @@ export async function getAuthorizedOrgContext(
       and(
         eq(organization_memberships.kilo_user_id, user.id),
         eq(organization_memberships.organization_id, organizationId),
-        isNull(organizations.deleted_at),
-        roles && roles.length > 0 ? inArray(organization_memberships.role, roles) : undefined
+        isNull(organizations.deleted_at)
       )
     );
 
-  if (!rows.length) {
+  const inheritedRows = await db
+    .select({
+      role: organization_memberships.role,
+      organization: organizations,
+    })
+    .from(organizations)
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, organizations.parent_organization_id),
+        eq(organization_memberships.kilo_user_id, user.id),
+        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+      )
+    )
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+
+  const rows = [...directRows, ...inheritedRows];
+  const role = allowedRole(rows, roles);
+
+  if (!role) {
     warnInSentry(
       `User ${user.id} attempted to access organization ${organizationId} without sufficient permissions`
     );
     const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     return { success: false, nextResponse: res };
   }
-  const role = rows[0].role;
-  const organization = rows[0].organization;
+  const organization = rows.find(row => row.role === role)?.organization ?? rows[0].organization;
   return successResult({
     data: {
       user: { ...user, role },

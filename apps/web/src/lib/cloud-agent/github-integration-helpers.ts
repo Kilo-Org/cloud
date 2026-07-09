@@ -11,7 +11,10 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { DEMO_SOURCE_OWNER, DEMO_SOURCE_REPO_NAME } from '@/components/cloud-agent/demo-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import type { PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 
 type GitHubRepositoriesResult = {
   integrationInstalled: boolean;
@@ -130,8 +133,9 @@ export async function fetchGitHubRepositoriesForOrganization(
   }
 
   try {
+    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitHub and update cache
-    if (forceRefresh || !integration.repositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length) {
       const appType = integration.github_app_type || 'standard';
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
@@ -148,7 +152,7 @@ export async function fetchGitHubRepositoriesForOrganization(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(integration.repositories),
+      repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {
@@ -174,8 +178,9 @@ export async function fetchGitHubRepositoriesForUser(
   }
 
   try {
+    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitHub and update cache
-    if (forceRefresh || !integration.repositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length) {
       const appType = integration.github_app_type || 'standard';
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
@@ -192,7 +197,7 @@ export async function fetchGitHubRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(integration.repositories),
+      repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {

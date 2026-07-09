@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { ReviewConfigForm } from '@/components/code-reviews/ReviewConfigForm';
+import { BitbucketReviewConfigForm } from '@/components/code-reviews/BitbucketReviewConfigForm';
 import { CodeReviewActionRequiredAlert } from '@/components/code-reviews/CodeReviewActionRequiredAlert';
 import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard';
 import { ReviewMemoryPanel } from '@/components/code-reviews/ReviewMemoryPanel';
@@ -13,9 +14,11 @@ import { Button } from '@/components/ui/button';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  AlertCircle,
   Brain,
   ChartColumnIncreasing,
   ExternalLink,
+  ArrowLeft,
   ListChecks,
   Rocket,
   Settings2,
@@ -26,8 +29,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
+import { BitbucketLogo } from '@/components/auth/BitbucketLogo';
 
-type Platform = 'github' | 'gitlab';
+type Platform = 'github' | 'gitlab' | 'bitbucket';
+type BitbucketView = 'config' | 'jobs';
 
 type ReviewAgentPageClientProps = {
   organizationId: string;
@@ -35,6 +40,9 @@ type ReviewAgentPageClientProps = {
   successMessage?: string;
   errorMessage?: string;
   initialPlatform?: Platform;
+  localCodeReviewDevelopmentEnabled?: boolean;
+  returnTo?: string;
+  initialBitbucketView?: BitbucketView;
 };
 
 export function ReviewAgentPageClient({
@@ -43,6 +51,9 @@ export function ReviewAgentPageClient({
   successMessage,
   errorMessage,
   initialPlatform = 'github',
+  localCodeReviewDevelopmentEnabled = false,
+  returnTo,
+  initialBitbucketView = 'config',
 }: ReviewAgentPageClientProps) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -53,10 +64,20 @@ export function ReviewAgentPageClient({
     if (platform !== 'github') {
       params.set('platform', platform);
     }
+    if (returnTo) {
+      params.set('returnTo', returnTo);
+    }
     const queryString = params.toString();
     router.push(
       `/organizations/${organizationId}/code-reviews${queryString ? `?${queryString}` : ''}`
     );
+  };
+
+  const handleBitbucketViewChange = (view: string) => {
+    const params = new URLSearchParams({ platform: 'bitbucket' });
+    if (view === 'jobs') params.set('view', 'jobs');
+    if (returnTo) params.set('returnTo', returnTo);
+    router.push(`/organizations/${organizationId}/code-reviews?${params.toString()}`);
   };
 
   // Fetch GitHub App installation status
@@ -73,6 +94,16 @@ export function ReviewAgentPageClient({
     })
   );
 
+  const {
+    data: bitbucketReadinessData,
+    isLoading: isLoadingBitbucketReadiness,
+    error: bitbucketReadinessError,
+  } = useQuery(
+    trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
+      organizationId,
+    })
+  );
+
   const { data: selectedConfigData } = useQuery(
     trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
       organizationId,
@@ -84,6 +115,16 @@ export function ReviewAgentPageClient({
   const isGitHubAppInstalled =
     githubStatusData?.connected && githubStatusData?.integration?.isValid;
   const isGitLabConnected = gitlabStatusData?.connected && gitlabStatusData?.integration?.isValid;
+  const canUseGitHubJobs = isGitHubAppInstalled || localCodeReviewDevelopmentEnabled;
+  const canUseGitLabJobs = isGitLabConnected || localCodeReviewDevelopmentEnabled;
+  const returnPath = returnTo
+    ? `${returnTo}${returnTo.includes('?') ? '&' : '?'}code_reviewer_return=true`
+    : null;
+  const githubIntegrationPath = returnTo
+    ? `/organizations/${organizationId}/integrations/github?${new URLSearchParams({ returnTo })}`
+    : `/organizations/${organizationId}/integrations/github`;
+  const isBitbucketConnected = bitbucketReadinessData?.connected ?? false;
+  const isBitbucketReady = bitbucketReadinessData?.ready ?? false;
 
   // Show toast messages from URL params
   useEffect(() => {
@@ -105,6 +146,16 @@ export function ReviewAgentPageClient({
       <SetPageTitle title="Code Reviewer">
         <Badge variant="new">new</Badge>
       </SetPageTitle>
+      {returnPath && (
+        <div>
+          <Button asChild variant="outline" size="sm">
+            <Link href={returnPath}>
+              <ArrowLeft className="size-4" />
+              Return to setup
+            </Link>
+          </Button>
+        </div>
+      )}
       {/* Header */}
       <div className="space-y-2">
         <p className="text-muted-foreground">
@@ -127,28 +178,44 @@ export function ReviewAgentPageClient({
         onValueChange={v => handlePlatformChange(v as Platform)}
         className="w-full"
       >
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="github" className="flex items-center gap-2">
+        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-1 sm:grid-cols-3">
+          <TabsTrigger value="github" className="flex min-h-11 items-center gap-2 sm:min-h-9">
             <GitHubLogo className="h-4 w-4" />
             GitHub
             {isGitHubAppInstalled && (
               <Badge
                 variant="outline"
-                className="ml-1 border-green-500/30 bg-green-500/10 text-xs text-green-400"
+                className="border-status-success-border bg-status-success-surface text-status-success ml-1 text-xs"
               >
                 Connected
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="gitlab" className="flex items-center gap-2">
+          <TabsTrigger value="gitlab" className="flex min-h-11 items-center gap-2 sm:min-h-9">
             <GitLabLogo className="h-4 w-4" />
             GitLab
             {isGitLabConnected && (
               <Badge
                 variant="outline"
-                className="ml-1 border-green-500/30 bg-green-500/10 text-xs text-green-400"
+                className="border-status-success-border bg-status-success-surface text-status-success ml-1 text-xs"
               >
                 Connected
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="bitbucket" className="flex min-h-11 items-center gap-2 sm:min-h-9">
+            <BitbucketLogo className="h-4 w-4" />
+            Bitbucket
+            {isBitbucketConnected && (
+              <Badge
+                variant="outline"
+                className={
+                  isBitbucketReady
+                    ? 'border-status-success-border bg-status-success-surface text-status-success ml-1 text-xs'
+                    : 'border-status-warning-border bg-status-warning-surface text-status-warning ml-1 text-xs'
+                }
+              >
+                {isBitbucketReady ? 'Connected' : 'Permissions'}
               </Badge>
             )}
           </TabsTrigger>
@@ -157,7 +224,7 @@ export function ReviewAgentPageClient({
         {/* GitHub Tab Content */}
         <TabsContent value="github" className="mt-6 space-y-6">
           {/* GitHub App Required Alert */}
-          {!isGitHubAppInstalled && (
+          {!isGitHubAppInstalled && !localCodeReviewDevelopmentEnabled && (
             <Alert>
               <Rocket className="h-4 w-4" />
               <AlertTitle>GitHub App Required</AlertTitle>
@@ -166,7 +233,7 @@ export function ReviewAgentPageClient({
                   The Kilo GitHub App must be installed to use Code Reviewer. The app automatically
                   manages workflows and triggers reviews on your pull requests.
                 </p>
-                <Link href={`/organizations/${organizationId}/integrations/github`}>
+                <Link href={githubIntegrationPath}>
                   <Button variant="default" size="sm">
                     Install GitHub App
                     <ExternalLink className="ml-2 h-3 w-3" />
@@ -180,6 +247,7 @@ export function ReviewAgentPageClient({
             <CodeReviewActionRequiredAlert
               actionRequired={selectedActionRequired}
               organizationId={organizationId}
+              platform={selectedPlatform}
             />
           )}
 
@@ -193,7 +261,7 @@ export function ReviewAgentPageClient({
               <TabsTrigger
                 value="jobs"
                 className="flex items-center gap-2"
-                disabled={!isGitHubAppInstalled}
+                disabled={!canUseGitHubJobs}
               >
                 <ListChecks className="h-4 w-4" />
                 Jobs
@@ -217,8 +285,14 @@ export function ReviewAgentPageClient({
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">
-              {isGitHubAppInstalled ? (
-                <CodeReviewJobsCard organizationId={organizationId} platform="github" />
+              {canUseGitHubJobs ? (
+                <CodeReviewJobsCard
+                  organizationId={organizationId}
+                  platform="github"
+                  localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
+                  defaultModelSlug={selectedConfigData?.modelSlug}
+                  defaultThinkingEffort={selectedConfigData?.thinkingEffort}
+                />
               ) : (
                 <Alert>
                   <ListChecks className="h-4 w-4" />
@@ -254,7 +328,7 @@ export function ReviewAgentPageClient({
         {/* GitLab Tab Content */}
         <TabsContent value="gitlab" className="mt-6 space-y-6">
           {/* GitLab Connection Required Alert */}
-          {!isGitLabConnected && (
+          {!isGitLabConnected && !localCodeReviewDevelopmentEnabled && (
             <Alert>
               <Rocket className="h-4 w-4" />
               <AlertTitle>GitLab Connection Required</AlertTitle>
@@ -277,6 +351,7 @@ export function ReviewAgentPageClient({
             <CodeReviewActionRequiredAlert
               actionRequired={selectedActionRequired}
               organizationId={organizationId}
+              platform={selectedPlatform}
             />
           )}
 
@@ -290,7 +365,7 @@ export function ReviewAgentPageClient({
               <TabsTrigger
                 value="jobs"
                 className="flex items-center gap-2"
-                disabled={!isGitLabConnected}
+                disabled={!canUseGitLabJobs}
               >
                 <ListChecks className="h-4 w-4" />
                 Jobs
@@ -323,8 +398,14 @@ export function ReviewAgentPageClient({
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">
-              {isGitLabConnected ? (
-                <CodeReviewJobsCard organizationId={organizationId} platform="gitlab" />
+              {canUseGitLabJobs ? (
+                <CodeReviewJobsCard
+                  organizationId={organizationId}
+                  platform="gitlab"
+                  localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
+                  defaultModelSlug={selectedConfigData?.modelSlug}
+                  defaultThinkingEffort={selectedConfigData?.thinkingEffort}
+                />
               ) : (
                 <Alert>
                   <ListChecks className="h-4 w-4" />
@@ -338,6 +419,92 @@ export function ReviewAgentPageClient({
 
             <TabsContent value="analytics" className="mt-6 space-y-4">
               <CodeReviewAnalyticsPanel organizationId={organizationId} platform="gitlab" />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="bitbucket" className="mt-6 space-y-6">
+          {selectedPlatform === 'bitbucket' && selectedActionRequired && (
+            <CodeReviewActionRequiredAlert
+              actionRequired={selectedActionRequired}
+              organizationId={organizationId}
+              platform="bitbucket"
+            />
+          )}
+
+          <Tabs
+            value={initialBitbucketView}
+            onValueChange={handleBitbucketViewChange}
+            className="w-full"
+          >
+            <TabsList className="grid h-auto w-full max-w-md grid-cols-2">
+              <TabsTrigger value="config" className="flex min-h-11 items-center gap-2 sm:min-h-9">
+                <Settings2 className="h-4 w-4" />
+                Config
+              </TabsTrigger>
+              <TabsTrigger value="jobs" className="flex min-h-11 items-center gap-2 sm:min-h-9">
+                <ListChecks className="h-4 w-4" />
+                Jobs
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="config" className="mt-6 space-y-4">
+              {isLoadingBitbucketReadiness ? (
+                <Alert>
+                  <BitbucketLogo />
+                  <AlertTitle>Checking Bitbucket connection</AlertTitle>
+                  <AlertDescription>Loading Workspace Access Token status...</AlertDescription>
+                </Alert>
+              ) : bitbucketReadinessError ? (
+                <Alert variant="destructive">
+                  <AlertCircle />
+                  <AlertTitle>Bitbucket status is unavailable</AlertTitle>
+                  <AlertDescription>{bitbucketReadinessError.message}</AlertDescription>
+                </Alert>
+              ) : !isBitbucketConnected ? (
+                <Alert>
+                  <BitbucketLogo />
+                  <AlertTitle>Bitbucket connection required</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>
+                      Connect an organization Workspace Access Token before configuring Bitbucket
+                      Code Reviewer.
+                    </p>
+                    <Button asChild size="sm" className="min-h-11 sm:min-h-9">
+                      <Link href={`/organizations/${organizationId}/integrations/bitbucket`}>
+                        Connect Bitbucket
+                        <ExternalLink className="ml-2 h-3 w-3" />
+                      </Link>
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  {!isBitbucketReady && bitbucketReadinessData && (
+                    <Alert variant="warning">
+                      <AlertCircle />
+                      <AlertTitle>Code Reviewer permissions required</AlertTitle>
+                      <AlertDescription className="space-y-3">
+                        <p>
+                          Replace the Workspace Access Token with one that includes:{' '}
+                          {bitbucketReadinessData.missingRequiredScopes.join(', ')}.
+                        </p>
+                        <Button asChild variant="outline" size="sm" className="min-h-11 sm:min-h-9">
+                          <Link href={`/organizations/${organizationId}/integrations/bitbucket`}>
+                            Replace Bitbucket token
+                            <ExternalLink className="ml-2 h-3 w-3" />
+                          </Link>
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <BitbucketReviewConfigForm organizationId={organizationId} />
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="jobs" className="mt-6 space-y-4">
+              <CodeReviewJobsCard organizationId={organizationId} platform="bitbucket" />
             </TabsContent>
           </Tabs>
         </TabsContent>

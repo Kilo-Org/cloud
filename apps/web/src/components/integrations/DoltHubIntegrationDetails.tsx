@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
+import { useConfirm } from '@/components/ui/confirm';
 
 type DoltHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -25,6 +26,7 @@ export function DoltHubIntegrationDetails({
 }: DoltHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
 
   const {
@@ -59,8 +61,15 @@ export function DoltHubIntegrationDetails({
     window.location.href = getPlatformOAuthConnectPath(PLATFORM.DOLTHUB, organizationId);
   };
 
-  const handleDisconnect = () => {
-    if (confirm('Are you sure you want to disconnect DoltHub?')) {
+  const handleDisconnect = async () => {
+    if (
+      await confirm({
+        title: 'Disconnect DoltHub?',
+        description: 'Kilo will lose access to your DoltHub databases. You can reconnect later.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      })
+    ) {
       disconnect.mutate(input, {
         onSuccess: async () => {
           toast.success('DoltHub disconnected');

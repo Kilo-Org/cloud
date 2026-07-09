@@ -5,6 +5,7 @@ jest.mock('dns/promises', () => ({
 import { lookup } from 'dns/promises';
 import {
   assertGitLabUrlResolvesSafely,
+  buildGitLabPlatformRepositoryId,
   buildGitLabUrl,
   isDefaultGitLabInstanceUrl,
   normalizeGitLabInstanceUrl,
@@ -31,6 +32,18 @@ describe('GitLab instance URL safety', () => {
     expect(buildGitLabUrl('https://GitLab.Example.COM/gitlab/', '/api/v4/user')).toBe(
       'https://gitlab.example.com/gitlab/api/v4/user'
     );
+  });
+
+  it('builds instance-qualified platform repository IDs', () => {
+    expect(buildGitLabPlatformRepositoryId({ instanceUrl: undefined, projectId: 123 })).toBe(
+      'https://gitlab.com/-/projects/123'
+    );
+    expect(
+      buildGitLabPlatformRepositoryId({
+        instanceUrl: 'https://GitLab.Example.COM/gitlab/',
+        projectId: 456,
+      })
+    ).toBe('https://gitlab.example.com/gitlab/-/projects/456');
   });
 
   const urlWithCredentials = new URL('https://gitlab.example.com');

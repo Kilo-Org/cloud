@@ -2,10 +2,11 @@
  * Adapter between the wrapper and the @kilocode/sdk client.
  *
  * Provides a stable `WrapperKiloClient` interface that all wrapper modules use.
- * Session and event subscription methods use the v1 SDK client (passed in from
- * main.ts, which uses createKilo() from the root @kilocode/sdk). Methods only
- * available in the v2 API (permission reply, question reply/reject, commit
- * message) use a v2 client created internally from the same server URL.
+ * Session methods use the v1 SDK client (passed in from main.ts, which uses
+ * createKilo() from the root @kilocode/sdk). Global event subscription and
+ * methods only available in the v2 API (permission reply, question
+ * reply/reject, commit message) use a v2 client created internally from the
+ * same server URL.
  *
  * The raw SDK client is not exposed on the returned interface — all access
  * goes through named methods.
@@ -18,6 +19,74 @@ import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slas
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isKiloEvent(value: unknown): value is KiloEvent {
+  return isRecord(value) && typeof value.type === 'string';
+}
+
+function isSyntheticKiloEvent(event: KiloEvent): boolean {
+  return event.type === 'server.connected' || event.type === 'server.heartbeat';
+}
+
+/**
+ * Codes raised by fetch when the server process cannot be reached — Node/undici
+ * errno strings plus Bun's fetch codes, which have no errno equivalent.
+ */
+const CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EPIPE',
+  'ConnectionRefused',
+  'ConnectionClosed',
+  'FailedToOpenSocket',
+]);
+
+/** Transport-failure texts from fetch implementations that set no code. */
+const UNREACHABLE_ERROR_PATTERN = /econnrefused|econnreset|fetch failed|unable to connect/i;
+
+/** Bound on `cause` traversal, in case a chain is cyclic. */
+const MAX_CAUSE_DEPTH = 5;
+
+/**
+ * True when a WrapperKiloClient call failed because the kilo server process
+ * itself is gone (crashed, OOM-killed) rather than because it returned an
+ * application-level error. Distinguishing the two matters: app-level errors
+ * (bad session id, invalid model) must not trigger a runtime restart, but a
+ * dead server should — see MEMORY_CGROUPS_PLAN.md (W5).
+ *
+ * Wrapper errors carry the original SDK failure as `cause`: an Error instance
+ * when the transport failed, or the parsed response body (not an Error) when a
+ * live server answered with an application error. Codes are checked at every
+ * level of the chain, but the message pattern applies only to a leaf Error:
+ * composed wrapper messages embed application text, and a live server relaying
+ * an upstream failure may legitimately say "fetch failed" in its error body.
+ */
+export function isKiloServerUnreachableError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH && current instanceof Error; depth++) {
+    const code = (current as NodeJS.ErrnoException).code;
+    if (code !== undefined && CONNECTION_ERROR_CODES.has(code)) return true;
+    if (current.cause === undefined) return UNREACHABLE_ERROR_PATTERN.test(current.message);
+    current = current.cause;
+  }
+  return false;
+}
+
+async function* globalFeedPayloads(
+  stream: AsyncIterable<unknown>,
+  workspacePath: string
+): AsyncGenerator<KiloEvent> {
+  for await (const envelope of stream) {
+    if (!isRecord(envelope)) continue;
+    const payload = envelope.payload;
+    if (!isKiloEvent(payload)) continue;
+
+    const directory = envelope.directory;
+    if (isSyntheticKiloEvent(payload) || directory === workspacePath) {
+      yield payload;
+    }
+  }
 }
 
 function providerIdFromRecord(provider: Record<string, unknown>): string | undefined {
@@ -93,7 +162,9 @@ function formatSdkError(error: unknown): string {
 
 function requireSdkData<T>(result: { data?: T; error?: unknown }, operation: string): T {
   if (result.error !== undefined) {
-    throw new Error(`${operation} failed: ${formatSdkError(result.error)}`);
+    throw new Error(`${operation} failed: ${formatSdkError(result.error)}`, {
+      cause: result.error,
+    });
   }
 
   if (result.data === undefined) {
@@ -140,10 +211,9 @@ export type WrapperPtySize = {
 };
 
 /**
- * Shape of an event yielded by `subscribeEvents().stream`. Both the real SDK's
- * `event.subscribe()` generator and the fake kilo's in-memory channel produce
- * values that structurally match this — `connection.ts` only reads `type`
- * and `properties`.
+ * Shape of an event yielded by `subscribeEvents().stream`. The wrapper unwraps
+ * the SDK global event envelope before handing events to `connection.ts`, which
+ * only reads `type` and `properties`.
  */
 export type KiloEvent = {
   type?: string;
@@ -237,10 +307,9 @@ export type WrapperKiloClient = {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a WrapperKiloClient. Session/event operations use the v1 sdkClient
- * (from createKilo()). Permission/question/commitMessage operations use a v2
- * client created from the same server URL, since those APIs are only available
- * in the v2 SDK.
+ * Create a WrapperKiloClient. Session operations use the v1 sdkClient (from
+ * createKilo()). Event, permission, question, and commitMessage operations use
+ * a v2 client created from the same server URL.
  */
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
@@ -254,8 +323,10 @@ export function createWrapperKiloClient(
     serverUrl,
 
     subscribeEvents: async opts => {
-      const result = await sdkClient.event.subscribe({ signal: opts.signal });
-      return { stream: result.stream };
+      const result = await v2Client.global.event({ signal: opts.signal });
+      return {
+        stream: result.stream ? globalFeedPayloads(result.stream, workspacePath) : undefined,
+      };
     },
 
     createSession: async opts => {
@@ -314,7 +385,8 @@ export function createWrapperKiloClient(
       });
       if (result.error !== undefined) {
         throw new Error(
-          `Async prompt for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+          `Async prompt for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`,
+          { cause: result.error }
         );
       }
     },
@@ -333,7 +405,8 @@ export function createWrapperKiloClient(
       });
       if (result.error !== undefined) {
         throw new Error(
-          `Session summarize for ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+          `Session summarize for ${opts.sessionId} failed: ${formatSdkError(result.error)}`,
+          { cause: result.error }
         );
       }
       return result.data ?? true;
@@ -351,7 +424,8 @@ export function createWrapperKiloClient(
       });
       if (result.error !== undefined) {
         throw new Error(
-          `Command for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`
+          `Command for session ${opts.sessionId} failed: ${formatSdkError(result.error)}`,
+          { cause: result.error }
         );
       }
       return result.data;

@@ -20,6 +20,7 @@ import {
 } from './session-message-state.js';
 import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
+import type { SandboxId } from '../types.js';
 import {
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_MAX_SERIALIZED_BYTES,
@@ -29,30 +30,39 @@ import {
 import {
   clearCurrentWrapperRuntimeFailureState,
   clearCurrentWrapperRuntimeLivenessState,
+  clearSettledSandboxRecovery,
   clearWrapperRuntimeIdentity,
+  getSandboxRecoveryState,
   getWrapperLease,
   getWrapperRuntimeState,
   hasCompleteWrapperIdentity,
   hasCompleteWrapperRunMessageIndex,
   IDLE_KEEP_WARM_MS,
   isCurrentWrapperConnection,
+  isWrapperCleanupExhausted,
   isWrapperDeliveryHeld,
   isWrapperRunFinalizing,
   markWrapperFinalizing,
   markWrapperPingSent,
+  nextSandboxRecoveryDeadline,
   nextWrapperLeaseDeadline,
+  putSandboxRecoveryState,
   putWrapperLease,
   recordMeaningfulWrapperOutput,
+  recordSandboxInspectionFailure,
   recordWrapperPong,
+  reduceSandboxRecoveryState,
   reduceWrapperLease,
   type WrapperConnectionFence,
   type WrapperRuntimeState,
+  WRAPPER_STOP_MAX_ATTEMPTS,
 } from './wrapper-runtime-state.js';
 
 const DISCONNECT_GRACE_MS = 10_000;
 const WRAPPER_PING_TIMEOUT_MS = 30_000;
 const WRAPPER_STOP_ATTEMPT_TIMEOUT_MS = 45_000;
-const WRAPPER_STOP_RETRY_DELAYS_MS = [5_000, 30_000, 120_000, 300_000];
+const WRAPPER_STOP_RETRY_DELAYS_MS = [5_000, 10_000, 10_000, 10_000] as const;
+const SHARED_SANDBOX_FAILOVER_RETRY_DELAYS_MS = [2_000, 4_000, 8_000] as const;
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
 const MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE = 'Assistant request failed: model not found';
 
@@ -164,6 +174,7 @@ export type WrapperSupervisorDependencies = {
     attemptId: string;
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
+  recordSharedSandboxFailover: (routeKey: SandboxId) => Promise<void>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
 };
@@ -347,6 +358,7 @@ export function createWrapperSupervisor(
     clearInterruptRequest,
     ensureAcceptedMessageBeforeTerminal,
     stopWrappers,
+    recordSharedSandboxFailover,
     requestAlarmAtOrBefore,
     getSessionIdForLogs,
   } = dependencies;
@@ -683,11 +695,41 @@ export function createWrapperSupervisor(
     return (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0;
   }
 
+  /**
+   * The liveness guards below silently stop tracking a wrapper run once they decide there's
+   * no active work for it. If a message is still sitting non-terminal/accepted somewhere (for
+   * this run or a stale one), that's the watchdog going dark on a message it should still be
+   * supervising — surface it, since neither guard branch otherwise leaves a trace.
+   */
+  async function warnIfLivenessGuardOrphansAcceptedMessage(
+    guard: 'missing_wrapper_connection' | 'no_active_wrapper_work',
+    state: WrapperRuntimeState
+  ): Promise<void> {
+    const orphaned = await listNonTerminalAcceptedMessages(storage);
+    if (orphaned.length === 0) return;
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        guard,
+        wrapperRunId: state.wrapperRunId,
+        wrapperGeneration: state.wrapperGeneration,
+        wrapperConnectionId: state.wrapperConnectionId,
+        orphanedMessageIds: orphaned.map(message => message.messageId),
+      })
+      .warn(
+        'Wrapper liveness watchdog stopped tracking while accepted messages remain non-terminal'
+      );
+  }
+
   async function getNextWrapperLivenessDeadline(): Promise<number | undefined> {
     const state = await getWrapperRuntimeState(storage);
-    if (!state.wrapperConnectionId) return undefined;
+    if (!state.wrapperConnectionId) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('missing_wrapper_connection', state);
+      return undefined;
+    }
 
     if (!(await hasActiveWrapperWork(state))) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('no_active_wrapper_work', state);
       const hasLivenessFields =
         state.noOutputDeadlineAt !== undefined ||
         state.pingDeadlineAt !== undefined ||
@@ -714,9 +756,13 @@ export function createWrapperSupervisor(
       state.noOutputDeadlineAt !== undefined ||
       state.pingDeadlineAt !== undefined ||
       state.nextPingAt !== undefined;
-    if (!hasLivenessDeadline || !state.wrapperConnectionId) return false;
+    if (!hasLivenessDeadline || !state.wrapperConnectionId) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('missing_wrapper_connection', state);
+      return false;
+    }
 
     if (!(await hasActiveWrapperWork(state))) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('no_active_wrapper_work', state);
       await clearCurrentWrapperRuntimeLivenessState(
         storage,
         state.wrapperGeneration,
@@ -956,9 +1002,143 @@ export function createWrapperSupervisor(
     return now + delay;
   }
 
+  async function exhaustPhysicalCleanup(
+    lease: Extract<
+      Awaited<ReturnType<typeof getWrapperLease>>,
+      { state: 'stop_needed' | 'stopping' }
+    >,
+    now: number,
+    error: string
+  ): Promise<void> {
+    const exhausted = reduceWrapperLease(lease, {
+      type: 'cleanup_exhausted',
+      ...(lease.state === 'stopping' ? { attemptId: lease.attemptId } : {}),
+      now,
+      error,
+    });
+    await putWrapperLease(storage, exhausted);
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        attempts: lease.attempts,
+        reason: lease.reason,
+        targetKind: lease.target.kind,
+        requestedAt: lease.requestedAt,
+        exhaustedAt: now,
+        error,
+        logTag: 'wrapper_cleanup_exhausted',
+      })
+      .error('Wrapper cleanup attempt limit exhausted');
+  }
+
+  let sharedSandboxFailoverReconciliation: Promise<void> | undefined;
+
+  async function clearCompletedRecoveryIfWrapperAbsent(): Promise<void> {
+    if ((await getWrapperLease(storage)).state === 'none') {
+      await clearSettledSandboxRecovery(storage);
+    }
+  }
+
+  async function performSharedSandboxFailoverReconciliation(): Promise<void> {
+    const currentTime = Date.now();
+    let recovery = await getSandboxRecoveryState(storage);
+    if (!recovery || recovery.listProcessesTimeouts < 2) return;
+
+    if (!recovery.failoverPublication) {
+      const route = (await getMetadata())?.workspace?.sandboxRoute;
+      recovery = reduceSandboxRecoveryState(
+        recovery,
+        route?.kind === 'shared' && !route.suffix
+          ? { type: 'prepare_failover', routeKey: route.routeKey, now: currentTime }
+          : { type: 'settle_failover', outcome: 'not-applicable' }
+      );
+      if (!recovery) return;
+      await putSandboxRecoveryState(storage, recovery);
+    }
+
+    const publication = recovery.failoverPublication;
+    if (publication?.status !== 'pending' || publication.nextAttemptAt > currentTime) return;
+
+    try {
+      await recordSharedSandboxFailover(publication.routeKey);
+      const latest = await getSandboxRecoveryState(storage);
+      const settled = reduceSandboxRecoveryState(latest, {
+        type: 'settle_failover',
+        outcome: 'recorded',
+        routeKey: publication.routeKey,
+        expectedFailedAttempts: publication.failedAttempts,
+      });
+      if (settled) await putSandboxRecoveryState(storage, settled);
+      await clearCompletedRecoveryIfWrapperAbsent();
+      logger
+        .withFields({
+          routeKey: publication.routeKey,
+          sessionId: getSessionIdForLogs(),
+          timeoutCount: recovery.listProcessesTimeouts,
+          logTag: 'shared_sandbox_failover_recorded',
+        })
+        .warn('Recorded one-way shared sandbox failover');
+    } catch (error) {
+      const failedAt = Date.now();
+      const failedAttempts = publication.failedAttempts + 1;
+      const retryDelay = SHARED_SANDBOX_FAILOVER_RETRY_DELAYS_MS[publication.failedAttempts];
+      const latest = await getSandboxRecoveryState(storage);
+      const updated = reduceSandboxRecoveryState(
+        latest,
+        retryDelay === undefined
+          ? {
+              type: 'settle_failover',
+              outcome: 'exhausted',
+              routeKey: publication.routeKey,
+              expectedFailedAttempts: publication.failedAttempts,
+            }
+          : {
+              type: 'record_failover_retry',
+              routeKey: publication.routeKey,
+              expectedFailedAttempts: publication.failedAttempts,
+              nextAttemptAt: failedAt + retryDelay,
+            }
+      );
+      if (updated) await putSandboxRecoveryState(storage, updated);
+      if (retryDelay === undefined) await clearCompletedRecoveryIfWrapperAbsent();
+      logger
+        .withFields({
+          routeKey: publication.routeKey,
+          sessionId: getSessionIdForLogs(),
+          failedAttempts,
+          retryAt: retryDelay === undefined ? undefined : failedAt + retryDelay,
+          error: error instanceof Error ? error.message : String(error),
+          logTag: 'shared_sandbox_failover_record_failed',
+        })
+        .error('Failed to record shared sandbox failover');
+    }
+  }
+
+  async function reconcileSharedSandboxFailover(): Promise<void> {
+    if (sharedSandboxFailoverReconciliation) {
+      await sharedSandboxFailoverReconciliation;
+      return;
+    }
+    sharedSandboxFailoverReconciliation = performSharedSandboxFailoverReconciliation();
+    try {
+      await sharedSandboxFailoverReconciliation;
+    } finally {
+      sharedSandboxFailoverReconciliation = undefined;
+    }
+  }
+
   async function reconcilePhysicalCleanup(now: number): Promise<void> {
     if (!stopWrappers) return;
     let lease = await getWrapperLease(storage);
+    if (isWrapperCleanupExhausted(lease)) return;
+    if (lease.state === 'stop_needed' && lease.attempts >= WRAPPER_STOP_MAX_ATTEMPTS) {
+      await exhaustPhysicalCleanup(
+        lease,
+        now,
+        lease.lastError ?? 'Wrapper cleanup attempt limit exhausted'
+      );
+      return;
+    }
     if (
       lease.state === 'owns_wrapper' &&
       lease.startupDeadlineAt !== undefined &&
@@ -982,6 +1162,10 @@ export function createWrapperSupervisor(
     }
     if (lease.state === 'stopping') {
       if (now < lease.attemptDeadlineAt) return;
+      if (lease.attempts >= WRAPPER_STOP_MAX_ATTEMPTS) {
+        await exhaustPhysicalCleanup(lease, now, 'Stop attempt deadline expired');
+        return;
+      }
       lease = reduceWrapperLease(lease, {
         type: 'stop_attempt_expired',
         attemptId: lease.attemptId,
@@ -1003,6 +1187,17 @@ export function createWrapperSupervisor(
     await putWrapperLease(storage, stopping);
     await requestAlarmAtOrBefore?.(stopping.attemptDeadlineAt);
 
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        reason: stopping.reason,
+        target: stopping.target,
+        attemptId,
+        attempts: stopping.attempts,
+        requestedAt: stopping.requestedAt,
+      })
+      .info('Reconciling physical wrapper stop');
+
     let result: StopWrappersResult;
     try {
       result = await stopWrappers({
@@ -1018,9 +1213,11 @@ export function createWrapperSupervisor(
     }
 
     const latest = await getWrapperLease(storage);
+    if (latest.state !== 'stopping' || latest.attemptId !== attemptId) return;
     if (result.status === 'absent') {
       const cleaned = reduceWrapperLease(latest, { type: 'stop_absent', attemptId });
       await putWrapperLease(storage, cleaned);
+      await clearSettledSandboxRecovery(storage);
       if (!isWrapperDeliveryHeld(await getWrapperRuntimeState(storage), cleaned)) {
         await sessionMessageQueue.requestPendingDrainIfNeeded();
       }
@@ -1030,12 +1227,22 @@ export function createWrapperSupervisor(
       result.status === 'inspection-failed'
         ? result.error
         : (result.error ?? 'Wrapper remains present');
+    const failedAt = Date.now();
+    if (result.status === 'inspection-failed') {
+      await recordSandboxInspectionFailure(storage, result.reason);
+    }
+    if (stopping.attempts >= WRAPPER_STOP_MAX_ATTEMPTS) {
+      if (latest.state === 'stopping' && latest.attemptId === attemptId) {
+        await exhaustPhysicalCleanup(latest, failedAt, error);
+      }
+      return;
+    }
     await putWrapperLease(
       storage,
       reduceWrapperLease(latest, {
         type: 'stop_not_confirmed',
         attemptId,
-        retryAt: stopRetryAt(Date.now(), stopping.attempts),
+        retryAt: stopRetryAt(failedAt, stopping.attempts),
         error,
       })
     );
@@ -1216,6 +1423,7 @@ export function createWrapperSupervisor(
 
   async function runMaintenance(now: number): Promise<void> {
     await reconcilePhysicalCleanup(now);
+    await reconcileSharedSandboxFailover();
     await checkDisconnectGrace(now);
     await checkWrapperLiveness(now);
     await checkKeepWarmCleanup(now);
@@ -1226,6 +1434,10 @@ export function createWrapperSupervisor(
     const physicalDeadline = nextWrapperLeaseDeadline(await getWrapperLease(storage));
     if (physicalDeadline !== undefined) {
       deadlines.push(physicalDeadline);
+    }
+    const recoveryDeadline = nextSandboxRecoveryDeadline(await getSandboxRecoveryState(storage));
+    if (recoveryDeadline !== undefined) {
+      deadlines.push(recoveryDeadline);
     }
     const livenessDeadline = await getNextWrapperLivenessDeadline();
     if (livenessDeadline !== undefined) {

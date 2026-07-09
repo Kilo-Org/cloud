@@ -14,7 +14,6 @@ import { NewTaskButton } from '@/components/home/new-task-button';
 import { SectionHeader } from '@/components/home/section-header';
 import { KiloClawCard } from '@/components/kiloclaw/instance-card';
 import { isTransitionalStatus } from '@/components/kiloclaw/status-badge';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -108,13 +107,7 @@ export function HomeScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={headerTitle}
-        size="large"
-        showBackButton={false}
-        className="px-[22px]"
-        headerRight={<ProfileAvatarButton />}
-      />
+      <ScreenHeader title={headerTitle} size="large" showBackButton={false} className="px-[22px]" />
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-24"

@@ -31,6 +31,10 @@ import {
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
+import {
+  modelRetainsPrompts,
+  modelTrains,
+} from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 
 type Props = {
   organizationId: string;
@@ -269,8 +273,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerSlug: provider.slug,
         providerDisplayName: provider.displayName,
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
-        trains: provider.dataPolicy.training,
-        retainsPrompts: provider.dataPolicy.retainsPrompts,
+        trains: modelTrains(model, provider.dataPolicy.training),
+        retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         promptPrice: model.endpoint.pricing.prompt,
         completionPrice: model.endpoint.pricing.completion,
       });
@@ -415,6 +419,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         sourceIndex,
         promptPrice: model.endpoint.pricing.prompt,
         completionPrice: model.endpoint.pricing.completion,
+        trains: modelTrains(model, provider.dataPolicy.training),
+        retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
     }
 

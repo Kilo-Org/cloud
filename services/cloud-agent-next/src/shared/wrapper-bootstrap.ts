@@ -23,7 +23,7 @@ export type WrapperBootstrapRepoSource =
       kind: 'git';
       url: string;
       token?: string;
-      platform?: 'github' | 'gitlab';
+      platform?: 'github' | 'gitlab' | 'bitbucket';
       shallow?: boolean;
       refreshRemote?: boolean;
     };
@@ -35,6 +35,7 @@ export type WrapperBootstrapWorkspace = {
   upstreamBranch?: string;
   strictBranch?: boolean;
   preferSnapshot?: boolean;
+  restoredFromBackup?: boolean;
 };
 
 export type WrapperBootstrapRuntimeSkill = {
@@ -140,6 +141,7 @@ export type WrapperWorkspaceReady = {
   githubAppType?: 'standard' | 'lite';
   gitToken?: string;
   gitlabTokenManaged?: boolean;
+  bitbucketTokenManaged?: boolean;
   devcontainer?: WrapperDevContainerMetadata;
 };
 
@@ -158,6 +160,7 @@ export type WrapperSessionReadyErrorResponse = {
     code:
       | 'INVALID_REQUEST'
       | 'WRAPPER_FINALIZING'
+      | 'WORKSPACE_RECONCILIATION_FAILED'
       | 'WORKSPACE_SETUP_FAILED'
       | 'KILO_SERVER_FAILED';
     subtype?: WorkspaceFailureSubtype;
@@ -206,6 +209,12 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
   if (!hasString(workspace, 'workspacePath')) return false;
   if (!hasString(workspace, 'sessionHome')) return false;
   if (!hasString(workspace, 'branchName')) return false;
+  if (
+    workspace.restoredFromBackup !== undefined &&
+    typeof workspace.restoredFromBackup !== 'boolean'
+  ) {
+    return false;
+  }
 
   const devcontainer = value.devcontainer;
   if (devcontainer !== undefined) {

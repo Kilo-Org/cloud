@@ -3,13 +3,15 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import {
+  generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
 import { isNull, count, or, desc, sql } from 'drizzle-orm';
 
-const missingEither = or(
+const missingAny = or(
   isNull(kilocode_users.openrouter_upstream_safety_identifier),
+  isNull(kilocode_users.openrouter_downstream_safety_identifier),
   isNull(kilocode_users.vercel_downstream_safety_identifier)
 );
 
@@ -25,6 +27,7 @@ export type BackfillBatchResponse = {
 type SafetyIdentifierUpdate = {
   id: string;
   openrouter_upstream_safety_identifier: string;
+  openrouter_downstream_safety_identifier: string;
   vercel_downstream_safety_identifier: string;
 };
 
@@ -34,7 +37,7 @@ export async function GET(): Promise<
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const [result] = await db.select({ count: count() }).from(kilocode_users).where(missingEither);
+  const [result] = await db.select({ count: count() }).from(kilocode_users).where(missingAny);
 
   return NextResponse.json({ missing: result?.count ?? 0 });
 }
@@ -52,7 +55,7 @@ export async function POST(): Promise<NextResponse<BackfillBatchResponse | { err
     const rows = await db
       .select({ id: kilocode_users.id })
       .from(kilocode_users)
-      .where(missingEither)
+      .where(missingAny)
       .orderBy(desc(kilocode_users.created_at))
       .limit(BATCH_SIZE);
 
@@ -70,6 +73,9 @@ export async function POST(): Promise<NextResponse<BackfillBatchResponse | { err
       updates.push({
         id: user.id,
         openrouter_upstream_safety_identifier,
+        openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(
+          user.id
+        ),
         vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(user.id),
       });
     }
@@ -78,15 +84,16 @@ export async function POST(): Promise<NextResponse<BackfillBatchResponse | { err
       await db.execute(sql`
         UPDATE ${kilocode_users}
         SET
-          openrouter_upstream_safety_identifier = safety_identifier_updates.openrouter_upstream_safety_identifier,
-          vercel_downstream_safety_identifier = safety_identifier_updates.vercel_downstream_safety_identifier
+          openrouter_upstream_safety_identifier = COALESCE(${kilocode_users.openrouter_upstream_safety_identifier}, safety_identifier_updates.openrouter_upstream_safety_identifier),
+          openrouter_downstream_safety_identifier = COALESCE(${kilocode_users.openrouter_downstream_safety_identifier}, safety_identifier_updates.openrouter_downstream_safety_identifier),
+          vercel_downstream_safety_identifier = COALESCE(${kilocode_users.vercel_downstream_safety_identifier}, safety_identifier_updates.vercel_downstream_safety_identifier)
         FROM (VALUES ${sql.join(
           updates.map(
             update =>
-              sql`(${update.id}, ${update.openrouter_upstream_safety_identifier}, ${update.vercel_downstream_safety_identifier})`
+              sql`(${update.id}, ${update.openrouter_upstream_safety_identifier}, ${update.openrouter_downstream_safety_identifier}, ${update.vercel_downstream_safety_identifier})`
           ),
           sql`, `
-        )}) AS safety_identifier_updates(id, openrouter_upstream_safety_identifier, vercel_downstream_safety_identifier)
+        )}) AS safety_identifier_updates(id, openrouter_upstream_safety_identifier, openrouter_downstream_safety_identifier, vercel_downstream_safety_identifier)
         WHERE ${kilocode_users.id} = safety_identifier_updates.id
       `);
     }

@@ -7,6 +7,7 @@ import { fetchSessionMetadata } from '../../session-service.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import type { WrapperClient } from '../../kilo/wrapper-client.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
 
 async function resolveWrapperClient(opts: {
   sessionId: SessionId;
@@ -14,6 +15,11 @@ async function resolveWrapperClient(opts: {
   env: Env;
 }): Promise<WrapperClient> {
   const { sessionId, userId, env } = opts;
+  await requireCurrentSessionAccess({
+    env,
+    kiloUserId: userId,
+    cloudAgentSessionId: sessionId,
+  });
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });

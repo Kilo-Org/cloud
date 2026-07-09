@@ -55,7 +55,7 @@ function BranchComboboxStory({ value, branches = mockBranches, ...props }: Story
 }
 
 const meta: Meta<typeof BranchComboboxStory> = {
-  title: 'Shared/BranchCombobox',
+  title: 'Components/App Controls/BranchCombobox',
   component: BranchComboboxStory,
   tags: ['autodocs'],
   argTypes: {

@@ -2,8 +2,12 @@
  * Long-running wrapper entry point.
  *
  * The wrapper runs as a single control plane inside the sandbox container.
- * It starts the kilo server in-process via `@kilocode/sdk`'s `createKilo()`,
- * then exposes an HTTP API for the Worker to send commands.
+ * It starts the kilo server as a child process via `@kilocode/sdk`'s
+ * `createKilo()` (which spawns `kilo serve` via cross-spawn — not in-process),
+ * then exposes an HTTP API for the Worker to send commands. Because the
+ * server is a separate process, it can be OOM-killed independently of the
+ * wrapper (see `kilo-server` cgroup, `tool-cgroup.ts`); `restartKiloRuntime`
+ * in `serverDeps` recovers from that by respawning it.
  *
  * Configuration:
  * - Session-level: WRAPPER_PORT, WORKSPACE_PATH (env vars at process start)
@@ -22,6 +26,7 @@ import { bindSessionContext, createServer } from './server.js';
 import { openKiloGlobalFeed } from './global-feed.js';
 import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
+import { startToolCgroup } from './tool-cgroup.js';
 import {
   kiloServerBootstrapError,
   kiloServerStartupError,
@@ -35,6 +40,7 @@ import type {
 import {
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
+  RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
 // ---------------------------------------------------------------------------
@@ -226,6 +232,10 @@ async function main() {
   // ---------------------------------------------------------------------------
   // Wire up components
   // ---------------------------------------------------------------------------
+  // Confine tool subprocesses to a memory-capped cgroup (best-effort; null
+  // when disabled or the cgroup fs is unavailable, e.g. in devcontainers).
+  const toolCgroup = startToolCgroup(process.env);
+
   const state = new WrapperState();
   let kiloClient: WrapperKiloClient | undefined;
   let kiloSessionId = configuredSessionId ?? '';
@@ -237,6 +247,7 @@ async function main() {
   const workspaceBootstrapController = new AbortController();
   const activeWorkspaceBootstraps = new Set<ReturnType<typeof prepareWrapperBootstrapWorkspace>>();
   const activeRuntimeStartups = new Set<Promise<void>>();
+  let inFlightRuntimeRestart: Promise<void> | undefined;
 
   const unavailableKiloClient = new Proxy(
     {},
@@ -276,6 +287,27 @@ async function main() {
     materializePromptAttachments,
     onSessionBound: (feedPolicy: SessionBoundFeedPolicy) =>
       globalFeedManager.onSessionBound(feedPolicy),
+    toolCgroupHealth: () => toolCgroup?.health() ?? null,
+    // Deduped: concurrent failed requests must share one restart rather than each
+    // respawning the kilo server and racing to mutate closeKiloServer/kiloClient.
+    // No restarts during shutdown — a server spawned after handleShutdown snapshots
+    // activeRuntimeStartups would never be closed and leak past the wrapper's exit.
+    restartKiloRuntime: (): Promise<void> => {
+      if (isShuttingDown || !runtimeWorkspacePath) return Promise.resolve();
+      if (inFlightRuntimeRestart) return inFlightRuntimeRestart;
+      const restart = startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
+      inFlightRuntimeRestart = restart;
+      activeRuntimeStartups.add(restart);
+      // Rejection is surfaced via the returned `restart` (awaited by callers);
+      // this chain only clears bookkeeping and must never throw.
+      void restart
+        .catch(() => {})
+        .finally(() => {
+          inFlightRuntimeRestart = undefined;
+          activeRuntimeStartups.delete(restart);
+        });
+      return restart;
+    },
   };
 
   async function verifyExistingKiloSession(
@@ -317,11 +349,31 @@ async function main() {
     },
   });
 
-  async function startKiloRuntime(
+  // Runtime transitions must not interleave: readySession, updateRuntimeEnvironment
+  // and restartKiloRuntime can each request one concurrently, and two bodies racing
+  // through the awaits in doStartKiloRuntime would overwrite each other's
+  // closeKiloServer/kiloClient/connectionManager bindings, orphaning one of the
+  // freshly spawned kilo server processes.
+  let runtimeTransitionChain: Promise<unknown> = Promise.resolve();
+
+  function startKiloRuntime(
     workspacePath: string,
     expectedSessionId?: string,
     forceRestart = false
   ): Promise<void> {
+    const transition = runtimeTransitionChain.then(() =>
+      doStartKiloRuntime(workspacePath, expectedSessionId, forceRestart)
+    );
+    runtimeTransitionChain = transition.catch(() => {});
+    return transition;
+  }
+
+  async function doStartKiloRuntime(
+    workspacePath: string,
+    expectedSessionId?: string,
+    forceRestart = false
+  ): Promise<void> {
+    if (isShuttingDown) throw new Error('Wrapper is shutting down');
     logToFile(
       `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${kiloSessionId || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
     );
@@ -354,7 +406,7 @@ async function main() {
     serverDeps.kiloClient = unavailableKiloClient;
 
     process.chdir(workspacePath);
-    logToFile('starting kilo server in-process via @kilocode/sdk');
+    logToFile('starting kilo server child process via @kilocode/sdk');
     let nextKiloClient: WrapperKiloClient;
     try {
       const result = await createKilo({
@@ -643,12 +695,18 @@ async function main() {
       const bootstrapError =
         error instanceof WrapperBootstrapError
           ? error
-          : new WrapperBootstrapError({
-              code: 'WORKSPACE_SETUP_FAILED',
-              subtype: 'workspace_setup_unknown',
-              message: 'Workspace setup failed',
-              retryable: true,
-            });
+          : error instanceof RestoredWorkspaceReconciliationError
+            ? new WrapperBootstrapError({
+                code: 'WORKSPACE_RECONCILIATION_FAILED',
+                message: error.message,
+                retryable: true,
+              })
+            : new WrapperBootstrapError({
+                code: 'WORKSPACE_SETUP_FAILED',
+                subtype: 'workspace_setup_unknown',
+                message: 'Workspace setup failed',
+                retryable: true,
+              });
       logToFile(
         `session/ready failed kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
       );
@@ -726,6 +784,7 @@ async function main() {
     // Stop lifecycle timers
     lifecycleManager?.stop();
     globalFeedManager.close();
+    toolCgroup?.stop();
 
     // Best-effort final log upload
     const uploader = state.logUploader;

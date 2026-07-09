@@ -1,5 +1,11 @@
 import * as z from 'zod';
-import { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema } from '../types.js';
+import {
+  sessionIdSchema,
+  githubRepoSchema,
+  gitUrlSchema,
+  envVarsSchema,
+  parseCanonicalBitbucketCloneUrl,
+} from '../types.js';
 import {
   MCPServerConfigSchema,
   MCPSecretValueSchema,
@@ -145,6 +151,19 @@ export function validateGitSource<T extends { githubRepo?: unknown; gitUrl?: unk
   const hasGithubRepo = !!data.githubRepo;
   const hasGitUrl = !!data.gitUrl;
   return (hasGithubRepo || hasGitUrl) && !(hasGithubRepo && hasGitUrl);
+}
+
+export function codeReviewIdFromCallbackTarget(
+  callbackTarget: { url: string } | undefined
+): string | null {
+  if (!callbackTarget) return null;
+  try {
+    const pathname = new URL(callbackTarget.url).pathname;
+    const match = /^\/api\/internal\/code-review-status\/([A-Za-z0-9_-]{1,128})$/.exec(pathname);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 const requiresAppendSystemPrompt = (data: {
@@ -388,9 +407,25 @@ export const PrepareSessionInput = z
         'Git token for generic git repositories. Ignored when platform selects a managed provider.'
       ),
     platform: z
-      .enum(['github', 'gitlab'])
+      .enum(['github', 'gitlab', 'bitbucket'])
       .optional()
       .describe('Git platform type for correct token/env var handling'),
+    bitbucketWorkspaceUuid: z.string().uuid().optional(),
+    bitbucketWorkspaceSlug: z
+      .string()
+      .regex(/^[A-Za-z0-9_.-]+$/)
+      .optional(),
+    bitbucketRepositoryUuid: z.string().uuid().optional(),
+    bitbucketRepositorySlug: z
+      .string()
+      .regex(/^[A-Za-z0-9_.-]+$/)
+      .optional(),
+    bitbucketIntegrationId: z.string().uuid().optional(),
+    bitbucketPullRequestId: z.number().int().positive().safe().optional(),
+    bitbucketExpectedHeadSha: z
+      .string()
+      .regex(/^[0-9a-f]{40}$/)
+      .optional(),
 
     // Optional configuration
     envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
@@ -512,6 +547,88 @@ export const PrepareSessionInput = z
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
   })
+  .superRefine((data, ctx) => {
+    const hasBitbucketIds =
+      data.bitbucketWorkspaceUuid !== undefined && data.bitbucketRepositoryUuid !== undefined;
+    if (
+      (data.bitbucketWorkspaceUuid === undefined) !==
+      (data.bitbucketRepositoryUuid === undefined)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['bitbucketWorkspaceUuid'],
+        message: 'Bitbucket workspace and repository UUIDs must be provided together',
+      });
+    }
+    if ((data.platform === 'bitbucket') !== hasBitbucketIds) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['platform'],
+        message: 'Bitbucket identity is required only for Bitbucket repositories',
+      });
+    }
+
+    const bitbucketReviewFields = [
+      data.bitbucketWorkspaceSlug,
+      data.bitbucketRepositorySlug,
+      data.bitbucketIntegrationId,
+      data.bitbucketPullRequestId,
+      data.bitbucketExpectedHeadSha,
+    ];
+    const hasAnyBitbucketReviewField = bitbucketReviewFields.some(value => value !== undefined);
+    const hasCompleteBitbucketReviewContext = bitbucketReviewFields.every(
+      value => value !== undefined
+    );
+    const isBitbucketCodeReview =
+      data.createdOnPlatform === 'code-review' && data.platform === 'bitbucket';
+
+    if (isBitbucketCodeReview) {
+      if (!hasCompleteBitbucketReviewContext) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['bitbucketIntegrationId'],
+          message: 'Complete Bitbucket review context is required for Bitbucket code review',
+        });
+      }
+      if (!data.kilocodeOrganizationId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['kilocodeOrganizationId'],
+          message: 'Bitbucket code review requires an organization ID',
+        });
+      }
+      const canonicalRepository = data.gitUrl ? parseCanonicalBitbucketCloneUrl(data.gitUrl) : null;
+      if (!canonicalRepository) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['gitUrl'],
+          message: 'Bitbucket code review requires a canonical Bitbucket Cloud clone URL',
+        });
+      } else if (
+        canonicalRepository.workspaceSlug !== data.bitbucketWorkspaceSlug ||
+        canonicalRepository.repositorySlug !== data.bitbucketRepositorySlug
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['gitUrl'],
+          message: 'Bitbucket code review clone URL must match its workspace and repository slugs',
+        });
+      }
+      if (!codeReviewIdFromCallbackTarget(data.callbackTarget)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['callbackTarget'],
+          message: 'Bitbucket code review requires a canonical code-review callback target',
+        });
+      }
+    } else if (hasAnyBitbucketReviewField) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['bitbucketIntegrationId'],
+        message: 'Bitbucket review context is only valid for Bitbucket code review',
+      });
+    }
+  })
   .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
@@ -560,6 +677,14 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('gitlab'),
     url: gitUrlSchema.describe('GitLab repository HTTPS URL'),
+    branch: branchNameSchema.optional().describe('Branch to checkout'),
+  }),
+  z.object({
+    type: z.literal('bitbucket'),
+    url: gitUrlSchema.describe('Bitbucket Cloud repository HTTPS URL'),
+    workspaceUuid: z.string().uuid(),
+    repositoryUuid: z.string().uuid(),
+    bitbucketIntegrationId: z.string().uuid().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
@@ -802,7 +927,7 @@ export const GetSessionOutput = z.object({
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
-  platform: z.enum(['github', 'gitlab']).optional().describe('Git platform type'),
+  platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
 
   // Execution params
   prompt: z.string().optional().describe('Task prompt'),

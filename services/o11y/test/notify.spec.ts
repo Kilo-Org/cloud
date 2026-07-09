@@ -4,6 +4,7 @@ import {
   type SloAlertPayload,
   type ContainerCapacityAlertPayload,
   type QueueBacklogAlertPayload,
+  type GastownHealthAlertPayload,
 } from '../src/alerting/notify';
 
 describe('buildSlackMessage — SLO error_rate alert', () => {
@@ -93,6 +94,55 @@ describe('buildSlackMessage — queue_backlog alert', () => {
     expect(allText.some(text => text.includes('50,000'))).toBe(true);
     expect(allText.some(text => text.includes('12,345,678'))).toBe(true);
     expect(allText.some(text => text.includes('2026-06-04T08:00:00.000Z'))).toBe(true);
+  });
+});
+
+describe('buildSlackMessage — gastown_container_health alert', () => {
+  const alert: GastownHealthAlertPayload = {
+    alertType: 'gastown_container_health',
+    severity: 'ticket',
+    windowMinutes: 15,
+    sustainedFailureMinutes: 10,
+    exhaustedTownIds: ['town-a', 'town-b'],
+    sustainedTownIds: ['town-c'],
+    deployChurnSuspected: false,
+    deployChurnTownCount: 0,
+    affectedTownCount: 4,
+    weightedFailedChecks: 36,
+  };
+
+  function renderText(payload: GastownHealthAlertPayload): string {
+    const msg = buildSlackMessage(payload) as {
+      blocks: Array<{ fields?: Array<{ text: string }>; text?: { text: string } }>;
+    };
+    return msg.blocks
+      .flatMap(block => [block.text?.text ?? '', ...(block.fields?.map(field => field.text) ?? [])])
+      .join('\n');
+  }
+
+  it('names the wedged towns and keeps guidance links', () => {
+    const text = renderText(alert);
+
+    expect(text).toContain('Gastown container health failures');
+    expect(text).toContain('15-minute window');
+    expect(text).toContain('exhausted auto-restarts');
+    expect(text).toContain('town-a, town-b');
+    expect(text).toContain('failing >= 10 min');
+    expect(text).toContain('town-c');
+    expect(text).toContain('36');
+    expect(text).toContain('gastown-operations');
+    expect(text).toContain('gastown-container-health-failures.md');
+  });
+
+  it('does not render a deploy-churn annotation when churn is not suspected', () => {
+    expect(renderText(alert)).not.toContain('Deploy churn suspected');
+  });
+
+  it('renders the deploy-churn annotation when churn is suspected', () => {
+    const text = renderText({ ...alert, deployChurnSuspected: true, deployChurnTownCount: 5 });
+
+    expect(text).toContain('Deploy churn suspected across 5 town(s)');
+    expect(text).toContain('code was updated');
   });
 });
 

@@ -10,3 +10,4 @@ fi
 
 husky
 pnpm --filter @kilocode/trpc run build
+pnpm --filter web run copy:swagger-ui-assets

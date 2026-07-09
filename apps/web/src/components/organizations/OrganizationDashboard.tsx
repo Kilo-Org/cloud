@@ -18,6 +18,8 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageCircleQuestion, Terminal } from 'lucide-react';
 import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/organizations/OrganizationProvidersAndModelsConfigurationCard';
+import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
+import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
 import { OrgActiveKiloclawsCard } from '@/components/organizations/OrgActiveKiloclawsCard';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
 import Image from 'next/image';
@@ -140,6 +142,9 @@ export function OrganizationDashboard({
             <LockableContainer>
               <OrganizationInfoCard organizationId={organizationId} />
             </LockableContainer>
+            {(currentRole === 'owner' || currentRole === 'billing_manager') && (
+              <OrganizationChildOrganizationsCard organizationId={organizationId} />
+            )}
             {organizationData && (
               <>
                 {organizationData.plan === 'teams' ? (
@@ -167,6 +172,9 @@ export function OrganizationDashboard({
               <LockableContainer>
                 <SSOSignupCard organization={organizationData} role={currentRole} />
               </LockableContainer>
+            )}
+            {(currentRole === 'owner' || isKiloAdmin) && (
+              <OrganizationEmailPreferencesCard organizationId={organizationId} />
             )}
             <Card>
               <CardHeader>

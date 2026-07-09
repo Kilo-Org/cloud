@@ -63,6 +63,7 @@ function buildEnterpriseOrg(overrides: Partial<Organization> = {}): Organization
     created_by_kilo_user_id: null,
     deleted_at: null,
     sso_domain: null,
+    parent_organization_id: null,
     plan: 'enterprise',
     free_trial_end_at: null,
     company_domain: null,

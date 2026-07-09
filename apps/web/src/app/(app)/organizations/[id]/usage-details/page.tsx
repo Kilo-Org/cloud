@@ -16,6 +16,7 @@ export default async function OrganizationUsageStatsPage({
           organizationId={organization.id}
           organizationName={organization.name}
           callerRole={role}
+          organizationPlan={organization.plan}
           title={`Usage — ${organization.name}`}
         />
       )}

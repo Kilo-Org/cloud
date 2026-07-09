@@ -8,7 +8,7 @@
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**
- * Extract owner/repo or group/project from a git URL
+ * Extract owner/repo, group/project, or workspace/repo from a git URL
  *
  * Supports formats:
  * - https://github.com/owner/repo
@@ -19,9 +19,11 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
  * - https://gitlab.com/group/subgroup/project.git (nested GitLab groups)
  * - git@gitlab.com:group/project.git
  * - git@gitlab.com:group/subgroup/project.git (nested GitLab groups)
+ * - https://bitbucket.org/workspace/repo.git
+ * - Bitbucket SSH shorthand
  *
  * @param gitUrl - The git URL to parse
- * @returns owner/repo or group/project format string, or undefined if parsing fails
+ * @returns Repository path in provider format, or undefined if parsing fails
  */
 export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string | undefined {
   if (!gitUrl) return undefined;
@@ -51,7 +53,7 @@ export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string
       if (url.hostname === 'gitlab.com') {
         return fullPath;
       }
-      // Fallback for GitHub-style URLs: owner/repo (first two segments)
+      // GitHub and Bitbucket repository paths use the first two segments.
       return `${pathParts[0]}/${pathParts[1]}`;
     }
   } catch {
@@ -61,7 +63,7 @@ export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string
   return undefined;
 }
 
-export type GitPlatform = 'github' | 'gitlab';
+export type GitPlatform = 'github' | 'gitlab' | 'bitbucket';
 
 export function buildPrepareSessionRepoParams(options: {
   repo?: string | null;
@@ -70,11 +72,17 @@ export function buildPrepareSessionRepoParams(options: {
   const repo = options.repo?.trim();
   if (!repo) return null;
 
-  if (options.platform === PLATFORM.GITLAB) {
-    return { gitlabProject: repo };
+  switch (options.platform) {
+    case PLATFORM.GITHUB:
+      return { githubRepo: repo };
+    case PLATFORM.GITLAB:
+      return { gitlabProject: repo };
+    case 'bitbucket':
+      return null;
+    default:
+      options.platform satisfies never;
+      return null;
   }
-
-  return { githubRepo: repo };
 }
 
 export function buildRepoBrowseUrl(gitUrl: string | null | undefined): string | undefined {
@@ -121,17 +129,20 @@ export function detectGitPlatform(gitUrl: string | null | undefined): GitPlatfor
 
   if (hostname === 'github.com') return 'github';
   if (hostname === 'gitlab.com') return 'gitlab';
+  if (hostname === 'bitbucket.org') return 'bitbucket';
   return undefined;
 }
 
 /**
- * Find all GitHub or GitLab URLs in free-form text, in order of appearance.
+ * Find all GitHub, GitLab, or Bitbucket URLs in free-form text, in order of appearance.
  *
  * Useful for detecting when a user pastes links to issues, PRs, etc.
  * Returns all matches so the caller can iterate and pick the first one
  * that corresponds to a connected repository.
  */
 export function findAllGitPlatformUrls(text: string): string[] {
-  const matches = text.matchAll(/https?:\/\/(?:github\.com|gitlab\.com)\/[^\s)>\]]+/g);
+  const matches = text.matchAll(
+    /https?:\/\/(?:github\.com|gitlab\.com|bitbucket\.org)\/[^\s)>\]]+/g
+  );
   return Array.from(matches, m => m[0].replace(/[.,;:!?]+$/, ''));
 }

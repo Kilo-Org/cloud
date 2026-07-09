@@ -366,6 +366,9 @@ The `gastown_events` dataset maps fields as follows:
 | blob11 | convoyId | Convoy ID |
 | blob12 | role | Agent role (`polecat`, `refinery`, `mayor`) |
 | blob13 | beadType | Bead type |
+| blob14 | reason | Failure/action reason (e.g. `timeout`, `auto_restart`) |
+| blob15 | containerStartedAt | Container boot timestamp (ISO) |
+| blob16 | containerId | Cloudflare container id (TownContainerDO Durable Object id) |
 | double1 | durationMs | Duration in milliseconds |
 | double2 | value | Generic numeric value |
 | double3 | actionsEmitted | (reconciler_tick) actions count |

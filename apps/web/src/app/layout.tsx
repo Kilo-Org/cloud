@@ -12,13 +12,13 @@ import { APP_URL } from '@/lib/constants';
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-sans',
+  variable: '--font-sans-loaded',
 });
 
 const mono = Roboto_Mono({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-mono',
+  variable: '--font-mono-loaded',
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -112,7 +112,7 @@ export default function RootLayout({
     <html
       suppressHydrationWarning
       lang="en"
-      className={`${inter.variable} ${mono.variable} ${jetbrainsMono.variable} antialiased`}
+      className={`${inter.variable} ${mono.variable} ${jetbrainsMono.variable} font-sans antialiased`}
     >
       <head />
       <body>

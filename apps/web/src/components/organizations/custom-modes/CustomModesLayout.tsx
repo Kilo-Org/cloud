@@ -32,139 +32,171 @@ import { NewModeForm } from './NewModeForm';
 import { EditModeForm } from './EditModeForm';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import {
+  getOrganizationAutoRoute,
+  ORGANIZATION_AUTO_MODEL_FLAG,
+} from '@/lib/organizations/organization-auto-model-shared';
+import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
 type CustomModesLayoutProps = {
   organizationId: string;
+  role: OrganizationRole;
+  isGlobalAdmin: boolean;
 };
 
 type DisplayMode = OrganizationMode & {
   isDefault: boolean;
   isOverridden: boolean;
+  routeModel?: string;
 };
 
 type ModesListProps = {
   organizationId: string;
   modes: DisplayMode[];
   readonly: boolean;
+  canManageRoutes: boolean;
   onDeleteClick: (mode: DisplayMode) => void;
   onEditClick: (mode: DisplayMode) => void;
   isDefaultModelConfigEnabled: boolean;
+  isOrganizationAutoDefaultActive: boolean;
 };
 
 function ModesList({
   modes,
   readonly,
+  canManageRoutes,
   onDeleteClick,
   onEditClick,
   isDefaultModelConfigEnabled,
+  isOrganizationAutoDefaultActive,
 }: ModesListProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {modes.map((mode, index) => (
-        <motion.div
-          key={mode.isDefault && !mode.isOverridden ? mode.slug : mode.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.3,
-            delay: index * 0.05,
-            ease: [0.25, 0.1, 0.25, 1],
-          }}
-        >
-          <Card className="flex h-full flex-col">
-            <CardHeader className="flex-none">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="mb-2 line-clamp-1">{mode.name}</CardTitle>
-                  <p className="text-muted-foreground line-clamp-2 h-10 text-sm">
-                    {mode.config.description}
-                  </p>
-                </div>
-                {!readonly && (
-                  <div className="-mt-3 -mr-3 flex shrink-0 gap-2">
-                    <Button variant="outline" size="sm" onClick={() => onEditClick(mode)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    {mode.isOverridden ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onDeleteClick(mode)}
-                        className="text-amber-600 hover:text-amber-700"
-                      >
-                        <RotateCcw className="h-4 w-4" />
+      {modes.map((mode, index) => {
+        const lifecycleRouteLocked = !!mode.routeModel && !canManageRoutes;
+        return (
+          <motion.div
+            key={mode.isDefault && !mode.isOverridden ? mode.slug : mode.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.3,
+              delay: index * 0.05,
+              ease: [0.25, 0.1, 0.25, 1],
+            }}
+          >
+            <Card className="flex h-full flex-col">
+              <CardHeader className="flex-none">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="mb-2 line-clamp-1">{mode.name}</CardTitle>
+                    <p className="text-muted-foreground line-clamp-2 h-10 text-sm">
+                      {mode.config.description}
+                    </p>
+                  </div>
+                  {!readonly && (
+                    <div className="-mt-3 -mr-3 flex shrink-0 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => onEditClick(mode)}>
+                        <Edit className="h-4 w-4" />
                       </Button>
-                    ) : (
-                      !mode.isDefault && (
+                      {mode.isOverridden ? (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => onDeleteClick(mode)}
-                          className="text-red-400 hover:text-red-500"
+                          disabled={lifecycleRouteLocked}
+                          title={
+                            lifecycleRouteLocked
+                              ? 'Organization owners must revert a routed mode.'
+                              : undefined
+                          }
+                          className="text-amber-600 hover:text-amber-700"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <RotateCcw className="h-4 w-4" />
                         </Button>
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <div className="flex h-full flex-col gap-4">
-                {isDefaultModelConfigEnabled && mode.config.defaultModel && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground text-xs font-medium">Default model</span>
-                    <Badge variant="secondary" className="max-w-full font-mono text-xs">
-                      <span className="break-all">{mode.config.defaultModel}</span>
-                    </Badge>
-                  </div>
-                )}
-                {mode.config?.groups && mode.config.groups.length > 0 && (
-                  <div className="flex-1">
-                    <h4 className="mb-2 text-sm font-medium">Available Tools</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {mode.config.groups.map((group, idx) => {
-                        const groupName = Array.isArray(group) ? group[0] : group;
-                        const groupConfig = Array.isArray(group) ? group[1] : null;
-                        const hasRestriction = !!groupConfig;
-                        const tooltipText = groupConfig
-                          ? `Restricted file access: ${groupConfig.description || ''} (${groupConfig.fileRegex})`.trim()
-                          : undefined;
-
-                        const badgeContent = (
-                          <Badge
-                            key={`${groupName}-${idx}`}
-                            variant="secondary"
-                            className={hasRestriction ? 'cursor-pointer' : undefined}
+                      ) : (
+                        !mode.isDefault && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onDeleteClick(mode)}
+                            disabled={lifecycleRouteLocked}
+                            title={
+                              lifecycleRouteLocked
+                                ? 'Organization owners must delete a routed mode.'
+                                : undefined
+                            }
+                            className="text-red-400 hover:text-red-500"
                           >
-                            {groupName}
-                            {hasRestriction && ' *'}
-                          </Badge>
-                        );
-
-                        return hasRestriction ? (
-                          <Tooltip key={`${groupName}-${idx}`}>
-                            <TooltipTrigger asChild>{badgeContent}</TooltipTrigger>
-                            <TooltipContent>{tooltipText}</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          badgeContent
-                        );
-                      })}
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <div className="flex h-full flex-col gap-4">
+                  {isDefaultModelConfigEnabled && mode.routeModel && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-muted-foreground text-xs font-medium">
+                        {isOrganizationAutoDefaultActive
+                          ? 'Organization Auto route'
+                          : 'Saved Organization Auto route (inactive)'}
+                      </span>
+                      <Badge variant="secondary" className="max-w-full font-mono text-xs">
+                        <span className="break-all">{mode.routeModel}</span>
+                      </Badge>
+                    </div>
+                  )}
+                  {mode.config?.groups && mode.config.groups.length > 0 && (
+                    <div className="flex-1">
+                      <h4 className="mb-2 text-sm font-medium">Available Tools</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {mode.config.groups.map((group, idx) => {
+                          const groupName = Array.isArray(group) ? group[0] : group;
+                          const groupConfig = Array.isArray(group) ? group[1] : null;
+                          const hasRestriction = !!groupConfig;
+                          const tooltipText = groupConfig
+                            ? `Restricted file access: ${groupConfig.description || ''} (${groupConfig.fileRegex})`.trim()
+                            : undefined;
+
+                          const badgeContent = (
+                            <Badge
+                              key={`${groupName}-${idx}`}
+                              variant="secondary"
+                              className={hasRestriction ? 'cursor-pointer' : undefined}
+                            >
+                              {groupName}
+                              {hasRestriction && ' *'}
+                            </Badge>
+                          );
+
+                          return hasRestriction ? (
+                            <Tooltip key={`${groupName}-${idx}`}>
+                              <TooltipTrigger asChild>{badgeContent}</TooltipTrigger>
+                              <TooltipContent>{tooltipText}</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            badgeContent
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
 
-export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
+export function CustomModesLayout({ organizationId, role, isGlobalAdmin }: CustomModesLayoutProps) {
   const { data, isLoading, error } = useOrganizationModes(organizationId);
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const deleteMutation = useDeleteOrganizationMode();
@@ -174,10 +206,14 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create');
   const [editingMode, setEditingMode] = useState<DisplayMode | null>(null);
   const isReadOnly = useOrganizationReadOnly(organizationId);
-  const isDefaultModelFeatureEnabled = useFeatureFlagEnabled('org-default-model-config');
+  const isDefaultModelFeatureEnabled = useFeatureFlagEnabled(ORGANIZATION_AUTO_MODEL_FLAG);
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isDefaultModelConfigEnabled = isDevelopment || isDefaultModelFeatureEnabled === true;
-  const canSetDefaultModel = organizationData?.plan === 'enterprise';
+  const canMaintainRoutedMode = role === 'owner' || isGlobalAdmin;
+  const canSetDefaultModel =
+    organizationData?.plan === 'enterprise' && isDefaultModelConfigEnabled && canMaintainRoutedMode;
+  const isOrganizationAutoDefaultActive =
+    organizationData?.settings.default_model === ORG_AUTO_MODEL.id;
   const readonly = isReadOnly;
 
   // Separate built-in modes and custom modes
@@ -197,6 +233,9 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
           ...customMode,
           isDefault: true,
           isOverridden: true,
+          routeModel: organizationData
+            ? getOrganizationAutoRoute(organizationData.settings, customMode.slug)
+            : undefined,
         };
       } else {
         // This default mode is not overridden
@@ -207,6 +246,9 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
           slug: defaultMode.slug,
           name: defaultMode.name,
           config: defaultMode.config,
+          routeModel: organizationData
+            ? getOrganizationAutoRoute(organizationData.settings, defaultMode.slug)
+            : undefined,
           created_by: '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -224,6 +266,9 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
         ...mode,
         isDefault: false,
         isOverridden: false,
+        routeModel: organizationData
+          ? getOrganizationAutoRoute(organizationData.settings, mode.slug)
+          : undefined,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -231,7 +276,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
       builtInModes: builtInDisplayModes,
       customModes: customDisplayModes,
     };
-  }, [data?.modes, organizationId]);
+  }, [data?.modes, organizationData?.settings, organizationId]);
 
   const handleDelete = async () => {
     if (!modeToDelete) return;
@@ -242,6 +287,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
       await deleteMutation.mutateAsync({
         organizationId,
         modeId: modeToDelete.id,
+        ...(modeToDelete.isDefault && modeToDelete.isOverridden ? { preserve_route: true } : {}),
       });
       toast.success(`Mode "${modeToDelete.name}" ${action} successfully`);
       setDeleteDialogOpen(false);
@@ -319,9 +365,11 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               organizationId={organizationId}
               modes={builtInModes}
               readonly={readonly}
+              canManageRoutes={canMaintainRoutedMode}
               onDeleteClick={openDeleteDialog}
               onEditClick={handleEditMode}
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+              isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
             />
           </div>
 
@@ -333,9 +381,11 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
                 organizationId={organizationId}
                 modes={customModes}
                 readonly={readonly}
+                canManageRoutes={canMaintainRoutedMode}
                 onDeleteClick={openDeleteDialog}
                 onEditClick={handleEditMode}
                 isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
+                isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
               />
             </div>
           )}
@@ -395,10 +445,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
           footer={
             <div className="flex items-center justify-end gap-4">
               <Button type="button" variant="outline" onClick={handleDrawerClose}>
-                Cancel
-              </Button>
-              <Button type="submit" form="mode-form" variant="primary">
-                {drawerMode === 'create' ? 'Create Mode' : 'Update Mode'}
+                Close
               </Button>
             </div>
           }
@@ -421,6 +468,7 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
               defaultModeSlug={editingMode.isDefault ? editingMode.slug : undefined}
               isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
               canSetDefaultModel={canSetDefaultModel}
+              canMaintainRoutedMode={canMaintainRoutedMode}
               onSuccess={handleDrawerClose}
               onCancel={handleDrawerClose}
             />

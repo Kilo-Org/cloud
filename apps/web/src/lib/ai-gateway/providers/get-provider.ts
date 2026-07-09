@@ -79,7 +79,7 @@ async function checkDirectBYOK(
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
       supportedChatApis: directByok.supported_chat_apis,
-      transformRequest(context) {
+      async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);
       },
@@ -231,7 +231,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
+    (await shouldRouteToVercel(requestedModel, kiloExclusiveModel, request, taskId || user.id))
   ) {
     return {
       kind: 'provider',

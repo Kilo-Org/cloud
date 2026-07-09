@@ -1,70 +1,19 @@
 import { useRouter } from 'expo-router';
-import {
-  AlertTriangle,
-  Brain,
-  CheckCircle2,
-  Clock3,
-  Eye,
-  Loader2,
-  type LucideIcon,
-  Shield,
-  ShieldAlert,
-  ShieldCheck,
-  XCircle,
-} from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
+import {
+  FINDING_ICONS,
+  FINDING_TONE_TEXT_CLASS,
+  findingToneColor,
+} from '@/components/security-agent/finding-tone';
 import { Text } from '@/components/ui/text';
-import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import {
-  type FindingIconKey,
-  type FindingTone,
   getSecurityAnalysisPresentation,
   getSecurityDeadlinePresentation,
 } from '@/lib/security-agent-presentation';
 import { cn } from '@/lib/utils';
-
-const ICONS: Record<FindingIconKey, LucideIcon> = {
-  loader: Loader2,
-  'x-circle': XCircle,
-  eye: Eye,
-  'shield-alert': ShieldAlert,
-  'shield-check': ShieldCheck,
-  shield: Shield,
-  brain: Brain,
-  'check-circle': CheckCircle2,
-  clock: Clock3,
-  'alert-triangle': AlertTriangle,
-};
-
-const TONE_TEXT_CLASS: Record<FindingTone, string> = {
-  success: 'text-good',
-  warning: 'text-warn',
-  danger: 'text-destructive',
-  neutral: 'text-muted-foreground',
-};
-
-function toneColor(colors: ThemeColors, tone: FindingTone): string {
-  switch (tone) {
-    case 'success': {
-      return colors.good;
-    }
-    case 'warning': {
-      return colors.warn;
-    }
-    case 'danger': {
-      return colors.destructive;
-    }
-    case 'neutral': {
-      return colors.mutedForeground;
-    }
-    default: {
-      const exhaustiveCheck: never = tone;
-      throw new Error(`Unhandled finding tone: ${String(exhaustiveCheck)}`);
-    }
-  }
-}
 
 const SEVERITY_TEXT_CLASS: Record<string, string> = {
   critical: 'text-destructive',
@@ -125,8 +74,8 @@ export function FindingRow({ finding, scope, slaEnabled }: Readonly<FindingRowPr
   const deadline = slaEnabled ? getSecurityDeadlinePresentation(finding) : null;
   const nextAction = getNextActionLabel(finding);
 
-  const AnalysisIcon = ICONS[analysis.icon];
-  const DeadlineIcon = deadline ? ICONS[deadline.icon] : null;
+  const AnalysisIcon = FINDING_ICONS[analysis.icon];
+  const DeadlineIcon = deadline ? FINDING_ICONS[deadline.icon] : null;
 
   return (
     <Pressable
@@ -151,13 +100,17 @@ export function FindingRow({ finding, scope, slaEnabled }: Readonly<FindingRowPr
       </Text>
       <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
         <View className="flex-row items-center gap-1">
-          <AnalysisIcon size={13} color={toneColor(colors, analysis.tone)} />
-          <Text className={cn('text-xs', TONE_TEXT_CLASS[analysis.tone])}>{analysis.label}</Text>
+          <AnalysisIcon size={13} color={findingToneColor(colors, analysis.tone)} />
+          <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
+            {analysis.label}
+          </Text>
         </View>
         {deadline && DeadlineIcon && (
           <View className="flex-row items-center gap-1">
-            <DeadlineIcon size={13} color={toneColor(colors, deadline.tone)} />
-            <Text className={cn('text-xs', TONE_TEXT_CLASS[deadline.tone])}>{deadline.label}</Text>
+            <DeadlineIcon size={13} color={findingToneColor(colors, deadline.tone)} />
+            <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
+              {deadline.label}
+            </Text>
           </View>
         )}
       </View>

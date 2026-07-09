@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
-import { isPersonalSecurityScope } from '@/lib/security-agent';
+import { isPersonalSecurityScope, type SecurityAnalysis } from '@/lib/security-agent';
+import {
+  getRemediationUnavailableCopy,
+  isActiveRemediationStatus,
+} from '@/lib/security-agent-presentation';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -40,11 +44,28 @@ export function useSecurityFinding(scope: string, id: string) {
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
+const ANALYSIS_POLL_INTERVAL_MS = 3000;
+
+// Poll only while there's something in flight: analysis still running, or a
+// remediation attempt still active. Mirrors FindingDetailDialog.tsx's
+// pollWhileActive and use-code-reviews.ts's refetchInterval convention.
+function isSecurityAnalysisActive(data: SecurityAnalysis | undefined): boolean {
+  if (!data) {
+    return false;
+  }
+  if (data.status === 'pending' || data.status === 'running') {
+    return true;
+  }
+  return data.remediationAttempts.some(attempt => isActiveRemediationStatus(attempt.status));
+}
+
 export function useSecurityAnalysis(scope: string, findingId: string) {
   const trpc = useTRPC();
   const personal = useQuery({
     ...trpc.securityAgent.getAnalysis.queryOptions({ findingId }),
     enabled: isPersonalSecurityScope(scope),
+    refetchInterval: query =>
+      isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
   const organization = useQuery({
     ...trpc.organizations.securityAgent.getAnalysis.queryOptions({
@@ -52,6 +73,8 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
       findingId,
     }),
     enabled: !isPersonalSecurityScope(scope),
+    refetchInterval: query =>
+      isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
@@ -96,41 +119,6 @@ export function useStartSecurityAnalysis(scope: string) {
   });
 }
 
-// Ported from apps/web/src/components/security-agent/remediation-unavailable-copy.ts:6
-// — the user-visible copy per admission rejection reason.
-const REMEDIATION_REJECTION_MESSAGES: Record<string, string> = {
-  finding_not_found: 'Security finding no longer exists.',
-  finding_not_open: 'Finding is no longer open.',
-  repo_not_in_scope: 'Repository is not selected for Security Agent.',
-  analysis_required: 'Run codebase analysis before starting remediation.',
-  sandbox_analysis_required: 'Run codebase analysis before starting remediation.',
-  stale_analysis: 'Finding changed after analysis. Rerun analysis before starting remediation.',
-  not_exploitable: 'Analysis found no reachable vulnerable path. Auto Remediation is unavailable.',
-  exploitability_unknown:
-    'Analysis could not confirm exploitability. Manual review is required before one-click remediation.',
-  manual_review_required:
-    'Analysis recommends manual review, so one-click remediation is unavailable.',
-  monitor_required: 'Analysis recommends monitoring instead of opening a PR.',
-  triage_only: 'Only triage has completed. Run codebase analysis before starting remediation.',
-  action_not_concrete: 'No concrete dependency patch or suggested fix is available.',
-  remediation_active: 'A remediation attempt is already active.',
-  pr_already_opened: 'A remediation PR is already open.',
-  duplicate_analysis_result: 'This analysis result already produced remediation work.',
-  retry_not_allowed: 'Retry is not available for this attempt.',
-  security_agent_disabled: 'Security Agent is disabled for this owner.',
-  auto_remediation_disabled:
-    'Auto Remediation is disabled. Manual remediation can still start when safety gates pass.',
-  include_existing_disabled: 'Existing findings are excluded from automatic remediation.',
-  below_threshold:
-    'Finding is below automatic severity threshold. Manual remediation can still start when safety gates pass.',
-  before_enablement:
-    'Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.',
-};
-
-function getRemediationRejectionMessage(reason: string): string {
-  return REMEDIATION_REJECTION_MESSAGES[reason] ?? 'Remediation is unavailable for this finding.';
-}
-
 export function useStartSecurityRemediation(scope: string) {
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -146,7 +134,10 @@ export function useStartSecurityRemediation(scope: string) {
     },
     onSuccess: result => {
       if (!result.queued) {
-        toast.error(getRemediationRejectionMessage(result.reason));
+        toast.error(
+          getRemediationUnavailableCopy(result.reason) ??
+            'Remediation is unavailable for this finding.'
+        );
       }
     },
   });
@@ -167,7 +158,10 @@ export function useRetrySecurityRemediation(scope: string) {
     },
     onSuccess: result => {
       if (!result.queued) {
-        toast.error(getRemediationRejectionMessage(result.reason));
+        toast.error(
+          getRemediationUnavailableCopy(result.reason) ??
+            'Remediation is unavailable for this finding.'
+        );
       }
     },
   });

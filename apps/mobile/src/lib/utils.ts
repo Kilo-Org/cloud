@@ -49,4 +49,19 @@ function timeAgo(date: Date): string {
 // eslint-disable-next-line no-empty-function -- intentional no-op
 async function asyncNoop() {}
 
-export { asyncNoop, cn, parseTimestamp, timeAgo };
+/**
+ * First non-empty string among the candidates, treating `''` the same as
+ * `null`/`undefined` (unlike `??`). Ports web's `a || b || 'default'`
+ * fallback-text chains without tripping `prefer-nullish-coalescing` — always
+ * pass a truthy string literal last so the result is never `''`.
+ */
+function firstNonEmpty(...values: (string | null | undefined)[]): string {
+  for (const value of values) {
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+}
+
+export { asyncNoop, cn, firstNonEmpty, parseTimestamp, timeAgo };

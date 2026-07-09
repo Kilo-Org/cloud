@@ -74,7 +74,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.includes('codex') || isGemini3Model(model)) {
     return Object.fromEntries(
       ReasoningEffortSchema.options
-        .filter(e => e !== 'none' && e !== 'minimal')
+        .filter(e => e !== 'none' && e !== 'minimal' && e !== 'max')
         .map(effort => [effort, { reasoning: { enabled: true, effort } }])
     );
   }

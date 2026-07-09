@@ -345,6 +345,48 @@ describe('openKiloGlobalFeed', () => {
     ]);
   });
 
+  it('fails the attempt and reconnects when backpressure never clears', async () => {
+    const state = new WrapperState();
+    bindGlobalFeedSession(state);
+    FakeWebSocket.initialBufferedAmount = Number.MAX_SAFE_INTEGER;
+    let fetchCount = 0;
+    let secondFetchStarted: (() => void) | undefined;
+    const secondFetch = new Promise<void>(resolve => {
+      secondFetchStarted = resolve;
+    });
+    const fetchImpl = asFetch(async () => {
+      fetchCount += 1;
+      if (fetchCount === 2) {
+        secondFetchStarted?.();
+      }
+      return new Response(
+        streamFromChunks([
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_1"}}}\n\n',
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_2"}}}\n\n',
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const connection = openKiloGlobalFeed({
+      state,
+      kiloClient: makeKiloClient(),
+      fetchImpl,
+      WebSocketImpl: FakeWebSocket as unknown as GlobalFeedWebSocketImpl,
+      retryDelayMs: 1,
+      backpressureStallMs: 0,
+    });
+
+    // The first drop starts the stall window; the second drop exceeds it and
+    // fails the attempt, forcing a reconnect on a fresh socket.
+    await secondFetch;
+    connection.close();
+    await connection.done;
+
+    expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2);
+    expect(FakeWebSocket.instances[0].sent).toEqual([]);
+  });
+
   it('restarts the global feed after the private Kilo SSE stream ends', async () => {
     const state = new WrapperState();
     bindGlobalFeedSession(state);

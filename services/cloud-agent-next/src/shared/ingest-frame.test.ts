@@ -180,6 +180,57 @@ describe('prepareIngestFrame', () => {
     expect(sent.data.reason).toBe('oversized_ingest_event');
     expect(sent.data.originalBytes).toBeGreaterThan(MAX_INGEST_EVENT_BYTES);
   });
+
+  it('degrades an unserializable non-terminal event to a surrogate instead of throwing', () => {
+    const circular: Record<string, unknown> = { message: 'boom' };
+    circular.self = circular;
+    const frame = prepareIngestFrame({
+      streamEventType: 'status',
+      timestamp: '2026-04-14T08:00:00.000Z',
+      data: circular,
+    });
+    expect(frame.kind).toBe('send');
+    if (frame.kind !== 'send') return;
+    expect(frame.compacted).toBe(true);
+    const sent = JSON.parse(frame.serialized);
+    expect(sent.streamEventType).toBe('wrapper_event_truncated');
+    expect(sent.data.originalStreamEventType).toBe('status');
+  });
+
+  it('still sends a compact terminal error when its data is unserializable', () => {
+    const circular: Record<string, unknown> = { fatal: true, error: 'boom' };
+    circular.self = circular;
+    const frame = prepareIngestFrame({
+      streamEventType: 'error',
+      timestamp: '2026-04-14T08:00:00.000Z',
+      data: circular,
+    });
+    expect(frame.kind).toBe('send');
+    if (frame.kind !== 'send') return;
+    expect(frame.compacted).toBe(true);
+    const sent = JSON.parse(frame.serialized);
+    expect(sent.streamEventType).toBe('error');
+    expect(sent.data.fatal).toBe(true);
+    expect(sent.data.error).toBe('boom');
+  });
+
+  it('falls back to the minimal form when even the compacted event is unserializable', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    // compactMessagePartUpdated copies `type` verbatim, so the compacted event
+    // is still circular and only the minimal surrogate can be serialized.
+    const frame = prepareIngestFrame({
+      streamEventType: 'kilocode',
+      timestamp: '2026-04-14T08:00:00.000Z',
+      data: { event: 'message.part.updated', type: circular },
+    });
+    expect(frame.kind).toBe('send');
+    if (frame.kind !== 'send') return;
+    expect(frame.compacted).toBe(true);
+    const sent = JSON.parse(frame.serialized);
+    expect(sent.streamEventType).toBe('wrapper_event_truncated');
+    expect(sent.data.kiloEventName).toBe('message.part.updated');
+  });
 });
 
 describe('IngestEventBuffer', () => {

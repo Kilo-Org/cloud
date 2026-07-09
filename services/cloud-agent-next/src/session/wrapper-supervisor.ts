@@ -53,7 +53,7 @@ import {
   recordWrapperPong,
   reduceSandboxRecoveryState,
   reduceWrapperLease,
-  resetOutstandingWrapperPing,
+  resetWrapperLivenessAfterReconnect,
   type WrapperConnectionFence,
   type WrapperRuntimeState,
   WRAPPER_STOP_MAX_ATTEMPTS,
@@ -459,13 +459,17 @@ export function createWrapperSupervisor(
     // A ping in flight when the previous socket closed can never be answered on
     // the new socket (the wrapper only pongs in response to a ping command), so
     // its stale deadline would expire into a wrapper_ping_timeout right after a
-    // successful reconnect. Clear it and schedule a fresh ping instead.
+    // successful reconnect. Clear it and schedule a fresh ping instead. The
+    // no-output deadline kept ticking while output could not be delivered, so
+    // it gets a fresh window too instead of firing wrapper_no_output before
+    // the wrapper's buffered events can drain.
     if (fence.wrapperGeneration !== undefined && fence.wrapperConnectionId !== undefined) {
-      await resetOutstandingWrapperPing(
+      await resetWrapperLivenessAfterReconnect(
         storage,
         fence.wrapperGeneration,
         fence.wrapperConnectionId,
-        now + WRAPPER_PING_INTERVAL_MS
+        now + WRAPPER_PING_INTERVAL_MS,
+        now + WRAPPER_NO_OUTPUT_TIMEOUT_MS
       );
     }
   }

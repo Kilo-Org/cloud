@@ -1052,6 +1052,31 @@ describe('WrapperSupervisor', () => {
     });
   });
 
+  it('extends an expired no-output deadline when a reconnect is accepted during grace', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt: 94_000, nextPingAt: 200_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.recordReconnectAccepted(
+      { wrapperGeneration: 4, wrapperConnectionId: WRAPPER_CONNECTION_ID },
+      95_000
+    );
+
+    // Output could not be delivered while the socket was down, so the stale
+    // deadline gets a fresh window instead of firing wrapper_no_output on the
+    // first maintenance tick after the reconnect.
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      noOutputDeadlineAt: 95_000 + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+    });
+    await harness.supervisor.runMaintenance(95_000);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+  });
+
   it('terminalizes accepted work as wrapper_disconnected once grace expires without reconnect', async () => {
     const harness = createHarness([
       liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 332_000 }),

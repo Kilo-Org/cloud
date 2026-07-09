@@ -20,6 +20,7 @@ import {
   MAX_INGEST_BUFFERED_BYTES,
   IngestEventBuffer,
   isLifecycleIngestEvent,
+  kiloEventNameOf,
   prepareIngestFrame,
   type PreparedIngestFrame,
 } from '../../src/shared/ingest-frame.js';
@@ -152,11 +153,7 @@ function rejectCodeReviewPermission(
 }
 
 function kiloEventNameForLog(event: IngestEvent): string | undefined {
-  if (event.streamEventType !== 'kilocode') return undefined;
-  const data = event.data;
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return undefined;
-  const name = (data as Record<string, unknown>).event ?? (data as Record<string, unknown>).type;
-  return typeof name === 'string' ? name : undefined;
+  return event.streamEventType === 'kilocode' ? kiloEventNameOf(event.data) : undefined;
 }
 
 function sessionLogFields(state: WrapperState): Record<string, unknown> {

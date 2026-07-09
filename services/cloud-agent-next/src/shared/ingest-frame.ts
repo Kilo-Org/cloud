@@ -71,7 +71,7 @@ export function isLifecycleIngestEvent(event: IngestEvent): boolean {
   return TERMINAL_INGEST_STREAM_EVENT_TYPES.has(event.streamEventType);
 }
 
-function kiloEventNameOf(data: unknown): string | undefined {
+export function kiloEventNameOf(data: unknown): string | undefined {
   if (!isRecord(data)) return undefined;
   const name = data.event ?? data.type;
   return typeof name === 'string' ? name : undefined;
@@ -305,6 +305,19 @@ export type PreparedIngestFrame =
   | { kind: 'dropped'; originalBytes: number; reason: string };
 
 /**
+ * Serialization must never crash the send path: unserializable data (e.g. a
+ * circular reference) degrades to the same compaction/drop ladder as an
+ * oversized event.
+ */
+function tryStringify(event: IngestEvent): string | undefined {
+  try {
+    return JSON.stringify(event);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Trim, serialize, measure, and (if needed) compact an ingest event so its
  * serialized UTF-8 byte length stays under `MAX_INGEST_EVENT_BYTES`.
  */
@@ -313,9 +326,9 @@ export function prepareIngestFrame(event: IngestEvent): PreparedIngestFrame {
     ...event,
     data: trimPayload(event.streamEventType, event.data),
   };
-  const originalSerialized = JSON.stringify(trimmed);
-  const originalBytes = byteLength(originalSerialized);
-  if (originalBytes <= MAX_INGEST_EVENT_BYTES) {
+  const originalSerialized = tryStringify(trimmed);
+  const originalBytes = originalSerialized === undefined ? 0 : byteLength(originalSerialized);
+  if (originalSerialized !== undefined && originalBytes <= MAX_INGEST_EVENT_BYTES) {
     return {
       kind: 'send',
       serialized: originalSerialized,
@@ -326,32 +339,41 @@ export function prepareIngestFrame(event: IngestEvent): PreparedIngestFrame {
   }
 
   const compactedEvent = compactIngestEvent(trimmed, originalBytes);
-  const compactedSerialized = JSON.stringify(compactedEvent);
-  const compactedBytes = byteLength(compactedSerialized);
-  if (compactedBytes <= MAX_INGEST_EVENT_BYTES) {
-    return {
-      kind: 'send',
-      serialized: compactedSerialized,
-      bytes: compactedBytes,
-      compacted: true,
-      originalBytes,
-    };
+  const compactedSerialized = tryStringify(compactedEvent);
+  if (compactedSerialized !== undefined) {
+    const compactedBytes = byteLength(compactedSerialized);
+    if (compactedBytes <= MAX_INGEST_EVENT_BYTES) {
+      return {
+        kind: 'send',
+        serialized: compactedSerialized,
+        bytes: compactedBytes,
+        compacted: true,
+        originalBytes,
+      };
+    }
   }
 
   const minimalEvent = minimalIngestEvent(trimmed, originalBytes);
-  const minimalSerialized = JSON.stringify(minimalEvent);
-  const minimalBytes = byteLength(minimalSerialized);
-  if (minimalBytes <= MAX_INGEST_EVENT_BYTES) {
-    return {
-      kind: 'send',
-      serialized: minimalSerialized,
-      bytes: minimalBytes,
-      compacted: true,
-      originalBytes,
-    };
+  const minimalSerialized = tryStringify(minimalEvent);
+  if (minimalSerialized !== undefined) {
+    const minimalBytes = byteLength(minimalSerialized);
+    if (minimalBytes <= MAX_INGEST_EVENT_BYTES) {
+      return {
+        kind: 'send',
+        serialized: minimalSerialized,
+        bytes: minimalBytes,
+        compacted: true,
+        originalBytes,
+      };
+    }
   }
 
-  return { kind: 'dropped', originalBytes, reason: 'oversized_ingest_event' };
+  return {
+    kind: 'dropped',
+    originalBytes,
+    reason:
+      originalSerialized === undefined ? 'unserializable_ingest_event' : 'oversized_ingest_event',
+  };
 }
 
 export type BufferedIngestFrame = {

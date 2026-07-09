@@ -57,6 +57,10 @@
     "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    "TOOL_CGROUP_ORG_IDS": "*",
+    "TOOL_CGROUP_MODE": "enforce",
+    "TOOL_CGROUP_RESERVE_MB": "1024",
+    "TOOL_CGROUP_CPU_WEIGHT": "50",
   },
   "placement": { "mode": "smart" },
   /**

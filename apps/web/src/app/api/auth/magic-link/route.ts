@@ -1,31 +1,15 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { checkRateLimit } from '@vercel/firewall';
-import { createHmac } from 'node:crypto';
 import { createMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
-import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
-import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
-import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
-
-const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
+import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 
 const requestSchema = z.object({
   email: z.string().email(),
   callbackUrl: z.string().optional(),
 });
-
-function getMagicLinkEmailRateLimitKey(email: string): string {
-  const emailHash = createHmac('sha256', NEXTAUTH_SECRET)
-    .update(email.trim().toLowerCase())
-    .digest('base64url');
-  return `magic-link-email:${emailHash}`;
-}
 
 /**
  * API route to request a magic link.
@@ -51,63 +35,9 @@ export async function POST(request: NextRequest) {
     return turnstileResult.response;
   }
 
-  const { rateLimited } = await checkRateLimit(MAGIC_LINK_EMAIL_RATE_LIMIT_ID, {
-    request,
-    rateLimitKey: getMagicLinkEmailRateLimitKey(email),
-  });
-
-  if (rateLimited) {
-    return NextResponse.json(
-      { success: false, error: 'Rate limit exceeded. Please try again later.' },
-      { status: 429 }
-    );
-  }
-
-  if (await isEmailBlacklistedByDomainAsync(email)) {
-    return NextResponse.json({ success: false, error: 'BLOCKED' }, { status: 403 });
-  }
-
-  // Check if this is an existing user (sign-in) or new user (signup)
-  const existingUser = await findUserByEmail(email);
-  const primaryEmail = existingUser?.google_user_email ?? email;
-  const primaryDomain = getLowerDomainFromEmail(primaryEmail);
-  if (primaryDomain) {
-    const ssoAuthority = await resolveSsoAuthorityForDomain(primaryDomain);
-    if (ssoAuthority.status === 'misconfigured') {
-      return NextResponse.json(
-        { success: false, error: 'SSO configuration error. Contact your administrator.' },
-        { status: 503 }
-      );
-    }
-    if (ssoAuthority.status === 'required') {
-      const workosOrganization = await getWorkOSOrganization(primaryDomain);
-      if (!workosOrganization) {
-        return NextResponse.json(
-          { success: false, error: 'SSO configuration error. Contact your administrator.' },
-          { status: 503 }
-        );
-      }
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Sign in with your organization SSO provider.',
-          ssoOrganizationId: workosOrganization.id,
-        },
-        { status: 403 }
-      );
-    }
-  }
-
-  // For new users, enforce stricter email validation and TLD blocking
-  if (!existingUser) {
-    if (isBlockedTLD(email)) {
-      return NextResponse.json({ success: false, error: 'BLOCKED' }, { status: 403 });
-    }
-    const signupValidation = validateMagicLinkSignupEmail(email);
-    if (!signupValidation.valid) {
-      return NextResponse.json({ success: false, error: signupValidation.error }, { status: 400 });
-    }
+  const eligibility = await checkEmailSignInEligibility(email, request);
+  if (!eligibility.ok) {
+    return NextResponse.json(eligibility.body, { status: eligibility.status });
   }
 
   const magicLink = await createMagicLinkToken(email);

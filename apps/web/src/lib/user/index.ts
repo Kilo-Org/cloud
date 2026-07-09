@@ -311,6 +311,19 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
   });
 }
 
+export async function findUserByNormalizedEmail(email: string): Promise<User | undefined> {
+  const normalizedEmail = normalizeEmail(email);
+  return await db.query.kilocode_users.findFirst({
+    where: or(
+      eq(kilocode_users.normalized_email, normalizedEmail),
+      and(
+        isNull(kilocode_users.normalized_email),
+        sql`lower(${kilocode_users.google_user_email}) = lower(${email.trim()})`
+      )
+    ),
+  });
+}
+
 async function fireAuthEvent(
   user: Pick<
     User,

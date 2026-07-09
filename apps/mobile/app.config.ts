@@ -1,5 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
-import { ENV_KEYS } from './src/lib/env-keys';
+import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -11,11 +11,21 @@ if (missing.length > 0) {
   }
 }
 
+// ponytail: Google OAuth client IDs aren't created yet — plugin/config below tolerate absence
+// so the app still builds; the native Google button (Task 6) hides itself when undefined.
+const googleIosClientId = process.env[OPTIONAL_ENV_KEYS.googleIosClientId];
+const googleIosUrlScheme = googleIosClientId
+  ? `com.googleusercontent.apps.${googleIosClientId.replace(/\.apps\.googleusercontent\.com$/, '')}`
+  : undefined;
+const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlScheme
+  ? [['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]]
+  : [];
+
 const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.1',
+  version: '1.0.2',
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
@@ -59,6 +69,16 @@ const config: ExpoConfig = {
       {
         android: {
           enableProguardInReleaseBuilds: true,
+        },
+        ios: {
+          // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
+          // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
+          // modules, so pod install fails unless we force module maps on them. Unconditional
+          // because the google-signin pod autolinks whether or not the OAuth client is set.
+          extraPods: [
+            { name: 'GoogleUtilities', modular_headers: true },
+            { name: 'RecaptchaInterop', modular_headers: true },
+          ],
         },
       },
     ],
@@ -112,6 +132,9 @@ const config: ExpoConfig = {
     ],
     ['react-native-appsflyer', {}],
     './plugins/withAndroidManifestFix',
+    // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
+    // Google OAuth clients exist.
+    ...googleSignInPlugins,
   ],
   experiments: {
     typedRoutes: true,
@@ -119,6 +142,9 @@ const config: ExpoConfig = {
   },
   extra: {
     ...Object.fromEntries(Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]])),
+    ...Object.fromEntries(
+      Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
+    ),
     router: {},
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',

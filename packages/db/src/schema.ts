@@ -4573,6 +4573,8 @@ export const magic_link_tokens = pgTable(
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    attempts: integer().default(0).notNull(),
+    purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
   },
   table => [
     index('idx_magic_link_tokens_email').on(table.email),

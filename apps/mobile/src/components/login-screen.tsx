@@ -13,6 +13,7 @@ import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
 import { EmailOtpForm } from '@/components/login/email-otp-form';
+import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -145,13 +146,14 @@ function IdleAuth({ start }: Readonly<{ start: (mode: 'signin' | 'signup') => Pr
         <Button
           variant="outline"
           size="lg"
-          className="flex-row gap-2"
+          // Match the native Apple button exactly: 44pt tall, cornerRadius 8, full width.
+          className="h-[44px] w-full flex-row gap-2 rounded-[8px]"
           disabled={busy === 'google'}
           onPress={() => void signInWithGoogle()}
           accessibilityLabel="Sign in with Google"
         >
-          {busy === 'google' ? <ActivityIndicator size="small" /> : null}
-          <Text>Continue with Google</Text>
+          {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={20} />}
+          <Text className="text-[19px] font-semibold">Sign in with Google</Text>
         </Button>
       )}
 

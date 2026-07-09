@@ -153,6 +153,8 @@ export function useNativeAuth(): NativeAuthResult {
     setBusy('google');
     try {
       ensureGoogleConfigured();
+      // Android: surfaces the "update Play Services" prompt instead of a cryptic failure; no-op on iOS.
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
 
       if (response.type === 'cancelled') {

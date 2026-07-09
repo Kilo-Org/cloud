@@ -99,6 +99,7 @@ Gotchas:
 - `simctl io recordVideo` is flaky (1-frame videos after first use). For capturing transitions, loop `simctl io screenshot` in the background (~7.5 fps) and assemble with ffmpeg.
 - Re-inspect the screen after every UI change; element ids/text from a stale inspect will miss.
 - Elements are matched by `accessibilityLabel` via the `text:` selector (the app has no testIDs); `id:` does not match a11y labels.
+- Attach screenshots from the e2e run to the PR description where applicable — e.g. the screen a UI change touches, or a key step of the flow being verified. They're the evidence the flow actually works and make review faster.
 
 ## 6. Android emulator
 

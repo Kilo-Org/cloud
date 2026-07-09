@@ -11,7 +11,6 @@ import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases
 import { NotificationsCard } from '@/components/notifications-card';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -26,6 +25,36 @@ const SUPPORT_EMAIL = 'hi@kilo.ai';
 
 function providerIcon(_provider: string) {
   return KeyRound;
+}
+
+function ActionTile({
+  icon: Icon,
+  label,
+  color,
+  onPress,
+  destructive,
+  disabled,
+}: {
+  icon: React.ComponentType<{ size?: number; color?: string }>;
+  label: string;
+  color: string;
+  onPress: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      className={`flex-1 items-center gap-2 rounded-lg bg-secondary py-4 active:opacity-70 ${disabled ? 'opacity-50' : ''}`}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityLabel={label}
+    >
+      <Icon size={20} color={color} />
+      <Text className={`text-sm ${destructive ? 'text-destructive' : 'text-muted-foreground'}`}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
 export function ProfileScreen() {
@@ -201,48 +230,38 @@ export function ProfileScreen() {
 
         {/* Actions */}
         <View className="mt-6 gap-3">
-          <Button
-            variant="ghost"
-            className="flex-row gap-2"
-            onPress={() => {
-              void openSupportEmail();
-            }}
-            accessibilityLabel="Support"
-          >
-            <LifeBuoy size={16} color={colors.mutedForeground} />
-            <Text className="text-muted-foreground">Support</Text>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className="flex-row gap-2"
-            onPress={showPrivacyChoices}
-            accessibilityLabel="Privacy choices"
-          >
-            <Lock size={16} color={colors.mutedForeground} />
-            <Text className="text-muted-foreground">Privacy choices</Text>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className="flex-row gap-2"
-            onPress={confirmSignOut}
-            accessibilityLabel="Sign out"
-          >
-            <LogOut size={16} color={colors.mutedForeground} />
-            <Text className="text-muted-foreground">Sign Out</Text>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className="flex-row gap-2"
-            onPress={confirmDeleteAccount}
-            disabled={deleteAccount.isPending}
-            accessibilityLabel="Delete account"
-          >
-            <Trash2 size={16} color={colors.destructive} />
-            <Text className="text-destructive">Delete Account</Text>
-          </Button>
+          <View className="flex-row gap-3">
+            <ActionTile
+              icon={LifeBuoy}
+              label="Support"
+              color={colors.mutedForeground}
+              onPress={() => {
+                void openSupportEmail();
+              }}
+            />
+            <ActionTile
+              icon={Lock}
+              label="Privacy choices"
+              color={colors.mutedForeground}
+              onPress={showPrivacyChoices}
+            />
+          </View>
+          <View className="flex-row gap-3">
+            <ActionTile
+              icon={LogOut}
+              label="Sign Out"
+              color={colors.mutedForeground}
+              onPress={confirmSignOut}
+            />
+            <ActionTile
+              icon={Trash2}
+              label="Delete Account"
+              color={colors.destructive}
+              destructive
+              disabled={deleteAccount.isPending}
+              onPress={confirmDeleteAccount}
+            />
+          </View>
 
           <Text className="text-center text-xs text-muted-foreground">
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})

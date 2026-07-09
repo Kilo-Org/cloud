@@ -25,6 +25,9 @@ import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
+import { getCodeReviewerProfilePath, getProfileAgentScope } from '@/lib/profile-agent-navigation';
+import { getSecurityAgentPath } from '@/lib/security-agent';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
 
@@ -39,6 +42,7 @@ export function ProfileScreen() {
   const router = useRouter();
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
   const {
     data,
@@ -49,10 +53,13 @@ export function ProfileScreen() {
     ...trpc.user.getAuthProviders.queryOptions(),
     enabled: isAuthenticated,
   });
-  const { data: orgs } = useQuery({
+  const { data: orgs, isFetching: organizationsFetching } = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated,
   });
+  const agentScope = organizationContextLoaded
+    ? getProfileAgentScope(organizationId, orgs, organizationsFetching)
+    : undefined;
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
 
@@ -140,8 +147,11 @@ export function ProfileScreen() {
             title="Code Reviewer"
             subtitle="Automatic PR reviews"
             className="rounded-lg bg-secondary px-3"
+            disabled={!agentScope}
             onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/code-reviewer' as Href);
+              if (agentScope) {
+                router.push(getCodeReviewerProfilePath(agentScope));
+              }
             }}
           />
           <ConfigureRow
@@ -149,9 +159,12 @@ export function ProfileScreen() {
             title="Security Agent"
             subtitle="Find and remediate vulnerabilities"
             className="rounded-lg bg-secondary px-3"
+            disabled={!agentScope}
             last
             onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/security-agent' as Href);
+              if (agentScope) {
+                router.push(getSecurityAgentPath(agentScope));
+              }
             }}
           />
         </View>

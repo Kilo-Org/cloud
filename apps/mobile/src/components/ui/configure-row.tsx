@@ -18,6 +18,7 @@ type ConfigureRowProps = {
    */
   tone?: ToneKey;
   onPress?: () => void;
+  disabled?: boolean;
   trailing?: ReactNode;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -31,6 +32,7 @@ export function ConfigureRow({
   subtitle,
   tone,
   onPress,
+  disabled,
   trailing,
   last,
   className,
@@ -66,7 +68,12 @@ export function ConfigureRow({
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} className="active:opacity-70">
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityState={{ disabled }}
+        className={cn('active:opacity-70', disabled && 'opacity-50')}
+      >
         {inner}
       </Pressable>
     );

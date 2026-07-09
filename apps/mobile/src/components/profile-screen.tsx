@@ -1,7 +1,15 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { GitPullRequest, KeyRound, LifeBuoy, Lock, LogOut, Trash2 } from 'lucide-react-native';
+import {
+  GitPullRequest,
+  KeyRound,
+  LifeBuoy,
+  Lock,
+  LogOut,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react-native';
 import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -132,9 +140,18 @@ export function ProfileScreen() {
             title="Code Reviewer"
             subtitle="Automatic PR reviews"
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/code-reviewer' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={ShieldCheck}
+            title="Security Agent"
+            subtitle="Find and remediate vulnerabilities"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/security-agent' as Href);
             }}
           />
         </View>

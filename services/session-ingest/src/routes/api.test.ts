@@ -671,6 +671,15 @@ describe('api routes', () => {
       expect(ingest).not.toHaveBeenCalled();
       expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
       expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: 'declared_bytes_exceeded',
+        })
+      );
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_legacy' })
+      );
       warn.mockRestore();
     });
 

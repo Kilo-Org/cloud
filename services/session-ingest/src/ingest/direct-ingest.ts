@@ -149,13 +149,13 @@ export async function handleDirectIngestRequest(
   );
   if (!buffered.ok) {
     logEvent('warn', {
-      event: 'direct_ingest_legacy',
+      event: 'direct_ingest_reject',
       ...eventBase(request, startedAt, {
         declaredBytes: contentLength,
         actualBytes: null,
         items: null,
       }),
-      reason: 'oversized_body',
+      reason: 'declared_bytes_exceeded',
     });
     return { status: 413, body: { success: false, error: 'payload_too_large' } };
   }
@@ -197,6 +197,8 @@ export async function handleDirectIngestRequest(
   }
   if (
     validation.validItemCount > INGEST_CHUNK_MAX_ITEMS ||
+    // The byte check is defensive while the HTTP body cap equals the RPC byte budget,
+    // but keeps direct eligibility tied to the shared chunk policy if either limit moves.
     validation.totalValidItemBytes > INGEST_CHUNK_MAX_BYTES
   ) {
     return legacy(request, r2Key, buffered.bytes, {
@@ -209,7 +211,11 @@ export async function handleDirectIngestRequest(
   let ingestResult: DirectIngestResult;
   try {
     ingestResult = await withDORetry<ReturnType<typeof getSessionIngestDO>, DirectIngestResult>(
-      () => getSessionIngestDO(request.env, request),
+      () =>
+        getSessionIngestDO(request.env, {
+          kiloUserId: request.kiloUserId,
+          sessionId: request.sessionId,
+        }),
       async stub =>
         stub.ingest(
           validation.items,

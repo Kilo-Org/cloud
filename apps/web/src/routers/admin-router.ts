@@ -1,6 +1,8 @@
 // admin-router.ts
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
+import { isEligibleForPlatformAdmin } from '@/lib/admin/platform-admin';
+import { hosted_domain_specials } from '@/lib/auth/constants';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
@@ -59,7 +61,8 @@ import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-ro
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
-import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
+import { eq, and, ne, or, ilike, like, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
+import type { InferColumnsDataTypes } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
@@ -285,6 +288,46 @@ const SetPersonalAccountDisabledSchema = z.object({
   userId: z.string(),
   value: z.boolean(),
 });
+
+const SearchPlatformAdminCandidatesSchema = z.object({
+  query: z.string().trim().min(1).max(200),
+});
+
+const SetPlatformAdminAccessSchema = z.object({
+  userId: z.string().min(1),
+  isAdmin: z.boolean(),
+});
+
+// Narrow column projection shared by the platform-admin roster and
+// candidate-search results. Both `.select(...)` call sites below reuse this
+// same object (rather than repeating the column list) so their result shapes
+// cannot drift from each other; `PlatformAdminUser` is derived from it so the
+// type can't drift from either query either.
+const platformAdminUserColumns = {
+  id: kilocode_users.id,
+  google_user_email: kilocode_users.google_user_email,
+  google_user_name: kilocode_users.google_user_name,
+  google_user_image_url: kilocode_users.google_user_image_url,
+  hosted_domain: kilocode_users.hosted_domain,
+  blocked_reason: kilocode_users.blocked_reason,
+  can_manage_credits: kilocode_users.can_manage_credits,
+  is_admin: kilocode_users.is_admin,
+};
+
+type PlatformAdminUser = InferColumnsDataTypes<typeof platformAdminUserColumns>;
+
+function toPlatformAdminUser(user: typeof kilocode_users.$inferSelect): PlatformAdminUser {
+  return {
+    id: user.id,
+    google_user_email: user.google_user_email,
+    google_user_name: user.google_user_name,
+    google_user_image_url: user.google_user_image_url,
+    hosted_domain: user.hosted_domain,
+    blocked_reason: user.blocked_reason,
+    can_manage_credits: user.can_manage_credits,
+    is_admin: user.is_admin,
+  };
+}
 
 const GetStytchFingerprintsSchema = z.object({
   kilo_user_id: z.string(),
@@ -1450,6 +1493,169 @@ export const adminRouter = createTRPCRouter({
           balanceResetAmountUsd: result.balanceResetAmountUsd,
           alreadyBlocked: result.alreadyBlocked,
         };
+      }),
+
+    listPlatformAdmins: adminProcedure.query(async ({ ctx }) => {
+      const admins = await db
+        .select(platformAdminUserColumns)
+        .from(kilocode_users)
+        .where(eq(kilocode_users.is_admin, true))
+        .orderBy(asc(kilocode_users.google_user_email));
+
+      return {
+        currentUserId: ctx.user.id,
+        canGrantAdmins: isEligibleForPlatformAdmin(
+          ctx.user.google_user_email,
+          ctx.user.hosted_domain
+        ),
+        admins,
+      };
+    }),
+
+    // Server-filtered so results only ever contain non-admin, exact-eligibility
+    // kilocode.ai users. Filtering here is a UX convenience, not a security
+    // boundary: setPlatformAdminAccess independently re-validates eligibility
+    // against freshly locked rows before granting.
+    searchPlatformAdminCandidates: adminProcedure
+      .input(SearchPlatformAdminCandidatesSchema)
+      .query(async ({ input, ctx }) => {
+        if (!isEligibleForPlatformAdmin(ctx.user.google_user_email, ctx.user.hosted_domain)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only a qualifying kilocode.ai admin can search for grant candidates.',
+          });
+        }
+
+        const escaped = input.query.replace(/[%_\\]/g, '\\$&');
+
+        const candidates = await db
+          .select(platformAdminUserColumns)
+          .from(kilocode_users)
+          .where(
+            and(
+              eq(kilocode_users.is_admin, false),
+              eq(kilocode_users.hosted_domain, hosted_domain_specials.kilocode_admin),
+              // Case-sensitive suffix match — `like` (not `ilike`) so search
+              // eligibility cannot disagree with isEligibleForPlatformAdmin.
+              like(kilocode_users.google_user_email, `%@${hosted_domain_specials.kilocode_admin}`),
+              or(
+                ilike(kilocode_users.google_user_email, `%${escaped}%`),
+                ilike(kilocode_users.google_user_name, `%${escaped}%`),
+                eq(kilocode_users.id, input.query)
+              )
+            )
+          )
+          // Deterministic ordering so the truncated top-20 is stable across
+          // repeated identical searches regardless of DB plan/physical order.
+          .orderBy(asc(kilocode_users.google_user_email), asc(kilocode_users.id))
+          .limit(20);
+
+        return candidates;
+      }),
+
+    setPlatformAdminAccess: adminProcedure
+      .input(SetPlatformAdminAccessSchema)
+      .mutation(async ({ input, ctx }) => {
+        const actorId = ctx.user.id;
+        const targetId = input.userId;
+
+        if (!input.isAdmin && actorId === targetId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'You cannot revoke your own platform admin access.',
+          });
+        }
+
+        return await db.transaction(async tx => {
+          // Deterministic lock ordering (by ID) avoids deadlocks when two
+          // admins concurrently act on each other in opposite directions.
+          const lockIds = [...new Set([actorId, targetId])].sort();
+          const lockedRows = await tx
+            .select()
+            .from(kilocode_users)
+            .where(inArray(kilocode_users.id, lockIds))
+            .orderBy(asc(kilocode_users.id))
+            .for('update');
+
+          const actor = lockedRows.find(row => row.id === actorId);
+          const target = lockedRows.find(row => row.id === targetId);
+
+          if (!actor || !actor.is_admin) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+          }
+
+          if (!target) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Target user not found' });
+          }
+
+          // No-op: the target already has the requested state. Return early
+          // without rotating the session pepper or inserting a duplicate note —
+          // there is no permission change here, so there is nothing to sign out of.
+          // Checked before eligibility so a redundant "grant" against an
+          // already-admin target (e.g. a grandfathered admin outside
+          // kilocode.ai) is always a no-op, not a FORBIDDEN error.
+          if (target.is_admin === input.isAdmin) {
+            return { changed: false as const, user: toPlatformAdminUser(target) };
+          }
+
+          if (input.isAdmin) {
+            if (!isEligibleForPlatformAdmin(actor.google_user_email, actor.hosted_domain)) {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Only a qualifying kilocode.ai admin can grant platform admin access.',
+              });
+            }
+            if (!isEligibleForPlatformAdmin(target.google_user_email, target.hosted_domain)) {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Target user is not eligible for platform admin access.',
+              });
+            }
+          }
+
+          // Rotate both the web session pepper AND the API token pepper on any
+          // privilege change. getUserFromAuth authorizes bearer tokens from the
+          // current DB is_admin value after only matching api_token_pepper, so a
+          // token minted while the user was non-admin would otherwise become
+          // admin-capable the instant we grant (and, on revoke, a pre-revoke
+          // token would retain admin capability). Rotating the pepper here
+          // invalidates every previously-issued token in the same transaction.
+          const [updatedTarget] = await tx
+            .update(kilocode_users)
+            .set(
+              input.isAdmin
+                ? {
+                    is_admin: true,
+                    web_session_pepper: crypto.randomUUID(),
+                    api_token_pepper: crypto.randomUUID(),
+                  }
+                : {
+                    is_admin: false,
+                    can_manage_credits: false,
+                    web_session_pepper: crypto.randomUUID(),
+                    api_token_pepper: crypto.randomUUID(),
+                  }
+            )
+            .where(eq(kilocode_users.id, target.id))
+            .returning();
+
+          if (!updatedTarget) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to update target user',
+            });
+          }
+
+          await tx.insert(user_admin_notes).values({
+            kilo_user_id: target.id,
+            admin_kilo_user_id: actor.id,
+            note_content: input.isAdmin
+              ? 'Granted platform admin access.'
+              : 'Revoked platform admin access.',
+          });
+
+          return { changed: true as const, user: toPlatformAdminUser(updatedTarget) };
+        });
       }),
   }),
 

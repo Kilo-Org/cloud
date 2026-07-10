@@ -8,6 +8,7 @@ import {
   Building2,
   Clock,
   Shield,
+  ShieldCheck,
   Ban,
   Database,
   BarChart,
@@ -70,6 +71,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Users',
     url: '/admin/users',
     icon: () => <Users />,
+  },
+  {
+    title: () => 'Admins',
+    url: '/admin/admins',
+    icon: () => <ShieldCheck />,
   },
   {
     title: () => 'Organizations',

@@ -15,6 +15,7 @@ export const subjects = {
   orgSSOUserJoined: 'Kilo: New SSO User Joined Your Organization',
   orgInvitation: 'Kilo: Teams Invitation',
   magicLink: 'Sign in to Kilo Code',
+  signInCode: 'Your Kilo Code sign-in code',
   balanceAlert: 'Kilo: Low Balance Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
   codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
@@ -229,6 +230,18 @@ export async function sendMagicLinkEmail(
       expires_in: '30 minutes',
       expires_at: new Date(magicLink.expires_at).toISOString(),
       app_url: NEXTAUTH_URL,
+    },
+  });
+}
+
+export async function sendSignInCodeEmail(email: string, code: string): Promise<SendResult> {
+  return send({
+    to: email,
+    templateName: 'signInCode',
+    templateVars: {
+      code,
+      email,
+      expires_in: '10 minutes',
     },
   });
 }

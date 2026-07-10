@@ -57,10 +57,6 @@ export function CondensedProviderAndModelsList({
     return <div className="text-muted-foreground text-sm">Loading providers...</div>;
   }
 
-  if (!selections || providersWithSelections.length === 0) {
-    return null;
-  }
-
   return (
     <div className="space-y-2">
       {/* Default model row */}

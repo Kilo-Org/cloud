@@ -291,10 +291,14 @@ http://localhost:3000/users/sign_in?fakeUser=someone@example.com&callbackPath=/p
 
 ### Admin access
 
-Some features (e.g., admin panels) are only visible to users with `is_admin = true`. The admin flag is set at user-creation time based on the email address:
+Some features (e.g., admin panels) are only visible to users with `is_admin = true`.
 
-- **Real OAuth:** emails ending in `@kilocode.ai` with the `kilocode.ai` hosted domain are admins.
-- **Fake login:** emails must end in `@admin.example.com` to get admin access.
+- **Real OAuth:** new `@kilocode.ai` signups are never automatically made admins. An existing
+  qualifying `@kilocode.ai` admin must grant access explicitly from `/admin/admins`.
+- **Fake login:** emails must end in `@admin.example.com` to get admin access automatically at
+  signup. This bootstrap only applies in environments where fake login is enabled; note that a
+  fake-login `someone@kilocode.ai` user does not qualify for production-domain admin grants
+  because its hosted domain is `@@fake@@`, not `kilocode.ai`.
 
 To sign in as a fake admin:
 

@@ -15,9 +15,8 @@ export async function GET(
   }
 
   const { organization } = data;
-  const modes = await getAllOrganizationModes(organization.id);
 
   return NextResponse.json({
-    modes,
+    modes: await getAllOrganizationModes(organization.id),
   });
 }

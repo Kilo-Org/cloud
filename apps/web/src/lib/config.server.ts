@@ -208,6 +208,9 @@ export const APPLE_TEAM_ID = getEnvVariable('APPLE_TEAM_ID');
 export const APPLE_KEY_ID = getEnvVariable('APPLE_KEY_ID');
 export const APPLE_PRIVATE_KEY = getEnvVariable('APPLE_PRIVATE_KEY');
 
+// Native Google client is a separate OAuth client from the web GOOGLE_CLIENT_ID.
+export const GOOGLE_IOS_CLIENT_ID = getEnvVariable('GOOGLE_IOS_CLIENT_ID');
+
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBACK_WEBHOOK_URL');

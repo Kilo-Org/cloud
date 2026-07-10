@@ -331,7 +331,35 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
       const authToken = generateCloudAgentToken(ctx.user);
-      const client = createCloudAgentNextClient(authToken);
+      // Prompt turns carry their own model; command turns run the session's
+      // stored model, so resolve it to apply the same free/BYOK eligibility
+      // to every follow-up that queues a model-using turn. If the worker
+      // can't return the session model, fall back to the balance-checked
+      // client (the safe default) rather than failing the mutation on a
+      // read-side error.
+      let modelId: string | undefined;
+      if (input.payload.type === 'prompt') {
+        modelId = input.payload.model;
+      } else {
+        try {
+          modelId = (
+            await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
+          ).model;
+        } catch {
+          modelId = undefined;
+        }
+      }
+      const client = createCloudAgentNextClientForModel(
+        authToken,
+        modelId
+          ? await computeCloudAgentNextBalanceCheckEligibility({
+              fromDb: db,
+              user: ctx.user,
+              modelId,
+              organizationId: input.organizationId,
+            })
+          : { isFree: false, hasUserByokAvailable: false }
+      );
 
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab). organizationId is

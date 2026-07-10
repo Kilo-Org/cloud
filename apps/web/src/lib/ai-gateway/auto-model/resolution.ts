@@ -9,6 +9,10 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@/lib/organizations/organization-types';
 import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
   KILO_AUTO_FREE_MODEL,
@@ -22,6 +26,7 @@ import {
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
+  ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -33,6 +38,11 @@ import {
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import {
+  getOrganizationAutoRoute,
+  isOrganizationAutoTargetModel,
+  validateOrganizationAutoTarget,
+} from '@/lib/organizations/organization-auto-model';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -44,6 +54,11 @@ type ResolveAutoModelParams = {
   // Lazily fetches the auto-routing worker's decision; only set for
   // kilo-auto/efficient requests (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
+  organizationContext?: Promise<{
+    organizationId?: string;
+    settings?: OrganizationSettings;
+    plan?: OrganizationPlan;
+  }>;
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
@@ -88,9 +103,133 @@ function gatewaySupportsApiKind(
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
 }
 
+type OrganizationAutoContext = {
+  organizationId?: string;
+  settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
+};
+
+function resolveOrganizationAutoRouteTarget(
+  settings: OrganizationSettings,
+  modeHeader: string | null
+): string | undefined {
+  const mode = modeHeader?.trim() ?? '';
+  const normalizedMode = mode.toLowerCase();
+  const exactRoute = getOrganizationAutoRoute(settings, normalizedMode);
+
+  if (exactRoute) {
+    return exactRoute;
+  }
+
+  if (normalizedMode === 'build') {
+    return getOrganizationAutoRoute(settings, 'code') ?? settings.org_auto_model?.fallback_model;
+  }
+
+  if (normalizedMode === 'plan') {
+    return (
+      getOrganizationAutoRoute(settings, 'architect') ?? settings.org_auto_model?.fallback_model
+    );
+  }
+
+  return settings.org_auto_model?.fallback_model;
+}
+
 export type ResolveAutoModelResult =
-  | { kind: 'ok'; resolved: ResolvedAutoModel }
-  | { kind: 'no_free_models_available' };
+  | { kind: 'ok'; resolved: ResolvedAutoModel; routingTarget?: string }
+  | { kind: 'no_free_models_available' }
+  | { kind: 'organization_auto_configuration_error'; message: string };
+
+async function resolveOrganizationAutoModel(
+  params: ResolveAutoModelParams,
+  userPromise: Promise<User | null>,
+  balancePromise: Promise<number>
+): Promise<ResolveAutoModelResult> {
+  const organizationContext: OrganizationAutoContext = await (params.organizationContext ??
+    Promise.resolve({}));
+
+  if (!organizationContext.organizationId || organizationContext.plan !== 'enterprise') {
+    return {
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto is not available for this account.',
+    };
+  }
+
+  if (!organizationContext.settings?.org_auto_model) {
+    return {
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto is not configured for this organization.',
+    };
+  }
+
+  if (organizationContext.settings.default_model !== ORG_AUTO_MODEL.id) {
+    return {
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto is not enabled for this organization.',
+    };
+  }
+
+  const targetModelId = resolveOrganizationAutoRouteTarget(
+    organizationContext.settings,
+    params.modeHeader
+  );
+  if (!targetModelId) {
+    return {
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto has no configured fallback model.',
+    };
+  }
+
+  let validation: Awaited<ReturnType<typeof validateOrganizationAutoTarget>>;
+  try {
+    validation = await validateOrganizationAutoTarget(
+      {
+        id: organizationContext.organizationId,
+        plan: organizationContext.plan,
+        settings: organizationContext.settings,
+      },
+      targetModelId,
+      { apiKind: params.apiKind ?? undefined }
+    );
+  } catch {
+    return {
+      kind: 'organization_auto_configuration_error',
+      message:
+        'Organization Auto could not validate this route target against the current model catalog.',
+    };
+  }
+  if (validation.kind === 'error') {
+    return { kind: 'organization_auto_configuration_error', message: validation.message };
+  }
+
+  if (validation.modelId === ORG_AUTO_MODEL.id) {
+    // Keep this fail-closed guard at the recursion boundary even though validation rejects self-targets.
+    return {
+      kind: 'organization_auto_configuration_error',
+      message: 'Organization Auto cannot target itself.',
+    };
+  }
+
+  if (isOrganizationAutoTargetModel(validation.modelId)) {
+    const nestedResult = await resolveAutoModel(
+      {
+        ...params,
+        model: validation.modelId,
+      },
+      userPromise,
+      balancePromise
+    );
+    if (nestedResult.kind === 'ok') {
+      return { ...nestedResult, routingTarget: validation.modelId };
+    }
+    return nestedResult;
+  }
+
+  return {
+    kind: 'ok',
+    resolved: { model: validation.modelId },
+    routingTarget: validation.modelId,
+  };
+}
 
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
@@ -98,6 +237,9 @@ export async function resolveAutoModel(
   balancePromise: Promise<number>
 ): Promise<ResolveAutoModelResult> {
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
+  if (model === ORG_AUTO_MODEL.id) {
+    return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
+  }
   if (model === KILO_AUTO_FREE_MODEL.id) {
     const candidates = await getAutoFreeCandidates(apiKind);
     if (candidates.length === 0) {

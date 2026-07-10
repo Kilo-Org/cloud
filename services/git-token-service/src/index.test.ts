@@ -1356,6 +1356,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId,
+        requestMethod: 'POST',
         requestUrl: 'https://api.kilo.ai/api/openrouter/v1/chat/completions',
       })
     ).resolves.toEqual({
@@ -1374,6 +1375,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId,
+        requestMethod: 'GET',
         requestUrl: 'https://api.kilo.ai/api/users/me',
       })
     ).resolves.toEqual({
@@ -1392,7 +1394,28 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId,
+        requestMethod: 'GET',
         requestUrl: 'https://ingest.kilosessions.ai/api/session/kilo-session-1/export',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer raw-user-token',
+      routeClass: 'session_ingest',
+    });
+  });
+
+  it('redeems the user token for a bootstrap bound to the Kilo session', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://ingest.kilosessions.ai/api/session',
+        bootstrapKiloSessionId: kiloSubject.kiloSessionId,
       })
     ).resolves.toEqual({
       success: true,
@@ -1410,6 +1433,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId,
+        requestMethod: 'GET',
         requestUrl: 'https://ingest.kilosessions.ai/api/session/another-session/export',
       })
     ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
@@ -1431,6 +1455,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId,
+        requestMethod: 'GET',
         requestUrl: 'https://api.kilo.ai/api/session/another-session/export',
       })
     ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
@@ -1445,6 +1470,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId: 'another-outbound-container',
+        requestMethod: 'GET',
         requestUrl: 'https://api.kilo.ai/api/users/me',
       })
     ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
@@ -1459,6 +1485,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       service.redeemKiloSessionCapability({
         capability: issued.capability,
         outboundContainerId,
+        requestMethod: 'GET',
         requestUrl: 'https://evil.example.com/api/users/me',
       })
     ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });

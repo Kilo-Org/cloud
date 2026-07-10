@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import type { Env } from '../env';
+import { getSessionIngestDO } from './SessionIngestDO';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
@@ -28,6 +29,9 @@ type WSAttachment =
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
       // predates this field entirely. Both cases fall back to legacy behavior.
       protocolVersion?: string;
+      // Set from the authenticated /user/cli route; undefined on sockets
+      // accepted before this field existed. Needed for the session-ready push.
+      kiloUserId?: string;
     }
   | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
 
@@ -164,7 +168,8 @@ export class UserConnectionDO extends DurableObject<Env> {
       // Close any stale socket from a previous connection with the same ID (CLI reconnect)
       const reconnect = this.closeStaleSocket(connectionId);
 
-      const attachment: WSAttachment = { role: 'cli', connectionId, sessions: [] };
+      const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
+      const attachment: WSAttachment = { role: 'cli', connectionId, sessions: [], kiloUserId };
       this.ctx.acceptWebSocket(server, ['cli']);
       server.serializeAttachment(attachment);
       const now = Date.now();
@@ -356,6 +361,12 @@ export class UserConnectionDO extends DurableObject<Env> {
       if (previousOwner && previousOwner !== connectionId) {
         this.failPendingCommandsForOwnerChange(session.id, connectionId);
       }
+      // First sight of a main session on this DO means it just became
+      // remote-controllable — the only moment the session-ready push fires.
+      // The durable claim in SessionIngestDO makes reconnect re-sights no-ops.
+      if (!previousOwner && !session.parentSessionId && attachment.kiloUserId) {
+        this.claimSessionReadyPush(attachment.kiloUserId, session.id);
+      }
       this.sessionOwners.set(session.id, connectionId);
     }
 
@@ -373,6 +384,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       connectionId,
       sessions,
       protocolVersion,
+      kiloUserId: attachment.kiloUserId,
     };
     ws.serializeAttachment(updatedAttachment);
 
@@ -401,6 +413,22 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });
+  }
+
+  /**
+   * Fire-and-forget "session ready to control from your phone" push via the
+   * session's SessionIngestDO, which holds the durable once-ever claim.
+   */
+  private claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+    const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+    this.ctx.waitUntil(
+      stub.claimSessionReadyPush(kiloUserId, sessionId).catch((error: unknown) => {
+        console.error('Failed to claim session-ready push (non-fatal)', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
   }
 
   private handleCliEvent(

@@ -471,6 +471,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
         backup = await sandbox.createBackup({
           dir: workspacePath,
           ttl: WORKSPACE_BACKUP_TTL_MS / 1000,
+          multipart: false,
           ...(localBucket ? { localBucket: true } : {}),
         });
       } catch (error) {

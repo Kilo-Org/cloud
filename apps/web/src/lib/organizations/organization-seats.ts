@@ -355,7 +355,6 @@ async function handleSubscriptionEventInternal(
       return;
     }
 
-    // Update organization plan from subscription metadata for ALL events (Org Plans 5)
     const plan = getPlanTypeFromSubscription(subscription);
     if (plan !== null) {
       await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));

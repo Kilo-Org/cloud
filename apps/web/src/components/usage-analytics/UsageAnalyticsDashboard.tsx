@@ -24,6 +24,7 @@ import { BreakdownPieChart } from './BreakdownPieChart';
 import { BreakdownBarChart } from './BreakdownBarChart';
 import { AIAdoptionScoreCard } from './AIAdoptionScoreCard';
 import { ActiveKiloclawsTable } from './ActiveKiloclawsTable';
+import { UsageDataPendingState } from './UsageDataPendingState';
 import {
   PERSONAL_VIEW_ALL_USAGE,
   PERSONAL_VIEW_PERSONAL_ONLY,
@@ -462,6 +463,14 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     return list;
   }, [filters]);
 
+  const usageDataPending =
+    period === 'today' &&
+    summary !== undefined &&
+    tableData !== undefined &&
+    summary.requestCount === 0 &&
+    tableData.rows.length === 0 &&
+    activeFilters.length === 0;
+
   const addFilter = useCallback(
     (dimension: Dimension, direction: FilterDirection, value: string): void => {
       setState({
@@ -715,101 +724,107 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
               <>
                 <UsageWarning />
 
-                {/* Org-level panels follow the selected single org so they
-                    don't mix scopes; hidden in the All Organizations aggregate
-                    (effectiveOrgId is null) which they cannot represent. */}
-                {isOrgContext && effectiveOrgId && (
-                  <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
-                )}
+                {usageDataPending ? (
+                  <UsageDataPendingState />
+                ) : (
+                  <>
+                    {/* Org-level panels follow the selected single org so they
+                        don't mix scopes; hidden in the All Organizations aggregate
+                        (effectiveOrgId is null) which they cannot represent. */}
+                    {isOrgContext && effectiveOrgId && (
+                      <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
+                    )}
 
-                <SummarySection
-                  summary={summary}
-                  loading={summaryLoading}
-                  costSource={costSource}
-                  showActiveUsers={isOrgWideView}
-                />
-
-                <BreakdownPieChart
-                  title="Features"
-                  dimension="feature"
-                  data={featureBreakdown}
-                  loading={featureBreakdownLoading}
-                  labelFor={featureLabelFor}
-                />
-                <BreakdownBarChart
-                  title="Models"
-                  dimension="model"
-                  data={modelBreakdown}
-                  loading={modelBreakdownLoading}
-                  metric="cost"
-                />
-                <BreakdownBarChart
-                  title="Top Projects"
-                  dimension="project"
-                  data={projectBreakdown}
-                  loading={projectBreakdownLoading}
-                  metric="cost"
-                  labelFor={projectLabelFor}
-                />
-                {isOrgWideView && (
-                  <BreakdownBarChart
-                    title="Users"
-                    dimension="user"
-                    data={userBreakdown}
-                    loading={userBreakdownLoading}
-                    metric="cost"
-                    labelFor={userLabelFor}
-                  />
-                )}
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Trends</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <PrimaryChart
-                      metric={chartMetric}
+                    <SummarySection
+                      summary={summary}
+                      loading={summaryLoading}
                       costSource={costSource}
-                      data={timeseries}
-                      loading={timeseriesLoading}
-                      splitByLabel={
-                        splitByDimension
-                          ? DIMENSION_LABELS[splitByDimension as Dimension]
-                          : undefined
-                      }
-                      seriesLabelFor={
-                        splitByDimension
-                          ? value => labelForDimensionValue(splitByDimension, value)
-                          : undefined
-                      }
-                      period={period}
-                      granularity={granularity}
+                      showActiveUsers={isOrgWideView}
                     />
-                  </CardContent>
-                </Card>
 
-                <UsageTableBase
-                  title="Detailed Breakdown"
-                  columns={tableColumns}
-                  data={tableRows}
-                  emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
-                  sortable
-                  defaultSort={{ key: 'datetime', direction: 'desc' }}
-                  headerActions={
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleExportCsv}
-                      disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
-                    >
-                      <Download className="mr-1.5 h-3.5 w-3.5" />
-                      Download CSV
-                    </Button>
-                  }
-                />
+                    <BreakdownPieChart
+                      title="Features"
+                      dimension="feature"
+                      data={featureBreakdown}
+                      loading={featureBreakdownLoading}
+                      labelFor={featureLabelFor}
+                    />
+                    <BreakdownBarChart
+                      title="Models"
+                      dimension="model"
+                      data={modelBreakdown}
+                      loading={modelBreakdownLoading}
+                      metric="cost"
+                    />
+                    <BreakdownBarChart
+                      title="Top Projects"
+                      dimension="project"
+                      data={projectBreakdown}
+                      loading={projectBreakdownLoading}
+                      metric="cost"
+                      labelFor={projectLabelFor}
+                    />
+                    {isOrgWideView && (
+                      <BreakdownBarChart
+                        title="Users"
+                        dimension="user"
+                        data={userBreakdown}
+                        loading={userBreakdownLoading}
+                        metric="cost"
+                        labelFor={userLabelFor}
+                      />
+                    )}
 
-                {isOrgAdmin && effectiveOrgId && (
-                  <ActiveKiloclawsTable organizationId={effectiveOrgId} />
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Trends</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <PrimaryChart
+                          metric={chartMetric}
+                          costSource={costSource}
+                          data={timeseries}
+                          loading={timeseriesLoading}
+                          splitByLabel={
+                            splitByDimension
+                              ? DIMENSION_LABELS[splitByDimension as Dimension]
+                              : undefined
+                          }
+                          seriesLabelFor={
+                            splitByDimension
+                              ? value => labelForDimensionValue(splitByDimension, value)
+                              : undefined
+                          }
+                          period={period}
+                          granularity={granularity}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    <UsageTableBase
+                      title="Detailed Breakdown"
+                      columns={tableColumns}
+                      data={tableRows}
+                      emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
+                      sortable
+                      defaultSort={{ key: 'datetime', direction: 'desc' }}
+                      headerActions={
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleExportCsv}
+                          disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
+                        >
+                          <Download className="mr-1.5 h-3.5 w-3.5" />
+                          Download CSV
+                        </Button>
+                      }
+                    />
+
+                    {isOrgAdmin && effectiveOrgId && (
+                      <ActiveKiloclawsTable organizationId={effectiveOrgId} />
+                    )}
+                  </>
                 )}
               </>
             )}

@@ -164,6 +164,38 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 
+  test('returns Organization Auto when it is configured as the organization default', async () => {
+    const user = await insertTestUser();
+    const organization = await createOrganization('Test Org', user.id);
+
+    mockedGetEnhancedOpenRouterModels.mockRejectedValue(new Error('should not be called'));
+    mockedGetAuthorizedOrgContext.mockResolvedValue({
+      success: true,
+      data: {
+        user: { ...user, role: 'owner' },
+        organization: {
+          ...organization,
+          plan: 'enterprise' as const,
+          settings: {
+            default_model: 'kilo-auto/org',
+            org_auto_model: {
+              routes: {},
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        },
+      },
+    });
+
+    const response = await GET(new NextRequest('http://localhost:3000'), {
+      params: Promise.resolve({ id: organization.id }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.defaultModel).toBe('kilo-auto/org');
+  });
+
   test('returns 409 when all available models are blocked by policy', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);

@@ -36,4 +36,6 @@ export type ProviderModelRow = {
   sourceIndex: number;
   promptPrice: string;
   completionPrice: string;
+  trains: boolean;
+  retainsPrompts: boolean;
 };

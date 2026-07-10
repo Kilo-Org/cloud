@@ -63,9 +63,13 @@ export function ProvidersTab({
 }) {
   return (
     <div className="flex flex-col gap-y-4">
-      <p className="text-muted-foreground text-sm">
-        Enable which providers organization members can use.
-      </p>
+      <div className="text-muted-foreground space-y-1 text-sm">
+        <p>Enable which providers organization members can use.</p>
+        <p>
+          Provider policy badges and filters reflect provider defaults. Training and prompt
+          retention policies can differ for individual models.
+        </p>
+      </div>
 
       {isLoading ? (
         <div className="text-muted-foreground flex h-40 items-center justify-center text-sm">
@@ -105,7 +109,6 @@ export function ProvidersTab({
                       }}
                     />
                   </div>
-
                   <div className="space-y-2">
                     <div className="text-muted-foreground text-xs">Retains prompts</div>
                     <RadioButtonGroup

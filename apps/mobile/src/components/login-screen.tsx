@@ -1,11 +1,12 @@
 import * as Clipboard from 'expo-clipboard';
 import { ExternalLink } from 'lucide-react-native';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
+import { IdleAuth } from '@/components/login/idle-auth';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -70,7 +71,12 @@ export function LoginScreen() {
   }
 
   return (
-    <View className="flex-1 items-center justify-center gap-6 bg-background px-6">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerClassName="flex-grow items-center justify-center gap-6 px-6"
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
+    >
       <View className="items-center gap-2">
         <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
         <Text className="text-lg">Welcome to Kilo Code</Text>
@@ -83,10 +89,7 @@ export function LoginScreen() {
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
           >
-            <AuthButtons start={start} />
-            <Text variant="muted" className="text-center text-xs">
-              You will be redirected to your browser
-            </Text>
+            <IdleAuth start={start} />
           </Animated.View>
         )}
 
@@ -163,6 +166,6 @@ export function LoginScreen() {
           </Animated.View>
         )}
       </Animated.View>
-    </View>
+    </ScrollView>
   );
 }

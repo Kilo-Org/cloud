@@ -10,6 +10,7 @@ import {
   type OrganizationMember,
   type AcceptInviteResult,
   type OrganizationSettings,
+  OrganizationSettingsSchema,
 } from '@/lib/organizations/organization-types';
 import {
   kilocode_users,
@@ -874,6 +875,33 @@ export async function isOrganizationMember(
 export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token']): string {
   const acceptInviteUrl = `${APP_URL}/users/accept-invite/${inviteToken}`;
   return acceptInviteUrl;
+}
+
+export async function mutateOrganizationSettings(
+  organizationId: Organization['id'],
+  mutate: (organization: Organization) => Promise<OrganizationSettings> | OrganizationSettings,
+  txn?: DrizzleTransaction
+): Promise<OrganizationSettings> {
+  const run = async (tx: DrizzleTransaction): Promise<OrganizationSettings> => {
+    const [organization] = await tx
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .for('update');
+    if (!organization) {
+      throw new Error(`Organization ${organizationId} not found`);
+    }
+    const nextSettings = await mutate(organization);
+    // Returning the locked settings object is the explicit no-op signal.
+    if (nextSettings === organization.settings) {
+      return organization.settings;
+    }
+    const settings = OrganizationSettingsSchema.parse(nextSettings);
+    await tx.update(organizations).set({ settings }).where(eq(organizations.id, organizationId));
+    return settings;
+  };
+
+  return txn ? run(txn) : db.transaction(run);
 }
 
 export async function updateOrganizationSettings(

@@ -17,6 +17,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
@@ -48,6 +49,7 @@ import {
   modelNotAllowedResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
+  organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -95,6 +97,7 @@ import {
   isKiloAutoModel,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
@@ -236,6 +239,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       ? getBalanceAndOrgSettings(res.organizationId, res.user)
       : { balance: 0, settings: undefined, plan: undefined }
   );
+  const organizationContextPromise = Promise.all([authPromise, balanceAndSettingsPromise]).then(
+    ([auth, balanceAndSettings]) => ({
+      organizationId: auth.organizationId,
+      settings: balanceAndSettings.settings,
+      plan: balanceAndSettings.plan,
+    })
+  );
 
   // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
@@ -265,6 +275,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   let autoModel: string | null = null;
+  // Organization Auto can resolve through an intermediate route target before
+  // reaching a concrete model. Keep that target for nested free-tier rate
+  // limiting and direct-BYOK ownership validation after resolution.
+  let routingTarget: string | null = null;
   let classifierCostUsd = 0;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
@@ -312,6 +326,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         apiKind: requestBodyParsed.kind,
         clientIp: ipAddress ?? null,
         efficientDecision,
+        organizationContext: organizationContextPromise,
       },
       requestBodyParsed,
       authPromise.then(res => res.user),
@@ -320,6 +335,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (autoResult.kind === 'no_free_models_available') {
       return noFreeModelsAvailableResponse();
     }
+    if (autoResult.kind === 'organization_auto_configuration_error') {
+      return organizationAutoConfigurationResponse(autoResult.message);
+    }
+    routingTarget = autoResult.routingTarget ?? null;
   }
 
   let effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -348,6 +367,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(effectiveModelIdLowerCased) ||
     autoModel === KILO_AUTO_FREE_MODEL.id ||
+    routingTarget === KILO_AUTO_FREE_MODEL.id ||
     (await isPublicIdExperimented(effectiveModelIdLowerCased));
   if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
@@ -556,6 +576,29 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
+  if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
+    try {
+      const directByokTarget = await getDirectByokModel(routingTarget);
+      if (directByokTarget.provider && effectiveProviderContext.provider.id !== 'direct-byok') {
+        return organizationAutoConfigurationResponse(
+          `Organization Auto route target '${routingTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
+        );
+      }
+    } catch {
+      return organizationAutoConfigurationResponse(
+        'Organization Auto could not validate this route target against the current model catalog.'
+      );
+    }
+  }
+
+  // Request-level data-collection opt-out: a caller can set
+  // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
+  // request to opt that single request out of training/data-retention.
+  // Direct experiment upstreams ignore those OpenRouter/Vercel flags
+  // (we never reach OpenRouter), but we still capture the prompt to R2
+  // for partner evaluation — which violates the caller's stated
+  // intent. Refuse here regardless of org settings, anon/BYOK status,
+  // or the org-level check below.
   if (
     (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
     isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)

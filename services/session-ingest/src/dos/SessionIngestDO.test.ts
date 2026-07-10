@@ -280,20 +280,15 @@ describe('SessionIngestDO session-ready push', () => {
     return {
       durableObject: new SessionIngestDO(state, env),
       sendSessionReadyNotification,
+      rows,
       settle: () => Promise.all(waitUntilPromises),
     };
   }
 
-  it('pushes once when the session record first arrives without a parent', async () => {
+  it('pushes on first claim and never again', async () => {
     const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
 
-    await durableObject.ingest(
-      [{ type: 'session', data: { title: 'Hello' } }],
-      'usr_push',
-      'ses_push',
-      1,
-      1
-    );
+    durableObject.claimSessionReadyPush('usr_push', 'ses_push');
     await settle();
 
     expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
@@ -302,79 +297,38 @@ describe('SessionIngestDO session-ready push', () => {
       cliSessionId: 'ses_push',
     });
 
-    // Later session-record updates (e.g. title change) must not re-push.
-    await durableObject.ingest(
-      [{ type: 'session', data: { title: 'Renamed' } }],
-      'usr_push',
-      'ses_push',
-      1,
-      2
-    );
+    // Re-claims (CLI reconnect, UserConnectionDO eviction) must not re-push.
+    durableObject.claimSessionReadyPush('usr_push', 'ses_push');
     await settle();
 
     expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
   });
 
-  it('never pushes for a subagent session record', async () => {
-    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+  it('never pushes for a deleted session', async () => {
+    const { durableObject, sendSessionReadyNotification, rows, settle } = makeHarness();
+    rows.set('deleted', { value: 'true' });
 
-    await durableObject.ingest(
-      [{ type: 'session', data: { title: 'Sub', parentID: 'ses_parent' } }],
-      'usr_push',
-      'ses_sub',
-      1,
-      1
-    );
+    durableObject.claimSessionReadyPush('usr_push', 'ses_gone');
     await settle();
 
     expect(sendSessionReadyNotification).not.toHaveBeenCalled();
   });
 
-  it('does not push for payloads without a session record, even for a subagent whose record arrives later', async () => {
+  it('does not push from ingest, even for a parentless session record', async () => {
     const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
 
     await durableObject.ingest(
-      [{ type: 'message', data: { id: 'msg_1' } }],
+      [
+        { type: 'kilo_meta', data: { platform: 'cli' } },
+        { type: 'session', data: { title: 'Main' } },
+      ],
       'usr_push',
-      'ses_sub',
+      'ses_main',
       1,
       1
     );
     await settle();
+
     expect(sendSessionReadyNotification).not.toHaveBeenCalled();
-
-    await durableObject.ingest(
-      [{ type: 'session', data: { title: 'Sub', parentID: 'ses_parent' } }],
-      'usr_push',
-      'ses_sub',
-      1,
-      2
-    );
-    await settle();
-    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
-  });
-
-  it('pushes when a main session record arrives after message-only payloads', async () => {
-    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
-
-    await durableObject.ingest(
-      [{ type: 'message', data: { id: 'msg_1' } }],
-      'usr_push',
-      'ses_late',
-      1,
-      1
-    );
-    await settle();
-    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
-
-    await durableObject.ingest(
-      [{ type: 'session', data: { title: 'Late main' } }],
-      'usr_push',
-      'ses_late',
-      1,
-      2
-    );
-    await settle();
-    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
   });
 });

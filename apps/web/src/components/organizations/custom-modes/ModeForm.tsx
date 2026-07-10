@@ -1,7 +1,7 @@
 'use client';
 
 import type { FormEvent } from 'react';
-import { useMemo, useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,8 @@ import type { EditGroupConfig } from '@/lib/organizations/organization-types';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model-shared';
+import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },
@@ -54,11 +56,15 @@ export type ModeFormData = z.infer<typeof modeFormSchema>;
 type ModeFormProps = {
   organizationId: string;
   mode?: OrganizationMode;
+  routeModel?: string;
   onSubmit: (data: ModeFormData) => Promise<void>;
   isSubmitting: boolean;
   isEditingBuiltIn?: boolean;
   isDefaultModelConfigEnabled?: boolean;
+  isOrganizationAutoDefaultActive?: boolean;
   canSetDefaultModel?: boolean;
+  hasActiveModelPolicy?: boolean;
+  disableSlug?: boolean;
   existingModes?: OrganizationMode[];
   onCancel?: () => void;
   renderButtons?: (props: { isDirty: boolean; isSubmitting: boolean }) => React.ReactNode;
@@ -100,11 +106,15 @@ function denormalizeGroups(
 export function ModeForm({
   organizationId,
   mode,
+  routeModel,
   onSubmit,
   isSubmitting,
   isEditingBuiltIn = false,
   isDefaultModelConfigEnabled = false,
+  isOrganizationAutoDefaultActive = false,
   canSetDefaultModel = true,
+  hasActiveModelPolicy = false,
+  disableSlug = false,
   existingModes = [],
   onCancel,
   renderButtons,
@@ -116,7 +126,7 @@ export function ModeForm({
     description: mode?.config?.description || '',
     whenToUse: mode?.config?.whenToUse || '',
     customInstructions: mode?.config?.customInstructions || '',
-    defaultModel: mode?.config?.defaultModel || '',
+    defaultModel: routeModel || '',
   });
   const [selectedGroups, setSelectedGroups] = useState<string[]>(() => {
     const { simpleGroups } = normalizeGroups(mode?.config?.groups || []);
@@ -134,7 +144,7 @@ export function ModeForm({
     description: mode?.config?.description || '',
     whenToUse: mode?.config?.whenToUse || '',
     customInstructions: mode?.config?.customInstructions || '',
-    defaultModel: mode?.config?.defaultModel || '',
+    defaultModel: routeModel || '',
   });
   const [initialGroups, setInitialGroups] = useState<string[]>(() => {
     const { simpleGroups } = normalizeGroups(mode?.config?.groups || []);
@@ -145,6 +155,8 @@ export function ModeForm({
     return editConfig || { fileRegex: '', description: '' };
   });
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const routeFieldDirtyRef = useRef(false);
+  routeFieldDirtyRef.current = formData.defaultModel !== initialFormData.defaultModel;
 
   // Fetch mode templates
   const { data: templates, isLoading: templatesLoading } = useModeTemplates();
@@ -153,7 +165,19 @@ export function ModeForm({
     isLoading: modelsLoading,
     error: modelsError,
   } = useModelSelectorList(organizationId, isDefaultModelConfigEnabled && canSetDefaultModel);
-  const modelOptions = useMemo(() => modelsData?.data || [], [modelsData?.data]);
+  const modelOptions = useMemo(
+    () =>
+      (modelsData?.data || []).filter(model => {
+        if (model.id.startsWith(CUSTOM_LLM_PREFIX)) {
+          return false;
+        }
+        if (model.id.startsWith('kilo-auto/')) {
+          return !hasActiveModelPolicy && isOrganizationAutoTargetModel(model.id);
+        }
+        return true;
+      }),
+    [hasActiveModelPolicy, modelsData?.data]
+  );
   const hasCurrentDefaultModelOption =
     canSetDefaultModel &&
     !!formData.defaultModel &&
@@ -164,8 +188,17 @@ export function ModeForm({
   const shouldShowDefaultModelControl =
     isDefaultModelConfigEnabled && (canSetDefaultModel || !!formData.defaultModel);
   const defaultModelChanged = formData.defaultModel !== initialFormData.defaultModel;
+  const hasStoredInactiveRoute = !isOrganizationAutoDefaultActive && !!formData.defaultModel;
+  const routeLabel = isOrganizationAutoDefaultActive
+    ? 'Route Organization Auto to'
+    : hasStoredInactiveRoute
+      ? 'Saved Organization Auto route'
+      : 'Organization Auto route';
+  const routeFallbackLabel = isOrganizationAutoDefaultActive
+    ? 'Use Organization Auto fallback'
+    : 'Use Organization Auto fallback when enabled';
 
-  // Update form data when mode prop changes
+  // Re-seed the full form only when switching modes, not when settings refetch.
   useEffect(() => {
     if (mode) {
       const newFormData = {
@@ -175,7 +208,7 @@ export function ModeForm({
         description: mode.config?.description || '',
         whenToUse: mode.config?.whenToUse || '',
         customInstructions: mode.config?.customInstructions || '',
-        defaultModel: mode.config?.defaultModel || '',
+        defaultModel: routeModel || '',
       };
       const { simpleGroups, editConfig } = normalizeGroups(mode.config?.groups || []);
       const newEditConfig = editConfig || { fileRegex: '', description: '' };
@@ -187,7 +220,16 @@ export function ModeForm({
       setInitialGroups(simpleGroups);
       setInitialEditConfig(newEditConfig);
     }
-  }, [mode]);
+  }, [mode?.id]);
+
+  useEffect(() => {
+    if (routeFieldDirtyRef.current) {
+      return;
+    }
+    const nextRouteModel = routeModel || '';
+    setFormData(previous => ({ ...previous, defaultModel: nextRouteModel }));
+    setInitialFormData(previous => ({ ...previous, defaultModel: nextRouteModel }));
+  }, [routeModel]);
 
   // Check if form is dirty (has changes)
   const isDirty =
@@ -198,7 +240,7 @@ export function ModeForm({
     formData.whenToUse !== initialFormData.whenToUse ||
     formData.customInstructions !== initialFormData.customInstructions ||
     formData.defaultModel !== initialFormData.defaultModel ||
-    JSON.stringify(selectedGroups.sort()) !== JSON.stringify(initialGroups.sort()) ||
+    JSON.stringify([...selectedGroups].sort()) !== JSON.stringify([...initialGroups].sort()) ||
     editGroupConfig.fileRegex !== initialEditConfig.fileRegex ||
     editGroupConfig.description !== initialEditConfig.description;
 
@@ -378,12 +420,14 @@ export function ModeForm({
               value={formData.slug}
               onChange={e => setFormData(prev => ({ ...prev, slug: e.target.value }))}
               placeholder="e.g., code"
-              disabled={isSubmitting || isEditingBuiltIn}
+              disabled={isSubmitting || isEditingBuiltIn || disableSlug}
             />
             <p className="text-muted-foreground text-xs">
               {isEditingBuiltIn
                 ? 'Built-in mode slugs cannot be changed'
-                : 'Unique identifier for this mode.'}
+                : disableSlug
+                  ? 'Organization owners must rename routed modes.'
+                  : 'Unique identifier for this mode.'}
             </p>
             {errors.slug && <p className="text-sm text-red-600">{errors.slug}</p>}
           </div>
@@ -456,7 +500,7 @@ export function ModeForm({
 
           {shouldShowDefaultModelControl && (
             <div className="space-y-2">
-              <Label htmlFor="defaultModel">Mode Default Model</Label>
+              <Label htmlFor="defaultModel">{routeLabel}</Label>
               <Select
                 value={formData.defaultModel || noDefaultModelValue}
                 onValueChange={value =>
@@ -465,7 +509,7 @@ export function ModeForm({
                     defaultModel: value === noDefaultModelValue ? '' : value,
                   }))
                 }
-                disabled={isSubmitting || modelsLoading}
+                disabled={isSubmitting || modelsLoading || !canSetDefaultModel}
               >
                 <SelectTrigger
                   id="defaultModel"
@@ -480,18 +524,18 @@ export function ModeForm({
                   aria-invalid={Boolean(errors.defaultModel)}
                 >
                   <SelectValue
-                    placeholder={modelsLoading ? 'Loading models...' : 'No default model'}
+                    placeholder={modelsLoading ? 'Loading models...' : routeFallbackLabel}
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={noDefaultModelValue}>No mode-specific default</SelectItem>
+                  <SelectItem value={noDefaultModelValue}>{routeFallbackLabel}</SelectItem>
                   {shouldRenderCurrentDefaultModel && (
                     <SelectItem value={formData.defaultModel} disabled>
                       <div className="flex flex-col">
                         <span className="font-mono text-sm">{formData.defaultModel}</span>
                         <span className="text-muted-foreground text-xs">
                           {!canSetDefaultModel
-                            ? 'Existing default; clear only while on Teams plan'
+                            ? 'Existing route; read-only for your role or plan'
                             : modelsLoading
                               ? 'Checking organization policy...'
                               : modelsError
@@ -516,14 +560,18 @@ export function ModeForm({
               </Select>
               <p id="defaultModel-help" className="text-muted-foreground text-xs">
                 {!canSetDefaultModel
-                  ? 'This organization must be on Enterprise to set mode defaults. Existing defaults can still be cleared.'
-                  : modelsLoading
-                    ? 'Loading organization-allowed models...'
-                    : modelsError
-                      ? 'Unable to load organization models.'
-                      : modelOptions.length === 0
-                        ? 'No organization-allowed models are available.'
-                        : 'Members can still override this locally in Kilo Code.'}
+                  ? 'Organization Auto routes are read-only for your role or plan.'
+                  : !isOrganizationAutoDefaultActive
+                    ? hasStoredInactiveRoute
+                      ? 'Organization Auto is off. This saved route will apply if you enable it.'
+                      : 'Organization Auto is off. Select a route now to use it when enabled.'
+                    : modelsLoading
+                      ? 'Loading organization-allowed models...'
+                      : modelsError
+                        ? 'Unable to load organization models.'
+                        : modelOptions.length === 0
+                          ? 'No organization-allowed models are available.'
+                          : 'Members can still override Organization Auto locally in Kilo Code.'}
               </p>
               {hasUnavailableDefaultModel && (
                 <p id="defaultModel-warning" className="text-sm text-amber-600">

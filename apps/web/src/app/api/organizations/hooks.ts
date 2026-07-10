@@ -180,30 +180,63 @@ export function useUpdateCompanyDomain() {
   );
 }
 
-export function useUpdateOrganizationSettings() {
+const useInvalidateOrganizationDataAndDefaults = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  return function (_: unknown, { organizationId }: { organizationId: Organization['id'] }) {
+    void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+    void queryClient.invalidateQueries({ queryKey: ['organization-defaults', organizationId] });
+  };
+};
+
+export function useUpdateOrganizationSettings() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
 
   return useMutation(
     trpc.organizations.settings.updateAllowLists.mutationOptions({
-      onSuccess: () => {
-        // lazy-mode invalidate everything related to an org if settings change
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useUpdateDefaultModel() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
 
   return useMutation(
     trpc.organizations.settings.updateDefaultModel.mutationOptions({
-      onSuccess: () => {
-        // lazy-mode invalidate everything related to an org if settings change
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
+      onSuccess,
+    })
+  );
+}
+
+export function useConfigureOrganizationDefaultBehavior() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.configureOrganizationDefaultBehavior.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useSetOrganizationAutoRoute() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.setOrganizationAutoRoute.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useClearOrganizationAutoRoute() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
+  return useMutation(
+    trpc.organizations.settings.clearOrganizationAutoRoute.mutationOptions({
+      onSuccess,
     })
   );
 }
@@ -514,56 +547,61 @@ export function useOrganizationModeById(organizationId: string, modeId: string) 
   );
 }
 
-export function useCreateOrganizationMode() {
+function useInvalidateOrganizationModes() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  return async (_: unknown, variables: { organizationId: Organization['id']; modeId?: string }) => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.modes.list.queryKey({
+          organizationId: variables.organizationId,
+        }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.withMembers.queryKey({
+          organizationId: variables.organizationId,
+        }),
+      }),
+      ...(variables.modeId
+        ? [
+            queryClient.invalidateQueries({
+              queryKey: trpc.organizations.modes.getById.queryKey({
+                organizationId: variables.organizationId,
+                modeId: variables.modeId,
+              }),
+            }),
+          ]
+        : []),
+    ]);
+  };
+}
+
+export function useCreateOrganizationMode() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationModes();
   return useMutation(
     trpc.organizations.modes.create.mutationOptions({
-      onSuccess: (_, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.list.queryKey({
-            organizationId: variables.organizationId,
-          }),
-        });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useUpdateOrganizationMode() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationModes();
   return useMutation(
     trpc.organizations.modes.update.mutationOptions({
-      onSuccess: (_, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.list.queryKey({
-            organizationId: variables.organizationId,
-          }),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.getById.queryKey({
-            organizationId: variables.organizationId,
-            modeId: variables.modeId,
-          }),
-        });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useDeleteOrganizationMode() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationModes();
   return useMutation(
     trpc.organizations.modes.delete.mutationOptions({
-      onSuccess: (_, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.organizations.modes.list.queryKey({
-            organizationId: variables.organizationId,
-          }),
-        });
-      },
+      onSuccess,
     })
   );
 }

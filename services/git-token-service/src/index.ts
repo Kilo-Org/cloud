@@ -227,7 +227,9 @@ export type IssueKiloSessionCapabilityResult =
 export type RedeemKiloSessionCapabilityParams = {
   capability: string;
   outboundContainerId: string;
+  requestMethod: string;
   requestUrl: string;
+  bootstrapKiloSessionId?: string;
 };
 export type RedeemKiloSessionCapabilityFailureReason =
   | KiloSessionCapabilityFailureReason
@@ -1113,7 +1115,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const classification = classifyKiloCapabilityRequest(
       params.requestUrl,
       claims.targets,
-      claims.kiloSessionId
+      claims.kiloSessionId,
+      {
+        requestMethod: params.requestMethod,
+        bootstrapKiloSessionId: params.bootstrapKiloSessionId,
+      }
     );
     if (!classification.success) {
       return { success: false, reason: classification.reason };

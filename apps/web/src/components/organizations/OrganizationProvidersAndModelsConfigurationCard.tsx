@@ -175,6 +175,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
         organizationId={organizationId}
         organizationSettings={organizationData?.settings}
         currentDefaultModel={organizationData?.settings?.default_model}
+        organizationPlan={organizationData?.plan}
       />
 
       <AvailableModelsDialog

@@ -16,18 +16,44 @@ const fetchCreditCategoryStats = async (
   const response = await fetch(
     `/admin/api/credit-categories?key=${encodeURIComponent(creditCategoryKey)}`
   );
-  const data: CreditCategoriesApiResponse = await response.json();
 
+  // The endpoint can return an auth-failure body (e.g. expired/revoked admin
+  // access), so don't treat every JSON payload as the success contract.
+  if (!response.ok) {
+    throw new Error(
+      response.status === 401 || response.status === 403
+        ? 'You no longer have access to credit category statistics.'
+        : 'Failed to load credit category statistics.'
+    );
+  }
+
+  const data: CreditCategoriesApiResponse = await response.json();
   return data.creditCategories.length === 1 ? data.creditCategories[0] : null;
 };
 
 export function CreditCategoryStats({ creditCategoryKey }: CreditCategoryStatsProps) {
-  const { data: stats, isLoading } = useQuery({
+  const {
+    data: stats,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ['credit-category-stats', creditCategoryKey],
     queryFn: () => fetchCreditCategoryStats(creditCategoryKey),
   });
 
   const valueClassName = isLoading ? 'bg-muted h-6 animate-pulse rounded' : 'text-2xl font-bold';
+
+  if (isError) {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold">Credit category usage statistics</h2>
+        <p className="text-destructive mt-2 text-sm">
+          {error instanceof Error ? error.message : 'Failed to load credit category statistics.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

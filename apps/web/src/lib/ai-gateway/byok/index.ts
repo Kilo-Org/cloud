@@ -1,4 +1,4 @@
-import { type db } from '@/lib/drizzle';
+import { type db, type DrizzleTransaction } from '@/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
@@ -120,7 +120,7 @@ export async function getBYOKforUser(
 }
 
 export async function getBYOKforOrganization(
-  fromDb: typeof db,
+  fromDb: typeof db | DrizzleTransaction,
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {

@@ -304,6 +304,17 @@ export function noFreeModelsAvailableResponse() {
   );
 }
 
+export function organizationAutoConfigurationResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: 'Organization Auto configuration error',
+      error_type: ProxyErrorType.organization_auto_configuration,
+      message,
+    },
+    { status: 400 }
+  );
+}
+
 export function featureExclusiveModelResponse(modelId: string) {
   const exclusiveTo = findKiloExclusiveModel(modelId)?.exclusive_to ?? [];
   const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;

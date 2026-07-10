@@ -30,7 +30,8 @@ export type DashboardStats = {
 export type DashboardMetricTone = 'danger' | 'warning' | 'neutral';
 
 // Stable identifiers so consumers can attach presentation (e.g. web's icon
-// per metric) without depending on array order.
+// per metric) without depending on array order. Named `id`, not `key`, so
+// spreading a metric into JSX doesn't collide with React's reserved prop.
 export type DashboardMetricKey =
   | 'openFindings'
   | 'exploitable'
@@ -42,7 +43,7 @@ export type DashboardMetricKey =
   | 'noDeadline';
 
 type DashboardMetric = {
-  key: DashboardMetricKey;
+  id: DashboardMetricKey;
   label: string;
   value: string;
   detail: string;
@@ -71,28 +72,28 @@ export function buildSecurityDashboardMetrics(
   if (!slaEnabled) {
     return [
       {
-        key: 'openFindings',
+        id: 'openFindings',
         label: 'Open findings',
         value: String(data.analysis.total),
         detail: `${data.severity.critical} critical, ${data.severity.high} high`,
         tone: 'danger',
       },
       {
-        key: 'exploitable',
+        id: 'exploitable',
         label: 'Confirmed exploitable',
         value: String(data.analysis.exploitable),
         detail: 'Project risk confirmed by analysis',
         tone: 'danger',
       },
       {
-        key: 'needsReview',
+        id: 'needsReview',
         label: 'Needs your review',
         value: String(data.analysis.needsReview),
         detail: 'Human decision required',
         tone: 'warning',
       },
       {
-        key: 'analysisIncomplete',
+        id: 'analysisIncomplete',
         label: 'Analysis not complete',
         value: String(getAnalysisIncompleteCount(data.analysis)),
         detail: 'Project risk still unknown',
@@ -108,7 +109,7 @@ export function buildSecurityDashboardMetrics(
 
   return [
     {
-      key: 'slaCompliance',
+      id: 'slaCompliance',
       label: 'SLA compliance',
       value: `${compliance}%`,
       detail:
@@ -118,21 +119,21 @@ export function buildSecurityDashboardMetrics(
       tone: complianceTone(compliance),
     },
     {
-      key: 'deadlinePassed',
+      id: 'deadlinePassed',
       label: 'Deadline passed',
       value: String(data.sla.overall.overdue),
       detail: `${data.sla.bySeverity.critical.overdue} critical, ${data.sla.bySeverity.high.overdue} high`,
       tone: data.sla.overall.overdue > 0 ? 'danger' : 'neutral',
     },
     {
-      key: 'dueSoon',
+      id: 'dueSoon',
       label: 'Due this week',
       value: String(data.sla.dueSoon.total),
       detail: `${data.sla.dueSoon.exploitable} confirmed exploitable`,
       tone: data.sla.dueSoon.total > 0 ? 'warning' : 'neutral',
     },
     {
-      key: 'noDeadline',
+      id: 'noDeadline',
       label: 'No deadline',
       value: String(data.sla.untrackedCount),
       detail: data.sla.untrackedCount > 0 ? 'Review SLA assignment' : 'All open findings tracked',

@@ -88,6 +88,7 @@ type Repository = {
 type MetricTone = 'danger' | 'warning' | 'neutral';
 
 type DashboardMetric = {
+  id: DashboardMetricKey;
   label: string;
   value: string;
   detail: string;
@@ -262,7 +263,7 @@ export function SecurityDashboardView({
             aria-label="Security overview"
           >
             {metrics.map(metric => (
-              <DashboardMetricCard key={metric.label} {...metric} />
+              <DashboardMetricCard key={metric.id} {...metric} />
             ))}
           </section>
 
@@ -415,7 +416,7 @@ const metricIcons: Record<DashboardMetricKey, LucideIcon> = {
 function buildDashboardMetrics(data: DashboardStats, slaEnabled: boolean): DashboardMetric[] {
   return buildSecurityDashboardMetrics(data, slaEnabled).map(metric => ({
     ...metric,
-    icon: metricIcons[metric.key],
+    icon: metricIcons[metric.id],
   }));
 }
 

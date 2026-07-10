@@ -61,4 +61,24 @@ describe('useKiloChatTokenResponseGetter', () => {
 
     unsubscribe();
   });
+
+  it('parses PostgreSQL timestamp format for token expiry', async () => {
+    const futureTime = Date.now() + 3_600_000;
+    const pgTimestamp = new Date(futureTime).toISOString().replace('T', ' ').replace('Z', '+00');
+
+    const response = {
+      token: 'kilo-jwt',
+      userId: 'user-2',
+      expiresAt: pgTimestamp,
+    };
+
+    mocks.getItemAsync.mockResolvedValue('auth-token-2');
+    mocks.getTokenQuery.mockResolvedValueOnce(response);
+
+    const { useKiloChatTokenResponseGetter } = await import('./use-kilo-chat-token');
+    const getTokenResponse = useKiloChatTokenResponseGetter();
+
+    const result = await getTokenResponse();
+    expect(result).toBe(response);
+  });
 });

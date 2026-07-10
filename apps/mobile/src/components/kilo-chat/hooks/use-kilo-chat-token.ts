@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback } from 'react';
 
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import { parseTimestamp } from '@/lib/utils';
 import { trpcClient } from '@/lib/trpc';
 
 type KiloChatTokenResponse = Awaited<ReturnType<typeof trpcClient.kiloChat.getToken.query>>;
@@ -81,7 +82,7 @@ export function useKiloChatTokenResponseGetter(): () => Promise<KiloChatTokenRes
 
 async function fetchAndCacheToken(authToken: string): Promise<KiloChatTokenResponse> {
   const response = await trpcClient.kiloChat.getToken.query();
-  cache = { authToken, response, expiresAtMs: new Date(response.expiresAt).getTime() };
+  cache = { authToken, response, expiresAtMs: parseTimestamp(response.expiresAt).getTime() };
   for (const listener of tokenResponseListeners) {
     listener(response);
   }

@@ -15,6 +15,7 @@ import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -25,6 +26,7 @@ import {
   useCanEditReviewer,
   useGitHubStatus,
   useGitLabStatus,
+  useGitLabWebhookWarning,
   useReviewConfig,
   useSaveReviewConfig,
   useToggleReviewer,
@@ -43,6 +45,10 @@ export function PlatformOverviewScreen({
   const toggle = useToggleReviewer(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const canEdit = useCanEditReviewer(scope);
+  const { hasWebhookSyncWarning, dismissWebhookSyncWarning } = useGitLabWebhookWarning(
+    scope,
+    platform
+  );
   const { models, isLoading: modelsLoading } = useAvailableModels(
     scope === PERSONAL_SCOPE ? undefined : scope
   );
@@ -181,6 +187,28 @@ export function PlatformOverviewScreen({
 
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+              {platform === 'gitlab' && hasWebhookSyncWarning && (
+                <View className="flex-row items-center justify-between rounded-lg bg-amber-100 p-4 dark:bg-amber-950">
+                  <View className="flex-1 pr-3">
+                    <Text className="text-sm font-medium">Webhook setup incomplete</Text>
+                    <Text variant="muted" className="text-xs">
+                      Some repositories may not receive automatic reviews.
+                    </Text>
+                  </View>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={save.isPending}
+                    onPress={() => {
+                      dismissWebhookSyncWarning();
+                      save.mutate({});
+                    }}
+                  >
+                    <Text>Retry</Text>
+                  </Button>
+                </View>
+              )}
+
               <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
                 <View className="flex-1 pr-3">
                   <Text className="text-sm font-medium">Automatic reviews</Text>

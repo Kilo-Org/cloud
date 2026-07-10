@@ -10,9 +10,8 @@ import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type OrgRole, useOrgRole } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
+import { cn, EMAIL_PATTERN } from '@/lib/utils';
 
-const EMAIL_PATTERN = /.+@.+\..+/;
 const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
 
 export function InviteMemberSheet() {

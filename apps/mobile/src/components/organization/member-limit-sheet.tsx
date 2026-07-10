@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -63,8 +64,26 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     mutations.updateMember.mutate({ memberId, dailyUsageLimitUsd: null }, { onSuccess: onSaved });
   };
 
+  if (orgWithMembers.isLoading) {
+    return (
+      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+        <View className="gap-1">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            Daily usage limit
+          </Text>
+        </View>
+        <Skeleton className="h-11 rounded-lg" />
+      </ScrollView>
+    );
+  }
+
   if (!member) {
-    return <ScrollView className="flex-1 bg-background" />;
+    return (
+      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <Text className="text-center text-sm text-muted-foreground">Member not found</Text>
+      </ScrollView>
+    );
   }
 
   return (

@@ -5,6 +5,8 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const EMAIL_PATTERN = /.+@.+\..+/;
+
 /**
  * Parse a Drizzle `mode: 'string'` timestamp into a Date.
  * Hermes can't parse PostgreSQL's default format (`2026-03-13 14:30:00+00`),
@@ -64,4 +66,4 @@ function firstNonEmpty(...values: (string | null | undefined)[]): string {
   return '';
 }
 
-export { asyncNoop, cn, firstNonEmpty, parseTimestamp, timeAgo };
+export { asyncNoop, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, timeAgo };

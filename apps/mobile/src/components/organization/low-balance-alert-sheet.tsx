@@ -4,13 +4,17 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, Switch, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
-import { useOrgRole, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import {
+  type OrgWithMembers,
+  useOrgRole,
+  useOrgWithMembers,
+} from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-const EMAIL_PATTERN = /.+@.+\..+/;
+import { EMAIL_PATTERN } from '@/lib/utils';
 
 function parseThreshold(value: string): number | null {
   const trimmed = value.trim();
@@ -28,38 +32,46 @@ function parseEmails(value: string): string[] {
     .filter(email => email !== '');
 }
 
-export function LowBalanceAlertSheet() {
+type LowBalanceAlertFormProps = Readonly<{
+  organizationId: string | null;
+  settings: OrgWithMembers['settings'];
+}>;
+
+function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId } = useOrgRole();
-  const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const { email: myEmail } = useCurrentUserId();
-  const settings = orgWithMembers.data?.settings;
 
-  const [enabled, setEnabled] = useState(settings?.minimum_balance !== undefined);
+  const [enabled, setEnabled] = useState(settings.minimum_balance !== undefined);
   const thresholdRef = useRef(
-    settings?.minimum_balance != null ? String(settings.minimum_balance) : ''
+    settings.minimum_balance != null ? String(settings.minimum_balance) : ''
   );
-  const emailsRef = useRef((settings?.minimum_balance_alert_email ?? []).join(', '));
-  const [canSave, setCanSave] = useState(
-    !enabled ||
+  const emailsRef = useRef((settings.minimum_balance_alert_email ?? []).join(', '));
+  const [canSave, setCanSave] = useState(() => {
+    const emails = parseEmails(emailsRef.current);
+    return (
+      !enabled ||
       (parseThreshold(thresholdRef.current) != null &&
-        parseEmails(emailsRef.current).some(email => EMAIL_PATTERN.test(email)))
-  );
+        emails.length > 0 &&
+        emails.every(email => EMAIL_PATTERN.test(email)))
+    );
+  });
 
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
+    const emails = parseEmails(emailsValue);
     setCanSave(
       !nextEnabled ||
         (parseThreshold(thresholdValue) != null &&
-          parseEmails(emailsValue).some(email => EMAIL_PATTERN.test(email)))
+          emails.length > 0 &&
+          emails.every(email => EMAIL_PATTERN.test(email)))
     );
   };
 
   const onSave = () => {
     const threshold = parseThreshold(thresholdRef.current);
-    const emails = parseEmails(emailsRef.current).filter(email => EMAIL_PATTERN.test(email));
-    if (enabled && (threshold == null || emails.length === 0)) {
+    const emails = parseEmails(emailsRef.current);
+    if (enabled && (threshold == null || emails.length === 0 || !canSave)) {
       return;
     }
     mutations.updateMinimumBalanceAlert.mutate(
@@ -79,14 +91,7 @@ export function LowBalanceAlertSheet() {
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text className="text-center text-lg font-semibold text-foreground">Low balance alert</Text>
-
+    <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
         <Text className="text-sm font-medium">Enabled</Text>
         <Switch
@@ -151,6 +156,34 @@ export function LowBalanceAlertSheet() {
         ) : null}
         <Text className="text-primary-foreground">Save</Text>
       </Button>
+    </>
+  );
+}
+
+export function LowBalanceAlertSheet() {
+  const { organizationId } = useOrgRole();
+  const orgWithMembers = useOrgWithMembers(organizationId);
+
+  return (
+    <ScrollView
+      className="flex-1 bg-background px-6"
+      contentContainerClassName="gap-6 pb-8 pt-4"
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text className="text-center text-lg font-semibold text-foreground">Low balance alert</Text>
+
+      {orgWithMembers.data ? (
+        <LowBalanceAlertForm
+          organizationId={organizationId}
+          settings={orgWithMembers.data.settings}
+        />
+      ) : (
+        <>
+          <Skeleton className="h-[52px] rounded-lg" />
+          <Skeleton className="h-11 rounded-lg" />
+        </>
+      )}
     </ScrollView>
   );
 }

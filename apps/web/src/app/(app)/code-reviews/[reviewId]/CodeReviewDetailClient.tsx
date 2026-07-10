@@ -7,18 +7,8 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
-import {
-  ExternalLink,
-  GitPullRequest,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-  ArrowLeft,
-  RotateCcw,
-  Ban,
-} from 'lucide-react';
+import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
+import { getCodeReviewStatusIcon } from '@/components/code-reviews/code-review-status-icons';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -33,25 +23,6 @@ import {
   isRetriggerableReviewStatus,
   type CodeReviewStatus,
 } from '@kilocode/app-shared/code-review';
-
-// Icons/badge variant stay web-local; labels come from the shared
-// CODE_REVIEW_STATUS_LABELS map (see usage below) so they can't drift from
-// mobile's STATUS_META copy.
-const statusIconConfig: Record<
-  CodeReviewStatus,
-  {
-    icon: React.ComponentType<{ className?: string }>;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-  }
-> = {
-  pending: { icon: Clock, variant: 'secondary' },
-  queued: { icon: Clock, variant: 'secondary' },
-  running: { icon: Loader2, variant: 'default' },
-  completed: { icon: CheckCircle2, variant: 'default' },
-  failed: { icon: XCircle, variant: 'destructive' },
-  cancelled: { icon: Ban, variant: 'outline' },
-  interrupted: { icon: AlertCircle, variant: 'outline' },
-};
 
 type CodeReviewDetailClientProps = {
   reviewId: string;
@@ -134,10 +105,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
 
   const review = data.review;
   const status = review.status as CodeReviewStatus;
-  const statusInfo = statusIconConfig[status] ?? {
-    icon: AlertCircle,
-    variant: 'outline' as const,
-  };
+  const statusInfo = getCodeReviewStatusIcon(status);
   const statusLabel = CODE_REVIEW_STATUS_LABELS[status] ?? review.status;
   const StatusIcon = statusInfo.icon;
   const showStreamView = status !== 'pending';

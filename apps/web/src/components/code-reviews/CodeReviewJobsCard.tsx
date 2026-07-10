@@ -1,6 +1,6 @@
 'use client';
 
-import { type ComponentType, type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,9 +29,6 @@ import {
   ExternalLink,
   GitPullRequest,
   Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
   AlertCircle,
   ChevronDown,
   ChevronUp,
@@ -41,6 +38,7 @@ import {
   Ban,
   Plus,
 } from 'lucide-react';
+import { getCodeReviewStatusIcon } from './code-review-status-icons';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -78,25 +76,6 @@ type CodeReviewJobsCardProps = {
   localCodeReviewDevelopmentEnabled?: boolean;
   defaultModelSlug?: string | null;
   defaultThinkingEffort?: string | null;
-};
-
-// Icons/badge variant stay web-local; labels come from the shared
-// CODE_REVIEW_STATUS_LABELS map (see usage below) so they can't drift from
-// mobile's STATUS_META copy.
-const statusIconConfig: Record<
-  CodeReviewStatus,
-  {
-    icon: ComponentType<{ className?: string }>;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-  }
-> = {
-  pending: { icon: Clock, variant: 'secondary' },
-  queued: { icon: Clock, variant: 'secondary' },
-  running: { icon: Loader2, variant: 'default' },
-  completed: { icon: CheckCircle2, variant: 'default' },
-  failed: { icon: XCircle, variant: 'destructive' },
-  cancelled: { icon: Ban, variant: 'outline' },
-  interrupted: { icon: AlertCircle, variant: 'outline' },
 };
 
 const PAGE_SIZE = 10;
@@ -680,10 +659,7 @@ export function CodeReviewJobsCard({
         <CardContent>
           <div className="space-y-3">
             {reviews.map(review => {
-              const statusInfo = statusIconConfig[review.status as CodeReviewStatus] ?? {
-                icon: AlertCircle,
-                variant: 'outline' as const,
-              };
+              const statusInfo = getCodeReviewStatusIcon(review.status);
               const statusLabel =
                 CODE_REVIEW_STATUS_LABELS[review.status as CodeReviewStatus] ?? review.status;
               const StatusIcon = statusInfo.icon;

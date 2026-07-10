@@ -4,13 +4,13 @@ import { type Href, useRouter } from 'expo-router';
 import {
   GitPullRequest,
   KeyRound,
-  LifeBuoy,
   Lock,
   LogOut,
+  MessageSquare,
   ShieldCheck,
   Trash2,
 } from 'lucide-react-native';
-import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -23,6 +23,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { showFeedbackPrompt } from '@/lib/feedback';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -30,8 +31,6 @@ import { getCodeReviewerProfilePath, getProfileAgentScope } from '@/lib/profile-
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
-
-const SUPPORT_EMAIL = 'hi@kilo.ai';
 
 function providerIcon(_provider: string) {
   return KeyRound;
@@ -96,21 +95,6 @@ export function ProfileScreen() {
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
 
   const { bottom } = useSafeAreaInsets();
-
-  const openSupportEmail = async () => {
-    const envDetails = [
-      `User ID: ${userId ?? 'unknown'}`,
-      `App version: ${Application.nativeApplicationVersion} (${Application.nativeBuildVersion})`,
-      `OS: ${Platform.OS} ${Platform.Version}`,
-    ].join('\n');
-    const body = `\n\n---\n${envDetails}`;
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('mobile app feedback')}&body=${encodeURIComponent(body)}`;
-    try {
-      await Linking.openURL(url);
-    } catch {
-      toast.error(`No email app available. You can reach us at ${SUPPORT_EMAIL}`);
-    }
-  };
 
   const deleteAccount = useMutation(
     trpc.user.requestAccountDeletion.mutationOptions({
@@ -262,11 +246,11 @@ export function ProfileScreen() {
         <View className="mt-6 gap-3">
           <View className="flex-row gap-3">
             <ActionTile
-              icon={LifeBuoy}
-              label="Support"
+              icon={MessageSquare}
+              label="Feedback"
               color={colors.mutedForeground}
               onPress={() => {
-                void openSupportEmail();
+                showFeedbackPrompt(userId);
               }}
             />
             <ActionTile

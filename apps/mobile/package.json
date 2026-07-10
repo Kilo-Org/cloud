@@ -66,6 +66,7 @@
     "expo-sharing": "~55.0.21",
     "expo-splash-screen": "55.0.22",
     "expo-status-bar": "55.0.6",
+    "expo-store-review": "~55.0.15",
     "expo-tracking-transparency": "55.0.15",
     "expo-web-browser": "55.0.17",
     "jotai": "2.18.1",

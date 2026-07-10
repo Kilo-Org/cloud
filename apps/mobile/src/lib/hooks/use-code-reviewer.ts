@@ -4,12 +4,13 @@ import { toast } from 'sonner-native';
 import {
   buildSaveConfigInput,
   type ConfigPatch,
+  PERSONAL_SCOPE,
   type ReviewConfigData,
   type ReviewerPlatform,
 } from '@/lib/code-reviewer-config';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
-export const PERSONAL_SCOPE = 'personal';
+export { PERSONAL_SCOPE };
 
 function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;

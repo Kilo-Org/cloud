@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
@@ -9,9 +10,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+const ORGANIZATION_WELCOME_PATH = /^\/organizations\/[0-9a-f-]{36}\/welcome$/;
+
+export function shouldShowCustomerSourceSurvey(
+  customerSource: string | null | undefined,
+  pathname: string
+): boolean {
+  return (
+    customerSource === null &&
+    pathname !== '/gastown/onboarding' &&
+    !ORGANIZATION_WELCOME_PATH.test(pathname)
+  );
+}
+
 export function CustomerSourceSurvey() {
   const [source, setSource] = useState('');
   const [dismissed, setDismissed] = useState(false);
+  const pathname = usePathname();
   const { data: user } = useUser();
   const trpc = useTRPC();
 
@@ -27,7 +42,7 @@ export function CustomerSourceSurvey() {
     })
   );
 
-  if (dismissed || user?.customer_source !== null) {
+  if (dismissed || !shouldShowCustomerSourceSurvey(user?.customer_source, pathname)) {
     return null;
   }
 

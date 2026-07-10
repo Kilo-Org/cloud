@@ -22,7 +22,7 @@ import {
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
-  getVercelInferenceProviders,
+  getCachedVercelInferenceProviderIdsForModel,
   getVercelModels,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
@@ -111,7 +111,8 @@ export async function shouldRouteToVercel(
 
   const only = request.body.provider?.only;
   if (only) {
-    const vercelInferenceProviders = await getVercelInferenceProviders(vercelModelId);
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
     if (!hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
       console.debug(
         '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'

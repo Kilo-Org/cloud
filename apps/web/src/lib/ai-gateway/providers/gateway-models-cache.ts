@@ -45,7 +45,7 @@ export function getLanguageModelIds(models: StoredModelMap): string[] {
     .map(model => model.id);
 }
 
-export function getVercelInferenceProviderIds(model: StoredModel): string[] {
+export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): string[] {
   return [
     ...new Set(
       model.endpoints.map(endpoint => endpoint.provider_name).filter(p => p !== undefined)
@@ -56,7 +56,9 @@ export function getVercelInferenceProviderIds(model: StoredModel): string[] {
 const VercelInferenceProvidersSchema = z.array(z.string());
 const vercelInferenceProviderFetchers = new Map<string, () => Promise<string[] | null>>();
 
-export function getVercelInferenceProviders(modelId: string): Promise<string[] | null> {
+export function getCachedVercelInferenceProviderIdsForModel(
+  modelId: string
+): Promise<string[] | null> {
   let fetchProviders = vercelInferenceProviderFetchers.get(modelId);
   if (!fetchProviders) {
     fetchProviders = createCachedFetch<string[] | null>(

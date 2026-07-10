@@ -31,8 +31,8 @@ import {
   vercelInferenceProvidersRedisKey,
 } from '@/lib/redis-keys';
 import {
+  extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
-  getVercelInferenceProviderIds,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -56,7 +56,7 @@ async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string
   for (const model of Object.values(vercelModels)) {
     pipeline.set(
       vercelInferenceProvidersRedisKey(model.id),
-      JSON.stringify(getVercelInferenceProviderIds(model)),
+      JSON.stringify(extractVercelInferenceProviderIdsFromModel(model)),
       { ex: VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS }
     );
   }

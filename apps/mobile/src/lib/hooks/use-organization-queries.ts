@@ -1,3 +1,4 @@
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth/auth-context';
@@ -24,9 +25,7 @@ export function useOrgRole() {
 export type OrgListEntry = NonNullable<ReturnType<typeof useOrgRole>['org']>;
 export type OrgRole = OrgListEntry['role'];
 
-export function isMoneyRole(role: OrgRole | undefined): boolean {
-  return role === 'owner' || role === 'billing_manager';
-}
+export const isMoneyRole = canManageOrganizationBilling;
 
 export function useOrgWithMembers(organizationId: string | null) {
   const trpc = useTRPC();

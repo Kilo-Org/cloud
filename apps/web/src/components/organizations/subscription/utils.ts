@@ -1,5 +1,5 @@
 import type Stripe from 'stripe';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 // Module-level formatting functions
 export const formatDate = (timestamp: number) => {
@@ -18,9 +18,7 @@ export const formatCurrency = (amount: number) => {
 };
 
 /** True for roles that may manage billing (owner or billing_manager). */
-export function canManageBilling(role: OrganizationRole | string): boolean {
-  return role === 'owner' || role === 'billing_manager';
-}
+export const canManageBilling = canManageOrganizationBilling;
 
 /** Find the paid seat item in a subscription (unit_amount > 0). */
 export function findPaidSeatItem(

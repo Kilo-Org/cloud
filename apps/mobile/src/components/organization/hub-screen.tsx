@@ -1,3 +1,4 @@
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
@@ -75,7 +76,7 @@ export function OrganizationHubScreen() {
                 )}
               </View>
               {showMoney && (
-                <KvRow label="Balance" value={`$${(org.balance / 1_000_000).toFixed(2)}`} />
+                <KvRow label="Balance" value={`$${fromMicrodollars(org.balance).toFixed(2)}`} />
               )}
               <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
             </Animated.View>

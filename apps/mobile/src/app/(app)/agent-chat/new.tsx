@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from 'cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
@@ -70,6 +71,7 @@ export default function NewSessionScreen() {
   const navigation = useNavigation();
   const colors = useThemeColors();
   const queryClient = useQueryClient();
+  const { showActionSheetWithOptions } = useActionSheet();
   const { organizationId } = useLocalSearchParams<{ organizationId?: string }>();
 
   // ── Selectors state ──────────────────────────────────────────────
@@ -257,8 +259,8 @@ export default function NewSessionScreen() {
 
   const { addCandidates } = attachments;
   const handleAddAttachment = useCallback(async () => {
-    addCandidates(await pickAgentAttachments());
-  }, [addCandidates]);
+    addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
+  }, [addCandidates, showActionSheetWithOptions]);
 
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);

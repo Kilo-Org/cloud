@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -69,6 +70,7 @@ export function ChatComposer({
   attachmentsEnabled = true,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
+  const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [hasText, setHasText] = useState(false);
@@ -134,8 +136,8 @@ export function ChatComposer({
   const { addCandidates, removeAttachment } = upload;
 
   const handleAddAttachment = useCallback(async () => {
-    addCandidates(await pickAgentAttachments());
-  }, [addCandidates]);
+    addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
+  }, [addCandidates, showActionSheetWithOptions]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,

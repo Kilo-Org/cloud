@@ -359,7 +359,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 8. Store installation in database using new platform_integrations table
-    if (setupAction === 'install') {
+    if (setupAction === 'install' || setupAction === 'update') {
       // Handle null account and union type (User | Organization)
       if (!installation.account) {
         throw new Error('Installation account is missing');

@@ -928,15 +928,17 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     // Forward plumbing: today execution consumes only the standard reviewer settings
     // (agents[0] / sessionInput). Log the full selection for observability ahead of
-    // council (multi-agent) mode, which will consume the rest. Guard the shape
-    // defensively so a malformed payload can never throw here, between saveState()
-    // and setAlarm(), which would leave the review queued but never scheduled.
-    if (params.reviewAgents && Array.isArray(params.reviewAgents.agents)) {
+    // council (multi-agent) mode, which will consume the rest. This is a pure
+    // observability log sitting between saveState() and setAlarm(): a malformed
+    // payload (non-array agents, null entries, etc.) must never throw here, or the
+    // review would be persisted as queued but never scheduled. Keep it total.
+    if (params.reviewAgents) {
+      const agents = params.reviewAgents.agents;
       console.log('[CodeReviewOrchestrator] Review agent selections', {
         reviewId: params.reviewId,
         reviewType: params.reviewAgents.reviewType,
-        agentCount: params.reviewAgents.agents.length,
-        agentRoles: params.reviewAgents.agents.map(agent => agent.role),
+        agentCount: Array.isArray(agents) ? agents.length : 0,
+        agentRoles: Array.isArray(agents) ? agents.map(agent => agent?.role) : [],
       });
     }
     const runReviewDelayMs =

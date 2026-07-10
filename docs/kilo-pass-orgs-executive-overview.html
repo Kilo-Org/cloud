@@ -1,0 +1,3799 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#151515" />
+    <title>Kilo Pass for Organizations | Executive overview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --surface-inset: #101010;
+        --surface-background: #151515;
+        --surface-raised: #202020;
+        --surface-overlay: #333333;
+        --surface-hover: #3a3a3a;
+        --surface-selected: #454545;
+        --foreground: #fafafa;
+        --muted: #a3a3a3;
+        --subtle: #7a7a7a;
+        --border: #ffffff1a;
+        --border-strong: #ffffff2e;
+        --primary: #f7f586;
+        --primary-hover: #e6e475;
+        --primary-foreground: #1f1f1f;
+        --focus: #f7f58659;
+        --chart-blue: #3b82f6;
+        --chart-teal: #00baa9;
+        --chart-orange: #f97316;
+        --chart-purple: #a855f7;
+        --success: #86efac;
+        --success-surface: #22c55e1a;
+        --success-border: #22c55e33;
+        --warning: #fdd94a;
+        --warning-surface: #f0a9001a;
+        --warning-border: #f0a90033;
+        --danger: #fca5a5;
+        --danger-surface: #ef44441a;
+        --danger-border: #ef444433;
+        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+        --radius-sm: 4px;
+        --radius-md: 8px;
+        --radius-lg: 10px;
+        --radius-xl: 14px;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--surface-background);
+        font-size: 16px;
+        font-kerning: normal;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        overflow: hidden;
+        background: var(--surface-background);
+        color: var(--foreground);
+        font-family:
+          Inter,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      button:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 3px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .deck {
+        min-height: 100dvh;
+        background: var(--surface-background);
+      }
+
+      .deck.is-ready .slide:not(.is-active) {
+        display: none;
+      }
+
+      .slide {
+        position: relative;
+        min-height: 100dvh;
+        overflow: auto;
+        isolation: isolate;
+        background: var(--surface-background);
+      }
+
+      .slide::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: 0;
+        right: clamp(2rem, 8vw, 9rem);
+        width: 1px;
+        height: 100%;
+        background: var(--border);
+      }
+
+      .slide::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: clamp(5rem, 12vh, 8rem);
+        right: calc(clamp(2rem, 8vw, 9rem) - 3px);
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--primary);
+      }
+
+      .slide-inner {
+        width: min(100%, 96rem);
+        min-height: 100dvh;
+        margin: 0 auto;
+        padding: max(1.5rem, env(safe-area-inset-top)) clamp(1.25rem, 5vw, 5rem)
+          max(6.5rem, calc(env(safe-area-inset-bottom) + 5rem));
+        display: flex;
+        flex-direction: column;
+      }
+
+      .slide-header {
+        min-height: 2.75rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
+
+      .brand-lockup {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.625rem;
+        color: var(--foreground);
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+
+      .brand-mark {
+        display: block;
+        width: 1.5rem;
+        height: 1.5rem;
+        flex: none;
+        object-fit: contain;
+      }
+
+      .header-rule {
+        height: 1px;
+        flex: 1;
+        background: var(--border);
+      }
+
+      .slide-number {
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .slide-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: clamp(1.5rem, 3.5vh, 2.75rem);
+        padding-block: clamp(1.5rem, 5vh, 4rem);
+      }
+
+      .title-block {
+        max-width: 72rem;
+        display: grid;
+        gap: 1rem;
+      }
+
+      .section-label {
+        width: fit-content;
+        margin: 0;
+        padding: 0.25rem 0.625rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 9999px;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.4;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 14ch;
+        font-size: clamp(3.15rem, 7vw, 6rem);
+        font-weight: 650;
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+      }
+
+      h2 {
+        max-width: 21ch;
+        font-size: clamp(2.25rem, 4.6vw, 4.5rem);
+        font-weight: 650;
+        line-height: 1.03;
+        letter-spacing: -0.035em;
+      }
+
+      h3 {
+        font-size: 1.125rem;
+        font-weight: 650;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+      }
+
+      .lede {
+        max-width: 63ch;
+        color: var(--muted);
+        font-size: clamp(1.05rem, 1.6vw, 1.375rem);
+        line-height: 1.55;
+        text-wrap: pretty;
+      }
+
+      .small-copy {
+        color: var(--muted);
+        font-size: 0.875rem;
+        line-height: 1.55;
+        text-wrap: pretty;
+      }
+
+      .mono {
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .accent {
+        color: var(--primary);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .two-column {
+        display: grid;
+        grid-template-columns: minmax(0, 1.04fr) minmax(20rem, 0.96fr);
+        gap: clamp(2rem, 6vw, 6rem);
+        align-items: center;
+      }
+
+      .three-column {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--border);
+      }
+
+      .panel {
+        padding: clamp(1.25rem, 2.8vw, 2rem);
+        background: var(--surface-raised);
+      }
+
+      .panel.inset {
+        background: var(--surface-inset);
+      }
+
+      .panel-label {
+        margin-bottom: 1rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .decision-list {
+        display: grid;
+        gap: 0;
+        border-top: 1px solid var(--border);
+      }
+
+      .decision {
+        display: grid;
+        grid-template-columns: 2rem minmax(0, 1fr);
+        gap: 1rem;
+        padding: 1.125rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .decision-index {
+        color: var(--primary);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+        line-height: 1.5rem;
+      }
+
+      .decision p {
+        margin-top: 0.35rem;
+        color: var(--muted);
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
+
+      .stat-line {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        padding-block: 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .stat-line:last-child {
+        border-bottom: 0;
+      }
+
+      .stat-value {
+        min-width: 5.5rem;
+        color: var(--foreground);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(1.75rem, 3vw, 2.75rem);
+        font-weight: 600;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .stat-label {
+        color: var(--muted);
+        font-size: 0.875rem;
+        line-height: 1.45;
+      }
+
+      .system-map {
+        position: relative;
+        min-height: 22rem;
+        padding: 1.25rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-inset);
+        overflow: hidden;
+      }
+
+      .map-connectors {
+        position: absolute;
+        z-index: 0;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .map-connectors path {
+        fill: none;
+        stroke: var(--border-strong);
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
+      }
+
+      .map-node {
+        position: absolute;
+        z-index: 1;
+        width: min(42%, 11rem);
+        padding: 0.875rem;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+      }
+
+      .map-node strong,
+      .flow-node strong {
+        display: block;
+        font-size: 0.875rem;
+        line-height: 1.35;
+      }
+
+      .map-node span,
+      .flow-node span {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--muted);
+        font-size: 0.6875rem;
+        line-height: 1.4;
+      }
+
+      .map-node.center {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+
+      .map-node.top {
+        top: 0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .map-node.left {
+        top: 65%;
+        left: 1.25rem;
+      }
+
+      .map-node.right {
+        top: 65%;
+        right: 1.25rem;
+      }
+
+      .map-pulse {
+        display: none;
+      }
+
+      .formula {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        gap: 1rem;
+        align-items: stretch;
+      }
+
+      .formula-item {
+        min-height: 9rem;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-raised);
+      }
+
+      .formula-item strong {
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(1.7rem, 3vw, 2.75rem);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .formula-item span {
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .formula-op {
+        align-self: center;
+        color: var(--subtle);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 1.25rem;
+      }
+
+      .tier-row {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        list-style: none;
+      }
+
+      .tier-pill {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 9999px;
+        color: var(--muted);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+      }
+
+      .callout {
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-lg);
+        background: var(--surface-raised);
+        color: var(--foreground);
+        font-size: 0.875rem;
+        line-height: 1.55;
+      }
+
+      .callout strong {
+        color: var(--primary);
+      }
+
+      .flow {
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        align-items: stretch;
+        list-style: none;
+      }
+
+      .flow-node {
+        position: relative;
+        min-height: 8.5rem;
+        padding: 1.25rem 1rem;
+        border: 1px solid var(--border);
+        background: var(--surface-raised);
+      }
+
+      .flow-node:first-child {
+        border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+      }
+
+      .flow-node:last-child {
+        border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+      }
+
+      .flow-node + .flow-node {
+        border-left: 0;
+      }
+
+      .flow-node::after {
+        content: '';
+        position: absolute;
+        z-index: 2;
+        top: 50%;
+        right: -0.3rem;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-top: 1px solid var(--primary);
+        border-right: 1px solid var(--primary);
+        background: var(--surface-raised);
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .flow-node:last-child::after {
+        display: none;
+      }
+
+      .flow-step {
+        display: block;
+        margin-bottom: 1.25rem;
+        color: var(--primary);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+      }
+
+      .allocation-shell {
+        display: grid;
+        grid-template-columns: minmax(15rem, 0.72fr) minmax(0, 1.28fr);
+        gap: 2rem;
+        align-items: stretch;
+      }
+
+      .org-tree {
+        display: grid;
+        gap: 1rem;
+        padding: 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-inset);
+      }
+
+      .org-parent,
+      .org-child {
+        padding: 1rem;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+      }
+
+      .org-parent {
+        border-color: var(--primary);
+      }
+
+      .org-parent span,
+      .org-child span {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .child-row {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        padding-top: 1.25rem;
+      }
+
+      .child-row::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 20%;
+        right: 20%;
+        height: 1px;
+        background: var(--border-strong);
+      }
+
+      .allocation-bar {
+        display: flex;
+        min-height: 5.5rem;
+        overflow: hidden;
+        border-radius: var(--radius-lg);
+        background: var(--surface-overlay);
+      }
+
+      .allocation-segment {
+        min-width: 4rem;
+        padding: 0.875rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        border-right: 1px solid var(--surface-background);
+        color: var(--foreground);
+      }
+
+      .allocation-segment:last-child {
+        border-right: 0;
+      }
+
+      .allocation-segment strong {
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 1.5rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .allocation-segment span {
+        color: #fafafa;
+        font-size: 0.6875rem;
+      }
+
+      .allocation-segment.parent {
+        background: var(--chart-blue);
+      }
+
+      .allocation-segment.child-a {
+        background: var(--chart-teal);
+      }
+
+      .allocation-segment.child-b {
+        background: var(--chart-purple);
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+      }
+
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .legend-swatch {
+        width: 0.625rem;
+        height: 0.625rem;
+        border-radius: 2px;
+        background: var(--surface-overlay);
+      }
+
+      .cycle {
+        --cycle-marker-size: 1.75rem;
+        position: relative;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        list-style: none;
+      }
+
+      .cycle::before {
+        content: '';
+        position: absolute;
+        top: calc(var(--cycle-marker-size) / 2);
+        left: 12.5%;
+        right: 12.5%;
+        height: 1px;
+        background: var(--border-strong);
+      }
+
+      .cycle::after {
+        content: '';
+        position: absolute;
+        top: calc(var(--cycle-marker-size) / 2 - 0.25rem);
+        right: calc(12.5% - 0.1rem);
+        width: 0.5rem;
+        height: 0.5rem;
+        border-top: 1px solid var(--border-strong);
+        border-right: 1px solid var(--border-strong);
+        transform: rotate(45deg);
+      }
+
+      .cycle-step {
+        position: relative;
+        display: grid;
+        grid-template-rows: var(--cycle-marker-size) minmax(0, 1fr);
+        gap: 0.9rem;
+      }
+
+      .cycle-marker {
+        z-index: 1;
+        width: var(--cycle-marker-size);
+        height: var(--cycle-marker-size);
+        display: grid;
+        place-items: center;
+        justify-self: center;
+        border: 1px solid var(--border-strong);
+        border-radius: 50%;
+        background: var(--surface-background);
+        color: var(--foreground);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .cycle-copy {
+        padding: 1.25rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-raised);
+      }
+
+      .cycle-phase {
+        display: block;
+        margin-bottom: 0.65rem;
+        color: var(--muted);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+        line-height: 1.3;
+      }
+
+      .cycle-copy p {
+        margin-top: 0.6rem;
+        color: var(--muted);
+        font-size: 0.8125rem;
+        line-height: 1.5;
+      }
+
+      .qualifies {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+      }
+
+      .qualifies > div {
+        padding: 1.25rem;
+        background: var(--surface-inset);
+      }
+
+      .qualifies > div + div {
+        border-left: 1px solid var(--border);
+      }
+
+      .qualifies strong {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-size: 0.875rem;
+      }
+
+      .qualifies p {
+        color: var(--muted);
+        font-size: 0.8125rem;
+        line-height: 1.5;
+      }
+
+      .timeline-set {
+        display: grid;
+        gap: 2rem;
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: 8rem minmax(0, 1fr);
+        gap: 1.5rem;
+        align-items: center;
+      }
+
+      .timeline-label strong {
+        display: block;
+        font-size: 0.875rem;
+      }
+
+      .timeline-label span {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .timeline-track {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 0.35rem;
+        align-items: center;
+      }
+
+      .timeline-track::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--border-strong);
+      }
+
+      .month-dot {
+        position: relative;
+        z-index: 1;
+        aspect-ratio: 1;
+        max-width: 1.05rem;
+        border: 2px solid var(--surface-background);
+        border-radius: 50%;
+        background: var(--primary);
+      }
+
+      .month-dot.charge {
+        box-shadow: 0 0 0 3px var(--chart-blue);
+      }
+
+      .timeline-note {
+        grid-column: 2;
+        color: var(--muted);
+        font-size: 0.75rem;
+        line-height: 1.5;
+      }
+
+      .seat-scenarios {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+      }
+
+      .seat-scenario {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-raised);
+      }
+
+      .seat-scenario.increase {
+        border-color: var(--success-border);
+      }
+
+      .seat-scenario.decrease {
+        border-color: var(--warning-border);
+      }
+
+      .seat-scenario-header {
+        padding: 1.25rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .change-badge,
+      .owner-badge {
+        width: fit-content;
+        padding: 0.3rem 0.55rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 9999px;
+        background: var(--surface-overlay);
+        color: var(--foreground);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+        white-space: nowrap;
+      }
+
+      .increase .change-badge {
+        color: var(--success);
+      }
+
+      .decrease .change-badge {
+        color: var(--warning);
+      }
+
+      .seat-equation {
+        padding: 1rem 1.25rem;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 1rem;
+        align-items: center;
+        border-block: 1px solid var(--border);
+        background: var(--surface-inset);
+        text-align: center;
+      }
+
+      .seat-equation b {
+        display: block;
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 1.5rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .seat-equation small {
+        display: block;
+        margin-top: 0.25rem;
+        color: var(--muted);
+        font-size: 0.6875rem;
+      }
+
+      .seat-effects {
+        margin: 0;
+        padding: 0 1.25rem;
+      }
+
+      .seat-effects > div {
+        display: grid;
+        grid-template-columns: 7.5rem minmax(0, 1fr);
+        gap: 1rem;
+        padding: 0.85rem 0;
+        border-top: 1px solid var(--border);
+      }
+
+      .seat-effects > div:first-child {
+        border-top: 0;
+      }
+
+      .seat-effects dt {
+        color: var(--foreground);
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .seat-effects dd {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.8125rem;
+        line-height: 1.45;
+      }
+
+      .role-matrix {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.25rem;
+      }
+
+      .role {
+        padding: 1.5rem;
+        border-top: 2px solid var(--surface-selected);
+        background: var(--surface-raised);
+      }
+
+      .role.parent-role {
+        border-color: var(--primary);
+      }
+
+      .role.member-role {
+        border-color: var(--chart-blue);
+      }
+
+      .role.admin-role {
+        border-color: var(--chart-orange);
+      }
+
+      .role-who {
+        min-height: 3.2rem;
+        color: var(--muted);
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
+
+      .role ul,
+      .impact-list {
+        margin: 1rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .role li,
+      .impact-list li {
+        position: relative;
+        padding: 0.7rem 0 0.7rem 1rem;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.8125rem;
+        line-height: 1.45;
+      }
+
+      .role li::before,
+      .impact-list li::before {
+        content: '';
+        position: absolute;
+        top: 1.05rem;
+        left: 0;
+        width: 0.35rem;
+        height: 0.35rem;
+        border-radius: 50%;
+        background: var(--primary);
+      }
+
+      .lanes {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .lane {
+        display: grid;
+        grid-template-columns: 12rem minmax(0, 1fr) 9rem;
+        align-items: center;
+        gap: 1.5rem;
+        min-height: 5.25rem;
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface-raised);
+      }
+
+      .lane strong {
+        font-size: 0.875rem;
+      }
+
+      .lane p {
+        color: var(--muted);
+        font-size: 0.8125rem;
+        line-height: 1.45;
+      }
+
+      .lane-state {
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 9999px;
+        color: var(--muted);
+        font-size: 0.6875rem;
+        text-align: center;
+      }
+
+      .state-model {
+        display: grid;
+        grid-template-columns: 0.78fr 1.22fr;
+        gap: 2rem;
+      }
+
+      .state-track {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-inset);
+      }
+
+      .state-pill {
+        flex: 1;
+        min-height: 4.5rem;
+        padding: 0.8rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+        text-align: center;
+      }
+
+      .state-arrow {
+        color: var(--subtle);
+      }
+
+      .ownership-wrap {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--surface-raised);
+      }
+
+      .ownership-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      .ownership-table th,
+      .ownership-table td {
+        padding: 0.8rem 0.9rem;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      .ownership-table th {
+        background: var(--surface-inset);
+        color: var(--muted);
+        font-size: 0.6875rem;
+        font-weight: 500;
+      }
+
+      .ownership-table th:first-child {
+        width: 32%;
+      }
+
+      .ownership-table th:nth-child(2) {
+        width: 31%;
+      }
+
+      .ownership-table td {
+        color: var(--muted);
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
+
+      .ownership-table td:first-child {
+        color: var(--foreground);
+        font-weight: 600;
+      }
+
+      .ownership-table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .ownership-table tr.needs-customer-action {
+        background: var(--warning-surface);
+      }
+
+      .needs-customer-action .owner-badge {
+        color: var(--warning);
+      }
+
+      .impact-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--border);
+      }
+
+      .impact-column {
+        padding: 1.5rem;
+        background: var(--surface-raised);
+      }
+
+      .impact-column.tradeoff {
+        background: var(--surface-inset);
+      }
+
+      .impact-column h3 {
+        min-height: 2.8rem;
+      }
+
+      .summary-layout {
+        display: grid;
+        grid-template-rows: auto auto;
+        align-content: center;
+        gap: 2rem;
+      }
+
+      .summary-intro {
+        max-width: 66rem;
+        display: grid;
+        gap: 1rem;
+      }
+
+      .summary-title {
+        max-width: 26ch;
+        font-size: clamp(2.2rem, 3.6vw, 4rem);
+        font-weight: 650;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+        text-wrap: balance;
+      }
+
+      .summary-lede {
+        max-width: 70ch;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        background: var(--border);
+      }
+
+      .summary-item {
+        min-height: 8rem;
+        padding: 1.25rem;
+        display: grid;
+        grid-template-columns: 2rem minmax(0, 1fr);
+        gap: 1rem;
+        background: var(--surface-raised);
+      }
+
+      .summary-index {
+        color: var(--muted);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+      }
+
+      .summary-item p {
+        margin-top: 0.5rem;
+        color: var(--muted);
+        font-size: 0.8125rem;
+        line-height: 1.5;
+      }
+
+      .deck-controls {
+        position: fixed;
+        z-index: 20;
+        right: max(1rem, env(safe-area-inset-right));
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        left: max(1rem, env(safe-area-inset-left));
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: none;
+      }
+
+      .control-cluster {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        pointer-events: auto;
+      }
+
+      .control-button {
+        width: 2.75rem;
+        height: 2.75rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-overlay);
+        color: var(--foreground);
+        cursor: pointer;
+        transition:
+          background-color 150ms var(--ease-out),
+          color 150ms var(--ease-out),
+          transform 150ms var(--ease-out);
+      }
+
+      .control-button:hover:not(:disabled) {
+        background: var(--surface-hover);
+      }
+
+      .control-button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+
+      .control-button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .control-button svg {
+        width: 1rem;
+        height: 1rem;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .slide-counter {
+        min-width: 4.5rem;
+        padding: 0 0.8rem;
+        height: 2.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        color: var(--muted);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .progress-track {
+        position: fixed;
+        z-index: 30;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: var(--surface-raised);
+      }
+
+      .progress-bar {
+        width: 0;
+        height: 100%;
+        background: var(--primary);
+        transition: width 300ms var(--ease-out);
+      }
+
+      .overview-dialog {
+        width: min(70rem, calc(100% - 2rem));
+        max-height: min(80vh, 50rem);
+        padding: 0;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-xl);
+        background: var(--surface-raised);
+        color: var(--foreground);
+      }
+
+      .overview-dialog::backdrop {
+        background: #101010dd;
+      }
+
+      .overview-header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-raised);
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: 1px;
+        padding: 1px;
+        background: var(--border);
+      }
+
+      .overview-item {
+        min-height: 8rem;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1rem;
+        border: 0;
+        background: var(--surface-inset);
+        color: var(--foreground);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .overview-item:hover {
+        background: var(--surface-hover);
+      }
+
+      .overview-item[aria-current='true'] {
+        box-shadow: inset 0 0 0 2px var(--primary);
+      }
+
+      .overview-item span {
+        color: var(--muted);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+      }
+
+      .overview-item strong {
+        font-size: 0.875rem;
+        line-height: 1.35;
+      }
+
+      .ui-slide .slide-body {
+        min-height: 0;
+        justify-content: flex-start;
+      }
+
+      .ui-title-row {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(24rem, 1.1fr);
+        align-items: end;
+        gap: clamp(1.5rem, 4vw, 4rem);
+      }
+
+      .ui-title-row .title-block {
+        gap: 0.625rem;
+      }
+
+      .ui-title-row h2 {
+        font-size: clamp(2.25rem, 3.6vw, 3.25rem);
+        line-height: 1.04;
+      }
+
+      .faux-browser {
+        width: min(100%, 62rem);
+        height: min(68vh, 43rem);
+        min-height: 31rem;
+        margin-inline: auto;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-xl);
+        background: var(--surface-inset);
+      }
+
+      .browser-chrome {
+        height: 2.5rem;
+        padding: 0 0.875rem;
+        display: grid;
+        grid-template-columns: 3.75rem minmax(0, 1fr) 3.75rem;
+        align-items: center;
+        gap: 0.75rem;
+        flex: none;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-raised);
+      }
+
+      .browser-dots {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+      }
+
+      .browser-dots span {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background: var(--surface-selected);
+      }
+
+      .browser-address {
+        min-width: 0;
+        padding: 0.3rem 0.75rem;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surface-inset);
+        color: var(--muted);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.6875rem;
+        line-height: 1.2;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .browser-menu {
+        justify-self: end;
+        color: var(--subtle);
+        font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.875rem;
+        letter-spacing: 0.16em;
+      }
+
+      .browser-viewport {
+        position: relative;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        flex: 1;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        contain: size layout paint;
+        background: var(--surface-background);
+      }
+
+      .browser-viewport img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        min-width: 0;
+        display: block;
+        object-fit: contain;
+        object-position: top center;
+      }
+
+      @media (max-width: 1100px) {
+        body {
+          overflow: auto;
+        }
+      }
+
+      @media (max-width: 960px) {
+        body {
+          overflow: auto;
+        }
+
+        .two-column,
+        .state-model,
+        .allocation-shell,
+        .ui-title-row {
+          grid-template-columns: 1fr;
+        }
+
+        .faux-browser {
+          min-height: 24rem;
+        }
+
+        .two-column {
+          align-items: start;
+        }
+
+        .flow {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-node {
+          min-height: auto;
+        }
+
+        .flow-node:first-child {
+          border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        }
+
+        .flow-node:last-child {
+          border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+        }
+
+        .flow-node + .flow-node {
+          border-top: 0;
+          border-left: 1px solid var(--border);
+        }
+
+        .flow-node::after {
+          top: auto;
+          right: 50%;
+          bottom: -0.3rem;
+          transform: translateX(50%) rotate(135deg);
+        }
+
+        .cycle,
+        .role-matrix,
+        .impact-grid,
+        .three-column {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .cycle::before,
+        .cycle::after {
+          display: none;
+        }
+
+        .formula {
+          grid-template-columns: 1fr;
+        }
+
+        .formula-op {
+          display: none;
+        }
+
+        .lane {
+          grid-template-columns: 1fr;
+          gap: 0.5rem;
+        }
+
+        .lane-state {
+          width: fit-content;
+        }
+
+        .state-model {
+          gap: 1.25rem;
+        }
+      }
+
+      @media screen and (min-width: 961px) {
+        .map-node.left,
+        .map-node.right {
+          min-height: 7.25rem;
+        }
+      }
+
+      @media screen and (min-width: 961px) and (max-height: 1000px) {
+        .slide-inner {
+          padding-top: 1.25rem;
+          padding-bottom: 5rem;
+        }
+
+        .slide-body {
+          gap: 1rem;
+          padding-block: 1rem;
+        }
+
+        .title-block {
+          gap: 0.75rem;
+        }
+
+        .lane {
+          min-height: 4.75rem;
+        }
+
+        #slide-7 .timeline-set {
+          gap: 1rem;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .slide::before,
+        .slide::after {
+          display: none;
+        }
+
+        .slide-inner {
+          padding-inline: max(1rem, env(safe-area-inset-left));
+        }
+
+        .slide-header > span:not(.slide-number),
+        .header-rule {
+          display: none;
+        }
+
+        .slide-header {
+          justify-content: space-between;
+        }
+
+        h1 {
+          font-size: clamp(2.85rem, 16vw, 4.3rem);
+        }
+
+        h2 {
+          font-size: clamp(2rem, 10.5vw, 3.2rem);
+        }
+
+        .three-column,
+        .cycle,
+        .role-matrix,
+        .impact-grid,
+        .seat-scenarios,
+        .summary-grid,
+        .qualifies {
+          grid-template-columns: 1fr;
+        }
+
+        .cycle-step {
+          grid-template-columns: var(--cycle-marker-size) minmax(0, 1fr);
+          grid-template-rows: auto;
+          align-items: start;
+        }
+
+        .cycle-marker {
+          grid-column: 1;
+          margin-top: 1rem;
+        }
+
+        .cycle-copy {
+          grid-column: 2;
+        }
+
+        .seat-scenario-header,
+        .seat-effects > div {
+          grid-template-columns: 1fr;
+        }
+
+        .ownership-table thead {
+          display: none;
+        }
+
+        .ownership-table,
+        .ownership-table tbody,
+        .ownership-table tr,
+        .ownership-table td {
+          display: block;
+          width: 100%;
+        }
+
+        .ownership-table tr {
+          padding: 1rem;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .ownership-table td {
+          padding: 0;
+          border: 0;
+        }
+
+        .ownership-table td + td {
+          margin-top: 0.75rem;
+        }
+
+        .ownership-table td::before {
+          content: attr(data-label);
+          display: block;
+          margin-bottom: 0.25rem;
+          color: var(--muted);
+          font-size: 0.6875rem;
+          font-weight: 500;
+        }
+
+        .summary-title {
+          font-size: 2.25rem;
+        }
+
+        .qualifies > div + div {
+          border-top: 1px solid var(--border);
+          border-left: 0;
+        }
+
+        .child-row {
+          grid-template-columns: 1fr;
+        }
+
+        .child-row::before {
+          display: none;
+        }
+
+        .allocation-bar {
+          min-height: 16rem;
+          flex-direction: column;
+        }
+
+        .allocation-segment {
+          width: 100% !important;
+          flex: 1;
+          border-right: 0;
+          border-bottom: 1px solid var(--surface-background);
+        }
+
+        .timeline {
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+        }
+
+        .timeline-note {
+          grid-column: 1;
+        }
+
+        .state-track {
+          flex-direction: column;
+        }
+
+        .state-pill {
+          width: 100%;
+        }
+
+        .state-arrow {
+          transform: rotate(90deg);
+        }
+
+        .faux-browser {
+          height: auto;
+          min-height: 0;
+          aspect-ratio: 1 / 1;
+        }
+
+        .browser-chrome {
+          grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+        }
+
+        .deck-controls {
+          align-items: end;
+        }
+
+        .control-cluster:first-child {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      @media print {
+        @page {
+          size: letter landscape;
+          margin: 0;
+        }
+
+        html,
+        body {
+          width: 11in;
+          height: auto;
+          overflow: visible;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+
+        .deck.is-ready .slide:not(.is-active),
+        .slide {
+          display: block !important;
+        }
+
+        .slide {
+          width: 11in;
+          height: 8.5in;
+          min-height: 8.5in;
+          max-height: 8.5in;
+          overflow: hidden;
+          break-after: page;
+          page-break-after: always;
+        }
+
+        .slide::before {
+          right: 5mm;
+        }
+
+        .slide::after {
+          right: calc(5mm - 3px);
+        }
+
+        .slide:last-child {
+          break-after: auto;
+          page-break-after: auto;
+        }
+
+        .slide-inner {
+          width: 11in;
+          height: 8.5in;
+          min-height: 8.5in;
+          padding: 8mm 13mm 10mm;
+        }
+
+        .slide-header {
+          min-height: 7mm;
+          gap: 3mm;
+          font-size: 7.5pt;
+        }
+
+        .brand-lockup {
+          gap: 2mm;
+        }
+
+        .brand-mark {
+          width: 5mm;
+          height: 5mm;
+        }
+
+        .slide-body {
+          gap: 4mm;
+          padding-block: 4mm;
+        }
+
+        .ui-slide .slide-body {
+          gap: 3mm;
+          padding-block: 3mm;
+        }
+
+        .ui-title-row {
+          grid-template-columns: 0.9fr 1.1fr;
+          gap: 8mm;
+        }
+
+        .ui-title-row .title-block {
+          gap: 1.5mm;
+        }
+
+        .ui-title-row h2 {
+          font-size: 22pt;
+        }
+
+        .ui-title-row .lede {
+          font-size: 9pt;
+          line-height: 1.35;
+        }
+
+        .faux-browser {
+          width: 100%;
+          height: 153mm;
+          min-height: 0;
+          border-radius: 3mm;
+        }
+
+        .browser-chrome {
+          height: 8mm;
+          padding: 0 3mm;
+          grid-template-columns: 12mm minmax(0, 1fr) 12mm;
+          gap: 2mm;
+        }
+
+        .browser-dots {
+          gap: 1.25mm;
+        }
+
+        .browser-dots span {
+          width: 1.75mm;
+          height: 1.75mm;
+        }
+
+        .browser-address {
+          padding: 0.8mm 2mm;
+          font-size: 6.5pt;
+        }
+
+        .browser-menu {
+          font-size: 7pt;
+        }
+
+        #slide-1 .slide-body {
+          align-content: center;
+        }
+
+        .title-block {
+          gap: 2.5mm;
+        }
+
+        .section-label {
+          padding: 1mm 2.5mm;
+          font-size: 7.5pt;
+        }
+
+        h1 {
+          font-size: 42pt;
+        }
+
+        h2 {
+          font-size: 27pt;
+          line-height: 1.02;
+        }
+
+        h3 {
+          font-size: 10.5pt;
+        }
+
+        .lede {
+          max-width: 68ch;
+          font-size: 11.5pt;
+          line-height: 1.4;
+        }
+
+        .small-copy,
+        .callout {
+          font-size: 8.5pt;
+          line-height: 1.4;
+        }
+
+        .two-column {
+          grid-template-columns: minmax(0, 1.04fr) minmax(20rem, 0.96fr);
+          gap: 10mm;
+        }
+
+        .three-column,
+        .impact-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          border-radius: 3mm;
+        }
+
+        .panel,
+        .impact-column {
+          padding: 4mm;
+        }
+
+        .panel-label {
+          margin-bottom: 2mm;
+          font-size: 7pt;
+        }
+
+        .decision {
+          grid-template-columns: 5mm minmax(0, 1fr);
+          gap: 3mm;
+          padding: 2.4mm 0;
+        }
+
+        .decision-index {
+          font-size: 7pt;
+          line-height: 1.2rem;
+        }
+
+        .decision p {
+          margin-top: 1mm;
+          font-size: 8.25pt;
+          line-height: 1.35;
+        }
+
+        .system-map {
+          min-height: 70mm;
+          padding: 4mm;
+        }
+
+        .map-node {
+          padding: 3mm;
+        }
+
+        .map-node.left,
+        .map-node.right {
+          min-height: 23mm;
+        }
+
+        .map-node strong,
+        .flow-node strong {
+          font-size: 8.5pt;
+        }
+
+        .map-node span,
+        .flow-node span {
+          font-size: 7pt;
+        }
+
+        .formula {
+          grid-template-columns: 1fr auto 1fr auto 1fr;
+          gap: 3mm;
+        }
+
+        .formula-op {
+          display: block;
+        }
+
+        .formula-item {
+          min-height: 27mm;
+          padding: 4mm;
+        }
+
+        .formula-item strong {
+          font-size: 22pt;
+        }
+
+        .formula-item span,
+        .tier-pill,
+        .legend-item {
+          font-size: 7pt;
+        }
+
+        .tier-row {
+          gap: 2mm;
+        }
+
+        .tier-pill {
+          padding: 1.5mm 2.5mm;
+        }
+
+        .callout {
+          padding: 3mm 4mm;
+        }
+
+        .flow-node {
+          min-height: 27mm;
+          padding: 4mm 3mm;
+        }
+
+        .flow {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .flow-node:first-child {
+          border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+        }
+
+        .flow-node:last-child {
+          border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+        }
+
+        .flow-node + .flow-node {
+          border-top: 1px solid var(--border);
+          border-left: 0;
+        }
+
+        .flow-node::after {
+          top: 50%;
+          right: -0.3rem;
+          bottom: auto;
+          transform: translateY(-50%) rotate(45deg);
+        }
+
+        .flow-step {
+          margin-bottom: 3mm;
+          font-size: 7pt;
+        }
+
+        .allocation-shell {
+          grid-template-columns: minmax(15rem, 0.72fr) minmax(0, 1.28fr);
+          gap: 6mm;
+        }
+
+        .org-tree {
+          gap: 3mm;
+          padding: 4mm;
+        }
+
+        .org-parent,
+        .org-child {
+          padding: 3mm;
+        }
+
+        .org-parent span,
+        .org-child span {
+          font-size: 7pt;
+        }
+
+        .child-row {
+          gap: 3mm;
+          padding-top: 4mm;
+        }
+
+        .allocation-bar {
+          min-height: 19mm;
+        }
+
+        .allocation-segment {
+          min-width: 15mm;
+          padding: 2.5mm;
+        }
+
+        .allocation-segment strong {
+          font-size: 15pt;
+        }
+
+        .allocation-segment span {
+          font-size: 6.75pt;
+        }
+
+        .legend {
+          gap: 2mm 4mm;
+        }
+
+        .cycle {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 4mm;
+        }
+
+        .cycle::before,
+        .cycle::after {
+          display: block;
+        }
+
+        .cycle-copy {
+          padding: 3.5mm;
+        }
+
+        .cycle-marker {
+          width: 6mm;
+          height: 6mm;
+          font-size: 6.5pt;
+        }
+
+        .cycle-copy p,
+        .qualifies p,
+        .seat-effects dd,
+        .role li,
+        .impact-list li,
+        .lane p {
+          font-size: 7.5pt;
+          line-height: 1.35;
+        }
+
+        .qualifies > div {
+          padding: 3.5mm;
+        }
+
+        .qualifies strong {
+          margin-bottom: 2mm;
+          font-size: 8pt;
+        }
+
+        .timeline-set {
+          gap: 5mm;
+        }
+
+        .timeline {
+          grid-template-columns: 28mm minmax(0, 1fr);
+          gap: 5mm;
+        }
+
+        .timeline-label strong {
+          font-size: 8.5pt;
+        }
+
+        .timeline-label span,
+        .timeline-note {
+          font-size: 7pt;
+        }
+
+        .seat-scenarios,
+        .role-matrix {
+          gap: 4mm;
+        }
+
+        .role-matrix {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .seat-scenario-header {
+          padding: 3mm 4mm;
+        }
+
+        .change-badge,
+        .owner-badge {
+          padding: 1mm 2mm;
+          font-size: 6.5pt;
+        }
+
+        .seat-equation {
+          padding: 2.5mm 4mm;
+        }
+
+        .seat-equation b {
+          font-size: 16pt;
+        }
+
+        .seat-equation small,
+        .seat-effects dt {
+          font-size: 6.75pt;
+        }
+
+        .seat-effects {
+          padding: 0 4mm;
+        }
+
+        .seat-effects > div {
+          grid-template-columns: 25mm minmax(0, 1fr);
+          gap: 3mm;
+          padding: 2mm 0;
+        }
+
+        .role {
+          padding: 4mm;
+        }
+
+        .role-who {
+          min-height: 9mm;
+          font-size: 7pt;
+        }
+
+        .role ul,
+        .impact-list {
+          margin-top: 3mm;
+        }
+
+        .role li,
+        .impact-list li {
+          padding: 2mm 0 2mm 3.5mm;
+        }
+
+        .role li::before,
+        .impact-list li::before {
+          top: 3.3mm;
+        }
+
+        .lane {
+          grid-template-columns: 38mm minmax(0, 1fr) 30mm;
+          gap: 4mm;
+          min-height: 16mm;
+          padding: 2.5mm 4mm;
+        }
+
+        .lane strong {
+          font-size: 8.5pt;
+        }
+
+        .lane-state {
+          font-size: 7pt;
+        }
+
+        .state-model {
+          grid-template-columns: 0.78fr 1.22fr;
+          gap: 6mm;
+        }
+
+        .state-track {
+          gap: 2mm;
+          padding: 4mm;
+        }
+
+        .state-pill {
+          min-height: 14mm;
+          padding: 2mm;
+          font-size: 7pt;
+        }
+
+        .ownership-table th,
+        .ownership-table td {
+          padding: 2mm 2.5mm;
+        }
+
+        .ownership-table th,
+        .ownership-table td {
+          font-size: 6.5pt;
+        }
+
+        .summary-layout {
+          gap: 6mm;
+        }
+
+        .summary-intro {
+          gap: 2.5mm;
+        }
+
+        .summary-title {
+          font-size: 27pt;
+        }
+
+        .summary-lede {
+          font-size: 9pt;
+        }
+
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .summary-item {
+          min-height: 25mm;
+          padding: 3mm;
+          gap: 3mm;
+        }
+
+        .summary-item h3 {
+          font-size: 9pt;
+        }
+
+        .summary-item p,
+        .summary-index {
+          font-size: 7pt;
+        }
+
+        .deck-controls,
+        .progress-track,
+        .overview-dialog {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck" id="deck">
+      <section
+        class="slide is-active"
+        id="slide-1"
+        data-title="Kilo Pass for Organizations"
+        aria-labelledby="title-1"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup">
+              <img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />
+              Kilo
+            </span>
+            <span>Internal enablement</span>
+            <span class="header-rule"></span>
+            <span class="slide-number">01 / 17</span>
+          </header>
+          <div class="slide-body two-column">
+            <div class="title-block">
+              <p class="section-label">Internal enablement</p>
+              <h1 id="title-1">Kilo Pass for Organizations</h1>
+              <p class="lede">
+                Fund shared organization Credit balances from one Kilo Pass per paid seat.
+                Organization owners and billing managers choose how passes are distributed.
+              </p>
+              <p class="small-copy mono">Internal enablement | July 2026</p>
+            </div>
+            <div
+              class="system-map"
+              role="img"
+              aria-label="Kilo Pass for Organizations covers every paid seat, funds parent and direct child organization balances, gives owners and billing managers distribution control, and provides monthly value under automated processing"
+            >
+              <svg
+                class="map-connectors"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path d="M 50 8 V 65 M 15 65 H 85"></path>
+              </svg>
+              <div class="map-node top">
+                <strong>Every paid seat covered</strong>
+                <span>One selected Kilo Pass org tier</span>
+              </div>
+              <div class="map-node center">
+                <strong>Shared organization Credits</strong>
+                <span>Not individual employee wallets</span>
+              </div>
+              <div class="map-node left">
+                <strong>Owner-controlled distribution</strong>
+                <span>Parent org and/or direct child sub-orgs</span>
+              </div>
+              <div class="map-node right">
+                <strong>Automated monthly base credits</strong>
+                <span>Bonus is unlocked after usage or co-granted, based on approved terms</span>
+              </div>
+              <span class="map-pulse" aria-hidden="true"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-2"
+        data-title="How the product works"
+        aria-labelledby="title-2"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">02 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-2">How the product works</h2>
+              <p class="lede">
+                Four rules define who is covered, where credits go, when value is issued, and how
+                bonus behavior works.
+              </p>
+            </div>
+            <div class="decision-list">
+              <div class="decision">
+                <span class="decision-index">01</span>
+                <div>
+                  <h3>One tier covers every paid seat</h3>
+                  <p>
+                    Each paid seat in the parent organization requires one Kilo Pass. One pricing
+                    tier applies to every pass.
+                  </p>
+                </div>
+              </div>
+              <div class="decision">
+                <span class="decision-index">02</span>
+                <div>
+                  <h3>Owners and billing managers choose where credits go</h3>
+                  <p>
+                    Kilo Passes can fund the parent org, direct child sub-orgs, or both. They are
+                    never assigned to individual users.
+                  </p>
+                </div>
+              </div>
+              <div class="decision">
+                <span class="decision-index">03</span>
+                <div>
+                  <h3>Automated agreements deliver monthly value</h3>
+                  <p>
+                    Automated agreements add credits monthly on each customer's own schedule, even
+                    when billing is annual.
+                  </p>
+                </div>
+              </div>
+              <div class="decision">
+                <span class="decision-index">04</span>
+                <div>
+                  <h3>Bonus timing follows the agreement terms</h3>
+                  <p>
+                    Standard plans unlock bonus through organization usage. Upfront plans include
+                    bonus with monthly base credits. Some older annual agreements remain manual.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide ui-slide"
+        id="slide-ui-entry"
+        data-title="Find Kilo Pass in organization Subscriptions"
+        aria-labelledby="title-ui-entry"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Owner / billing manager journey</span><span class="header-rule"></span
+            ><span class="slide-number">03 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="ui-title-row">
+              <div class="title-block">
+                <p class="section-label">App journey</p>
+                <h2 id="title-ui-entry">Find Kilo Pass beside seat billing</h2>
+              </div>
+              <p class="lede">
+                Owners and billing managers start from the existing organization Subscriptions page.
+                Kilo Pass shows the paid-seat requirement before setup begins.
+              </p>
+            </div>
+            <div
+              class="faux-browser"
+              role="img"
+              aria-label="Organization Subscriptions page showing Teams and Enterprise Seats followed by an available Kilo Pass for Organizations group"
+            >
+              <div class="browser-chrome" aria-hidden="true">
+                <span class="browser-dots"><span></span><span></span><span></span></span>
+                <span class="browser-address"
+                  >app.kilo.ai/organizations/northstar/subscriptions</span
+                >
+                <span class="browser-menu">•••</span>
+              </div>
+              <div class="browser-viewport">
+                <img
+                  src="assets/kilo-pass-orgs/subscription-center-entry.png"
+                  alt="Organization Subscriptions page showing active seat billing and a Set up Kilo Pass action"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-3"
+        data-title="One pass for every paid seat"
+        aria-labelledby="title-3"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">04 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-3">One pass for every paid seat</h2>
+              <p class="lede">
+                A parent organization with 120 paid seats purchases 120 Kilo Passes. One selected
+                tier applies to all 120.
+              </p>
+            </div>
+            <div
+              class="formula"
+              role="img"
+              aria-label="Example: one hundred twenty parent-organization paid seats require one hundred twenty Kilo Passes at one selected forty-nine dollar per-pass monthly price"
+            >
+              <div class="formula-item"><span>Paid seats</span><strong>120</strong></div>
+              <span class="formula-op" aria-hidden="true">=</span>
+              <div class="formula-item"><span>Kilo Passes purchased</span><strong>120</strong></div>
+              <span class="formula-op" aria-hidden="true">@</span>
+              <div class="formula-item">
+                <span>Example price per pass</span><strong>$49 / mo</strong>
+              </div>
+            </div>
+            <div class="two-column">
+              <ul class="tier-row" aria-label="Available monthly price points per Kilo Pass">
+                <li class="tier-pill">$19 per pass / month</li>
+                <li class="tier-pill">$49 per pass / month</li>
+                <li class="tier-pill">$199 per pass / month</li>
+              </ul>
+              <div class="callout">
+                <strong>Important:</strong> these are standard self-serve list prices per pass.
+                Approved custom agreements may use different fixed per-pass pricing and benefits.
+                Kilo Pass quantity still equals paid-seat count; quantity cannot be reduced to cover
+                only selected users.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-4"
+        data-title="Self-serve billing stays with seat billing"
+        aria-labelledby="title-4"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">05 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-4">Self-serve billing stays with seat billing</h2>
+              <p class="lede">
+                Self-serve customers add Kilo Pass to the parent organization's seat subscription,
+                either during initial purchase or as an add-on later. It stays on the same invoice
+                and renewal schedule as seats.
+              </p>
+            </div>
+            <ol
+              class="flow"
+              aria-label="Self-serve purchase flow from tier and initial organization distribution through seat-subscription billing, confirmed paid-invoice evidence, and first Kilo Pass issuance"
+            >
+              <li class="flow-node">
+                <span class="flow-step">01</span><strong>Select a tier</strong
+                ><span>A parent-organization owner or billing manager chooses one tier</span>
+              </li>
+              <li class="flow-node">
+                <span class="flow-step">02</span><strong>Choose distribution</strong
+                ><span>Choose each direct child's pass count; the remainder stays with parent</span>
+              </li>
+              <li class="flow-node">
+                <span class="flow-step">03</span><strong>Add to seat billing</strong
+                ><span>Quantity, cadence, and renewal stay aligned with paid seats</span>
+              </li>
+              <li class="flow-node">
+                <span class="flow-step">04</span><strong>Confirm paid invoice</strong
+                ><span>A valid paid invoice, including one with $0 due, activates Kilo Pass</span>
+              </li>
+              <li class="flow-node">
+                <span class="flow-step">05</span><strong>Issue the first credits</strong
+                ><span>Initial distribution applies immediately to the first issuance</span>
+              </li>
+            </ol>
+            <div class="three-column">
+              <div class="panel">
+                <p class="panel-label">Customer experience</p>
+                <h3>Same invoice and renewal date</h3>
+                <p class="small-copy">No second subscription to reconcile.</p>
+              </div>
+              <div class="panel">
+                <p class="panel-label">Aligned billing</p>
+                <h3>Same cadence and seat count</h3>
+                <p class="small-copy">Kilo Pass quantity stays synchronized with paid seats.</p>
+              </div>
+              <div class="panel">
+                <p class="panel-label">Activation</p>
+                <h3>First window depends on purchase timing</h3>
+                <p class="small-copy">
+                  Buying Kilo Pass when the seat subscription starts creates a full window. Adding
+                  it during an existing seat period reduces the first charge and credits to the
+                  remaining time in that period.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide ui-slide"
+        id="slide-ui-setup"
+        data-title="Choose tier and first distribution"
+        aria-labelledby="title-ui-setup"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Owner / billing manager journey</span><span class="header-rule"></span
+            ><span class="slide-number">06 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="ui-title-row">
+              <div class="title-block">
+                <p class="section-label">Initial setup</p>
+                <h2 id="title-ui-setup">Choose one tier, then direct the first Credits</h2>
+              </div>
+              <p class="lede">
+                Paid seats determine pass quantity. The customer assigns direct children and sees
+                the parent remainder before reviewing the purchase.
+              </p>
+            </div>
+            <div
+              class="faux-browser"
+              role="img"
+              aria-label="Kilo Pass setup page showing 120 paid seats and passes, tier selection, and initial distribution across a parent and two direct-child organizations"
+            >
+              <div class="browser-chrome" aria-hidden="true">
+                <span class="browser-dots"><span></span><span></span><span></span></span>
+                <span class="browser-address"
+                  >app.kilo.ai/organizations/northstar/subscriptions/kilo-pass/setup</span
+                >
+                <span class="browser-menu">•••</span>
+              </div>
+              <div class="browser-viewport">
+                <img
+                  src="assets/kilo-pass-orgs/initial-setup.png"
+                  alt="Kilo Pass setup page showing Pro selected for 120 passes and a 70 parent, 30 Product and Engineering, 20 Customer Operations distribution"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-5"
+        data-title="Three common allocation scenarios"
+        aria-labelledby="title-5"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">07 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-5">Three common allocation scenarios</h2>
+              <p class="lede">
+                Owners and billing managers choose each direct child's Kilo Pass count. Any
+                remaining passes automatically fund the parent org.
+              </p>
+            </div>
+            <div class="three-column">
+              <article class="panel">
+                <p class="panel-label">Scenario 1 | No sub-orgs</p>
+                <h3>50 seats, one shared balance</h3>
+                <p class="small-copy">
+                  50 paid seats create 50 passes. All 50 are allocated to the parent org, so members
+                  use one shared organization Credit balance. Usage charged there can help unlock
+                  bonus credits when the agreement requires usage before bonus.
+                </p>
+              </article>
+              <article class="panel">
+                <p class="panel-label">Scenario 2 | Parent + direct children</p>
+                <h3>120 seats, value split by organization</h3>
+                <p class="small-copy">
+                  Assign 30 passes to child A and 20 to child B. The remaining 70 automatically go
+                  to the parent org. Each organization receives credits in its own Credit balance.
+                </p>
+              </article>
+              <article class="panel">
+                <p class="panel-label">Scenario 3 | All value to children</p>
+                <h3>80 seats, parent allocation is zero</h3>
+                <p class="small-copy">
+                  Assign 50 passes to child A and 30 to child B. No passes remain for the parent
+                  org, but all 80 purchased passes still create spendable credits for the two
+                  children.
+                </p>
+              </article>
+            </div>
+            <div class="callout">
+              <strong>Timing:</strong> initial distribution is selected before first issuance and
+              applies immediately. Later changes start with the next credit issuance cycle and never
+              move existing spend or credits between organizations.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide ui-slide"
+        id="slide-ui-active"
+        data-title="Manage current and next distributions"
+        aria-labelledby="title-ui-active"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Owner / billing manager journey</span><span class="header-rule"></span
+            ><span class="slide-number">08 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="ui-title-row">
+              <div class="title-block">
+                <p class="section-label">Ongoing management</p>
+                <h2 id="title-ui-active">
+                  Current value stays fixed; next distribution can change
+                </h2>
+              </div>
+              <p class="lede">
+                The management screen separates issued Credits and bonus progress from the plan that
+                will apply at the next agreement-relative window.
+              </p>
+            </div>
+            <div
+              class="faux-browser"
+              role="img"
+              aria-label="Active Kilo Pass management page showing read-only current Credit window allocations and a separate next distribution"
+            >
+              <div class="browser-chrome" aria-hidden="true">
+                <span class="browser-dots"><span></span><span></span><span></span></span>
+                <span class="browser-address"
+                  >app.kilo.ai/organizations/northstar/subscriptions/kilo-pass</span
+                >
+                <span class="browser-menu">•••</span>
+              </div>
+              <div class="browser-viewport">
+                <img
+                  src="assets/kilo-pass-orgs/active-management.png"
+                  alt="Active Kilo Pass page showing the current Credit window, per-organization bonus progress, and next distribution effective August 1"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-6"
+        data-title="Monthly usage can unlock more credits"
+        aria-labelledby="title-6"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">09 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-6">Monthly usage can unlock more credits</h2>
+              <p class="lede">
+                In standard automated plans, each allocated organization gets monthly base credits
+                and may unlock extra bonus credits through usage.
+              </p>
+            </div>
+            <ol
+              class="cycle"
+              aria-label="Standard after-base Kilo Pass issuance window from base credits through bonus expiry"
+            >
+              <li class="cycle-step">
+                <span class="cycle-marker" aria-hidden="true">01</span>
+                <div class="cycle-copy">
+                  <span class="cycle-phase">Window opens</span>
+                  <h3>Base credits arrive</h3>
+                  <p>Each allocated organization receives its approved monthly base amount.</p>
+                </div>
+              </li>
+              <li class="cycle-step">
+                <span class="cycle-marker" aria-hidden="true">02</span>
+                <div class="cycle-copy">
+                  <span class="cycle-phase">During the window</span>
+                  <h3>Usage adds progress</h3>
+                  <p>
+                    Usage charged to that organization's Credit balance counts toward its bonus.
+                  </p>
+                </div>
+              </li>
+              <li class="cycle-step">
+                <span class="cycle-marker" aria-hidden="true">03</span>
+                <div class="cycle-copy">
+                  <span class="cycle-phase">Threshold reached</span>
+                  <h3>Bonus unlocks once</h3>
+                  <p>Reaching the approved threshold grants that organization's monthly bonus.</p>
+                </div>
+              </li>
+              <li class="cycle-step">
+                <span class="cycle-marker" aria-hidden="true">04</span>
+                <div class="cycle-copy">
+                  <span class="cycle-phase">Next boundary</span>
+                  <h3>A new window begins</h3>
+                  <p>
+                    Unused base may remain. Bonus not yet unlocked and unused bonus credits expire.
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <div class="qualifies">
+              <div>
+                <strong class="accent">Counts toward bonus unlock</strong>
+                <p>Eligible model, API, hosting, and other paid product Credit consumption.</p>
+              </div>
+              <div>
+                <strong>Does not count</strong>
+                <p>
+                  Transfers, grants, expirations, refunds, reversals, and administrative
+                  adjustments.
+                </p>
+              </div>
+            </div>
+            <div class="callout">
+              <strong>Important:</strong> standard after-base terms set the unlock threshold equal
+              to the monthly base-credit benefit. Other approved plans may use a different target or
+              include bonus automatically with monthly credits. Personal streaks, welcome
+              promotions, and referral benefits do not apply.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-7"
+        data-title="Automated annual billing delivers monthly credits"
+        aria-labelledby="title-7"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">10 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-7">Automated annual billing delivers monthly credits</h2>
+              <p class="lede">
+                Monthly credits follow each agreement's start date, not calendar months.
+              </p>
+            </div>
+            <div class="timeline-set">
+              <div class="timeline">
+                <div class="timeline-label">
+                  <strong>Monthly</strong><span>Invoice monthly</span>
+                </div>
+                <div
+                  class="timeline-track"
+                  role="img"
+                  aria-label="Monthly self-serve agreement is invoiced at each renewal and issues for each paid-through Kilo Pass issuance window"
+                >
+                  <span class="month-dot charge"></span><span class="month-dot charge"></span
+                  ><span class="month-dot charge"></span><span class="month-dot charge"></span
+                  ><span class="month-dot charge"></span><span class="month-dot charge"></span
+                  ><span class="month-dot charge"></span><span class="month-dot charge"></span
+                  ><span class="month-dot charge"></span><span class="month-dot charge"></span
+                  ><span class="month-dot charge"></span><span class="month-dot charge"></span>
+                </div>
+                <p class="timeline-note">
+                  Each paid monthly interval creates one full issuance window.
+                </p>
+              </div>
+              <div class="timeline">
+                <div class="timeline-label">
+                  <strong>Annual</strong><span>Invoice annually</span>
+                </div>
+                <div
+                  class="timeline-track"
+                  role="img"
+                  aria-label="One paid annual self-serve term authorizes no more than twelve monthly Kilo Pass issuance windows"
+                >
+                  <span class="month-dot charge"></span><span class="month-dot"></span
+                  ><span class="month-dot"></span><span class="month-dot"></span
+                  ><span class="month-dot"></span><span class="month-dot"></span
+                  ><span class="month-dot"></span><span class="month-dot"></span
+                  ><span class="month-dot"></span><span class="month-dot"></span
+                  ><span class="month-dot"></span><span class="month-dot"></span>
+                </div>
+                <p class="timeline-note">
+                  One paid annual term includes up to 12 monthly credit issuances.
+                </p>
+              </div>
+            </div>
+            <div class="three-column">
+              <div class="panel">
+                <p class="panel-label">Adding to existing seats</p>
+                <h3>Only the first window may be prorated</h3>
+                <p class="small-copy">
+                  Buying Kilo Pass when the seat subscription starts creates a full window. When
+                  added later, Kilo Pass does not start a separate billing period; first charge and
+                  credits cover only time until the next aligned boundary.
+                </p>
+              </div>
+              <div class="panel">
+                <p class="panel-label">Self-serve cancellation</p>
+                <h3>Ends at commercial renewal</h3>
+                <p class="small-copy">
+                  Scheduled monthly issuance continues through the self-serve paid period. Granted
+                  credits are not clawed back; normal bonus expiry still applies.
+                </p>
+              </div>
+              <div class="panel">
+                <p class="panel-label">Term or tier change</p>
+                <h3>Changes wait for renewal</h3>
+                <p class="small-copy">
+                  Term and tier changes take effect at commercial renewal, not mid-period.
+                </p>
+              </div>
+            </div>
+            <div class="callout">
+              <strong>Important:</strong> only designated older annual agreements still give all
+              value up front and require manual handling. New automated upfront plans deliver base
+              and bonus together each month.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-8"
+        data-title="Seat changes have explicit outcomes"
+        aria-labelledby="title-8"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">11 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-8">Seat count and Kilo Pass quantity stay in sync</h2>
+              <p class="lede">
+                When paid-seat count changes, Kilo Pass quantity changes with it. Credits already
+                issued for the current monthly cycle are not recalculated or taken back.
+              </p>
+            </div>
+            <div class="seat-scenarios">
+              <article class="seat-scenario increase">
+                <header class="seat-scenario-header">
+                  <h3>Paid mid-window seat increase</h3>
+                  <span class="change-badge">+ Added seats</span>
+                </header>
+                <div
+                  class="seat-equation"
+                  role="img"
+                  aria-label="N paid seats and Kilo Passes increase to N plus delta"
+                >
+                  <span><b>N</b><small>seats + passes</small></span>
+                  <span aria-hidden="true">&rarr;</span>
+                  <span><b>N + &Delta;</b><small>seats + passes</small></span>
+                </div>
+                <dl class="seat-effects">
+                  <div>
+                    <dt>What changes</dt>
+                    <dd>The added Kilo Passes automatically go to the parent org.</dd>
+                  </div>
+                  <div>
+                    <dt>This window</dt>
+                    <dd>
+                      Only newly added passes receive partial value for the remaining time in the
+                      current cycle.
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Next window</dt>
+                    <dd>An owner or billing manager may redistribute those passes to children.</dd>
+                  </div>
+                </dl>
+              </article>
+              <article class="seat-scenario decrease">
+                <header class="seat-scenario-header">
+                  <h3>Seat decrease</h3>
+                  <span class="change-badge">&minus; Removed seats</span>
+                </header>
+                <div
+                  class="seat-equation"
+                  role="img"
+                  aria-label="N paid seats and Kilo Passes decrease to N minus delta"
+                >
+                  <span><b>N</b><small>seats + passes</small></span>
+                  <span aria-hidden="true">&rarr;</span>
+                  <span><b>N &minus; &Delta;</b><small>seats + passes</small></span>
+                </div>
+                <dl class="seat-effects">
+                  <div>
+                    <dt>What changes</dt>
+                    <dd>Kilo first removes passes from the parent org's future share.</dd>
+                  </div>
+                  <div>
+                    <dt>This window</dt>
+                    <dd>Credits already issued remain unchanged and are not clawed back.</dd>
+                  </div>
+                  <div>
+                    <dt>Next window</dt>
+                    <dd>
+                      If child allocations exceed the new total, an owner or billing manager must
+                      reduce them before issuance can continue.
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            </div>
+            <div class="callout">
+              <strong>Why customer action may be required:</strong> when a seat decrease is larger
+              than the parent org's future share, Kilo cannot know which child should lose passes.
+              An owner or billing manager makes that choice before the next credit cycle. Until
+              then, no organization under that agreement receives new credits.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide ui-slide"
+        id="slide-ui-reconciliation"
+        data-title="Resolve distribution after a seat decrease"
+        aria-labelledby="title-ui-reconciliation"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Owner / billing manager journey</span><span class="header-rule"></span
+            ><span class="slide-number">12 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="ui-title-row">
+              <div class="title-block">
+                <p class="section-label">Seat decrease</p>
+                <h2 id="title-ui-reconciliation">Show exactly what must be reconciled</h2>
+              </div>
+              <p class="lede">
+                Current Credits remain untouched. A persistent warning names the excess and
+                deadline, while the next distribution stays blocked until child assignments fit paid
+                seats.
+              </p>
+            </div>
+            <div
+              class="faux-browser"
+              role="img"
+              aria-label="Kilo Pass management page warning that direct-child assignments exceed a reduced 100-seat total by 10 passes"
+            >
+              <div class="browser-chrome" aria-hidden="true">
+                <span class="browser-dots"><span></span><span></span><span></span></span>
+                <span class="browser-address"
+                  >app.kilo.ai/organizations/northstar/subscriptions/kilo-pass</span
+                >
+                <span class="browser-menu">•••</span>
+              </div>
+              <div class="browser-viewport">
+                <img
+                  src="assets/kilo-pass-orgs/seat-reconciliation.png"
+                  alt="Kilo Pass page showing a 10-pass over-allocation warning and editable next distribution"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-9"
+        data-title="Control is intentionally centralized"
+        aria-labelledby="title-9"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">13 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-9">Owners and billing managers control Kilo Pass</h2>
+              <p class="lede">
+                These existing parent-organization roles manage Kilo Pass. Most users only spend
+                from their organization's shared Credit balance.
+              </p>
+            </div>
+            <div class="role-matrix">
+              <article class="role parent-role">
+                <p class="role-who">Parent organization owner or billing manager</p>
+                <h3>Controls the agreement</h3>
+                <ul>
+                  <li>Purchase and cancel Kilo Pass for Organizations</li>
+                  <li>Select the pricing tier</li>
+                  <li>Set direct-child allocations; the parent org receives the remainder</li>
+                  <li>Resolve child allocations that exceed purchased Kilo Passes</li>
+                </ul>
+              </article>
+              <article class="role member-role">
+                <p class="role-who">Regular member or direct-child organization owner</p>
+                <h3>Uses shared credits</h3>
+                <ul>
+                  <li>Consumes Credits from the organization's Credit balance</li>
+                  <li>Sees generic Credit balance and transactions</li>
+                  <li>
+                    Does not see tier, pass count, or bonus rules without parent billing authority
+                  </li>
+                  <li>Cannot change Kilo Pass allocations</li>
+                </ul>
+              </article>
+              <article class="role admin-role">
+                <p class="role-who">Kilo platform admin</p>
+                <h3>Handles exceptions</h3>
+                <ul>
+                  <li>Create approved custom or manual agreements</li>
+                  <li>Set contractual service dates and schedule renewal changes</li>
+                  <li>Restore eligible value and record any manual adjustments</li>
+                  <li>Maintain an audit record for administrative changes</li>
+                </ul>
+              </article>
+            </div>
+            <div class="callout">
+              <strong>Hierarchy protection:</strong> before a child sub-org with an initial or
+              future allocation can be detached, reparented, archived, or deleted, a
+              parent-organization owner or billing manager must set that allocation to zero. Credits
+              already granted remain with the child sub-org.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-10"
+        data-title="How agreement types are processed"
+        aria-labelledby="title-10"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">14 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-10">How agreement types are processed</h2>
+              <p class="lede">
+                Purchase channel does not determine processing mode. Self-serve and new enterprise
+                agreements automate monthly issuance by default. Manual processing requires an
+                explicit legacy or exceptional designation.
+              </p>
+            </div>
+            <div class="lanes">
+              <div class="lane">
+                <strong>Self-serve standard</strong>
+                <p>
+                  Existing tiers, a synchronized seat add-on item, paid-invoice activation, and
+                  automated monthly issuance.
+                </p>
+                <span class="lane-state">Automated</span>
+              </div>
+              <div class="lane">
+                <strong>New enterprise</strong>
+                <p>
+                  Uses a reusable standard term version or a dedicated custom term version, plus
+                  contract dates. Allocation, monthly issuance, and bonus processing automate by
+                  default.
+                </p>
+                <span class="lane-state">Automated by default</span>
+              </div>
+              <div class="lane">
+                <strong>Existing legacy</strong>
+                <p>
+                  Agreement identity and term version are recorded, but current-term grants remain
+                  in Manual legacy processing to avoid duplicate value.
+                </p>
+                <span class="lane-state">Manual legacy processing</span>
+              </div>
+            </div>
+            <div class="three-column">
+              <div class="panel inset">
+                <p class="panel-label">Agreement terms</p>
+                <h3>A term version fixes the rules</h3>
+                <p class="small-copy">
+                  It records per-pass price, base credits, bonus, and unlock threshold for the paid
+                  commercial period.
+                </p>
+              </div>
+              <div class="panel inset">
+                <p class="panel-label">Changes</p>
+                <h3>New terms start at renewal</h3>
+                <p class="small-copy">
+                  Tier or term changes do not rewrite the current paid period.
+                </p>
+              </div>
+              <div class="panel inset">
+                <p class="panel-label">Manual processing</p>
+                <h3>Explicit exception only</h3>
+                <p class="small-copy">
+                  Existing legacy current-term grants remain manual to avoid duplication. Automation
+                  requires an explicit renewal transition.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-11"
+        data-title="Exceptions have clear owners and next actions"
+        aria-labelledby="title-11"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">15 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-11">Exceptions have clear owners and next actions</h2>
+              <p class="lede">
+                Kilo pauses new credits when payment or allocation is not valid. Some issues require
+                customer action; Kilo handles others.
+              </p>
+            </div>
+            <div class="state-model">
+              <div>
+                <p class="panel-label">Typical self-serve lifecycle</p>
+                <div
+                  class="state-track"
+                  role="img"
+                  aria-label="Typical self-serve lifecycle from awaiting payment through active and cancellation scheduled to ended"
+                >
+                  <span class="state-pill">Awaiting<br />payment</span
+                  ><span class="state-arrow">&rarr;</span><span class="state-pill">Active</span
+                  ><span class="state-arrow">&rarr;</span
+                  ><span class="state-pill">Cancellation<br />scheduled</span
+                  ><span class="state-arrow">&rarr;</span><span class="state-pill">Ended</span>
+                </div>
+              </div>
+              <div>
+                <p class="panel-label">Exception ownership</p>
+                <div class="ownership-wrap">
+                  <table class="ownership-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Exception</th>
+                        <th scope="col">Owner</th>
+                        <th scope="col">Next action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="needs-customer-action">
+                        <td data-label="Exception">Child allocations exceed purchased passes</td>
+                        <td data-label="Owner">
+                          <span class="owner-badge">Owner / billing manager</span>
+                        </td>
+                        <td data-label="Next action">Choose which child allocation to reduce.</td>
+                      </tr>
+                      <tr>
+                        <td data-label="Exception">Paid invoice is missing or reversed</td>
+                        <td data-label="Owner">
+                          <span class="owner-badge">Billing team / admin</span>
+                        </td>
+                        <td data-label="Next action">Review payment before future issuance.</td>
+                      </tr>
+                      <tr>
+                        <td data-label="Exception">Automated processing fails</td>
+                        <td data-label="Owner"><span class="owner-badge">Kilo system</span></td>
+                        <td data-label="Next action">
+                          Retry automatically; admin can rerun if needed.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td data-label="Exception">Manual legacy agreement</td>
+                        <td data-label="Owner">
+                          <span class="owner-badge">Platform admin</span>
+                        </td>
+                        <td data-label="Next action">Follow recorded agreement terms.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="three-column">
+              <div class="panel">
+                <p class="panel-label">Consistent issuance</p>
+                <h3>All allocated organizations or none</h3>
+                <p class="small-copy">
+                  No organization receives that window's credits unless the entire agreement is
+                  processed successfully.
+                </p>
+              </div>
+              <div class="panel">
+                <p class="panel-label">Delayed processing</p>
+                <h3>Original window is retained</h3>
+                <p class="small-copy">
+                  Kilo can still issue eligible base credits for the original cycle. If bonus has
+                  expired, an admin reviews whether a separate make-good is needed.
+                </p>
+              </div>
+              <div class="panel">
+                <p class="panel-label">Payment reversal</p>
+                <h3>Future issuance pauses for review</h3>
+                <p class="small-copy">
+                  Refunds, disputes, and chargebacks pause future issuance. Credits already granted
+                  are not automatically clawed back.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-12"
+        data-title="What this means for customers and operations"
+        aria-labelledby="title-12"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">16 / 17</span>
+          </header>
+          <div class="slide-body">
+            <div class="title-block">
+              <h2 id="title-12">What this means for customers and operations</h2>
+              <p class="lede">
+                The model centralizes funding and control at the parent organization while keeping
+                everyday Credit use simple for members.
+              </p>
+            </div>
+            <div class="impact-grid">
+              <div class="impact-column">
+                <h3>Customer experience</h3>
+                <ul class="impact-list">
+                  <li>Self-serve uses one Stripe subscription and invoice with seat billing</li>
+                  <li>Credits appear in allocated organization Credit balances</li>
+                  <li>Automated monthly base credits continue during paid annual terms</li>
+                  <li>Current-window grants stay unchanged when future allocations change</li>
+                  <li>Parent-organization owners and billing managers control allocations</li>
+                </ul>
+              </div>
+              <div class="impact-column tradeoff">
+                <h3>Product constraints</h3>
+                <ul class="impact-list">
+                  <li>All paid seats must be covered</li>
+                  <li>Every purchased pass funds either parent or direct-child credits</li>
+                  <li>Sub-org allocation is limited to direct child sub-orgs</li>
+                  <li>Child ownership alone does not grant allocation authority</li>
+                  <li>Child allocations above the reduced Kilo Pass total block issuance</li>
+                </ul>
+              </div>
+              <div class="impact-column">
+                <h3>Operational model</h3>
+                <ul class="impact-list">
+                  <li>Org agreements remain separate from personal Kilo Pass subscriptions</li>
+                  <li>Purchased terms stay fixed through the paid commercial period</li>
+                  <li>Credits issue only for paid service periods or approved contract dates</li>
+                  <li>Allocation changes affect future windows, not current-window benefits</li>
+                  <li>Blocked or failed issuance keeps its original schedule and can be retried</li>
+                </ul>
+              </div>
+            </div>
+            <div class="callout">
+              <strong>Model boundary:</strong> Kilo Pass for Organizations is centralized funding
+              for shared product usage. It is not a per-member allowance, a budget cap, or a
+              calendar-month coupon.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="slide"
+        id="slide-13"
+        data-title="How the full model fits together"
+        aria-labelledby="title-13"
+      >
+        <div class="slide-inner">
+          <header class="slide-header">
+            <span class="brand-lockup"
+              ><img
+                class="brand-mark"
+                src="../apps/web/public/kilo-v4.svg"
+                alt=""
+                aria-hidden="true"
+              />Kilo</span
+            >
+            <span>Kilo Pass for Organizations</span><span class="header-rule"></span
+            ><span class="slide-number">17 / 17</span>
+          </header>
+          <div class="slide-body summary-layout">
+            <div class="summary-intro">
+              <p class="section-label">Internal summary</p>
+              <h2 class="summary-title" id="title-13">How the full model fits together</h2>
+              <p class="summary-lede">
+                One tier covers every paid seat. Owners and billing managers choose how many passes
+                each direct child receives; all remaining passes stay with the parent org.
+              </p>
+            </div>
+            <div class="summary-grid">
+              <article class="summary-item">
+                <span class="summary-index">01</span>
+                <div>
+                  <h3>Coverage and billing</h3>
+                  <p>
+                    Kilo Pass quantity equals paid-seat count. Self-serve shares seat billing
+                    quantity, cadence, and renewal.
+                  </p>
+                </div>
+              </article>
+              <article class="summary-item">
+                <span class="summary-index">02</span>
+                <div>
+                  <h3>Distribution</h3>
+                  <p>
+                    Choose each direct child's pass count. All remaining passes automatically fund
+                    the parent org.
+                  </p>
+                </div>
+              </article>
+              <article class="summary-item">
+                <span class="summary-index">03</span>
+                <div>
+                  <h3>Monthly benefit</h3>
+                  <p>
+                    Automated agreements add base credits monthly. Bonus unlocks through usage or
+                    arrives automatically, depending on agreement type.
+                  </p>
+                </div>
+              </article>
+              <article class="summary-item">
+                <span class="summary-index">04</span>
+                <div>
+                  <h3>Operations</h3>
+                  <p>
+                    Most new agreements run automatically. Only legacy agreements or approved
+                    exceptions require manual handling.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="progress-track" aria-hidden="true">
+      <div class="progress-bar" id="progress"></div>
+    </div>
+    <nav class="deck-controls" aria-label="Slide navigation">
+      <div class="control-cluster">
+        <button
+          class="control-button"
+          id="overview-button"
+          type="button"
+          aria-label="Open slide overview"
+          title="Slide overview (O)"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="6" height="6"></rect>
+            <rect x="14" y="4" width="6" height="6"></rect>
+            <rect x="4" y="14" width="6" height="6"></rect>
+            <rect x="14" y="14" width="6" height="6"></rect>
+          </svg>
+        </button>
+      </div>
+      <div class="control-cluster">
+        <button
+          class="control-button"
+          id="previous-button"
+          type="button"
+          aria-label="Previous slide"
+          title="Previous slide (Left arrow)"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+        </button>
+        <span class="slide-counter" id="slide-counter" aria-live="polite">1 / 17</span>
+        <button
+          class="control-button"
+          id="next-button"
+          type="button"
+          aria-label="Next slide"
+          title="Next slide (Right arrow or Space)"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </button>
+      </div>
+    </nav>
+
+    <dialog class="overview-dialog" id="overview-dialog" aria-labelledby="overview-title">
+      <div class="overview-header">
+        <div>
+          <h3 id="overview-title">Slide overview</h3>
+          <p class="small-copy">Select a slide to present.</p>
+        </div>
+        <button
+          class="control-button"
+          id="close-overview"
+          type="button"
+          aria-label="Close slide overview"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="overview-grid" id="overview-grid"></div>
+    </dialog>
+
+    <p class="sr-only" id="announcer" aria-live="polite"></p>
+
+    <script>
+      (() => {
+        const deck = document.getElementById('deck');
+        const slides = Array.from(document.querySelectorAll('.slide'));
+        const previousButton = document.getElementById('previous-button');
+        const nextButton = document.getElementById('next-button');
+        const overviewButton = document.getElementById('overview-button');
+        const overviewDialog = document.getElementById('overview-dialog');
+        const closeOverviewButton = document.getElementById('close-overview');
+        const overviewGrid = document.getElementById('overview-grid');
+        const counter = document.getElementById('slide-counter');
+        const progress = document.getElementById('progress');
+        const announcer = document.getElementById('announcer');
+        let currentIndex = Math.max(
+          0,
+          slides.findIndex(slide => `#${slide.id}` === window.location.hash)
+        );
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        const overviewItems = slides.map((slide, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'overview-item';
+          button.innerHTML = `<span>${String(index + 1).padStart(2, '0')}</span><strong>${slide.dataset.title}</strong>`;
+          button.addEventListener('click', () => {
+            showSlide(index);
+            overviewDialog.close();
+          });
+          overviewGrid.appendChild(button);
+          return button;
+        });
+
+        function showSlide(index, updateHistory = true) {
+          currentIndex = Math.min(Math.max(index, 0), slides.length - 1);
+          window.scrollTo({ top: 0, behavior: 'auto' });
+          slides.forEach((slide, slideIndex) => {
+            const isActive = slideIndex === currentIndex;
+            slide.classList.toggle('is-active', isActive);
+            slide.setAttribute('aria-hidden', String(!isActive));
+            if ('inert' in slide) slide.inert = !isActive;
+            if (isActive) slide.scrollTop = 0;
+          });
+
+          previousButton.disabled = currentIndex === 0;
+          nextButton.disabled = currentIndex === slides.length - 1;
+          counter.textContent = `${currentIndex + 1} / ${slides.length}`;
+          progress.style.width = `${((currentIndex + 1) / slides.length) * 100}%`;
+          overviewItems.forEach((item, itemIndex) => {
+            item.setAttribute('aria-current', String(itemIndex === currentIndex));
+          });
+
+          const activeSlide = slides[currentIndex];
+          document.title = `${activeSlide.dataset.title} | Kilo Pass for Organizations`;
+          announcer.textContent = `Slide ${currentIndex + 1} of ${slides.length}: ${activeSlide.dataset.title}`;
+          if (updateHistory) history.replaceState(null, '', `#${activeSlide.id}`);
+        }
+
+        function openOverview() {
+          overviewDialog.showModal();
+          overviewItems[currentIndex].focus();
+        }
+
+        previousButton.addEventListener('click', () => showSlide(currentIndex - 1));
+        nextButton.addEventListener('click', () => showSlide(currentIndex + 1));
+        overviewButton.addEventListener('click', openOverview);
+        closeOverviewButton.addEventListener('click', () => overviewDialog.close());
+
+        overviewDialog.addEventListener('click', event => {
+          if (event.target === overviewDialog) overviewDialog.close();
+        });
+
+        window.addEventListener('keydown', event => {
+          if (overviewDialog.open) return;
+          if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+            event.preventDefault();
+            showSlide(currentIndex + 1);
+          } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+            event.preventDefault();
+            showSlide(currentIndex - 1);
+          } else if (event.key === 'Home') {
+            event.preventDefault();
+            showSlide(0);
+          } else if (event.key === 'End') {
+            event.preventDefault();
+            showSlide(slides.length - 1);
+          } else if (event.key.toLowerCase() === 'o') {
+            event.preventDefault();
+            openOverview();
+          }
+        });
+
+        window.addEventListener('hashchange', () => {
+          const hashIndex = slides.findIndex(slide => `#${slide.id}` === window.location.hash);
+          if (hashIndex >= 0) showSlide(hashIndex, false);
+        });
+
+        deck.addEventListener(
+          'touchstart',
+          event => {
+            touchStartX = event.changedTouches[0].screenX;
+            touchStartY = event.changedTouches[0].screenY;
+          },
+          { passive: true }
+        );
+
+        deck.addEventListener(
+          'touchend',
+          event => {
+            const deltaX = event.changedTouches[0].screenX - touchStartX;
+            const deltaY = event.changedTouches[0].screenY - touchStartY;
+            if (Math.abs(deltaX) > 70 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+              showSlide(currentIndex + (deltaX < 0 ? 1 : -1));
+            }
+          },
+          { passive: true }
+        );
+
+        deck.classList.add('is-ready');
+        showSlide(currentIndex, false);
+      })();
+    </script>
+  </body>
+</html>

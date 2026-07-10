@@ -32,6 +32,20 @@ body,
   color: var(--foreground);
 }
 
+body[data-storybook-view-mode='docs'] .storybook-org-app-shell {
+  position: relative;
+  min-height: 37rem;
+}
+
+body[data-storybook-view-mode='docs'] .storybook-org-app-shell-content {
+  min-height: 0;
+}
+
+body[data-storybook-view-mode='docs'] .storybook-org-app-shell [data-slot='sidebar-container'] {
+  position: absolute;
+  height: auto;
+}
+
 #storybook-docs .sbdocs.sbdocs-wrapper,
 #storybook-docs .sbdocs.sbdocs-content {
   background: var(--surface-background) !important;
@@ -64,8 +78,23 @@ body,
   color: var(--foreground) !important;
 }
 
+#storybook-docs .sbdocs table:not(.docblock-argstable table) {
+  width: 100%;
+  table-layout: fixed;
+}
+
+#storybook-docs .sbdocs table:not(.docblock-argstable table) th {
+  width: 33.333%;
+  vertical-align: bottom;
+  color: var(--foreground) !important;
+}
+
+#storybook-docs .sbdocs table:not(.docblock-argstable table) td {
+  vertical-align: top;
+  color: var(--muted-foreground) !important;
+}
+
 #storybook-docs .sbdocs a,
-#storybook-docs .sbdocs button:not([role='switch']),
 #storybook-docs .sbdocs label {
   color: var(--muted-foreground) !important;
 }

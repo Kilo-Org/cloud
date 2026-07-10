@@ -3,7 +3,7 @@
 // "anonymous performance and crash data" — see consent-card.tsx). This is
 // the pure decision function; src/app/_layout.tsx calls Sentry.init again
 // with these options whenever the stored consent state changes.
-export type SentryConsentOptions = {
+type SentryConsentOptions = {
   readonly replaysSessionSampleRate: number;
   readonly replaysOnErrorSampleRate: number;
   readonly attachScreenshot: boolean;

@@ -122,6 +122,35 @@ export type SessionInput = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
 };
 
+/**
+ * One reviewing agent's selection. FORWARD-SHAPED for the upcoming council (multi-agent)
+ * mode: today only a single `role: 'standard'` agent is produced/consumed. A council
+ * review will populate one entry per specialist, each with its own requested model.
+ */
+export type ReviewAgentSelection = {
+  /** `'standard'` for the standard reviewer; a specialist role/id for council members. */
+  role: string;
+  /** Requested model slug; falls back to the review default when null. */
+  model: string | null;
+  /** Requested thinking-effort variant; null = model default. */
+  thinkingEffort: string | null;
+};
+
+/**
+ * Review agent configuration sent along the code-reviewer -> cloud-agent path.
+ *
+ * NOTE (forward plumbing): today the pipeline only builds and consumes a single
+ * `'standard'` agent (`agents[0]`). `reviewType`, `aggregationStrategy`, and additional
+ * `agents[]` entries are carried end-to-end for the imminent council mode but are not yet
+ * consumed by execution. See the standard/council fork in prepare-review-payload.
+ */
+export type ReviewAgentsConfig = {
+  reviewType: 'standard' | 'council';
+  /** Council-only: how specialist votes combine. Unused for standard. */
+  aggregationStrategy?: 'any_blocking_member' | 'majority' | 'unanimous_required';
+  agents: ReviewAgentSelection[];
+};
+
 export type CodeReviewPayload = {
   reviewId: string;
   attemptId?: string;
@@ -133,6 +162,12 @@ export type CodeReviewPayload = {
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */
   repositorySize?: string | null;
+  /**
+   * Forward-shaped review agent selections. Built for every review (standard = a single
+   * `'standard'` agent). Only `agents[0]` is consumed today; the rest is plumbing for
+   * council mode.
+   */
+  reviewAgents?: ReviewAgentsConfig;
 };
 
 /**
@@ -697,6 +732,9 @@ export async function prepareReviewPayload(
     // GitHub: uses githubRepo (owner/repo format) + githubToken
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const variant = config.thinking_effort ?? undefined;
+    // Single source for the standard reviewer's model so the session input and the
+    // forward-shaped `reviewAgents[0]` can never drift apart.
+    const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
     const gateThreshold = config.gate_threshold ?? 'off';
     const githubCheckoutRef = getGitHubPullRequestCheckoutRef(review.pr_number);
     const sessionInput: SessionInput =
@@ -709,7 +747,7 @@ export async function prepareReviewPayload(
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-            model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+            model: standardModel,
             variant,
             upstreamBranch: review.head_ref,
           }
@@ -722,7 +760,7 @@ export async function prepareReviewPayload(
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
               prompt,
               mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-              model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+              model: standardModel,
               variant,
               upstreamBranch: review.head_ref,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
@@ -735,11 +773,25 @@ export async function prepareReviewPayload(
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
               prompt,
               mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-              model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+              model: standardModel,
               variant,
               upstreamBranch: githubCheckoutRef,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
             };
+
+    // Forward-shaped agent selections. Today this is always a single 'standard' agent
+    // mirroring the session's model/effort; council mode will populate one entry per
+    // specialist. agents[0].model is kept identical to sessionInput.model above.
+    const reviewAgents: ReviewAgentsConfig = {
+      reviewType: 'standard',
+      agents: [
+        {
+          role: 'standard',
+          model: standardModel,
+          thinkingEffort: config.thinking_effort ?? null,
+        },
+      ],
+    };
 
     // Log the session input for GitLab
     if (platform === 'gitlab') {
@@ -769,6 +821,7 @@ export async function prepareReviewPayload(
       owner,
       previousCloudAgentSessionId,
       repositorySize,
+      reviewAgents,
     };
 
     logExceptInTest('[prepareReviewPayload] Prepared payload', {

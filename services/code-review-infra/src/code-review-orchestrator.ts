@@ -22,6 +22,7 @@ import type {
   CodeReviewStatusResponse,
   CodeReviewStatusResult,
   SessionInput,
+  ReviewAgentsConfig,
 } from './types';
 import { InternalStatusResponseSchema } from './types';
 import { doNameForAttempt } from './do-name';
@@ -892,6 +893,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     previousCloudAgentSessionId?: string;
     repositorySize?: string | null;
     runReviewDelayMs?: number;
+    reviewAgents?: ReviewAgentsConfig;
   }): Promise<{ status: CodeReviewStatus }> {
     if (!this.state) {
       await this.loadState();
@@ -920,8 +922,21 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           ? undefined
           : params.previousCloudAgentSessionId,
       repositorySize: params.repositorySize,
+      reviewAgents: params.reviewAgents,
     };
     await this.saveState();
+
+    // Forward plumbing: today execution consumes only the standard reviewer settings
+    // (agents[0] / sessionInput). Log the full selection for observability ahead of
+    // council (multi-agent) mode, which will consume the rest.
+    if (params.reviewAgents) {
+      console.log('[CodeReviewOrchestrator] Review agent selections', {
+        reviewId: params.reviewId,
+        reviewType: params.reviewAgents.reviewType,
+        agentCount: params.reviewAgents.agents.length,
+        agentRoles: params.reviewAgents.agents.map(agent => agent.role),
+      });
+    }
     const runReviewDelayMs =
       params.runReviewDelayMs ?? CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS;
     await this.ctx.storage.setAlarm(Date.now() + runReviewDelayMs);

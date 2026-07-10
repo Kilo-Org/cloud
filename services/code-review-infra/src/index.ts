@@ -103,6 +103,7 @@ app.post('/review', async (c: Context<HonoEnv>) => {
         skipBalanceCheck: body.skipBalanceCheck,
         previousCloudAgentSessionId: body.previousCloudAgentSessionId,
         repositorySize: body.repositorySize,
+        reviewAgents: body.reviewAgents,
       }),
     'start'
   );

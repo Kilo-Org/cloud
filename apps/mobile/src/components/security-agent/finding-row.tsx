@@ -1,3 +1,7 @@
+import {
+  getSecurityAnalysisPresentation,
+  getSecurityDeadlinePresentation,
+} from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink } from 'lucide-react-native';
 import { ActivityIndicator, Linking, Pressable, View } from 'react-native';
@@ -12,10 +16,6 @@ import { Text } from '@/components/ui/text';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import {
-  getSecurityAnalysisPresentation,
-  getSecurityDeadlinePresentation,
-} from '@/lib/security-agent-presentation';
 import { cn } from '@/lib/utils';
 
 const SEVERITY_TEXT_CLASS: Record<string, string> = {

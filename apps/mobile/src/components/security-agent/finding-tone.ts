@@ -1,3 +1,4 @@
+import { type FindingIconKey, type FindingTone } from '@kilocode/app-shared/security-agent';
 import {
   AlertTriangle,
   Brain,
@@ -13,7 +14,6 @@ import {
 } from 'lucide-react-native';
 
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type FindingIconKey, type FindingTone } from '@/lib/security-agent-presentation';
 
 // Single source for mapping the presentation module's icon keys/tones to
 // actual lucide-react-native components and theme colors — shared by

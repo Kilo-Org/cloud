@@ -1,3 +1,9 @@
+import {
+  formatRemediationOrigin,
+  formatValidationEvidenceEntry,
+  getRemediationStatusPresentation,
+  getRemediationUnavailableCopy,
+} from '@kilocode/app-shared/security-agent';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
@@ -14,12 +20,6 @@ import {
 } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
-import {
-  formatRemediationOrigin,
-  formatValidationEvidenceEntry,
-  getRemediationStatusPresentation,
-  getRemediationUnavailableCopy,
-} from '@/lib/security-agent-presentation';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingRemediationPanelProps = {

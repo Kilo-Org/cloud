@@ -1,10 +1,10 @@
+import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import * as Haptics from 'expo-haptics';
 import { Check, Lock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
-import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';

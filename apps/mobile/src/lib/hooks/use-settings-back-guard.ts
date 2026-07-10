@@ -1,8 +1,8 @@
+import { getSettingsBackGuardOptions } from '@kilocode/app-shared/security-agent';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Alert, type AlertButton } from 'react-native';
 
-import { getSettingsBackGuardOptions } from '@/components/security-agent/settings-screen-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL = {

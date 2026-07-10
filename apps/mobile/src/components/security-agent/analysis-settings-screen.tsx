@@ -1,10 +1,13 @@
+import {
+  getSettingsDirtyState,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
-import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -21,7 +24,7 @@ import {
   useSecurityAgentConfig,
   useSecurityAgentEditCapability,
 } from '@/lib/hooks/use-security-agent';
-import { isPersonalSecurityScope, type SecurityAgentConfig } from '@/lib/security-agent';
+import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
 type AnalysisMode = SecurityAgentConfig['analysisMode'];

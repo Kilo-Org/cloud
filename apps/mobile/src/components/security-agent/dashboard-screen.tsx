@@ -1,3 +1,9 @@
+import {
+  buildSecurityDashboardMetrics,
+  type DashboardMetricTone,
+  getSecurityAgentAuditUrl,
+  getSecurityRepositoriesInScope,
+} from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -19,15 +25,7 @@ import {
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  getSecurityAgentAuditUrl,
-  getSecurityAgentPath,
-  getSecurityRepositoriesInScope,
-} from '@/lib/security-agent';
-import {
-  buildSecurityDashboardMetrics,
-  type DashboardMetricTone,
-} from '@/lib/security-agent-dashboard';
+import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const METRIC_TONE_CLASS: Record<DashboardMetricTone, string> = {

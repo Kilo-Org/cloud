@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
-
-import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import {
   getSettingsDirtyState,
   isValidDayCount,
   parseDayCount,
-} from '@/components/security-agent/settings-screen-state';
+} from '@kilocode/app-shared/security-agent';
+import { useEffect, useRef, useState } from 'react';
+import { ScrollView, TextInput, View } from 'react-native';
+
+import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';

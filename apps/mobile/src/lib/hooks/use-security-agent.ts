@@ -1,10 +1,12 @@
+import {
+  canManageSecurityAgent,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import {
-  canManageSecurityAgent,
-  isPersonalSecurityScope,
   type OrganizationRole,
   type SecurityAgentConfig,
   type SecurityAgentConfigPatch,

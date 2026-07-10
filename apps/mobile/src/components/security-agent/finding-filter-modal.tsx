@@ -1,10 +1,3 @@
-import { Check } from 'lucide-react-native';
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
-
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   DEFAULT_SECURITY_FINDING_FILTERS,
   type SecurityFindingFilters,
@@ -14,7 +7,14 @@ import {
   type SecuritySeverityFilter,
   selectSecurityFindingOutcome,
   selectSecurityFindingStatus,
-} from '@/lib/security-agent-filters';
+} from '@kilocode/app-shared/security-agent';
+import { Check } from 'lucide-react-native';
+import { useState } from 'react';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
+
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const STATUS_OPTIONS: { value: SecurityFindingStatusFilter; label: string }[] = [
   { value: 'open', label: 'Open' },

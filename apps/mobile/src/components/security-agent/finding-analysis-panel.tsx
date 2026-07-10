@@ -1,3 +1,8 @@
+import {
+  getSecurityAnalysisDetailPresentation,
+  getSecurityFindingAnalysisState,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
 import { ExternalLink } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
@@ -13,11 +18,7 @@ import { Text } from '@/components/ui/text';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { isPersonalSecurityScope, type SecurityAnalysis } from '@/lib/security-agent';
-import {
-  getSecurityAnalysisDetailPresentation,
-  getSecurityFindingAnalysisState,
-} from '@/lib/security-agent-presentation';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingAnalysisPanelProps = {

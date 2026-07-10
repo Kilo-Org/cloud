@@ -1,16 +1,17 @@
-import { useEffect, useRef } from 'react';
-import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
-
-import { isPersonalSecurityScope, type SecurityCommand } from '@/lib/security-agent';
 import {
   getSecurityCommandFailureMessage,
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
+  isPersonalSecurityScope,
   mergeTrackedCommandIds,
   securityCommandIdsKey,
   type SecurityQueryScope,
-} from '@/lib/security-agent-commands';
+} from '@kilocode/app-shared/security-agent';
+import { useEffect, useRef } from 'react';
+import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
+
+import { type SecurityCommand } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
 const COMMAND_POLL_INTERVAL_MS = 3000;

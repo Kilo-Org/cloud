@@ -1,3 +1,4 @@
+import { firstNonEmpty, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -6,21 +7,6 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const EMAIL_PATTERN = /.+@.+\..+/;
-
-/**
- * Parse a Drizzle `mode: 'string'` timestamp into a Date.
- * Hermes can't parse PostgreSQL's default format (`2026-03-13 14:30:00+00`),
- * so we normalise the space separator to `T` before parsing.
- */
-function parseTimestamp(value: string): Date {
-  // Date-only: "2026-09-26" → treat as UTC midnight
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return new Date(`${value}T00:00:00Z`);
-  }
-  // PostgreSQL: "2026-03-16 15:21:40.957+00" → need "T" separator and full tz offset "+00:00"
-  const iso = value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
-  return new Date(iso);
-}
 
 /** Returns a human-readable relative time string like "3 days ago". */
 function timeAgo(date: Date): string {
@@ -50,20 +36,5 @@ function timeAgo(date: Date): string {
 
 // eslint-disable-next-line no-empty-function -- intentional no-op
 async function asyncNoop() {}
-
-/**
- * First non-empty string among the candidates, treating `''` the same as
- * `null`/`undefined` (unlike `??`). Ports web's `a || b || 'default'`
- * fallback-text chains without tripping `prefer-nullish-coalescing` — always
- * pass a truthy string literal last so the result is never `''`.
- */
-function firstNonEmpty(...values: (string | null | undefined)[]): string {
-  for (const value of values) {
-    if (value) {
-      return value;
-    }
-  }
-  return '';
-}
 
 export { asyncNoop, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, timeAgo };

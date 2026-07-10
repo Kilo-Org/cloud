@@ -102,7 +102,10 @@ export function ModelPicker() {
     mutations.updateModel.mutate({ kilocodeDefaultModel: addModelPrefix(modelId) });
   };
 
-  if (isLoading) {
+  // Disabled queries (organizationId unresolved) have isLoading === false, so
+  // also skeleton while instance context is loading — otherwise the cards render
+  // interactive but taps silently no-op.
+  if (isLoading || instanceContext.status !== 'ready') {
     return (
       <View className="gap-3">
         <Skeleton className="h-40 w-full rounded-lg" />

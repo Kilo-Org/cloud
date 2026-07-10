@@ -51,6 +51,7 @@ import {
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
+  openedVia?: 'push' | 'app';
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -58,7 +59,10 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
   finalizing: 'Wrapping up...',
 };
 
-export function SessionDetailContent({ sessionId }: Readonly<SessionDetailContentProps>) {
+export function SessionDetailContent({
+  sessionId,
+  openedVia = 'app',
+}: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
 
   const messages = useAtomValue(manager.atoms.messagesList);
@@ -85,13 +89,22 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
 
+  const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
+    ? 'cloud-agent'
+    : 'remote-session';
+
   const {
     isAnswering,
     isRespondingToPermission,
     handleAnswerQuestion,
     handleRejectQuestion,
     handleRespondToPermission,
-  } = useInteractionHandlers({ manager, activeQuestion, activePermission });
+  } = useInteractionHandlers({
+    manager,
+    activeQuestion,
+    activePermission,
+    surface: analyticsSurface,
+  });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
 
@@ -161,18 +174,14 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     handleMomentumScrollEnd,
   } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
 
-  const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
-    ? 'cloud-agent'
-    : 'remote-session';
-
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
     if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
       return;
     }
     viewTrackedRef.current = sessionId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface });
-  }, [fetchedData, sessionId, analyticsSurface]);
+    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+  }, [fetchedData, sessionId, analyticsSurface, openedVia]);
 
   useEffect(() => {
     void manager.switchSession(sessionId);

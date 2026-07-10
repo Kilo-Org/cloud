@@ -75,6 +75,13 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: vi.fn(),
+  KILO_PASS_PURCHASE_COMPLETED_EVENT: 'kilo_pass_purchase_completed',
+  KILO_PASS_PURCHASE_FAILED_EVENT: 'kilo_pass_purchase_failed',
+  KILO_PASS_PURCHASE_STARTED_EVENT: 'kilo_pass_purchase_started',
+}));
+
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     kiloPass: {

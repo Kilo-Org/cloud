@@ -25,6 +25,7 @@ import { SettingsList } from '@/components/kiloclaw/settings-list';
 import { StatusCard } from '@/components/kiloclaw/status-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
@@ -143,6 +144,7 @@ export default function DashboardScreen() {
           text: 'Destroy',
           style: 'destructive',
           onPress: () => {
+            captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
             mutations.destroy.mutate(undefined);
             router.dismissAll();
             router.replace('/(app)/(tabs)/(0_home)' as Href);

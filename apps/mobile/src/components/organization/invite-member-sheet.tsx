@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { ROLE_LABEL } from '@/components/organization/member-row';
+import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
@@ -33,6 +34,9 @@ export function InviteMemberSheet() {
       { email, role: isBillingManager ? 'member' : role },
       {
         onSuccess: () => {
+          captureEvent(ORGANIZATION_MEMBER_INVITED_EVENT, {
+            role: isBillingManager ? 'member' : role,
+          });
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
         },

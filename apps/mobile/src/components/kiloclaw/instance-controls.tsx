@@ -2,6 +2,7 @@ import { Play, Power, RefreshCw, RotateCcw } from 'lucide-react-native';
 import { Alert, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 
 type InstanceControlsProps = {
@@ -21,6 +22,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Start',
         onPress: () => {
+          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'start' });
           mutations.start.mutate(undefined);
         },
       },
@@ -34,6 +36,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
         text: 'Stop',
         style: 'destructive',
         onPress: () => {
+          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'stop' });
           mutations.stop.mutate(undefined);
         },
       },
@@ -46,6 +49,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Restart',
         onPress: () => {
+          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'restart_openclaw' });
           mutations.restartOpenClaw.mutate(undefined);
         },
       },
@@ -58,6 +62,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Redeploy',
         onPress: () => {
+          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'redeploy' });
           mutations.restartMachine.mutate(undefined);
         },
       },

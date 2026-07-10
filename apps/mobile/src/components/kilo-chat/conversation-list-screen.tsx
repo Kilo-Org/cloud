@@ -9,6 +9,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
+import { captureEvent, CONVERSATION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -132,6 +133,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       { sandboxId },
       {
         onSuccess: result => {
+          captureEvent(CONVERSATION_CREATED_EVENT, { surface: 'claw' });
           router.push(chatConversationPath(sandboxId, result.conversationId));
         },
       }

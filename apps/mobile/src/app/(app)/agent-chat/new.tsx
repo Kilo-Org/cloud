@@ -33,6 +33,7 @@ import {
   shouldShowGitHubIntegrationPrompt,
 } from '@/lib/agent-github-integration';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
+import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import {
   type AgentAttachmentWire,
   useAgentAttachmentUpload,
@@ -219,6 +220,7 @@ export default function NewSessionScreen() {
           })
         : await trpcClient.cloudAgentNext.prepareSession.mutate(baseInput);
 
+      captureEvent(SESSION_CREATED_EVENT, { surface: 'cloud-agent' });
       await invalidateAgentSessionQueries(queryClient, trpc);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const path = organizationId

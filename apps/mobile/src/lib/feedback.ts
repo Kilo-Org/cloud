@@ -4,6 +4,7 @@ import * as StoreReview from 'expo-store-review';
 import { Alert, Linking, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { captureEvent, FEEDBACK_SUBMITTED_EVENT } from '@/lib/analytics/posthog';
 import { REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
 
 const SUPPORT_EMAIL = 'hi@kilo.ai';
@@ -54,6 +55,7 @@ export function showFeedbackPrompt(userId: string | undefined) {
     {
       text: 'I like it',
       onPress: () => {
+        captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
         Alert.alert(
           "We're glad to hear that!",
           'A store review would help us out immensely. Thanks for using Kilo!',
@@ -72,6 +74,7 @@ export function showFeedbackPrompt(userId: string | undefined) {
     {
       text: 'Needs work',
       onPress: () => {
+        captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
         Alert.alert(
           "We're sorry to hear that!",
           'Please let us know what needs to be better. The engineer in charge of the app reads every single report!',

@@ -22,6 +22,12 @@ import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import {
+  captureEvent,
+  KILO_PASS_PURCHASE_COMPLETED_EVENT,
+  KILO_PASS_PURCHASE_FAILED_EVENT,
+  KILO_PASS_PURCHASE_STARTED_EVENT,
+} from '@/lib/analytics/posthog';
 import { useTRPC } from '@/lib/trpc';
 import { type AppStoreKiloPassProduct } from './store-products';
 import {
@@ -373,8 +379,10 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     onPurchaseError: error => {
       pendingPurchaseCompletedCallbackRef.current = null;
       releasePurchaseRequest();
+      // A null message means the user cancelled — not a failure.
       const message = getKiloPassPurchaseErrorMessage(error, error.message);
       if (message) {
+        captureEvent(KILO_PASS_PURCHASE_FAILED_EVENT);
         showDedupedPurchaseError(message);
       }
     },
@@ -431,6 +439,9 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
+          // Only user-initiated purchases reach here — recovery and restore
+          // flows pass notifyCompletion: false.
+          captureEvent(KILO_PASS_PURCHASE_COMPLETED_EVENT);
           const onCompleted = pendingPurchaseCompletedCallbackRef.current;
           pendingPurchaseCompletedCallbackRef.current = null;
           onCompleted?.();
@@ -461,6 +472,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
 
       activePurchaseRequestRef.current = { sku: product.appleProductId };
       setIsRequestingPurchase(true);
+      captureEvent(KILO_PASS_PURCHASE_STARTED_EVENT);
       try {
         const requestStarted = await actions.purchase(product, options);
         if (!requestStarted) {

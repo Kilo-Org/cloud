@@ -16,9 +16,14 @@ import { useKiloChatClient } from '@/components/kilo-chat/hooks/use-kilo-chat-cl
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 export default function ChatConversationRoute() {
-  const params = useLocalSearchParams<{ 'sandbox-id': string; 'conversation-id': string }>();
+  const params = useLocalSearchParams<{
+    'sandbox-id': string;
+    'conversation-id': string;
+    via?: string;
+  }>();
   const sandboxId = params['sandbox-id'];
   const conversationId = params['conversation-id'];
+  const openedVia = params.via === 'push' ? 'push' : 'app';
   const router = useRouter();
   const client = useKiloChatClient();
   const conversationDetail = useConversationDetail(client, conversationId);
@@ -34,8 +39,8 @@ export default function ChatConversationRoute() {
       return;
     }
     viewTrackedRef.current = conversationId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: 'claw' });
-  }, [conversationDetail.data, conversationId]);
+    captureEvent(SESSION_VIEWED_EVENT, { surface: 'claw', via: openedVia });
+  }, [conversationDetail.data, conversationId, openedVia]);
 
   useEffect(() => {
     if (conversationDetail.isError) {

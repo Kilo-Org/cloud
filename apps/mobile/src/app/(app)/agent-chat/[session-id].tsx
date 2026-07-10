@@ -10,9 +10,14 @@ import { Text } from '@/components/ui/text';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
-  const { 'session-id': sessionId, organizationId: routeOrganizationId } = useLocalSearchParams<{
+  const {
+    'session-id': sessionId,
+    organizationId: routeOrganizationId,
+    via,
+  } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
+    via?: string;
   }>();
   const trpc = useTRPC();
   const sessionQuery = useQuery({
@@ -59,7 +64,10 @@ export default function SessionDetailScreen() {
       key={`${sessionId}:${organizationId ?? 'personal'}`}
       organizationId={organizationId}
     >
-      <SessionDetailContent sessionId={sessionId as KiloSessionId} />
+      <SessionDetailContent
+        sessionId={sessionId as KiloSessionId}
+        openedVia={via === 'push' ? 'push' : 'app'}
+      />
     </AgentSessionProvider>
   );
 }

@@ -31,6 +31,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import {
   checkInitialNotification,
@@ -159,6 +160,7 @@ function RootLayoutNav() {
 
   useTrackingPermissionPrompt(!isLoading);
   useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
+  useScreenTracking();
 
   useEffect(() => {
     if (isLoading) {

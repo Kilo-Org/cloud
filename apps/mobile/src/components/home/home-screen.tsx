@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, RefreshControl, ScrollView, View } from 'react-native';
+import { AppState, RefreshControl, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+
+import { TabScreenScrollView } from '@/components/tab-screen';
 
 import { badgeBucketForInstance } from '@kilocode/notifications';
 
@@ -108,9 +110,8 @@ export function HomeScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={headerTitle} size="large" showBackButton={false} className="px-[22px]" />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="pb-24"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
@@ -139,7 +140,7 @@ export function HomeScreen() {
             ) : null}
           </Animated.View>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

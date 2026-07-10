@@ -464,6 +464,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   }, [filters]);
 
   const usageDataPending =
+    period === 'today' &&
     summary !== undefined &&
     tableData !== undefined &&
     summary.requestCount === 0 &&

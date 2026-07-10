@@ -28,7 +28,8 @@
     "./security-notification-policy": "./src/security-notification-policy.ts",
     "./security-finding-audit": "./src/security-finding-audit.ts",
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
-    "./client-error": "./src/client-error.ts"
+    "./client-error": "./src/client-error.ts",
+    "./review-agents": "./src/review-agents.ts"
   },
   "scripts": {
     "test": "vitest run",

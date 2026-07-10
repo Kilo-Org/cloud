@@ -531,8 +531,8 @@ describe('prepareReviewPayload', () => {
       reviewType: 'standard',
       agents: [{ role: 'standard', model: 'test-model', thinkingEffort: 'high' }],
     });
-    expect(payload.reviewAgents?.agents[0].model).toBe(payload.sessionInput.model);
-    expect(payload.reviewAgents?.agents[0].thinkingEffort).toBe(payload.sessionInput.variant);
+    expect(payload.reviewAgents.agents[0].model).toBe(payload.sessionInput.model);
+    expect(payload.reviewAgents.agents[0].thinkingEffort).toBe(payload.sessionInput.variant);
   });
 
   it('throws when a provider GitLab review is missing its integration', async () => {
@@ -616,7 +616,7 @@ describe('prepareReviewPayload', () => {
       reviewType: 'standard',
       agents: [{ role: 'standard', model: 'test-model', thinkingEffort: null }],
     });
-    expect(payload.reviewAgents?.agents[0].model).toBe(payload.sessionInput.model);
+    expect(payload.reviewAgents.agents[0].model).toBe(payload.sessionInput.model);
     expect(payload.sessionInput).not.toHaveProperty('githubToken');
     expect(payload.sessionInput).not.toHaveProperty('gitToken');
     expect(payload.sessionInput).not.toHaveProperty('gateThreshold');

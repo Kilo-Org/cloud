@@ -4,9 +4,14 @@
 
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
 import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
+import type {
+  ReviewAgentSelection,
+  ReviewAgentsConfig,
+} from '@kilocode/worker-utils/review-agents';
 import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
+export type { ReviewAgentSelection, ReviewAgentsConfig };
 
 export type CodeReviewStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -46,31 +51,6 @@ export interface SessionInput {
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-}
-
-/**
- * One reviewing agent's selection. FORWARD-SHAPED for the upcoming council (multi-agent)
- * mode: today only a single `role: 'standard'` agent is produced/consumed. A council
- * review will populate one entry per specialist, each with its own requested model.
- */
-export interface ReviewAgentSelection {
-  /** `'standard'` for the standard reviewer; a specialist role/id for council members. */
-  role: string;
-  /** Requested model slug; falls back to the review default when null. */
-  model: string | null;
-  /** Requested thinking-effort variant; null = model default. */
-  thinkingEffort: string | null;
-}
-
-/**
- * Review agent configuration carried along the code-reviewer -> cloud-agent path.
- * NOTE (forward plumbing): only `agents[0]` (the standard agent) is consumed today;
- * `reviewType`/`aggregationStrategy`/extra `agents[]` are carried for council mode.
- */
-export interface ReviewAgentsConfig {
-  reviewType: 'standard' | 'council';
-  aggregationStrategy?: 'any_blocking_member' | 'majority' | 'unanimous_required';
-  agents: ReviewAgentSelection[];
 }
 
 export interface CodeReview {

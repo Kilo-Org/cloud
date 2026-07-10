@@ -22,6 +22,10 @@ import {
   fetchGitHubRepositorySize,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
+import type {
+  ReviewAgentSelection,
+  ReviewAgentsConfig,
+} from '@kilocode/worker-utils/review-agents';
 import {
   findKiloReviewNote,
   fetchMRInlineComments,
@@ -123,33 +127,11 @@ export type SessionInput = {
 };
 
 /**
- * One reviewing agent's selection. FORWARD-SHAPED for the upcoming council (multi-agent)
- * mode: today only a single `role: 'standard'` agent is produced/consumed. A council
- * review will populate one entry per specialist, each with its own requested model.
+ * Review agent selection wire contract shared with the code-review Worker. Defined once
+ * in `@kilocode/worker-utils/review-agents` so producer and consumer cannot drift as
+ * council mode adds fields. See that module for the forward-plumbing notes.
  */
-export type ReviewAgentSelection = {
-  /** `'standard'` for the standard reviewer; a specialist role/id for council members. */
-  role: string;
-  /** Requested model slug; falls back to the review default when null. */
-  model: string | null;
-  /** Requested thinking-effort variant; null = model default. */
-  thinkingEffort: string | null;
-};
-
-/**
- * Review agent configuration sent along the code-reviewer -> cloud-agent path.
- *
- * NOTE (forward plumbing): today the pipeline only builds and consumes a single
- * `'standard'` agent (`agents[0]`). `reviewType`, `aggregationStrategy`, and additional
- * `agents[]` entries are carried end-to-end for the imminent council mode but are not yet
- * consumed by execution. See the standard/council fork in prepare-review-payload.
- */
-export type ReviewAgentsConfig = {
-  reviewType: 'standard' | 'council';
-  /** Council-only: how specialist votes combine. Unused for standard. */
-  aggregationStrategy?: 'any_blocking_member' | 'majority' | 'unanimous_required';
-  agents: ReviewAgentSelection[];
-};
+export type { ReviewAgentSelection, ReviewAgentsConfig };
 
 export type CodeReviewPayload = {
   reviewId: string;
@@ -165,9 +147,11 @@ export type CodeReviewPayload = {
   /**
    * Forward-shaped review agent selections. Built for every review (standard = a single
    * `'standard'` agent). Only `agents[0]` is consumed today; the rest is plumbing for
-   * council mode.
+   * council mode. Required on the producer output so no return path can silently omit
+   * it; it stays optional on the Worker request and persisted state for rolling-deploy
+   * and in-flight compatibility.
    */
-  reviewAgents?: ReviewAgentsConfig;
+  reviewAgents: ReviewAgentsConfig;
 };
 
 /**

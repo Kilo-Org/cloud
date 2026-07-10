@@ -807,6 +807,10 @@ describe('CodeReviewOrchestrator recovery', () => {
           errorMessage: 'Container shutdown: SIGTERM',
           terminalReason: 'sandbox_error',
           repositorySize: '100 MB',
+          reviewAgents: {
+            reviewType: 'standard',
+            agents: [{ role: 'standard', model: 'test-model', thinkingEffort: null }],
+          },
         })
       );
     });
@@ -838,6 +842,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     await expect(storedReview(retryStub)).resolves.toMatchObject({
       repositorySize: '100 MB',
+      reviewAgents: {
+        reviewType: 'standard',
+        agents: [{ role: 'standard', model: 'test-model', thinkingEffort: null }],
+      },
     });
     const retryAlarm = await storedAlarm(retryStub);
     expectAutoRetryAlarmInRange(retryAlarm, retrySchedulingStartedAt);

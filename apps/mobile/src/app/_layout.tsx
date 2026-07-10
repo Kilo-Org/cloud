@@ -19,7 +19,7 @@ import {
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
@@ -40,30 +40,38 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
 
-Sentry.init({
-  dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
+// Session replay, screenshots, and view-hierarchy capture are gated on
+// stored consent (see src/lib/sentry-consent.ts) — the consent copy only
+// promises anonymous performance/crash data. The RN SDK decides whether
+// those integrations run once, at Sentry.init() time, so `consented` starts
+// `false` and RootLayoutNav below calls this again once consent is known or
+// changes (accepted, declined, or revoked).
+function initSentry(consented: boolean) {
+  Sentry.init({
+    dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
-  enabled: true,
+    enabled: true,
 
-  sendDefaultPii: false,
+    sendDefaultPii: false,
 
-  enableLogs: true,
-  tracesSampleRate: 0,
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  attachScreenshot: true,
-  attachViewHierarchy: true,
+    enableLogs: true,
+    tracesSampleRate: 0,
+    ...sentryOptionsForConsent(consented),
 
-  integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
-  enableNativeFramesTracking: false,
+    integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
+    enableNativeFramesTracking: false,
 
-  spotlight: __DEV__,
-});
+    spotlight: __DEV__,
+  });
+}
+
+initSentry(false);
 
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
@@ -97,6 +105,18 @@ function RootLayoutNav() {
       Sentry.captureException(fontsError);
     }
   }, [fontsError]);
+
+  const appliedSentryConsentRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    const consented = consentChecked && !needsConsent;
+    if (appliedSentryConsentRef.current === consented) {
+      return;
+    }
+
+    appliedSentryConsentRef.current = consented;
+    initSentry(consented);
+  }, [consentChecked, needsConsent]);
 
   const fontsReady = fontsLoaded || fontsError !== null;
   const isLoading = authLoading || updateChecking || !fontsReady;

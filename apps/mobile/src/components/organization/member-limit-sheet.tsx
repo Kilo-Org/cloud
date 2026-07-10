@@ -118,6 +118,10 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
         />
       </View>
 
+      {mutations.updateMember.isError && (
+        <Text className="text-sm text-destructive">{mutations.updateMember.error.message}</Text>
+      )}
+
       <Button disabled={!canSave || mutations.updateMember.isPending} onPress={onSave}>
         {mutations.updateMember.isPending ? (
           <ActivityIndicator size="small" color={colors.primaryForeground} />

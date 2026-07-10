@@ -101,6 +101,10 @@ export function InviteMemberSheet() {
         </View>
       )}
 
+      {mutations.invite.isError && (
+        <Text className="text-sm text-destructive">{mutations.invite.error.message}</Text>
+      )}
+
       <Button disabled={!canSubmit || mutations.invite.isPending} onPress={onSubmit}>
         {mutations.invite.isPending ? (
           <ActivityIndicator size="small" color={colors.primaryForeground} />

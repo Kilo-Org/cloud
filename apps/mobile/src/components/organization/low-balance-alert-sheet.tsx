@@ -150,6 +150,12 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         </>
       )}
 
+      {mutations.updateMinimumBalanceAlert.isError && (
+        <Text className="text-sm text-destructive">
+          {mutations.updateMinimumBalanceAlert.error.message}
+        </Text>
+      )}
+
       <Button disabled={!canSave || mutations.updateMinimumBalanceAlert.isPending} onPress={onSave}>
         {mutations.updateMinimumBalanceAlert.isPending ? (
           <ActivityIndicator size="small" color={colors.primaryForeground} />

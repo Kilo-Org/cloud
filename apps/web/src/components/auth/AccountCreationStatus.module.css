@@ -1,0 +1,33 @@
+.shimmer {
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+  background-image: linear-gradient(
+    100deg,
+    var(--foreground-subtle) 30%,
+    color-mix(in srgb, var(--foreground) 55%, var(--muted-foreground)) 50%,
+    var(--foreground-subtle) 70%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3.2s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 50%;
+  }
+
+  to {
+    background-position: -200% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
+}

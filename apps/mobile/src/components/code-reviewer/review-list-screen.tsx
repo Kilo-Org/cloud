@@ -3,7 +3,11 @@ import { GitPullRequest } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { CODE_REVIEW_STATUS_LABELS, type CodeReviewStatus } from '@kilocode/app-shared/code-review';
+import {
+  CODE_REVIEW_STATUS_LABELS,
+  type CodeReviewStatus,
+  isCodeReviewStatus,
+} from '@kilocode/app-shared/code-review';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,12 +30,8 @@ const STATUS_CLASSNAME: Record<CodeReviewStatus, string> = {
 type ReviewListData = NonNullable<ReturnType<typeof useReviewList>['data']>;
 type Review = Extract<ReviewListData, { success: true }>['reviews'][number];
 
-function isKnownReviewStatus(status: string): status is CodeReviewStatus {
-  return status in CODE_REVIEW_STATUS_LABELS;
-}
-
 export function statusMeta(status: string): { label: string; className: string } {
-  if (!isKnownReviewStatus(status)) {
+  if (!isCodeReviewStatus(status)) {
     return { label: status, className: 'text-muted-foreground' };
   }
   return { label: CODE_REVIEW_STATUS_LABELS[status], className: STATUS_CLASSNAME[status] };

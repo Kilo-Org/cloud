@@ -35,7 +35,7 @@ export const CODE_REVIEW_STATUS_LABELS: Record<CodeReviewStatus, string> = {
 const IN_FLIGHT_STATUSES = new Set<CodeReviewStatus>(['pending', 'queued', 'running']);
 const RETRIGGERABLE_STATUSES = new Set<CodeReviewStatus>(['failed', 'cancelled', 'interrupted']);
 
-function isCodeReviewStatus(status: string): status is CodeReviewStatus {
+export function isCodeReviewStatus(status: string): status is CodeReviewStatus {
   return (CODE_REVIEW_STATUSES as readonly string[]).includes(status);
 }
 

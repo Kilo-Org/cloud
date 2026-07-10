@@ -30,6 +30,7 @@ import type { DashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   buildSecurityDashboardMetrics,
+  type DashboardMetricKey,
   getAnalysisIncompleteCount as getSharedAnalysisIncompleteCount,
 } from '@kilocode/app-shared/security-agent';
 import { RepositoryFilter } from './RepositoryFilter';
@@ -399,26 +400,22 @@ function DashboardSkeleton() {
   );
 }
 
-// Icons in fixed order matching buildSecurityDashboardMetrics' two branches —
-// web-only presentation layered onto the shared label/value/detail/tone data.
-const metricIconsWithoutSla: readonly LucideIcon[] = [
-  ShieldAlert,
-  TriangleAlert,
-  CircleHelp,
-  FileSearch,
-];
-const metricIconsWithSla: readonly LucideIcon[] = [
-  ShieldCheck,
-  AlertCircle,
-  CalendarClock,
-  CircleHelp,
-];
+// Web-only presentation layered onto the shared label/value/detail/tone data.
+const metricIcons: Record<DashboardMetricKey, LucideIcon> = {
+  openFindings: ShieldAlert,
+  exploitable: TriangleAlert,
+  needsReview: CircleHelp,
+  analysisIncomplete: FileSearch,
+  slaCompliance: ShieldCheck,
+  deadlinePassed: AlertCircle,
+  dueSoon: CalendarClock,
+  noDeadline: CircleHelp,
+};
 
 function buildDashboardMetrics(data: DashboardStats, slaEnabled: boolean): DashboardMetric[] {
-  const icons = slaEnabled ? metricIconsWithSla : metricIconsWithoutSla;
-  return buildSecurityDashboardMetrics(data, slaEnabled).map((metric, index) => ({
+  return buildSecurityDashboardMetrics(data, slaEnabled).map(metric => ({
     ...metric,
-    icon: icons[index],
+    icon: metricIcons[metric.key],
   }));
 }
 

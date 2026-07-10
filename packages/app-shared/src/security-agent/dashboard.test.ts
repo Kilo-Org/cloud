@@ -33,24 +33,28 @@ describe('buildSecurityDashboardMetrics', () => {
 
     expect(buildSecurityDashboardMetrics(data, false)).toEqual([
       {
+        key: 'openFindings',
         label: 'Open findings',
         value: '10',
         detail: '2 critical, 3 high',
         tone: 'danger',
       },
       {
+        key: 'exploitable',
         label: 'Confirmed exploitable',
         value: '2',
         detail: 'Project risk confirmed by analysis',
         tone: 'danger',
       },
       {
+        key: 'needsReview',
         label: 'Needs your review',
         value: '3',
         detail: 'Human decision required',
         tone: 'warning',
       },
       {
+        key: 'analysisIncomplete',
         label: 'Analysis not complete',
         // triageComplete(1) + analyzing(1) + notAnalyzed(1) + failed(1)
         value: '4',
@@ -65,6 +69,7 @@ describe('buildSecurityDashboardMetrics', () => {
 
     expect(buildSecurityDashboardMetrics(data, true)).toEqual([
       {
+        key: 'slaCompliance',
         label: 'SLA compliance',
         // round(7 / 10 * 100)
         value: '70%',
@@ -72,18 +77,21 @@ describe('buildSecurityDashboardMetrics', () => {
         tone: 'warning',
       },
       {
+        key: 'deadlinePassed',
         label: 'Deadline passed',
         value: '3',
         detail: '1 critical, 1 high',
         tone: 'danger',
       },
       {
+        key: 'dueSoon',
         label: 'Due this week',
         value: '4',
         detail: '2 confirmed exploitable',
         tone: 'warning',
       },
       {
+        key: 'noDeadline',
         label: 'No deadline',
         value: '5',
         detail: 'Review SLA assignment',
@@ -107,6 +115,7 @@ describe('buildSecurityDashboardMetrics', () => {
 
     const [complianceMetric] = buildSecurityDashboardMetrics(data, true);
     expect(complianceMetric).toEqual({
+      key: 'slaCompliance',
       label: 'SLA compliance',
       value: '100%',
       detail: 'No assigned deadlines',

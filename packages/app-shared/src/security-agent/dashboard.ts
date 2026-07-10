@@ -29,7 +29,20 @@ export type DashboardStats = {
 
 export type DashboardMetricTone = 'danger' | 'warning' | 'neutral';
 
+// Stable identifiers so consumers can attach presentation (e.g. web's icon
+// per metric) without depending on array order.
+export type DashboardMetricKey =
+  | 'openFindings'
+  | 'exploitable'
+  | 'needsReview'
+  | 'analysisIncomplete'
+  | 'slaCompliance'
+  | 'deadlinePassed'
+  | 'dueSoon'
+  | 'noDeadline';
+
 type DashboardMetric = {
+  key: DashboardMetricKey;
   label: string;
   value: string;
   detail: string;
@@ -58,24 +71,28 @@ export function buildSecurityDashboardMetrics(
   if (!slaEnabled) {
     return [
       {
+        key: 'openFindings',
         label: 'Open findings',
         value: String(data.analysis.total),
         detail: `${data.severity.critical} critical, ${data.severity.high} high`,
         tone: 'danger',
       },
       {
+        key: 'exploitable',
         label: 'Confirmed exploitable',
         value: String(data.analysis.exploitable),
         detail: 'Project risk confirmed by analysis',
         tone: 'danger',
       },
       {
+        key: 'needsReview',
         label: 'Needs your review',
         value: String(data.analysis.needsReview),
         detail: 'Human decision required',
         tone: 'warning',
       },
       {
+        key: 'analysisIncomplete',
         label: 'Analysis not complete',
         value: String(getAnalysisIncompleteCount(data.analysis)),
         detail: 'Project risk still unknown',
@@ -91,6 +108,7 @@ export function buildSecurityDashboardMetrics(
 
   return [
     {
+      key: 'slaCompliance',
       label: 'SLA compliance',
       value: `${compliance}%`,
       detail:
@@ -100,18 +118,21 @@ export function buildSecurityDashboardMetrics(
       tone: complianceTone(compliance),
     },
     {
+      key: 'deadlinePassed',
       label: 'Deadline passed',
       value: String(data.sla.overall.overdue),
       detail: `${data.sla.bySeverity.critical.overdue} critical, ${data.sla.bySeverity.high.overdue} high`,
       tone: data.sla.overall.overdue > 0 ? 'danger' : 'neutral',
     },
     {
+      key: 'dueSoon',
       label: 'Due this week',
       value: String(data.sla.dueSoon.total),
       detail: `${data.sla.dueSoon.exploitable} confirmed exploitable`,
       tone: data.sla.dueSoon.total > 0 ? 'warning' : 'neutral',
     },
     {
+      key: 'noDeadline',
       label: 'No deadline',
       value: String(data.sla.untrackedCount),
       detail: data.sla.untrackedCount > 0 ? 'Review SLA assignment' : 'All open findings tracked',

@@ -17,6 +17,7 @@ import {
 import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, lte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { CreateReviewParamsSchema } from '../core';
+import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import type {
   CodeReviewPlatform,
   CreateReviewParams,
@@ -204,6 +205,8 @@ function codeReviewInsertValues(
     platform: params.platform ?? 'github',
     platform_project_id: params.platformProjectId ?? null,
     manual_config: params.manualConfig ?? null,
+    review_type: params.reviewType ?? 'standard',
+    trigger_source: params.triggerSource ?? null,
     agent_version: 'v2',
     status: 'pending',
   };
@@ -216,6 +219,7 @@ function codeReviewInsertValues(
 export async function createCodeReview(params: CreateReviewParams): Promise<string> {
   try {
     CreateReviewParamsSchema.parse(params);
+    await assertCouncilCreationAllowed({ owner: params.owner, reviewType: params.reviewType });
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(codeReviewInsertValues(params))
@@ -1448,6 +1452,7 @@ export async function createCodeReviewIfAbsentInTransaction(
   params: CreateReviewParams
 ): Promise<{ reviewId: string; created: boolean }> {
   CreateReviewParamsSchema.parse(params);
+  await assertCouncilCreationAllowed({ owner: params.owner, reviewType: params.reviewType });
   const [created] = await tx
     .insert(cloud_agent_code_reviews)
     .values(codeReviewInsertValues(params))

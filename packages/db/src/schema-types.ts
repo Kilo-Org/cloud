@@ -1233,9 +1233,88 @@ export const ManuallyAddedRepositorySchema = z.object({
 
 export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySchema>;
 
+// --- Code Reviewer Council (enterprise multi-specialist review) ---
+
+export const COUNCIL_SPECIALIST_ROLES = [
+  'security',
+  'performance',
+  'testing',
+  'correctness',
+  'docs',
+  'custom',
+] as const;
+export type CouncilSpecialistRole = (typeof COUNCIL_SPECIALIST_ROLES)[number];
+
+export const CouncilVoteSchema = z.enum(['pass', 'warn', 'block', 'abstain']);
+export type CouncilVote = z.infer<typeof CouncilVoteSchema>;
+
+/**
+ * Review type for a run. 'standard' is the existing single-reviewer scan; 'council'
+ * is a multi-specialist run. Extensible to future types.
+ */
+export const CODE_REVIEW_TYPES = ['standard', 'council'] as const;
+export const CodeReviewTypeSchema = z.enum(CODE_REVIEW_TYPES);
+export type CodeReviewType = z.infer<typeof CodeReviewTypeSchema>;
+
+/** How a review run was requested (its origin). */
+export const CODE_REVIEW_TRIGGER_SOURCES = ['manual', 'webhook'] as const;
+export const CodeReviewTriggerSourceSchema = z.enum(CODE_REVIEW_TRIGGER_SOURCES);
+export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSchema>;
+
+// 'weighted' is intentionally omitted until per-specialist vote weights exist in the
+// config — offering it now would be an aggregation option we cannot actually honor.
+export const COUNCIL_AGGREGATION_STRATEGIES = [
+  'any_blocking_member',
+  'majority',
+  'unanimous_required',
+] as const;
+export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
+export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
+
+export const CouncilSpecialistSchema = z.object({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9_-]+$/, 'Specialist id must be a lowercase slug'),
+  role: z.enum(COUNCIL_SPECIALIST_ROLES),
+  name: z.string().min(1).max(80),
+  enabled: z.boolean(),
+  required: z.boolean(),
+  // What this specialist looks for; drives its prompt lens.
+  lens: z.string().min(1).max(500),
+  instructions: z.string().max(2_000).nullable().optional(),
+  // Per-specialist model + thinking effort. In single-session execution these map to
+  // cloud-agent-next `runtimeAgents[]` so each specialist sub-agent runs on its own
+  // model; unset falls back to the review's default model.
+  model_slug: z.string().max(512).optional(),
+  thinking_effort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+});
+export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
+
+// The council definition: what the council IS (specialists + how their votes
+// aggregate). It carries no trigger/selection logic — whether a given run is a
+// council run is recorded per-run via `review_type`.
+export const CodeReviewCouncilConfigSchema = z.object({
+  // Whether the enterprise has council turned on. Lets specialists be configured
+  // and retained while council is toggled off. Defaults true so an existing council
+  // object (e.g. from a manual job) is treated as enabled.
+  enabled: z.boolean().default(true),
+  aggregation_strategy: CouncilAggregationStrategySchema.default('any_blocking_member'),
+  specialists: z.array(CouncilSpecialistSchema).max(8),
+});
+export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
+
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(['strict', 'balanced', 'lenient', 'roast']),
   focus_areas: z.array(z.string()),
+  // Optional enterprise council configuration. Absent = existing single-reviewer behavior.
+  council: CodeReviewCouncilConfigSchema.optional(),
   auto_approve_minor: z.boolean().optional(),
   custom_instructions: z.string().nullable().optional(),
   model_slug: z.string(),

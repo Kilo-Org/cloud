@@ -144,6 +144,8 @@ import type {
   Provider,
   CodeReviewAgentConfig,
   ManualCodeReviewConfig,
+  CodeReviewType,
+  CodeReviewTriggerSource,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -4934,6 +4936,11 @@ export const cloud_agent_code_reviews = pgTable(
 
     // Immutable per-job manual review snapshot. Null means webhook-created review.
     manual_config: jsonb('manual_config').$type<ManualCodeReviewConfig>(),
+
+    // Review type for this run: 'standard' (single reviewer) or 'council' (multi-specialist).
+    review_type: text().$type<CodeReviewType>().notNull().default('standard'),
+    // How this run was requested (its origin): 'manual' | 'webhook'. Null for legacy rows.
+    trigger_source: text().$type<CodeReviewTriggerSource>(),
 
     // PR information
     repo_full_name: text().notNull(), // e.g., "owner/repo"

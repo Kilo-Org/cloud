@@ -17,15 +17,13 @@ const usageDataPendingBars = [
 export function UsageDataPendingState({ reducedMotion = false }: UsageDataPendingStateProps) {
   return (
     <Card>
-      <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 p-6 text-center">
+      <CardContent className="flex min-h-128 flex-col items-center justify-center gap-4 p-6 text-center sm:p-10">
+        <h2 className="type-heading">Usage data is catching up</h2>
         <UsageDataPendingAnimation reducedMotion={reducedMotion} />
-        <div className="space-y-1.5">
-          <h2 className="type-heading">Usage data is catching up</h2>
-          <p className="type-body text-muted-foreground max-w-md">
-            <span className="block">Recent Kilo Gateway activity is still being processed.</span>
-            <span className="block">Come back soon to see the latest usage.</span>
-          </p>
-        </div>
+        <p className="type-body text-muted-foreground max-w-md">
+          <span className="block">Recent Kilo Gateway activity is still being processed.</span>
+          <span className="block">Come back soon to see the latest usage.</span>
+        </p>
       </CardContent>
     </Card>
   );

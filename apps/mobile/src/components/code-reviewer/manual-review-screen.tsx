@@ -36,8 +36,12 @@ const URL_PLACEHOLDER: Record<ManualReviewPlatform, string> = {
 // "ftp://evil.example/owner/repo/pull/123". Mobile keeps this host/protocol
 // anchor locally and combines it with the shared suffix check, rather than
 // adopting the shared regex unanchored (see isValidManualReviewUrl below).
+// GitHub PR URLs always carry an owner/repo prefix, so the anchor requires
+// it — otherwise structure-free URLs like https://github.com/pull/123 would
+// pass. GitLab nests groups arbitrarily deep, so only the protocol is
+// anchored there; the shared suffix requires the /-/merge_requests/<n> tail.
 const URL_HOST_PATTERN: Record<ManualReviewPlatform, RegExp> = {
-  github: /^https:\/\/github\.com\//,
+  github: /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\//,
   gitlab: /^https:\/\//,
 };
 

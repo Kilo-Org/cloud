@@ -1,6 +1,14 @@
-import { describe, expect, it } from '@jest/globals';
-import { getCodeReviewJobsHref, getCodeReviewRepositoryUrl } from './code-review-links';
+import { describe, expect, it } from 'vitest';
 
+import {
+  getCodeReviewJobsHref,
+  getCodeReviewRepositoryUrl,
+  matchesCodeReviewUrlSuffix,
+} from './links';
+
+// Moved from apps/web/src/lib/code-reviews/code-review-links.test.ts —
+// assertions kept identical, only the test runner import changed
+// (@jest/globals -> vitest, matching this package's test setup).
 describe('getCodeReviewRepositoryUrl', () => {
   it.each([
     ['github', 'https://github.com/kilocode/app/pull/42', 'https://github.com/kilocode/app'],
@@ -21,6 +29,35 @@ describe('getCodeReviewRepositoryUrl', () => {
   it('preserves URLs that do not end in a provider review path', () => {
     const repositoryUrl = 'https://bitbucket.org/kilocode/app';
     expect(getCodeReviewRepositoryUrl('bitbucket', repositoryUrl)).toBe(repositoryUrl);
+  });
+});
+
+describe('matchesCodeReviewUrlSuffix', () => {
+  it('matches a github PR URL', () => {
+    expect(matchesCodeReviewUrlSuffix('github', 'https://github.com/owner/repo/pull/123')).toBe(
+      true
+    );
+  });
+
+  it('matches with trailing slash/query/hash', () => {
+    expect(matchesCodeReviewUrlSuffix('github', 'https://github.com/owner/repo/pull/123/')).toBe(
+      true
+    );
+    expect(
+      matchesCodeReviewUrlSuffix('github', 'https://github.com/owner/repo/pull/123?tab=files')
+    ).toBe(true);
+  });
+
+  it('rejects trailing garbage after the number', () => {
+    expect(matchesCodeReviewUrlSuffix('github', 'https://github.com/owner/repo/pull/123abc')).toBe(
+      false
+    );
+  });
+
+  it('does not anchor the host or protocol', () => {
+    expect(matchesCodeReviewUrlSuffix('github', 'ftp://evil.example/owner/repo/pull/123')).toBe(
+      true
+    );
   });
 });
 

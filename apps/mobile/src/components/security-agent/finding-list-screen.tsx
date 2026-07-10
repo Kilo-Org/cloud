@@ -1,3 +1,11 @@
+import {
+  DEFAULT_SECURITY_FINDING_FILTERS,
+  getSecurityRepositoriesInScope,
+  hasActiveSecurityFindingFilters,
+  parseSecurityFindingFilters,
+  type SecurityFindingRouteParams,
+  toSecurityFindingQuery,
+} from '@kilocode/app-shared/security-agent';
 import { ShieldCheck, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
@@ -17,14 +25,6 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getSecurityRepositoriesInScope } from '@/lib/security-agent';
-import {
-  DEFAULT_SECURITY_FINDING_FILTERS,
-  hasActiveSecurityFindingFilters,
-  parseSecurityFindingFilters,
-  type SecurityFindingRouteParams,
-  toSecurityFindingQuery,
-} from '@/lib/security-agent-filters';
 
 type FindingListScreenProps = {
   scope: string;

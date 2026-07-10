@@ -2,6 +2,10 @@ import * as Haptics from 'expo-haptics';
 import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import {
+  isCancellableReviewStatus,
+  isRetriggerableReviewStatus,
+} from '@kilocode/app-shared/code-review';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -9,9 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
-
-const CANCELLABLE_STATUSES = new Set(['pending', 'queued', 'running']);
-const RETRIGGERABLE_STATUSES = new Set(['failed', 'cancelled', 'interrupted']);
 
 function MetaRow({
   label,
@@ -102,8 +103,8 @@ export function ReviewDetailScreen({
 
   const { review, tokenUsage } = data;
   const meta = statusMeta(review.status);
-  const canCancel = CANCELLABLE_STATUSES.has(review.status);
-  const canRetry = RETRIGGERABLE_STATUSES.has(review.status);
+  const canCancel = isCancellableReviewStatus(review.status);
+  const canRetry = isRetriggerableReviewStatus(review.status);
 
   return (
     <View className="flex-1 bg-background">

@@ -1,3 +1,4 @@
+import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
@@ -14,7 +15,7 @@ import {
   useSecurityAgentPermissionStatus,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
-import { getSecurityAgentPath, isPersonalSecurityScope } from '@/lib/security-agent';
+import { getSecurityAgentPath } from '@/lib/security-agent';
 
 function ScopeEntrySkeleton() {
   return (

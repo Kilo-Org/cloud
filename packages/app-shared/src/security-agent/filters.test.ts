@@ -8,7 +8,7 @@ import {
   selectSecurityFindingOutcome,
   selectSecurityFindingStatus,
   toSecurityFindingQuery,
-} from '@/lib/security-agent-filters';
+} from './filters';
 
 describe('DEFAULT_SECURITY_FINDING_FILTERS', () => {
   it('opens on open findings, unfiltered otherwise, sorted by severity', () => {

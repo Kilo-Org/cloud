@@ -1,12 +1,3 @@
-import { type inferRouterInputs, type RootRouter } from '@kilocode/trpc';
-
-type RouterInputs = inferRouterInputs<RootRouter>;
-
-// The personal and org listFindings procedures share the same filter fields
-// (the org variant just adds organizationId, applied by the hook layer), so
-// either side's input type describes the query shape we build here.
-type SecurityFindingQuery = RouterInputs['securityAgent']['listFindings'];
-
 const STATUS_FILTERS = ['open', 'fixed', 'ignored', 'closed', 'all'] as const;
 const SEVERITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low'] as const;
 const OUTCOME_FILTERS = [
@@ -48,6 +39,24 @@ export const DEFAULT_SECURITY_FINDING_FILTERS: SecurityFindingFilters = {
 };
 
 const SECURITY_FINDINGS_PAGE_SIZE = 50;
+
+// Structural shape of the `securityAgent.listFindings` tRPC input — the
+// personal and org procedures share these filter fields (the org variant
+// just adds organizationId, applied by the hook layer). Matches
+// apps/web/src/lib/security-agent/core/schemas.ts' ListFindingsInputSchema:
+// 'all' is a UI-only sentinel this module never sends for status/severity,
+// so those two fields exclude it while outcomeFilter (whose schema does
+// accept 'all') keeps the full union.
+export type SecurityFindingQuery = {
+  sortBy: SecurityFindingSortBy;
+  limit: number;
+  offset: number;
+  status?: Exclude<SecurityFindingStatusFilter, 'all'>;
+  severity?: Exclude<SecuritySeverityFilter, 'all'>;
+  outcomeFilter?: SecurityOutcomeFilter;
+  repoFullName?: string;
+  overdue?: boolean;
+};
 
 export function getNextSecurityFindingsOffset(
   initialOffset: number,

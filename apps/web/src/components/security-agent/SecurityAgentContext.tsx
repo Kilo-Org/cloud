@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityRemediationAdmissionRejectionReason } from '@kilocode/worker-utils/security-remediation-policy';
+import { getSecurityCommandFailureMessage } from '@kilocode/app-shared/security-agent';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { isGitHubIntegrationError } from '@/lib/security-agent/core/error-display';
 import type { DismissReason } from './DismissFindingDialog';
@@ -360,25 +361,7 @@ function securityAgentProviderReducer(
 }
 
 function commandFailureDescription(command: SecurityAgentCommand): string {
-  switch (command.resultCode) {
-    case 'OWNER_CAP_REACHED':
-      return 'Analysis capacity is full. Wait for an active analysis to finish, then retry.';
-    case 'GITHUB_TOKEN_UNAVAILABLE':
-    case 'GITHUB_AUTH_INVALID':
-      return 'GitHub authorization needs attention. Re-authorize GitHub App, then retry.';
-    case 'FINDING_UNAVAILABLE':
-      return 'Finding is no longer available. Refresh findings and retry if it remains open.';
-    case 'REPOSITORY_UNAVAILABLE':
-      return 'Repository is no longer available to GitHub App. Refresh repository access, then retry.';
-    case 'INVALID_DISMISS_TARGET':
-      return 'Finding cannot be dismissed because its Dependabot target is invalid.';
-    case 'COMMAND_STALLED':
-      return 'Queued action did not finish in time. Retry action.';
-    case 'QUEUE_ADMISSION_FAILED':
-      return command.lastErrorRedacted ?? 'Queued action could not be admitted. Retry action.';
-    default:
-      return command.lastErrorRedacted ?? 'Queued action failed. Retry action.';
-  }
+  return getSecurityCommandFailureMessage(command);
 }
 
 type SecurityAgentProviderProps = {

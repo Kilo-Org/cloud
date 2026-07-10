@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Users } from 'lucide-react';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { ErrorCard } from '../ErrorCard';
 import { LoadingCard } from '../LoadingCard';
 import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
@@ -83,7 +84,7 @@ export function SeatUsageCard({ organizationId }: Props) {
             <Users className="h-4 w-4" />
             <CardTitle>Seat Usage</CardTitle>
           </div>
-          {(currentUserRole === 'owner' || currentUserRole === 'billing_manager') && (
+          {canManageOrganizationBilling(currentUserRole) && (
             <Button asChild variant="outline" size="sm">
               <Link href={`/organizations/${organizationId}/subscriptions/seats`}>
                 Manage Subscription

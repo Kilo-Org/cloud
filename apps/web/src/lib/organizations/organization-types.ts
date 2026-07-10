@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@/lib/maybe-result';
 import { CompanyDomainSchema, isValidDomain } from './company-domain';
@@ -23,7 +24,7 @@ import type { OrganizationRole, OrganizationPlan } from './organization-base-typ
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
 import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
-export const OrganizationRoleSchema = z.enum(['owner', 'member', 'billing_manager']);
+export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
 // API-facing billing cycle values: 'monthly' | 'annual'
 // The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.

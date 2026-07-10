@@ -3,6 +3,11 @@ import { GitPullRequest } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import {
+  CODE_REVIEW_STATUS_LABELS,
+  type CodeReviewStatus,
+  isCodeReviewStatus,
+} from '@kilocode/app-shared/code-review';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,21 +15,26 @@ import { Text } from '@/components/ui/text';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-const STATUS_META: Record<string, { label: string; className: string }> = {
-  pending: { label: 'Pending', className: 'text-muted-foreground' },
-  queued: { label: 'Queued', className: 'text-muted-foreground' },
-  running: { label: 'Running', className: 'text-blue-600 dark:text-blue-400' },
-  completed: { label: 'Completed', className: 'text-green-600 dark:text-green-400' },
-  failed: { label: 'Failed', className: 'text-destructive' },
-  cancelled: { label: 'Cancelled', className: 'text-muted-foreground' },
-  interrupted: { label: 'Interrupted', className: 'text-amber-600 dark:text-amber-400' },
+// Tone classes stay mobile-local; labels come from the shared
+// CODE_REVIEW_STATUS_LABELS map so they can't drift from web's copy.
+const STATUS_CLASSNAME: Record<CodeReviewStatus, string> = {
+  pending: 'text-muted-foreground',
+  queued: 'text-muted-foreground',
+  running: 'text-blue-600 dark:text-blue-400',
+  completed: 'text-green-600 dark:text-green-400',
+  failed: 'text-destructive',
+  cancelled: 'text-muted-foreground',
+  interrupted: 'text-amber-600 dark:text-amber-400',
 };
 
 type ReviewListData = NonNullable<ReturnType<typeof useReviewList>['data']>;
 type Review = Extract<ReviewListData, { success: true }>['reviews'][number];
 
 export function statusMeta(status: string): { label: string; className: string } {
-  return STATUS_META[status] ?? { label: status, className: 'text-muted-foreground' };
+  if (!isCodeReviewStatus(status)) {
+    return { label: status, className: 'text-muted-foreground' };
+  }
+  return { label: CODE_REVIEW_STATUS_LABELS[status], className: STATUS_CLASSNAME[status] };
 }
 
 function reviewTime(review: Review): Date {

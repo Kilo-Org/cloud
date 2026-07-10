@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSaveConfigInput, type ReviewConfigData } from '@/lib/code-reviewer-config';
+import { buildSaveConfigInput, type CodeReviewConfigInput } from './config';
 
-const config: ReviewConfigData = {
-  isEnabled: true,
+// Moved from apps/mobile/src/lib/code-reviewer-config.test.ts — assertions
+// kept identical, only the imported type name changed (ReviewConfigData ->
+// CodeReviewConfigInput, this module's structural equivalent).
+const config: CodeReviewConfigInput = {
   reviewStyle: 'balanced',
   focusAreas: ['bugs', 'security'],
   customInstructions: null,

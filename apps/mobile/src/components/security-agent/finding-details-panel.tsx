@@ -1,3 +1,11 @@
+import {
+  getDismissalReasonLabel,
+  getFindingLifecycleStatusPresentation,
+  getFindingSeverityPresentation,
+  getFindingSourceLabel,
+  getSecurityDeadlinePresentation,
+  getSupersedingFindingId,
+} from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from 'lucide-react-native';
 import { Linking, Pressable, View } from 'react-native';
@@ -12,14 +20,6 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import {
-  getDismissalReasonLabel,
-  getFindingLifecycleStatusPresentation,
-  getFindingSeverityPresentation,
-  getFindingSourceLabel,
-  getSecurityDeadlinePresentation,
-  getSupersedingFindingId,
-} from '@/lib/security-agent-presentation';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingDetailsPanelProps = {

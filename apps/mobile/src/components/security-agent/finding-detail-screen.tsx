@@ -1,3 +1,4 @@
+import { canManageSecurityAgent } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Ban, ShieldOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -17,7 +18,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { canManageSecurityAgent, getSecurityAgentPath } from '@/lib/security-agent';
+import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';

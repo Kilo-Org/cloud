@@ -1,3 +1,4 @@
+import { type FindingIconKey, type FindingTone } from '@kilocode/app-shared/security-agent';
 import { View } from 'react-native';
 
 import {
@@ -7,7 +8,6 @@ import {
 } from '@/components/security-agent/finding-tone';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type FindingIconKey, type FindingTone } from '@/lib/security-agent-presentation';
 import { cn } from '@/lib/utils';
 
 type FindingStatusBadgeProps = {

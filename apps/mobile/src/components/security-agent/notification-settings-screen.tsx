@@ -1,13 +1,14 @@
+import {
+  getSettingsDirtyState,
+  isPersonalSecurityScope,
+  isValidDayCount,
+  parseDayCount,
+} from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
-import {
-  getSettingsDirtyState,
-  isValidDayCount,
-  parseDayCount,
-} from '@/components/security-agent/settings-screen-state';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -24,7 +25,7 @@ import {
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { isPersonalSecurityScope, type SecurityAgentConfig } from '@/lib/security-agent';
+import { type SecurityAgentConfig } from '@/lib/security-agent';
 
 type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeverity'];
 

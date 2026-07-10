@@ -1,8 +1,7 @@
 /* eslint-disable max-lines -- single UI-framework-free presentation module for the
    whole security-agent surface (list/deadline + details/analysis/remediation);
    splitting it would scatter one ported semantic mapping across files. */
-import { type SecurityFinding } from '@/lib/security-agent';
-import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { firstNonEmpty, parseTimestamp } from '../utils';
 
 // Ported from apps/web/src/components/security-agent/security-finding-list-presentation.ts,
 // FindingDetailDialog.tsx, and remediation-unavailable-copy.ts. The web
@@ -36,7 +35,37 @@ type FindingStatusPresentation = {
 
 type FindingDeadlinePresentation = FindingStatusPresentation & { detail: string };
 
-type SecurityFindingAnalysisState =
+// Structural shape of a finding's `analysis` column — permissive so it's
+// satisfied by both web's SecurityFinding (from @kilocode/db/schema) and
+// mobile's tRPC RouterOutputs['securityAgent']['getFinding'].
+export type SecurityFindingAnalysis = {
+  sandboxAnalysis?: {
+    extractionStatus?: 'succeeded' | 'failed';
+    isExploitable: boolean | 'unknown';
+    summary: string;
+    exploitabilityReasoning: string;
+  };
+  triage?: {
+    suggestedAction: 'dismiss' | 'analyze_codebase' | 'manual_review';
+    needsSandboxReasoning: string;
+  };
+};
+
+// Structural shape of a security finding — only the fields this module
+// reads, kept permissive so both web's DB row type and mobile's tRPC output
+// type satisfy it.
+export type SecurityFinding = {
+  status: string;
+  analysis_status: string | null;
+  analysis: SecurityFindingAnalysis | null;
+  analysis_error: string | null;
+  ignored_reason: string | null;
+  fixed_at: string | null;
+  sla_due_at: string | null;
+  updated_at: string;
+};
+
+export type SecurityFindingAnalysisState =
   | 'queued'
   | 'analyzing'
   | 'failed'
@@ -654,7 +683,9 @@ export function getRemediationUnavailableCopy(reason: string | null | undefined)
   if (!reason || reason === 'eligible') {
     return null;
   }
-  return reason in REMEDIATION_UNAVAILABLE_COPY
+  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
+  // through to the generic copy instead of leaking prototype members.
+  return Object.hasOwn(REMEDIATION_UNAVAILABLE_COPY, reason)
     ? REMEDIATION_UNAVAILABLE_COPY[reason as RemediationUnavailableReason]
     : 'Remediation is unavailable for this finding.';
 }

@@ -1,4 +1,13 @@
-export type ReviewerPlatform = 'github' | 'gitlab' | 'bitbucket';
+import { type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
+
+export {
+  buildSaveConfigInput,
+  GATE_THRESHOLDS,
+  REVIEW_FOCUS_AREAS,
+  REVIEW_STYLES,
+} from '@kilocode/app-shared/code-review';
+
+export type ReviewerPlatform = CodeReviewPlatform;
 
 export function asReviewerPlatform(value: string): ReviewerPlatform {
   return value === 'gitlab' || value === 'bitbucket' ? value : 'github';
@@ -65,41 +74,3 @@ export type ConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   disableReviewMd: boolean;
 }>;
-
-export function buildSaveConfigInput(
-  platform: ReviewerPlatform,
-  config: ReviewConfigData,
-  patch: ConfigPatch
-) {
-  return {
-    platform,
-    reviewStyle: config.reviewStyle,
-    focusAreas: config.focusAreas,
-    customInstructions: config.customInstructions ?? undefined,
-    modelSlug: config.modelSlug,
-    thinkingEffort: config.thinkingEffort,
-    gateThreshold: config.gateThreshold,
-    // GitLab and Bitbucket only support 'selected' repo mode server-side; the
-    // mode picker only exists for github, so force it here instead of relying
-    // on a config default that can still be 'all'.
-    repositorySelectionMode:
-      platform === 'gitlab' || platform === 'bitbucket'
-        ? ('selected' as const)
-        : config.repositorySelectionMode,
-    selectedRepositoryIds: config.selectedRepositoryIds,
-    disableReviewMd: config.disableReviewMd,
-    ...(platform === 'gitlab' ? { autoConfigureWebhooks: true as const } : {}),
-    ...patch,
-  };
-}
-
-export const REVIEW_STYLES = ['strict', 'balanced', 'lenient', 'roast'] as const;
-export const GATE_THRESHOLDS = ['off', 'all', 'warning', 'critical'] as const;
-export const FOCUS_AREAS = [
-  'security',
-  'performance',
-  'bugs',
-  'style',
-  'testing',
-  'documentation',
-] as const;

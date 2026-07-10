@@ -1,3 +1,4 @@
+import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
 import { ArrowRight, ShieldCheck } from 'lucide-react-native';
 import { type ReactNode } from 'react';
@@ -5,10 +6,17 @@ import { Pressable, View } from 'react-native';
 
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
+import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type DashboardStats, getAnalysisIncompleteCount } from '@/lib/security-agent-dashboard';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
+
+// Derived from the tRPC-backed hook rather than reusing
+// @kilocode/app-shared/security-agent's DashboardStats — that package type is
+// deliberately narrowed to only the fields buildSecurityDashboardMetrics /
+// getAnalysisIncompleteCount read, while this component also needs
+// priorityFinding and repoHealth from the full tRPC output.
+type DashboardStats = NonNullable<ReturnType<typeof useSecurityAgentDashboardStats>['data']>;
 
 type SectionProps = Readonly<{
   scope: string;

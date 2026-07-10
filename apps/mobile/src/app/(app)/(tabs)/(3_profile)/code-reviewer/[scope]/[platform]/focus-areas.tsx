@@ -5,7 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
-import { asReviewerPlatform, FOCUS_AREAS } from '@/lib/code-reviewer-config';
+import { asReviewerPlatform, REVIEW_FOCUS_AREAS } from '@/lib/code-reviewer-config';
 import {
   useReviewConfig,
   useReviewConfigCacheReader,
@@ -44,7 +44,7 @@ export default function FocusAreasRoute() {
         <Text variant="muted" className="mb-2 text-xs">
           Leave all unselected to review everything.
         </Text>
-        {FOCUS_AREAS.map(area => (
+        {REVIEW_FOCUS_AREAS.map(area => (
           <Pressable
             key={area}
             className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"

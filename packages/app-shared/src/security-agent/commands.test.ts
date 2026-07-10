@@ -4,24 +4,14 @@ import {
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   mergeTrackedCommandIds,
-} from '@/lib/security-agent-commands';
-import { type SecurityCommand } from '@/lib/security-agent';
+  type SecurityCommand,
+} from './commands';
 
 function command(overrides: Partial<SecurityCommand> = {}): SecurityCommand {
   return {
-    id: 'command-1',
-    commandType: 'sync',
-    origin: 'manual',
-    findingId: null,
-    repoFullName: null,
     status: 'accepted',
     resultCode: null,
-    resultMetadata: null,
     lastErrorRedacted: null,
-    acceptedAt: null,
-    startedAt: null,
-    completedAt: null,
-    updatedAt: null,
     ...overrides,
   };
 }
@@ -33,7 +23,7 @@ describe('security agent command helpers', () => {
     expect(isActiveSecurityCommand(command({ status: 'succeeded' }))).toBe(false);
   });
 
-  it('invalidates sync data without config', () => {
+  it('invalidates sync data across the full web scope superset', () => {
     expect(getSecurityCommandInvalidationScopes('sync')).toEqual([
       'findings',
       'findingDetails',
@@ -42,6 +32,8 @@ describe('security agent command helpers', () => {
       'dashboardStats',
       'lastSyncTime',
       'repositories',
+      'orphanedRepositories',
+      'autoDismissEligible',
       'permissionStatus',
     ]);
   });

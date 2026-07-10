@@ -13,6 +13,7 @@ import {
   CodeReviewTypeSchema,
   CodeReviewTriggerSourceSchema,
 } from '@kilocode/db/schema-types';
+import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
 // ============================================================================
@@ -22,15 +23,7 @@ import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 /**
  * Code review status enum
  */
-export const CodeReviewStatusSchema = z.enum([
-  'pending',
-  'queued',
-  'running',
-  'completed',
-  'failed',
-  'cancelled',
-  'interrupted',
-]);
+export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
 
 /**
  * Owner schema - discriminated union

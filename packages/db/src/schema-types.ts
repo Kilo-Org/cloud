@@ -1,3 +1,4 @@
+import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
 // =============================================================================
@@ -1221,8 +1222,7 @@ export type CodeReviewFindingSecurityClass =
 
 // --- CodeReviewAgentConfig ---
 
-export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
-export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];
+export { CODE_REVIEW_PLATFORMS, type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
 
 export const ManuallyAddedRepositorySchema = z.object({
   id: z.number(),
@@ -1311,7 +1311,7 @@ export const CodeReviewCouncilConfigSchema = z.object({
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 
 export const CodeReviewAgentConfigSchema = z.object({
-  review_style: z.enum(['strict', 'balanced', 'lenient', 'roast']),
+  review_style: z.enum(REVIEW_STYLES),
   focus_areas: z.array(z.string()),
   // Optional enterprise council configuration. Absent = existing single-reviewer behavior.
   council: CodeReviewCouncilConfigSchema.optional(),
@@ -1336,7 +1336,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'all'      — gate fails on any finding
   //   'warning'  — gate fails on warnings and above
   //   'critical' — gate fails only on critical issues
-  gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  gate_threshold: z.enum(GATE_THRESHOLDS).optional(),
   review_memory_enabled: z.boolean().optional(),
   review_analytics_enabled: z.boolean().optional(),
 });

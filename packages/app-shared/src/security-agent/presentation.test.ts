@@ -3,7 +3,6 @@
    coverage is the point, splitting by describe block would just scatter it. */
 import { describe, expect, it } from 'vitest';
 
-import { type SecurityFinding } from '@/lib/security-agent';
 import {
   formatRemediationOrigin,
   formatValidationEvidenceEntry,
@@ -19,20 +18,17 @@ import {
   getSecurityFindingAnalysisState,
   getSupersedingFindingId,
   isActiveRemediationStatus,
-} from '@/lib/security-agent-presentation';
+  type SecurityFinding,
+  type SecurityFindingAnalysis,
+} from './presentation';
 
-type FindingAnalysis = NonNullable<SecurityFinding['analysis']>;
-type SandboxAnalysis = NonNullable<FindingAnalysis['sandboxAnalysis']>;
-type Triage = NonNullable<FindingAnalysis['triage']>;
+type SandboxAnalysis = NonNullable<SecurityFindingAnalysis['sandboxAnalysis']>;
+type Triage = NonNullable<SecurityFindingAnalysis['triage']>;
 
-// Minimal fixture for the huge Drizzle-inferred SecurityFinding type — only
-// the fields the list-scoped presentation helpers read are meaningful here.
+// Minimal fixture for the structural SecurityFinding type — only the fields
+// the list-scoped presentation helpers read are meaningful here.
 function makeFinding(overrides: Partial<SecurityFinding> = {}): SecurityFinding {
   return {
-    id: 'finding-1',
-    title: 'Prototype pollution in lodash',
-    repo_full_name: 'kilocode/cloud',
-    severity: 'high',
     status: 'open',
     ignored_reason: null,
     analysis_status: null,
@@ -42,38 +38,30 @@ function makeFinding(overrides: Partial<SecurityFinding> = {}): SecurityFinding 
     fixed_at: null,
     updated_at: '2026-07-01 00:00:00+00',
     ...overrides,
-  } as unknown as SecurityFinding;
+  };
 }
 
 function makeSandbox(overrides: Partial<SandboxAnalysis> = {}): SandboxAnalysis {
   return {
     isExploitable: false,
     exploitabilityReasoning: '',
-    usageLocations: [],
-    suggestedFix: '',
-    suggestedAction: 'monitor',
     summary: '',
-    rawMarkdown: '',
-    analysisAt: '2026-07-01T00:00:00Z',
     ...overrides,
   };
 }
 function makeTriage(overrides: Partial<Triage> = {}): Triage {
   return {
-    needsSandboxAnalysis: false,
     needsSandboxReasoning: '',
     suggestedAction: 'analyze_codebase',
-    confidence: 'medium',
-    triageAt: '2026-07-01T00:00:00Z',
     ...overrides,
   };
 }
-function makeAnalysis(overrides: Partial<FindingAnalysis> = {}): FindingAnalysis {
-  return { analyzedAt: '2026-07-01T00:00:00Z', ...overrides };
+function makeAnalysis(overrides: Partial<SecurityFindingAnalysis> = {}): SecurityFindingAnalysis {
+  return { ...overrides };
 }
 
 describe('getSecurityFindingAnalysisState', () => {
-  it.each<[string, string | null, FindingAnalysis | null]>([
+  it.each<[string, string | null, SecurityFindingAnalysis | null]>([
     ['queued', 'pending', null],
     ['analyzing', 'running', null],
     ['failed', 'failed', null],
@@ -635,6 +623,15 @@ describe('getRemediationUnavailableCopy', () => {
 
   it('falls back to a generic message for an unrecognized reason', () => {
     expect(getRemediationUnavailableCopy('some_future_reason')).toBe(
+      'Remediation is unavailable for this finding.'
+    );
+  });
+
+  it('falls back for inherited object keys instead of leaking prototype members', () => {
+    expect(getRemediationUnavailableCopy('constructor')).toBe(
+      'Remediation is unavailable for this finding.'
+    );
+    expect(getRemediationUnavailableCopy('toString')).toBe(
       'Remediation is unavailable for this finding.'
     );
   });

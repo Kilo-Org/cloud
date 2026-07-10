@@ -1,0 +1,25 @@
+{
+  "name": "@kilocode/app-shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-agnostic app logic shared by the web and mobile apps",
+  "type": "module",
+  "exports": {
+    "./utils": "./src/utils.ts",
+    "./security-agent": "./src/security-agent/index.ts",
+    "./code-review": "./src/code-review/index.ts",
+    "./organizations": "./src/organizations/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "author": "Kilo Code",
+  "license": "MIT"
+}

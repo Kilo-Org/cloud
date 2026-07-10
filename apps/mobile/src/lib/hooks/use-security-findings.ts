@@ -1,13 +1,14 @@
+import {
+  getNextSecurityFindingsOffset,
+  getRemediationUnavailableCopy,
+  isActiveRemediationStatus,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
-import { isPersonalSecurityScope, type SecurityAnalysis } from '@/lib/security-agent';
-import { getNextSecurityFindingsOffset } from '@/lib/security-agent-filters';
-import {
-  getRemediationUnavailableCopy,
-  isActiveRemediationStatus,
-} from '@/lib/security-agent-presentation';
+import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Personal and org procedures resolve to nominally distinct tRPC option

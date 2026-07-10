@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -29,10 +30,24 @@ const URL_PLACEHOLDER: Record<ManualReviewPlatform, string> = {
   gitlab: 'https://gitlab.com/group/project/-/merge_requests/123',
 };
 
-const URL_PATTERN: Record<ManualReviewPlatform, RegExp> = {
-  github: /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/,
-  gitlab: /^https:\/\/.+\/-\/merge_requests\/\d+/,
+// The shared suffix check (matchesCodeReviewUrlSuffix, ported from web's
+// code-review-links.ts) only looks at the end of the URL — it isn't
+// anchored to a host or protocol, so on its own it would accept e.g.
+// "ftp://evil.example/owner/repo/pull/123". Mobile keeps this host/protocol
+// anchor locally and combines it with the shared suffix check, rather than
+// adopting the shared regex unanchored (see isValidManualReviewUrl below).
+// GitHub PR URLs always carry an owner/repo prefix, so the anchor requires
+// it — otherwise structure-free URLs like https://github.com/pull/123 would
+// pass. GitLab nests groups arbitrarily deep, so only the protocol is
+// anchored there; the shared suffix requires the /-/merge_requests/<n> tail.
+const URL_HOST_PATTERN: Record<ManualReviewPlatform, RegExp> = {
+  github: /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\//,
+  gitlab: /^https:\/\//,
 };
+
+function isValidManualReviewUrl(platform: ManualReviewPlatform, url: string): boolean {
+  return URL_HOST_PATTERN[platform].test(url) && matchesCodeReviewUrlSuffix(platform, url);
+}
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
@@ -60,7 +75,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   const onSubmit = () => {
     const url = urlRef.current.trim();
-    if (!URL_PATTERN[platform].test(url)) {
+    if (!isValidManualReviewUrl(platform, url)) {
       toast.error('Enter a valid pull request URL');
       return;
     }

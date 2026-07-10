@@ -1,10 +1,10 @@
+import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
-import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';

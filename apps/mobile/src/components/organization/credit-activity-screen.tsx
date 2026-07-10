@@ -1,3 +1,4 @@
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { Receipt } from 'lucide-react-native';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -28,7 +29,7 @@ function CreditRowSkeleton() {
 }
 
 function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>) {
-  const amount = transaction.amount_microdollars / 1_000_000;
+  const amount = fromMicrodollars(transaction.amount_microdollars);
   const isPositive = amount >= 0;
   const title = firstNonEmpty(
     transaction.description,

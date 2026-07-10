@@ -1,7 +1,14 @@
-import { type SecurityCommand } from '@/lib/security-agent';
+export type SecurityCommandType =
+  | 'sync'
+  | 'dismiss_finding'
+  | 'start_analysis'
+  | 'apply_auto_remediation';
 
-type SecurityCommandType = 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
-
+// Web's full invalidation-scope superset (from
+// apps/web/src/components/security-agent/security-agent-command-invalidation.ts:6).
+// Mobile filters this down to the scopes it implements when it adopts this
+// module — it has no orphaned-repository cleanup, auto-dismiss, or config
+// surfaces yet, but the shared table stays authoritative for both.
 export type SecurityQueryScope =
   | 'findings'
   | 'findingDetails'
@@ -10,11 +17,12 @@ export type SecurityQueryScope =
   | 'dashboardStats'
   | 'lastSyncTime'
   | 'repositories'
-  | 'permissionStatus';
+  | 'orphanedRepositories'
+  | 'autoDismissEligible'
+  | 'permissionStatus'
+  | 'config';
 
 // Ported from apps/web/src/components/security-agent/security-agent-command-invalidation.ts:19.
-// Mobile has no orphaned-repository cleanup or auto-dismiss surfaces, so those two
-// web-only scopes are dropped from every list below.
 const syncScopes = [
   'findings',
   'findingDetails',
@@ -23,6 +31,8 @@ const syncScopes = [
   'dashboardStats',
   'lastSyncTime',
   'repositories',
+  'orphanedRepositories',
+  'autoDismissEligible',
   'permissionStatus',
 ] as const satisfies readonly SecurityQueryScope[];
 
@@ -31,6 +41,7 @@ const dismissalScopes = [
   'findingDetails',
   'stats',
   'dashboardStats',
+  'autoDismissEligible',
 ] as const satisfies readonly SecurityQueryScope[];
 
 const analysisScopes = [
@@ -39,6 +50,7 @@ const analysisScopes = [
   'analysis',
   'stats',
   'dashboardStats',
+  'autoDismissEligible',
 ] as const satisfies readonly SecurityQueryScope[];
 
 const remediationScopes = [
@@ -52,6 +64,14 @@ const remediationScopes = [
 export function securityCommandIdsKey(scope: string) {
   return ['security-agent-command-ids', scope] as const;
 }
+
+// Structural shape of a security command — only the fields these helpers
+// read, kept permissive so both web's and mobile's command types satisfy it.
+export type SecurityCommand = {
+  status: string;
+  resultCode?: string | null;
+  lastErrorRedacted?: string | null;
+};
 
 export function isActiveSecurityCommand(command: SecurityCommand): boolean {
   return command.status === 'accepted' || command.status === 'running';

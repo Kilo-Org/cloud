@@ -75,8 +75,15 @@ import {
   getRemediationUnavailableCopy,
   isCodebaseAnalysisRequiredReason,
 } from './remediation-unavailable-copy';
-import { getFindingAnalysisState } from './security-finding-list-presentation';
+import { getFindingAnalysisState, toWebTone } from './security-finding-list-presentation';
 import type { SecurityFindingWithRemediation } from '@/lib/security-agent/db/security-remediation';
+import {
+  getDismissalReasonLabel,
+  getFindingLifecycleStatusPresentation,
+  getFindingSeverityPresentation,
+  getFindingSourceLabel,
+  getSupersedingFindingId as getSharedSupersedingFindingId,
+} from '@kilocode/app-shared/security-agent';
 
 type FindingAnalysis = SecurityFinding['analysis'];
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -190,7 +197,6 @@ type RemediationPresentation = {
 };
 
 const ANALYSIS_POLL_INTERVAL_MS = 3000;
-const SUPERSEDED_PREFIX = 'superseded:';
 const utcDateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -239,14 +245,6 @@ const toneStyles: Record<
   },
 };
 
-const dismissalReasonLabels: Record<string, string> = {
-  fix_started: 'a fix has already started',
-  no_bandwidth: 'no bandwidth is available',
-  tolerable_risk: 'the risk is tolerable',
-  inaccurate: 'the finding is inaccurate',
-  not_used: 'vulnerable code is not used',
-};
-
 function LoadingSpinner({ className = 'size-4' }: { className?: string }) {
   return (
     <Loader2
@@ -265,19 +263,15 @@ function formatUtcDate(value: string, includeTime = true): string {
 }
 
 function formatSource(source: string): string {
-  if (source === 'dependabot') return 'GitHub Dependabot';
-  return source.replace(/_/g, ' ');
+  return getFindingSourceLabel(source);
 }
 
 function getSupersedingFindingId(finding: SecurityFinding): string | null {
-  if (!finding.ignored_reason?.startsWith(SUPERSEDED_PREFIX)) return null;
-  const findingId = finding.ignored_reason.slice(SUPERSEDED_PREFIX.length);
-  return findingId || null;
+  return getSharedSupersedingFindingId(finding);
 }
 
 function getDismissalReason(reason: string | null): string {
-  if (!reason) return 'after review';
-  return dismissalReasonLabels[reason] ?? reason.replace(/_/g, ' ');
+  return getDismissalReasonLabel(reason);
 }
 
 function formatRemediationStatus(
@@ -304,19 +298,13 @@ function isActiveRemediationStatus(status: string | null | undefined): boolean {
 }
 
 function getSeverityStatus(severity: string): StatusValue {
-  if (severity === 'critical') return { value: 'Critical', tone: 'destructive' };
-  if (severity === 'high') return { value: 'High', tone: 'warning' };
-  if (severity === 'medium') return { value: 'Medium', tone: 'warning' };
-  if (severity === 'low') return { value: 'Low', tone: 'neutral' };
-  return { value: severity, tone: 'neutral' };
+  const presentation = getFindingSeverityPresentation(severity);
+  return { value: presentation.label, tone: toWebTone(presentation.tone) };
 }
 
 function getFindingStatus(finding: SecurityFinding): StatusValue {
-  if (getSupersedingFindingId(finding)) return { value: 'Superseded', tone: 'neutral' };
-  if (finding.status === 'fixed') return { value: 'Fixed', tone: 'success' };
-  if (finding.status === 'ignored') return { value: 'Dismissed', tone: 'neutral' };
-  if (finding.status === 'open') return { value: 'Open', tone: 'neutral' };
-  return { value: finding.status, tone: 'neutral' };
+  const presentation = getFindingLifecycleStatusPresentation(finding);
+  return { value: presentation.label, tone: toWebTone(presentation.tone) };
 }
 
 function getAnalysisStatus(analysis: FindingAnalysis, analysisStatus: string | null): StatusValue {

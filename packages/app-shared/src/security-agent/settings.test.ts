@@ -1,18 +1,70 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canManageSecurityAgent,
+  getSecurityAgentAuditUrl,
+  getSecurityRepositoriesInScope,
   getSettingsBackGuardOptions,
   getSettingsDirtyState,
+  isSecurityConfigPatchDirty,
   isValidDayCount,
   parseDayCount,
-} from '@/components/security-agent/settings-screen-state';
-import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
+} from './settings';
+
+describe('Security Agent helpers', () => {
+  it('builds owner-aware web audit URLs', () => {
+    expect(getSecurityAgentAuditUrl('https://app.kilo.ai/', 'personal')).toBe(
+      'https://app.kilo.ai/security-agent/audit-report'
+    );
+    expect(getSecurityAgentAuditUrl('https://app.kilo.ai', 'org_123')).toBe(
+      'https://app.kilo.ai/organizations/org_123/security-agent/audit-report'
+    );
+  });
+
+  it('allows only personal, owner, and billing manager policy changes', () => {
+    expect(canManageSecurityAgent('personal', undefined)).toBe(true);
+    expect(canManageSecurityAgent('org_123', 'owner')).toBe(true);
+    expect(canManageSecurityAgent('org_123', 'billing_manager')).toBe(true);
+    expect(canManageSecurityAgent('org_123', 'member')).toBe(false);
+  });
+
+  it('compares scalar and repository-array patches', () => {
+    const config = {
+      analysisMode: 'auto',
+      selectedRepositoryIds: [1, 2],
+    };
+    expect(isSecurityConfigPatchDirty(config, { analysisMode: 'auto' })).toBe(false);
+    expect(isSecurityConfigPatchDirty(config, { analysisMode: 'deep' })).toBe(true);
+    expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [1, 2] })).toBe(false);
+    expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [2, 1] })).toBe(false);
+    expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [1, 3] })).toBe(true);
+  });
+
+  it('limits repository choices to configured Security Agent scope', () => {
+    const repositories = [
+      { id: 1, fullName: 'kilo/one' },
+      { id: 2, fullName: 'kilo/two' },
+    ];
+    expect(
+      getSecurityRepositoriesInScope(repositories, {
+        repositorySelectionMode: 'selected',
+        selectedRepositoryIds: [2],
+      })
+    ).toEqual([{ id: 2, fullName: 'kilo/two' }]);
+    expect(
+      getSecurityRepositoriesInScope(repositories, {
+        repositorySelectionMode: 'all',
+        selectedRepositoryIds: [],
+      })
+    ).toEqual(repositories);
+  });
+});
 
 describe('getSettingsDirtyState', () => {
   const config = {
     selectedRepositoryIds: [1, 2],
     slaCriticalDays: 15,
-  } satisfies Partial<SecurityAgentConfig>;
+  };
 
   it('is clean when the patch matches the loaded config', () => {
     expect(getSettingsDirtyState(config, { selectedRepositoryIds: [1, 2] }, true)).toBe('clean');
@@ -88,7 +140,7 @@ describe('isValidDayCount', () => {
 // pulling in another screen's field would silently overwrite it on save.
 describe('Task 9 settings screens each own a disjoint field set', () => {
   it('Automation screen patch contains exactly its 8 fields', () => {
-    const patch: SecurityAgentConfigPatch = {
+    const patch = {
       autoAnalysisEnabled: true,
       autoAnalysisMinSeverity: 'high',
       autoAnalysisIncludeExisting: false,
@@ -113,7 +165,7 @@ describe('Task 9 settings screens each own a disjoint field set', () => {
   });
 
   it('Notifications screen patch contains exactly its 5 fields', () => {
-    const patch: SecurityAgentConfigPatch = {
+    const patch = {
       newFindingNotificationsEnabled: true,
       newFindingNotificationMinSeverity: 'high',
       slaNotificationsEnabled: true,
@@ -132,7 +184,7 @@ describe('Task 9 settings screens each own a disjoint field set', () => {
   });
 
   it('SLA screen patch contains exactly its 5 fields', () => {
-    const patch: SecurityAgentConfigPatch = {
+    const patch = {
       slaEnabled: true,
       slaCriticalDays: 1,
       slaHighDays: 7,
@@ -152,15 +204,23 @@ describe('Task 9 settings screens each own a disjoint field set', () => {
 // screen's own Save button gate, so this is the one place both properties
 // have to hold together.
 describe('invalid day/lead-time input can never classify as dirty-valid', () => {
-  const config = {
+  type SlaConfig = {
+    slaNotificationWarningDays: number;
+    slaCriticalDays: number;
+    slaHighDays: number;
+    slaMediumDays: number;
+    slaLowDays: number;
+  };
+
+  const config: Partial<SlaConfig> = {
     slaNotificationWarningDays: 7,
     slaCriticalDays: 15,
     slaHighDays: 10,
     slaMediumDays: 5,
     slaLowDays: 2,
-  } satisfies Partial<SecurityAgentConfig>;
+  };
 
-  const cases: { field: keyof SecurityAgentConfigPatch; raw: string }[] = [
+  const cases: { field: keyof SlaConfig; raw: string }[] = [
     { field: 'slaNotificationWarningDays', raw: '' },
     { field: 'slaCriticalDays', raw: '0' },
     { field: 'slaHighDays', raw: '400' },
@@ -172,7 +232,7 @@ describe('invalid day/lead-time input can never classify as dirty-valid', () => 
     const parsed = parseDayCount(raw);
     const valid = isValidDayCount(parsed);
     expect(valid).toBe(false);
-    const patch: SecurityAgentConfigPatch = { [field]: parsed };
+    const patch: Partial<SlaConfig> = { [field]: parsed };
     expect(getSettingsDirtyState(config, patch, valid)).toBe('dirty-invalid');
   });
 });

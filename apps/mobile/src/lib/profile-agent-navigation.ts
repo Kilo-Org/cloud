@@ -1,6 +1,5 @@
+import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
-
-import { PERSONAL_SECURITY_SCOPE } from '@/lib/security-agent';
 
 type ProfileOrganization = { organizationId: string };
 

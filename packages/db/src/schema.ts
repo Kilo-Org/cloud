@@ -2214,6 +2214,7 @@ export const api_request_log = pgTable(
     kilo_user_id: text(),
     organization_id: text(),
     session_id: text(),
+    vercel_request_id: text(),
     provider: text(),
     model: text(),
     status_code: integer(),

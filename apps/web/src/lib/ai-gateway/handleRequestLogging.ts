@@ -33,11 +33,21 @@ export async function handleRequestLogging(params: {
   user: User | null;
   organization_id: string | null;
   session_id: string | null;
+  vercel_request_id: string | null;
   provider: string;
   model: string;
   request: GatewayRequest;
 }) {
-  const { clonedResponse, user, organization_id, session_id, provider, model, request } = params;
+  const {
+    clonedResponse,
+    user,
+    organization_id,
+    session_id,
+    vercel_request_id,
+    provider,
+    model,
+    request,
+  } = params;
   if (!(await isLoggingEnabledForUser(user, organization_id))) {
     return;
   }
@@ -52,6 +62,7 @@ export async function handleRequestLogging(params: {
           kilo_user_id: user?.id,
           organization_id: organization_id,
           session_id,
+          vercel_request_id,
           status_code: clonedResponse.status,
           model,
           provider,

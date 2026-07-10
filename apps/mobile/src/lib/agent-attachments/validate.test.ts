@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canAddAttachments, classifyAttachment } from './validate';
+import { canAddAttachments, classifyAttachment, hasFailedAttachments } from './validate';
 
 describe('classifyAttachment', () => {
   it('accepts a png by extension', () => {
@@ -43,5 +43,24 @@ describe('canAddAttachments', () => {
 
   it('rejects when already full', () => {
     expect(canAddAttachments(5, 1)).toEqual({ ok: false, acceptedCount: 0 });
+  });
+});
+
+describe('hasFailedAttachments', () => {
+  it('blocks send when an attachment has errored', () => {
+    expect(
+      hasFailedAttachments([{ status: 'uploaded' }, { status: 'error' }, { status: 'pending' }])
+    ).toBe(true);
+  });
+
+  it('allows send once the errored attachment is retried (status no longer error)', () => {
+    // Mirrors retryAttachment(id): the errored item transitions back to
+    // 'uploading' via the same status patch used for a fresh upload.
+    expect(hasFailedAttachments([{ status: 'uploaded' }, { status: 'uploading' }])).toBe(false);
+  });
+
+  it('returns false for an empty or all-clear attachment list', () => {
+    expect(hasFailedAttachments([])).toBe(false);
+    expect(hasFailedAttachments([{ status: 'uploaded' }])).toBe(false);
   });
 });

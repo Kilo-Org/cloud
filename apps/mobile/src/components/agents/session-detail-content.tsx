@@ -328,8 +328,10 @@ export function SessionDetailContent({
           ...(supportsAttachments && attachments ? { attachments } : {}),
         });
         captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
-      } catch {
+      } catch (sendError) {
         toast.error('Failed to send message. Please try again.');
+        // Rethrow so the composer knows the send failed and preserves the draft.
+        throw sendError;
       }
     },
     [

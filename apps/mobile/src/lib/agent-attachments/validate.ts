@@ -28,6 +28,11 @@ export function classifyAttachment(candidate: Candidate): ClassifiedAttachment {
   };
 }
 
+/** Pure so send-blocking can be unit-tested without rendering the upload hook. */
+export function hasFailedAttachments(attachments: { status: string }[]): boolean {
+  return attachments.some(item => item.status === 'error');
+}
+
 export function canAddAttachments(
   currentCount: number,
   incomingCount: number

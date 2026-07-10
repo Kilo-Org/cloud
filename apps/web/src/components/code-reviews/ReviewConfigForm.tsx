@@ -24,6 +24,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import {
+  REVIEW_FOCUS_AREAS,
+  REVIEW_STYLES as REVIEW_STYLE_VALUES,
+  type ReviewFocusArea,
+  type ReviewStyle,
+} from '@kilocode/app-shared/code-review';
 
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
@@ -62,38 +68,45 @@ export type ReviewConfigFormProps = {
   gitlabStatusData?: GitLabStatusData;
 };
 
-export const FOCUS_AREAS = [
-  { id: 'security', label: 'Security vulnerabilities', description: 'SQL injection, XSS, etc.' },
-  { id: 'performance', label: 'Performance issues', description: 'N+1 queries, inefficient loops' },
-  { id: 'bugs', label: 'Bug detection', description: 'Logic errors, edge cases' },
-  { id: 'style', label: 'Code style', description: 'Formatting, naming conventions' },
-  { id: 'testing', label: 'Test coverage', description: 'Missing or inadequate tests' },
-  { id: 'documentation', label: 'Documentation', description: 'Missing comments, unclear APIs' },
-] as const;
+// Labels/descriptions stay web-local; the ids/values themselves are derived
+// from the shared arrays (@kilocode/app-shared/code-review) so they can't
+// drift from the db schema's review_style/gate_threshold enums or mobile's
+// copy. Order matches the original literal arrays exactly.
+const FOCUS_AREA_COPY: Record<ReviewFocusArea, { label: string; description: string }> = {
+  security: { label: 'Security vulnerabilities', description: 'SQL injection, XSS, etc.' },
+  performance: { label: 'Performance issues', description: 'N+1 queries, inefficient loops' },
+  bugs: { label: 'Bug detection', description: 'Logic errors, edge cases' },
+  style: { label: 'Code style', description: 'Formatting, naming conventions' },
+  testing: { label: 'Test coverage', description: 'Missing or inadequate tests' },
+  documentation: { label: 'Documentation', description: 'Missing comments, unclear APIs' },
+};
 
-export const REVIEW_STYLES = [
-  {
-    value: 'strict',
+export const FOCUS_AREAS = REVIEW_FOCUS_AREAS.map(id => ({ id, ...FOCUS_AREA_COPY[id] }));
+
+const REVIEW_STYLE_COPY: Record<ReviewStyle, { label: string; description: string }> = {
+  strict: {
     label: 'Strict',
     description: 'Flag all potential issues, prioritize quality and security',
   },
-  {
-    value: 'balanced',
+  balanced: {
     label: 'Balanced',
     description: 'Focus on confidence, balance thoroughness with practicality',
   },
-  {
-    value: 'lenient',
+  lenient: {
     label: 'Lenient',
     description: 'Only critical bugs and security issues, be encouraging',
   },
-  {
-    value: 'roast',
+  roast: {
     label: 'Roast',
     description:
       'Brutally honest, technically accurate feedback wrapped in sharp, witty commentary',
   },
-] as const;
+};
+
+export const REVIEW_STYLES = REVIEW_STYLE_VALUES.map(value => ({
+  value,
+  ...REVIEW_STYLE_COPY[value],
+}));
 
 export function ReviewConfigForm({
   organizationId,

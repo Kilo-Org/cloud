@@ -26,31 +26,31 @@ import { TRPCClientError } from '@trpc/client';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import {
+  CODE_REVIEW_STATUS_LABELS,
+  isCancellableReviewStatus,
+  isInFlightReviewStatus,
+  isRetriggerableReviewStatus,
+  type CodeReviewStatus,
+} from '@kilocode/app-shared/code-review';
 
-type CodeReviewStatus =
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'interrupted';
-
-const statusConfig: Record<
+// Icons/badge variant stay web-local; labels come from the shared
+// CODE_REVIEW_STATUS_LABELS map (see usage below) so they can't drift from
+// mobile's STATUS_META copy.
+const statusIconConfig: Record<
   CodeReviewStatus,
   {
     icon: React.ComponentType<{ className?: string }>;
     variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    label: string;
   }
 > = {
-  pending: { icon: Clock, variant: 'secondary', label: 'Pending' },
-  queued: { icon: Clock, variant: 'secondary', label: 'Queued' },
-  running: { icon: Loader2, variant: 'default', label: 'Running' },
-  completed: { icon: CheckCircle2, variant: 'default', label: 'Completed' },
-  failed: { icon: XCircle, variant: 'destructive', label: 'Failed' },
-  cancelled: { icon: Ban, variant: 'outline', label: 'Cancelled' },
-  interrupted: { icon: AlertCircle, variant: 'outline', label: 'Interrupted' },
+  pending: { icon: Clock, variant: 'secondary' },
+  queued: { icon: Clock, variant: 'secondary' },
+  running: { icon: Loader2, variant: 'default' },
+  completed: { icon: CheckCircle2, variant: 'default' },
+  failed: { icon: XCircle, variant: 'destructive' },
+  cancelled: { icon: Ban, variant: 'outline' },
+  interrupted: { icon: AlertCircle, variant: 'outline' },
 };
 
 type CodeReviewDetailClientProps = {
@@ -66,8 +66,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
     refetchInterval: query => {
       const result = query.state.data;
       if (!result?.success) return false;
-      const status = result.review.status;
-      return ['pending', 'queued', 'running'].includes(status) ? 5000 : false;
+      return isInFlightReviewStatus(result.review.status) ? 5000 : false;
     },
   });
 
@@ -135,15 +134,15 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
 
   const review = data.review;
   const status = review.status as CodeReviewStatus;
-  const statusInfo = statusConfig[status] ?? {
+  const statusInfo = statusIconConfig[status] ?? {
     icon: AlertCircle,
     variant: 'outline' as const,
-    label: review.status,
   };
+  const statusLabel = CODE_REVIEW_STATUS_LABELS[status] ?? review.status;
   const StatusIcon = statusInfo.icon;
   const showStreamView = status !== 'pending';
-  const canRetry = ['failed', 'cancelled', 'interrupted'].includes(status);
-  const canCancel = ['pending', 'queued', 'running'].includes(status);
+  const canRetry = isRetriggerableReviewStatus(status);
+  const canCancel = isCancellableReviewStatus(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
   const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);
   const isSupersededCancellation =
@@ -201,7 +200,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           )}
           <Badge variant={statusInfo.variant} className="mt-1 gap-1.5 text-sm whitespace-nowrap">
             <StatusIcon className={`h-4 w-4 ${status === 'running' ? 'animate-spin' : ''}`} />
-            {statusInfo.label}
+            {statusLabel}
           </Badge>
         </div>
       </div>

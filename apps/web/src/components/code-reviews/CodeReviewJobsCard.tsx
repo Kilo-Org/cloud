@@ -62,6 +62,13 @@ import {
   getCodeReviewRepositoryUrl,
   type CodeReviewUiPlatform,
 } from '@/lib/code-reviews/code-review-links';
+import {
+  CODE_REVIEW_STATUS_LABELS,
+  hasInFlightReview,
+  isCancellableReviewStatus,
+  isRetriggerableReviewStatus,
+  type CodeReviewStatus,
+} from '@kilocode/app-shared/code-review';
 
 type Platform = CodeReviewUiPlatform;
 
@@ -73,30 +80,23 @@ type CodeReviewJobsCardProps = {
   defaultThinkingEffort?: string | null;
 };
 
-type CodeReviewStatus =
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'interrupted';
-
-const statusConfig: Record<
+// Icons/badge variant stay web-local; labels come from the shared
+// CODE_REVIEW_STATUS_LABELS map (see usage below) so they can't drift from
+// mobile's STATUS_META copy.
+const statusIconConfig: Record<
   CodeReviewStatus,
   {
     icon: ComponentType<{ className?: string }>;
     variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    label: string;
   }
 > = {
-  pending: { icon: Clock, variant: 'secondary', label: 'Pending' },
-  queued: { icon: Clock, variant: 'secondary', label: 'Queued' },
-  running: { icon: Loader2, variant: 'default', label: 'Running' },
-  completed: { icon: CheckCircle2, variant: 'default', label: 'Completed' },
-  failed: { icon: XCircle, variant: 'destructive', label: 'Failed' },
-  cancelled: { icon: Ban, variant: 'outline', label: 'Cancelled' },
-  interrupted: { icon: AlertCircle, variant: 'outline', label: 'Interrupted' },
+  pending: { icon: Clock, variant: 'secondary' },
+  queued: { icon: Clock, variant: 'secondary' },
+  running: { icon: Loader2, variant: 'default' },
+  completed: { icon: CheckCircle2, variant: 'default' },
+  failed: { icon: XCircle, variant: 'destructive' },
+  cancelled: { icon: Ban, variant: 'outline' },
+  interrupted: { icon: AlertCircle, variant: 'outline' },
 };
 
 const PAGE_SIZE = 10;
@@ -249,8 +249,7 @@ export function CodeReviewJobsCard({
       const result = query.state.data;
       if (!result || !result.success) return false;
       const reviews = result.reviews || [];
-      const hasActiveJobs = reviews.some(r => ['pending', 'queued', 'running'].includes(r.status));
-      return hasActiveJobs ? 5000 : false; // Poll every 5s if active jobs
+      return hasInFlightReview(reviews) ? 5000 : false; // Poll every 5s if active jobs
     },
   });
 
@@ -681,11 +680,12 @@ export function CodeReviewJobsCard({
         <CardContent>
           <div className="space-y-3">
             {reviews.map(review => {
-              const statusInfo = statusConfig[review.status as CodeReviewStatus] ?? {
+              const statusInfo = statusIconConfig[review.status as CodeReviewStatus] ?? {
                 icon: AlertCircle,
                 variant: 'outline' as const,
-                label: review.status,
               };
+              const statusLabel =
+                CODE_REVIEW_STATUS_LABELS[review.status as CodeReviewStatus] ?? review.status;
               const StatusIcon = statusInfo.icon;
               const isExpanded = expandedReviewId === review.id;
               const canShowStream = ['running', 'queued'].includes(review.status);
@@ -758,7 +758,7 @@ export function CodeReviewJobsCard({
                           <StatusIcon
                             className={`h-3 w-3 ${review.status === 'running' ? 'animate-spin' : ''}`}
                           />
-                          {statusInfo.label}
+                          {statusLabel}
                         </Badge>
                       </div>
 
@@ -820,7 +820,7 @@ export function CodeReviewJobsCard({
                       {/* Action Buttons */}
                       <div className="mt-2 flex gap-2">
                         {/* Cancel Button for pending/queued/running reviews */}
-                        {['pending', 'queued', 'running'].includes(review.status) && (
+                        {isCancellableReviewStatus(review.status) && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -841,7 +841,7 @@ export function CodeReviewJobsCard({
                         )}
 
                         {/* Retry Button for failed/cancelled/interrupted reviews */}
-                        {['failed', 'cancelled', 'interrupted'].includes(review.status) &&
+                        {isRetriggerableReviewStatus(review.status) &&
                           actionRequiredCopy &&
                           actionRequiredRecoveryHref && (
                             <Button variant="outline" size="sm" asChild className="gap-2">
@@ -858,28 +858,27 @@ export function CodeReviewJobsCard({
                               )}
                             </Button>
                           )}
-                        {['failed', 'cancelled', 'interrupted'].includes(review.status) &&
-                          !actionRequiredReason && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActionInProgressId(review.id);
-                                retriggerMutation.mutate({ reviewId: review.id });
-                              }}
-                              disabled={
-                                actionInProgressId === review.id && retriggerMutation.isPending
-                              }
-                              className="gap-2"
-                            >
-                              <RotateCcw
-                                className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
-                              />
-                              {actionInProgressId === review.id && retriggerMutation.isPending
-                                ? 'Retrying...'
-                                : 'Retry'}
-                            </Button>
-                          )}
+                        {isRetriggerableReviewStatus(review.status) && !actionRequiredReason && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setActionInProgressId(review.id);
+                              retriggerMutation.mutate({ reviewId: review.id });
+                            }}
+                            disabled={
+                              actionInProgressId === review.id && retriggerMutation.isPending
+                            }
+                            className="gap-2"
+                          >
+                            <RotateCcw
+                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                            />
+                            {actionInProgressId === review.id && retriggerMutation.isPending
+                              ? 'Retrying...'
+                              : 'Retry'}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

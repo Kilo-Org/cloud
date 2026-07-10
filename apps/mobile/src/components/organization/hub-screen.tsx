@@ -60,7 +60,7 @@ export function OrganizationHubScreen() {
                 <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
                   {org.organizationName}
                 </Text>
-                {role === 'owner' && (
+                {showMoney && (
                   <Pressable
                     onPress={() => {
                       setRenameVisible(true);

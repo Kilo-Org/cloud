@@ -40,10 +40,14 @@ export default function ModelListScreen() {
 
   const {
     data: models,
-    isLoading,
+    isLoading: isModelsLoading,
     isError,
     refetch,
   } = useQuery(trpc.models.list.queryOptions(undefined, { staleTime: 5 * 60_000 }));
+
+  // Instance context resolves organizationId — until it's ready, updateModel would
+  // mutate with organizationId undefined (PERSONAL config) instead of the org's.
+  const isLoading = isModelsLoading || instanceContext.status === 'loading';
 
   const filtered = (models ?? []).filter((m: ModelItem) => {
     if (!searchFilter) {

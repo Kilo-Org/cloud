@@ -1,4 +1,7 @@
-import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
+import {
+  advanceSettingsBaseline,
+  getSettingsDirtyState,
+} from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -125,6 +128,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const handleSave = async () => {
     const result = await save.mutateAsync(patch);
+    initialConfigRef.current = advanceSettingsBaseline(initialConfigRef.current, patch);
     if (result.existingFindingsQueuedCount) {
       toast.success(
         `${result.existingFindingsQueuedCount} existing finding${result.existingFindingsQueuedCount === 1 ? '' : 's'} queued for analysis.`
@@ -132,7 +136,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     }
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
@@ -165,6 +169,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }

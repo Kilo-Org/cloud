@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { type RefObject } from 'react';
 import { ActivityIndicator } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -19,11 +20,16 @@ export function SettingsSaveButton({
   valid,
   pending,
   onSave,
+  skipNextGuardRef,
 }: Readonly<{
   dirty: boolean;
   valid: boolean;
   pending: boolean;
   onSave: () => Promise<void>;
+  // From useSettingsBackGuard — set right before router.back() so the
+  // back-navigation this button itself triggers doesn't get intercepted as
+  // an unconfirmed exit (see use-settings-back-guard.ts).
+  skipNextGuardRef: RefObject<boolean>;
 }>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -36,6 +42,7 @@ export function SettingsSaveButton({
         void (async () => {
           try {
             await onSave();
+            skipNextGuardRef.current = true;
             router.back();
           } catch {
             // Centralized onError already toasted; stay on screen.

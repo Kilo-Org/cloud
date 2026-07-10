@@ -89,6 +89,18 @@ export function getSettingsDirtyState<T extends Record<string, unknown>>(
   return valid ? 'dirty-valid' : 'dirty-invalid';
 }
 
+/**
+ * Advances a settings screen's dirty-comparison baseline after a successful
+ * save, so `getSettingsDirtyState(advanced, patch, valid)` reads 'clean'
+ * without waiting for the screen to re-hydrate from a refetched query.
+ */
+export function advanceSettingsBaseline<T extends Record<string, unknown>>(
+  baseline: Partial<T>,
+  patch: Partial<T>
+): Partial<T> {
+  return { ...baseline, ...patch };
+}
+
 type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
 
 /**

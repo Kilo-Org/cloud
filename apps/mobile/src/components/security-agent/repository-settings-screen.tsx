@@ -1,4 +1,7 @@
-import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
+import {
+  advanceSettingsBaseline,
+  getSettingsDirtyState,
+} from '@kilocode/app-shared/security-agent';
 import * as Haptics from 'expo-haptics';
 import { Check, Lock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -66,19 +69,17 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
 
   const valid = mode === 'all' || selectedIds.length > 0;
+  const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
   const dirty =
     hydratedRef.current &&
-    getSettingsDirtyState(
-      initialConfigRef.current,
-      { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds },
-      valid
-    ) !== 'clean';
+    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
 
   const handleSave = async () => {
-    await save.mutateAsync({ repositorySelectionMode: mode, selectedRepositoryIds: selectedIds });
+    await save.mutateAsync(patch);
+    initialConfigRef.current = advanceSettingsBaseline(initialConfigRef.current, patch);
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
@@ -123,6 +124,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }

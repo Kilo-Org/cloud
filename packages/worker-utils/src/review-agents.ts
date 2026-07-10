@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { CODE_REVIEW_TYPES, COUNCIL_AGGREGATION_STRATEGIES } from '@kilocode/db/schema-types';
 
 /**
  * Cross-service wire contract for code-reviewer -> cloud-agent review agent selections.
@@ -30,9 +31,11 @@ export const ReviewAgentSelectionSchema = z.object({
  * end-to-end for council mode but are not yet consumed by execution.
  */
 export const ReviewAgentsConfigSchema = z.object({
-  reviewType: z.enum(['standard', 'council']),
+  // Reuse the persisted-config enums (single source of truth in @kilocode/db/schema-types)
+  // so the wire contract and the stored council config can't drift.
+  reviewType: z.enum(CODE_REVIEW_TYPES),
   /** Council-only: how specialist votes combine. Unused for standard. */
-  aggregationStrategy: z.enum(['any_blocking_member', 'majority', 'unanimous_required']).optional(),
+  aggregationStrategy: z.enum(COUNCIL_AGGREGATION_STRATEGIES).optional(),
   agents: z.array(ReviewAgentSelectionSchema),
 });
 

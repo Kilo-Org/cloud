@@ -55,20 +55,7 @@ export async function assertCouncilCreationAllowed(params: {
   });
 }
 
-/**
- * Enforces entitlement when a council configuration is being saved. Same authority
- * as run-creation, keyed on the presence of a council config rather than review type.
- * Throws FORBIDDEN when council config is provided without entitlement.
- */
-export async function assertCouncilConfigAllowed(params: {
-  owner: Owner;
-  council: unknown;
-}): Promise<void> {
-  if (!params.council) return;
-  if (isLocalCodeReviewDevelopmentEnabled()) return;
-  if (await isCouncilEntitledForOwner(params.owner)) return;
-  throw new TRPCError({
-    code: 'FORBIDDEN',
-    message: 'Council reviews require an Enterprise plan.',
-  });
-}
+// NOTE: a config-save guard (`assertCouncilConfigAllowed`) will be added alongside the
+// council config-save path (PR #5) that actually accepts a `council` config, so it lands
+// with its first caller rather than as an unreferenced export. The creation-boundary
+// guard above already prevents a non-entitled owner from *running* a council review.

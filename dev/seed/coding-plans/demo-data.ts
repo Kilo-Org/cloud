@@ -480,6 +480,7 @@ async function seedScenario(scenario: string, key: Buffer, users: SeedUser[]): P
           normalized_email: user.normalizedEmail,
           email_domain: EMAIL_DOMAIN,
           has_validation_stytch: true,
+          customer_source: 'dev-seed',
           total_microdollars_acquired: grantAmount,
           microdollars_used: subscription ? PLANS[subscription.planId].costMicrodollars : 0,
           auto_top_up_enabled: subscription?.status === 'past_due',

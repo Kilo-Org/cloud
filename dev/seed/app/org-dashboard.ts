@@ -107,6 +107,7 @@ async function createUser(handle: string, displayName: string) {
     stripe_customer_id: `cus_seed_${id.replace(/-/g, '').slice(0, 14)}`,
     normalized_email: email,
     has_validation_stytch: true,
+    customer_source: 'dev-seed',
   });
   return id;
 }

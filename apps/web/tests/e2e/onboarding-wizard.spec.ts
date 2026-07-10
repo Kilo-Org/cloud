@@ -25,10 +25,23 @@ async function signInFreshUser(
   await page.waitForURL(
     url =>
       url.pathname === '/gastown/onboarding' ||
+      url.pathname === '/customer-source-survey' ||
       url.pathname === '/profile' ||
       url.pathname.startsWith('/organizations/'),
     { timeout: 30000, waitUntil: 'networkidle' }
   );
+
+  // If we landed on the survey page, skip it
+  if (new URL(page.url()).pathname === '/customer-source-survey') {
+    await page.click('button:has-text("Skip")');
+    await page.waitForURL(
+      url =>
+        url.pathname === '/gastown/onboarding' ||
+        url.pathname === '/profile' ||
+        url.pathname.startsWith('/organizations/'),
+      { timeout: 15000, waitUntil: 'networkidle' }
+    );
+  }
 
   // If we're not on /gastown/onboarding, navigate directly
   if (new URL(page.url()).pathname !== '/gastown/onboarding') {

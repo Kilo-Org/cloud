@@ -6,6 +6,8 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
 let testUser: User;
+let surveyTestUser: User;
+let skipTestUser: User;
 
 describe('user router - updateProfile', () => {
   beforeAll(async () => {
@@ -129,40 +131,217 @@ describe('user router - updateProfile', () => {
   });
 });
 
-describe('user router - customer source', () => {
-  it('saves a submitted source', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
+describe('user router - submitCustomerSource', () => {
+  beforeAll(async () => {
+    surveyTestUser = await insertTestUser({
+      google_user_email: 'survey-test@example.com',
+      google_user_name: 'Survey Test User',
+    });
+  });
 
-    await caller.user.submitCustomerSource({ source: '  GitHub  ' });
+  afterEach(async () => {
+    await db
+      .update(kilocode_users)
+      .set({ customer_source: null })
+      .where(eq(kilocode_users.id, surveyTestUser.id));
+  });
+
+  it('saves the customer source to the database', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
+    const result = await caller.user.submitCustomerSource({ source: 'A YouTube video' });
+
+    expect(result).toEqual({ success: true });
 
     const updated = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
+      where: eq(kilocode_users.id, surveyTestUser.id),
     });
-    expect(updated?.customer_source).toBe('GitHub');
+    expect(updated?.customer_source).toBe('A YouTube video');
   });
 
-  it('rejects empty and oversized sources', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
+  it('overwrites a previous response', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
 
-    await expect(caller.user.submitCustomerSource({ source: '   ' })).rejects.toThrow();
-    await expect(caller.user.submitCustomerSource({ source: 'a'.repeat(1001) })).rejects.toThrow();
+    await caller.user.submitCustomerSource({ source: 'First answer' });
+    await caller.user.submitCustomerSource({ source: 'Updated answer' });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, surveyTestUser.id),
+    });
+    expect(updated?.customer_source).toBe('Updated answer');
   });
 
-  it('dismisses an unanswered prompt without overwriting an answer', async () => {
-    const unansweredUser = await insertTestUser();
-    const answeredUser = await insertTestUser({ customer_source: 'A teammate' });
+  it('rejects empty strings', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
 
-    await (await createCallerForUser(unansweredUser.id)).user.skipCustomerSource();
-    await (await createCallerForUser(answeredUser.id)).user.skipCustomerSource();
+    await expect(caller.user.submitCustomerSource({ source: '' })).rejects.toThrow();
+  });
 
-    const [unansweredResult, answeredResult] = await Promise.all([
-      db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, unansweredUser.id) }),
-      db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, answeredUser.id) }),
-    ]);
-    expect(unansweredResult?.customer_source).toBe('');
-    expect(answeredResult?.customer_source).toBe('A teammate');
+  it('rejects strings over 1000 characters', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
+
+    const longString = 'a'.repeat(1001);
+    await expect(caller.user.submitCustomerSource({ source: longString })).rejects.toThrow();
+  });
+
+  it('accepts a string at the max length of 1000', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
+    const maxString = 'a'.repeat(1000);
+
+    const result = await caller.user.submitCustomerSource({ source: maxString });
+    expect(result).toEqual({ success: true });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, surveyTestUser.id),
+    });
+    expect(updated?.customer_source).toBe(maxString);
+  });
+
+  it('accepts a single-character string', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
+    const result = await caller.user.submitCustomerSource({ source: 'X' });
+
+    expect(result).toEqual({ success: true });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, surveyTestUser.id),
+    });
+    expect(updated?.customer_source).toBe('X');
+  });
+
+  it('accepts 1000 chars of content with leading/trailing spaces (validates post-trim)', async () => {
+    const caller = await createCallerForUser(surveyTestUser.id);
+    const content = 'a'.repeat(1000);
+    const result = await caller.user.submitCustomerSource({ source: `  ${content}  ` });
+
+    expect(result).toEqual({ success: true });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, surveyTestUser.id),
+    });
+    expect(updated?.customer_source).toBe(content);
+  });
+
+  describe('whitespace-only input rejection', () => {
+    it('rejects spaces-only input', async () => {
+      const caller = await createCallerForUser(surveyTestUser.id);
+
+      await expect(caller.user.submitCustomerSource({ source: '   ' })).rejects.toThrow();
+    });
+
+    it('rejects tab-only input', async () => {
+      const caller = await createCallerForUser(surveyTestUser.id);
+
+      await expect(caller.user.submitCustomerSource({ source: '\t\t' })).rejects.toThrow();
+    });
+
+    it('rejects newline-only input', async () => {
+      const caller = await createCallerForUser(surveyTestUser.id);
+
+      await expect(caller.user.submitCustomerSource({ source: '\n\n' })).rejects.toThrow();
+    });
+
+    it('rejects mixed whitespace input', async () => {
+      const caller = await createCallerForUser(surveyTestUser.id);
+
+      await expect(caller.user.submitCustomerSource({ source: ' \t\n ' })).rejects.toThrow();
+    });
+  });
+
+  describe('whitespace trimming on valid input', () => {
+    it('trims leading and trailing whitespace before storing', async () => {
+      const caller = await createCallerForUser(surveyTestUser.id);
+      const result = await caller.user.submitCustomerSource({ source: '  hello  ' });
+
+      expect(result).toEqual({ success: true });
+
+      const updated = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, surveyTestUser.id),
+      });
+      expect(updated?.customer_source).toBe('hello');
+    });
+
+    it('preserves internal whitespace in stored value', async () => {
+      const caller = await createCallerForUser(surveyTestUser.id);
+      const result = await caller.user.submitCustomerSource({ source: 'a YouTube video' });
+
+      expect(result).toEqual({ success: true });
+
+      const updated = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, surveyTestUser.id),
+      });
+      expect(updated?.customer_source).toBe('a YouTube video');
+    });
+  });
+});
+
+describe('user router - skipCustomerSource', () => {
+  beforeAll(async () => {
+    skipTestUser = await insertTestUser({
+      google_user_email: 'skip-survey-test@example.com',
+      google_user_name: 'Skip Survey Test User',
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .update(kilocode_users)
+      .set({ customer_source: null })
+      .where(eq(kilocode_users.id, skipTestUser.id));
+  });
+
+  it('skipCustomerSource mutation exists and returns success', async () => {
+    const caller = await createCallerForUser(skipTestUser.id);
+    const result = await caller.user.skipCustomerSource();
+
+    expect(result).toEqual({ success: true });
+  });
+
+  it('sets customer_source to empty string after skipping', async () => {
+    const caller = await createCallerForUser(skipTestUser.id);
+    await caller.user.skipCustomerSource();
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, skipTestUser.id),
+    });
+    expect(updated?.customer_source).toBe('');
+  });
+
+  it('is idempotent - calling skipCustomerSource twice still returns success', async () => {
+    const caller = await createCallerForUser(skipTestUser.id);
+
+    const result1 = await caller.user.skipCustomerSource();
+    expect(result1).toEqual({ success: true });
+
+    const result2 = await caller.user.skipCustomerSource();
+    expect(result2).toEqual({ success: true });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, skipTestUser.id),
+    });
+    expect(updated?.customer_source).toBe('');
+  });
+
+  it('does NOT overwrite a real answer when skipCustomerSource is called after submitCustomerSource', async () => {
+    const caller = await createCallerForUser(skipTestUser.id);
+
+    await caller.user.submitCustomerSource({ source: 'Found it on Hacker News' });
+    await caller.user.skipCustomerSource();
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, skipTestUser.id),
+    });
+    expect(updated?.customer_source).toBe('Found it on Hacker News');
+  });
+
+  it('allows a real answer to overwrite a previous skip', async () => {
+    const caller = await createCallerForUser(skipTestUser.id);
+    await caller.user.skipCustomerSource();
+    await caller.user.submitCustomerSource({ source: 'Changed my mind — Reddit' });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, skipTestUser.id),
+    });
+    expect(updated?.customer_source).toBe('Changed my mind — Reddit');
   });
 });
 

@@ -75,8 +75,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     kiloUserId: userId,
   });
 
-  // Pre-set account verification so seeded users can hit dashboards without
-  // bouncing through `/account-verification`.
+  // Pre-set the onboarding gates so seeded users can hit dashboards without
+  // bouncing through `/account-verification` (gated on
+  // `has_validation_stytch !== null`) or `/customer-source-survey` (gated on
+  // `customer_source !== null`). See apps/web/src/lib/stytch.ts and
+  // apps/web/src/lib/survey-redirect.ts.
   try {
     await db.insert(kilocode_users).values({
       id: userId,
@@ -86,6 +89,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       stripe_customer_id: stripeCustomer.id,
       normalized_email: normalizedEmail,
       has_validation_stytch: true,
+      customer_source: 'dev-seed',
     });
   } catch (error) {
     // The DB insert failed after we already created a Stripe customer; clean
@@ -100,5 +104,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     email: trimmedEmail,
     stripeCustomerId: stripeCustomer.id,
     hasValidationStytch: true,
+    customerSource: 'dev-seed',
   };
 }

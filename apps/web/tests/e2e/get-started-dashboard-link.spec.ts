@@ -23,13 +23,18 @@ test.describe('/get-started auth-aware router', () => {
     const testEmail = `test-get-started-${uniqueId}+stytchpass@example.com`;
 
     await page.goto(`/users/sign_in?fakeUser=${encodeURIComponent(testEmail)}`);
-    await page.waitForURL(url => isSignedInDestination(url), {
-      timeout: 30000,
-      waitUntil: 'networkidle',
-    });
-    await expect(
-      page.getByText('Where did you hear about Kilo Code?', { exact: true })
-    ).toBeVisible();
+    await page.waitForURL(
+      url => url.pathname === '/customer-source-survey' || isSignedInDestination(url),
+      { timeout: 30000, waitUntil: 'networkidle' }
+    );
+
+    if (new URL(page.url()).pathname === '/customer-source-survey') {
+      await page.getByRole('button', { name: 'Skip' }).click();
+      await page.waitForURL(url => isSignedInDestination(url), {
+        timeout: 15000,
+        waitUntil: 'networkidle',
+      });
+    }
 
     await page.goto('/get-started');
     await page.waitForURL(url => isSignedInDestination(url), {

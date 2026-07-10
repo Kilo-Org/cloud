@@ -72,8 +72,9 @@ Topic files MUST NOT:
 Bare `kilocode_users` inserts leave users trapped in onboarding. To reach product surfaces, set:
 
 - `has_validation_stytch: true` — bypasses `/account-verification` (`!== null`).
+- `customer_source: 'dev-seed'` — bypasses `/customer-source-survey` (`!== null`; `''` means skipped).
 
-Canonical example: `app/create-user.ts`. Gate code: `apps/web/src/lib/stytch.ts` (`getStytchStatus`). When adding a gate, update this section and `app/create-user.ts` together.
+Canonical example: `app/create-user.ts`. Gate code: `apps/web/src/lib/stytch.ts` (`getStytchStatus`) and `apps/web/src/lib/survey-redirect.ts` (`maybeInterceptWithSurvey`). When adding a gate, update this section and `app/create-user.ts` together.
 
 ## New-topic checklist
 

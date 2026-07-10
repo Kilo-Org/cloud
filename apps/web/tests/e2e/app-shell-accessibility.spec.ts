@@ -27,6 +27,7 @@ async function seedFakeUser({ isAdmin }: { isAdmin: boolean }) {
       hosted_domain: hosted_domain_specials.fake_devonly,
       stripe_customer_id: `cus_app_shell_${uniqueId}`,
       completed_welcome_form: true,
+      customer_source: 'App shell test',
       has_validation_stytch: true,
       is_admin: isAdmin,
     });

@@ -31,6 +31,10 @@ jest.mock('@/lib/impact/debug', () => ({
 
 jest.mock('@/lib/posthog', () => jest.fn(() => ({ capture: jest.fn() })));
 
+jest.mock('@/lib/survey-redirect', () => ({
+  maybeInterceptWithSurvey: jest.fn((_, responsePath: string) => responsePath),
+}));
+
 jest.mock('@/lib/credit-campaigns', () => ({
   isCreditCampaignCallback: jest.fn(() => null),
   lookupCampaignBySlug: jest.fn(),

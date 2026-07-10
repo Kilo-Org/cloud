@@ -46,6 +46,7 @@ test.describe('local setup smoke', () => {
         hosted_domain: hosted_domain_specials.fake_devonly,
         stripe_customer_id: `cus_setup_smoke_${uniqueId}`,
         completed_welcome_form: true,
+        customer_source: 'Setup smoke test',
         has_validation_stytch: true,
       });
     } finally {

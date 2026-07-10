@@ -19,7 +19,7 @@ type MemberRowProps = {
   last?: boolean;
 };
 
-const ROLE_LABEL: Record<OrgRole, string> = {
+export const ROLE_LABEL: Record<OrgRole, string> = {
   owner: 'Owner',
   member: 'Member',
   billing_manager: 'Billing manager',

@@ -1,3 +1,5 @@
+import type { CodeReviewPlatform } from '@kilocode/app-shared/code-review';
+
 export {
   buildSaveConfigInput,
   GATE_THRESHOLDS,
@@ -5,7 +7,7 @@ export {
   REVIEW_STYLES,
 } from '@kilocode/app-shared/code-review';
 
-export type ReviewerPlatform = 'github' | 'gitlab' | 'bitbucket';
+export type ReviewerPlatform = CodeReviewPlatform;
 
 export function asReviewerPlatform(value: string): ReviewerPlatform {
   return value === 'gitlab' || value === 'bitbucket' ? value : 'github';

@@ -23,6 +23,7 @@ export type ReviewFocusArea = (typeof REVIEW_FOCUS_AREAS)[number];
 export const GATE_THRESHOLDS = ['off', 'all', 'warning', 'critical'] as const;
 export type GateThreshold = (typeof GATE_THRESHOLDS)[number];
 
-// Structural platform union — matches packages/db's CODE_REVIEW_PLATFORMS
-// (['github', 'gitlab', 'bitbucket']) without importing @kilocode/db.
-export type CodeReviewPlatform = 'github' | 'gitlab' | 'bitbucket';
+// Canonical platform list — packages/db re-exports this (schema-types.ts),
+// same direction as REVIEW_STYLES / GATE_THRESHOLDS above.
+export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
+export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];

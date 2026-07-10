@@ -1222,8 +1222,7 @@ export type CodeReviewFindingSecurityClass =
 
 // --- CodeReviewAgentConfig ---
 
-export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
-export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];
+export { CODE_REVIEW_PLATFORMS, type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
 
 export const ManuallyAddedRepositorySchema = z.object({
   id: z.number(),

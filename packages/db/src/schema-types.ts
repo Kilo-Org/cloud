@@ -1551,7 +1551,15 @@ export const VerbositySchema = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
 
 export type Verbosity = z.infer<typeof VerbositySchema>;
 
-export const ReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+export const ReasoningEffortSchema = z.enum([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+]);
 
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 

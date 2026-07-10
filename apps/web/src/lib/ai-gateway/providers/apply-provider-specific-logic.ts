@@ -41,12 +41,6 @@ import {
 } from '@/lib/ai-gateway/schema-rewrite';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
-  if (isFableModel(requestedModel)) {
-    return [
-      // our bedrock account doesn't have the required data retention enabled
-      OpenRouterInferenceProviderIdSchema.enum.anthropic,
-    ];
-  }
   if (isClaudeModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],

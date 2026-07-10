@@ -26,6 +26,7 @@ export type VercelProviderAttempt = {
 };
 
 export type VercelModelAttempt = {
+  canonicalSlug?: string;
   success?: boolean;
   providerAttempts?: VercelProviderAttempt[];
 };
@@ -33,6 +34,7 @@ export type VercelModelAttempt = {
 export type VercelProviderMetaData = {
   gateway?: {
     routing?: {
+      canonicalSlug?: string;
       finalProvider?: string;
       modelAttempts?: VercelModelAttempt[];
     };

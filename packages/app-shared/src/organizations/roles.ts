@@ -26,5 +26,4 @@ export function canManageOrganizationBilling(role: string | undefined): boolean 
 // MemberRoleDropdown.tsx) render 'Billing Manager' (capital M). Three
 // different renderings for the same role — not shareable. owner/member
 // labels agree ('Owner'/'Member' everywhere) but a partial Record<OrganizationRole, string>
-// isn't a meaningful export, so nothing is shared here. See task report for
-// detail.
+// isn't a meaningful export, so nothing is shared here.

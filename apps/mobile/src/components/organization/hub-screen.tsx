@@ -74,7 +74,9 @@ export function OrganizationHubScreen() {
                   </Pressable>
                 )}
               </View>
-              {showMoney && <KvRow label="Balance" value={`$${org.balance.toFixed(2)}`} />}
+              {showMoney && (
+                <KvRow label="Balance" value={`$${(org.balance / 1_000_000).toFixed(2)}`} />
+              )}
               <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
             </Animated.View>
           )}

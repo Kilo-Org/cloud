@@ -62,14 +62,11 @@ describe('useKiloChatTokenResponseGetter', () => {
     unsubscribe();
   });
 
-  it('parses PostgreSQL timestamp format for token expiry', async () => {
-    const futureTime = Date.now() + 3_600_000;
-    const pgTimestamp = new Date(futureTime).toISOString().replace('T', ' ').replace('Z', '+00');
-
+  it('caches the token when a PostgreSQL-format expiry is far in the future', async () => {
     const response = {
       token: 'kilo-jwt',
       userId: 'user-2',
-      expiresAt: pgTimestamp,
+      expiresAt: '2099-03-13 14:30:00+00',
     };
 
     mocks.getItemAsync.mockResolvedValue('auth-token-2');
@@ -78,7 +75,39 @@ describe('useKiloChatTokenResponseGetter', () => {
     const { useKiloChatTokenResponseGetter } = await import('./use-kilo-chat-token');
     const getTokenResponse = useKiloChatTokenResponseGetter();
 
-    const result = await getTokenResponse();
-    expect(result).toBe(response);
+    await expect(getTokenResponse()).resolves.toBe(response);
+    await expect(getTokenResponse()).resolves.toBe(response);
+
+    // A second call within the cache window must not re-fetch. This only
+    // holds if the PG-format expiresAt was parsed into a valid future
+    // timestamp — with the old `new Date(pgTimestamp)` behavior it parses to
+    // an invalid Date (NaN), `expiresAtMs - Date.now() > 60_000` is false,
+    // and this would refetch, failing this assertion.
+    expect(mocks.getTokenQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches when a PostgreSQL-format expiry is in the past', async () => {
+    const firstResponse = {
+      token: 'kilo-jwt-old',
+      userId: 'user-3',
+      expiresAt: '2000-01-01 00:00:00+00',
+    };
+    const secondResponse = {
+      token: 'kilo-jwt-new',
+      userId: 'user-3',
+      expiresAt: '2099-03-13 14:30:00+00',
+    };
+
+    mocks.getItemAsync.mockResolvedValue('auth-token-3');
+    mocks.getTokenQuery.mockResolvedValueOnce(firstResponse);
+    mocks.getTokenQuery.mockResolvedValueOnce(secondResponse);
+
+    const { useKiloChatTokenResponseGetter } = await import('./use-kilo-chat-token');
+    const getTokenResponse = useKiloChatTokenResponseGetter();
+
+    await expect(getTokenResponse()).resolves.toBe(firstResponse);
+    await expect(getTokenResponse()).resolves.toBe(secondResponse);
+
+    expect(mocks.getTokenQuery).toHaveBeenCalledTimes(2);
   });
 });

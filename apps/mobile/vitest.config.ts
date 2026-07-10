@@ -26,6 +26,7 @@ export default defineConfig({
     include: [
       'src/lib/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',
+      'src/lib/auth/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/hooks/**/*.test.ts',

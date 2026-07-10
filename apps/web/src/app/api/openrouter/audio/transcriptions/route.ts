@@ -26,10 +26,12 @@ import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.ser
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
+  buildVercelTranscriptionBody,
   extractTranscriptionPromptInfo,
   TranscriptionRequestSchema,
 } from '@/lib/ai-gateway/transcriptions/transcription-request';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 export const maxDuration = 300;
 
@@ -38,9 +40,10 @@ const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 async function transcriptionProxyRequest(params: {
   body: Record<string, unknown>;
   provider: Provider;
+  model: string;
   signal?: AbortSignal;
 }) {
-  const { body, provider, signal } = params;
+  const { body, provider, model, signal } = params;
   const headers = new Headers();
   headers.set('Content-Type', 'application/json');
   headers.set('Authorization', `Bearer ${provider.apiKey}`);
@@ -49,10 +52,20 @@ async function transcriptionProxyRequest(params: {
     headers.set(key, value);
   }
 
+  if (provider.id === 'vercel') {
+    headers.set('ai-model-id', mapModelIdToVercel(model, false));
+    headers.set('ai-transcription-model-specification-version', '4');
+  }
+
   const timeout = AbortSignal.timeout(10 * 60 * 1000);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
 
-  return await fetch(`${provider.apiUrl}/audio/transcriptions`, {
+  const targetUrl =
+    provider.id === 'vercel'
+      ? `${provider.apiUrl.replace(/\/v1$/, '')}/v4/ai/transcription-model`
+      : `${provider.apiUrl}/audio/transcriptions`;
+
+  return await fetch(targetUrl, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -133,7 +146,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const user = maybeUser;
 
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const { provider, userByok } = await getTranscriptionProvider();
+  let { provider, userByok } = await getTranscriptionProvider(
+    requestedModelLowerCased,
+    body.provider,
+    user.id
+  );
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
   const promptInfo = extractTranscriptionPromptInfo(body);
 
@@ -182,6 +199,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (providerConfig) {
     body.provider = { ...body.provider, ...providerConfig };
+    ({ provider, userByok } = await getTranscriptionProvider(
+      requestedModelLowerCased,
+      body.provider,
+      user.id
+    ));
+    usageContext.provider = provider.id;
+    usageContext.user_byok = !!userByok;
   }
 
   sentryRootSpan()?.setAttribute(
@@ -192,11 +216,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const span = startInactiveSpan({ name: 'transcription-request-start', op: 'http.client' });
   body.safety_identifier = generateProviderSpecificHash(user.id, provider);
   body.user = body.safety_identifier;
-  const upstreamBody = buildUpstreamBody(body);
+  const upstreamBody =
+    provider.id === 'vercel' ? buildVercelTranscriptionBody(body) : buildUpstreamBody(body);
 
   const response = await transcriptionProxyRequest({
     body: upstreamBody,
     provider,
+    model: requestedModelLowerCased,
     signal: request.signal,
   });
 

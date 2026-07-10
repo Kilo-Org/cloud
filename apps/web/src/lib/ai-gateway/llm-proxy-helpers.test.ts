@@ -691,6 +691,20 @@ describe('parseEmbeddingUsageFromResponse', () => {
     expect(result.cost_mUsd).toBe(50);
   });
 
+  it('uses Vercel provider metadata cost when available', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      data: [],
+      model: 'openai/text-embedding-3-small',
+      usage: { prompt_tokens: 42, total_tokens: 42 },
+      providerMetadata: { gateway: { cost: '0.00002', marketCost: '0.00003' } },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(30);
+  });
+
   it('should default to 0 cost when upstream cost field is absent', () => {
     const response = makeResponse({
       usage: { prompt_tokens: 1000, total_tokens: 1000 },
@@ -815,6 +829,26 @@ describe('parseTranscriptionUsageFromResponse', () => {
     );
 
     expect(result.generation_time).toBe(2.5);
+  });
+
+  it('uses Vercel provider metadata cost and duration', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      JSON.stringify({
+        text: 'hello world',
+        durationInSeconds: 3.5,
+        providerMetadata: {
+          gateway: {
+            cost: '0.00002',
+            marketCost: '0.00003',
+          },
+        },
+      }),
+      200,
+      'openai/whisper-1'
+    );
+
+    expect(result.cost_mUsd).toBe(30);
+    expect(result.generation_time).toBe(3.5);
   });
 
   it('falls back to requested model when response model is absent', () => {

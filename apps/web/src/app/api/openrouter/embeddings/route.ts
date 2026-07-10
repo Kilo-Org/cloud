@@ -38,7 +38,10 @@ import {
   validateEmbeddingDimensions,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
+import {
+  convertProviderOptions,
+  getVercelInferenceProviderConfigForUserByok,
+} from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 
 export const maxDuration = 300;
@@ -155,10 +158,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Extract fraud/project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
 
-  const { provider, userByok } = await getEmbeddingProvider(
+  let { provider, userByok } = await getEmbeddingProvider(
     requestedModelLowerCased,
     user,
-    organizationId
+    organizationId,
+    requestBodyParsed.provider,
+    user.id
   );
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
@@ -213,6 +218,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     if (providerConfig) {
       requestBodyParsed.provider = providerConfig;
+      if (!userByok) {
+        ({ provider, userByok } = await getEmbeddingProvider(
+          requestedModelLowerCased,
+          user,
+          organizationId,
+          providerConfig,
+          user.id
+        ));
+        usageContext.provider = provider.id;
+        usageContext.user_byok = !!userByok;
+      }
     }
   }
 
@@ -247,7 +263,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // BYOK: for Vercel gateway, pass the user's key via providerOptions (same as chat completions).
   const effectiveProvider = provider;
 
-  if (userByok && userByok.length > 0 && provider.id === 'vercel') {
+  if (provider.id === 'vercel') {
     requestBodyParsed.model = mapModelIdToVercel(requestBodyParsed.model, false);
   }
 
@@ -265,7 +281,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         byok: byokProviders,
       },
     };
+  } else if (provider.id === 'vercel') {
+    upstreamBody.providerOptions = convertProviderOptions(requestBodyParsed.provider);
   }
+
+  if (provider.id === 'vercel') delete upstreamBody.provider;
 
   const response = await embeddingProxyRequest({
     body: upstreamBody,

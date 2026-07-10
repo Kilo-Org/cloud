@@ -1,4 +1,5 @@
 import { getKiloEmbeddingModel } from './kilo-embedding-models';
+import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 
 export type EmbeddingProxyRequest = {
   model: string;
@@ -6,7 +7,8 @@ export type EmbeddingProxyRequest = {
   encoding_format?: string;
   dimensions?: number;
   safety_identifier?: string;
-  provider?: Record<string, unknown>;
+  provider?: OpenRouterProviderConfig;
+  providerOptions?: Record<string, unknown>;
   input_type?: string;
   // Mistral-specific
   output_dtype?: string;

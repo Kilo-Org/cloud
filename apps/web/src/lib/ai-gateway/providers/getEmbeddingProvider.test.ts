@@ -11,12 +11,17 @@ import {
   getBYOKforOrganization,
 } from '@/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
+import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 
 jest.mock('@/lib/ai-gateway/byok');
+jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+  shouldRouteToVercel: jest.fn(),
+}));
 
 const mockedGetModelUserByokProviders = getModelUserByokProviders as jest.Mock;
 const mockedGetBYOKforUser = getBYOKforUser as jest.Mock;
 const mockedGetBYOKforOrganization = getBYOKforOrganization as jest.Mock;
+const mockedShouldRouteToVercel = jest.mocked(shouldRouteToVercel);
 
 function createTestUser(overrides: Partial<User> = {}): User {
   return {
@@ -34,6 +39,7 @@ describe('getEmbeddingProvider', () => {
     mockedGetModelUserByokProviders.mockClear().mockResolvedValue([]);
     mockedGetBYOKforUser.mockClear().mockResolvedValue(null);
     mockedGetBYOKforOrganization.mockClear().mockResolvedValue(null);
+    mockedShouldRouteToVercel.mockReset().mockResolvedValue(false);
   });
 
   it('should route all non-BYOK models to PROVIDERS.OPENROUTER', async () => {
@@ -44,7 +50,7 @@ describe('getEmbeddingProvider', () => {
       'openai/text-embedding-3-small',
       'google/text-embedding-004',
     ]) {
-      const result = await getEmbeddingProvider(model, user, undefined);
+      const result = await getEmbeddingProvider(model, user, undefined, undefined, user.id);
       expect(result.provider.id).toBe('openrouter');
       expect(result.provider).toBe(PROVIDERS.OPENROUTER);
       expect(result.userByok).toBeNull();
@@ -58,7 +64,13 @@ describe('getEmbeddingProvider', () => {
     mockedGetModelUserByokProviders.mockResolvedValue(['openai']);
     mockedGetBYOKforUser.mockResolvedValue(mockByokResult);
 
-    const result = await getEmbeddingProvider('openai/text-embedding-3-small', user, undefined);
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      user,
+      undefined,
+      undefined,
+      user.id
+    );
 
     expect(result.provider.id).toBe('vercel');
     expect(result.provider).toBe(PROVIDERS.VERCEL_AI_GATEWAY);
@@ -72,7 +84,13 @@ describe('getEmbeddingProvider', () => {
     mockedGetModelUserByokProviders.mockResolvedValue(['mistral']);
     mockedGetBYOKforOrganization.mockResolvedValue(mockByokResult);
 
-    const result = await getEmbeddingProvider('mistralai/mistral-embed-2312', user, 'org-123');
+    const result = await getEmbeddingProvider(
+      'mistralai/mistral-embed-2312',
+      user,
+      'org-123',
+      undefined,
+      user.id
+    );
 
     expect(result.provider.id).toBe('vercel');
     expect(result.userByok).toBe(mockByokResult);
@@ -83,7 +101,13 @@ describe('getEmbeddingProvider', () => {
 
   it('should skip BYOK check for anonymous users', async () => {
     const anonUser = createAnonymousContext('127.0.0.1');
-    const result = await getEmbeddingProvider('openai/text-embedding-3-small', anonUser, undefined);
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      anonUser,
+      undefined,
+      undefined,
+      anonUser.id
+    );
 
     expect(result.provider.id).toBe('openrouter');
     expect(result.userByok).toBeNull();
@@ -95,18 +119,63 @@ describe('getEmbeddingProvider', () => {
     mockedGetModelUserByokProviders.mockResolvedValue(['openai']);
     mockedGetBYOKforUser.mockResolvedValue(null);
 
-    const result = await getEmbeddingProvider('mistralai/codestral-embed-2505', user, undefined);
+    const result = await getEmbeddingProvider(
+      'mistralai/codestral-embed-2505',
+      user,
+      undefined,
+      undefined,
+      user.id
+    );
 
     expect(result.provider.id).toBe('openrouter');
     expect(result.userByok).toBeNull();
   });
+
+  it('routes eligible non-BYOK embeddings to Vercel', async () => {
+    const user = createTestUser();
+    mockedShouldRouteToVercel.mockResolvedValue(true);
+
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      user,
+      undefined,
+      { only: ['openai'] },
+      user.id
+    );
+
+    expect(result.provider).toBe(PROVIDERS.VERCEL_AI_GATEWAY);
+    expect(result.userByok).toBeNull();
+    expect(mockedShouldRouteToVercel).toHaveBeenCalledWith(
+      'openai/text-embedding-3-small',
+      null,
+      { only: ['openai'] },
+      user.id,
+      'embeddings'
+    );
+  });
 });
 
 describe('getTranscriptionProvider', () => {
+  beforeEach(() => {
+    mockedShouldRouteToVercel.mockReset().mockResolvedValue(false);
+  });
+
   it('routes transcription requests to OpenRouter', async () => {
-    const result = await getTranscriptionProvider();
+    const result = await getTranscriptionProvider('openai/whisper-1', undefined, 'user-123');
 
     expect(result.provider).toBe(PROVIDERS.OPENROUTER);
     expect(result.userByok).toBeNull();
+  });
+
+  it('routes eligible transcription requests to Vercel', async () => {
+    mockedShouldRouteToVercel.mockResolvedValue(true);
+
+    const result = await getTranscriptionProvider(
+      'openai/whisper-1',
+      { only: ['openai'] },
+      'user-123'
+    );
+
+    expect(result.provider).toBe(PROVIDERS.VERCEL_AI_GATEWAY);
   });
 });

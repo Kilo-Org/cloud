@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   buildUpstreamBody,
+  buildVercelTranscriptionBody,
   extractTranscriptionPromptInfo,
   TranscriptionRequestSchema,
 } from './transcription-request';
@@ -44,6 +45,28 @@ describe('buildUpstreamBody', () => {
     });
 
     expect(buildUpstreamBody(body)).toEqual(body);
+  });
+});
+
+describe('buildVercelTranscriptionBody', () => {
+  it('converts OpenRouter audio and routing fields to the Vercel contract', () => {
+    const body = TranscriptionRequestSchema.parse({
+      model: 'openai/gpt-4o-mini-transcribe',
+      input_audio: { data: 'UklGRiQA', format: 'mp3' },
+      language: 'en',
+      temperature: 0,
+      provider: { only: ['openai'] },
+      safety_identifier: 'hash-abc',
+    });
+
+    expect(buildVercelTranscriptionBody(body)).toMatchObject({
+      audio: 'UklGRiQA',
+      mediaType: 'audio/mpeg',
+      providerOptions: {
+        gateway: { only: ['openai'] },
+        openai: { language: 'en', temperature: 0 },
+      },
+    });
   });
 });
 

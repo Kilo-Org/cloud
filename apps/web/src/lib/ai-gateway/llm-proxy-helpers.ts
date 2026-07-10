@@ -39,11 +39,16 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
+  VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
+import {
+  computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
+  extractVercelIsByok,
+} from '@/lib/ai-gateway/processUsage.shared';
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
@@ -910,6 +915,7 @@ type EmbeddingResponse = {
   object: 'list';
   model: string;
   usage: EmbeddingUsage;
+  providerMetadata?: VercelProviderMetaData;
 };
 
 type TranscriptionUsage = {
@@ -927,6 +933,8 @@ type TranscriptionResponse = {
   model?: string;
   text?: string;
   usage?: TranscriptionUsage;
+  durationInSeconds?: number;
+  providerMetadata?: VercelProviderMetaData;
 };
 
 export function parseEmbeddingUsageFromResponse(
@@ -935,8 +943,12 @@ export function parseEmbeddingUsageFromResponse(
 ): MicrodollarUsageStats {
   const json: EmbeddingResponse = JSON.parse(responseText);
 
-  // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
+  const vercelGateway = json.providerMetadata?.gateway;
+  const cost_mUsd = vercelGateway
+    ? computeVercelCostMicrodollars(vercelGateway)
+    : json.usage.cost != null
+      ? toMicrodollars(json.usage.cost)
+      : 0;
 
   return {
     messageId: json.id ?? null,
@@ -949,7 +961,7 @@ export function parseEmbeddingUsageFromResponse(
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
     cost_mUsd,
-    is_byok: null,
+    is_byok: extractVercelIsByok(vercelGateway),
     upstream_id: null,
     finish_reason: null,
     latency: null,
@@ -977,16 +989,18 @@ export function parseTranscriptionUsageFromResponse(
     finish_reason: null,
     latency: null,
     moderation_latency: null,
-    generation_time: json.usage?.seconds ?? null,
+    generation_time: json.usage?.seconds ?? json.durationInSeconds ?? null,
     streamed: false,
     cancelled: false,
     status_code: statusCode,
   };
-  const cost = computeOpenRouterCostFields(
-    json.usage ?? {},
-    base,
-    'transcription_usage_processing'
-  );
+  const vercelGateway = json.providerMetadata?.gateway;
+  const cost = vercelGateway
+    ? {
+        cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
+        is_byok: extractVercelIsByok(vercelGateway),
+      }
+    : computeOpenRouterCostFields(json.usage ?? {}, base, 'transcription_usage_processing');
 
   return {
     ...base,

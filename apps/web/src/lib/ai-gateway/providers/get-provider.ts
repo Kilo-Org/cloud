@@ -1,5 +1,6 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
@@ -231,7 +232,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(requestedModel, kiloExclusiveModel, request, taskId || user.id))
+    (await shouldRouteToVercel(
+      requestedModel,
+      kiloExclusiveModel,
+      request.body.provider,
+      taskId || user.id,
+      'chat',
+      isReasoningExplicitlyDisabled(request)
+    ))
   ) {
     return {
       kind: 'provider',
@@ -254,7 +262,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  provider: GatewayRequest['body']['provider'] | undefined,
+  randomSeed: string
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null }> {
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
@@ -262,13 +272,30 @@ export async function getEmbeddingProvider(
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok };
   }
 
-  // 2. All non-BYOK embedding requests go through OpenRouter
+  if (await shouldRouteToVercel(requestedModel, null, provider, randomSeed, 'embeddings')) {
+    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null };
+  }
+
   return { provider: PROVIDERS.OPENROUTER, userByok: null };
 }
 
-export async function getTranscriptionProvider(): Promise<{
+export async function getTranscriptionProvider(
+  requestedModel: string,
+  provider: GatewayRequest['body']['provider'] | undefined,
+  randomSeed: string
+): Promise<{
   provider: Provider;
   userByok: BYOKResult[] | null;
 }> {
-  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+  const routeToVercel = await shouldRouteToVercel(
+    requestedModel,
+    null,
+    provider,
+    randomSeed,
+    'transcription'
+  );
+  return {
+    provider: routeToVercel ? PROVIDERS.VERCEL_AI_GATEWAY : PROVIDERS.OPENROUTER,
+    userByok: null,
+  };
 }

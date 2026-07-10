@@ -4,6 +4,8 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import { getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 
 jest.mock('next/server', () => {
   return {
@@ -14,6 +16,7 @@ jest.mock('next/server', () => {
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@/lib/ai-gateway/providers/get-provider');
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
 }));
@@ -28,6 +31,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
+const mockedGetTranscriptionProvider = jest.mocked(getTranscriptionProvider);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -71,6 +75,10 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
+    mockedGetTranscriptionProvider.mockResolvedValue({
+      provider: PROVIDERS.OPENROUTER,
+      userByok: null,
+    });
   });
 
   afterAll(() => {
@@ -147,6 +155,42 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     const [, init] = mockedFetch.mock.calls[0];
     const upstream = JSON.parse(init?.body as string);
     expect(upstream.provider).toEqual({ only: ['openai'], data_collection: 'deny' });
+  });
+
+  it('adapts transcription requests to the Vercel REST API', async () => {
+    setUserAuth();
+    mockedGetTranscriptionProvider.mockResolvedValue({
+      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      userByok: null,
+    });
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse({
+        text: 'hello world',
+        durationInSeconds: 1.5,
+        providerMetadata: { gateway: { cost: '0.00002' } },
+      })
+    );
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'mp3' },
+        provider: { only: ['openai'] },
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://ai-gateway.vercel.sh/v4/ai/transcription-model');
+    const headers = init?.headers as Headers;
+    expect(headers.get('ai-model-id')).toBe('openai/gpt-4o-mini-transcribe');
+    expect(headers.get('ai-transcription-model-specification-version')).toBe('4');
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      audio: 'UklGRiQA',
+      mediaType: 'audio/mpeg',
+      providerOptions: { gateway: { only: ['openai'] } },
+    });
   });
 
   it('rejects malformed transcription bodies before proxying', async () => {

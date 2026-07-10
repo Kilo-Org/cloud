@@ -26,7 +26,11 @@ export const adminGatewayConfigRouter = createTRPCRouter({
 
   set: adminProcedure.input(GatewayConfigInputSchema).mutation(async ({ input, ctx }) => {
     const config: GatewayConfig = {
-      vercel_routing_percentage: input.vercel_routing_percentage,
+      // Keep the legacy field while old instances may still read this Redis value.
+      vercel_routing_percentage: input.vercel_chat_routing_percentage,
+      vercel_chat_routing_percentage: input.vercel_chat_routing_percentage,
+      vercel_embeddings_routing_percentage: input.vercel_embeddings_routing_percentage,
+      vercel_transcription_routing_percentage: input.vercel_transcription_routing_percentage,
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,

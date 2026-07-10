@@ -2,32 +2,47 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 import type { CodeReviewType } from '@kilocode/db/schema-types';
 import type { Owner } from './schemas';
 
 /**
- * Single source of truth for which plan grants council. Council is enterprise-only.
- * Every gate (backend enforcement, UI visibility) derives from this predicate.
+ * Which plan tier grants council. Council is enterprise-only.
  *
- * NOTE: this is the access/entitlement boundary (money). Staged rollout (which entitled
- * users see council yet) is a separate concern handled by a client-side PostHog flag —
- * see "Rollout gating" in the plan. This module does not implement the rollout flag.
+ * NOTE: this is only the tier label. `organizations.plan` stays `'enterprise'` even
+ * after an enterprise subscription ends (it is not downgraded on cancellation), so plan
+ * alone is NOT proof of active entitlement. Active-subscription/trial status is layered
+ * on separately in `isCouncilEntitledForOrganization`. Staged rollout (which entitled
+ * users see council yet) is a separate client-side PostHog concern handled elsewhere.
  */
 export function isCouncilEntitledPlan(plan: string | null | undefined): boolean {
   return plan === 'enterprise';
 }
 
 /**
- * Council reviews are an enterprise-only feature. Entitlement is owned by the
- * organization plan; personal owners are never entitled.
+ * Council reviews are an enterprise-only paid feature. An organization is entitled only
+ * when it is on the enterprise tier AND currently has active entitlement (active paid
+ * subscription or non-expired trial). This mirrors the canonical entitlement check used
+ * by `requireActiveSubscriptionOrTrial`, so a lapsed enterprise org (plan still
+ * `'enterprise'`, seat purchase `ended`, trial hard-expired) cannot create paid council
+ * reviews. Personal owners are never entitled.
  */
 export async function isCouncilEntitledForOrganization(
   organizationId: string | null | undefined
 ): Promise<boolean> {
   if (!organizationId) return false;
   const organization = await getOrganizationById(organizationId);
-  return isCouncilEntitledPlan(organization?.plan);
+  if (!organization || !isCouncilEntitledPlan(organization.plan)) return false;
+
+  const latestPurchase = await getMostRecentSeatPurchase(organizationId);
+  const classification = classifyOrganizationEntitlement({
+    organization,
+    latestSeatPurchaseStatus: latestPurchase?.subscription_status ?? null,
+    now: new Date(),
+  });
+  return classification.hasEntitlement;
 }
 
 export async function isCouncilEntitledForOwner(owner: Owner): Promise<boolean> {

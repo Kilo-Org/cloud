@@ -1,59 +1,20 @@
+import {
+  getSecurityCommandInvalidationScopes,
+  type SecurityQueryScope,
+} from '@kilocode/app-shared/security-agent';
+
+// SecurityCommandType isn't exported from the shared package (it's an
+// internal detail of getSecurityCommandInvalidationScopes' parameter), so
+// the literal union is kept here — same values as the shared module.
 export type SecurityAgentCommandType =
   | 'sync'
   | 'dismiss_finding'
   | 'start_analysis'
   | 'apply_auto_remediation';
-export type SecurityAgentInvalidationScope =
-  | 'findings'
-  | 'findingDetails'
-  | 'analysis'
-  | 'stats'
-  | 'dashboardStats'
-  | 'lastSyncTime'
-  | 'repositories'
-  | 'orphanedRepositories'
-  | 'autoDismissEligible'
-  | 'permissionStatus'
-  | 'config';
+export type SecurityAgentInvalidationScope = SecurityQueryScope;
 
-const syncScopes = [
-  'findings',
-  'findingDetails',
-  'analysis',
-  'stats',
-  'dashboardStats',
-  'lastSyncTime',
-  'repositories',
-  'orphanedRepositories',
-  'autoDismissEligible',
-  'permissionStatus',
-] as const satisfies readonly SecurityAgentInvalidationScope[];
-
-const dismissalScopes = [
-  'findings',
-  'findingDetails',
-  'stats',
-  'dashboardStats',
-  'autoDismissEligible',
-] as const satisfies readonly SecurityAgentInvalidationScope[];
-
-const analysisScopes = [
-  'findings',
-  'findingDetails',
-  'analysis',
-  'stats',
-  'dashboardStats',
-  'autoDismissEligible',
-] as const satisfies readonly SecurityAgentInvalidationScope[];
-
-const remediationScopes = [
-  'findings',
-  'findingDetails',
-  'analysis',
-  'stats',
-  'dashboardStats',
-] as const satisfies readonly SecurityAgentInvalidationScope[];
-
+// Not part of the shared scope table (web-only bulk-delete flow; mobile has
+// no orphaned-repository cleanup surface yet).
 export const deletedSecurityAgentFindingsScopes = [
   'findings',
   'findingDetails',
@@ -66,14 +27,5 @@ export const deletedSecurityAgentFindingsScopes = [
 export function getSecurityAgentInvalidationScopesForCommand(
   commandType: SecurityAgentCommandType
 ): readonly SecurityAgentInvalidationScope[] {
-  switch (commandType) {
-    case 'sync':
-      return syncScopes;
-    case 'dismiss_finding':
-      return dismissalScopes;
-    case 'start_analysis':
-      return analysisScopes;
-    case 'apply_auto_remediation':
-      return remediationScopes;
-  }
+  return getSecurityCommandInvalidationScopes(commandType);
 }

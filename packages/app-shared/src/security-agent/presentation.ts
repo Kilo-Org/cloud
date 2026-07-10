@@ -683,7 +683,9 @@ export function getRemediationUnavailableCopy(reason: string | null | undefined)
   if (!reason || reason === 'eligible') {
     return null;
   }
-  return reason in REMEDIATION_UNAVAILABLE_COPY
+  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
+  // through to the generic copy instead of leaking prototype members.
+  return Object.hasOwn(REMEDIATION_UNAVAILABLE_COPY, reason)
     ? REMEDIATION_UNAVAILABLE_COPY[reason as RemediationUnavailableReason]
     : 'Remediation is unavailable for this finding.';
 }

@@ -626,6 +626,15 @@ describe('getRemediationUnavailableCopy', () => {
       'Remediation is unavailable for this finding.'
     );
   });
+
+  it('falls back for inherited object keys instead of leaking prototype members', () => {
+    expect(getRemediationUnavailableCopy('constructor')).toBe(
+      'Remediation is unavailable for this finding.'
+    );
+    expect(getRemediationUnavailableCopy('toString')).toBe(
+      'Remediation is unavailable for this finding.'
+    );
+  });
 });
 
 describe('formatValidationEvidenceEntry', () => {

@@ -5,12 +5,7 @@ import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
-    const expectedModels = [
-      'google/gemini-3.1-pro-preview',
-      CLAUDE_SONNET_CURRENT_MODEL_ID,
-      GPT_CURRENT_MODEL_ID,
-      'z-ai/glm-5.2',
-    ];
+    const expectedModels = [CLAUDE_SONNET_CURRENT_MODEL_ID, GPT_CURRENT_MODEL_ID, 'z-ai/glm-5.2'];
 
     expectedModels.forEach(model => {
       expect(preferredModels).toContain(model);

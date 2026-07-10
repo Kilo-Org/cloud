@@ -29,8 +29,8 @@ import {
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
-  getVercelModelsMetadata,
-  getOpenRouterModelsMetadata,
+  getVercelModelsMetadataFromDatabase,
+  getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -88,19 +88,20 @@ async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; 
 
 async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   const [vercelModelMetadata, openRouterModelMetadata] = await Promise.all([
-    getVercelModelsMetadata(),
-    getOpenRouterModelsMetadata(),
+    getVercelModelsMetadataFromDatabase(),
+    getOpenRouterModelsMetadataFromDatabase(),
   ]);
 
   if (Object.keys(vercelModelMetadata).length === 0) {
     throw new Error(
-      'No Vercel model metadata in Redis, use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
+      'No Vercel model metadata in the database, use the admin panel at ' +
+        MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
 
   if (Object.keys(openRouterModelMetadata).length === 0) {
     throw new Error(
-      'No OpenRouter model metadata in Redis, use the admin panel at ' +
+      'No OpenRouter model metadata in the database, use the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }

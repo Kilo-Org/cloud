@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModels: jest.fn(async () => new Set<string>()),
+  getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
 }));
 
 jest.mock('@/lib/kiloclaw/setup-promo', () => ({

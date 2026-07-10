@@ -5,7 +5,7 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
@@ -14,6 +14,7 @@ import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decisi
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 
 jest.mock('next/server', () => {
   return {
@@ -86,7 +87,7 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModels);
+const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromRedis);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
@@ -95,6 +96,7 @@ const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision)
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
+const mockedHandleRequestLogging = jest.mocked(handleRequestLogging);
 
 const provider = {
   id: 'openrouter',
@@ -104,12 +106,13 @@ const provider = {
   transformRequest: jest.fn(),
 } satisfies Provider;
 
-function makeRequest(body: unknown) {
+function makeRequest(body: unknown, headers?: HeadersInit) {
   return new Request('http://localhost:3000/api/openrouter/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-forwarded-for': '127.0.0.1',
+      ...headers,
     },
     body: JSON.stringify(body),
   });
@@ -240,6 +243,19 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedRedisSet).toHaveBeenCalledWith(
       expect.stringContaining('ai-gateway.abuse-rules:last-classification:user:user-123'),
       'block'
+    );
+  });
+
+  it('passes the Vercel request ID to request logging', async () => {
+    const { POST } = await import('./route');
+
+    const response = await POST(
+      makeRequest(makeBody(), { 'x-vercel-id': 'iad1::iad1::request-id' }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedHandleRequestLogging).toHaveBeenCalledWith(
+      expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' })
     );
   });
 

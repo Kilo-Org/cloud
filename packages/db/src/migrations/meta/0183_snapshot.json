@@ -1,6 +1,6 @@
 {
-  "id": "949c6e3d-8264-4f27-9859-cfb63089537b",
-  "prevId": "c9e7c86b-668e-4e83-855c-350559cef725",
+  "id": "ef66d673-db32-41ea-b475-beb256f820b5",
+  "prevId": "949c6e3d-8264-4f27-9859-cfb63089537b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4670,6 +4670,19 @@
         "manual_config": {
           "name": "manual_config",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_type": {
+          "name": "review_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "trigger_source": {
+          "name": "trigger_source",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

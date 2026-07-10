@@ -965,6 +965,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider: effectiveProviderContext.provider.id,
     model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
+    vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
     request: requestBodyParsed,
   });
 

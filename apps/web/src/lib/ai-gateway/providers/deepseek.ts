@@ -4,7 +4,7 @@ export function isDeepseekModel(model: string) {
   return model.includes('deepseek');
 }
 
-const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
+export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-pro:discounted',
   internal_id: 'deepseek/deepseek-v4-pro',
   display_name: 'DeepSeek: DeepSeek V4 Pro (>80% off)',

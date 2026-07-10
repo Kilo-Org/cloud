@@ -63,15 +63,8 @@ jest.mock('@/lib/credit-campaigns', () => ({
 jest.mock('@/components/auth/StytchClient', () => ({
   StytchClient: () => null,
 }));
-jest.mock('@/components/AnimatedLogo', () => ({
-  AnimatedLogo: () => null,
-}));
-jest.mock('@/components/BigLoader', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-jest.mock('@/components/layouts/PageContainer', () => ({
-  PageContainer: ({ children }: { children: React.ReactNode }) => children,
+jest.mock('@/components/auth/AccountCreationScreen', () => ({
+  AccountCreationScreen: () => null,
 }));
 
 // isValidCallbackPath is NOT mocked — we use the real implementation

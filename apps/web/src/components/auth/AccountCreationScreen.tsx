@@ -1,19 +1,17 @@
-'use client';
-
-import dynamic from 'next/dynamic';
+import AnimatedKiloLogo from '@/components/AnimatedKiloLogo';
 import { PageContainer } from '@/components/layouts/PageContainer';
-
-const AccountCreationStatus = dynamic(
-  () =>
-    import('@/components/auth/AccountCreationStatus').then(module => module.AccountCreationStatus),
-  { ssr: false }
-);
+import styles from './AccountCreationScreen.module.css';
 
 export function AccountCreationScreen() {
   return (
     <PageContainer className="min-h-screen">
       <main className="flex flex-1 items-center justify-center">
-        <AccountCreationStatus />
+        <div className="flex flex-col items-center gap-4" role="status" aria-busy="true">
+          <span className="text-brand-primary size-12" aria-hidden="true">
+            <AnimatedKiloLogo />
+          </span>
+          <p className={`type-body ${styles.shimmer}`}>Creating your account</p>
+        </div>
       </main>
     </PageContainer>
   );

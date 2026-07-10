@@ -21,7 +21,6 @@ function InfoCardSkeleton() {
     <View className="gap-2.5 rounded-lg bg-secondary px-3 py-3">
       <Skeleton className="h-5 w-2/3 rounded-md" />
       <Skeleton className="h-5 w-1/3 rounded-md" />
-      <Skeleton className="h-5 w-1/3 rounded-md" />
     </View>
   );
 }
@@ -30,7 +29,7 @@ export function OrganizationHubScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { organizationId, role, org, isLoading } = useOrgRole();
-  const orgWithMembers = useOrgWithMembers(organizationId ?? '');
+  const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
 

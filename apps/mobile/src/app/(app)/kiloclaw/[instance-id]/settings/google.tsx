@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { useLocalSearchParams } from 'expo-router';
 
 import { GmailIcon, GoogleIcon } from '@/components/icons';
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,9 @@ import { cn } from '@/lib/utils';
 
 export default function GoogleScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
 
@@ -31,6 +34,15 @@ export default function GoogleScreen() {
   const gmailEnabled = statusQuery.data?.gmailNotificationsEnabled ?? false;
 
   const setupQuery = useKiloClawGoogleSetup(organizationId, !statusQuery.isPending && !isConnected);
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Google Account" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
 
   if (statusQuery.isPending) {
     return (

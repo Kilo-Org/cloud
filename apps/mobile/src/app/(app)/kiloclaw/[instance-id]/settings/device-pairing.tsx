@@ -15,6 +15,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { CATALOG_ICONS } from '@/components/icons';
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,9 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 export default function DevicePairingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const pairingQuery = useKiloClawPairing(organizationId);
@@ -75,6 +78,15 @@ export default function DevicePairingScreen() {
       </Animated.View>
     </Pressable>
   );
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Device Pairing" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -85,7 +85,9 @@ function PerformanceIndicator({ level, dotColor }: { level: number; dotColor: st
 export function ModelPicker() {
   const router = useRouter();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const { data: config, isLoading } = useKiloClawConfig(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const colors = useThemeColors();

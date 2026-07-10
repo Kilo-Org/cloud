@@ -3,6 +3,7 @@ import { Linking, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -94,11 +95,21 @@ function PlanDetails({
 
 export default function BillingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { isResolved, isOrg } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const isOrg = instanceContext.status === 'ready' && instanceContext.isOrg;
   const colors = useThemeColors();
 
-  const billingQuery = useKiloClawBillingStatus(isResolved && !isOrg);
+  const billingQuery = useKiloClawBillingStatus(instanceContext.status === 'ready' && !isOrg);
   const billing = billingQuery.data;
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Billing" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
 
   if (isOrg) {
     return (

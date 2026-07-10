@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { SettingsCard } from '@/components/kiloclaw/settings-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -13,7 +14,9 @@ import { useKiloClawChannelCatalog, useKiloClawMutations } from '@/lib/hooks/use
 
 export default function ChannelsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const catalogQuery = useKiloClawChannelCatalog(organizationId);
   const mutations = useKiloClawMutations(organizationId);
 
@@ -65,6 +68,15 @@ export default function ChannelsScreen() {
           />
         ))}
       </Animated.View>
+    );
+  }
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Channels" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
     );
   }
 

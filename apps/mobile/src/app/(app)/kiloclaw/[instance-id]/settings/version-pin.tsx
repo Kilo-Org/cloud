@@ -4,6 +4,7 @@ import { Alert, FlatList, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,9 @@ type VersionItem = NonNullable<
 
 export default function VersionPinScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const colors = useThemeColors();
   const myPinQuery = useKiloClawMyPin(organizationId);
   const latestVersionQuery = useKiloClawLatestVersion();
@@ -36,6 +39,15 @@ export default function VersionPinScreen() {
   const flatListRef = useRef<FlatList<VersionItem>>(null);
 
   const isLoading = myPinQuery.isPending || latestVersionQuery.isPending;
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Version Pinning" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (

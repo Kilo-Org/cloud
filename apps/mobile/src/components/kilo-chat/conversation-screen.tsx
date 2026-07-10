@@ -61,8 +61,8 @@ export function ConversationScreen({
   const { bottom } = useSafeAreaInsets();
   const instanceContext = useInstanceContext(sandboxId);
   const instanceStatusQuery = useKiloClawStatus(
-    instanceContext.organizationId,
-    instanceContext.isResolved
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined,
+    instanceContext.status === 'ready'
   );
   const { data: instances } = useAllKiloClawInstances();
   const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);

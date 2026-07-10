@@ -5,6 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { ChangelogList } from '@/components/kiloclaw/changelog-list';
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +15,9 @@ import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
 
 export default function ChangelogScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const changelogQuery = useKiloClawChangelog(organizationId);
   const entries = changelogQuery.data;
 
@@ -51,6 +54,15 @@ export default function ChangelogScreen() {
       <Animated.View entering={FadeIn.duration(200)}>
         <ChangelogList entries={entries} />
       </Animated.View>
+    );
+  }
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="What's New" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
     );
   }
 

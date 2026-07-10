@@ -19,6 +19,7 @@ import {
   DashboardHero,
   ServiceDegradedBanner,
 } from '@/components/kiloclaw/dashboard-parts';
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { InstanceControls } from '@/components/kiloclaw/instance-controls';
 import { RenameInstanceModal } from '@/components/kiloclaw/rename-instance-modal';
 import { SettingsList } from '@/components/kiloclaw/settings-list';
@@ -45,10 +46,13 @@ export default function DashboardScreen() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId, isResolved, isOrg } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId =
+    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const isOrg = instanceContext.status === 'ready' && instanceContext.isOrg;
 
   const statusQuery = useKiloClawStatus(organizationId);
-  const isPersonal = isResolved && !isOrg;
+  const isPersonal = instanceContext.status === 'ready' && !isOrg;
   const billingQuery = useKiloClawBillingStatus(isPersonal);
   const serviceDegradedQuery = useKiloClawServiceDegraded();
   const mutations = useKiloClawMutations(organizationId);
@@ -98,6 +102,15 @@ export default function DashboardScreen() {
     isPersonal,
     isRunning,
   ]);
+
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Dashboard" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (

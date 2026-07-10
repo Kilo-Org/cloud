@@ -18,6 +18,11 @@ Change `packages/db/src/schema.ts` first, then generate migrations with
 `pnpm drizzle generate`. Do not hand-write or edit generated DDL, snapshots, or
 journal entries. If generated DDL is wrong, correct the schema and regenerate.
 
+Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
+Review generated migrations for data loss. Prefer additive or staged schema
+changes over destructive operations; when generated DDL is unsafe, revise the
+schema and regenerate rather than editing generated artifacts.
+
 Only intentional `UPDATE` or `INSERT` data backfills may be appended after the
 generated DDL, separated with the exact marker `-->  statement-breakpoint`.
 Prefer one generated migration per unshipped feature branch.

@@ -83,10 +83,12 @@ pnpm drizzle:verify-bootstrap
 ### 5. Start the development server
 
 ```bash
-pnpm dev:start
+KILO_PORT_OFFSET=auto pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and local infrastructure. Run `pnpm dev:status` to get the web app's port; the root checkout defaults to `3000`, while worktrees use offsets.
+This launches a tmux dashboard with the Next.js app and local infrastructure.
+The automatic offset keeps secondary worktrees from colliding with the root
+checkout. Run `pnpm dev:status` to get the web app's port.
 
 To stop all services:
 
@@ -135,7 +137,7 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 
 | Command | Description |
 |---|---|
-| `pnpm dev:start` | Start all local services in a tmux dashboard |
+| `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:status` | Live status of running services |
 | `pnpm dev:restart` | Restart a running service |

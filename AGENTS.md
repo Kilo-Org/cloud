@@ -77,5 +77,5 @@ Agent, and Cost Insights contexts. Before changing covered domains, consult its
 - Never log tokens, credentials, API keys, authentication headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` when headers must be retained or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry.
 - Validate genuinely unknown, external, user-controlled, or persisted data at runtime. Do not hide uncertainty with `as any`, double casts through `unknown`, or non-null assertions.
 - When adding persisted PII such as email, name, or IP address to any database, update `softDeleteUser` in `apps/web/src/lib/user/index.ts` to delete or anonymize it and add corresponding test in `apps/web/src/lib/user/index.test.ts`.
-- Do not use Git force push, `--no-verify`, or hook-bypass flags without explicit user approval. Diagnose failed hooks rather than skipping them.
+- Do not use Git `--force`, `--no-verify`, or any flag that bypasses hooks or safety checks without explicit user approval. Diagnose failed hooks rather than skipping them.
 - Run `pnpm format` before committing.

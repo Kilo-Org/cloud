@@ -15,13 +15,18 @@ Before accessing local app or service endpoints, inspect this worktree's service
 pnpm dev:status --json
 ```
 
-Reuse an active session and its reported ports. Do not start a competing stack. If required services are absent, start only the needed group or named services:
+Reuse an active session and its reported ports. Do not start a competing stack.
+`dev:start` cannot add services to an existing session. If the active session
+does not include required services, stop it with `pnpm dev:stop`, then recreate
+it with the complete needed group or named-service selection:
 
 ```bash
 KILO_PORT_OFFSET=auto pnpm dev:start <needed-group-or-services>
 ```
 
-If generated local endpoint configuration is needed first, run the matching selector, then start that same selection with the same automatic offset:
+When no session is active, start only the needed group or named services. If
+generated local endpoint configuration is needed first, run the matching
+selector, then start that same selection with the same automatic offset:
 
 ```bash
 KILO_PORT_OFFSET=auto pnpm dev:env <needed-group-or-service>

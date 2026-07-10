@@ -13,7 +13,10 @@ This skill covers shared PostgreSQL migrations only. It does not govern Durable 
 2. Change `packages/db/src/schema.ts` first.
 3. Generate artifacts with `pnpm drizzle generate`.
 4. Inspect generated SQL.
-5. If generated DDL is wrong or too broad, correct schema and regenerate. Do not hand-edit generated DDL, snapshots, or journal entries.
+5. Review generated DDL for destructive operations and data loss. Prefer
+   additive or staged schema changes. If generated DDL is unsafe, wrong, or too
+   broad, correct the schema and regenerate. Do not hand-edit generated DDL,
+   snapshots, or journal entries.
 6. Append only intentional `UPDATE` or `INSERT` data backfills after generated DDL, separated with `-->  statement-breakpoint`.
 7. Apply migrations with `pnpm drizzle migrate` or run `pnpm drizzle:verify-bootstrap` when relevant.
 8. Run `pnpm format` and targeted schema or migration checks.

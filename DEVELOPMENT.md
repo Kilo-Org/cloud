@@ -210,10 +210,13 @@ pnpm drizzle:verify-bootstrap
 ### 6. Start the development server
 
 ```bash
-pnpm dev:start
+KILO_PORT_OFFSET=auto pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and local infrastructure. When the Stripe CLI is installed, it also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port; the root checkout defaults to `3000`, while worktrees use offsets.
+This launches a tmux dashboard with the Next.js app and local infrastructure.
+The automatic offset keeps secondary worktrees from colliding with the root
+checkout. When the Stripe CLI is installed, the command also starts the Stripe
+webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
 To stop all services:
 
@@ -235,7 +238,7 @@ This runs the web tests and web environment tests. They should pass against the 
 
 | Command | Description |
 |---|---|
-| `pnpm dev:start` | Start all local services in a tmux dashboard |
+| `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
 | `pnpm test` | Run web tests and web environment tests |

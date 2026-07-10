@@ -928,8 +928,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     // Forward plumbing: today execution consumes only the standard reviewer settings
     // (agents[0] / sessionInput). Log the full selection for observability ahead of
-    // council (multi-agent) mode, which will consume the rest.
-    if (params.reviewAgents) {
+    // council (multi-agent) mode, which will consume the rest. Guard the shape
+    // defensively so a malformed payload can never throw here, between saveState()
+    // and setAlarm(), which would leave the review queued but never scheduled.
+    if (params.reviewAgents && Array.isArray(params.reviewAgents.agents)) {
       console.log('[CodeReviewOrchestrator] Review agent selections', {
         reviewId: params.reviewId,
         reviewType: params.reviewAgents.reviewType,
@@ -1040,6 +1042,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       previousCloudAgentSessionId: undefined,
       repositorySize: this.state.repositorySize,
+      reviewAgents: this.state.reviewAgents,
       runReviewDelayMs: retryDelayMs,
     });
 

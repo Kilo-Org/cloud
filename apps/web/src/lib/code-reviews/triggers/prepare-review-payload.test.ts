@@ -610,6 +610,13 @@ describe('prepareReviewPayload', () => {
       },
     });
     expect(payload.previousCloudAgentSessionId).toBeUndefined();
+    // Bitbucket must carry the same forward-shaped reviewAgents contract as
+    // GitHub/GitLab, mirroring the session's model (no drift).
+    expect(payload.reviewAgents).toEqual({
+      reviewType: 'standard',
+      agents: [{ role: 'standard', model: 'test-model', thinkingEffort: null }],
+    });
+    expect(payload.reviewAgents?.agents[0].model).toBe(payload.sessionInput.model);
     expect(payload.sessionInput).not.toHaveProperty('githubToken');
     expect(payload.sessionInput).not.toHaveProperty('gitToken');
     expect(payload.sessionInput).not.toHaveProperty('gateThreshold');

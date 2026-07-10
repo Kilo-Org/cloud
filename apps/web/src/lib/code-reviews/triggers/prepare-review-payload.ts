@@ -306,12 +306,15 @@ export async function prepareReviewPayload(
           }
         );
         const authToken = generateApiToken(user, { botId: 'reviewer' });
+        // Single source for the standard reviewer's model so the session input and the
+        // forward-shaped `reviewAgents[0]` can never drift apart.
+        const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
         const sessionInput: SessionInput = {
           gitUrl: `https://bitbucket.org/${workspaceSlug.data}/${repositorySlug.data}.git`,
           kilocodeOrganizationId: owner.id,
           prompt,
           mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-          model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+          model: standardModel,
           variant: config.thinking_effort ?? undefined,
           upstreamBranch: review.head_ref,
           platform: PLATFORM.BITBUCKET,
@@ -322,6 +325,20 @@ export async function prepareReviewPayload(
           bitbucketIntegrationId: integration.id,
           bitbucketPullRequestId: review.pr_number,
           bitbucketExpectedHeadSha: expectedHeadSha.data,
+        };
+
+        // Forward-shaped agent selections, built for every review (see GitHub/GitLab
+        // path below). Today this is always a single 'standard' agent mirroring the
+        // session's model/effort; council mode will populate one entry per specialist.
+        const reviewAgents: ReviewAgentsConfig = {
+          reviewType: 'standard',
+          agents: [
+            {
+              role: 'standard',
+              model: standardModel,
+              thinkingEffort: config.thinking_effort ?? null,
+            },
+          ],
         };
 
         logExceptInTest('[prepareReviewPayload] Prepared Bitbucket payload', {
@@ -340,6 +357,7 @@ export async function prepareReviewPayload(
           sessionInput,
           owner,
           repositorySize: null,
+          reviewAgents,
         };
       }
       case PLATFORM.GITHUB:

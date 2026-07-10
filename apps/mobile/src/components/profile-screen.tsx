@@ -182,7 +182,7 @@ export function ProfileScreen() {
             </Text>
             <ConfigureRow
               icon={Building2}
-              title={orgRole === 'member' ? 'View org' : 'Manage org'}
+              title={orgRole === 'member' ? 'View organization' : 'Manage organization'}
               subtitle={orgName}
               className="rounded-lg bg-secondary px-3"
               disabled={!orgRole}

@@ -31,15 +31,15 @@ async function openSupportEmail(userId: string | undefined) {
 async function rateApp() {
   // The native review popup silently no-ops when the OS rate limit is hit, so
   // only use it the first time; afterwards deep-link to the store review page.
-  const alreadyRequested = await SecureStore.getItemAsync(REVIEW_REQUESTED_AT_KEY);
-  if (alreadyRequested == null && (await StoreReview.isAvailableAsync().catch(() => false))) {
-    await SecureStore.setItemAsync(REVIEW_REQUESTED_AT_KEY, new Date().toISOString());
-    try {
+  try {
+    const alreadyRequested = await SecureStore.getItemAsync(REVIEW_REQUESTED_AT_KEY);
+    if (alreadyRequested == null && (await StoreReview.isAvailableAsync())) {
+      await SecureStore.setItemAsync(REVIEW_REQUESTED_AT_KEY, new Date().toISOString());
       await StoreReview.requestReview();
       return;
-    } catch {
-      // Native popup failed — fall through to the store page.
     }
+  } catch {
+    // Native popup path failed — fall through to the store page.
   }
   try {
     await Linking.openURL(STORE_REVIEW_URL);

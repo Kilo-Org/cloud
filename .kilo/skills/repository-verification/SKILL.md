@@ -26,12 +26,18 @@ working-tree changes. Run `git diff --check` before finishing.
 
 ## Test dependencies
 
-Before tests that use shared PostgreSQL, check whether it is running with:
+Before tests that use shared PostgreSQL, confirm the configured `POSTGRES_URL`
+points to a reachable test database. For the repository-managed Docker Compose
+setup, check it with:
 
 ```bash
 docker compose -f dev/docker-compose.yml ps postgres
 ```
 
-If it is not active, run `pnpm test:db`; this starts PostgreSQL and applies migrations. Pure unit suites and Durable Object SQLite suites do not automatically need shared PostgreSQL.
+If that Compose database is not active, run `pnpm test:db`; this starts the
+repository-managed PostgreSQL container and applies migrations. Developers using
+another compatible PostgreSQL setup should start and migrate that database using
+their setup instead. Pure unit suites and Durable Object SQLite suites do not
+automatically need shared PostgreSQL.
 
 Report exact checks run and their results. Do not describe targeted checks as full validation.

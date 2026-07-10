@@ -4,6 +4,8 @@
 
 Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contract defines Code Reviewer, Security Agent, and Cost Insights language plus ownership boundaries used across review execution, analytics, sync, web, email, remediation, billing alerts, tests, and product documentation.
 
+Covered domains must use this contract's canonical terms in code, docs, task descriptions, tests, and agent outputs. Do not introduce a synonym for a governed concept without updating this contract. Scoped `AGENTS.md` files link to this contract instead of copying it.
+
 ## Contexts
 
 | Context | Owns | Location | Notes |

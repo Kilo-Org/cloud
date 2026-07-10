@@ -1,7 +1,19 @@
 # Repo Conventions — Worker/DO Services in This Monorepo
 
-Always bias towards following established patterns in existing services. These
-are merely guidelines.
+Bias toward established patterns in existing services. Sections marked as
+mandatory override legacy examples and local precedent.
+
+## Durable Object SQLite
+
+This repository has a stricter mandatory convention for Durable Object SQLite:
+
+- All Durable Object SQLite code must use `drizzle-orm/durable-sqlite`.
+- Use Drizzle's query-builder API for all Durable Object SQLite queries.
+- Consult `docs/do-sqlite-drizzle.md` for schema and migration conventions.
+
+The generic `ctx.storage.sql.exec()` examples in this skill illustrate Cloudflare
+Durable Objects APIs. They are not implementation templates for Durable Object
+SQLite code in this repository.
 
 ## DO call retries
 
@@ -47,8 +59,10 @@ dos/
     beads.ts            # Bead CRUD, convoy progress
 ```
 
-Each sub-module exports plain functions (not classes) that accept `SqlStorage` and
-any other required context as arguments. The DO imports them with the
+Each sub-module exports plain functions rather than classes and accepts the
+required storage wrapper and context as arguments. Legacy raw-SQL modules may
+accept `SqlStorage`; new Durable Object SQLite work must pass a Drizzle client
+and follow the mandatory convention above. The DO imports modules with the
 `import * as X` pattern:
 
 ```ts

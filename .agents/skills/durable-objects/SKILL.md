@@ -60,6 +60,15 @@ Search: `blockConcurrencyWhile`, `idFromName`, `getByName`, `setAlarm`, `sql.exe
 
 ## Quick Reference
 
+### Repository Durable Object SQLite convention
+
+For Durable Object SQLite code in this repository, read
+`./references/repo-conventions.md` and `docs/do-sqlite-drizzle.md`. The
+repository requires `drizzle-orm/durable-sqlite` and Drizzle's query-builder API
+for all Durable Object SQLite queries. The generic `ctx.storage.sql.exec()`
+examples below illustrate Cloudflare APIs only; they do not override this
+repository convention.
+
 ### Wrangler Configuration
 
 ```jsonc

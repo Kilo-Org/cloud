@@ -1,8 +1,12 @@
+'use client';
+
 import dynamic from 'next/dynamic';
 import { PageContainer } from '@/components/layouts/PageContainer';
 
-const AccountCreationStatus = dynamic(() =>
-  import('@/components/auth/AccountCreationStatus').then(module => module.AccountCreationStatus)
+const AccountCreationStatus = dynamic(
+  () =>
+    import('@/components/auth/AccountCreationStatus').then(module => module.AccountCreationStatus),
+  { ssr: false }
 );
 
 export function AccountCreationScreen() {

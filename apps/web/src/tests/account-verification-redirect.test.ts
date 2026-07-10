@@ -6,7 +6,7 @@
  *   redirect directly to the final destination (callbackPath or /get-started),
  *   skipping the survey entirely.
  * - If stytchStatus !== null AND user.customer_source === null:
- *   redirect to /customer-source-survey with callbackPath forwarding.
+ *   redirect directly to the final destination without blocking on the survey.
  * - If stytchStatus === null: render the page (no redirect).
  */
 
@@ -156,7 +156,7 @@ describe('account-verification redirect logic', () => {
   // Case: verified user who has NOT completed the survey
   // ---------------------------------------------------------------
   describe('when stytchStatus is non-null AND customer_source is null (survey not completed)', () => {
-    it('should redirect to /customer-source-survey with /get-started as default destination', async () => {
+    it('should redirect to /get-started as the default destination', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -164,12 +164,10 @@ describe('account-verification redirect logic', () => {
       await renderPage();
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect to /customer-source-survey with callbackPath forwarded', async () => {
+    it('should redirect directly to callbackPath', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -177,12 +175,10 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/get-started' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect to /customer-source-survey with an org callbackPath forwarded', async () => {
+    it('should redirect directly to an org callbackPath', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -190,9 +186,7 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/organizations/some-org-id' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/organizations/some-org-id')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/organizations/some-org-id');
     });
   });
 
@@ -270,9 +264,7 @@ describe('account-verification redirect logic', () => {
       await renderPage();
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
     it('should skip survey when customer_source is set even with stytchStatus=false', async () => {
@@ -549,10 +541,7 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: 'https://evil.com/phish' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      // Invalid callbackPath is dropped — redirect to survey with default destination
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
     it('should ignore invalid callbackPath for user with customer_source set', async () => {

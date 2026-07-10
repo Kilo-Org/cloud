@@ -9,6 +9,7 @@ import { AdminOmnibox } from '@/components/admin-omnibox';
 import { AppShellSkipLink } from '@/components/AppShellSkipLink';
 import { PrefetchedOrganizations } from './components/PrefetchedOrganizations';
 import { PlatformPresenceMount } from './components/PlatformPresenceMount';
+import { CustomerSourceSurvey } from '@/components/CustomerSourceSurvey';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleTestingProvider>
@@ -31,6 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </PrefetchedOrganizations>
           </SidebarProvider>
+          <CustomerSourceSurvey />
         </EventServiceProvider>
       </PageTitleProvider>
       <AdminOmnibox />

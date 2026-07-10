@@ -16,8 +16,8 @@ nearer `AGENTS.md` and follow its scoped invariants.
 | `dev/` | Local development tooling, Docker Compose, environment sync, and seed data |
 | `scripts/` | CI and one-off repository scripts |
 | `.specs/` | Domain business-rule specs |
-| `.agents/skills/` | Portable, on-demand agent workflows |
-| `.kilo/` | Kilo-specific commands, agents, and skills |
+| `.agents/skills/` | Third-party skills managed with the `npx skills` command |
+| `.kilo/` | Repository-owned commands, agents, and skills |
 
 ## Common Locations
 

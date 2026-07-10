@@ -437,6 +437,105 @@
     animation: pulse-glow 0.6s ease-out;
   }
 
+  @keyframes usage-pending-bar {
+    0%,
+    12% {
+      transform: scaleY(0.55);
+    }
+    32%,
+    70% {
+      transform: scaleY(1);
+    }
+    88%,
+    100% {
+      transform: scaleY(0.55);
+    }
+  }
+
+  @keyframes usage-pending-sparkline {
+    0%,
+    12% {
+      stroke-dashoffset: 1;
+      opacity: 0;
+    }
+    16% {
+      opacity: 1;
+    }
+    56%,
+    78% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    90%,
+    100% {
+      stroke-dashoffset: 1;
+      opacity: 0;
+    }
+  }
+
+  @keyframes usage-pending-endpoint {
+    0%,
+    30% {
+      opacity: 0;
+    }
+    34%,
+    78% {
+      opacity: 1;
+    }
+    90%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .animate-usage-pending-bar {
+    transform: scaleY(0.55);
+    transform-origin: bottom;
+    animation: usage-pending-bar 5s var(--ease-out-strong) infinite backwards;
+  }
+
+  .animate-usage-pending-sparkline {
+    animation: usage-pending-sparkline 5s var(--ease-out-strong) infinite;
+  }
+
+  .animate-usage-pending-endpoint {
+    animation: usage-pending-endpoint 5s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-usage-pending-bar {
+      animation: none;
+      transform: scaleY(1);
+    }
+
+    .animate-usage-pending-sparkline {
+      animation: none;
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+
+    .animate-usage-pending-endpoint {
+      animation: none;
+      opacity: 1;
+    }
+  }
+
+  .usage-pending-static .animate-usage-pending-bar {
+    animation: none;
+    transform: scaleY(1);
+  }
+
+  .usage-pending-static .animate-usage-pending-sparkline {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+
+  .usage-pending-static .animate-usage-pending-endpoint {
+    animation: none;
+    opacity: 1;
+  }
+
   @keyframes pulse-opacity {
     0%,
     100% {

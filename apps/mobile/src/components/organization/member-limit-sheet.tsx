@@ -33,16 +33,17 @@ function isValidLimit(value: string): boolean {
   return parseLimit(value) != null;
 }
 
-export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
+type MemberLimitFormProps = Readonly<{
+  memberId: string;
+  organizationId: string | null;
+  member: ActiveOrgMember;
+}>;
+
+function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormProps) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId } = useOrgRole();
-  const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
-  const member = orgWithMembers.data?.members.find(
-    (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
-  );
-  const currentLimit = member?.dailyUsageLimitUsd ?? null;
+  const currentLimit = member.dailyUsageLimitUsd;
 
   const limitRef = useRef(currentLimit != null ? String(currentLimit) : '');
   const [canSave, setCanSave] = useState(isValidLimit(limitRef.current));
@@ -64,42 +65,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     mutations.updateMember.mutate({ memberId, dailyUsageLimitUsd: null }, { onSuccess: onSaved });
   };
 
-  if (orgWithMembers.isLoading) {
-    return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
-        <View className="gap-1">
-          <Text className="text-center text-lg font-semibold text-foreground">
-            Daily usage limit
-          </Text>
-        </View>
-        <Skeleton className="h-11 rounded-lg" />
-      </ScrollView>
-    );
-  }
-
-  if (!member) {
-    return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
-        <Text className="text-center text-sm text-muted-foreground">Member not found</Text>
-      </ScrollView>
-    );
-  }
-
   return (
-    <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <View className="gap-1">
-        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
-        <Text className="text-center text-sm text-muted-foreground" numberOfLines={1}>
-          {firstNonEmpty(member.name, member.email)}
-        </Text>
-      </View>
-
+    <>
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           Limit (USD per day)
@@ -138,6 +105,54 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
           <Text className="text-destructive-foreground">Remove limit</Text>
         </Button>
       )}
+    </>
+  );
+}
+
+export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
+  const { organizationId } = useOrgRole();
+  const orgWithMembers = useOrgWithMembers(organizationId);
+  const member = orgWithMembers.data?.members.find(
+    (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
+  );
+
+  if (orgWithMembers.isLoading) {
+    return (
+      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+        <View className="gap-1">
+          <Text className="text-center text-lg font-semibold text-foreground">
+            Daily usage limit
+          </Text>
+        </View>
+        <Skeleton className="h-11 rounded-lg" />
+      </ScrollView>
+    );
+  }
+
+  if (!member) {
+    return (
+      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <Text className="text-center text-sm text-muted-foreground">Member not found</Text>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView
+      className="flex-1 bg-background px-6"
+      contentContainerClassName="gap-6 pb-8 pt-4"
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
+    >
+      <View className="gap-1">
+        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <Text className="text-center text-sm text-muted-foreground" numberOfLines={1}>
+          {firstNonEmpty(member.name, member.email)}
+        </Text>
+      </View>
+
+      <MemberLimitForm memberId={memberId} organizationId={organizationId} member={member} />
     </ScrollView>
   );
 }

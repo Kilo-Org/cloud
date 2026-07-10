@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
-import { type InvitedOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
+import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
 import { cn, parseTimestamp } from '@/lib/utils';
+
+import { ROLE_LABEL } from './member-row';
 
 type InvitedMemberRowProps = {
   invite: InvitedOrgMember;
@@ -14,12 +16,6 @@ type InvitedMemberRowProps = {
   organizationId: string;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
-};
-
-const ROLE_LABEL: Record<OrgRole, string> = {
-  owner: 'Owner',
-  member: 'Member',
-  billing_manager: 'Billing manager',
 };
 
 function inviteDateLabel(inviteDate: string | null): string | null {

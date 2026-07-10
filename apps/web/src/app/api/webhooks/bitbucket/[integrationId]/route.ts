@@ -530,6 +530,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         headRef: pullRequest.source.branch,
         headSha: pullRequest.source.sha,
         platform: 'bitbucket',
+        triggerSource: 'webhook',
       });
       await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
       return {

@@ -207,6 +207,7 @@ export async function createManualCodeReviewJob(params: {
       platform: source.platform,
       platformProjectId: source.platformProjectId,
       manualConfig,
+      triggerSource: 'manual',
     });
 
     logExceptInTest('[manual-code-review-job] Created manual Code Reviewer job', {

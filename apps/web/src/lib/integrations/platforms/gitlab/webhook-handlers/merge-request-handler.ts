@@ -285,6 +285,7 @@ export async function handleMergeRequestCodeReview(
       headSha,
       platform: PLATFORM.GITLAB,
       platformProjectId: project.id,
+      triggerSource: 'webhook',
     });
 
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);

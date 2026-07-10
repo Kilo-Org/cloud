@@ -465,6 +465,7 @@ export async function triggerManualBitbucketCodeReview(input: {
         headRef: pullRequest.source.branch,
         headSha: pullRequest.source.sha,
         platform: 'bitbucket',
+        triggerSource: 'manual',
       });
       return {
         cancelledReviews,

@@ -1160,6 +1160,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       '@kilocode/kiloclaw-instance-tiers':
         specifier: workspace:*
         version: link:../kiloclaw-instance-tiers

@@ -1,3 +1,4 @@
+import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
 // =============================================================================
@@ -1234,7 +1235,7 @@ export const ManuallyAddedRepositorySchema = z.object({
 export type ManuallyAddedRepository = z.infer<typeof ManuallyAddedRepositorySchema>;
 
 export const CodeReviewAgentConfigSchema = z.object({
-  review_style: z.enum(['strict', 'balanced', 'lenient', 'roast']),
+  review_style: z.enum(REVIEW_STYLES),
   focus_areas: z.array(z.string()),
   auto_approve_minor: z.boolean().optional(),
   custom_instructions: z.string().nullable().optional(),
@@ -1257,7 +1258,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'all'      — gate fails on any finding
   //   'warning'  — gate fails on warnings and above
   //   'critical' — gate fails only on critical issues
-  gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  gate_threshold: z.enum(GATE_THRESHOLDS).optional(),
   review_memory_enabled: z.boolean().optional(),
   review_analytics_enabled: z.boolean().optional(),
 });

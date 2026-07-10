@@ -1,18 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { hasInFlightReview, isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
-}
-
-function hasInFlightReview(reviews: { status: string }[]): boolean {
-  return reviews.some(
-    review =>
-      review.status === 'pending' || review.status === 'queued' || review.status === 'running'
-  );
 }
 
 export function useReviewList(scope: string) {
@@ -51,7 +45,7 @@ export function useReviewDetail(reviewId: string) {
       if (!data?.success) {
         return false;
       }
-      return ['pending', 'queued', 'running'].includes(data.review.status) ? 5000 : false;
+      return isInFlightReviewStatus(data.review.status) ? 5000 : false;
     },
   });
 }

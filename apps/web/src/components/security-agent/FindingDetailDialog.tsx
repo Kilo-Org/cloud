@@ -75,7 +75,7 @@ import {
   getRemediationUnavailableCopy,
   isCodebaseAnalysisRequiredReason,
 } from './remediation-unavailable-copy';
-import { getFindingAnalysisState } from './security-finding-list-presentation';
+import { getFindingAnalysisState, toWebTone } from './security-finding-list-presentation';
 import type { SecurityFindingWithRemediation } from '@/lib/security-agent/db/security-remediation';
 import {
   getDismissalReasonLabel,
@@ -83,7 +83,6 @@ import {
   getFindingSeverityPresentation,
   getFindingSourceLabel,
   getSupersedingFindingId as getSharedSupersedingFindingId,
-  type FindingTone as SharedFindingTone,
 } from '@kilocode/app-shared/security-agent';
 
 type FindingAnalysis = SecurityFinding['analysis'];
@@ -246,10 +245,6 @@ const toneStyles: Record<
   },
 };
 
-function toToneValue(tone: SharedFindingTone): Tone {
-  return tone === 'danger' ? 'destructive' : tone;
-}
-
 function LoadingSpinner({ className = 'size-4' }: { className?: string }) {
   return (
     <Loader2
@@ -304,12 +299,12 @@ function isActiveRemediationStatus(status: string | null | undefined): boolean {
 
 function getSeverityStatus(severity: string): StatusValue {
   const presentation = getFindingSeverityPresentation(severity);
-  return { value: presentation.label, tone: toToneValue(presentation.tone) };
+  return { value: presentation.label, tone: toWebTone(presentation.tone) };
 }
 
 function getFindingStatus(finding: SecurityFinding): StatusValue {
   const presentation = getFindingLifecycleStatusPresentation(finding);
-  return { value: presentation.label, tone: toToneValue(presentation.tone) };
+  return { value: presentation.label, tone: toWebTone(presentation.tone) };
 }
 
 function getAnalysisStatus(analysis: FindingAnalysis, analysisStatus: string | null): StatusValue {

@@ -1,4 +1,4 @@
-import type { CodeReviewPlatform } from '@kilocode/app-shared/code-review';
+import { type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
 
 export {
   buildSaveConfigInput,

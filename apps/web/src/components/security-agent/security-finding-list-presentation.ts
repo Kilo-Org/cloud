@@ -59,7 +59,7 @@ const iconByKey: Record<FindingIconKey, LucideIcon> = {
   'alert-triangle': AlertTriangle,
 };
 
-function toWebTone(tone: SharedFindingTone): FindingTone {
+export function toWebTone(tone: SharedFindingTone): FindingTone {
   return tone === 'danger' ? 'destructive' : tone;
 }
 

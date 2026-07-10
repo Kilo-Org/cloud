@@ -232,7 +232,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'event: message_start\n' +
         'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-fable-5","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}\n\n' +
         'event: message_delta\n' +
-        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":25,"output_tokens":724},"provider_metadata":{"gateway":{"routing":{"canonicalSlug":"anthropic/claude-opus-4.8","finalProvider":"anthropic","modelAttempts":[{"canonicalSlug":"anthropic/claude-fable-5","success":false},{"canonicalSlug":"anthropic/claude-opus-4.8","success":true}]},"cost":"0","marketCost":"0.018225"}}}\n\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":25,"output_tokens":724},"provider_metadata":{"gateway":{"routing":{"canonicalSlug":"anthropic/claude-fable-5","finalProvider":"anthropic","modelAttempts":[{"canonicalSlug":"anthropic/claude-fable-5","success":false},{"canonicalSlug":"anthropic/claude-opus-4.8","success":true}]},"cost":"0","marketCost":"0.018225"}}}\n\n' +
         'event: message_stop\n' +
         'data: {"type":"message_stop"}\n\n'
     );

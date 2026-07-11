@@ -10,11 +10,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { MoreHorizontal, RefreshCw, Settings, ShieldAlert } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -42,6 +44,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const { showActionSheetWithOptions } = useActionSheet();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
 
   const config = useSecurityAgentConfig(scope);
   const dashboardStats = useSecurityAgentDashboardStats(scope, repoFullName);
@@ -55,16 +58,25 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildSecurityDashboardMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
-  const lastSyncLabel = lastSyncTime
-    ? `Last synced ${timeAgo(parseTimestamp(lastSyncTime))}`
-    : 'Not yet synced';
+  let lastSyncLabel = 'Not yet synced';
+  if (lastSync.isError) {
+    lastSyncLabel = 'Sync status unavailable';
+  } else if (lastSyncTime) {
+    lastSyncLabel = `Last synced ${timeAgo(parseTimestamp(lastSyncTime))}`;
+  }
 
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
+      setRefreshFailed(false);
       try {
-        // Refresh only — never triggers a new sync.
-        await Promise.all([dashboardStats.refetch(), lastSync.refetch()]);
+        // Refresh only — never triggers a new sync. Stale data stays on
+        // screen either way; a failed refresh just surfaces a brief warning.
+        const [statsResult, syncResult] = await Promise.all([
+          dashboardStats.refetch(),
+          lastSync.refetch(),
+        ]);
+        setRefreshFailed(statsResult.isError || syncResult.isError);
       } finally {
         setRefreshing(false);
       }
@@ -164,16 +176,35 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </Pressable>
           <Pressable
             onPress={() => {
-              triggerSync.mutate({ repoFullName });
+              triggerSync.mutate(
+                { repoFullName },
+                {
+                  onSuccess: () => {
+                    toast.success('Sync queued');
+                  },
+                }
+              );
             }}
             disabled={triggerSync.isPending}
             accessibilityRole="button"
             accessibilityLabel="Sync now"
+            accessibilityState={{ disabled: triggerSync.isPending, busy: triggerSync.isPending }}
             className="size-11 items-center justify-center active:opacity-70"
           >
-            <RefreshCw size={18} color={colors.mutedForeground} />
+            <SpinningIcon
+              icon={RefreshCw}
+              size={18}
+              color={colors.mutedForeground}
+              spinning={triggerSync.isPending}
+            />
           </Pressable>
         </View>
+
+        {refreshFailed ? (
+          <Text className="text-xs text-destructive">
+            Could not refresh — showing last synced data.
+          </Text>
+        ) : null}
 
         {dashboardStats.isLoading ? (
           <View className="flex-row flex-wrap gap-3">

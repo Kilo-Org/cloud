@@ -12,10 +12,10 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type AccessRequiredSubcase } from '@/lib/analytics/onboarding-events';
-import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
 
 type Props = {
   instances: ClawInstance[];
@@ -41,16 +41,6 @@ const ACCESS_ISSUE_LABELS: Record<AccessRequiredSubcase, string> = {
   multiple_current_conflict: 'Account needs review',
   non_canonical_earlybird: 'Legacy plan needs review',
 };
-
-const SUBSCRIBE_SUBCASES: ReadonlySet<AccessRequiredSubcase> = new Set([
-  'trial_expired',
-  'subscription_canceled',
-  'subscription_past_due',
-]);
-
-function resolveAccessIssueUrl(subcase: AccessRequiredSubcase): string {
-  return SUBSCRIBE_SUBCASES.has(subcase) ? `${WEB_BASE_URL}/claw` : WEB_BASE_URL;
-}
 
 function splitInstances(instances: ClawInstance[]) {
   return {

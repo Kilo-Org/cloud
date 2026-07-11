@@ -12,6 +12,7 @@ import {
   findingToneColor,
 } from '@/components/security-agent/finding-tone';
 import { Button } from '@/components/ui/button';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -191,14 +192,24 @@ export function FindingRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
           <View className="flex-row items-center gap-1">
-            <AnalysisIcon size={13} color={findingToneColor(colors, analysis.tone)} />
+            <SpinningIcon
+              icon={AnalysisIcon}
+              size={13}
+              color={findingToneColor(colors, analysis.tone)}
+              spinning={Boolean(analysis.spinning)}
+            />
             <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
               {analysis.label}
             </Text>
           </View>
           {deadline && DeadlineIcon && (
             <View className="flex-row items-center gap-1">
-              <DeadlineIcon size={13} color={findingToneColor(colors, deadline.tone)} />
+              <SpinningIcon
+                icon={DeadlineIcon}
+                size={13}
+                color={findingToneColor(colors, deadline.tone)}
+                spinning={Boolean(deadline.spinning)}
+              />
               <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
                 {deadline.label}
               </Text>

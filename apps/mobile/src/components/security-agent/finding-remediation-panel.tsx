@@ -93,6 +93,7 @@ export function FindingRemediationPanel({
           icon={presentation.icon}
           label={presentation.label}
           tone={presentation.tone}
+          spinning={presentation.spinning}
         />
         {remediationSummary?.outcomeSummary ? (
           <Text variant="muted" className="text-sm" selectable>
@@ -215,6 +216,7 @@ export function FindingRemediationPanel({
                     icon={attemptPresentation.icon}
                     label={attemptPresentation.label}
                     tone={attemptPresentation.tone}
+                    spinning={attemptPresentation.spinning}
                   />
                   <KvRow label="Started by" value={formatRemediationOrigin(attempt.origin)} />
                   <KvRow label="Model" value={attempt.remediationModelSlug} selectable />

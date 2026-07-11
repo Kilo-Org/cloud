@@ -4,6 +4,7 @@ import { Bot, ChevronRight, Loader2 } from 'lucide-react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
 
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -143,7 +144,7 @@ export function ChildSessionSection({
         />
 
         {isRunning ? (
-          <Loader2 size={16} color={colors.agentSky} />
+          <SpinningIcon icon={Loader2} size={16} color={colors.agentSky} />
         ) : (
           <Bot size={16} color={colors.agentSky} />
         )}

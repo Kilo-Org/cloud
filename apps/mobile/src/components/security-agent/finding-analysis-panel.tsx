@@ -143,6 +143,7 @@ export function FindingAnalysisPanel({
           icon={presentation.icon}
           label={presentation.title}
           tone={presentation.tone}
+          spinning={presentation.spinning}
         />
         <Text variant="muted" className="text-sm" selectable>
           {presentation.description}

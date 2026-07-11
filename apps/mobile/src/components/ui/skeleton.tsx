@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -13,14 +14,19 @@ type SkeletonProps = {
 };
 
 export function Skeleton({ className }: Readonly<SkeletonProps>) {
+  const reducedMotion = useReducedMotion();
   const opacity = useSharedValue(0.4);
 
   useEffect(() => {
+    if (reducedMotion) {
+      return;
+    }
     opacity.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
-  }, [opacity]);
+  }, [opacity, reducedMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+    // Static muted block when reduced motion is on — no shimmer loop.
+    opacity: reducedMotion ? 0.7 : opacity.value,
   }));
 
   return <Animated.View className={cn('rounded-md bg-muted', className)} style={animatedStyle} />;

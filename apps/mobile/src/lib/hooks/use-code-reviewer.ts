@@ -299,15 +299,8 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
 // use-reviewer-permission.ts (kept this file under the max-lines limit);
 // re-exported here so existing call sites keep importing from
 // use-code-reviewer without churn.
-export {
-  classifyPermission,
-  classifyProviderState,
-  type PermissionState,
-  type ProviderState,
-  useCanEditReviewer,
-  useReviewerEditGuard,
-  useReviewerPermission,
-} from '@/lib/hooks/use-reviewer-permission';
+export { classifyProviderState } from '@/lib/code-reviewer-status';
+export { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 
 // Bitbucket is org-only, so unlike the GitHub/GitLab status hooks above
 // there is no personal-vs-org split here.

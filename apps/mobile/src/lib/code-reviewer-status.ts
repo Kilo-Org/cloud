@@ -11,7 +11,7 @@ import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations
 // treating every non-connected state as the same "show the connect card"
 // case — a query failure on an already-connected account must not render
 // the connect card.
-export type ProviderState =
+type ProviderState =
   | { status: 'loading' }
   | { status: 'error'; refetch: () => void; isRetrying: boolean }
   | { status: 'connected' }

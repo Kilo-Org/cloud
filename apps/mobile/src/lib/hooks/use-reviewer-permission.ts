@@ -6,13 +6,6 @@ import { classifyPermission, type PermissionState } from '@/lib/code-reviewer-st
 import { PERSONAL_SCOPE, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useTRPC } from '@/lib/trpc';
 
-export {
-  classifyPermission,
-  classifyProviderState,
-  type PermissionState,
-  type ProviderState,
-} from '@/lib/code-reviewer-status';
-
 function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
 }
@@ -32,11 +25,6 @@ export function useReviewerPermission(scope: string): PermissionState {
     role,
     refetch: () => void query.refetch(),
   });
-}
-
-export function useCanEditReviewer(scope: string) {
-  const permission = useReviewerPermission(scope);
-  return permission.status === 'ready' && permission.canEdit;
 }
 
 /**

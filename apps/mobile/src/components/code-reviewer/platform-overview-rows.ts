@@ -13,7 +13,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
-export type OverviewRow = {
+type OverviewRow = {
   field: string;
   icon: LucideIcon;
   title: string;

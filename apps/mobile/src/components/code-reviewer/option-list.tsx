@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type OptionListProps<T extends string> = {
@@ -30,7 +31,7 @@ export function OptionList<T extends string>({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {options.map(option => (
           <Pressable
             key={option}
@@ -52,7 +53,7 @@ export function OptionList<T extends string>({
             <Check size={18} color={selected === option ? colors.foreground : 'transparent'} />
           </Pressable>
         ))}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

@@ -9,12 +9,13 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { MoreHorizontal, RefreshCw, Settings, ShieldAlert } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { WEB_BASE_URL } from '@/lib/config';
 import {
   useSecurityAgentConfig,
@@ -130,9 +131,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         }
       />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-4 pb-24"
+        contentContainerClassName="gap-4"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
@@ -211,7 +212,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             repoFullName={repoFullName}
           />
         ) : null}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

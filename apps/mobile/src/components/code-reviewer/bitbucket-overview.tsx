@@ -7,7 +7,7 @@ import {
   ScrollText,
   ShieldCheck,
 } from 'lucide-react-native';
-import { ScrollView, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -16,6 +16,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
@@ -116,9 +117,9 @@ export function BitbucketOverview({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="pt-4 pb-8"
+        contentContainerClassName="pt-4"
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
@@ -188,7 +189,7 @@ export function BitbucketOverview({
             </Animated.View>
           )}
         </Animated.View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

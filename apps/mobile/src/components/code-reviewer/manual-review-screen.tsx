@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
@@ -10,6 +10,7 @@ import { ModelSelector } from '@/components/agents/model-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
@@ -104,9 +105,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Manual Review" eyebrow="Code Reviewer" />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-8"
+        contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
@@ -210,7 +211,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         >
           <Text>Start review</Text>
         </Button>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

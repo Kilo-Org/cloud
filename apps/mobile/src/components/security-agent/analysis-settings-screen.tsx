@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -15,6 +15,7 @@ import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   useSecurityAgentSettingsRedirect,
@@ -147,7 +148,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Analysis depth
@@ -210,7 +211,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
             Only organization owners and billing managers can change these settings.
           </Text>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

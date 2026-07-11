@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useLocalSearchParams } from 'expo-router';
 import { Check } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   parseReviewerPlatform,
   REVIEW_FOCUS_AREAS,
@@ -62,7 +63,7 @@ function FocusAreasRouteContent({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Focus Areas" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Text variant="muted" className="mb-2 text-xs">
           Leave all unselected to review everything.
         </Text>
@@ -78,7 +79,7 @@ function FocusAreasRouteContent({
             <Check size={18} color={selected.includes(area) ? colors.foreground : 'transparent'} />
           </Pressable>
         ))}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

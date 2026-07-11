@@ -2,7 +2,7 @@ import { canManageSecurityAgent } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Ban, ShieldOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -12,6 +12,7 @@ import { FindingDetailsPanel } from '@/components/security-agent/finding-details
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentOrgRole,
   useTrackSecurityAgentInteraction,
@@ -175,7 +176,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           );
         })}
       </View>
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pb-24 pt-2">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-2">
         {tab === 'details' && <FindingDetailsPanel finding={finding} scope={scope} />}
         {tab === 'analysis' && (
           <FindingAnalysisPanel
@@ -197,7 +198,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             onRetry={() => void analysisQuery.refetch()}
           />
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

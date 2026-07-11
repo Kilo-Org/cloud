@@ -2,13 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { ScrollView, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentConfig,
   useSecurityAgentEditCapability,
@@ -99,7 +100,7 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Settings" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">
             <Text className="text-sm font-medium">Security Agent</Text>
@@ -180,7 +181,7 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
             />
           </View>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

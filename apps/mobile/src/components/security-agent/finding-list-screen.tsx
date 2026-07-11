@@ -15,6 +15,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
 import { FindingRow } from '@/components/security-agent/finding-row';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -47,6 +48,7 @@ function FindingsListFooter({
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const [filters, setFilters] = useState(() => parseSecurityFindingFilters(routeParams));
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -125,7 +127,8 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               hasAnalysisCapacity={hasAnalysisCapacity}
             />
           )}
-          contentContainerClassName="gap-3 px-6 pb-24 pt-4"
+          contentContainerClassName="gap-3 px-6 pt-4"
+          contentContainerStyle={{ paddingBottom }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {

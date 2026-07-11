@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -64,6 +65,7 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
 export function OrganizationCreditActivityScreen() {
   const { organizationId } = useOrgRole();
   const query = useOrgCreditTransactions(organizationId);
+  const paddingBottom = useTabBarBottomPadding();
 
   if (organizationId == null) {
     return null;
@@ -87,7 +89,8 @@ export function OrganizationCreditActivityScreen() {
             data={transactions}
             keyExtractor={item => item.id}
             renderItem={({ item }) => <CreditRow transaction={item} />}
-            contentContainerClassName="gap-3 px-6 pb-8 pt-4"
+            contentContainerClassName="gap-3 px-6 pt-4"
+            contentContainerStyle={{ paddingBottom }}
             ListEmptyComponent={
               <EmptyState
                 icon={Receipt}

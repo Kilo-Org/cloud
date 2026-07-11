@@ -1,12 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useLocalSearchParams } from 'expo-router';
 import { Check, Lock } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   parseReviewerPlatform,
   PLATFORM_CAPABILITIES,
@@ -90,7 +91,7 @@ function ReposRouteContent({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Repositories" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {capabilities.selectionModePicker &&
           (['all', 'selected'] as const).map(option => (
             <Pressable
@@ -147,7 +148,7 @@ function ReposRouteContent({
             ))}
           </View>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

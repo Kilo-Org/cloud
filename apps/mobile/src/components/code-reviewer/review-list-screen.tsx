@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import {
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -48,7 +49,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Recent Reviews" eyebrow="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
             <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
@@ -128,7 +129,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             </Animated.View>
           )}
         </Animated.View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

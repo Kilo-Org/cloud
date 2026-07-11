@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Building2, User } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useTRPC } from '@/lib/trpc';
 
@@ -21,7 +22,7 @@ export function ScopeListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <ConfigureRow
           icon={User}
           title="Personal"
@@ -47,7 +48,7 @@ export function ScopeListScreen() {
             />
           ))
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

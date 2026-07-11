@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
@@ -13,6 +13,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { isMoneyRole, useOrgRole, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -45,9 +46,9 @@ export function OrganizationHubScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={org?.organizationName ?? 'Organization'} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-8"
+        contentContainerClassName="gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <Animated.View layout={LinearTransition}>
@@ -122,7 +123,7 @@ export function OrganizationHubScreen() {
             </>
           )}
         </View>
-      </ScrollView>
+      </TabScreenScrollView>
 
       {renameVisible && org && (
         <RenameOrgModal

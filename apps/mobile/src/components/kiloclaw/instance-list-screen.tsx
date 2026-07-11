@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Plus } from 'lucide-react-native';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { badgeBucketForInstance } from '@kilocode/notifications';
@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -102,9 +103,9 @@ export function InstanceListScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-        <ScrollView
+        <TabScreenScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow gap-6 pb-24 pt-5"
+          contentContainerClassName="flex-grow gap-6 pt-5"
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
@@ -140,7 +141,7 @@ export function InstanceListScreen({
             unreadByBadgeBucket={unreadByBadgeBucket}
             showCount={showSectionCounts}
           />
-        </ScrollView>
+        </TabScreenScrollView>
       </Animated.View>
     </View>
   );

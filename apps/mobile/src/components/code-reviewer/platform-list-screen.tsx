@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   PERSONAL_SCOPE,
@@ -64,7 +65,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={scopeTitle} eyebrow="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Platforms
@@ -114,7 +115,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             />
           </View>
         </View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

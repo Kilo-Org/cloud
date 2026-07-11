@@ -5,7 +5,7 @@ import {
   parseDayCount,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
@@ -13,6 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -228,9 +229,9 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-24"
+        contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
       >
         <ToggleRow
@@ -266,7 +267,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
             Only organization owners and billing managers can change these settings.
           </Text>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

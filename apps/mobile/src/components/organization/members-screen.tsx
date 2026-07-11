@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
@@ -8,6 +8,7 @@ import { MemberRow } from '@/components/organization/member-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type ActiveOrgMember,
@@ -93,9 +94,9 @@ export function OrganizationMembersScreen() {
           ) : undefined
         }
       />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-8"
+        contentContainerClassName="gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <Animated.View layout={LinearTransition} className="gap-2">
@@ -142,7 +143,7 @@ export function OrganizationMembersScreen() {
             </View>
           </Animated.View>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

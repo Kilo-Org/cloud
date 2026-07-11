@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Linking, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -55,7 +56,7 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />
-        <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
           <Pressable
             className="rounded-lg bg-secondary p-3 active:opacity-70"
             onPress={() => {
@@ -64,7 +65,7 @@ export function ReviewDetailScreen({
           >
             <Text className="text-sm text-destructive">{error.message}. Tap to retry.</Text>
           </Pressable>
-        </ScrollView>
+        </TabScreenScrollView>
       </View>
     );
   }
@@ -73,12 +74,12 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />
-        <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
             <Skeleton className="h-40 w-full rounded-lg" />
           </Animated.View>
-        </ScrollView>
+        </TabScreenScrollView>
       </View>
     );
   }
@@ -87,7 +88,7 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />
-        <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
           <Pressable
             className="rounded-lg bg-secondary p-3 active:opacity-70"
             onPress={() => {
@@ -96,7 +97,7 @@ export function ReviewDetailScreen({
           >
             <Text className="text-sm text-destructive">{data.error}. Tap to retry.</Text>
           </Pressable>
-        </ScrollView>
+        </TabScreenScrollView>
       </View>
     );
   }
@@ -109,7 +110,7 @@ export function ReviewDetailScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Review" eyebrow={review.repo_full_name} />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-4">
         <Animated.View entering={FadeIn.duration(200)} className="gap-1">
           <Text className="text-base font-medium">{review.pr_title}</Text>
           <Text variant="muted" className="text-xs">
@@ -195,7 +196,7 @@ export function ReviewDetailScreen({
             </Button>
           ) : null}
         </View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

@@ -5,13 +5,14 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Check, Lock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -129,7 +130,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-24">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {(['all', 'selected'] as const).map(option => (
           <Pressable
             key={option}
@@ -193,7 +194,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             Only organization owners and billing managers can change these settings.
           </Text>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

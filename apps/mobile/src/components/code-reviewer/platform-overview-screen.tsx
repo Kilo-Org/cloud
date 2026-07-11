@@ -8,7 +8,7 @@ import {
   ScrollText,
   ShieldCheck,
 } from 'lucide-react-native';
-import { ScrollView, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
@@ -158,7 +159,7 @@ export function PlatformOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
             <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
@@ -266,7 +267,7 @@ export function PlatformOverviewScreen({
             </Animated.View>
           )}
         </Animated.View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

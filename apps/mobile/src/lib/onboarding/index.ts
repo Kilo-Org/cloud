@@ -17,7 +17,6 @@ export {
 
 export {
   getProvisioningTerminalReason,
-  isProvisioningTerminal,
   type ProvisioningTerminalReason,
   shouldAdvanceFromProvisioning,
   shouldFireCompletion,

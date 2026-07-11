@@ -5,7 +5,7 @@ import { resolveMobileMessageInputAvailability } from './bot-send-state';
 const NOW = 1_000_000;
 
 describe('mobile bot send gate', () => {
-  it('blocks sends while bot status is unknown', () => {
+  it('blocks sends but hides the instance CTA while bot status is unknown (cold cache)', () => {
     const state = resolveMobileMessageInputAvailability({
       currentUserId: 'user-1',
       instanceStatus: 'running',
@@ -17,7 +17,7 @@ describe('mobile bot send gate', () => {
 
     expect(state.disabled).toBe(true);
     expect(state.disabledReason).toBe('Waiting for bot status...');
-    expect(state.showInstanceCta).toBe(true);
+    expect(state.showInstanceCta).toBe(false);
   });
 
   it('blocks sends when the bot is offline or stale', () => {

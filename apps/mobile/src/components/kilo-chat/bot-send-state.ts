@@ -93,12 +93,11 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay.state === 'unknown'
         ? 'Waiting for bot status...'
         : 'Bot is offline. Messages will resume when it reconnects.',
-    // No time-since-first-unknown tracking here (this fn stays a pure,
-    // easily-testable state map) — show the CTA as soon as the composer is
-    // blocked on offline/unknown, since bot status normally arrives within
-    // seconds of connecting. Add a real "prolonged" threshold if that proves
-    // too eager in practice.
-    showInstanceCta: true,
+    // Only a confirmed 'offline' surfaces the CTA. 'unknown' is the cold-cache
+    // gap before the WS connects and the first bot-status round-trip resolves
+    // (see useBotStatus) — every conversation open passes through it, so
+    // treating it like offline fired the CTA on every open.
+    showInstanceCta: botDisplay.state === 'offline',
     submitDisabled: true,
   };
 }

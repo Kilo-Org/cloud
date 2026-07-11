@@ -116,6 +116,7 @@ export function MessageInputView({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Open instance"
+              className="active:opacity-70"
             >
               <Text className="text-xs font-medium text-foreground">Open instance</Text>
             </Pressable>

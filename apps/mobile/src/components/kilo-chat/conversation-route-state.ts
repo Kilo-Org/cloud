@@ -30,26 +30,22 @@ export function getConversationRouteDecision({
   detail: ConversationRouteDetailState;
   routeSandboxId: string;
 }): ConversationRouteDecision {
-  if (detail.isError) {
-    // Only a confirmed not-found/forbidden response should redirect away —
-    // transport/server errors are retryable in place (see T2.9).
-    return isConversationNotFoundError(detail.error) ? 'not-found' : 'retryable-error';
-  }
-  if (detail.data === null || detail.data === undefined) {
-    return 'pending';
-  }
-  if (conversationSandboxIdFromMembers(detail.data.members) !== routeSandboxId) {
+  // Only a confirmed not-found/forbidden response redirects away — it's
+  // authoritative even over stale cached data (access was actually revoked).
+  if (detail.isError && isConversationNotFoundError(detail.error)) {
     return 'not-found';
   }
-  return 'ready';
-}
-
-export function shouldRenderConversationScreen({
-  detail,
-  routeSandboxId,
-}: {
-  detail: ConversationRouteDetailState;
-  routeSandboxId: string;
-}): boolean {
-  return getConversationRouteDecision({ detail, routeSandboxId }) === 'ready';
+  // Cached data wins: a failed background refetch (isError true, data
+  // retained by TanStack) must not replace an already-rendered conversation
+  // with a full-screen error. Transport/server errors only take over the
+  // screen when there is no data to show yet.
+  if (detail.data !== null && detail.data !== undefined) {
+    return conversationSandboxIdFromMembers(detail.data.members) !== routeSandboxId
+      ? 'not-found'
+      : 'ready';
+  }
+  if (detail.isError) {
+    return 'retryable-error';
+  }
+  return 'pending';
 }

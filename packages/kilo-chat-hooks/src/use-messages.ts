@@ -11,6 +11,7 @@ import type {
   MessageUpdatedEvent,
   MessageDeletedEvent,
   MessageDeliveryFailedEvent,
+  MessageRedeliveredEvent,
   ActionDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
@@ -725,6 +726,45 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
   });
 }
 
+/**
+ * Retries bot delivery of an existing delivery-failed message. The server
+ * re-attempts delivery of the same message row (no new message), so the cache
+ * update is just an optimistic clear of `deliveryFailed`. If the retry fails
+ * permanently again the server pushes a fresh `message.delivery_failed` event.
+ */
+export function useRedeliverMessage(client: KiloChatClient, conversationId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId }: { messageId: string }) =>
+      client.redeliverMessage(conversationId ?? '', messageId),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = messagesKey(conversationId);
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      const optimisticMessage = snapshot ? { ...snapshot, deliveryFailed: false } : undefined;
+      queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
+        if (!old) return old;
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          deliveryFailed: false,
+        }));
+      });
+      return { queryKey, snapshot, optimisticMessage };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context) return;
+      const restored = restoreOptimisticMessage(
+        queryClient,
+        context.queryKey,
+        context.snapshot,
+        context.optimisticMessage
+      );
+      if (!restored) invalidateMessages(queryClient, context.queryKey);
+    },
+  });
+}
+
 export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1015,6 +1055,14 @@ export function useMessageCacheUpdater(
       onMessageDeliveryFailed?.();
     };
 
+    const onRedelivered = (ctx: string, e: MessageRedeliveredEvent) => {
+      if (ctx !== expectedContext) return;
+      queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
+        if (!old) return old;
+        return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deliveryFailed: false }));
+      });
+    };
+
     const onActionDeliveryFailed = (ctx: string, e: ActionDeliveryFailedEvent) => {
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
@@ -1052,6 +1100,7 @@ export function useMessageCacheUpdater(
       client.onMessageUpdated(onUpdated),
       client.onMessageDeleted(onDeleted),
       client.onMessageDeliveryFailed(onDeliveryFailed),
+      client.onMessageRedelivered(onRedelivered),
       client.onActionDeliveryFailed(onActionDeliveryFailed),
       client.onReactionAdded(onReactionAdded),
       client.onReactionRemoved(onReactionRemoved),

@@ -96,13 +96,6 @@ export function canRetryFailedMessage(message: Message): boolean {
   return !message.deleted && message.deliveryFailed;
 }
 
-/** Reconstructs the original send content from a delivery-failed message, for retry. */
-export function buildRetrySendContent(message: Message): InputContentBlock[] {
-  const text = contentBlocksToText(message.content).trim();
-  const textBlocks: InputContentBlock[] = text.length > 0 ? [{ type: 'text', text }] : [];
-  return [...textBlocks, ...getEditableAttachmentBlocks(message)];
-}
-
 function firstDisplayValue(values: readonly (string | null | undefined)[]): string | null {
   for (const value of values) {
     const trimmed = value?.trim();

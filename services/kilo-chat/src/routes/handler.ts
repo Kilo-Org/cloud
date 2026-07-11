@@ -251,6 +251,36 @@ export async function handleExecuteAction(c: HonoCtx) {
   return c.json(result satisfies ExecuteActionResponse);
 }
 
+// ─── redeliverMessage ───────────────────────────────────────────────────────
+
+export async function handleRedeliverMessage(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
+
+  const callerId = c.get('callerId');
+  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
+  const result = await convStub.redeliverMessage({ messageId: msgId.data, senderId: callerId });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    return c.json({ error: result.error }, 404);
+  }
+
+  if (result.redelivered && result.memberContext.sandboxId) {
+    const pushPromise = pushEventToHumanMembers(
+      c.env,
+      convId.data,
+      result.memberContext.sandboxId,
+      result.memberContext.humanMemberIds,
+      'message.redelivered',
+      { messageId: msgId.data }
+    );
+    c.executionCtx.waitUntil(pushPromise);
+  }
+  return c.json({ ok: true } satisfies OkResponse);
+}
+
 // ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
 
 export async function handleMessageDeliveryFailed(c: HonoCtx) {

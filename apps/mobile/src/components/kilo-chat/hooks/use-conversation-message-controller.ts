@@ -1,6 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { messagesKey, removeMessageFromCache, useEditMessage } from '@kilocode/kilo-chat-hooks';
+import { useEditMessage, useRedeliverMessage } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageEditContent,
   contentBlocksToText,
@@ -17,7 +16,6 @@ import { captureEvent, MESSAGE_SENT_EVENT } from '@/lib/analytics/posthog';
 import { resolveMobileMessageInputAvailability } from '../bot-send-state';
 import { type MessageInputSubmitControls } from '../message-input-state';
 import {
-  buildRetrySendContent,
   buildSendMessageVariables,
   createSendMessageClientId,
   getEditableAttachmentBlocks,
@@ -60,9 +58,9 @@ export function useConversationMessageController({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [scrollToNewestRequest, setScrollToNewestRequest] = useState(0);
 
-  const queryClient = useQueryClient();
   const sendMutation = useSendMessage(client, conversationId, currentUserId);
   const editMessage = useEditMessage(client, conversationId);
+  const redeliverMessage = useRedeliverMessage(client, conversationId);
   const editingTextValue = useMemo(
     () => (editingMessage ? editableText(editingMessage) : ''),
     [editingMessage]
@@ -98,28 +96,22 @@ export function useConversationMessageController({
 
   const handleRetrySend = useCallback(
     (message: Message) => {
-      sendMutation.mutate(
-        buildSendMessageVariables({
-          conversationId,
-          content: buildRetrySendContent(message),
-          clientId: createSendMessageClientId(),
-          inReplyToMessageId: message.inReplyToMessageId ?? undefined,
-        }),
+      // Redelivers the existing failed message row server-side — no new
+      // message, no attachment re-linking. The server clears delivery_failed
+      // and pushes message.redelivered to other clients.
+      redeliverMessage.mutate(
+        { messageId: message.id },
         {
           onSuccess: () => {
-            // The resend settled a brand-new message row; drop the original
-            // failed row so retrying doesn't leave a permanent "Not
-            // delivered" duplicate alongside the delivered message.
-            removeMessageFromCache(queryClient, messagesKey(conversationId), message.id);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: err => {
-            toast.error(formatKiloChatError(err, 'Failed to send message'));
+            toast.error(formatKiloChatError(err, 'Failed to retry send'));
           },
         }
       );
     },
-    [conversationId, queryClient, sendMutation]
+    [redeliverMessage]
   );
 
   const messageActions = useConversationMessageActions({

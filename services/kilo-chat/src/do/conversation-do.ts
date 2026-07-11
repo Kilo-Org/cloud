@@ -255,6 +255,15 @@ export type NotifyDeliveryFailedResult =
   | { ok: true; changed: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
+export type RedeliverMessageParams = {
+  messageId: string;
+  senderId: string;
+};
+
+export type RedeliverMessageResult =
+  | { ok: true; redelivered: boolean; memberContext: MemberContext }
+  | { ok: false; code: 'not_found' | 'forbidden'; error: string };
+
 export type InitAttachmentParams = {
   uploaderId: string;
   mimeType: string;
@@ -442,6 +451,94 @@ export class ConversationDO extends DurableObject<Env> {
 
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
     return { ok: true, changed: true };
+  }
+
+  /**
+   * Re-attempts bot delivery of an existing delivery-failed message. Clears
+   * the `delivery_failed` flag and re-enqueues the webhook for the stored
+   * content — no new message row, no attachment re-linking. If the retry
+   * fails permanently again, the normal deliverToBot failure path flips the
+   * flag back and pushes `message.delivery_failed`.
+   */
+  async redeliverMessage(params: RedeliverMessageParams): Promise<RedeliverMessageResult> {
+    const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
+    if (!row || row.deleted === 1) {
+      return { ok: false, code: 'not_found', error: 'Message not found' };
+    }
+
+    if (params.senderId !== row.sender_id) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not the owner of message ${params.messageId}`,
+      };
+    }
+
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === params.senderId)) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
+      };
+    }
+    const memberContext = this.getMemberContextFromRows(activeMembers);
+
+    // Already delivered (or a concurrent redeliver won) — idempotent no-op so
+    // a double-tap cannot double-deliver to the bot.
+    if (row.delivery_failed !== 1) {
+      return { ok: true, redelivered: false, memberContext };
+    }
+
+    this.db
+      .update(messages)
+      .set({ delivery_failed: 0 })
+      .where(eq(messages.id, params.messageId))
+      .run();
+
+    const conversationId = this.getConversationId();
+    const content = parseStoredContent(row.content, row.id);
+
+    // Mirror the reply context the original delivery carried (see
+    // postCommitFanOut in services/messages.ts).
+    let inReplyToBody: string | undefined;
+    let inReplyToSender: string | undefined;
+    if (row.in_reply_to_message_id) {
+      const parent = this.db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, row.in_reply_to_message_id))
+        .get();
+      if (parent && parent.deleted !== 1) {
+        inReplyToBody = parseStoredContent(parent.content, parent.id)
+          .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+          .map(b => b.text)
+          .join('');
+        inReplyToSender = parent.sender_id;
+      }
+    }
+
+    const sentAt = new Date().toISOString();
+    for (const bot of activeMembers.filter(member => member.kind === 'bot')) {
+      await this.enqueueMessageWebhook(
+        {
+          targetBotId: bot.id,
+          conversationId,
+          messageId: row.id,
+          from: row.sender_id,
+          content,
+          sentAt,
+          ...(row.in_reply_to_message_id !== null && {
+            inReplyToMessageId: row.in_reply_to_message_id,
+          }),
+          ...(inReplyToBody !== undefined && { inReplyToBody }),
+          ...(inReplyToSender !== undefined && { inReplyToSender }),
+        },
+        memberContext
+      );
+    }
+
+    return { ok: true, redelivered: true, memberContext };
   }
 
   revertActionResolution(params: {

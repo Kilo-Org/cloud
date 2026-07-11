@@ -5,8 +5,8 @@ import {
   expandPlatformFilter,
   formatGitUrlProject,
 } from '@/components/agents/session-list-helpers';
-import { CompactSessionRow } from '@/components/home/compact-session-row';
 import { SectionHeader } from '@/components/home/section-header';
+import { SessionRow } from '@/components/ui/session-row';
 import {
   type ActiveSession,
   type StoredSession,
@@ -182,10 +182,10 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
                 key={row.key}
                 className="overflow-hidden rounded-2xl border border-border bg-card"
               >
-                <CompactSessionRow
+                <SessionRow
                   agentLabel={activeSessionLabel(session)}
                   title={activeSessionTitle(session)}
-                  isLive
+                  live
                   last
                   onPress={() => {
                     navigateTo(session.id);
@@ -200,11 +200,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
               key={row.key}
               className="overflow-hidden rounded-2xl border border-border bg-card"
             >
-              <CompactSessionRow
+              <SessionRow
                 agentLabel={storedSessionLabel(session)}
                 title={storedSessionTitle(session)}
                 meta={storedSessionMeta(session)}
-                isLive={row.isLive}
+                live={row.isLive}
                 last
                 onPress={() => {
                   navigateTo(session.session_id, session.organization_id);

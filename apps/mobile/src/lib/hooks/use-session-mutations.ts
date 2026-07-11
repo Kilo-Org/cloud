@@ -19,9 +19,10 @@ const onError = (error: { message: string }) => {
 export function useSessionMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  // A ref (not state) is enough — this only gates duplicate taps
-  // on the same row, it never needs to drive a re-render.
+  // Refs (not state) are enough — these only gate duplicate taps and order
+  // mutations per row, they never need to drive a re-render.
   const pendingSessionIds = useRef(new Set<string>());
+  const sessionOpChains = useRef(new Map<string, Promise<unknown>>());
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();
 
   const invalidateSessions = async () => {
@@ -73,40 +74,48 @@ export function useSessionMutations() {
     })
   );
 
-  // Optimistic updates already make the row change land instantly, so a
-  // second tap before the first mutation settles would just be a duplicate
-  // in-flight request for the same operation — drop it instead of firing
-  // another. Keyed by operation + session so a delete issued while a rename
-  // settles (or vice versa) still goes through.
-  const withPendingGuard = (pendingKey: string, run: () => Promise<unknown>) => {
-    if (pendingSessionIds.current.has(pendingKey)) {
+  // Two rules per session row:
+  // - identical duplicate taps (same op + args) are dropped while pending —
+  //   optimistic updates make the first tap land instantly, a second is noise;
+  // - DISTINCT operations (a delete during a settling rename, a re-rename to
+  //   a different title) run, but serialized through a per-session promise
+  //   chain so their optimistic snapshots/rollbacks can't interleave and an
+  //   older request can never overwrite a newer one's result.
+  const enqueueSessionOp = (sessionId: string, opKey: string, run: () => Promise<unknown>) => {
+    if (pendingSessionIds.current.has(opKey)) {
       return;
     }
-    pendingSessionIds.current.add(pendingKey);
-    void (async () => {
+    pendingSessionIds.current.add(opKey);
+    const previous = sessionOpChains.current.get(sessionId);
+    let next: Promise<void> | undefined = undefined;
+    next = (async () => {
+      try {
+        await previous;
+      } catch {
+        // The prior op already reported via its mutation's onError.
+      }
       try {
         await run();
       } catch {
         // Already surfaced via the mutation's own onError (toast + rollback).
-      } finally {
-        pendingSessionIds.current.delete(pendingKey);
+      }
+      pendingSessionIds.current.delete(opKey);
+      if (sessionOpChains.current.get(sessionId) === next) {
+        sessionOpChains.current.delete(sessionId);
       }
     })();
+    sessionOpChains.current.set(sessionId, next);
   };
 
   return {
     deleteSession: (sessionId: string) => {
-      withPendingGuard(`delete:${sessionId}`, async () => {
-        const result = await deleteSessionMutation.mutateAsync({ session_id: sessionId });
-        return result;
+      enqueueSessionOp(sessionId, `delete:${sessionId}`, async () => {
+        await deleteSessionMutation.mutateAsync({ session_id: sessionId });
       });
     },
     renameSession: (sessionId: string, title: string) => {
-      // Title in the key: a re-rename to a different title is a new
-      // operation, only the identical duplicate gets dropped.
-      withPendingGuard(`rename:${sessionId}:${title}`, async () => {
-        const result = await renameSessionMutation.mutateAsync({ session_id: sessionId, title });
-        return result;
+      enqueueSessionOp(sessionId, `rename:${sessionId}:${title}`, async () => {
+        await renameSessionMutation.mutateAsync({ session_id: sessionId, title });
       });
     },
   };

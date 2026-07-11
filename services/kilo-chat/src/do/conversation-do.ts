@@ -52,6 +52,7 @@ import {
   botMessageNotificationTextLength,
   sendConversationMessagePush,
 } from '../services/push-notifications';
+import { pushEventToHumanMembers } from '../services/event-push';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
@@ -262,7 +263,7 @@ export type RedeliverMessageParams = {
 
 export type RedeliverMessageResult =
   | { ok: true; redelivered: boolean; memberContext: MemberContext }
-  | { ok: false; code: 'not_found' | 'forbidden'; error: string };
+  | { ok: false; code: 'not_found' | 'forbidden' | 'conflict'; error: string };
 
 export type InitAttachmentParams = {
   uploaderId: string;
@@ -455,10 +456,11 @@ export class ConversationDO extends DurableObject<Env> {
 
   /**
    * Re-attempts bot delivery of an existing delivery-failed message. Clears
-   * the `delivery_failed` flag and re-enqueues the webhook for the stored
-   * content — no new message row, no attachment re-linking. If the retry
-   * fails permanently again, the normal deliverToBot failure path flips the
-   * flag back and pushes `message.delivery_failed`.
+   * the `delivery_failed` flag, publishes `message.redelivered` to human
+   * members, then re-enqueues the webhook for the stored content — no new
+   * message row, no attachment re-linking. If the retry fails permanently
+   * again, the normal deliverToBot failure path flips the flag back and
+   * pushes `message.delivery_failed`.
    */
   async redeliverMessage(params: RedeliverMessageParams): Promise<RedeliverMessageResult> {
     const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
@@ -490,6 +492,25 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: true, redelivered: false, memberContext };
     }
 
+    // delivery_failed is one message-level bit — it doesn't record which
+    // recipient failed. Redelivery is only well-defined with exactly one
+    // eligible bot (the shape every kilo-chat conversation has; see
+    // getMemberContextFromRows). Zero bots must not clear the flag and
+    // report success; multiple would double-deliver to bots that already
+    // accepted the original.
+    const bots = activeMembers.filter(member => member.kind === 'bot');
+    if (bots.length !== 1) {
+      return {
+        ok: false,
+        code: 'conflict',
+        error:
+          bots.length === 0
+            ? 'No active bot to redeliver to'
+            : 'Redelivery is ambiguous with multiple bots',
+      };
+    }
+    const bot = bots[0]!;
+
     this.db
       .update(messages)
       .set({ delivery_failed: 0 })
@@ -518,25 +539,39 @@ export class ConversationDO extends DurableObject<Env> {
       }
     }
 
-    const sentAt = new Date().toISOString();
-    for (const bot of activeMembers.filter(member => member.kind === 'bot')) {
-      await this.enqueueMessageWebhook(
-        {
-          targetBotId: bot.id,
-          conversationId,
-          messageId: row.id,
-          from: row.sender_id,
-          content,
-          sentAt,
-          ...(row.in_reply_to_message_id !== null && {
-            inReplyToMessageId: row.in_reply_to_message_id,
-          }),
-          ...(inReplyToBody !== undefined && { inReplyToBody }),
-          ...(inReplyToSender !== undefined && { inReplyToSender }),
-        },
-        memberContext
+    // Publish the flag-clear event BEFORE the delivery attempt is enqueued:
+    // the bot acks receipt before processing and can asynchronously report a
+    // fresh message.delivery_failed — publishing after enqueue would let that
+    // failure land first and then be wrongly cleared by a delayed
+    // message.redelivered.
+    if (memberContext.sandboxId) {
+      await pushEventToHumanMembers(
+        this.env,
+        conversationId,
+        memberContext.sandboxId,
+        memberContext.humanMemberIds,
+        'message.redelivered',
+        { messageId: row.id }
       );
     }
+
+    const sentAt = new Date().toISOString();
+    await this.enqueueMessageWebhook(
+      {
+        targetBotId: bot.id,
+        conversationId,
+        messageId: row.id,
+        from: row.sender_id,
+        content,
+        sentAt,
+        ...(row.in_reply_to_message_id !== null && {
+          inReplyToMessageId: row.in_reply_to_message_id,
+        }),
+        ...(inReplyToBody !== undefined && { inReplyToBody }),
+        ...(inReplyToSender !== undefined && { inReplyToSender }),
+      },
+      memberContext
+    );
 
     return { ok: true, redelivered: true, memberContext };
   }

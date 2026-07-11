@@ -19,7 +19,7 @@ import {
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
@@ -40,7 +40,8 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
-import { reinitSentryForConsent, sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -108,18 +109,7 @@ function RootLayoutNav() {
     }
   }, [fontsError]);
 
-  // Starts `false` because module scope above already ran initSentry(false).
-  const appliedSentryConsentRef = useRef(false);
-
-  useEffect(() => {
-    const consented = consentChecked && !needsConsent;
-    if (appliedSentryConsentRef.current === consented) {
-      return;
-    }
-
-    appliedSentryConsentRef.current = consented;
-    void reinitSentryForConsent(consented, initSentry);
-  }, [consentChecked, needsConsent]);
+  useSentryConsentSync(consentChecked && !needsConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
   const isLoading = authLoading || updateChecking || !fontsReady;

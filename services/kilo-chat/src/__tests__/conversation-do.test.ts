@@ -1202,6 +1202,33 @@ describe('ConversationDO', () => {
     if (!result.ok) expect(result.code).toBe('forbidden');
   });
 
+  it('redeliverMessage - conflict when no bot remains to redeliver to', async () => {
+    const stub = getStub('conv-redeliver-5');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-redeliver-5',
+      members: [{ id: 'user-alice', kind: 'user' as const }],
+    });
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Nobody home' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    await stub.notifyDeliveryFailed(created.messageId);
+
+    const result = await stub.redeliverMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('conflict');
+
+    // The flag must survive a rejected redelivery.
+    const { messages } = await stub.listMessages({ limit: 10 });
+    expect(messages.find(m => m.id === created.messageId)!.deliveryFailed).toBe(true);
+  });
+
   it('redeliverMessage - not_found for missing or deleted messages', async () => {
     const stub = getStub('conv-redeliver-4');
     await stub.initialize({ ...BASE_PARAMS, id: 'conv-redeliver-4' });

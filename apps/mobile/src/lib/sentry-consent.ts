@@ -38,17 +38,28 @@ export function sentryOptionsForConsent(consented: boolean): SentryConsentOption
 // (it awaits closeNativeSdk, which uninstalls the native replay integration),
 // so every consent transition is close-then-init. Chained through `lifecycle`
 // so a fast accept → revoke can't interleave close and init.
+// The chain promise never rejects (each transition resolves it in `finally`),
+// so a failed transition can't poison later ones — they re-attempt their own
+// close+init. Failures surface through the caller's `onFailure`.
 let lifecycle: Promise<void> | undefined = undefined;
 
 export async function reinitSentryForConsent(
   consented: boolean,
-  init: (consented: boolean) => void
+  init: (consented: boolean) => void,
+  onFailure?: () => void
 ): Promise<void> {
   const previous = lifecycle;
-  lifecycle = (async () => {
+  const gate: { release?: () => void } = {};
+  lifecycle = new Promise(resolve => {
+    gate.release = resolve;
+  });
+  try {
     await previous;
     await Sentry.close();
     init(consented);
-  })();
-  await lifecycle;
+  } catch {
+    onFailure?.();
+  } finally {
+    gate.release?.();
+  }
 }

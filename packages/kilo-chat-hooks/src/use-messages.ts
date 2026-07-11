@@ -754,13 +754,18 @@ export function useRedeliverMessage(client: KiloChatClient, conversationId: stri
     },
     onError: (_err, _variables, context) => {
       if (!context) return;
-      const restored = restoreOptimisticMessage(
+      restoreOptimisticMessage(
         queryClient,
         context.queryKey,
         context.snapshot,
         context.optimisticMessage
       );
-      if (!restored) invalidateMessages(queryClient, context.queryKey);
+      // Always reconcile (not just when restore fails): a lost HTTP response
+      // can mean the server actually committed the redelivery — its
+      // message.redelivered event may have already updated the row to the
+      // same value as our optimistic one, in which case the restore above
+      // resurrected a stale deliveryFailed with no later event to correct it.
+      invalidateMessages(queryClient, context.queryKey);
     },
   });
 }

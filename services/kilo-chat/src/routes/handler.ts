@@ -264,20 +264,13 @@ export async function handleRedeliverMessage(c: HonoCtx) {
   const result = await convStub.redeliverMessage({ messageId: msgId.data, senderId: callerId });
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'conflict') return c.json({ error: result.error }, 409);
     return c.json({ error: result.error }, 404);
   }
 
-  if (result.redelivered && result.memberContext.sandboxId) {
-    const pushPromise = pushEventToHumanMembers(
-      c.env,
-      convId.data,
-      result.memberContext.sandboxId,
-      result.memberContext.humanMemberIds,
-      'message.redelivered',
-      { messageId: msgId.data }
-    );
-    c.executionCtx.waitUntil(pushPromise);
-  }
+  // The DO publishes message.redelivered itself, ordered before the delivery
+  // attempt is enqueued, so a fresh delivery failure can never be clobbered
+  // by a delayed clear event.
   return c.json({ ok: true } satisfies OkResponse);
 }
 

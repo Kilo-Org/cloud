@@ -39,6 +39,10 @@ export const messageDeliveryFailedEventSchema = z.object({
   messageId: ulidSchema,
 });
 
+export const messageRedeliveredEventSchema = z.object({
+  messageId: ulidSchema,
+});
+
 export const typingEventSchema = z.object({
   memberId: nonEmptyStringSchema,
 });
@@ -124,6 +128,7 @@ export const kiloChatEventSchema = z.discriminatedUnion('event', [
     event: z.literal('message.delivery_failed'),
     payload: messageDeliveryFailedEventSchema,
   }),
+  z.object({ event: z.literal('message.redelivered'), payload: messageRedeliveredEventSchema }),
   z.object({ event: z.literal('typing'), payload: typingEventSchema }),
   z.object({ event: z.literal('typing.stop'), payload: typingEventSchema }),
   z.object({ event: z.literal('reaction.added'), payload: reactionAddedEventSchema }),
@@ -160,6 +165,7 @@ const payloadSchemaRegistry: { [K in KiloChatEventName]: z.ZodType<KiloChatEvent
   'message.updated': messageUpdatedEventSchema,
   'message.deleted': messageDeletedEventSchema,
   'message.delivery_failed': messageDeliveryFailedEventSchema,
+  'message.redelivered': messageRedeliveredEventSchema,
   typing: typingEventSchema,
   'typing.stop': typingEventSchema,
   'reaction.added': reactionAddedEventSchema,

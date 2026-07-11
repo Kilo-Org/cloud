@@ -84,6 +84,7 @@ export default function NewSessionScreen() {
 
   // Prompt ref (uncontrolled TextInput on iOS)
   const promptRef = useRef('');
+  const [hasPrompt, setHasPrompt] = useState(false);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -278,6 +279,13 @@ export default function NewSessionScreen() {
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
+  const canCreate =
+    hasPrompt &&
+    Boolean(selectedRepo) &&
+    Boolean(model) &&
+    !attachments.isUploading &&
+    !attachments.hasFailedAttachments;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="New Session" />
@@ -327,6 +335,8 @@ export default function NewSessionScreen() {
               onChangeText={text => {
                 promptRef.current = text;
                 promptMeasure.setText(text);
+                const nextHasPrompt = text.trim().length > 0;
+                setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
               }}
               onLayout={handlePromptInputLayout}
               scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
@@ -422,7 +432,7 @@ export default function NewSessionScreen() {
         <Button
           size="lg"
           className="mt-6"
-          disabled={isCreating}
+          disabled={isCreating || !canCreate}
           onPress={() => {
             void handleCreate();
           }}

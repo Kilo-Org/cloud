@@ -9,7 +9,6 @@ import {
   type AgentAttachmentExtension,
 } from '@/lib/agent-attachments/constants';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { classifyAttachment } from '@/lib/agent-attachments/validate';
 
 const IMAGE_PICKER_OPTIONS = {
   mediaTypes: ['images'],
@@ -73,10 +72,7 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeImageAsset).filter(asset => {
-    const classified = classifyAttachment(asset);
-    return classified.ok;
-  });
+  return result.assets.map(normalizeImageAsset);
 }
 
 async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
@@ -87,10 +83,7 @@ async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeImageAsset).filter(asset => {
-    const classified = classifyAttachment(asset);
-    return classified.ok;
-  });
+  return result.assets.map(normalizeImageAsset);
 }
 
 async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
@@ -102,10 +95,7 @@ async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeDocumentAsset).filter(asset => {
-    const classified = classifyAttachment(asset);
-    return classified.ok;
-  });
+  return result.assets.map(normalizeDocumentAsset);
 }
 
 type AttachmentSource = 'camera' | 'library' | 'files';

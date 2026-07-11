@@ -247,6 +247,7 @@ export function AgentSessionListScreen() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
 
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
+  const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
   const handleClearQuery = useCallback(() => {
     handleClearSearch();
@@ -263,6 +264,7 @@ export function AgentSessionListScreen() {
         headerRight={
           <SessionListHeaderActions
             hasActiveFilter={hasActiveFilter}
+            showNewSession={hasAnySessions}
             onNewSession={() => {
               router.push(getNewAgentSessionPath(organizationId) as Href);
             }}
@@ -289,7 +291,7 @@ export function AgentSessionListScreen() {
         <AgentSessionListContent
           sections={sections}
           storedSessions={storedSessions}
-          hasAnySessions={storedSessions.length > 0 || activeSessions.length > 0}
+          hasAnySessions={hasAnySessions}
           isLoading={isLoading || !ready}
           isSearchPending={isSearchPending}
           isError={contentIsError}

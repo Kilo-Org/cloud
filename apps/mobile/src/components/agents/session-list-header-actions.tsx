@@ -5,12 +5,16 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionListHeaderActionsProps = {
   hasActiveFilter: boolean;
+  /** Hides the header "New session" button — the empty-state CTA is the only
+   * creation affordance while there are no sessions yet. */
+  showNewSession: boolean;
   onNewSession: () => void;
   onOpenFilters: () => void;
 };
 
 export function SessionListHeaderActions({
   hasActiveFilter,
+  showNewSession,
   onNewSession,
   onOpenFilters,
 }: Readonly<SessionListHeaderActionsProps>) {
@@ -18,16 +22,18 @@ export function SessionListHeaderActions({
 
   return (
     <View className="flex-row items-center gap-4">
-      <Pressable
-        onPress={onNewSession}
-        // right slop capped so the expanded targets don't overlap inside the 16px gap
-        hitSlop={{ top: 11, bottom: 11, left: 11, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel="New session"
-        className="active:opacity-70"
-      >
-        <Plus size={22} color={colors.foreground} />
-      </Pressable>
+      {showNewSession ? (
+        <Pressable
+          onPress={onNewSession}
+          // right slop capped so the expanded targets don't overlap inside the 16px gap
+          hitSlop={{ top: 11, bottom: 11, left: 11, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="New session"
+          className="active:opacity-70"
+        >
+          <Plus size={22} color={colors.foreground} />
+        </Pressable>
+      ) : null}
       <Pressable
         onPress={onOpenFilters}
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}

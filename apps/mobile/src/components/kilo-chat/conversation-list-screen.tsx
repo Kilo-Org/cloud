@@ -279,20 +279,24 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           }
         />
       </Animated.View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="New conversation"
-        disabled={createConversation.isPending}
-        onPress={handleCreateAndNavigate}
-        className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
-        style={createButtonStyle}
-      >
-        {createConversation.isPending ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : (
-          <Plus size={24} color={colors.primaryForeground} />
-        )}
-      </Pressable>
+      {/* The empty state below already renders its own "Create conversation" CTA —
+          only one creation affordance should be visible at a time. */}
+      {entries.length > 0 && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New conversation"
+          disabled={createConversation.isPending}
+          onPress={handleCreateAndNavigate}
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
+          style={createButtonStyle}
+        >
+          {createConversation.isPending ? (
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : (
+            <Plus size={24} color={colors.primaryForeground} />
+          )}
+        </Pressable>
+      )}
     </View>
   );
 }

@@ -201,10 +201,19 @@ export function StoredSessionRow({
                   setRenameVisible(false);
                 }}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                className="active:opacity-70"
               >
                 <Text className="text-sm text-muted-foreground">Cancel</Text>
               </Pressable>
-              <Pressable onPress={handleRenameConfirm} hitSlop={8}>
+              <Pressable
+                onPress={handleRenameConfirm}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Rename"
+                className="active:opacity-70"
+              >
                 <Text className="text-sm font-semibold text-primary">Rename</Text>
               </Pressable>
             </View>

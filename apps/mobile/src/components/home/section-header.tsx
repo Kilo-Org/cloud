@@ -14,7 +14,13 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
     <View className="flex-row items-center justify-between px-4 pb-2 pt-5">
       <Text variant="eyebrow">{label}</Text>
       {actionLabel && onActionPress ? (
-        <Pressable onPress={onActionPress} hitSlop={8} accessibilityLabel={actionLabel}>
+        <Pressable
+          onPress={onActionPress}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={actionLabel}
+          className="active:opacity-70"
+        >
           <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
             {actionLabel}
           </Text>

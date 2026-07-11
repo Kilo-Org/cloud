@@ -24,10 +24,14 @@ export function ReasoningPartRenderer({
   return (
     <View className="rounded-xl border-[1.5px] border-dashed border-border p-3">
       <Pressable
-        className="flex-row items-center justify-between"
+        className="-m-1 flex-row items-center justify-between rounded-lg p-1 active:bg-secondary"
         onPress={() => {
           setIsExpanded(prev => !prev);
         }}
+        accessibilityRole="button"
+        accessibilityLabel={isStreaming ? 'Thinking' : 'Thought'}
+        accessibilityHint={isExpanded ? 'Collapse details' : 'Expand details'}
+        accessibilityState={{ expanded: isExpanded }}
       >
         <Eyebrow>{isStreaming ? 'Thinking' : 'Thought'}</Eyebrow>
         {isExpanded ? (

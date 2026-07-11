@@ -130,10 +130,11 @@ export function SessionFilterChips({
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
+            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
+            accessibilityRole="button"
             accessibilityLabel={`Remove ${label} project filter`}
           >
             <Text
@@ -149,10 +150,11 @@ export function SessionFilterChips({
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
+          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
           onPress={() => {
             onRemovePlatform(platform);
           }}
+          accessibilityRole="button"
           accessibilityLabel={`Remove ${platformFilterLabel(platform)} platform filter`}
         >
           <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">

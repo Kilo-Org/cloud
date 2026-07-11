@@ -37,12 +37,14 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   const canRedeploy = status == null || !REDEPLOY_BLOCKING_STATUSES.has(status);
 
   // Only one lifecycle mutation should ever be in flight at a time — while
-  // any of these is pending, disable the rest so they can't race each other.
+  // any of these is pending (including destroy, initiated from DangerZone),
+  // disable the rest so they can't race each other.
   const isLifecycleBusy =
     mutations.start.isPending ||
     mutations.stop.isPending ||
     mutations.restartOpenClaw.isPending ||
-    mutations.restartMachine.isPending;
+    mutations.restartMachine.isPending ||
+    mutations.destroy.isPending;
 
   const handleStart = () => {
     Alert.alert('Start Instance', 'Are you sure you want to start this instance?', [

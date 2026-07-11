@@ -224,6 +224,11 @@ export default function BillingScreen() {
                 <Skeleton className="h-4 w-16 rounded" />
                 <Skeleton className="h-4 w-28 rounded" />
               </View>
+              <View className="h-px bg-border" />
+              <View className="flex-row items-center justify-between py-2">
+                <Skeleton className="h-4 w-14 rounded" />
+                <Skeleton className="h-4 w-24 rounded" />
+              </View>
             </View>
             <Skeleton className="h-11 w-full rounded-md" />
           </Animated.View>

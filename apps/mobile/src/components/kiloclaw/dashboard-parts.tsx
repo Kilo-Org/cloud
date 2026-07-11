@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Trash2 } from 'lucide-react-native';
+import { AlertTriangle, Bot, RefreshCw, Trash2 } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
@@ -68,29 +68,51 @@ export function DashboardHero({ name, status, uptime }: Readonly<DashboardHeroPr
 
 type ServiceDegradedBannerProps = {
   onPress: () => void;
+  /** A background status poll failed, so this degraded reading is stale. */
+  stale?: boolean;
+  onRetry?: () => void;
+  isRetrying?: boolean;
 };
 
-function ServiceDegradedBanner({ onPress }: Readonly<ServiceDegradedBannerProps>) {
+function ServiceDegradedBanner({
+  onPress,
+  stale,
+  onRetry,
+  isRetrying,
+}: Readonly<ServiceDegradedBannerProps>) {
   const colors = useThemeColors();
   const danger = toneColor('danger');
   return (
-    <Pressable
-      className="mx-[22px] flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 active:opacity-70"
-      onPress={onPress}
-    >
-      <View
-        className={cn(
-          'h-9 w-9 items-center justify-center rounded-lg border',
-          danger.tileBgClass,
-          danger.tileBorderClass
-        )}
-      >
-        <AlertTriangle size={16} color={colors.destructive} />
-      </View>
-      <Text className="flex-1 text-[13px] font-medium text-foreground">
-        Service degraded — tap to view status
-      </Text>
-    </Pressable>
+    <View className="mx-[22px] flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <Pressable className="flex-1 flex-row items-center gap-3 active:opacity-70" onPress={onPress}>
+        <View
+          className={cn(
+            'h-9 w-9 items-center justify-center rounded-lg border',
+            danger.tileBgClass,
+            danger.tileBorderClass
+          )}
+        >
+          <AlertTriangle size={16} color={colors.destructive} />
+        </View>
+        <Text className="flex-1 text-[13px] font-medium text-foreground">
+          Service degraded — tap to view status
+        </Text>
+      </Pressable>
+      {stale && onRetry ? (
+        <Pressable
+          hitSlop={8}
+          disabled={isRetrying}
+          onPress={onRetry}
+          className="p-1 active:opacity-70"
+        >
+          {isRetrying ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : (
+            <RefreshCw size={16} color={colors.mutedForeground} />
+          )}
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -103,9 +125,11 @@ type DashboardServiceStatusProps = {
 };
 
 /**
- * The service-degraded check is optional context — on failure we can't tell
- * degraded from healthy, so say so instead of silently rendering as if
- * everything's fine.
+ * The service-degraded check is optional context. A known-degraded reading
+ * takes precedence even if the latest background poll failed — that stale
+ * "degraded" signal is more useful than a generic error, so we keep showing
+ * it (with a retry affordance) instead of discarding it. Only fall back to
+ * the generic error row when there's no degraded data at all.
  */
 export function DashboardServiceStatus({
   isError,
@@ -114,6 +138,16 @@ export function DashboardServiceStatus({
   onRetry,
   onOpenStatusPage,
 }: Readonly<DashboardServiceStatusProps>) {
+  if (isDegraded) {
+    return (
+      <ServiceDegradedBanner
+        onPress={onOpenStatusPage}
+        stale={isError}
+        onRetry={onRetry}
+        isRetrying={isFetching}
+      />
+    );
+  }
   if (isError) {
     return (
       <View className="mx-[22px]">
@@ -128,9 +162,6 @@ export function DashboardServiceStatus({
       </View>
     );
   }
-  if (isDegraded) {
-    return <ServiceDegradedBanner onPress={onOpenStatusPage} />;
-  }
   return null;
 }
 
@@ -138,7 +169,7 @@ export function DashboardServiceStatus({
 export function StatusCardGroupSkeleton({ rows }: Readonly<{ rows: number }>) {
   return (
     <View className="overflow-hidden rounded-2xl border border-border bg-card px-4 pb-1 pt-3">
-      <Skeleton className="mb-2 h-3 w-24 rounded" />
+      <Skeleton className="mb-1 h-3 w-24 rounded" />
       {Array.from({ length: rows }, (_, index) => (
         <View
           // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering

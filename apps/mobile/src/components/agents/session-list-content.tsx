@@ -109,9 +109,14 @@ export function AgentSessionListContent({
             </Text>
           </View>
         ) : null}
+        {isError ? (
+          <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
+            Could not refresh — showing the last saved list.
+          </Text>
+        ) : null}
       </View>
     ),
-    [colors.mutedForeground, isSearchPending, onSearchChange]
+    [colors.mutedForeground, isError, isSearchPending, onSearchChange]
   );
 
   const emptyStateAction = useMemo(
@@ -231,7 +236,10 @@ export function AgentSessionListContent({
     );
   }
 
-  if (isError) {
+  // Full-screen error only when there is nothing cached to fall back on —
+  // a background refetch/search failure with stale sessions already in
+  // cache (keepPreviousData) must never blank out what's already rendered.
+  if (isError && !hasAnySessions) {
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1 items-center justify-center">
         <QueryError message="Could not load sessions" onRetry={onRetry} />

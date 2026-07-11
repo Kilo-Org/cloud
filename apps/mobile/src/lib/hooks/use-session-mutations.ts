@@ -1,47 +1,20 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
 import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { toast } from 'sonner-native';
 
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
+import {
+  mapStoredSessions,
+  removeStoredSession,
+  type SessionsListData,
+} from '@/lib/session-list-cache';
 import { useTRPC } from '@/lib/trpc';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
-type SessionsListPage = RouterOutputs['cliSessionsV2']['list'];
-type SessionsListData = { pages: SessionsListPage[]; pageParams: unknown[] };
 type SessionsListSnapshot = [QueryKey, SessionsListData | undefined][];
 
 const onError = (error: { message: string }) => {
   toast.error(error.message || 'Something went wrong');
 };
-
-function mapStoredSessions(
-  data: SessionsListData,
-  sessionId: string,
-  update: (
-    session: SessionsListPage['cliSessions'][number]
-  ) => SessionsListPage['cliSessions'][number]
-): SessionsListData {
-  return {
-    ...data,
-    pages: data.pages.map(page => ({
-      ...page,
-      cliSessions: page.cliSessions.map(session =>
-        session.session_id === sessionId ? update(session) : session
-      ),
-    })),
-  };
-}
-
-function removeStoredSession(data: SessionsListData, sessionId: string): SessionsListData {
-  return {
-    ...data,
-    pages: data.pages.map(page => ({
-      ...page,
-      cliSessions: page.cliSessions.filter(session => session.session_id !== sessionId),
-    })),
-  };
-}
 
 export function useSessionMutations() {
   const trpc = useTRPC();

@@ -196,7 +196,8 @@ export default function DashboardScreen() {
             onPress={() => {
               setRenameVisible(true);
             }}
-            hitSlop={8}
+            // 18px icon + 13 slop each side = 44pt minimum touch target
+            hitSlop={13}
             accessibilityLabel="Rename instance"
             className="active:opacity-70"
           >

@@ -126,6 +126,16 @@ export function AgentSessionListScreen() {
     }
   }, [isSearching, searchRefetch, refetch]);
 
+  // Pull-to-refresh must also retry the search query while one is active —
+  // it's the query actually driving what's on screen.
+  const handleRefetch = useCallback(async () => {
+    if (!isSearching) {
+      return refetch();
+    }
+    const [searchResult, listHadError] = await Promise.all([searchRefetch(), refetch()]);
+    return searchResult.isError || listHadError;
+  }, [isSearching, refetch, searchRefetch]);
+
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
@@ -296,7 +306,7 @@ export function AgentSessionListScreen() {
           isSearchPending={isSearchPending}
           isError={contentIsError}
           isFetchingNextPage={isFetchingNextPage}
-          refetch={refetch}
+          refetch={handleRefetch}
           onRetry={handleRetry}
           onEndReached={handleEndReached}
           onSessionPress={navigateToSession}

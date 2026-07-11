@@ -25,8 +25,9 @@ export function SessionListHeaderActions({
       {showNewSession ? (
         <Pressable
           onPress={onNewSession}
-          // right slop capped so the expanded targets don't overlap inside the 16px gap
-          hitSlop={{ top: 11, bottom: 11, left: 11, right: 8 }}
+          // right slop capped so the expanded targets don't overlap inside the
+          // 16px gap; left slop makes up the difference to a 44pt-wide target
+          hitSlop={{ top: 11, bottom: 11, left: 14, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel="New session"
           className="active:opacity-70"
@@ -36,7 +37,8 @@ export function SessionListHeaderActions({
       ) : null}
       <Pressable
         onPress={onOpenFilters}
-        hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
+        // left slop capped against the 16px gap, right slop reaches 44pt wide
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
         accessibilityRole="button"
         accessibilityLabel="Filter sessions"
         className="active:opacity-70"

@@ -85,6 +85,10 @@ export function AgentSessionListContent({
     [bottom]
   );
 
+  // When the list is empty the error surface below (QueryError + retry)
+  // already covers it — don't double up with the inline header line.
+  const showInlineError = isError && sections.length > 0;
+
   const listHeader = useMemo(
     () => (
       <View>
@@ -109,14 +113,14 @@ export function AgentSessionListContent({
             </Text>
           </View>
         ) : null}
-        {isError ? (
+        {showInlineError ? (
           <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
             Could not refresh — showing the last saved list.
           </Text>
         ) : null}
       </View>
     ),
-    [colors.mutedForeground, isError, isSearchPending, onSearchChange]
+    [colors.mutedForeground, showInlineError, isSearchPending, onSearchChange]
   );
 
   const emptyStateAction = useMemo(
@@ -156,6 +160,24 @@ export function AgentSessionListContent({
       </View>
     ),
     [clearQueryAction, isSearching]
+  );
+
+  // The query in error produced no rows to show — surface a retry for it
+  // (search or list, whichever `onRetry` targets) instead of pretending the
+  // empty result is a real "no matches".
+  const queryErrorEmptyComponent = useMemo(
+    () => (
+      <View className="items-center gap-4 pt-16">
+        <QueryError
+          placement="top"
+          className="pt-0"
+          message={isSearching ? 'Could not search sessions' : 'Could not load sessions'}
+          onRetry={onRetry}
+        />
+        {clearQueryAction}
+      </View>
+    ),
+    [clearQueryAction, isSearching, onRetry]
   );
 
   const organizationIdBySessionId = useMemo(
@@ -272,6 +294,11 @@ export function AgentSessionListContent({
     );
   }
 
+  let emptyComponent = null;
+  if (hasActiveQuery) {
+    emptyComponent = isError ? queryErrorEmptyComponent : filteredEmptyComponent;
+  }
+
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
       <SectionList<SessionItem, SessionSection>
@@ -280,7 +307,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={hasActiveQuery ? filteredEmptyComponent : null}
+        ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (
             <View className="py-4">

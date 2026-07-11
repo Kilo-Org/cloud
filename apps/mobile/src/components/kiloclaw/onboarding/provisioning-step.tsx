@@ -9,10 +9,12 @@ import { AlertTriangle } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   FadeOut,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -96,9 +98,14 @@ export function ProvisioningStep({
   const stageMessage = useMemo(() => provisioningStageMessage(state), [state]);
 
   // Gentle breathing pulse on the avatar tile — signals "actively working"
-  // without the spinner-in-the-middle-of-nowhere look.
+  // without the spinner-in-the-middle-of-nowhere look. Static tile when
+  // Reduce Motion is on, same as Skeleton/SpinningIcon.
+  const reducedMotion = useReducedMotion();
   const pulse = useSharedValue(1);
   useEffect(() => {
+    if (reducedMotion) {
+      return undefined;
+    }
     pulse.value = withRepeat(
       withTiming(PULSE_PEAK, {
         duration: PULSE_DURATION_MS,
@@ -107,7 +114,10 @@ export function ProvisioningStep({
       -1,
       true
     );
-  }, [pulse]);
+    return () => {
+      cancelAnimation(pulse);
+    };
+  }, [pulse, reducedMotion]);
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
   }));

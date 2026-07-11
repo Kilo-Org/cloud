@@ -427,3 +427,7 @@ Kilo voice is clear, technical, calm, and direct. Use concrete verbs and specifi
 - Invent status colors, spacing values, radii, or typography roles.
 - Nest cards or use shadows as the default source of depth.
 - Depend on color, hover, placeholders, or icon shape alone to convey meaning.
+
+## Mobile (Focus palette)
+
+The mobile app (`apps/mobile/`) intentionally does not use this token contract. It ships its own light/dark palette ("Focus", FL/FD) defined as CSS variables in `apps/mobile/src/global.css`, tuned for WCAG AA contrast against its own warmer neutral surfaces. This divergence is deliberate — mobile is not expected to converge onto the tokens above.

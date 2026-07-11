@@ -10,10 +10,13 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -73,6 +76,27 @@ export function OrganizationHubScreen() {
           </View>
           {showMoney && (
             <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
+          )}
+          {showMoney && org.balance === 0 && (
+            <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
+              <Text className="flex-1 pr-3 text-xs text-muted-foreground">
+                Add credits to keep usage running.
+              </Text>
+              <Button
+                size="sm"
+                variant="outline"
+                onPress={() => {
+                  void openExternalUrl(
+                    `${WEB_BASE_URL}/organizations/${organizationId}/payment-details`,
+                    {
+                      label: 'billing page',
+                    }
+                  );
+                }}
+              >
+                <Text className="text-xs font-semibold">Add credits</Text>
+              </Button>
+            </View>
           )}
           <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
         </Animated.View>

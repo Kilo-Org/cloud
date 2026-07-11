@@ -1,14 +1,16 @@
 import { type Href, useRouter } from 'expo-router';
-import { UserPlus } from 'lucide-react-native';
+import { UserPlus, Users } from 'lucide-react-native';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { EmptyState } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -98,6 +100,30 @@ export function OrganizationMembersScreen() {
         onRetry={() => void orgWithMembers.refetch()}
         isRetrying={orgWithMembers.isFetching}
         placement="top"
+      />
+    );
+  } else if (activeMembers.length === 0) {
+    membersBody = (
+      <EmptyState
+        icon={Users}
+        placement="top"
+        title="No members yet"
+        description={
+          canInvite
+            ? 'Invite teammates to start collaborating in this organization.'
+            : 'Ask an owner or billing manager to invite teammates.'
+        }
+        action={
+          canInvite ? (
+            <Button
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
+              }}
+            >
+              <Text className="text-primary-foreground">Invite member</Text>
+            </Button>
+          ) : undefined
+        }
       />
     );
   } else {

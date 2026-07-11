@@ -118,7 +118,7 @@ export function OrganizationInvoicesScreen() {
               icon={FileText}
               className="pt-16"
               title="No invoices"
-              description="Invoices for this organization will show up here."
+              description="Invoices are generated automatically each billing cycle and will appear here once your organization is billed."
             />
           }
         />

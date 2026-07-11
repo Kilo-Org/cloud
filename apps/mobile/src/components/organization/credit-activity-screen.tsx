@@ -115,7 +115,7 @@ export function OrganizationCreditActivityScreen() {
               icon={Receipt}
               className="pt-16"
               title="No credit activity"
-              description="Credit transactions for this organization will show up here."
+              description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
             />
           }
         />

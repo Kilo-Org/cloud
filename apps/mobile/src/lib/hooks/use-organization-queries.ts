@@ -14,12 +14,18 @@ export function useOrgRole() {
   const trpc = useTRPC();
   const { token } = useAuth();
   const { organizationId } = useOrganization();
-  const { data: orgs, isLoading } = useQuery({
+  const {
+    data: orgs,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: token != null,
   });
   const org = orgs?.find(entry => entry.organizationId === organizationId);
-  return { organizationId, role: org?.role, org, isLoading };
+  return { organizationId, role: org?.role, org, isLoading, isError, isFetching, refetch };
 }
 
 export type OrgListEntry = NonNullable<ReturnType<typeof useOrgRole>['org']>;

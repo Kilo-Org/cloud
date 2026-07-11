@@ -1,10 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus } from 'lucide-react-native';
+import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -62,7 +64,8 @@ export function OrganizationMembersScreen() {
     return null;
   }
 
-  const isLoading = orgWithMembers.isLoading || !orgWithMembers.data;
+  const isLoading = orgWithMembers.isLoading;
+  const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
   const canInvite = isMoneyRole(role);
   const isOwner = role === 'owner';
@@ -73,6 +76,40 @@ export function OrganizationMembersScreen() {
   const invitedMembers = sortInvitedMembers(
     orgWithMembers.data?.members.filter(m => m.status === 'invited') ?? []
   );
+
+  let membersBody: ReactNode = null;
+  if (isLoading) {
+    membersBody = (
+      <Animated.View exiting={FadeOut.duration(150)} className="rounded-lg bg-secondary">
+        <MemberRowSkeleton />
+        <MemberRowSkeleton />
+        <MemberRowSkeleton last />
+      </Animated.View>
+    );
+  } else if (isError) {
+    membersBody = (
+      <QueryError
+        onRetry={() => void orgWithMembers.refetch()}
+        isRetrying={orgWithMembers.isFetching}
+        placement="top"
+      />
+    );
+  } else {
+    membersBody = (
+      <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary">
+        {activeMembers.map((member, index) => (
+          <MemberRow
+            key={member.id}
+            member={member}
+            canManage={isOwner && member.id !== currentUserId}
+            enableUsageLimits={enableUsageLimits}
+            organizationId={organizationId}
+            last={index === activeMembers.length - 1}
+          />
+        ))}
+      </Animated.View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -101,29 +138,10 @@ export function OrganizationMembersScreen() {
       >
         <Animated.View layout={LinearTransition} className="gap-2">
           <Text variant="eyebrow">Members</Text>
-          {isLoading ? (
-            <Animated.View exiting={FadeOut.duration(150)} className="rounded-lg bg-secondary">
-              <MemberRowSkeleton />
-              <MemberRowSkeleton />
-              <MemberRowSkeleton last />
-            </Animated.View>
-          ) : (
-            <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary">
-              {activeMembers.map((member, index) => (
-                <MemberRow
-                  key={member.id}
-                  member={member}
-                  canManage={isOwner && member.id !== currentUserId}
-                  enableUsageLimits={enableUsageLimits}
-                  organizationId={organizationId}
-                  last={index === activeMembers.length - 1}
-                />
-              ))}
-            </Animated.View>
-          )}
+          {membersBody}
         </Animated.View>
 
-        {!isLoading && invitedMembers.length > 0 && (
+        {!isLoading && !isError && invitedMembers.length > 0 && (
           <Animated.View
             entering={FadeIn.duration(200)}
             layout={LinearTransition}

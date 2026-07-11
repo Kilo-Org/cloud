@@ -2,11 +2,12 @@ import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
+import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -30,7 +31,7 @@ function InfoCardSkeleton() {
 export function OrganizationHubScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role, org, isLoading } = useOrgRole();
+  const { organizationId, role, org, isLoading, isError, isFetching, refetch } = useOrgRole();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
@@ -44,6 +45,51 @@ export function OrganizationHubScreen() {
   const lowBalanceSubtitle =
     minimumBalance != null ? `Below ${formatDollars(minimumBalance)}` : 'Off';
 
+  let infoCard: ReactNode = null;
+  if (isLoading) {
+    infoCard = (
+      <Animated.View exiting={FadeOut.duration(150)}>
+        <InfoCardSkeleton />
+      </Animated.View>
+    );
+  } else if (isError && !org) {
+    infoCard = (
+      <QueryError
+        onRetry={() => void refetch()}
+        isRetrying={isFetching}
+        className="rounded-lg bg-secondary py-6"
+        placement="top"
+      />
+    );
+  } else if (org) {
+    infoCard = (
+      <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
+        <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
+          <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
+            {org.organizationName}
+          </Text>
+          {showMoney && (
+            <Pressable
+              onPress={() => {
+                setRenameVisible(true);
+              }}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Rename organization"
+              className="active:opacity-70"
+            >
+              <Pencil size={16} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        </View>
+        {showMoney && (
+          <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
+        )}
+        <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
+      </Animated.View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={org?.organizationName ?? 'Organization'} />
@@ -52,38 +98,7 @@ export function OrganizationHubScreen() {
         contentContainerClassName="gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View layout={LinearTransition}>
-          {isLoading || !org ? (
-            <Animated.View exiting={FadeOut.duration(150)}>
-              <InfoCardSkeleton />
-            </Animated.View>
-          ) : (
-            <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-              <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-                <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
-                  {org.organizationName}
-                </Text>
-                {showMoney && (
-                  <Pressable
-                    onPress={() => {
-                      setRenameVisible(true);
-                    }}
-                    hitSlop={12}
-                    accessibilityRole="button"
-                    accessibilityLabel="Rename organization"
-                    className="active:opacity-70"
-                  >
-                    <Pencil size={16} color={colors.mutedForeground} />
-                  </Pressable>
-                )}
-              </View>
-              {showMoney && (
-                <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
-              )}
-              <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
-            </Animated.View>
-          )}
-        </Animated.View>
+        <Animated.View layout={LinearTransition}>{infoCard}</Animated.View>
 
         <OrgUsageStats organizationId={organizationId} />
 

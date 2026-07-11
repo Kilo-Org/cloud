@@ -1,9 +1,11 @@
 import { formatCents } from '@kilocode/app-shared/utils';
 import { FileText } from 'lucide-react-native';
+import { type ReactNode } from 'react';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,37 +73,53 @@ export function OrganizationInvoicesScreen() {
     return null;
   }
 
-  const isLoading = query.isLoading || !query.data;
+  const isLoading = query.isLoading;
+  const isError = query.isError && !query.data;
   const invoices = query.data ?? [];
+
+  let body: ReactNode = null;
+  if (isLoading) {
+    body = (
+      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
+        <InvoiceRowSkeleton />
+        <InvoiceRowSkeleton />
+        <InvoiceRowSkeleton />
+      </Animated.View>
+    );
+  } else if (isError) {
+    body = (
+      <QueryError
+        onRetry={() => void query.refetch()}
+        isRetrying={query.isFetching}
+        placement="top"
+      />
+    );
+  } else {
+    body = (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <FlatList
+          data={invoices}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => <InvoiceRow invoice={item} />}
+          contentContainerClassName="gap-3 px-6 pt-4"
+          contentContainerStyle={{ paddingBottom }}
+          ListEmptyComponent={
+            <EmptyState
+              icon={FileText}
+              className="pt-16"
+              title="No invoices"
+              description="Invoices for this organization will show up here."
+            />
+          }
+        />
+      </Animated.View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Invoices" />
-      {isLoading ? (
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
-          <InvoiceRowSkeleton />
-          <InvoiceRowSkeleton />
-          <InvoiceRowSkeleton />
-        </Animated.View>
-      ) : (
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-          <FlatList
-            data={invoices}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => <InvoiceRow invoice={item} />}
-            contentContainerClassName="gap-3 px-6 pt-4"
-            contentContainerStyle={{ paddingBottom }}
-            ListEmptyComponent={
-              <EmptyState
-                icon={FileText}
-                className="pt-16"
-                title="No invoices"
-                description="Invoices for this organization will show up here."
-              />
-            }
-          />
-        </Animated.View>
-      )}
+      {body}
     </View>
   );
 }

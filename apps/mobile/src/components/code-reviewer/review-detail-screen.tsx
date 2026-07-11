@@ -51,11 +51,40 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const { data, isLoading, isError, isFetching, refetch } = useReviewDetail(reviewId);
+  const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
 
-  if (isError) {
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Review" />
+        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+          <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
+            <Skeleton className="h-14 w-full rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-lg" />
+          </Animated.View>
+        </TabScreenScrollView>
+      </View>
+    );
+  }
+
+  // A thrown NOT_FOUND/FORBIDDEN can never be fixed by retrying — show a
+  // plain message with no "Retry" affordance. Any other thrown error (or a
+  // resolved `success: false`, the router's generic-failure shape) is
+  // treated as transient and gets a retry button.
+  if (!data) {
+    const errorCode = isError ? error.data?.code : undefined;
+    if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN') {
+      return (
+        <View className="flex-1 bg-background">
+          <ScreenHeader title="Review" />
+          <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
+            <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
+          </TabScreenScrollView>
+        </View>
+      );
+    }
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />
@@ -66,20 +95,6 @@ export function ReviewDetailScreen({
             onRetry={() => void refetch()}
             isRetrying={isFetching}
           />
-        </TabScreenScrollView>
-      </View>
-    );
-  }
-
-  if (isLoading || !data) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Review" />
-        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
-          <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-            <Skeleton className="h-14 w-full rounded-lg" />
-            <Skeleton className="h-40 w-full rounded-lg" />
-          </Animated.View>
         </TabScreenScrollView>
       </View>
     );
@@ -110,6 +125,15 @@ export function ReviewDetailScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader title="Review" eyebrow={review.repo_full_name} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-4">
+        {/* A background poll failure must not blank out an already-loaded
+            review — keep showing the stale detail with a non-blocking note
+            instead of replacing it with a full error screen. */}
+        {isError && (
+          <Text variant="muted" className="text-center text-xs">
+            Couldn't refresh — showing the last known status.
+          </Text>
+        )}
+
         <Animated.View entering={FadeIn.duration(200)} className="gap-1">
           <Text className="text-base font-medium">{review.pr_title}</Text>
           <Text variant="muted" className="text-xs">

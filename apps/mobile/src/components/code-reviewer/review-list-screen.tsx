@@ -11,9 +11,11 @@ import {
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -46,6 +48,10 @@ function reviewTime(review: Review): Date {
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { data, isLoading, isError, isFetching, refetch } = useReviewList(scope);
+  const githubStatus = useGitHubStatus(scope);
+  const gitlabStatus = useGitLabStatus(scope);
+  const hasConnectedProvider =
+    githubStatus.data?.connected === true || gitlabStatus.data?.connected === true;
 
   return (
     <View className="flex-1 bg-background">
@@ -90,6 +96,21 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               title="No reviews yet"
               description="Reviews appear here once the Code Reviewer runs on a pull request."
               className="pt-12"
+              action={
+                <Button
+                  onPress={() => {
+                    router.push(
+                      (hasConnectedProvider
+                        ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
+                        : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
+                    );
+                  }}
+                >
+                  <Text>
+                    {hasConnectedProvider ? 'Start a manual review' : 'Configure provider'}
+                  </Text>
+                </Button>
+              }
             />
           )}
 

@@ -25,8 +25,11 @@ const PLATFORM_ICONS: Record<ReviewerPlatform, typeof GitBranch> = {
 const ALL_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 
 function connectionSubtitle(status: { isLoading: boolean; data?: { connected: boolean } }) {
+  // Reserve the subtitle line with a placeholder while loading instead of
+  // omitting it — otherwise the row grows by a line once the real status
+  // arrives, popping the layout.
   if (status.isLoading) {
-    return undefined;
+    return 'Checking…';
   }
   return status.data?.connected ? 'Connected' : 'Not connected';
 }

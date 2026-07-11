@@ -5,9 +5,17 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import {
+  type StoreKiloPassRestorePurchasesResult,
+  useStoreKiloPassPurchase,
+} from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 
-export function RestorePurchasesButton() {
+type RestorePurchasesButtonProps = {
+  /** Called with the outcome instead of the default toast — for callers that render feedback inline. */
+  onResult?: (result: StoreKiloPassRestorePurchasesResult) => void;
+};
+
+export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesButtonProps> = {}) {
   const colors = useThemeColors();
   const { isPending, isRestoringPurchases, restorePurchases } = useStoreKiloPassPurchase();
 
@@ -21,6 +29,10 @@ export function RestorePurchasesButton() {
     void Haptics.selectionAsync();
     void (async () => {
       const result = await restorePurchases();
+      if (onResult) {
+        onResult(result);
+        return;
+      }
       if (result === 'restored') {
         toast.success('Subscription restored.');
       }

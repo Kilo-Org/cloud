@@ -111,11 +111,9 @@ export function OrganizationInvoicesScreen() {
     );
   } else if (isError) {
     body = (
-      <QueryError
-        onRetry={() => void query.refetch()}
-        isRetrying={query.isFetching}
-        placement="top"
-      />
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
+        <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />
+      </Animated.View>
     );
   } else {
     body = (

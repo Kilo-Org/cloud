@@ -64,7 +64,9 @@ export function KvRow({
       <View className="shrink-0 flex-row items-center gap-2">
         {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
         {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
-        <Text className="text-sm text-muted-foreground">{label}</Text>
+        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+          {label}
+        </Text>
       </View>
       <Text
         variant="mono"

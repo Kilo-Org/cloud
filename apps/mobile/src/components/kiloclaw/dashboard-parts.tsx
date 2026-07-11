@@ -207,7 +207,7 @@ export function DangerZone({ pending, onDestroy }: Readonly<DangerZoneProps>) {
         accessibilityRole="button"
         accessibilityLabel="Destroy instance"
         accessibilityState={{ busy: pending }}
-        className="flex-row items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-2.5 active:opacity-70 disabled:opacity-50"
+        className="flex-row items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-2.5 active:opacity-70"
         onPress={onDestroy}
       >
         {pending ? (

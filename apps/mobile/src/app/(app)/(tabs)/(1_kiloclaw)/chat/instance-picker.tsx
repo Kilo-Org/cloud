@@ -1,12 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, View } from 'react-native';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
+import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
-import { SheetHeader } from '@/components/sheet-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
@@ -18,7 +17,6 @@ export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { currentId } = useLocalSearchParams<{ currentId: string }>();
-  const { bottom } = useSafeAreaInsets();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
 
@@ -33,17 +31,12 @@ export default function InstancePickerScreen() {
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ paddingBottom: bottom + 16 }}
+    <PickerSheet
+      title="Switch Instance"
+      onDone={() => {
+        router.back();
+      }}
     >
-      <SheetHeader
-        title="Switch Instance"
-        onDone={() => {
-          router.back();
-        }}
-      />
-
       {instancesQuery.isPending ? (
         <View className="gap-3 px-4 py-4">
           <Skeleton className="h-16 rounded-xl" />
@@ -90,6 +83,6 @@ export default function InstancePickerScreen() {
             );
           })
         : null}
-    </ScrollView>
+    </PickerSheet>
   );
 }

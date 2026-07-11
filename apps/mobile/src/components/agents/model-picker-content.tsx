@@ -6,7 +6,7 @@ import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
-import { SheetHeader } from '@/components/sheet-header';
+import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -134,24 +134,30 @@ export function ModelPickerContent() {
 
   if (!bridge) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <Text className="text-muted-foreground">No models available</Text>
-      </View>
+      <PickerSheet
+        title="Select Model"
+        onDone={closePicker}
+        scrollable={false}
+        fallback={
+          <View className="flex-1 items-center justify-center bg-background">
+            <Text className="text-muted-foreground">No models available</Text>
+          </View>
+        }
+      />
     );
   }
 
   return (
-    <FlatList
-      className="flex-1 bg-background"
-      data={rows}
-      keyExtractor={item => item.key}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      contentContainerStyle={{ paddingBottom: bottom }}
-      ListHeaderComponent={
-        <View className="bg-background pb-3">
-          <SheetHeader title="Select Model" onDone={closePicker} />
-          <View className="mx-4 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+    <PickerSheet title="Select Model" onDone={closePicker} scrollable={false}>
+      <FlatList
+        className="flex-1 bg-background"
+        data={rows}
+        keyExtractor={item => item.key}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{ paddingBottom: bottom }}
+        ListHeaderComponent={
+          <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
               placeholder="Search models..."
@@ -164,38 +170,38 @@ export function ModelPickerContent() {
               onChangeText={setSearch}
             />
           </View>
-        </View>
-      }
-      ListEmptyComponent={
-        <View className="items-center justify-center px-6 py-16">
-          <Text className="text-center text-sm text-muted-foreground">
-            {search.trim() ? 'No models match your search' : 'No models available'}
-          </Text>
-        </View>
-      }
-      renderItem={({ item }) => {
-        if (item.type === 'header') {
-          return (
-            <View className="bg-secondary px-4 py-2">
-              <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {item.title}
-              </Text>
-            </View>
-          );
         }
+        ListEmptyComponent={
+          <View className="items-center justify-center px-6 py-16">
+            <Text className="text-center text-sm text-muted-foreground">
+              {search.trim() ? 'No models match your search' : 'No models available'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          if (item.type === 'header') {
+            return (
+              <View className="bg-secondary px-4 py-2">
+                <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {item.title}
+                </Text>
+              </View>
+            );
+          }
 
-        return (
-          <ModelPickerOptionRow
-            option={item.model}
-            selected={item.model.id === selectedModel}
-            selectedVariant={selectedVariant}
-            isFavorite={item.isFavorite}
-            onSelectModel={handleSelectModel}
-            onSelectVariant={handleSelectVariant}
-            onToggleFavorite={handleToggleFavorite}
-          />
-        );
-      }}
-    />
+          return (
+            <ModelPickerOptionRow
+              option={item.model}
+              selected={item.model.id === selectedModel}
+              selectedVariant={selectedVariant}
+              isFavorite={item.isFavorite}
+              onSelectModel={handleSelectModel}
+              onSelectVariant={handleSelectVariant}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          );
+        }}
+      />
+    </PickerSheet>
   );
 }

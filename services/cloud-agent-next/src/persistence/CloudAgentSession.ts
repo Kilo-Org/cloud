@@ -252,7 +252,7 @@ type GroupedRegisterSessionInput = {
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
-    'sandboxId' | 'sandboxRoute' | 'shallow' | 'devcontainerRequested'
+    'sandboxId' | 'sandboxRoute' | 'shallow' | 'credentialContainment' | 'devcontainerRequested'
   >;
 };
 

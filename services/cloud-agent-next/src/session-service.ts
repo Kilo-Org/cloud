@@ -46,7 +46,11 @@ import type {
   RuntimeSkill,
   RuntimeAgent,
 } from './persistence/types.js';
-import { parseSessionMetadata } from './persistence/session-metadata.js';
+import {
+  getEffectiveCredentialContainment,
+  parseSessionMetadata,
+  requiresContainmentSandbox,
+} from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
@@ -1683,8 +1687,9 @@ export class SessionService {
   ): Promise<ResolvedWorkspaceTokens> {
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
-    const useManagedScmContainment = metadata.workspace?.managedScmContainment === true;
-    if (useManagedScmContainment && sandboxId.startsWith('dind-')) {
+    const credentialContainment = getEffectiveCredentialContainment(metadata);
+    const containmentSandboxRequired = requiresContainmentSandbox(metadata);
+    if (containmentSandboxRequired && sandboxId.startsWith('dind-')) {
       throw ExecutionError.invalidRequest(
         'Managed SCM containment is not supported for DIND sandboxes'
       );
@@ -1706,11 +1711,11 @@ export class SessionService {
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
           metadata.identity.createdOnPlatform === 'slack',
       };
-      const result = useManagedScmContainment
+      const result = credentialContainment.github
         ? await issueCloudAgentGitHubSessionCapability(env, {
             ...authParams,
             outboundContainerId: getOutboundContainerId(env, sandboxId, {
-              managedScmContainment: useManagedScmContainment,
+              managedScmContainment: containmentSandboxRequired,
             }),
           })
         : await resolveCloudAgentGitHubAuthForRepo(env, authParams);
@@ -1745,12 +1750,12 @@ export class SessionService {
       if (!env.GIT_TOKEN_SERVICE) {
         throw ExecutionError.invalidRequest('Git token service is not configured');
       }
-      if (useManagedScmContainment) {
+      if (credentialContainment.gitlab) {
         const result = await issueCloudAgentGitLabSessionCapability(env, {
           gitUrl: git.url,
           userId: metadata.identity.userId,
           outboundContainerId: getOutboundContainerId(env, sandboxId, {
-            managedScmContainment: useManagedScmContainment,
+            managedScmContainment: containmentSandboxRequired,
           }),
           orgId: metadata.identity.orgId,
           createdOnPlatform: metadata.identity.createdOnPlatform,
@@ -1851,7 +1856,7 @@ export class SessionService {
       cloudAgentSessionId: string;
       kiloSessionId: string;
       sandboxId: string;
-      managedScmContainment: boolean;
+      kilocodeContainment: boolean;
       userToken: string;
     }
   ): Promise<{ capability: string; providerBaseUrl?: string; sessionIngestBaseUrl?: string }> {
@@ -1859,7 +1864,7 @@ export class SessionService {
       return { capability: params.userToken };
     }
 
-    if (!params.managedScmContainment) {
+    if (!params.kilocodeContainment) {
       logger
         .withFields({ sandboxId: params.sandboxId })
         .info('Using raw Kilo token; session does not use managed containment');
@@ -1897,6 +1902,27 @@ export class SessionService {
     };
   }
 
+  private async resolveKiloCapability(
+    env: PersistenceEnv,
+    metadata: CloudAgentSessionState,
+    params: {
+      userId: string;
+      cloudAgentSessionId: string;
+      kiloSessionId: string;
+      sandboxId: string;
+      userToken: string;
+    }
+  ): Promise<{ capability: string; providerBaseUrl?: string; sessionIngestBaseUrl?: string }> {
+    return this.issueKiloSessionCapability(env, {
+      userId: params.userId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      kiloSessionId: params.kiloSessionId,
+      sandboxId: params.sandboxId,
+      kilocodeContainment: getEffectiveCredentialContainment(metadata).kilocode,
+      userToken: params.userToken,
+    });
+  }
+
   async buildWrapperSessionReadyAndPromptRequests(
     options: BuildWrapperSessionReadyAndPromptRequestsOptions
   ): Promise<
@@ -1928,12 +1954,11 @@ export class SessionService {
       capability: kiloCapability,
       providerBaseUrl: kiloProviderBaseUrl,
       sessionIngestBaseUrl: kiloSessionIngestBaseUrl,
-    } = await this.issueKiloSessionCapability(env, {
+    } = await this.resolveKiloCapability(env, metadata, {
       userId,
       cloudAgentSessionId: sessionId,
       kiloSessionId: metadata.auth.kiloSessionId,
       sandboxId,
-      managedScmContainment: metadata.workspace?.managedScmContainment === true,
       userToken: metadata.auth.kilocodeToken,
     });
 
@@ -2177,12 +2202,11 @@ export class SessionService {
       capability: kiloCapability,
       providerBaseUrl: kiloProviderBaseUrl,
       sessionIngestBaseUrl: kiloSessionIngestBaseUrl,
-    } = await this.issueKiloSessionCapability(env, {
+    } = await this.resolveKiloCapability(env, metadata, {
       userId,
       cloudAgentSessionId: sessionId,
       kiloSessionId: metadata.auth.kiloSessionId,
       sandboxId,
-      managedScmContainment: metadata.workspace?.managedScmContainment === true,
       userToken: metadata.auth.kilocodeToken,
     });
 

@@ -1,5 +1,6 @@
 import { getSandbox } from '@cloudflare/sandbox';
 import { findWrapperForSession } from '../kilo/wrapper-manager.js';
+import { requiresContainmentSandbox } from '../persistence/session-metadata.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 import { fetchSessionMetadata } from '../session-service.js';
 import type { Env, SandboxInstance, SandboxId, SessionId } from '../types.js';
@@ -80,7 +81,7 @@ export async function resolveLiveWrapperTarget(params: {
 
   const sandbox = getSandbox(
     getSandboxNamespace(env, sandboxId, {
-      managedScmContainment: metadata.workspace?.managedScmContainment === true,
+      managedScmContainment: requiresContainmentSandbox(metadata),
     }),
     sandboxId
   );

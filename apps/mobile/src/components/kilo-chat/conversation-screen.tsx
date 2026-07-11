@@ -29,6 +29,7 @@ import { useConversationMessageController } from './hooks/use-conversation-messa
 import { useMessageCacheUpdater, useMessages } from './hooks/use-messages';
 import { useNowTicker } from './hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
+import { useKiloChatTokenError } from './kilo-chat-provider';
 import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { kiloclawConversationEyebrow } from '@/lib/kiloclaw-display';
@@ -58,6 +59,7 @@ export function ConversationScreen({
   const eventClient = useEventServiceClient();
   const router = useRouter();
   const currentUserId = useCurrentUserId();
+  const tokenError = useKiloChatTokenError();
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
   const instanceContext = useInstanceContext(sandboxId);
@@ -219,6 +221,14 @@ export function ConversationScreen({
         onSwitchInstance={handleSwitchInstance}
         onOpenOptions={handleOpenConversationOptions}
       />
+      {tokenError.hasError ? (
+        <ConversationInlineRetryBanner
+          message="Couldn't sign in to chat"
+          onRetry={() => {
+            tokenError.retry();
+          }}
+        />
+      ) : null}
       {messageHistoryState === 'stale-error' ? (
         <ConversationInlineRetryBanner
           message="Couldn't refresh messages"

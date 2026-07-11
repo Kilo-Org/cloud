@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { EventServiceClient } from '@kilocode/event-service';
 import { KiloChatClient } from '@kilocode/kilo-chat';
@@ -19,10 +19,28 @@ type KiloChatProviderProps = {
 
 export const KiloChatCurrentUserContext = createContext<string | null>(null);
 
+type KiloChatTokenErrorState = {
+  hasError: boolean;
+  retry: () => void;
+};
+
+const KiloChatTokenErrorContext = createContext<KiloChatTokenErrorState | undefined>(undefined);
+
+/** Whether the initial kilo-chat token fetch failed, plus a way to retry it. */
+export function useKiloChatTokenError(): KiloChatTokenErrorState {
+  const context = useContext(KiloChatTokenErrorContext);
+  if (!context) {
+    throw new Error('useKiloChatTokenError must be used within a KiloChatProvider');
+  }
+  return context;
+}
+
 export function KiloChatProvider({ children }: KiloChatProviderProps) {
   const getToken = useKiloChatTokenGetter();
   const getTokenResponse = useKiloChatTokenResponseGetter();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const [value] = useState(() => {
     const eventService = new EventServiceClient({
@@ -57,6 +75,7 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
     const unsubscribe = subscribeToKiloChatTokenResponses(response => {
       if (!cancelled) {
         setCurrentUserId(response.userId);
+        setTokenError(false);
       }
     });
 
@@ -65,10 +84,14 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
         const response = await getTokenResponse();
         if (!cancelled) {
           setCurrentUserId(response.userId);
+          setTokenError(false);
         }
       } catch {
-        // Keep the provider in its loading state. A later successful token fetch
-        // from any Kilo Chat caller will notify the subscription above.
+        // Surface the failure instead of swallowing it — the composer would
+        // otherwise stay stuck behind "Loading user..." with no way out.
+        if (!cancelled) {
+          setTokenError(true);
+        }
       }
     }
 
@@ -78,15 +101,26 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
       cancelled = true;
       unsubscribe();
     };
-  }, [getTokenResponse]);
+  }, [getTokenResponse, retryCount]);
+
+  const retryTokenFetch = useCallback(() => {
+    setTokenError(false);
+    setRetryCount(count => count + 1);
+  }, []);
+  const tokenErrorValue = useMemo(
+    () => ({ hasError: tokenError, retry: retryTokenFetch }),
+    [tokenError, retryTokenFetch]
+  );
 
   return (
     <KiloChatCurrentUserContext.Provider value={currentUserId}>
-      <KiloChatHooksProvider
-        value={{ kiloChatClient: value.kiloChatClient, eventService: value.eventService }}
-      >
-        {children}
-      </KiloChatHooksProvider>
+      <KiloChatTokenErrorContext.Provider value={tokenErrorValue}>
+        <KiloChatHooksProvider
+          value={{ kiloChatClient: value.kiloChatClient, eventService: value.eventService }}
+        >
+          {children}
+        </KiloChatHooksProvider>
+      </KiloChatTokenErrorContext.Provider>
     </KiloChatCurrentUserContext.Provider>
   );
 }

@@ -6,6 +6,7 @@ import {
   type SecurityFindingRouteParams,
   toSecurityFindingQuery,
 } from '@kilocode/app-shared/security-agent';
+import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
@@ -13,7 +14,6 @@ import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
 import { FindingRow } from '@/components/security-agent/finding-row';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,8 @@ import {
   useSecurityAnalysisCapacity,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
+import { getSecurityAgentPath } from '@/lib/security-agent';
+import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -48,10 +50,10 @@ function FindingsListFooter({
 }
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
+  const router = useRouter();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
   const [filters, setFilters] = useState(() => parseSecurityFindingFilters(routeParams));
-  const [showFilterModal, setShowFilterModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const config = useSecurityAgentConfig(scope);
@@ -91,9 +93,15 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         headerRight={
           <Pressable
             onPress={() => {
-              if (!filterUnavailable) {
-                setShowFilterModal(true);
+              if (filterUnavailable) {
+                return;
               }
+              setSecurityFindingFilterBridge({
+                filters,
+                repositories: scopedRepositories,
+                onApply: setFilters,
+              });
+              router.push(getSecurityAgentPath(scope, 'filter'));
             }}
             disabled={filterUnavailable}
             accessibilityRole="button"
@@ -178,16 +186,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               }
             />
           }
-        />
-      )}
-      {showFilterModal && (
-        <FindingFilterModal
-          filters={filters}
-          repositories={scopedRepositories}
-          onClose={() => {
-            setShowFilterModal(false);
-          }}
-          onApply={setFilters}
         />
       )}
     </View>

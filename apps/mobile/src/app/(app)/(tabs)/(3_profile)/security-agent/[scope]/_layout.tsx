@@ -33,6 +33,15 @@ export default function SecurityAgentScopeLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen
+          name="filter"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.5, fullSheetDetent],
+            sheetGrabberVisible: true,
+            headerShown: false,
+          }}
+        />
       </Stack>
     </>
   );

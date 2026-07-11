@@ -10,7 +10,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { Check } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -50,6 +50,11 @@ const SORT_OPTIONS: { value: SecurityFindingSortBy; label: string }[] = [
   { value: 'severity_desc', label: 'Severity: high to low' },
   { value: 'severity_asc', label: 'Severity: low to high' },
   { value: 'sla_due_at_asc', label: 'SLA due date' },
+];
+
+const SLA_STATUS_OPTIONS: { value: boolean; label: string }[] = [
+  { value: false, label: 'All' },
+  { value: true, label: 'Overdue only' },
 ];
 
 type FindingRepositoryOption = {
@@ -131,83 +136,86 @@ export function FindingFilterModal({
   ];
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View className="flex-1 justify-start px-6 pt-[15%]">
-        <Pressable className="absolute inset-0" onPress={onClose} accessible={false}>
-          <View className="absolute inset-0 bg-black opacity-50" />
-        </Pressable>
-        <View className="max-h-[75%] gap-4 rounded-2xl bg-popover p-5" accessibilityViewIsModal>
-          <Text className="text-base font-semibold">Filter Findings</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View className="gap-4">
-              <FilterSection
-                title="Repository"
-                options={repoOptions}
-                selected={draft.repoFullName}
-                onSelect={repoFullName => {
-                  setDraft(prev => ({ ...prev, repoFullName }));
-                }}
-              />
-              <FilterSection
-                title="Status"
-                options={STATUS_OPTIONS}
-                selected={draft.status}
-                onSelect={status => {
-                  setDraft(prev => selectSecurityFindingStatus(prev, status));
-                }}
-              />
-              <FilterSection
-                title="Severity"
-                options={SEVERITY_OPTIONS}
-                selected={draft.severity}
-                onSelect={severity => {
-                  setDraft(prev => ({ ...prev, severity }));
-                }}
-              />
-              <FilterSection
-                title="Outcome"
-                options={OUTCOME_OPTIONS}
-                selected={draft.outcome}
-                onSelect={outcome => {
-                  setDraft(prev => selectSecurityFindingOutcome(prev, outcome));
-                }}
-              />
-              <FilterSection
-                title="Sort by"
-                options={SORT_OPTIONS}
-                selected={draft.sortBy}
-                onSelect={sortBy => {
-                  setDraft(prev => ({ ...prev, sortBy }));
-                }}
-              />
-            </View>
-          </ScrollView>
-          <View className="flex-row items-center justify-between gap-3">
-            <Button
-              variant="ghost"
-              onPress={() => {
-                onApply(DEFAULT_SECURITY_FINDING_FILTERS);
-                onClose();
-              }}
-            >
-              <Text>Reset</Text>
-            </Button>
-            <View className="flex-row gap-3">
-              <Button variant="outline" onPress={onClose}>
-                <Text>Cancel</Text>
-              </Button>
-              <Button
-                onPress={() => {
-                  onApply(draft);
-                  onClose();
-                }}
-              >
-                <Text className="text-primary-foreground">Apply</Text>
-              </Button>
-            </View>
-          </View>
+    <ScrollView
+      className="flex-1 bg-background px-6"
+      contentContainerClassName="gap-6 pb-8 pt-4"
+      showsVerticalScrollIndicator={false}
+    >
+      <Text className="text-center text-lg font-semibold text-foreground">Filter Findings</Text>
+      <View className="gap-4">
+        <FilterSection
+          title="Repository"
+          options={repoOptions}
+          selected={draft.repoFullName}
+          onSelect={repoFullName => {
+            setDraft(prev => ({ ...prev, repoFullName }));
+          }}
+        />
+        <FilterSection
+          title="Status"
+          options={STATUS_OPTIONS}
+          selected={draft.status}
+          onSelect={status => {
+            setDraft(prev => selectSecurityFindingStatus(prev, status));
+          }}
+        />
+        <FilterSection
+          title="Severity"
+          options={SEVERITY_OPTIONS}
+          selected={draft.severity}
+          onSelect={severity => {
+            setDraft(prev => ({ ...prev, severity }));
+          }}
+        />
+        <FilterSection
+          title="Outcome"
+          options={OUTCOME_OPTIONS}
+          selected={draft.outcome}
+          onSelect={outcome => {
+            setDraft(prev => selectSecurityFindingOutcome(prev, outcome));
+          }}
+        />
+        <FilterSection
+          title="SLA status"
+          options={SLA_STATUS_OPTIONS}
+          selected={Boolean(draft.overdue)}
+          onSelect={overdue => {
+            setDraft(prev => ({ ...prev, overdue: overdue ? true : undefined }));
+          }}
+        />
+        <FilterSection
+          title="Sort by"
+          options={SORT_OPTIONS}
+          selected={draft.sortBy}
+          onSelect={sortBy => {
+            setDraft(prev => ({ ...prev, sortBy }));
+          }}
+        />
+      </View>
+      <View className="flex-row items-center justify-between gap-3">
+        <Button
+          variant="ghost"
+          onPress={() => {
+            onApply(DEFAULT_SECURITY_FINDING_FILTERS);
+            onClose();
+          }}
+        >
+          <Text>Reset</Text>
+        </Button>
+        <View className="flex-row gap-3">
+          <Button variant="outline" onPress={onClose}>
+            <Text>Cancel</Text>
+          </Button>
+          <Button
+            onPress={() => {
+              onApply(draft);
+              onClose();
+            }}
+          >
+            <Text className="text-primary-foreground">Apply</Text>
+          </Button>
         </View>
       </View>
-    </Modal>
+    </ScrollView>
   );
 }

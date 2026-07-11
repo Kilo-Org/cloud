@@ -176,6 +176,7 @@ function MessageBubbleComponent({
               {timestamp !== null && (
                 <Text className="text-[10px] text-muted-foreground">
                   {formatTimestamp(timestamp)}
+                  {edited ? ' (edited)' : ''}
                 </Text>
               )}
             </View>

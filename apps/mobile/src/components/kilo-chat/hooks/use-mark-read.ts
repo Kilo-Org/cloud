@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Sentry from '@sentry/react-native';
 import * as Notifications from 'expo-notifications';
-import { toast } from 'sonner-native';
 
 import { type KiloChatClient, type MarkConversationReadResponse } from '@kilocode/kilo-chat';
 import { type BadgeCountRow } from '@kilocode/notifications';
@@ -36,8 +36,11 @@ export function useMarkRead(client: KiloChatClient) {
       });
       return result;
     },
+    // Mark-read runs in the background (e.g. on scroll/focus) — a user-visible
+    // toast for a background failure is noise. Retry happens naturally on the
+    // next mark-read trigger; just log so we can see failure rates.
     onError: error => {
-      toast.error(error.message);
+      Sentry.captureException(error);
     },
     onMutate: () => ({ startBadgeFreshnessEpoch: advanceBadgeFreshnessEpoch() }),
     onSuccess: (result, _variables, context) => {

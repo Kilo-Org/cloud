@@ -30,6 +30,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
   const isImage = isImageMimeType(block.mimeType);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [previewShareError, setPreviewShareError] = useState<string | null>(null);
   const urlQuery = useAttachmentUrl(client, conversationId, block.attachmentId, {
     enabled: isImage,
   });
@@ -41,6 +42,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
 
   async function handleShare() {
     setSharing(true);
+    setPreviewShareError(null);
     try {
       const result = await urlQuery.refetch();
       const url = result.data?.url;
@@ -54,7 +56,13 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
         filename: block.filename,
       });
     } catch {
-      toast.error(getAttachmentOpenErrorMessage());
+      // The image preview modal covers the toast layer, so a failure there
+      // renders inline in the modal instead of a toast the user can't see.
+      if (previewUrl !== null) {
+        setPreviewShareError(getAttachmentOpenErrorMessage());
+      } else {
+        toast.error(getAttachmentOpenErrorMessage());
+      }
     } finally {
       setSharing(false);
     }
@@ -119,8 +127,10 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
           uri={previewUrl}
           filename={block.filename}
           sharing={sharing}
+          shareError={previewShareError}
           onClose={() => {
             setPreviewUrl(null);
+            setPreviewShareError(null);
           }}
           onShare={() => {
             void handleShare();

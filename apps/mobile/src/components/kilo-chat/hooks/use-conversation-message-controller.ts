@@ -16,6 +16,7 @@ import { captureEvent, MESSAGE_SENT_EVENT } from '@/lib/analytics/posthog';
 import { resolveMobileMessageInputAvailability } from '../bot-send-state';
 import { type MessageInputSubmitControls } from '../message-input-state';
 import {
+  buildRetrySendContent,
   buildSendMessageVariables,
   createSendMessageClientId,
   getEditableAttachmentBlocks,
@@ -93,12 +94,35 @@ export function useConversationMessageController({
     setRemovedEditAttachmentIds([]);
   }, []);
 
+  const handleRetrySend = useCallback(
+    (message: Message) => {
+      sendMutation.mutate(
+        buildSendMessageVariables({
+          conversationId,
+          content: buildRetrySendContent(message),
+          clientId: createSendMessageClientId(),
+          inReplyToMessageId: message.inReplyToMessageId ?? undefined,
+        }),
+        {
+          onSuccess: () => {
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+          onError: err => {
+            toast.error(formatKiloChatError(err, 'Failed to send message'));
+          },
+        }
+      );
+    },
+    [conversationId, sendMutation]
+  );
+
   const messageActions = useConversationMessageActions({
     client,
     conversationId,
     currentUserId,
     onEditMessage: startEditingMessage,
     onReplyToMessage: startReplyToMessage,
+    onRetrySend: handleRetrySend,
   });
 
   const handleSend = useCallback(

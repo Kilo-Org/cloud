@@ -1,9 +1,14 @@
+/* eslint-disable max-lines -- one cohesive test suite per pure-logic module; an
+   artificial split across files would scatter closely related coverage for
+   message-presentation.ts's exports. */
 import { describe, expect, it, vi } from 'vitest';
 import { createMessageRequestSchema, type Message } from '@kilocode/kilo-chat';
 
 import {
+  buildRetrySendContent,
   buildSendMessageVariables,
   canCopyMessage,
+  canRetryFailedMessage,
   canShowReactionPills,
   canToggleReaction,
   createSendMessageClientId,
@@ -232,6 +237,55 @@ describe('isMessageEdited', () => {
 
   it('hides edited state for deleted messages', () => {
     expect(isMessageEdited(message({ clientUpdatedAt: 123, deleted: true }))).toBe(false);
+  });
+});
+
+describe('canRetryFailedMessage', () => {
+  it('allows retrying delivery-failed messages', () => {
+    expect(canRetryFailedMessage(message({ deliveryFailed: true }))).toBe(true);
+  });
+
+  it('blocks retry for delivered messages', () => {
+    expect(canRetryFailedMessage(message({ deliveryFailed: false }))).toBe(false);
+  });
+
+  it('blocks retry for deleted messages', () => {
+    expect(canRetryFailedMessage(message({ deliveryFailed: true, deleted: true }))).toBe(false);
+  });
+});
+
+describe('buildRetrySendContent', () => {
+  it('rebuilds a single joined text block plus attachments', () => {
+    const attachment = {
+      type: 'attachment',
+      attachmentId: '01HV0000000000000000000001',
+      mimeType: 'image/png',
+      size: 123,
+      filename: 'photo.png',
+    } as const;
+
+    expect(
+      buildRetrySendContent(
+        message({
+          content: [{ type: 'text', text: 'hello' }, attachment],
+          deliveryFailed: true,
+        })
+      )
+    ).toEqual([{ type: 'text', text: 'hello' }, attachment]);
+  });
+
+  it('drops an empty text block, keeping attachment-only content', () => {
+    const attachment = {
+      type: 'attachment',
+      attachmentId: '01HV0000000000000000000001',
+      mimeType: 'image/png',
+      size: 123,
+      filename: 'photo.png',
+    } as const;
+
+    expect(buildRetrySendContent(message({ content: [attachment], deliveryFailed: true }))).toEqual(
+      [attachment]
+    );
   });
 });
 

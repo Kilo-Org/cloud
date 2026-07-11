@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Info, Search } from 'lucide-react-native';
+import { AlertCircle, Info, Search } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,7 +28,7 @@ export function ModelPickerContent() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const { favorites, toggleFavorite } = useModelPreferences(undefined);
+  const { favorites, favoritesError, toggleFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
   const [search, setSearch] = useState('');
   const [bridge, setBridge] = useState(() => getModelPickerBridge());
@@ -84,9 +84,10 @@ export function ModelPickerContent() {
     [bridge, search, favoriteIds]
   );
 
+  // The favorite star button in ModelPickerOptionRow already fires its own
+  // selection haptic on press — this callback must not fire a second one.
   const handleToggleFavorite = useCallback(
     (option: SessionModelOption) => {
-      void Haptics.selectionAsync();
       toggleFavorite(modelPickerFavoriteId(option));
     },
     [toggleFavorite]
@@ -160,18 +161,26 @@ export function ModelPickerContent() {
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingBottom: bottom }}
         ListHeaderComponent={
-          <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
-            <Search size={18} color={colors.mutedForeground} />
-            <TextInput
-              placeholder="Search models..."
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              returnKeyType="search"
-              className="h-8 flex-1 p-0 text-base leading-5 text-foreground"
-              onChangeText={setSearch}
-            />
+          <View>
+            <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
+              <Search size={18} color={colors.mutedForeground} />
+              <TextInput
+                placeholder="Search models..."
+                placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+                returnKeyType="search"
+                className="h-8 flex-1 p-0 text-base leading-5 text-foreground"
+                onChangeText={setSearch}
+              />
+            </View>
+            {favoritesError ? (
+              <View className="mx-4 mb-3 flex-row items-center gap-1.5">
+                <AlertCircle size={14} color={colors.destructive} />
+                <Text className="text-xs text-red-600 dark:text-red-400">{favoritesError}</Text>
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={

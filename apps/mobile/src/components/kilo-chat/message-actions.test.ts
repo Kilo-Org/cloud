@@ -132,6 +132,21 @@ describe('buildMessageActionSheetOptions', () => {
     expect(actionSheet.destructiveButtonIndex).toBeUndefined();
   });
 
+  it('offers retry send first for delivery-failed own messages', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      canReact: false,
+      canReply: false,
+      canCopy: true,
+      canEdit: false,
+      canDelete: true,
+      canRetry: true,
+    });
+
+    expect(actionSheet.options).toEqual(['Retry send', 'Copy', 'Delete', 'Cancel']);
+    expect(actionSheet.actions[0]).toEqual({ kind: 'retry', label: 'Retry send' });
+    expect(actionSheet.destructiveButtonIndex).toBe(2);
+  });
+
   it('orders reactions, reply, copy, edit, delete, then cancel', () => {
     const actionSheet = buildMessageActionSheetOptions({
       canReact: true,

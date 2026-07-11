@@ -3,6 +3,7 @@ const FIRST_REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉'] as const;
 type ReactionEmoji = (typeof FIRST_REACTION_EMOJIS)[number];
 
 type MessageAction =
+  | { kind: 'retry'; label: 'Retry send' }
   | { kind: 'reaction'; label: string; emoji: ReactionEmoji }
   | { kind: 'more-reactions'; label: 'More reactions' }
   | { kind: 'reply'; label: 'Reply' }
@@ -17,6 +18,7 @@ type BuildMessageActionSheetOptionsInput = {
   canCopy: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  canRetry?: boolean;
   isPendingMessage?: boolean;
 };
 
@@ -26,6 +28,7 @@ export function buildMessageActionSheetOptions({
   canCopy,
   canEdit,
   canDelete,
+  canRetry = false,
   isPendingMessage = false,
 }: BuildMessageActionSheetOptionsInput): {
   actions: MessageAction[];
@@ -35,6 +38,9 @@ export function buildMessageActionSheetOptions({
 } {
   const actions: MessageAction[] = [];
   const canUseApiBackedActions = !isPendingMessage;
+  if (canRetry) {
+    actions.push({ kind: 'retry', label: 'Retry send' });
+  }
   if (canUseApiBackedActions && canReact) {
     for (const emoji of FIRST_REACTION_EMOJIS) {
       actions.push({ kind: 'reaction', label: emoji, emoji });

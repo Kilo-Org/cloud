@@ -1,4 +1,4 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { Receipt } from 'lucide-react-native';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -45,7 +45,8 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
           {title}
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
-          {isPositive ? '+' : '-'}${Math.abs(amount).toFixed(2)}
+          {isPositive ? '+' : '-'}
+          {formatDollars(Math.abs(amount))}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">

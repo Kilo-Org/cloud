@@ -1,3 +1,4 @@
+import { formatCents } from '@kilocode/app-shared/utils';
 import { FileText } from 'lucide-react-native';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -46,7 +47,7 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
           {title}
         </Text>
         <Text className="text-sm font-medium text-foreground">
-          ${(invoice.amount_due / 100).toFixed(2)}
+          {formatCents(invoice.amount_due)}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">

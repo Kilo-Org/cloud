@@ -1,4 +1,5 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -54,7 +55,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const balanceDollars = balance?.balance ?? 0;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
-  const expiringTotal = expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0) / 1_000_000;
+  const expiringTotal = fromMicrodollars(
+    expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
+  );
   const earliestExpiry = expiringBlocks
     .map(b => b.expiry_date)
     .filter((d): d is string => d !== null)
@@ -126,7 +129,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {!balanceLoading && !balanceError && (
         <View className="h-16 flex-row items-center rounded-lg bg-secondary px-3">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
-            <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
+            <Text className="text-2xl font-bold">{formatDollars(balanceDollars)}</Text>
             {creditsLoading ? (
               <Animated.View exiting={FadeOut.duration(150)}>
                 <Skeleton className="mt-1 h-3 w-48 rounded" />
@@ -136,7 +139,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               earliestExpiry != null && (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
                   <Text className="text-xs text-muted-foreground">
-                    ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
+                    {formatDollars(expiringTotal)} in bonus credits expiring{' '}
                     {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
                       month: 'short',
                       day: 'numeric',

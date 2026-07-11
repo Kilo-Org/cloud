@@ -1,4 +1,4 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -51,7 +51,7 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
       ) : (
         <Animated.View entering={FadeIn.duration(200)} className="gap-3">
           <View className="flex-row gap-3">
-            <StatTile label="Cost" value={`$${fromMicrodollars(data.totalCost).toFixed(2)}`} />
+            <StatTile label="Cost" value={formatDollars(fromMicrodollars(data.totalCost))} />
             <StatTile label="Requests" value={data.totalRequestCount.toLocaleString()} />
           </View>
           <View className="flex-row gap-3">

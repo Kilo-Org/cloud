@@ -16,7 +16,6 @@ import { X } from 'lucide-react-native';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { AccessRequiredScreen } from '@/components/kiloclaw/access-required-screen';
 import { resolveAccessRequiredSubcase } from '@/components/kiloclaw/empty-state-content';
@@ -59,9 +58,6 @@ function categorizeProvisionError(error: {
 function uiCategoryToAnalyticsCategory(category: ProvisionErrorCategory): ProvisionFailedCategory {
   return category === 'access_conflict' ? 'access' : 'generic';
 }
-
-const GENERIC_PROVISION_ERROR_MESSAGE =
-  "We couldn't set up your instance just now. Please try again.";
 
 function resolveHeaderTitle(
   isIdentityStep: boolean,
@@ -199,11 +195,12 @@ export function OnboardingFlow() {
             trackEvent(PROVISION_SUCCEEDED_EVENT);
           },
           onError: error => {
+            // No toast here: `errorCategory` drives FlowBody's inline
+            // "Something went wrong" / access-conflict screens, so a toast
+            // on top of that would just be a redundant, modal-invisible
+            // duplicate (see `flow-body.tsx`).
             const category = categorizeProvisionError(error);
             dispatch({ type: 'provision-failed', category });
-            if (category === 'generic') {
-              toast.error(GENERIC_PROVISION_ERROR_MESSAGE);
-            }
             trackEvent(PROVISION_FAILED_EVENT, {
               category: uiCategoryToAnalyticsCategory(category),
             });

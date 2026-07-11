@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, ChevronUp, MapPin } from 'lucide-react-nativ
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -64,6 +63,16 @@ type IdentityStepProps = {
 const GPS_TIMEOUT_MS = 10_000;
 const GPS_COORDINATE_PRECISION = 2;
 
+function locationFeedbackClassName(status: 'validated' | 'service_unavailable' | 'error'): string {
+  if (status === 'error') {
+    return 'text-destructive';
+  }
+  if (status === 'service_unavailable') {
+    return 'text-amber-700 dark:text-amber-400';
+  }
+  return 'text-muted-foreground';
+}
+
 async function getCurrentPositionWithTimeout(): Promise<Location.LocationObject> {
   let triggerTimeout: (() => void) | null = null;
   const timeoutPromise = new Promise<Location.LocationObject>((_resolve, reject) => {
@@ -111,7 +120,7 @@ export function IdentityStep({
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [locationFeedback, setLocationFeedback] = useState<{
     message: string;
-    status: 'validated' | 'service_unavailable';
+    status: 'validated' | 'service_unavailable' | 'error';
   } | null>(null);
   const [validatedLocation, setValidatedLocation] = useState<string | null>(null);
 
@@ -153,10 +162,9 @@ export function IdentityStep({
       if (locationTextRef.current.trim() !== trimmed) {
         return;
       }
-      setLocationFeedback(null);
       setValidatedLocation(null);
       const message = error instanceof Error ? error.message : 'Location could not be validated.';
-      toast.error(message);
+      setLocationFeedback({ message, status: 'error' });
     }
   }, [
     applyLocationText,
@@ -190,13 +198,18 @@ export function IdentityStep({
       } catch (validateError) {
         Sentry.captureException(validateError);
         applyLocationText(coords);
-        setLocationFeedback(null);
         setValidatedLocation(null);
-        toast.error('Could not resolve your location. You can edit it manually.');
+        setLocationFeedback({
+          message: 'Could not resolve your location. You can edit it manually.',
+          status: 'error',
+        });
       }
     } catch (error) {
       Sentry.captureException(error);
-      toast.error('Could not get your location. Enter it manually.');
+      setLocationFeedback({
+        message: 'Could not get your location. Enter it manually.',
+        status: 'error',
+      });
     } finally {
       setIsGpsLoading(false);
     }
@@ -225,10 +238,10 @@ export function IdentityStep({
     validateLocationMutate(
       { location: trimmedLocation },
       {
+        // Advancing to the next step unmounts this screen either way, so
+        // there's no inline slot left to show feedback in — same as the
+        // onError path below, just continue silently.
         onSuccess: result => {
-          if (result.status === 'service_unavailable') {
-            toast("wttr.in is down right now. We'll store your location as entered.");
-          }
           onContinue(identity, result.location);
         },
         onError: () => {
@@ -410,14 +423,7 @@ export function IdentityStep({
           </Pressable>
         </View>
         {locationFeedback && (
-          <Text
-            className={cn(
-              'px-1 text-sm',
-              locationFeedback.status === 'service_unavailable'
-                ? 'text-amber-700 dark:text-amber-400'
-                : 'text-muted-foreground'
-            )}
-          >
+          <Text className={cn('px-1 text-sm', locationFeedbackClassName(locationFeedback.status))}>
             {locationFeedback.message}
           </Text>
         )}

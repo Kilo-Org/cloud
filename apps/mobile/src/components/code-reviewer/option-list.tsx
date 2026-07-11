@@ -1,12 +1,9 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
-import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ChoiceRow } from '@/components/ui/choice-row';
 
 type OptionListProps<T extends string> = {
   title: string;
@@ -26,32 +23,23 @@ export function OptionList<T extends string>({
   descriptions,
 }: Readonly<OptionListProps<T>>) {
   const router = useRouter();
-  const colors = useThemeColors();
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {options.map(option => (
-          <Pressable
+          <ChoiceRow
             key={option}
-            className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+            label={option}
+            description={descriptions?.[option]}
+            selected={selected === option}
             onPress={() => {
-              void Haptics.selectionAsync();
               onSelect(option);
               router.back();
             }}
-          >
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-medium capitalize">{option}</Text>
-              {descriptions?.[option] ? (
-                <Text variant="muted" className="mt-0.5 text-xs">
-                  {descriptions[option]}
-                </Text>
-              ) : null}
-            </View>
-            <Check size={18} color={selected === option ? colors.foreground : 'transparent'} />
-          </Pressable>
+            className="border-b-[0.5px] border-hair-soft"
+          />
         ))}
       </TabScreenScrollView>
     </View>

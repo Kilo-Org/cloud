@@ -1,4 +1,4 @@
-import { AlertTriangle, ShieldAlert } from 'lucide-react-native';
+import { AlertTriangle, ExternalLink, ShieldAlert } from 'lucide-react-native';
 import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -9,6 +9,8 @@ import { ProvisioningStep } from '@/components/kiloclaw/onboarding/provisioning-
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { toneColor } from '@/lib/agent-color';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type BotIdentity, type OnboardingState } from '@/lib/onboarding';
 import { cn } from '@/lib/utils';
@@ -67,6 +69,18 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
             to finish setting up.
           </Text>
         </View>
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full"
+          onPress={() => {
+            void openExternalUrl(WEB_BASE_URL, { label: 'kilo.ai' });
+          }}
+          accessibilityRole="link"
+        >
+          <Text className="text-base">Open kilo.ai</Text>
+          <ExternalLink size={16} color={colors.foreground} />
+        </Button>
       </Animated.View>
     );
   }

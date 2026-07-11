@@ -24,10 +24,10 @@ function FormField({ label, error, disabled, className, ref, ...props }: Readonl
       <Text className="text-sm font-medium text-foreground">{label}</Text>
       <TextInput
         ref={ref}
+        {...props}
         editable={!disabled}
         placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel={label}
-        accessibilityHint={error}
+        accessibilityLabel={error ? `${label}, error: ${error}` : label}
         accessibilityState={{ disabled }}
         className={cn(
           'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
@@ -36,9 +36,12 @@ function FormField({ label, error, disabled, className, ref, ...props }: Readonl
           disabled && 'opacity-50',
           className
         )}
-        {...props}
       />
-      {error ? <Text className="text-sm text-destructive">{error}</Text> : null}
+      {error ? (
+        <Text accessibilityLiveRegion="polite" className="text-sm text-destructive">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }

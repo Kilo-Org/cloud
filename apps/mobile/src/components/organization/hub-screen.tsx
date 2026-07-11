@@ -126,9 +126,8 @@ export function OrganizationHubScreen() {
         </View>
       </TabScreenScrollView>
 
-      {org && (
+      {renameVisible && org && (
         <RenameModal
-          visible={renameVisible}
           title="Rename Organization"
           placeholder="Enter organization name"
           initialValue={org.organizationName}

@@ -264,18 +264,19 @@ export default function DashboardScreen() {
         </Animated.View>
       </ScrollView>
 
-      <RenameModal
-        visible={renameVisible}
-        title="Rename Instance"
-        placeholder="Enter a new name (max 50 characters)"
-        initialValue={status?.name ?? ''}
-        onSave={async name => {
-          await mutations.renameInstance.mutateAsync({ name });
-        }}
-        onClose={() => {
-          setRenameVisible(false);
-        }}
-      />
+      {renameVisible && (
+        <RenameModal
+          title="Rename Instance"
+          placeholder="Enter a new name (max 50 characters)"
+          initialValue={status?.name ?? ''}
+          onSave={async name => {
+            await mutations.renameInstance.mutateAsync({ name });
+          }}
+          onClose={() => {
+            setRenameVisible(false);
+          }}
+        />
+      )}
     </Animated.View>
   );
 }

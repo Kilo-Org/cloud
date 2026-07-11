@@ -6,7 +6,6 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type RenameModalProps = {
-  visible: boolean;
   title: string;
   placeholder: string;
   initialValue: string;
@@ -14,8 +13,9 @@ type RenameModalProps = {
   onClose: () => void;
 };
 
+// Mount this component only while the modal should be open (e.g. `{visible && <RenameModal ... />}`)
+// so each open gets fresh state: current initialValue, a reset canSave, and a re-armed Android autofocus.
 export function RenameModal({
-  visible,
   title,
   placeholder,
   initialValue,
@@ -64,7 +64,7 @@ export function RenameModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={handleClose}>
       <Pressable className="flex-1 justify-start px-6 pt-[25%]" onPress={handleClose}>
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable

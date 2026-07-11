@@ -1,8 +1,9 @@
+import { getSecurityAgentAuditUrl } from '@kilocode/app-shared/security-agent';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Bell, Clock, Cpu, FolderGit2, Zap } from 'lucide-react-native';
+import { Bell, Clock, Cpu, FolderGit2, MoreHorizontal, Zap } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { Switch, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
@@ -10,12 +11,15 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import {
   useSecurityAgentConfig,
   useSecurityAgentEditCapability,
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 function SettingsOverviewSkeleton() {
@@ -37,6 +41,7 @@ function capitalize(value: string) {
 
 export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const colors = useThemeColors();
   const config = useSecurityAgentConfig(scope);
   const canManage = useSecurityAgentEditCapability(scope);
   const setEnabled = useSetSecurityAgentEnabled(scope);
@@ -97,9 +102,30 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
     });
   };
 
+  // Audit-report access shouldn't depend on the agent being enabled — see
+  // the matching header action in scope-entry-screen.tsx, which reaches
+  // audit reports from the connected-but-disconnected states. This is the
+  // connected-but-disabled counterpart: settings-overview-screen is where
+  // scope-entry redirects once the agent is disabled, so the same action
+  // needs to be reachable here too.
+  const auditAction = canManage ? (
+    <Pressable
+      onPress={() => {
+        void openExternalUrl(getSecurityAgentAuditUrl(WEB_BASE_URL, scope), {
+          label: 'audit report',
+        });
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="View audit report"
+      className="size-11 items-center justify-center active:opacity-70"
+    >
+      <MoreHorizontal size={20} color={colors.foreground} />
+    </Pressable>
+  ) : null;
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Settings" />
+      <ScreenHeader title="Settings" headerRight={auditAction} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">

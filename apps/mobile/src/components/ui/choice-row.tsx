@@ -12,6 +12,8 @@ type ChoiceRowProps = {
   selected: boolean;
   onPress: () => void;
   disabled?: boolean;
+  /** Marks the row as busy for a11y, e.g. while its own save is in flight. */
+  busy?: boolean;
   /** Renders `accessibilityRole="checkbox"` instead of `"radio"`. */
   multi?: boolean;
   /** Extra classes on the row container, e.g. a divider border. */
@@ -28,6 +30,7 @@ export function ChoiceRow({
   selected,
   onPress,
   disabled,
+  busy,
   multi,
   className,
 }: Readonly<ChoiceRowProps>) {
@@ -46,7 +49,7 @@ export function ChoiceRow({
         onPress();
       }}
       accessibilityRole={multi ? 'checkbox' : 'radio'}
-      accessibilityState={{ checked: selected, disabled: Boolean(disabled) }}
+      accessibilityState={{ checked: selected, disabled: Boolean(disabled), busy }}
     >
       <View className="flex-1 pr-3">
         <Text className="text-sm font-medium capitalize">{label}</Text>

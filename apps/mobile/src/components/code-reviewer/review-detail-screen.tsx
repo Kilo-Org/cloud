@@ -69,13 +69,15 @@ export function ReviewDetailScreen({
     );
   }
 
-  // A thrown NOT_FOUND/FORBIDDEN can never be fixed by retrying — show a
-  // plain message with no "Retry" affordance. Any other thrown error (or a
-  // resolved `success: false`, the router's generic-failure shape) is
-  // treated as transient and gets a retry button.
+  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can never be fixed by
+  // retrying — show a plain message with no "Retry" affordance.
+  // UNAUTHORIZED is what org-scoped reviews throw via ensureOrganizationAccess,
+  // so it needs the same permanent classification as FORBIDDEN. Any other
+  // thrown error (or a resolved `success: false`, the router's
+  // generic-failure shape) is treated as transient and gets a retry button.
   if (!data) {
     const errorCode = isError ? error.data?.code : undefined;
-    if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN') {
+    if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title="Review" />

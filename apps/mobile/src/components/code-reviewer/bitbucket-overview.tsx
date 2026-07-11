@@ -254,6 +254,7 @@ export function BitbucketOverview({
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!canEdit}
                       onPress={() => {
                         pushField('repos');
                       }}

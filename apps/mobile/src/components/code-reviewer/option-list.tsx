@@ -58,6 +58,7 @@ export function OptionList<T extends string>({
               description={descriptions?.[option]}
               selected={selected === option}
               disabled={Boolean(disabled) || pending !== null}
+              busy={pending === option}
               onPress={() => {
                 void handleSelect(option);
               }}

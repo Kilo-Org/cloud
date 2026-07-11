@@ -8,6 +8,7 @@ import {
   type ReviewConfigData,
   type ReviewerPlatform,
 } from '@/lib/code-reviewer-config';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 export { PERSONAL_SCOPE };
@@ -16,30 +17,11 @@ function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
 }
 
-// In-flight save chains keyed by "scope:platform", so config saves for the
-// same reviewer config are never in flight concurrently — each waits for
-// the previous one on the same key to settle before running. Module-level
-// (not per-hook-instance) so it holds across remounts of the same screen.
-const inFlightSaves = new Map<string, Promise<unknown>>();
-
-async function awaitSettled(promise: Promise<unknown>): Promise<void> {
-  try {
-    await promise;
-  } catch {
-    // Swallow — this is only used to sequence subsequent saves, not to
-    // propagate the outcome (the caller of chainSave gets the real result).
-  }
-}
-
-async function chainSave<T>(key: string, run: () => Promise<T>): Promise<T> {
-  const previous = inFlightSaves.get(key);
-  if (previous) {
-    await awaitSettled(previous);
-  }
-  const next = run();
-  inFlightSaves.set(key, awaitSettled(next));
-  return next;
-}
+// chainSave keys in-flight saves by "scope:platform", so config saves for
+// the same reviewer config are never in flight concurrently — each waits
+// for the previous one on the same key to settle before running (see
+// save-chain.ts). It's module-level there (not per-hook-instance) so it
+// holds across remounts of the same screen.
 
 // The personal router only serves github/gitlab (bitbucket is org-only by UI
 // construction). This narrows a ReviewerPlatform down to what the personal

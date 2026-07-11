@@ -5,6 +5,7 @@ import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -12,8 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   type CreditTransaction,
+  useOrgBoundary,
   useOrgCreditTransactions,
-  useOrgRole,
 } from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -66,12 +67,17 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
 }
 
 export function OrganizationCreditActivityScreen() {
-  const { organizationId } = useOrgRole();
+  const { organizationId, org, isResolving } = useOrgBoundary();
   const query = useOrgCreditTransactions(organizationId);
   const paddingBottom = useTabBarBottomPadding();
 
-  if (organizationId == null) {
-    return null;
+  if (isResolving || organizationId == null || org == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Credit activity" />
+        <OrganizationBoundary isResolving={isResolving} />
+      </View>
+    );
   }
 
   const isLoading = query.isLoading;

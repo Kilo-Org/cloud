@@ -5,12 +5,17 @@ import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { type OrgInvoice, useOrgInvoices, useOrgRole } from '@/lib/hooks/use-organization-queries';
+import {
+  type OrgInvoice,
+  useOrgBoundary,
+  useOrgInvoices,
+} from '@/lib/hooks/use-organization-queries';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
 const STATUS_META: Record<string, { label: string; pillClass: string; textClass: string }> = {
@@ -65,12 +70,17 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
 }
 
 export function OrganizationInvoicesScreen() {
-  const { organizationId } = useOrgRole();
+  const { organizationId, org, isResolving } = useOrgBoundary();
   const query = useOrgInvoices(organizationId);
   const paddingBottom = useTabBarBottomPadding();
 
-  if (organizationId == null) {
-    return null;
+  if (isResolving || organizationId == null || org == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Invoices" />
+        <OrganizationBoundary isResolving={isResolving} />
+      </View>
+    );
   }
 
   const isLoading = query.isLoading;

@@ -2,42 +2,41 @@ import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
-import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
-import { isMoneyRole, useOrgRole, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import {
+  isMoneyRole,
+  useOrgBoundary,
+  useOrgWithMembers,
+} from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-function InfoCardSkeleton() {
-  return (
-    <View className="gap-2.5 rounded-lg bg-secondary px-3 py-3">
-      <Skeleton className="h-5 w-2/3 rounded-md" />
-      <Skeleton className="h-5 w-1/3 rounded-md" />
-    </View>
-  );
-}
 
 export function OrganizationHubScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role, org, isLoading, isError, isFetching, refetch } = useOrgRole();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
 
-  if (organizationId == null) {
-    return null;
+  if (isResolving || organizationId == null || org == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Organization" />
+        <OrganizationBoundary isResolving={isResolving} />
+      </View>
+    );
   }
 
   const showMoney = isMoneyRole(role);
@@ -45,60 +44,38 @@ export function OrganizationHubScreen() {
   const lowBalanceSubtitle =
     minimumBalance != null ? `Below ${formatDollars(minimumBalance)}` : 'Off';
 
-  let infoCard: ReactNode = null;
-  if (isLoading) {
-    infoCard = (
-      <Animated.View exiting={FadeOut.duration(150)}>
-        <InfoCardSkeleton />
-      </Animated.View>
-    );
-  } else if (isError && !org) {
-    infoCard = (
-      <QueryError
-        onRetry={() => void refetch()}
-        isRetrying={isFetching}
-        className="rounded-lg bg-secondary py-6"
-        placement="top"
-      />
-    );
-  } else if (org) {
-    infoCard = (
-      <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-        <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-          <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
-            {org.organizationName}
-          </Text>
-          {showMoney && (
-            <Pressable
-              onPress={() => {
-                setRenameVisible(true);
-              }}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Rename organization"
-              className="active:opacity-70"
-            >
-              <Pencil size={16} color={colors.mutedForeground} />
-            </Pressable>
-          )}
-        </View>
-        {showMoney && (
-          <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
-        )}
-        <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
-      </Animated.View>
-    );
-  }
-
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={org?.organizationName ?? 'Organization'} />
+      <ScreenHeader title={org.organizationName} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View layout={LinearTransition}>{infoCard}</Animated.View>
+        <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
+          <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
+            <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
+              {org.organizationName}
+            </Text>
+            {showMoney && (
+              <Pressable
+                onPress={() => {
+                  setRenameVisible(true);
+                }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Rename organization"
+                className="active:opacity-70"
+              >
+                <Pencil size={16} color={colors.mutedForeground} />
+              </Pressable>
+            )}
+          </View>
+          {showMoney && (
+            <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
+          )}
+          <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
+        </Animated.View>
 
         <OrgUsageStats organizationId={organizationId} />
 
@@ -141,7 +118,7 @@ export function OrganizationHubScreen() {
         </View>
       </TabScreenScrollView>
 
-      {renameVisible && org && (
+      {renameVisible && (
         <RenameModal
           title="Rename Organization"
           placeholder="Enter organization name"

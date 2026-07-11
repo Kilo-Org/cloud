@@ -5,12 +5,15 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { ROLE_LABEL } from '@/components/organization/member-row';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
+import { PermissionDenied } from '@/components/organization/permission-denied';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
-import { type OrgRole, useOrgRole } from '@/lib/hooks/use-organization-queries';
+import { isMoneyRole, type OrgRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, EMAIL_PATTERN } from '@/lib/utils';
 
@@ -20,13 +23,32 @@ const EMAIL_ERROR = 'Enter a valid email address';
 export function InviteMemberSheet() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role: myRole } = useOrgRole();
+  const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const emailRef = useRef('');
   const [canSubmit, setCanSubmit] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
+
+  if (isResolving) {
+    return (
+      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+        <Skeleton className="h-11 rounded-lg" />
+        <Skeleton className="h-11 rounded-lg" />
+      </ScrollView>
+    );
+  }
+  if (organizationId == null || org == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <OrganizationBoundary />
+      </View>
+    );
+  }
+  if (!isMoneyRole(myRole)) {
+    return <PermissionDenied description="You don't have permission to invite members." />;
+  }
 
   const onSubmit = () => {
     const email = emailRef.current.trim().toLowerCase();

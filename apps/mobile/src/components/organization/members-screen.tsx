@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,7 +17,7 @@ import {
   type ActiveOrgMember,
   type InvitedOrgMember,
   isMoneyRole,
-  useOrgRole,
+  useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -56,12 +57,17 @@ function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
 export function OrganizationMembersScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role } = useOrgRole();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const { userId: currentUserId } = useCurrentUserId();
 
-  if (organizationId == null) {
-    return null;
+  if (isResolving || organizationId == null || org == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Members" />
+        <OrganizationBoundary isResolving={isResolving} />
+      </View>
+    );
   }
 
   const isLoading = orgWithMembers.isLoading;

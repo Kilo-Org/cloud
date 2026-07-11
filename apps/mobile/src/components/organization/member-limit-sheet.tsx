@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
+import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
@@ -11,7 +13,7 @@ import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
-  useOrgRole,
+  useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { firstNonEmpty } from '@/lib/utils';
@@ -114,13 +116,13 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 }
 
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
-  const { organizationId } = useOrgRole();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const member = orgWithMembers.data?.members.find(
     (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
   );
 
-  if (orgWithMembers.isLoading) {
+  if (isResolving || orgWithMembers.isLoading) {
     return (
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
         <View className="gap-1">
@@ -131,6 +133,18 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
         <Skeleton className="h-11 rounded-lg" />
       </ScrollView>
     );
+  }
+
+  if (organizationId == null || org == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <OrganizationBoundary />
+      </View>
+    );
+  }
+
+  if (role !== 'owner') {
+    return <PermissionDenied description="Only the organization owner can manage usage limits." />;
   }
 
   if (orgWithMembers.isError && !orgWithMembers.data) {

@@ -60,6 +60,8 @@ export function KiloPassSubscriptionScreen() {
       onCompleted: () => {
         ensureProfileAfterKiloPassPurchase(router);
       },
+      // This screen owns the inline error banner — don't double up with a toast.
+      suppressToast: true,
     });
   };
 

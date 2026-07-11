@@ -28,7 +28,9 @@ export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesBu
   const handlePress = () => {
     void Haptics.selectionAsync();
     void (async () => {
-      const result = await restorePurchases();
+      // A caller that renders its own feedback (onResult) also owns the error banner —
+      // suppress the hook's toast so failures aren't reported twice.
+      const result = await restorePurchases({ suppressToast: onResult !== undefined });
       if (onResult) {
         onResult(result);
         return;

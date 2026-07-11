@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAppStoreKiloPassPurchaseActions,
+  resetPurchaseErrorToastDedup,
   StoreKiloPassPurchaseProvider,
 } from './use-store-kilo-pass-purchase';
 import { type AppStoreKiloPassProduct } from './store-products';
@@ -101,11 +102,14 @@ type StoreKiloPassPurchaseContextValue = {
   appStoreOwnershipPreflight: 'owned-by-another-account' | null;
   purchase: (
     product: AppStoreKiloPassProduct,
-    options?: { onCompleted?: () => void }
+    options?: { onCompleted?: () => void; suppressToast?: boolean }
   ) => Promise<void>;
-  restorePurchases: () => Promise<'restored' | 'empty' | 'failed'>;
+  restorePurchases: (options?: {
+    suppressToast?: boolean;
+  }) => Promise<'restored' | 'empty' | 'failed'>;
   isPending: boolean;
   isRestoringPurchases: boolean;
+  errorMessage: string | null;
 };
 
 type ReactInternals = {
@@ -271,6 +275,7 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetPurchaseErrorToastDedup();
   mockedIap.availablePurchases = [];
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
@@ -346,6 +351,22 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.purchase(product);
 
     expect(showError).toHaveBeenCalledWith('Could not connect to App Store');
+  });
+
+  it('tells showError to suppress its toast when the caller owns inline feedback', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      requestPurchase: vi.fn().mockRejectedValue(new Error('Could not connect to App Store')),
+      showError: (message, options) => {
+        showError(message, options);
+      },
+    });
+
+    await actions.purchase(product, { suppressToast: true });
+
+    expect(showError).toHaveBeenCalledWith('Could not connect to App Store', {
+      suppressToast: true,
+    });
   });
 
   it('does not show an error when the user cancels the App Store purchase sheet', async () => {
@@ -753,6 +774,24 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(result).toBe('failed');
     expect(showError).toHaveBeenCalledWith('Failed to restore purchases. Try again.');
   });
+
+  it('tells showError to suppress its toast when restore is driven by an inline-feedback caller', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      getAvailablePurchases: vi.fn(),
+      restorePurchases: vi.fn().mockRejectedValue(new Error('StoreKit unavailable')),
+      showError: (message, options) => {
+        showError(message, options);
+      },
+    });
+
+    const result = await actions.restorePurchases({ suppressToast: true });
+
+    expect(result).toBe('failed');
+    expect(showError).toHaveBeenCalledWith('Failed to restore purchases. Try again.', {
+      suppressToast: true,
+    });
+  });
 });
 
 describe('StoreKiloPassPurchaseProvider', () => {
@@ -814,6 +853,45 @@ describe('StoreKiloPassPurchaseProvider', () => {
     expect(releasedValue.isPending).toBe(false);
     await releasedValue.purchase(product);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('toasts a purchase error when no screen owns inline feedback', async () => {
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product);
+
+    mockedIap.handlers?.onPurchaseError(new Error('Untoasted screen check failed'));
+    const releasedValue = provider.render();
+
+    expect(toast.error).toHaveBeenCalledWith('Untoasted screen check failed');
+    expect(releasedValue.errorMessage).toBe('Untoasted screen check failed');
+  });
+
+  it('suppresses the purchase-error toast when the subscription screen owns inline feedback', async () => {
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product, { suppressToast: true });
+
+    mockedIap.handlers?.onPurchaseError(new Error('Inline banner check failed'));
+    const releasedValue = provider.render();
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(releasedValue.errorMessage).toBe('Inline banner check failed');
+  });
+
+  it('suppresses the restore-error toast when the caller passes suppressToast', async () => {
+    mockedIap.restorePurchases.mockRejectedValue(new Error('StoreKit unavailable'));
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    const result = await initialValue.restorePurchases({ suppressToast: true });
+    const releasedValue = provider.render();
+
+    expect(result).toBe('failed');
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(releasedValue.errorMessage).toBe('Failed to restore purchases. Try again.');
   });
 
   it('ignores live StoreKit success for an unknown product', async () => {

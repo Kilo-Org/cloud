@@ -39,7 +39,9 @@ export function QuestionCard({
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
   const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
   const customInputs = useRef<Record<number, string>>({});
-  const [customHasText, setCustomHasText] = useState<Record<number, boolean>>({});
+  // Unread; setting it forces a re-render on every keystroke so
+  // `allQuestionsAnswered` (derived from the customInputs ref) stays in sync.
+  const [, setCustomHasText] = useState<Record<number, boolean>>({});
 
   function toggleOption(questionIndex: number, optionIndex: number, multiple: boolean | undefined) {
     setSelectedOptions(prev => {
@@ -110,15 +112,7 @@ export function QuestionCard({
 
   function handleSubmit() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const answers = buildAnswers();
-
-    const unanswered = answers.findIndex(a => a.length === 0);
-    if (unanswered !== -1) {
-      Alert.alert('Please Answer All Questions', `Question ${unanswered + 1} needs an answer.`);
-      return;
-    }
-
-    onAnswer(answers);
+    onAnswer(buildAnswers());
   }
 
   function handleReject() {
@@ -128,11 +122,7 @@ export function QuestionCard({
     ]);
   }
 
-  const hasOptionSelected = Object.values(selectedOptions).some(s => s.size > 0);
-  const hasCustomAnswer = Object.entries(customSelected).some(
-    ([idx, selected]) => selected && customHasText[Number(idx)]
-  );
-  const hasAnyAnswer = hasOptionSelected || hasCustomAnswer;
+  const allQuestionsAnswered = buildAnswers().every(answer => answer.length > 0);
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
@@ -221,12 +211,16 @@ export function QuestionCard({
         <Button variant="outline" className="flex-1" onPress={handleReject} disabled={isSubmitting}>
           <Text className="text-sm">Skip</Text>
         </Button>
-        <Button className="flex-1" onPress={handleSubmit} disabled={!hasAnyAnswer || isSubmitting}>
+        <Button
+          className="flex-1"
+          onPress={handleSubmit}
+          disabled={!allQuestionsAnswered || isSubmitting}
+        >
           {isSubmitting ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
           <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
-            {isSubmitting ? 'Submitting…' : 'Submit'}
+            {isSubmitting ? 'Submitting…' : 'Send answers'}
           </Text>
         </Button>
       </View>

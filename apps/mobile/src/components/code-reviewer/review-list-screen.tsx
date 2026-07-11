@@ -45,7 +45,7 @@ function reviewTime(review: Review): Date {
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const { data, isLoading, isError, refetch } = useReviewList(scope);
+  const { data, isLoading, isError, isFetching, refetch } = useReviewList(scope);
 
   return (
     <View className="flex-1 bg-background">
@@ -69,6 +69,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               placement="top"
               title="Could not load reviews"
               onRetry={() => void refetch()}
+              isRetrying={isFetching}
             />
           )}
 
@@ -78,12 +79,14 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               placement="top"
               title="Could not load reviews"
               onRetry={() => void refetch()}
+              isRetrying={isFetching}
             />
           )}
 
           {!isLoading && data?.success && data.reviews.length === 0 && (
             <EmptyState
               icon={GitPullRequest}
+              placement="top"
               title="No reviews yet"
               description="Reviews appear here once the Code Reviewer runs on a pull request."
               className="pt-12"

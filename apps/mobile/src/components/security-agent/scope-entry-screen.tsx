@@ -36,11 +36,19 @@ function ScopeEntrySkeleton() {
   );
 }
 
-function ScopeEntryError({ onRetry }: Readonly<{ onRetry: () => void }>) {
+function ScopeEntryError({
+  onRetry,
+  isRetrying,
+}: Readonly<{ onRetry: () => void; isRetrying: boolean }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Security Agent" />
-      <QueryError variant="server" title="Could not load Security Agent" onRetry={onRetry} />
+      <QueryError
+        variant="server"
+        title="Could not load Security Agent"
+        onRetry={onRetry}
+        isRetrying={isRetrying}
+      />
     </View>
   );
 }
@@ -80,6 +88,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
           void permission.refetch();
           void config.refetch();
         }}
+        isRetrying={permission.isFetching || config.isFetching}
       />
     );
   }

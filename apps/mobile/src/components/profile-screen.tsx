@@ -50,6 +50,7 @@ export function ProfileScreen() {
     data,
     isLoading,
     isError: providersError,
+    isFetching: providersFetching,
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
@@ -197,6 +198,7 @@ export function ProfileScreen() {
               placement="top"
               title="Could not load accounts"
               onRetry={() => void refetchProviders()}
+              isRetrying={providersFetching}
             />
           )}
 

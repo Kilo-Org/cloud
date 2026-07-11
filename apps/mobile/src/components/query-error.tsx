@@ -49,7 +49,7 @@ const VARIANT_META: Record<
 type QueryErrorProps = {
   variant?: QueryErrorVariant;
   title?: string;
-  /** Legacy description prop, kept for existing call sites — prefer `description`. */
+  /** Same as `description`, kept for existing call sites. New call sites should use `description` instead. */
   message?: string;
   description?: string;
   onRetry?: () => void;

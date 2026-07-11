@@ -6,6 +6,7 @@ import {
   isCancellableReviewStatus,
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -50,7 +51,7 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const { data, isLoading, isError, refetch } = useReviewDetail(reviewId);
+  const { data, isLoading, isError, isFetching, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
 
@@ -63,6 +64,7 @@ export function ReviewDetailScreen({
             variant="server"
             title="Could not load review"
             onRetry={() => void refetch()}
+            isRetrying={isFetching}
           />
         </TabScreenScrollView>
       </View>
@@ -92,6 +94,7 @@ export function ReviewDetailScreen({
             variant="server"
             title="Could not load review"
             onRetry={() => void refetch()}
+            isRetrying={isFetching}
           />
         </TabScreenScrollView>
       </View>
@@ -127,7 +130,7 @@ export function ReviewDetailScreen({
             <MetaRow label="Completed" value={timeAgo(parseTimestamp(review.completed_at))} />
           ) : null}
           {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
-            <MetaRow label="Cost" value={`$${(review.total_cost_musd / 1e6).toFixed(2)}`} />
+            <MetaRow label="Cost" value={formatDollars(fromMicrodollars(review.total_cost_musd))} />
           ) : null}
           {tokenUsage.input > 0 || tokenUsage.output > 0 ? (
             <MetaRow label="Tokens" value={`${tokenUsage.input} in / ${tokenUsage.output} out`} />

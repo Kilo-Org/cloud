@@ -198,6 +198,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             placement="top"
             title="Could not load dashboard data"
             onRetry={() => void dashboardStats.refetch()}
+            isRetrying={dashboardStats.isFetching}
           />
         ) : null}
 

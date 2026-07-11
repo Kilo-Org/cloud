@@ -2,10 +2,11 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
+import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -148,20 +149,9 @@ export function ModelPickerContent() {
       keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingBottom: bottom }}
       ListHeaderComponent={
-        <View className="border-b border-border bg-background px-4 pb-3 pt-4">
-          <View className="h-11 flex-row items-center justify-center">
-            <Text className="text-lg font-semibold text-foreground">Select Model</Text>
-            <Pressable
-              onPress={closePicker}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Done selecting model"
-              className="absolute right-0 rounded-full bg-secondary px-4 py-2 active:opacity-70 will-change-pressable"
-            >
-              <Text className="text-base font-medium text-foreground">Done</Text>
-            </Pressable>
-          </View>
-          <View className="mt-2 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+        <View className="bg-background pb-3">
+          <SheetHeader title="Select Model" onDone={closePicker} />
+          <View className="mx-4 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
               placeholder="Search models..."

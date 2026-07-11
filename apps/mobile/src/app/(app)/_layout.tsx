@@ -51,8 +51,7 @@ export default function AppLayout() {
                   presentation: 'formSheet',
                   sheetAllowedDetents: [0.5],
                   sheetGrabberVisible: true,
-                  headerShown: true,
-                  title: 'Select Mode',
+                  headerShown: false,
                 }}
               />
               <Stack.Screen

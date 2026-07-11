@@ -6,6 +6,7 @@ import { FlatList, Pressable, View } from 'react-native';
 
 import { getModeIcon, MODE_OPTIONS, type ModeOption } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearModePickerBridge, getModePickerBridge } from '@/lib/picker-bridge';
@@ -34,10 +35,18 @@ export default function ModePickerScreen() {
 
   if (!onSelect) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <Text className="text-muted-foreground" style={{ color: colors.mutedForeground }}>
-          No options available
-        </Text>
+      <View className="flex-1 bg-background">
+        <SheetHeader
+          title="Select Mode"
+          onDone={() => {
+            router.back();
+          }}
+        />
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-muted-foreground" style={{ color: colors.mutedForeground }}>
+            No options available
+          </Text>
+        </View>
       </View>
     );
   }
@@ -68,13 +77,21 @@ export default function ModePickerScreen() {
   }
 
   return (
-    <FlatList
-      className="flex-1 bg-background"
-      data={MODE_OPTIONS}
-      keyExtractor={item => item.value}
-      renderItem={renderItem}
-      contentInsetAdjustmentBehavior="automatic"
-      ItemSeparatorComponent={() => <View className="mx-4 border-b border-border" />}
-    />
+    <View className="flex-1 bg-background">
+      <SheetHeader
+        title="Select Mode"
+        onDone={() => {
+          router.back();
+        }}
+      />
+      <FlatList
+        className="flex-1 bg-background"
+        data={MODE_OPTIONS}
+        keyExtractor={item => item.value}
+        renderItem={renderItem}
+        contentInsetAdjustmentBehavior="automatic"
+        ItemSeparatorComponent={() => <View className="mx-4 border-b border-border" />}
+      />
+    </View>
   );
 }

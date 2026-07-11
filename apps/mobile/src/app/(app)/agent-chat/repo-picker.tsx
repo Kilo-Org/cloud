@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearRepoPickerBridge, getRepoPickerBridge } from '@/lib/picker-bridge';
@@ -70,20 +71,9 @@ export default function RepoPickerScreen() {
       keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingBottom: bottom }}
       ListHeaderComponent={
-        <View className="border-b border-border bg-background px-4 pb-3 pt-4">
-          <View className="h-11 flex-row items-center justify-center">
-            <Text className="text-lg font-semibold text-foreground">Select Repository</Text>
-            <Pressable
-              onPress={closePicker}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Close repository picker"
-              className="absolute right-0 rounded-full bg-secondary px-4 py-2 active:opacity-70 will-change-pressable"
-            >
-              <Text className="text-base font-medium text-foreground">Done</Text>
-            </Pressable>
-          </View>
-          <View className="mt-2 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+        <View className="bg-background pb-3">
+          <SheetHeader title="Select Repository" onDone={closePicker} />
+          <View className="mx-4 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
               placeholder="Search repositories..."

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
 import { QueryError } from '@/components/query-error';
+import { SheetHeader } from '@/components/sheet-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
@@ -36,22 +37,12 @@ export default function InstancePickerScreen() {
       className="flex-1 bg-background"
       contentContainerStyle={{ paddingBottom: bottom + 16 }}
     >
-      <View className="border-b border-border px-4 pb-3 pt-4">
-        <View className="h-11 flex-row items-center justify-center">
-          <Text className="text-lg font-semibold text-foreground">Switch Instance</Text>
-          <Pressable
-            onPress={() => {
-              router.back();
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Done"
-            className="absolute right-0 rounded-full bg-secondary px-4 py-2 active:opacity-70 will-change-pressable"
-          >
-            <Text className="text-base font-medium text-foreground">Done</Text>
-          </Pressable>
-        </View>
-      </View>
+      <SheetHeader
+        title="Switch Instance"
+        onDone={() => {
+          router.back();
+        }}
+      />
 
       {instancesQuery.isPending ? (
         <View className="gap-3 px-4 py-4">
@@ -63,7 +54,7 @@ export default function InstancePickerScreen() {
       {instancesQuery.isError ? (
         <QueryError
           className="py-12"
-          message="Could not load instances"
+          description="Could not load instances"
           onRetry={() => {
             void instancesQuery.refetch();
           }}

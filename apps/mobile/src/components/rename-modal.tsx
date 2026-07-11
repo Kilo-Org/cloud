@@ -4,6 +4,7 @@ import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type RenameModalProps = {
   title: string;
@@ -77,7 +78,10 @@ export function RenameModal({
           <Text className="text-base font-semibold">{title}</Text>
           <TextInput
             ref={inputRef}
-            className="rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground"
+            className={cn(
+              'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
+              pending && 'opacity-50'
+            )}
             placeholder={placeholder}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={initialValue}
@@ -89,6 +93,7 @@ export function RenameModal({
             autoFocus={Platform.OS !== 'android'}
             maxLength={50}
             editable={!pending}
+            accessibilityState={{ disabled: pending }}
           />
           {errorText ? <Text className="text-sm text-destructive">{errorText}</Text> : null}
           <View className="flex-row justify-end gap-3">

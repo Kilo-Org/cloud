@@ -72,6 +72,7 @@ export function ChatToolbar({
             className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
             accessibilityRole="button"
             accessibilityLabel="Reasoning settings"
+            accessibilityState={{ disabled }}
           >
             <Settings2 size={16} color={colors.mutedForeground} />
           </Pressable>

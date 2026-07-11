@@ -177,6 +177,7 @@ export function QuestionCard({
                         toggleCustom(qIndex, question.multiple);
                       }}
                       disabled={isSubmitting}
+                      accessibilityState={{ disabled: isSubmitting, selected: isCustomActive }}
                       className={cn(
                         'flex-row items-center rounded-md border px-3 py-2.5 shadow-sm shadow-black/5',
                         isCustomActive

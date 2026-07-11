@@ -103,6 +103,9 @@ function ServiceDegradedBanner({
           hitSlop={8}
           disabled={isRetrying}
           onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="Retry"
+          accessibilityState={{ busy: isRetrying }}
           className="p-1 active:opacity-70"
         >
           {isRetrying ? (
@@ -201,6 +204,9 @@ export function DangerZone({ pending, onDestroy }: Readonly<DangerZoneProps>) {
       </Text>
       <Pressable
         disabled={pending}
+        accessibilityRole="button"
+        accessibilityLabel="Destroy instance"
+        accessibilityState={{ busy: pending }}
         className="flex-row items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-2.5 active:opacity-70 disabled:opacity-50"
         onPress={onDestroy}
       >

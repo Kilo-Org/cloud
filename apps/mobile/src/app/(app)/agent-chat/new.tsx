@@ -47,6 +47,7 @@ import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -285,6 +286,8 @@ export default function NewSessionScreen() {
     Boolean(model) &&
     !attachments.isUploading &&
     !attachments.hasFailedAttachments;
+  const paperclipDisabled =
+    isCreating || attachments.attachments.length >= AGENT_ATTACHMENT_MAX_FILES;
 
   return (
     <View className="flex-1 bg-background">
@@ -311,11 +314,15 @@ export default function NewSessionScreen() {
               onPress={() => {
                 void handleAddAttachment();
               }}
-              disabled={isCreating || attachments.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
+              disabled={paperclipDisabled}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
+              className={cn(
+                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+                paperclipDisabled && 'opacity-50'
+              )}
               accessibilityRole="button"
               accessibilityLabel="Add attachment"
+              accessibilityState={{ disabled: paperclipDisabled }}
             >
               <Paperclip size={18} color={colors.mutedForeground} />
             </Pressable>
@@ -324,7 +331,10 @@ export default function NewSessionScreen() {
               placeholder="What would you like to work on?"
               placeholderTextColor={colors.mutedForeground}
               multiline
-              className="flex-1 px-2 py-2 text-base leading-6 text-foreground"
+              className={cn(
+                'flex-1 px-2 py-2 text-base leading-6 text-foreground',
+                isCreating && 'opacity-50'
+              )}
               style={[
                 promptInputStyle,
                 { height: promptMeasure.height },
@@ -341,6 +351,7 @@ export default function NewSessionScreen() {
               onLayout={handlePromptInputLayout}
               scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
               editable={!isCreating}
+              accessibilityState={{ disabled: isCreating }}
               autoFocus
             />
           </View>

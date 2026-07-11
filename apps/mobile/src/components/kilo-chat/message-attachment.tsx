@@ -146,6 +146,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
         void handleShare();
       }}
       disabled={sharing}
+      accessibilityState={{ busy: sharing }}
       className={cn(
         'mt-2 max-w-56 flex-row items-center gap-2 rounded-md border px-3 py-2 active:opacity-80 disabled:opacity-60',
         isFromMe ? 'border-primary-foreground' : 'border-border bg-secondary'

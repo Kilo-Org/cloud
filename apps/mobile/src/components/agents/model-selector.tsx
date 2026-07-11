@@ -173,6 +173,7 @@ export function ModelSelector({
       disabled={effectivelyDisabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: effectivelyDisabled }}
       className={cn(
         'max-w-[240px] shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
         effectivelyDisabled && 'opacity-50'
@@ -254,6 +255,7 @@ export function ModelPickerOptionRow({
         disabled={option.unavailable}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled: option.unavailable, selected }}
       >
         <View className="flex-1">
           <Text className="text-base text-foreground">{option.name}</Text>

@@ -49,6 +49,9 @@ export function RepoSelector({
     <Pressable
       onPress={handlePress}
       disabled={effectivelyDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={`Repository: ${label}`}
+      accessibilityState={{ disabled: effectivelyDisabled }}
       className={cn(
         'flex-row items-center justify-between rounded-lg border border-border bg-secondary px-3 py-3',
         effectivelyDisabled && 'opacity-50'

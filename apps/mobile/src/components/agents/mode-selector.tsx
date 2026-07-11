@@ -38,6 +38,9 @@ export function ModeSelector({ value, onChange, disabled = false }: Readonly<Mod
     <Pressable
       onPress={handlePress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={`Mode: ${selectedLabel}`}
+      accessibilityState={{ disabled }}
       className={cn(
         'flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
         disabled && 'opacity-50'

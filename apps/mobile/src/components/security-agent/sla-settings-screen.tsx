@@ -101,6 +101,7 @@ function SlaDayRow({
         className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-5 text-foreground"
         textAlign="center"
         editable={!disabled}
+        accessibilityState={{ disabled }}
         keyboardType="number-pad"
         defaultValue={rawRef.current}
         placeholderTextColor={colors.mutedForeground}

@@ -161,7 +161,8 @@ export function MessageInputView({
               ref={inputRef}
               className={cn(
                 'rounded-md border bg-card px-3 text-foreground',
-                overLimit ? 'border-destructive' : 'border-input'
+                overLimit ? 'border-destructive' : 'border-input',
+                disabled && 'opacity-50'
               )}
               style={[messageInputTextStyle, { height: inputHeight }]}
               placeholder="Message"
@@ -170,6 +171,7 @@ export function MessageInputView({
               multiline
               scrollEnabled={shouldScroll}
               editable={!disabled}
+              accessibilityState={{ disabled }}
               onChangeText={onChangeText}
               onFocus={onInputFocus}
               onBlur={onInputBlur}

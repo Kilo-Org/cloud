@@ -27,6 +27,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
@@ -93,6 +94,8 @@ export function ChatComposer({
   const canSend = hasText && !disabled && !isStreaming && !isSending;
   const showToolbar = isFocused || hasText || upload.attachments.length > 0;
   const toolbarDisabled = disabled || isStreaming;
+  const paperclipDisabled =
+    toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES;
 
   function handleChangeText(value: string) {
     textRef.current = value;
@@ -199,18 +202,25 @@ export function ChatComposer({
             onPress={() => {
               void handleAddAttachment();
             }}
-            disabled={toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
+            disabled={paperclipDisabled}
             hitSlop={PAPERCLIP_HIT_SLOP}
-            className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full active:opacity-70',
+              paperclipDisabled && 'opacity-50'
+            )}
             accessibilityRole="button"
             accessibilityLabel="Add attachment"
+            accessibilityState={{ disabled: paperclipDisabled }}
           >
             <Paperclip size={18} color={colors.mutedForeground} />
           </Pressable>
         ) : null}
 
         <View
-          className="mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card"
+          className={cn(
+            'mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
+            toolbarDisabled && 'opacity-50'
+          )}
           onLayout={handleInputLayout}
         >
           <TextInput
@@ -229,6 +239,7 @@ export function ChatComposer({
             style={textInputStyle}
             scrollEnabled={measure.height >= TEXT_INPUT_MAX_HEIGHT}
             editable={!toolbarDisabled}
+            accessibilityState={{ disabled: toolbarDisabled }}
             returnKeyType="default"
             submitBehavior="newline"
             autoCapitalize="sentences"
@@ -244,7 +255,10 @@ export function ChatComposer({
             accessibilityRole="button"
             accessibilityLabel="Stop generating"
             accessibilityState={{ disabled }}
-            className="h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500"
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
+              disabled && 'opacity-50'
+            )}
           >
             <Square size={14} color="white" fill="white" />
           </Pressable>

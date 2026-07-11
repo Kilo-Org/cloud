@@ -154,6 +154,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                   <Pressable
                     key={option}
                     disabled={!connected}
+                    accessibilityState={{ disabled: !connected }}
                     className={cn(
                       'flex-row items-center justify-between px-4 py-3 active:opacity-70',
                       index < MANUAL_REVIEW_PLATFORMS.length - 1 &&

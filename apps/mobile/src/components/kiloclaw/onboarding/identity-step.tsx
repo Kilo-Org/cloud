@@ -413,6 +413,7 @@ export function IdentityStep({
               void handleGpsPress();
             }}
             disabled={isGpsLoading || isValidating}
+            accessibilityState={{ disabled: isValidating, busy: isGpsLoading }}
             className="h-11 w-11 items-center justify-center rounded-xl bg-secondary active:opacity-70 disabled:opacity-50"
           >
             {isGpsLoading ? (

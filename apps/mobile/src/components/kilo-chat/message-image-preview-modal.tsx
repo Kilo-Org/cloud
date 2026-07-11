@@ -47,6 +47,7 @@ export function MessageImagePreviewModal({
           <Pressable
             onPress={onShare}
             disabled={sharing || uri === null}
+            accessibilityState={{ disabled: uri === null, busy: sharing }}
             className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
             accessibilityRole="button"
             accessibilityLabel={`Share ${filename}`}

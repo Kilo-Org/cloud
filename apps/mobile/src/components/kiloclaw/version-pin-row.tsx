@@ -93,6 +93,7 @@ export function VersionPinRow({
               multiline
               maxLength={500}
               editable={!isConfirmingThis}
+              accessibilityState={{ busy: isConfirmingThis }}
             />
             {isPinnedByAdmin && adminPinLabel && (
               <Text className="text-xs text-amber-600 dark:text-amber-400">

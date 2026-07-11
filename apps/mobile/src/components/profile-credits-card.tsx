@@ -15,7 +15,7 @@ import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
+import { formatDate, parseTimestamp } from '@/lib/utils';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
@@ -152,10 +152,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
                   <Text className="text-xs text-muted-foreground">
                     {formatDollars(expiringTotal)} in bonus credits expiring{' '}
-                    {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+                    {formatDate(parseTimestamp(earliestExpiry))}
                   </Text>
                 </Animated.View>
               )

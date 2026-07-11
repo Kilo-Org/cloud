@@ -16,7 +16,7 @@ import {
   useOrgBoundary,
   useOrgInvoices,
 } from '@/lib/hooks/use-organization-queries';
-import { cn, firstNonEmpty } from '@/lib/utils';
+import { cn, firstNonEmpty, formatDate } from '@/lib/utils';
 
 const STATUS_META: Record<string, { label: string; pillClass: string; textClass: string }> = {
   paid: { label: 'Paid', pillClass: 'bg-good', textClass: 'text-good-foreground' },
@@ -59,7 +59,7 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {new Date(invoice.created * 1000).toLocaleDateString()}
+          {formatDate(new Date(invoice.created * 1000))}
         </Text>
         <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
           <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
-import { cn, parseTimestamp } from '@/lib/utils';
+import { cn, formatDate, parseTimestamp } from '@/lib/utils';
 
 import { ROLE_LABEL } from './member-row';
 
@@ -22,7 +22,7 @@ function inviteDateLabel(inviteDate: string | null): string | null {
   if (inviteDate == null) {
     return null;
   }
-  return `Invited ${parseTimestamp(inviteDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  return `Invited ${formatDate(parseTimestamp(inviteDate))}`;
 }
 
 export function InvitedMemberRow({

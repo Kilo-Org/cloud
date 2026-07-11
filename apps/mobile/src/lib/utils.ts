@@ -1,4 +1,4 @@
-import { firstNonEmpty, parseTimestamp } from '@kilocode/app-shared/utils';
+import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -37,4 +37,4 @@ function timeAgo(date: Date): string {
 // eslint-disable-next-line no-empty-function -- intentional no-op
 async function asyncNoop() {}
 
-export { asyncNoop, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, timeAgo };
+export { asyncNoop, cn, EMAIL_PATTERN, firstNonEmpty, formatDate, parseTimestamp, timeAgo };

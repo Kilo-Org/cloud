@@ -16,7 +16,7 @@ import {
   useOrgBoundary,
   useOrgCreditTransactions,
 } from '@/lib/hooks/use-organization-queries';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, formatDate, parseTimestamp } from '@/lib/utils';
 
 function humanizeCategory(category: string): string {
   const spaced = category.replaceAll('_', ' ');
@@ -54,11 +54,11 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {parseTimestamp(transaction.created_at).toLocaleDateString()}
+          {formatDate(parseTimestamp(transaction.created_at))}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            Expires {parseTimestamp(transaction.expiry_date).toLocaleDateString()}
+            Expires {formatDate(parseTimestamp(transaction.expiry_date))}
           </Text>
         )}
       </View>

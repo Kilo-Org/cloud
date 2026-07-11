@@ -1,4 +1,4 @@
-import { parseTimestamp } from '@/lib/utils';
+import { formatDate, parseTimestamp } from '@/lib/utils';
 
 type KiloPassSubscriptionCardSubscription = {
   cancelAtPeriodEnd: boolean;
@@ -162,11 +162,7 @@ function formatSubscriptionEndDate(iso: string | null): string {
     return 'period end';
   }
 
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDate(date);
 }
 
 function isEndedSubscriptionStatus(status: string): boolean {

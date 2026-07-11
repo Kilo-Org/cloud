@@ -132,6 +132,9 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
           <Text variant="muted" className="text-center text-base">
             KiloClaw access is managed outside the iOS app for this account.
           </Text>
+          <Text variant="muted" className="text-center text-base">
+            Questions? Contact hi@kilo.ai.
+          </Text>
         </View>
       </View>
     );

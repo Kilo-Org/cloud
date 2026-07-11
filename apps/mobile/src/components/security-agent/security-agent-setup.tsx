@@ -51,7 +51,7 @@ export function SecurityAgentSetup({
           void connect();
         }}
       >
-        {connecting ? <ActivityIndicator size="small" /> : null}
+        {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
         <Text>{buttonLabel}</Text>
       </Button>
     </View>

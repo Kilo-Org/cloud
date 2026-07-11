@@ -99,7 +99,7 @@ export function HomeScreen() {
   const isLoading = instancesPending || sessionsLoading;
 
   const hasAnySession = storedSessions.length > 0 || activeSessions.length > 0;
-  const headerTitle = buildTimedGreeting(null);
+  const headerTitle = buildTimedGreeting();
 
   const handleRefresh = useCallback(() => {
     void (async () => {

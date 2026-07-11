@@ -19,12 +19,13 @@ export function Skeleton({ className }: Readonly<SkeletonProps>) {
   const opacity = useSharedValue(0.4);
 
   useEffect(() => {
-    if (reducedMotion) {
-      return;
+    if (!reducedMotion) {
+      opacity.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
     }
-    opacity.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
 
-    return () => cancelAnimation(opacity);
+    return () => {
+      cancelAnimation(opacity);
+    };
   }, [opacity, reducedMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({

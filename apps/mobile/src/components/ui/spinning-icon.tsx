@@ -37,7 +37,9 @@ export function SpinningIcon({
       rotation.value = 0;
     }
 
-    return () => cancelAnimation(rotation);
+    return () => {
+      cancelAnimation(rotation);
+    };
   }, [isAnimating, rotation]);
 
   const animatedStyle = useAnimatedStyle(() => ({

@@ -21,11 +21,16 @@ export function ReasoningSettingsModal({
       <Pressable
         className="flex-1 justify-start px-6 pt-[20%]"
         onPress={onClose}
-        accessibilityLabel="Close reasoning settings"
+        // accessible={false} so the backdrop doesn't collapse the whole sheet
+        // into one VoiceOver node (a Pressable defaults to accessible=true) —
+        // same fix as platform-filter-modal. VoiceOver dismissal comes from the
+        // modal's onRequestClose escape gesture, not this backdrop.
+        accessible={false}
       >
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable
           className="rounded-xl bg-card p-5 gap-4"
+          accessible={false}
           onPress={event => {
             event.stopPropagation();
           }}

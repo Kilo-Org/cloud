@@ -56,9 +56,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
-  const { models, isLoading: modelsLoading } = useAvailableModels(
-    isPersonalSecurityScope(scope) ? undefined : scope
-  );
+  const {
+    models,
+    isLoading: modelsLoading,
+    isError: modelsError,
+    refetch: refetchModels,
+  } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
 
   const [triageModelSlug, setTriageModelSlug] = useState('');
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
@@ -149,6 +152,11 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         }
       />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+        {!canManage && (
+          <Text className="text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Analysis depth
@@ -162,13 +170,14 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                   disabled={!canManage}
                   className={cn(
                     'flex-1 items-center rounded-full py-2 active:opacity-70',
-                    active && 'bg-foreground'
+                    active && 'bg-foreground',
+                    !canManage && 'opacity-50'
                   )}
                   onPress={() => {
                     setAnalysisMode(option.value);
                   }}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
+                  accessibilityState={{ selected: active, disabled: !canManage }}
                 >
                   <Text
                     className={cn(
@@ -184,32 +193,47 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         </View>
 
-        <View>
-          <ConfigureRow
-            icon={Search}
-            title="Triage model"
-            subtitle={modelName(triageModelSlug)}
-            onPress={modelRowOnPress(triageModelSlug, setTriageModelSlug)}
+        {modelsLoading && (
+          <View className="gap-3">
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </View>
+        )}
+        {modelsError && (
+          <QueryError
+            variant="server"
+            placement="top"
+            title="Could not load models"
+            onRetry={() => void refetchModels()}
+            isRetrying={modelsLoading}
           />
-          <ConfigureRow
-            icon={Brain}
-            title="Analysis model"
-            subtitle={modelName(analysisModelSlug)}
-            onPress={modelRowOnPress(analysisModelSlug, setAnalysisModelSlug)}
-          />
-          <ConfigureRow
-            icon={Wrench}
-            title="Remediation model"
-            subtitle={modelName(remediationModelSlug)}
-            last
-            onPress={modelRowOnPress(remediationModelSlug, setRemediationModelSlug)}
-          />
-        </View>
-
-        {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
+        )}
+        {!modelsLoading && !modelsError && (
+          <View>
+            <ConfigureRow
+              icon={Search}
+              title="Triage model"
+              subtitle={modelName(triageModelSlug)}
+              disabled={!canManage}
+              onPress={modelRowOnPress(triageModelSlug, setTriageModelSlug)}
+            />
+            <ConfigureRow
+              icon={Brain}
+              title="Analysis model"
+              subtitle={modelName(analysisModelSlug)}
+              disabled={!canManage}
+              onPress={modelRowOnPress(analysisModelSlug, setAnalysisModelSlug)}
+            />
+            <ConfigureRow
+              icon={Wrench}
+              title="Remediation model"
+              subtitle={modelName(remediationModelSlug)}
+              last
+              disabled={!canManage}
+              onPress={modelRowOnPress(remediationModelSlug, setRemediationModelSlug)}
+            />
+          </View>
         )}
       </TabScreenScrollView>
     </View>

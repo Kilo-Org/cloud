@@ -31,6 +31,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { cn } from '@/lib/utils';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
@@ -137,16 +138,24 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         }
       />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+        {!canManage && (
+          <Text className="pb-4 text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         {(['all', 'selected'] as const).map(option => (
           <Pressable
             key={option}
             disabled={!canManage}
-            className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+            className={cn(
+              'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
+              !canManage && 'opacity-50'
+            )}
             onPress={() => {
               setModeOption(option);
             }}
             accessibilityRole="radio"
-            accessibilityState={{ selected: mode === option }}
+            accessibilityState={{ selected: mode === option, disabled: !canManage }}
           >
             <Text className="text-sm font-medium">
               {option === 'all' ? 'All repositories' : 'Selected repositories'}
@@ -205,12 +214,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 <Pressable
                   key={repo.id}
                   disabled={!canManage}
-                  className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+                  className={cn(
+                    'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
+                    !canManage && 'opacity-50'
+                  )}
                   onPress={() => {
                     toggleRepo(repo.id);
                   }}
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selectedIds.includes(repo.id) }}
+                  accessibilityState={{
+                    checked: selectedIds.includes(repo.id),
+                    disabled: !canManage,
+                  }}
                 >
                   <View className="flex-1 flex-row items-center gap-2 pr-3">
                     {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
@@ -233,12 +248,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 </Text>
               )}
           </View>
-        )}
-
-        {!canManage && (
-          <Text className="pt-6 text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
         )}
       </TabScreenScrollView>
     </View>

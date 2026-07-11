@@ -41,14 +41,15 @@ export function PillGroup<T extends string>({
               disabled={disabled}
               className={cn(
                 'min-h-11 flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
+                index < options.length - 1 && 'border-b-[0.5px] border-hair-soft',
+                disabled && 'opacity-50'
               )}
               onPress={() => {
                 void Haptics.selectionAsync();
                 onChange(option.value);
               }}
               accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
+              accessibilityState={{ selected: active, disabled }}
             >
               <Text
                 className={cn(

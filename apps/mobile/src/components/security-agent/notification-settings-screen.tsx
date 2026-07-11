@@ -28,6 +28,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { cn } from '@/lib/utils';
 
 type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeverity'];
 
@@ -113,13 +114,20 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     trackRef.current({ interaction: 'settings_notifications_viewed' });
   }, []);
 
-  const valid = isValidDayCount(slaNotificationWarningDays);
+  // Only validate the lead-time field while the SLA notification feature
+  // that owns it is enabled — once hidden by the toggle, its value can't
+  // block saving. If the field is invalid at the moment it's hidden, fall
+  // back to the last persisted value instead of sending an invalid one.
+  const warningDaysValid = isValidDayCount(slaNotificationWarningDays);
+  const valid = !slaNotificationsEnabled || warningDaysValid;
   const patch = {
     newFindingNotificationsEnabled,
     newFindingNotificationMinSeverity,
     slaNotificationsEnabled,
     slaNotificationMinSeverity,
-    slaNotificationWarningDays,
+    slaNotificationWarningDays: warningDaysValid
+      ? slaNotificationWarningDays
+      : (initialConfigRef.current.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
   const dirty =
     hydratedRef.current &&
@@ -173,6 +181,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
       >
+        {!canManage && (
+          <Text className="text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             New-finding Notification
@@ -226,7 +239,10 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       ? undefined
                       : 'Enter a whole number between 1 and 365'
                   }
-                  className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
+                  className={cn(
+                    'h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground',
+                    !canManage && 'opacity-50'
+                  )}
                   editable={canManage}
                   keyboardType="number-pad"
                   defaultValue={warningDaysRef.current}
@@ -246,12 +262,6 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
             </>
           )}
         </View>
-
-        {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
-        )}
       </TabScreenScrollView>
     </View>
   );

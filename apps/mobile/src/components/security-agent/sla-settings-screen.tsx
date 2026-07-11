@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { cn } from '@/lib/utils';
 
 function SlaSettingsSkeleton() {
   return (
@@ -77,7 +78,12 @@ function SlaDayRow({
   const [days, setDays] = useState(initialValue);
 
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
+    <View
+      className={cn(
+        'flex-row items-center justify-between rounded-lg bg-secondary p-4',
+        disabled && 'opacity-50'
+      )}
+    >
       <View className="flex-1 pr-3">
         <Text className="text-sm font-medium">{label}</Text>
         <Text variant="muted" className="text-xs">
@@ -157,17 +163,29 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     trackRef.current({ interaction: 'settings_sla_viewed' });
   }, []);
 
-  const valid =
-    isValidDayCount(slaCriticalDays) &&
-    isValidDayCount(slaHighDays) &&
-    isValidDayCount(slaMediumDays) &&
-    isValidDayCount(slaLowDays);
+  // Only validate the four day fields while SLA tracking is enabled — once
+  // hidden by the toggle, an invalid day count can't block saving. If a
+  // field is invalid at the moment it's hidden, fall back to its last
+  // persisted value instead of sending an invalid one.
+  const daysValid = {
+    critical: isValidDayCount(slaCriticalDays),
+    high: isValidDayCount(slaHighDays),
+    medium: isValidDayCount(slaMediumDays),
+    low: isValidDayCount(slaLowDays),
+  };
+  const valid = !slaEnabled || Object.values(daysValid).every(Boolean);
   const patch = {
     slaEnabled,
-    slaCriticalDays,
-    slaHighDays,
-    slaMediumDays,
-    slaLowDays,
+    slaCriticalDays: daysValid.critical
+      ? slaCriticalDays
+      : (initialConfigRef.current.slaCriticalDays ?? slaCriticalDays),
+    slaHighDays: daysValid.high
+      ? slaHighDays
+      : (initialConfigRef.current.slaHighDays ?? slaHighDays),
+    slaMediumDays: daysValid.medium
+      ? slaMediumDays
+      : (initialConfigRef.current.slaMediumDays ?? slaMediumDays),
+    slaLowDays: daysValid.low ? slaLowDays : (initialConfigRef.current.slaLowDays ?? slaLowDays),
   };
   const dirty =
     hydratedRef.current &&
@@ -234,6 +252,11 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
         contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
       >
+        {!canManage && (
+          <Text className="text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         <ToggleRow
           title="Enable SLA tracking"
           subtitle="Set remediation deadlines based on finding severity."
@@ -260,12 +283,6 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
               />
             ))}
           </View>
-        )}
-
-        {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
         )}
       </TabScreenScrollView>
     </View>

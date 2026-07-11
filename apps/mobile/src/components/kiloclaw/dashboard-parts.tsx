@@ -2,6 +2,8 @@ import { AlertTriangle, Bot, Trash2 } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
+import { QueryError } from '@/components/query-error';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor, toneColor } from '@/lib/agent-color';
@@ -68,7 +70,7 @@ type ServiceDegradedBannerProps = {
   onPress: () => void;
 };
 
-export function ServiceDegradedBanner({ onPress }: Readonly<ServiceDegradedBannerProps>) {
+function ServiceDegradedBanner({ onPress }: Readonly<ServiceDegradedBannerProps>) {
   const colors = useThemeColors();
   const danger = toneColor('danger');
   return (
@@ -89,6 +91,68 @@ export function ServiceDegradedBanner({ onPress }: Readonly<ServiceDegradedBanne
         Service degraded — tap to view status
       </Text>
     </Pressable>
+  );
+}
+
+type DashboardServiceStatusProps = {
+  isError: boolean;
+  isFetching: boolean;
+  isDegraded: boolean;
+  onRetry: () => void;
+  onOpenStatusPage: () => void;
+};
+
+/**
+ * The service-degraded check is optional context — on failure we can't tell
+ * degraded from healthy, so say so instead of silently rendering as if
+ * everything's fine.
+ */
+export function DashboardServiceStatus({
+  isError,
+  isFetching,
+  isDegraded,
+  onRetry,
+  onOpenStatusPage,
+}: Readonly<DashboardServiceStatusProps>) {
+  if (isError) {
+    return (
+      <View className="mx-[22px]">
+        <QueryError
+          variant="neutral"
+          placement="top"
+          title="Could not check service status"
+          onRetry={onRetry}
+          isRetrying={isFetching}
+          className="rounded-2xl border border-border bg-card py-4"
+        />
+      </View>
+    );
+  }
+  if (isDegraded) {
+    return <ServiceDegradedBanner onPress={onOpenStatusPage} />;
+  }
+  return null;
+}
+
+/** Row-by-row skeleton for a `StatusCard` group ("Gateway Process" or "Resources"). */
+export function StatusCardGroupSkeleton({ rows }: Readonly<{ rows: number }>) {
+  return (
+    <View className="overflow-hidden rounded-2xl border border-border bg-card px-4 pb-1 pt-3">
+      <Skeleton className="mb-2 h-3 w-24 rounded" />
+      {Array.from({ length: rows }, (_, index) => (
+        <View
+          // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
+          key={index}
+          className={cn(
+            'flex-row items-center justify-between py-3',
+            index < rows - 1 && 'border-b-[0.5px] border-hair-soft'
+          )}
+        >
+          <Skeleton className="h-3.5 w-20 rounded" />
+          <Skeleton className="h-3.5 w-12 rounded" />
+        </View>
+      ))}
+    </View>
   );
 }
 

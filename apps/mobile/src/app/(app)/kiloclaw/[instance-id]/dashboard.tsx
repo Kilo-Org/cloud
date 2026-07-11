@@ -16,7 +16,8 @@ import { BillingBanner } from '@/components/kiloclaw/billing-banner';
 import {
   DangerZone,
   DashboardHero,
-  ServiceDegradedBanner,
+  DashboardServiceStatus,
+  StatusCardGroupSkeleton,
 } from '@/components/kiloclaw/dashboard-parts';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { InstanceControls } from '@/components/kiloclaw/instance-controls';
@@ -116,12 +117,21 @@ export default function DashboardScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Dashboard" />
-        <Animated.View layout={LinearTransition} className="flex-1 gap-3 px-[22px] pt-4">
-          <Animated.View exiting={FadeOut.duration(150)}>
-            <Skeleton className="h-40 w-full rounded-2xl" />
-          </Animated.View>
-          <Animated.View exiting={FadeOut.duration(150)}>
-            <Skeleton className="h-10 w-full rounded-2xl" />
+        <Animated.View layout={LinearTransition} className="flex-1 gap-4 px-[22px] pt-4">
+          <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
+            {/* Hero */}
+            <View className="flex-row items-center gap-3 pb-2">
+              <Skeleton className="h-11 w-11 rounded-[14px]" />
+              <View className="flex-1 gap-1.5">
+                <Skeleton className="h-7 w-40 rounded" />
+                <Skeleton className="h-3 w-24 rounded" />
+              </View>
+            </View>
+            {/* Status card: "Gateway Process" (5 rows) + "Resources" (3 rows) */}
+            <View className="gap-3">
+              <StatusCardGroupSkeleton rows={5} />
+              <StatusCardGroupSkeleton rows={3} />
+            </View>
           </Animated.View>
         </Animated.View>
       </View>
@@ -211,13 +221,15 @@ export default function DashboardScreen() {
             uptime={gateway?.uptime}
           />
 
-          {isServiceDegraded && (
-            <ServiceDegradedBanner
-              onPress={() => {
-                void Linking.openURL('https://status.kilo.ai');
-              }}
-            />
-          )}
+          <DashboardServiceStatus
+            isError={serviceDegradedQuery.isError}
+            isFetching={serviceDegradedQuery.isFetching}
+            isDegraded={isServiceDegraded}
+            onRetry={() => void serviceDegradedQuery.refetch()}
+            onOpenStatusPage={() => {
+              void Linking.openURL('https://status.kilo.ai');
+            }}
+          />
 
           {isPersonal && billing && Platform.OS !== 'ios' ? (
             <View className="mx-[22px]">
@@ -225,7 +237,7 @@ export default function DashboardScreen() {
             </View>
           ) : null}
 
-          <View className="mx-[22px]">
+          <View className="mx-[22px] gap-2">
             <StatusCard
               region={status?.flyRegion}
               cpus={status?.machineSize?.cpus}
@@ -237,6 +249,23 @@ export default function DashboardScreen() {
               lastExitSignal={gateway?.lastExit?.signal}
               activeModel={activeModel}
             />
+            {/* Gateway/config are optional live detail on top of the essential
+                status fields above — on failure the dashes StatusCard already
+                renders for missing values are indistinguishable from "no
+                data", so call out the failure and offer a retry instead. */}
+            {gatewayQuery.isError || configQuery.isError ? (
+              <QueryError
+                variant="neutral"
+                placement="top"
+                title="Some live details failed to load"
+                onRetry={() => {
+                  void gatewayQuery.refetch();
+                  void configQuery.refetch();
+                }}
+                isRetrying={gatewayQuery.isFetching || configQuery.isFetching}
+                className="rounded-2xl border border-border bg-card py-4"
+              />
+            ) : null}
           </View>
 
           <View className="mx-[22px]">

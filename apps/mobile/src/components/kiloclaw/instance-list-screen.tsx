@@ -146,7 +146,14 @@ export function InstanceListScreen({
           className="flex-1"
           contentContainerClassName="flex-grow gap-6 pt-5"
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.mutedForeground]}
+              tintColor={colors.mutedForeground}
+            />
+          }
         >
           {personal.length === 0 ? (
             <View className="mx-4 gap-2">

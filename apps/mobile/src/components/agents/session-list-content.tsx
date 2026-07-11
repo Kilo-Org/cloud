@@ -1,5 +1,5 @@
-import { Bot, Plus, Search } from 'lucide-react-native';
-import { useCallback, useMemo } from 'react';
+import { Bot, Plus, Search, SearchX } from 'lucide-react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 import { type SessionItem, type SessionSection } from '@/components/agents/session-list-helpers';
 import { RemoteSessionRow, StoredSessionRow } from '@/components/agents/session-row';
@@ -32,12 +33,17 @@ type AgentSessionListContentProps = {
   storedSessions: StoredSession[];
   hasAnySessions: boolean;
   isLoading: boolean;
+  isSearchPending: boolean;
   isError: boolean;
   isFetchingNextPage: boolean;
   refetch: () => Promise<void>;
+  onRetry: () => void;
   onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
   onSearchChange: (text: string) => void;
+  hasActiveQuery: boolean;
+  isSearching: boolean;
+  onClearQuery: () => void;
   onCreateSession: () => void;
 };
 
@@ -46,17 +52,32 @@ export function AgentSessionListContent({
   storedSessions,
   hasAnySessions,
   isLoading,
+  isSearchPending,
   isError,
   isFetchingNextPage,
   refetch,
+  onRetry,
   onEndReached,
   onSessionPress,
   onSearchChange,
+  hasActiveQuery,
+  isSearching,
+  onClearQuery,
   onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { deleteSession, renameSession } = useSessionMutations();
+  const [refreshing, setRefreshing] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+
+  // The search TextInput is uncontrolled (see iOS TextInput rules — controlled
+  // `value` causes keystroke races), so clearing the query in state alone
+  // wouldn't clear what's visibly typed. Imperatively clear the input too.
+  const handleClearQuery = useCallback(() => {
+    searchInputRef.current?.clear();
+    onClearQuery();
+  }, [onClearQuery]);
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
@@ -66,20 +87,31 @@ export function AgentSessionListContent({
 
   const listHeader = useMemo(
     () => (
-      <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
-        <Search size={18} color={colors.mutedForeground} />
-        <TextInput
-          className="flex-1 text-[15px] text-foreground"
-          placeholder="Search sessions..."
-          placeholderTextColor={colors.mutedForeground}
-          onChangeText={onSearchChange}
-          returnKeyType="search"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+      <View>
+        <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
+          <Search size={18} color={colors.mutedForeground} />
+          <TextInput
+            ref={searchInputRef}
+            className="flex-1 text-[15px] text-foreground"
+            placeholder="Search sessions..."
+            placeholderTextColor={colors.mutedForeground}
+            onChangeText={onSearchChange}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        {isSearchPending ? (
+          <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+            <Text variant="muted" className="text-xs">
+              Searching…
+            </Text>
+          </View>
+        ) : null}
       </View>
     ),
-    [colors.mutedForeground, onSearchChange]
+    [colors.mutedForeground, isSearchPending, onSearchChange]
   );
 
   const emptyStateAction = useMemo(
@@ -92,18 +124,33 @@ export function AgentSessionListContent({
     [colors.foreground, onCreateSession]
   );
 
-  const listEmptyComponent = useMemo(
+  const clearQueryAction = useMemo(
+    () => (
+      <Button variant="outline" onPress={handleClearQuery}>
+        <Text>{isSearching ? 'Clear search' : 'Clear filters'}</Text>
+      </Button>
+    ),
+    [handleClearQuery, isSearching]
+  );
+
+  // Only reachable when `hasAnySessions` is true (the true first-use empty
+  // state is handled separately below), which means an active search or
+  // filter narrowed the results to zero matches — never show the "create a
+  // task" CTA here, it's not the fix for a filter that's too narrow.
+  const filteredEmptyComponent = useMemo(
     () => (
       <View className="items-center justify-center pt-16">
         <EmptyState
-          icon={Bot}
-          title="No sessions yet"
-          description="Start a coding task from your phone. Your sessions will appear here."
-          action={emptyStateAction}
+          icon={SearchX}
+          title="No sessions match"
+          description={
+            isSearching ? 'Try a different search term.' : 'Try adjusting or clearing your filters.'
+          }
+          action={clearQueryAction}
         />
       </View>
     ),
-    [emptyStateAction]
+    [clearQueryAction, isSearching]
   );
 
   const organizationIdBySessionId = useMemo(
@@ -112,7 +159,16 @@ export function AgentSessionListContent({
   );
 
   const handleRefresh = useCallback(() => {
-    void refetch();
+    void (async () => {
+      setRefreshing(true);
+      try {
+        await refetch();
+      } catch {
+        toast.error('Could not refresh sessions — showing the last saved list.');
+      } finally {
+        setRefreshing(false);
+      }
+    })();
   }, [refetch]);
 
   const renderItem = useCallback(
@@ -178,7 +234,7 @@ export function AgentSessionListContent({
   if (isError) {
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1 items-center justify-center">
-        <QueryError message="Could not load sessions" onRetry={() => void refetch()} />
+        <QueryError message="Could not load sessions" onRetry={onRetry} />
       </Animated.View>
     );
   }
@@ -211,7 +267,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmptyComponent}
+        ListEmptyComponent={hasActiveQuery ? filteredEmptyComponent : null}
         ListFooterComponent={
           isFetchingNextPage ? (
             <View className="py-4">
@@ -224,7 +280,7 @@ export function AgentSessionListContent({
         keyboardDismissMode="on-drag"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       />
     </Animated.View>
   );

@@ -205,7 +205,12 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const sessions = useMemo(() => query.data?.results ?? [], [query.data]);
   const dateGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
 
-  return { dateGroups, isPending: query.isPending, isError: query.isError };
+  return {
+    dateGroups,
+    isPending: query.isPending,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
 
 // ── Main hook ────────────────────────────────────────────────────────

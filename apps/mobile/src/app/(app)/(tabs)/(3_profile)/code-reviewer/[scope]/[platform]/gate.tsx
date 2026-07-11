@@ -45,9 +45,8 @@ function GateThresholdRouteContent({
       selected={data?.gateThreshold}
       descriptions={DESCRIPTIONS}
       disabled={data == null}
-      onSelect={value => {
-        save.mutate({ gateThreshold: value });
-      }}
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      onSelect={value => save.mutateAsync({ gateThreshold: value })}
     />
   );
 }

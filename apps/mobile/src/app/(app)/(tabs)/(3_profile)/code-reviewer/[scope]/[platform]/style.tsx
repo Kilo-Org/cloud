@@ -45,9 +45,8 @@ function ReviewStyleRouteContent({
       selected={data?.reviewStyle}
       descriptions={DESCRIPTIONS}
       disabled={data == null}
-      onSelect={value => {
-        save.mutate({ reviewStyle: value });
-      }}
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      onSelect={value => save.mutateAsync({ reviewStyle: value })}
     />
   );
 }

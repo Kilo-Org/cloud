@@ -16,6 +16,31 @@ function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
 }
 
+// In-flight save chains keyed by "scope:platform", so config saves for the
+// same reviewer config are never in flight concurrently — each waits for
+// the previous one on the same key to settle before running. Module-level
+// (not per-hook-instance) so it holds across remounts of the same screen.
+const inFlightSaves = new Map<string, Promise<unknown>>();
+
+async function awaitSettled(promise: Promise<unknown>): Promise<void> {
+  try {
+    await promise;
+  } catch {
+    // Swallow — this is only used to sequence subsequent saves, not to
+    // propagate the outcome (the caller of chainSave gets the real result).
+  }
+}
+
+async function chainSave<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const previous = inFlightSaves.get(key);
+  if (previous) {
+    await awaitSettled(previous);
+  }
+  const next = run();
+  inFlightSaves.set(key, awaitSettled(next));
+  return next;
+}
+
 // The personal router only serves github/gitlab (bitbucket is org-only by UI
 // construction). This narrows a ReviewerPlatform down to what the personal
 // procedures accept, without an `as` cast — the 'bitbucket' branch is dead
@@ -217,45 +242,54 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope, platform);
   const webhookWarningQueryKey = gitLabWebhookWarningQueryKey(scope, platform);
+  const saveChainKey = `${scope}:${platform}`;
 
   return useMutation({
-    mutationFn: async (patch: ConfigPatch) => {
-      const config = queryClient.getQueryData<ReviewConfigData>(queryKey);
-      if (!config) {
-        throw new Error('Config not loaded yet');
-      }
-      const input = buildSaveConfigInput(platform, config, patch);
-      // The personal schema only accepts numeric repository IDs (bitbucket,
-      // the only string-ID platform, is org-only). Filtering keeps this a
-      // type-safe narrowing rather than a cast; the personal branch is only
-      // ever reached with platform !== 'bitbucket' in practice.
-      const result = isPersonal(scope)
-        ? await trpcClient.personalReviewAgent.saveReviewConfig.mutate({
-            ...input,
-            platform: toPersonalPlatform(platform),
-            selectedRepositoryIds: input.selectedRepositoryIds.filter(
-              (id): id is number => typeof id === 'number'
-            ),
-          })
-        : await trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
-            ...input,
-            organizationId: scope,
-          });
-      // Same reasoning as useToggleReviewer: `success` is typed as `boolean`,
-      // not a `true` literal, so a domain failure must throw rather than
-      // resolve — otherwise onSuccess callers close sheets/navigate away as
-      // if the save worked.
-      if (!result.success) {
-        throw new Error('Failed to save review config');
-      }
-      if (platform === 'gitlab') {
-        queryClient.setQueryData<boolean>(
-          webhookWarningQueryKey,
-          (result.webhookSync?.errors.length ?? 0) > 0
-        );
-      }
-      return result;
-    },
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (patch: ConfigPatch) =>
+      // Rapid taps (e.g. toggling several focus areas in a row) each send a
+      // full-config snapshot; without serializing them, two in-flight saves
+      // for the same scope+platform can resolve out of order and the
+      // earlier response can stomp the later one's result. Chaining onto
+      // the prior in-flight save for this key keeps them in order — simple
+      // FIFO, no dedupe/coalescing.
+      chainSave(saveChainKey, async () => {
+        const config = queryClient.getQueryData<ReviewConfigData>(queryKey);
+        if (!config) {
+          throw new Error('Config not loaded yet');
+        }
+        const input = buildSaveConfigInput(platform, config, patch);
+        // The personal schema only accepts numeric repository IDs (bitbucket,
+        // the only string-ID platform, is org-only). Filtering keeps this a
+        // type-safe narrowing rather than a cast; the personal branch is only
+        // ever reached with platform !== 'bitbucket' in practice.
+        const result = isPersonal(scope)
+          ? await trpcClient.personalReviewAgent.saveReviewConfig.mutate({
+              ...input,
+              platform: toPersonalPlatform(platform),
+              selectedRepositoryIds: input.selectedRepositoryIds.filter(
+                (id): id is number => typeof id === 'number'
+              ),
+            })
+          : await trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
+              ...input,
+              organizationId: scope,
+            });
+        // Same reasoning as useToggleReviewer: `success` is typed as `boolean`,
+        // not a `true` literal, so a domain failure must throw rather than
+        // resolve — otherwise onSuccess callers close sheets/navigate away as
+        // if the save worked.
+        if (!result.success) {
+          throw new Error('Failed to save review config');
+        }
+        if (platform === 'gitlab') {
+          queryClient.setQueryData<boolean>(
+            webhookWarningQueryKey,
+            (result.webhookSync?.errors.length ?? 0) > 0
+          );
+        }
+        return result;
+      }),
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<ReviewConfigData>(queryKey);

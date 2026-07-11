@@ -1,7 +1,7 @@
 import { Newspaper } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { ChangelogList } from '@/components/kiloclaw/changelog-list';
@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
-import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
+import { useKiloClawChangelog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function ChangelogScreen() {
@@ -20,8 +20,26 @@ export default function ChangelogScreen() {
   const organizationId =
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const changelogQuery = useKiloClawChangelog(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
+  const router = useRouter();
   const entries = changelogQuery.data;
   const paddingBottom = useDetailScreenBottomPadding();
+
+  function handleRedeploy() {
+    Alert.alert('Redeploy Instance', 'Are you sure you want to redeploy this instance?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Redeploy',
+        onPress: () => {
+          mutations.restartMachine.mutate(undefined);
+        },
+      },
+    ]);
+  }
+
+  function handleUpgrade() {
+    router.push(`/(app)/kiloclaw/${instanceId}/settings/version-pin` as Href);
+  }
 
   function renderContent() {
     if (changelogQuery.isPending) {
@@ -54,7 +72,12 @@ export default function ChangelogScreen() {
     }
     return (
       <Animated.View entering={FadeIn.duration(200)}>
-        <ChangelogList entries={entries} />
+        <ChangelogList
+          entries={entries}
+          isRedeploying={mutations.restartMachine.isPending}
+          onRedeploy={handleRedeploy}
+          onUpgrade={handleUpgrade}
+        />
       </Animated.View>
     );
   }

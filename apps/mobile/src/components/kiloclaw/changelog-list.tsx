@@ -1,8 +1,10 @@
-import { Bug, Sparkles } from 'lucide-react-native';
+import { Bug, RefreshCw, Sparkles } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data']>[number];
@@ -25,7 +27,19 @@ const DEPLOY_HINTS: Record<string, { label: string; bgClass: string; textClass: 
   },
 };
 
-export function ChangelogList({ entries }: Readonly<{ entries: ChangelogEntry[] }>) {
+export function ChangelogList({
+  entries,
+  isRedeploying,
+  onRedeploy,
+  onUpgrade,
+}: Readonly<{
+  entries: ChangelogEntry[];
+  isRedeploying: boolean;
+  onRedeploy: () => void;
+  onUpgrade: () => void;
+}>) {
+  const colors = useThemeColors();
+
   return (
     <View className="gap-3">
       {entries.map((entry, index) => {
@@ -48,6 +62,23 @@ export function ChangelogList({ entries }: Readonly<{ entries: ChangelogEntry[] 
               )}
             </View>
             <Text className="text-sm leading-relaxed">{entry.description}</Text>
+            {entry.deployHint === 'redeploy_required' && (
+              <Button
+                size="sm"
+                variant="outline"
+                loading={isRedeploying}
+                onPress={onRedeploy}
+                className="flex-row gap-1.5 self-start"
+              >
+                {!isRedeploying && <RefreshCw size={14} color={colors.foreground} />}
+                <Text>Redeploy</Text>
+              </Button>
+            )}
+            {entry.deployHint === 'upgrade_required' && (
+              <Button size="sm" variant="outline" onPress={onUpgrade} className="self-start">
+                <Text>Manage Version</Text>
+              </Button>
+            )}
           </View>
         );
       })}

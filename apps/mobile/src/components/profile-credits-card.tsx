@@ -169,7 +169,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           <Text className="flex-1 pr-3 text-xs text-muted-foreground">
             {canShowZeroBalanceCta
               ? 'Add credits to keep usage running.'
-              : "Add credits from a browser to keep using Kilo — you can't purchase credits in the app."}
+              : 'Your credit balance is empty. Credits are managed outside the iOS app for this account.'}
           </Text>
           {canShowZeroBalanceCta && (
             <Button

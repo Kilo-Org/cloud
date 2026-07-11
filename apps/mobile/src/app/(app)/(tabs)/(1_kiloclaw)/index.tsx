@@ -118,10 +118,10 @@ export default function KiloClawTab() {
       <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
         {showInstanceSkeleton || onboardingQuery.data === undefined ? (
-          <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 px-4 pt-5">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Skeleton className="h-16 w-full rounded-xl" />
+          <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 pt-5">
+            <Skeleton className="h-[72px] w-full rounded-2xl" />
+            <Skeleton className="h-[72px] w-full rounded-2xl" />
+            <Skeleton className="h-[72px] w-full rounded-2xl" />
           </Animated.View>
         ) : (
           <Animated.View

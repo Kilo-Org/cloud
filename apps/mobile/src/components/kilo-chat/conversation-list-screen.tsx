@@ -61,8 +61,12 @@ const FAB_MARGIN = 16;
 
 function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolean }>) {
   return (
-    <View className="gap-3 px-4 pt-2">
-      {showHeader ? <Skeleton className="mx-1 mb-1 h-4 w-24 rounded-md" /> : null}
+    <View className="gap-3 px-4">
+      {showHeader ? (
+        <View className="px-1 pb-2 pt-4">
+          <Skeleton className="h-4 w-24 rounded-md" />
+        </View>
+      ) : null}
       {[0, 1, 2, 3].map(i => (
         <View
           key={i}
@@ -73,7 +77,6 @@ function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolea
             <Skeleton className="h-5 w-2/3 rounded-md" />
             <Skeleton className="h-4 w-24 rounded-md" />
           </View>
-          <Skeleton className="h-10 w-10 rounded-full" />
         </View>
       ))}
     </View>

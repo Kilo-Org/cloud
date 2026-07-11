@@ -230,7 +230,7 @@ export function AgentSessionListContent({
       <Animated.View exiting={FadeOut.duration(150)}>
         {Array.from({ length: 8 }, (_, i) => (
           <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-12 rounded-lg" />
+            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
           </View>
         ))}
       </Animated.View>

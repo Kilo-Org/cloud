@@ -178,7 +178,15 @@ export function LowBalanceAlertSheet() {
     return (
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
         <Skeleton className="h-[52px] rounded-lg" />
-        <Skeleton className="h-11 rounded-lg" />
+        <View className="gap-1.5">
+          <Skeleton className="h-3.5 w-28 rounded" />
+          <Skeleton className="h-11 rounded-md" />
+        </View>
+        <View className="gap-1.5">
+          <Skeleton className="h-3.5 w-32 rounded" />
+          <Skeleton className="h-11 rounded-md" />
+        </View>
+        <Skeleton className="h-11 rounded-md" />
       </ScrollView>
     );
   }
@@ -218,7 +226,15 @@ export function LowBalanceAlertSheet() {
     body = (
       <>
         <Skeleton className="h-[52px] rounded-lg" />
-        <Skeleton className="h-11 rounded-lg" />
+        <View className="gap-1.5">
+          <Skeleton className="h-3.5 w-28 rounded" />
+          <Skeleton className="h-11 rounded-md" />
+        </View>
+        <View className="gap-1.5">
+          <Skeleton className="h-3.5 w-32 rounded" />
+          <Skeleton className="h-11 rounded-md" />
+        </View>
+        <Skeleton className="h-11 rounded-md" />
       </>
     );
   }

@@ -17,9 +17,9 @@ export function ConversationHistoryLoadingView({ subtitle, title }: Props) {
       <ConversationHeader title={title} subtitle={subtitle} />
       <AppAwareKeyboardPaddingView className="flex-1">
         <View className="flex-1 justify-end gap-3 px-4 py-6">
-          <Skeleton className="h-14 w-3/4 rounded-md" />
-          <Skeleton className="ml-auto h-16 w-2/3 rounded-md" />
-          <Skeleton className="h-20 w-5/6 rounded-md" />
+          <Skeleton className="h-14 w-3/4 rounded-2xl" />
+          <Skeleton className="ml-auto h-16 w-2/3 rounded-2xl" />
+          <Skeleton className="h-20 w-5/6 rounded-2xl" />
         </View>
       </AppAwareKeyboardPaddingView>
     </View>

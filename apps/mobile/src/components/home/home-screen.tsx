@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, RefreshControl, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { TabScreenScrollView } from '@/components/tab-screen';
 
@@ -120,35 +120,48 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        {isLoading ? (
-          <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">
-            <Skeleton className="h-20 w-full rounded-2xl" />
-            <Skeleton className="h-20 w-full rounded-2xl" />
-          </Animated.View>
-        ) : (
-          <Animated.View entering={FadeIn.duration(200)} className="gap-2">
-            {renderKiloClawSlot({
-              instances: instances ?? [],
-              instancesError,
-              handleRetryInstances: () => void refetchInstances(),
-              unreadByBadgeBucket,
-            })}
-
-            {renderSessionsOrPromo({
-              hasAnySession,
-              organizationId,
-              sessionsError: storedIsError,
-              sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
-              handleRetrySessions: () => void refetchSessions(),
-            })}
-
-            {hasAnySession ? (
-              <View className="pt-4">
-                <NewTaskButton organizationId={organizationId} />
+        <Animated.View layout={LinearTransition}>
+          {isLoading ? (
+            <Animated.View exiting={FadeOut.duration(150)} className="gap-2">
+              <View className="px-4 pb-2 pt-5">
+                <Skeleton className="h-3 w-20 rounded" />
               </View>
-            ) : null}
-          </Animated.View>
-        )}
+              <View className="gap-3 px-4">
+                <Skeleton className="h-[72px] w-full rounded-2xl" />
+              </View>
+              <View className="px-4 pb-2 pt-5">
+                <Skeleton className="h-3 w-28 rounded" />
+              </View>
+              <View className="gap-2 px-4">
+                <Skeleton className="h-[72px] w-full rounded-2xl" />
+                <Skeleton className="h-[72px] w-full rounded-2xl" />
+              </View>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(200)} className="gap-2">
+              {renderKiloClawSlot({
+                instances: instances ?? [],
+                instancesError,
+                handleRetryInstances: () => void refetchInstances(),
+                unreadByBadgeBucket,
+              })}
+
+              {renderSessionsOrPromo({
+                hasAnySession,
+                organizationId,
+                sessionsError: storedIsError,
+                sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
+                handleRetrySessions: () => void refetchSessions(),
+              })}
+
+              {hasAnySession ? (
+                <View className="pt-4">
+                  <NewTaskButton organizationId={organizationId} />
+                </View>
+              ) : null}
+            </Animated.View>
+          )}
+        </Animated.View>
       </TabScreenScrollView>
     </View>
   );

@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { Check, Server } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -78,11 +79,11 @@ export default function InstancePickerScreen() {
       }}
     >
       {instancesQuery.isPending ? (
-        <View className="gap-3 px-4 py-4">
-          <Skeleton className="h-16 rounded-xl" />
-          <Skeleton className="h-16 rounded-xl" />
-          <Skeleton className="h-16 rounded-xl" />
-        </View>
+        <Animated.View exiting={FadeOut.duration(150)}>
+          <Skeleton className="mx-4 mt-3 h-16 rounded-xl" />
+          <Skeleton className="mx-4 mt-3 h-16 rounded-xl" />
+          <Skeleton className="mx-4 mt-3 h-16 rounded-xl" />
+        </Animated.View>
       ) : null}
       {instancesQuery.isError ? (
         <QueryError
@@ -111,16 +112,18 @@ export default function InstancePickerScreen() {
           }
         />
       ) : null}
-      {showList
-        ? loadedInstances.map(instance => (
+      {showList ? (
+        <Animated.View entering={FadeIn.duration(200)}>
+          {loadedInstances.map(instance => (
             <InstanceRow
               key={instance.sandboxId}
               instance={instance}
               isCurrent={instance.sandboxId === currentId}
               onSelect={handleSelect}
             />
-          ))
-        : null}
+          ))}
+        </Animated.View>
+      ) : null}
     </PickerSheet>
   );
 }

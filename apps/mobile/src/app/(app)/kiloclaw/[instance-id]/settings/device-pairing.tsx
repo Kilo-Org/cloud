@@ -138,7 +138,11 @@ export default function DevicePairingScreen() {
             setPendingChannelKey(`${channel}-${code}`);
             mutations.approvePairingRequest.mutate(
               { channel, code },
-              { onSettled: () =>{  setPendingChannelKey(null); } }
+              {
+                onSettled: () => {
+                  setPendingChannelKey(null);
+                },
+              }
             );
           },
         },
@@ -155,7 +159,11 @@ export default function DevicePairingScreen() {
           setPendingDeviceRequestId(requestId);
           mutations.approveDevicePairingRequest.mutate(
             { requestId },
-            { onSettled: () =>{  setPendingDeviceRequestId(null); } }
+            {
+              onSettled: () => {
+                setPendingDeviceRequestId(null);
+              },
+            }
           );
         },
       },

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { type useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -67,7 +68,10 @@ export function ChangelogList({
                 size="sm"
                 variant="outline"
                 loading={isRedeploying}
-                onPress={onRedeploy}
+                onPress={() => {
+                  captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'redeploy' });
+                  onRedeploy();
+                }}
                 className="flex-row gap-1.5 self-start"
               >
                 {!isRedeploying && <RefreshCw size={14} color={colors.foreground} />}

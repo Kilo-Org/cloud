@@ -12,6 +12,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawGoogleSetup,
@@ -121,6 +122,7 @@ export default function GoogleScreen() {
       {
         text: 'Redeploy',
         onPress: () => {
+          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'redeploy' });
           mutations.restartMachine.mutate(undefined, {
             onSuccess: () => {
               setShowRedeployPrompt(false);

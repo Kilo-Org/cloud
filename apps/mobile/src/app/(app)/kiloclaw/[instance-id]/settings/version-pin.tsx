@@ -7,6 +7,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { EmptyState } from '@/components/empty-state';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { type VersionItem, VersionPinRow } from '@/components/kiloclaw/version-pin-row';
+import { VersionPinStatusCard } from '@/components/kiloclaw/version-pin-status-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,8 @@ import {
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 const PAGE_SIZE = 25;
+// Server caps `limit` at 100 (kiloclaw-router.ts listAvailableVersions) — never send more.
+const MAX_LIMIT = 100;
 
 export default function VersionPinScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -68,7 +71,14 @@ export default function VersionPinScreen() {
     );
   }
 
-  if (myPinQuery.isError || latestVersionQuery.isError || availableVersionsQuery.isError) {
+  // Only a genuine initial-load failure (no cached data yet) is a hard
+  // error. A background refetch failure (e.g. a failed Load More page)
+  // must not blank out already-rendered versions or pin status.
+  if (
+    (myPinQuery.isError && !myPinQuery.data) ||
+    (latestVersionQuery.isError && !latestVersionQuery.data) ||
+    (availableVersionsQuery.isError && !availableVersionsQuery.data)
+  ) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Version Pinning" />
@@ -90,7 +100,9 @@ export default function VersionPinScreen() {
   const latestVersion = latestVersionQuery.data;
   const versions = availableVersionsQuery.data?.items ?? [];
   const pagination = availableVersionsQuery.data?.pagination;
+  const isAtLimitCap = limit >= MAX_LIMIT;
   const hasMoreVersions = pagination != null && versions.length < pagination.totalCount;
+  const versionsPageFailed = availableVersionsQuery.isError && versions.length > 0;
   const isFetchingMoreVersions =
     availableVersionsQuery.isFetching && !availableVersionsQuery.isPending;
 
@@ -179,6 +191,54 @@ export default function VersionPinScreen() {
     );
   }
 
+  function renderFooter() {
+    if (versionsPageFailed) {
+      return (
+        <View className="items-center gap-2 pt-3">
+          <Text variant="muted" className="text-xs">
+            Could not load more versions
+          </Text>
+          <Button
+            variant="outline"
+            size="sm"
+            loading={isFetchingMoreVersions}
+            onPress={() => {
+              void availableVersionsQuery.refetch();
+            }}
+          >
+            <Text>Retry</Text>
+          </Button>
+        </View>
+      );
+    }
+    if (hasMoreVersions && !isAtLimitCap) {
+      return (
+        <View className="items-center pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            loading={isFetchingMoreVersions}
+            onPress={() => {
+              setLimit(l => Math.min(l + PAGE_SIZE, MAX_LIMIT));
+            }}
+          >
+            <Text>Load more versions</Text>
+          </Button>
+        </View>
+      );
+    }
+    if (hasMoreVersions && isAtLimitCap) {
+      return (
+        <View className="items-center pt-3">
+          <Text variant="muted" className="text-xs">
+            Showing latest 100 versions
+          </Text>
+        </View>
+      );
+    }
+    return null;
+  }
+
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Version Pinning" />
@@ -195,53 +255,14 @@ export default function VersionPinScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <Animated.View entering={FadeIn.duration(200)} className="gap-4 mb-2">
-            <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center gap-2">
-              {myPin ? (
-                <>
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1 gap-1">
-                      <Text className="text-sm font-medium">
-                        Pinned to {myPin.openclaw_version ?? myPin.image_tag}
-                      </Text>
-                      {myPin.reason && (
-                        <Text variant="muted" className="text-xs">
-                          {myPin.reason}
-                        </Text>
-                      )}
-                    </View>
-                    {!isPinnedByAdmin && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        loading={mutations.removeMyPin.isPending}
-                        disabled={isPinMutating}
-                        onPress={handleUnpin}
-                      >
-                        <Text>Unpin</Text>
-                      </Button>
-                    )}
-                  </View>
-                  {isPinnedByAdmin && (
-                    <Text className="text-xs text-amber-600 dark:text-amber-400">
-                      Pinned by admin — contact your admin to change.
-                    </Text>
-                  )}
-                </>
-              ) : (
-                <View className="flex-row items-center gap-2">
-                  <View className="rounded-full bg-green-200 dark:bg-green-900 px-2 py-0.5">
-                    <Text className="text-xs font-medium text-green-800 dark:text-green-100">
-                      Following latest
-                    </Text>
-                  </View>
-                  {latestVersion && (
-                    <Text variant="muted" className="text-xs">
-                      {latestVersion.openclawVersion}
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
+            <VersionPinStatusCard
+              myPin={myPin}
+              latestVersion={latestVersion}
+              isPinnedByAdmin={isPinnedByAdmin}
+              isPinMutating={isPinMutating}
+              isRemovingPin={mutations.removeMyPin.isPending}
+              onUnpin={handleUnpin}
+            />
 
             {versions.length > 0 && (
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -264,22 +285,7 @@ export default function VersionPinScreen() {
             />
           )
         }
-        ListFooterComponent={
-          hasMoreVersions ? (
-            <View className="items-center pt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                loading={isFetchingMoreVersions}
-                onPress={() => {
-                  setLimit(l => l + PAGE_SIZE);
-                }}
-              >
-                <Text>Load more versions</Text>
-              </Button>
-            </View>
-          ) : null
-        }
+        ListFooterComponent={renderFooter()}
         className="rounded-lg bg-secondary"
       />
     </Animated.View>

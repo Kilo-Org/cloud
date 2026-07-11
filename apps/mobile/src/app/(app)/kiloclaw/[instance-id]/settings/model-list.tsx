@@ -217,6 +217,7 @@ export default function ModelListScreen() {
                   ? `No results for "${searchFilter}"`
                   : 'Models will appear here once available.'
               }
+              placement="top"
               action={
                 searchFilter ? (
                   <Button variant="outline" size="sm" onPress={handleClearSearch}>

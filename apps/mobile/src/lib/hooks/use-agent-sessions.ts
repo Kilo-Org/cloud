@@ -243,6 +243,15 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     dateGroups,
     isLoading: stored.isLoading || active.isLoading,
     isError: stored.isError || active.isError,
+    // Stored and active sessions come from independent queries with very
+    // different failure modes: a transient active-poll blip (10s interval)
+    // is common and should never hide stored history, while a stored-list
+    // failure is the one that actually blocks showing sessions at all.
+    // Callers that need to tell these apart (e.g. deciding promo vs error
+    // vs "keep showing stale data") should use these instead of `isError`.
+    storedIsError: stored.isError,
+    storedIsSuccess: stored.isSuccess,
+    activeIsError: active.isError,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage: stored.fetchNextPage,

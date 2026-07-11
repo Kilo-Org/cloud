@@ -7,6 +7,7 @@ import {
 } from '@/components/agents/session-list-helpers';
 import { SectionHeader } from '@/components/home/section-header';
 import { SessionRow } from '@/components/ui/session-row';
+import { Text } from '@/components/ui/text';
 import {
   type ActiveSession,
   type StoredSession,
@@ -147,7 +148,7 @@ function storedSessionLabel(session: StoredSession): string {
 
 export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
-  const { activeSessions, storedSessions, activeSessionIds } = useAgentSessions({
+  const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
     organizationId,
   });
 
@@ -173,6 +174,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
           router.push('/(app)/(tabs)/(2_agents)' as Href);
         }}
       />
+      {activeIsError ? (
+        <Text variant="muted" className="mx-4 mb-2 text-xs">
+          Showing saved sessions — live status may be out of date
+        </Text>
+      ) : null}
       <View className="mx-4 gap-2">
         {rows.map(row => {
           if (row.kind === 'active') {

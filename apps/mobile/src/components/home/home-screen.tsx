@@ -16,6 +16,7 @@ import { NewTaskButton } from '@/components/home/new-task-button';
 import { SectionHeader } from '@/components/home/section-header';
 import { KiloClawCard } from '@/components/kiloclaw/instance-card';
 import { isTransitionalStatus } from '@/components/kiloclaw/status-badge';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -81,12 +82,16 @@ export function HomeScreen() {
     data: instances,
     isPending: instancesPending,
     isError: instancesError,
+    refetch: refetchInstances,
   } = useAllKiloClawInstances(pickListPollInterval);
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
     isLoading: sessionsLoading,
+    storedIsError,
+    storedIsSuccess,
+    refetch: refetchSessions,
   } = useAgentSessions({
     organizationId,
   });
@@ -125,12 +130,16 @@ export function HomeScreen() {
             {renderKiloClawSlot({
               instances: instances ?? [],
               instancesError,
+              handleRetryInstances: () => void refetchInstances(),
               unreadByBadgeBucket,
             })}
 
             {renderSessionsOrPromo({
               hasAnySession,
               organizationId,
+              sessionsError: storedIsError,
+              sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
+              handleRetrySessions: () => void refetchSessions(),
             })}
 
             {hasAnySession ? (
@@ -148,8 +157,12 @@ export function HomeScreen() {
 function renderKiloClawSlot(params: {
   instances: ClawInstance[];
   instancesError: boolean;
+  handleRetryInstances: () => void;
   unreadByBadgeBucket: Map<string, number>;
 }) {
+  // Stale data (a previously successful fetch) always wins over a
+  // background-refetch failure — only an initial-load failure with no
+  // instances at all should replace the section with an error state.
   if (params.instances.length > 0) {
     return (
       <View>
@@ -169,14 +182,42 @@ function renderKiloClawSlot(params: {
     );
   }
   if (params.instancesError) {
-    return null;
+    return (
+      <QueryError
+        placement="top"
+        title="Couldn't load KiloClaw"
+        onRetry={params.handleRetryInstances}
+      />
+    );
   }
   return <KiloClawPromoCard />;
 }
 
-function renderSessionsOrPromo(params: { hasAnySession: boolean; organizationId: string | null }) {
+function renderSessionsOrPromo(params: {
+  hasAnySession: boolean;
+  organizationId: string | null;
+  sessionsError: boolean;
+  sessionsLoadedEmpty: boolean;
+  handleRetrySessions: () => void;
+}) {
+  // Stale stored history always wins over an error (e.g. a live-poll blip
+  // on the active-sessions query) — never blank out sessions we already
+  // have. The first-use promo only appears after a confirmed empty
+  // response, never merely because the fetch hasn't succeeded yet.
   if (params.hasAnySession) {
     return <AgentSessionsSection organizationId={params.organizationId} />;
   }
-  return <AgentsPromoCard organizationId={params.organizationId} />;
+  if (params.sessionsError) {
+    return (
+      <QueryError
+        placement="top"
+        title="Couldn't load sessions"
+        onRetry={params.handleRetrySessions}
+      />
+    );
+  }
+  if (params.sessionsLoadedEmpty) {
+    return <AgentsPromoCard organizationId={params.organizationId} />;
+  }
+  return null;
 }

@@ -83,8 +83,10 @@ export function useOrganizationMutations(organizationId: string) {
         );
         return { previousWithMembers, previousList };
       },
+      // No onMutationError toast here: RenameModal (the only caller) shows
+      // the error inline while it stays open (see Pattern P2).
       onError: (
-        error: { message: string },
+        _error: { message: string },
         _input,
         context?: { previousWithMembers?: OrgWithMembers; previousList?: OrgListEntry[] }
       ) => {
@@ -94,7 +96,6 @@ export function useOrganizationMutations(organizationId: string) {
         if (context?.previousList) {
           queryClient.setQueryData(listKey, context.previousList);
         }
-        onMutationError(error);
       },
       onSettled: invalidateAll,
     }),

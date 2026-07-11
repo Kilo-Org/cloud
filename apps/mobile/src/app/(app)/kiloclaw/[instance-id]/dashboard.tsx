@@ -20,10 +20,10 @@ import {
 } from '@/components/kiloclaw/dashboard-parts';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { InstanceControls } from '@/components/kiloclaw/instance-controls';
-import { RenameInstanceModal } from '@/components/kiloclaw/rename-instance-modal';
 import { SettingsList } from '@/components/kiloclaw/settings-list';
 import { StatusCard } from '@/components/kiloclaw/status-card';
 import { QueryError } from '@/components/query-error';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -264,17 +264,18 @@ export default function DashboardScreen() {
         </Animated.View>
       </ScrollView>
 
-      {renameVisible && (
-        <RenameInstanceModal
-          defaultName={status?.name ?? ''}
-          onSubmit={name => {
-            mutations.renameInstance.mutate({ name });
-          }}
-          onClose={() => {
-            setRenameVisible(false);
-          }}
-        />
-      )}
+      <RenameModal
+        visible={renameVisible}
+        title="Rename Instance"
+        placeholder="Enter a new name (max 50 characters)"
+        initialValue={status?.name ?? ''}
+        onSave={async name => {
+          await mutations.renameInstance.mutateAsync({ name });
+        }}
+        onClose={() => {
+          setRenameVisible(false);
+        }}
+      />
     </Animated.View>
   );
 }

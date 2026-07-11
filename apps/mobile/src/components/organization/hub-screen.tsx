@@ -1,4 +1,4 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
@@ -7,7 +7,7 @@ import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
-import { RenameOrgModal } from '@/components/organization/rename-org-modal';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
@@ -41,7 +41,8 @@ export function OrganizationHubScreen() {
 
   const showMoney = isMoneyRole(role);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
-  const lowBalanceSubtitle = minimumBalance != null ? `Below $${minimumBalance.toFixed(2)}` : 'Off';
+  const lowBalanceSubtitle =
+    minimumBalance != null ? `Below ${formatDollars(minimumBalance)}` : 'Off';
 
   return (
     <View className="flex-1 bg-background">
@@ -77,7 +78,7 @@ export function OrganizationHubScreen() {
                 )}
               </View>
               {showMoney && (
-                <KvRow label="Balance" value={`$${fromMicrodollars(org.balance).toFixed(2)}`} />
+                <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
               )}
               <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
             </Animated.View>
@@ -125,18 +126,15 @@ export function OrganizationHubScreen() {
         </View>
       </TabScreenScrollView>
 
-      {renameVisible && org && (
-        <RenameOrgModal
-          defaultName={org.organizationName}
-          onSubmit={name => {
-            mutations.rename.mutate(
-              { name },
-              {
-                onSuccess: () => {
-                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                },
-              }
-            );
+      {org && (
+        <RenameModal
+          visible={renameVisible}
+          title="Rename Organization"
+          placeholder="Enter organization name"
+          initialValue={org.organizationName}
+          onSave={async name => {
+            await mutations.rename.mutateAsync({ name });
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
           onClose={() => {
             setRenameVisible(false);

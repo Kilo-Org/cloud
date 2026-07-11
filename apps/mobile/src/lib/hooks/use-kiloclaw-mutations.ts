@@ -118,7 +118,9 @@ export function useKiloClawMutations(organizationId?: string | null) {
   function optimistic<TInput, TData extends Record<string, unknown>>(
     key: unknown[],
     updater: (old: TData, input: TInput) => TData,
-    settle?: () => Promise<void>
+    // silent: caller shows the error inline (e.g. a modal that stays open on
+    // failure per Pattern P2) instead of the default centralized toast.
+    options?: { settle?: () => Promise<void>; silent?: boolean }
   ) {
     return {
       onMutate: async (input: TInput) => {
@@ -131,10 +133,12 @@ export function useKiloClawMutations(organizationId?: string | null) {
         if (context?.previous) {
           queryClient.setQueryData(key, context.previous);
         }
-        onMutationError(error);
+        if (!options?.silent) {
+          onMutationError(error);
+        }
       },
       onSettled:
-        settle ??
+        options?.settle ??
         (async () => {
           await queryClient.invalidateQueries({ queryKey: key });
         }),
@@ -263,7 +267,7 @@ export function useKiloClawMutations(organizationId?: string | null) {
           ...(input.security != null && { execSecurity: input.security }),
           ...(input.ask != null && { execAsk: input.ask }),
         }),
-        invalidateStatus
+        { settle: invalidateStatus }
       ),
       retry: retryTransient,
       retryDelay: retryTransientDelay,
@@ -354,15 +358,16 @@ export function useKiloClawMutations(organizationId?: string | null) {
           ...old,
           gmailNotificationsEnabled: input.enabled,
         }),
-        invalidateStatus
+        { settle: invalidateStatus }
       ),
     }),
     renameInstance: useMutation({
       ...dispatch(trpc.kiloclaw.renameInstance, trpc.organizations.kiloclaw.renameInstance),
+      // silent: RenameModal (the only caller) shows the error inline (P2).
       ...optimistic(
         statusKey,
         (old, input: { name: string | null }) => ({ ...old, name: input.name }),
-        invalidateStatus
+        { settle: invalidateStatus, silent: true }
       ),
     }),
     destroy: useMutation({

@@ -145,6 +145,13 @@ export function PlatformOverviewScreen({
   };
 
   const data = config.data;
+  // Repositories must actually be in scope before automatic reviews can run
+  // "blind" — 'all' mode always qualifies, 'selected' mode needs at least
+  // one chosen repo. Only blocks turning the toggle ON; an already-enabled
+  // reviewer stays togglable off even if selection later becomes empty.
+  const hasRepoSelection =
+    data != null &&
+    (data.repositorySelectionMode === 'all' || data.selectedRepositoryIds.length > 0);
   const rows =
     data == null
       ? null
@@ -184,8 +191,12 @@ export function PlatformOverviewScreen({
         <Animated.View layout={LinearTransition}>
           {isLoading && (
             <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-16 w-full rounded-lg" />
+              <View className="gap-2">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <Skeleton key={index} className="h-12 w-full rounded-lg" />
+                ))}
+              </View>
             </Animated.View>
           )}
 
@@ -234,21 +245,41 @@ export function PlatformOverviewScreen({
                 </View>
               )}
 
-              <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-                <View className="flex-1 pr-3">
-                  <Text className="text-sm font-medium">Automatic reviews</Text>
-                  <Text variant="muted" className="text-xs">
-                    {status.data?.integration?.accountLogin ?? ''}
-                  </Text>
+              <View className="rounded-lg bg-secondary p-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 pr-3">
+                    <Text className="text-sm font-medium">Automatic reviews</Text>
+                    <Text variant="muted" className="text-xs">
+                      {status.data?.integration?.accountLogin ?? ''}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={config.data.isEnabled}
+                    disabled={
+                      !canEdit || toggle.isPending || (!hasRepoSelection && !config.data.isEnabled)
+                    }
+                    onValueChange={value => {
+                      void Haptics.selectionAsync();
+                      toggle.mutate({ isEnabled: value });
+                    }}
+                  />
                 </View>
-                <Switch
-                  value={config.data.isEnabled}
-                  disabled={!canEdit || toggle.isPending}
-                  onValueChange={value => {
-                    void Haptics.selectionAsync();
-                    toggle.mutate({ isEnabled: value });
-                  }}
-                />
+                {!hasRepoSelection && (
+                  <View className="mt-3 gap-2 border-t border-hair-soft pt-3">
+                    <Text variant="muted" className="text-xs">
+                      Select at least one repository to enable automatic reviews.
+                    </Text>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onPress={() => {
+                        pushField('repos');
+                      }}
+                    >
+                      <Text>Select repositories</Text>
+                    </Button>
+                  </View>
+                )}
               </View>
 
               <View>

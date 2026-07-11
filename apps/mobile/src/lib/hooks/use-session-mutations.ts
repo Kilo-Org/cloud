@@ -19,7 +19,7 @@ const onError = (error: { message: string }) => {
 export function useSessionMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  // ponytail: a ref (not state) is enough — this only gates duplicate taps
+  // A ref (not state) is enough — this only gates duplicate taps
   // on the same row, it never needs to drive a re-render.
   const pendingSessionIds = useRef(new Set<string>());
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();

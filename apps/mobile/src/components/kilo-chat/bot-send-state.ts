@@ -93,7 +93,7 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay.state === 'unknown'
         ? 'Waiting for bot status...'
         : 'Bot is offline. Messages will resume when it reconnects.',
-    // ponytail: no time-since-first-unknown tracking here (this fn stays a pure,
+    // No time-since-first-unknown tracking here (this fn stays a pure,
     // easily-testable state map) — show the CTA as soon as the composer is
     // blocked on offline/unknown, since bot status normally arrives within
     // seconds of connecting. Add a real "prolonged" threshold if that proves

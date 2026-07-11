@@ -70,7 +70,14 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
 }
 
 export function OrganizationInvoicesScreen() {
-  const { organizationId, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId,
+    org,
+    isResolving,
+    isError: isOrgListError,
+    isFetching: isOrgListFetching,
+    refetch: refetchOrgList,
+  } = useOrgBoundary();
   const query = useOrgInvoices(organizationId);
   const paddingBottom = useTabBarBottomPadding();
 
@@ -78,7 +85,13 @@ export function OrganizationInvoicesScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Invoices" />
-        <OrganizationBoundary isResolving={isResolving} />
+        <OrganizationBoundary
+          isResolving={isResolving}
+          isError={isOrgListError}
+          isFetching={isOrgListFetching}
+          refetch={refetchOrgList}
+          organizationId={organizationId}
+        />
       </View>
     );
   }

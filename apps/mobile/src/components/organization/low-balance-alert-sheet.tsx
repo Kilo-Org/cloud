@@ -4,6 +4,12 @@ import { type ReactNode, useRef, useState } from 'react';
 import { ScrollView, Switch, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
+import {
+  emailsError,
+  parseEmails,
+  parseThreshold,
+  thresholdError,
+} from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -18,37 +24,6 @@ import {
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { EMAIL_PATTERN } from '@/lib/utils';
-
-const THRESHOLD_ERROR = 'Enter an amount greater than 0';
-const EMAILS_ERROR = 'Enter at least one valid email, separated by commas';
-
-function parseThreshold(value: string): number | null {
-  const trimmed = value.trim();
-  const parsed = Number(trimmed);
-  if (trimmed === '' || !Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
-
-function parseEmails(value: string): string[] {
-  return value
-    .split(',')
-    .map(email => email.trim())
-    .filter(email => email !== '');
-}
-
-function thresholdError(value: string): string | null {
-  return parseThreshold(value) == null ? THRESHOLD_ERROR : null;
-}
-
-function emailsError(value: string): string | null {
-  const emails = parseEmails(value);
-  return emails.length === 0 || !emails.every(email => EMAIL_PATTERN.test(email))
-    ? EMAILS_ERROR
-    : null;
-}
 
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string | null;
@@ -188,7 +163,15 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 }
 
 export function LowBalanceAlertSheet() {
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId,
+    role,
+    org,
+    isResolving,
+    isError: isOrgListError,
+    isFetching: isOrgListFetching,
+    refetch: refetchOrgList,
+  } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
   if (isResolving) {
@@ -202,7 +185,12 @@ export function LowBalanceAlertSheet() {
   if (organizationId == null || org == null) {
     return (
       <View className="flex-1 bg-background">
-        <OrganizationBoundary />
+        <OrganizationBoundary
+          isError={isOrgListError}
+          isFetching={isOrgListFetching}
+          refetch={refetchOrgList}
+          organizationId={organizationId}
+        />
       </View>
     );
   }

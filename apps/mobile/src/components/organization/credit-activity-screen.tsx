@@ -67,7 +67,14 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
 }
 
 export function OrganizationCreditActivityScreen() {
-  const { organizationId, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId,
+    org,
+    isResolving,
+    isError: isOrgListError,
+    isFetching: isOrgListFetching,
+    refetch: refetchOrgList,
+  } = useOrgBoundary();
   const query = useOrgCreditTransactions(organizationId);
   const paddingBottom = useTabBarBottomPadding();
 
@@ -75,7 +82,13 @@ export function OrganizationCreditActivityScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Credit activity" />
-        <OrganizationBoundary isResolving={isResolving} />
+        <OrganizationBoundary
+          isResolving={isResolving}
+          isError={isOrgListError}
+          isFetching={isOrgListFetching}
+          refetch={refetchOrgList}
+          organizationId={organizationId}
+        />
       </View>
     );
   }

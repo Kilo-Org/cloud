@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
+import { limitError, parseLimit } from '@/components/organization/member-limit-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -17,27 +18,6 @@ import {
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { firstNonEmpty } from '@/lib/utils';
-
-const MAX_DAILY_LIMIT_USD = 2000;
-const LIMIT_RANGE_ERROR = `Enter an amount between 0 and ${MAX_DAILY_LIMIT_USD}`;
-
-// A blank field is valid — it means "no limit" (same as pressing Remove limit).
-function limitError(value: string): string | null {
-  const trimmed = value.trim();
-  if (trimmed === '') {
-    return null;
-  }
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_DAILY_LIMIT_USD) {
-    return LIMIT_RANGE_ERROR;
-  }
-  return null;
-}
-
-function parseLimit(value: string): number | null {
-  const trimmed = value.trim();
-  return trimmed === '' ? null : Number(trimmed);
-}
 
 type MemberLimitFormProps = Readonly<{
   memberId: string;
@@ -116,7 +96,15 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 }
 
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId,
+    role,
+    org,
+    isResolving,
+    isError: isOrgListError,
+    isFetching: isOrgListFetching,
+    refetch: refetchOrgList,
+  } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const member = orgWithMembers.data?.members.find(
     (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
@@ -138,7 +126,12 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   if (organizationId == null || org == null) {
     return (
       <View className="flex-1 bg-background">
-        <OrganizationBoundary />
+        <OrganizationBoundary
+          isError={isOrgListError}
+          isFetching={isOrgListFetching}
+          refetch={refetchOrgList}
+          organizationId={organizationId}
+        />
       </View>
     );
   }

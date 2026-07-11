@@ -23,7 +23,15 @@ const EMAIL_ERROR = 'Enter a valid email address';
 export function InviteMemberSheet() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId,
+    role: myRole,
+    org,
+    isResolving,
+    isError: isOrgListError,
+    isFetching: isOrgListFetching,
+    refetch: refetchOrgList,
+  } = useOrgBoundary();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const emailRef = useRef('');
   const [canSubmit, setCanSubmit] = useState(false);
@@ -42,7 +50,12 @@ export function InviteMemberSheet() {
   if (organizationId == null || org == null) {
     return (
       <View className="flex-1 bg-background">
-        <OrganizationBoundary />
+        <OrganizationBoundary
+          isError={isOrgListError}
+          isFetching={isOrgListFetching}
+          refetch={refetchOrgList}
+          organizationId={organizationId}
+        />
       </View>
     );
   }

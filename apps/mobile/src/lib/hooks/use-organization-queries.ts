@@ -46,9 +46,9 @@ export const isMoneyRole = canManageOrganizationBilling;
  */
 export function useOrgBoundary() {
   const { isLoaded } = useOrganization();
-  const { organizationId, role, org, isLoading } = useOrgRole();
+  const { organizationId, role, org, isLoading, isError, isFetching, refetch } = useOrgRole();
   const isResolving = !isLoaded || isLoading;
-  return { organizationId, role, org, isResolving };
+  return { organizationId, role, org, isResolving, isError, isFetching, refetch };
 }
 
 export function useOrgWithMembers(organizationId: string | null) {

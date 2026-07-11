@@ -28,7 +28,15 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function OrganizationHubScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId,
+    role,
+    org,
+    isResolving,
+    isError: isOrgListError,
+    isFetching: isOrgListFetching,
+    refetch: refetchOrgList,
+  } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
@@ -37,7 +45,13 @@ export function OrganizationHubScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Organization" />
-        <OrganizationBoundary isResolving={isResolving} />
+        <OrganizationBoundary
+          isResolving={isResolving}
+          isError={isOrgListError}
+          isFetching={isOrgListFetching}
+          refetch={refetchOrgList}
+          organizationId={organizationId}
+        />
       </View>
     );
   }

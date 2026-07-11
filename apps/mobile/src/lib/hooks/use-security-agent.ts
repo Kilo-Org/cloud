@@ -156,9 +156,15 @@ export function useSecurityAgentCapability(scope: string): {
 
 // Reuses listFindings (status: 'open', limit 1) instead of a dedicated
 // procedure — the concurrency numbers ride along on every findings fetch.
+// `isLoading`/`isError` are exposed alongside the counts so callers can tell
+// "still loading" and "failed to load" apart from "loaded: capacity full" —
+// all three previously collapsed into the same undefined counts.
 export function useSecurityAnalysisCapacity(scope: string): {
   runningCount: number | undefined;
   concurrencyLimit: number | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => unknown;
 } {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
@@ -173,6 +179,12 @@ export function useSecurityAnalysisCapacity(scope: string): {
     }),
     enabled: !isPersonalSecurityScope(scope),
   });
-  const data = isPersonalSecurityScope(scope) ? personal.data : organization.data;
-  return { runningCount: data?.runningCount, concurrencyLimit: data?.concurrencyLimit };
+  const active = isPersonalSecurityScope(scope) ? personal : organization;
+  return {
+    runningCount: active.data?.runningCount,
+    concurrencyLimit: active.data?.concurrencyLimit,
+    isLoading: active.isLoading,
+    isError: active.isError,
+    refetch: active.refetch,
+  };
 }

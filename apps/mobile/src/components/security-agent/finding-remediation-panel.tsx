@@ -4,10 +4,12 @@ import {
   getRemediationStatusPresentation,
   getRemediationUnavailableCopy,
 } from '@kilocode/app-shared/security-agent';
+import { Wrench } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
@@ -67,7 +69,14 @@ export function FindingRemediationPanel({
   }
 
   if (!analysis) {
-    return null;
+    return (
+      <EmptyState
+        icon={Wrench}
+        placement="top"
+        title="No analysis yet"
+        description="Run one from the Details tab"
+      />
+    );
   }
 
   const { remediationCapability, remediationSummary, remediationAttempts } = analysis;

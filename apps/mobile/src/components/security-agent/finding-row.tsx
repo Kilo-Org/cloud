@@ -68,17 +68,23 @@ type FindingRowQuickActionProps = {
   finding: SecurityFinding;
   scope: string;
   prUrl: string | null;
-  canQuickAnalyze: boolean;
+  isAnalyzable: boolean;
+  hasAnalysisCapacity: boolean;
   nextAction: string | null;
 };
 
-// Extracted to avoid a nested ternary (prUrl / canQuickAnalyze / nextAction
-// fallback) while keeping FindingRow's render body flat.
+// Extracted to avoid a nested ternary (prUrl / isAnalyzable / nextAction
+// fallback) while keeping FindingRow's render body flat. `isAnalyzable`
+// (eligibility) and `hasAnalysisCapacity` (loaded-and-not-full) are kept
+// separate so the Analyze button's presence never depends on capacity still
+// loading — only its disabled state does, avoiding a button/text layout
+// shift once capacity resolves.
 function FindingRowQuickAction({
   finding,
   scope,
   prUrl,
-  canQuickAnalyze,
+  isAnalyzable,
+  hasAnalysisCapacity,
   nextAction,
 }: Readonly<FindingRowQuickActionProps>) {
   const colors = useThemeColors();
@@ -101,13 +107,13 @@ function FindingRowQuickAction({
     );
   }
 
-  if (canQuickAnalyze) {
+  if (isAnalyzable) {
     return (
       <Button
         variant="secondary"
         size="sm"
         className="mt-1 h-8 self-start px-3"
-        disabled={startAnalysis.isPending}
+        disabled={startAnalysis.isPending || !hasAnalysisCapacity}
         onPress={() => {
           startAnalysis.mutate({
             findingId: finding.id,
@@ -138,7 +144,7 @@ type FindingRowProps = {
   finding: SecurityFinding;
   scope: string;
   slaEnabled: boolean;
-  /** From useSecurityAnalysisCapacity(scope) — gates the row's quick Analyze action. */
+  /** From useSecurityAnalysisCapacity(scope) — disables (not hides) the row's quick Analyze action. */
   hasAnalysisCapacity: boolean;
 };
 
@@ -160,11 +166,13 @@ export function FindingRow({
 
   const prUrl =
     finding.remediationSummary?.status === 'pr_opened' ? finding.remediationSummary.prUrl : null;
-  const canQuickAnalyze =
+  // Eligibility is independent of capacity — the button stays visible
+  // (disabled via hasAnalysisCapacity) instead of swapping for the
+  // nextAction text once capacity resolves.
+  const isAnalyzable =
     !prUrl &&
     finding.status === 'open' &&
-    (!finding.analysis_status || finding.analysis_status === 'failed') &&
-    hasAnalysisCapacity;
+    (!finding.analysis_status || finding.analysis_status === 'failed');
 
   return (
     <View className="gap-1.5 rounded-lg bg-secondary p-3">
@@ -221,7 +229,8 @@ export function FindingRow({
         finding={finding}
         scope={scope}
         prUrl={prUrl}
-        canQuickAnalyze={canQuickAnalyze}
+        isAnalyzable={isAnalyzable}
+        hasAnalysisCapacity={hasAnalysisCapacity}
         nextAction={nextAction}
       />
     </View>

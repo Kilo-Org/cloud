@@ -44,6 +44,7 @@ function GateThresholdRouteContent({
       options={GATE_THRESHOLDS}
       selected={data?.gateThreshold}
       descriptions={DESCRIPTIONS}
+      disabled={data == null}
       onSelect={value => {
         save.mutate({ gateThreshold: value });
       }}

@@ -12,6 +12,8 @@ type OptionListProps<T extends string> = {
   onSelect: (value: T) => void;
   /** Optional per-option caption below the label. */
   descriptions?: Readonly<Record<T, string>>;
+  /** Disables every row, e.g. while the config backing `selected` is still loading. */
+  disabled?: boolean;
 };
 
 /** Full-screen single-select list. Selecting saves and pops the screen. */
@@ -21,6 +23,7 @@ export function OptionList<T extends string>({
   selected,
   onSelect,
   descriptions,
+  disabled,
 }: Readonly<OptionListProps<T>>) {
   const router = useRouter();
 
@@ -34,6 +37,7 @@ export function OptionList<T extends string>({
             label={option}
             description={descriptions?.[option]}
             selected={selected === option}
+            disabled={disabled}
             onPress={() => {
               onSelect(option);
               router.back();

@@ -20,6 +20,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 export default function ReposRoute() {
   const params = useValidatedReviewerRouteParams();
@@ -63,6 +64,7 @@ function ReposRouteContent({
   };
   const { isLoading: reposLoading, rows: repoRows } = reposByPlatform[platform];
   const selectedIds = data?.selectedRepositoryIds ?? [];
+  const configDisabled = data == null;
 
   const setMode = (nextMode: 'all' | 'selected') => {
     void Haptics.selectionAsync();
@@ -89,7 +91,13 @@ function ReposRouteContent({
           (['all', 'selected'] as const).map(option => (
             <Pressable
               key={option}
-              className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+              className={cn(
+                'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
+                configDisabled && 'opacity-50'
+              )}
+              disabled={configDisabled}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: mode === option, disabled: configDisabled }}
               onPress={() => {
                 setMode(option);
               }}
@@ -122,7 +130,16 @@ function ReposRouteContent({
             {repoRows.map(repo => (
               <Pressable
                 key={repo.id}
-                className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+                className={cn(
+                  'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
+                  configDisabled && 'opacity-50'
+                )}
+                disabled={configDisabled}
+                accessibilityRole="checkbox"
+                accessibilityState={{
+                  checked: selectedIds.includes(repo.id),
+                  disabled: configDisabled,
+                }}
                 onPress={() => {
                   toggleRepo(repo.id);
                 }}

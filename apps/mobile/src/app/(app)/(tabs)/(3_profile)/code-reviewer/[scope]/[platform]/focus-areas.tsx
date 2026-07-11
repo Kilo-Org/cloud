@@ -16,6 +16,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 export default function FocusAreasRoute() {
   const params = useValidatedReviewerRouteParams();
@@ -40,6 +41,7 @@ function FocusAreasRouteContent({
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);
   const selected = data?.focusAreas ?? [];
+  const disabled = data == null;
 
   const toggleArea = (area: string) => {
     void Haptics.selectionAsync();
@@ -63,7 +65,13 @@ function FocusAreasRouteContent({
         {REVIEW_FOCUS_AREAS.map(area => (
           <Pressable
             key={area}
-            className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+            className={cn(
+              'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
+              disabled && 'opacity-50'
+            )}
+            disabled={disabled}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected.includes(area), disabled }}
             onPress={() => {
               toggleArea(area);
             }}

@@ -44,6 +44,7 @@ function ReviewStyleRouteContent({
       options={REVIEW_STYLES}
       selected={data?.reviewStyle}
       descriptions={DESCRIPTIONS}
+      disabled={data == null}
       onSelect={value => {
         save.mutate({ reviewStyle: value });
       }}

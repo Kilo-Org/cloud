@@ -74,6 +74,24 @@ export function BitbucketOverview({
   const isLoading = providerState.status === 'loading' || config.isLoading || permissionLoading;
   const connected = providerState.status === 'connected';
 
+  // A connected workspace whose config fails to load (and has no stale
+  // cache to fall back on) has nothing to show — surface a retry instead of
+  // a header over blank space. A background refetch failure with data
+  // already cached falls through to the normal content below, unaffected.
+  if (!isLoading && connected && config.isError && config.data == null) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+        <QueryError
+          onRetry={() => {
+            void config.refetch();
+          }}
+          isRetrying={config.isFetching}
+        />
+      </View>
+    );
+  }
+
   const pushField = (field: string) => {
     router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };

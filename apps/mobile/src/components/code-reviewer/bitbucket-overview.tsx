@@ -12,6 +12,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +21,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
+  classifyProviderState,
   useBitbucketReadiness,
   type useReviewConfig,
   useSaveReviewConfig,
@@ -34,18 +36,43 @@ export function BitbucketOverview({
   config,
   toggle,
   canEdit,
+  permissionLoading,
 }: Readonly<{
   scope: string;
   config: ReturnType<typeof useReviewConfig>;
   toggle: ReturnType<typeof useToggleReviewer>;
   canEdit: boolean;
+  permissionLoading: boolean;
 }>) {
   const router = useRouter();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useAvailableModels(scope);
-  const isLoading = readiness.isLoading || config.isLoading;
-  const connected = readiness.data?.connected === true;
+  const providerState = classifyProviderState({
+    isLoading: readiness.isLoading,
+    isError: readiness.isError,
+    isFetching: readiness.isFetching,
+    connected: readiness.data?.connected,
+    hasData: readiness.data !== undefined,
+    refetch: () => void readiness.refetch(),
+  });
+
+  if (providerState.status === 'error') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
+        <QueryError
+          onRetry={() => {
+            providerState.refetch();
+          }}
+          isRetrying={providerState.isRetrying}
+        />
+      </View>
+    );
+  }
+
+  const isLoading = providerState.status === 'loading' || config.isLoading || permissionLoading;
+  const connected = providerState.status === 'connected';
 
   const pushField = (field: string) => {
     router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);

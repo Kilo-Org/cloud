@@ -10,7 +10,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import {
+  useReviewConfig,
+  useReviewerEditGuard,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 // Mounted only once `data != null`, so useRef(initial) captures the real
@@ -73,6 +77,7 @@ function InstructionsRouteContent({
   platform: ReviewerPlatform;
 }>) {
   const router = useRouter();
+  useReviewerEditGuard(scope, platform);
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
 

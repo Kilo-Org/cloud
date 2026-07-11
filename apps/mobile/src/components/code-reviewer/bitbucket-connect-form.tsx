@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, TextInput, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -10,6 +10,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
   const tokenRef = useRef('');
+  const [canConnect, setCanConnect] = useState(false);
   const connect = useConnectBitbucket(scope);
 
   const onConnect = () => {
@@ -45,9 +46,14 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
         secureTextEntry
         onChangeText={value => {
           tokenRef.current = value;
+          setCanConnect(value.trim().length > 0);
         }}
       />
-      <Button className="w-full flex-row gap-2" disabled={connect.isPending} onPress={onConnect}>
+      <Button
+        className="w-full flex-row gap-2"
+        disabled={connect.isPending || !canConnect}
+        onPress={onConnect}
+      >
         {connect.isPending ? <ActivityIndicator size="small" /> : null}
         <Text>Connect</Text>
       </Button>

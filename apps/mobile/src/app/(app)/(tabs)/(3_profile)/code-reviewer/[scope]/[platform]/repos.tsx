@@ -15,6 +15,7 @@ import {
   useGitLabRepositories,
   useReviewConfig,
   useReviewConfigCacheReader,
+  useReviewerEditGuard,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
@@ -38,6 +39,7 @@ function ReposRouteContent({
   platform: ReviewerPlatform;
 }>) {
   const colors = useThemeColors();
+  useReviewerEditGuard(scope, platform);
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);

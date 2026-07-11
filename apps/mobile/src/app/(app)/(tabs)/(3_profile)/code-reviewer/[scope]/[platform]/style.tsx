@@ -3,7 +3,11 @@ import { type Href } from 'expo-router';
 import { OptionList } from '@/components/code-reviewer/option-list';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { REVIEW_STYLES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import {
+  useReviewConfig,
+  useReviewerEditGuard,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 const DESCRIPTIONS = {
@@ -30,6 +34,7 @@ function ReviewStyleRouteContent({
   scope: string;
   platform: ReviewerPlatform;
 }>) {
+  useReviewerEditGuard(scope, platform);
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
 

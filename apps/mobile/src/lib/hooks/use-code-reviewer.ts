@@ -279,18 +279,19 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   });
 }
 
-export function useCanEditReviewer(scope: string) {
-  const trpc = useTRPC();
-  const { data: orgs } = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonal(scope),
-  });
-  if (isPersonal(scope)) {
-    return true;
-  }
-  const role = orgs?.find(org => org.organizationId === scope)?.role;
-  return role === 'owner' || role === 'billing_manager';
-}
+// Discriminated provider-connection and permission state moved to
+// use-reviewer-permission.ts (kept this file under the max-lines limit);
+// re-exported here so existing call sites keep importing from
+// use-code-reviewer without churn.
+export {
+  classifyPermission,
+  classifyProviderState,
+  type PermissionState,
+  type ProviderState,
+  useCanEditReviewer,
+  useReviewerEditGuard,
+  useReviewerPermission,
+} from '@/lib/hooks/use-reviewer-permission';
 
 // Bitbucket is org-only, so unlike the GitHub/GitLab status hooks above
 // there is no personal-vs-org split here.

@@ -1,19 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import {
-  FileSliders,
-  FolderGit2,
-  Gauge,
-  MessageSquareText,
-  ScrollText,
-  ShieldCheck,
-} from 'lucide-react-native';
 import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
+import { buildOverviewRows } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -23,18 +17,30 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
+  classifyProviderState,
   PERSONAL_SCOPE,
-  useCanEditReviewer,
   useGitHubStatus,
   useGitLabStatus,
   useGitLabWebhookWarning,
   useReviewConfig,
+  useReviewerPermission,
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+function PlatformErrorScreen({
+  title,
+  onRetry,
+  isRetrying,
+}: Readonly<{ title: string; onRetry: () => void; isRetrying: boolean }>) {
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={title} eyebrow="Code Reviewer" />
+      <QueryError onRetry={onRetry} isRetrying={isRetrying} />
+    </View>
+  );
+}
 
 export function PlatformOverviewScreen({
   scope,
@@ -42,12 +48,14 @@ export function PlatformOverviewScreen({
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const capabilities = PLATFORM_CAPABILITIES[platform];
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const config = useReviewConfig(scope, platform);
   const toggle = useToggleReviewer(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
-  const canEdit = useCanEditReviewer(scope);
+  const permission = useReviewerPermission(scope);
+  const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useAvailableModels(
     scope === PERSONAL_SCOPE ? undefined : scope
@@ -66,14 +74,55 @@ export function PlatformOverviewScreen({
     );
   }
 
-  if (platform === 'bitbucket') {
-    return <BitbucketOverview scope={scope} config={config} toggle={toggle} canEdit={canEdit} />;
+  if (permission.status === 'error') {
+    return (
+      <PlatformErrorScreen
+        title={capabilities.label}
+        onRetry={() => {
+          permission.refetch();
+        }}
+        isRetrying={permission.isRetrying}
+      />
+    );
   }
 
-  const capabilities = PLATFORM_CAPABILITIES[platform];
+  if (platform === 'bitbucket') {
+    return (
+      <BitbucketOverview
+        scope={scope}
+        config={config}
+        toggle={toggle}
+        canEdit={canEdit}
+        permissionLoading={permission.status === 'loading'}
+      />
+    );
+  }
+
   const status = platform === 'gitlab' ? gitlabStatus : githubStatus;
-  const isLoading = status.isLoading || config.isLoading;
-  const connected = status.data?.connected === true;
+  const providerState = classifyProviderState({
+    isLoading: status.isLoading,
+    isError: status.isError,
+    isFetching: status.isFetching,
+    connected: status.data?.connected,
+    hasData: status.data !== undefined,
+    refetch: () => void status.refetch(),
+  });
+
+  if (providerState.status === 'error') {
+    return (
+      <PlatformErrorScreen
+        title={capabilities.label}
+        onRetry={() => {
+          providerState.refetch();
+        }}
+        isRetrying={providerState.isRetrying}
+      />
+    );
+  }
+
+  const isLoading =
+    providerState.status === 'loading' || config.isLoading || permission.status === 'loading';
+  const connected = providerState.status === 'connected';
 
   const pushField = (field: string) => {
     router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
@@ -83,65 +132,22 @@ export function PlatformOverviewScreen({
   const rows =
     data == null
       ? null
-      : [
-          {
-            field: 'style',
-            icon: MessageSquareText,
-            title: 'Review Style',
-            subtitle: capitalize(data.reviewStyle),
+      : buildOverviewRows({
+          data,
+          capabilities,
+          models,
+          modelsLoading,
+          onOpenModelPicker: () => {
+            openModelPicker(router, {
+              options: models,
+              value: data.modelSlug,
+              variant: data.thinkingEffort ?? '',
+              onSelect: (modelSlug, variant) => {
+                save.mutate({ modelSlug, thinkingEffort: variant || null });
+              },
+            });
           },
-          {
-            field: 'focus-areas',
-            icon: ShieldCheck,
-            title: 'Focus Areas',
-            subtitle:
-              data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
-          },
-          {
-            field: 'instructions',
-            icon: ScrollText,
-            title: 'Custom Instructions',
-            subtitle: data.customInstructions ? 'Set' : 'None',
-          },
-          {
-            field: 'model',
-            icon: FileSliders,
-            title: 'Model',
-            subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
-            onPress:
-              modelsLoading || models.length === 0
-                ? undefined
-                : () => {
-                    openModelPicker(router, {
-                      options: models,
-                      value: data.modelSlug,
-                      variant: data.thinkingEffort ?? '',
-                      onSelect: (modelSlug, variant) => {
-                        save.mutate({ modelSlug, thinkingEffort: variant || null });
-                      },
-                    });
-                  },
-          },
-          ...(capabilities.gateRow
-            ? [
-                {
-                  field: 'gate',
-                  icon: Gauge,
-                  title: 'Merge Gate',
-                  subtitle: capitalize(data.gateThreshold),
-                },
-              ]
-            : []),
-          {
-            field: 'repos',
-            icon: FolderGit2,
-            title: 'Repositories',
-            subtitle:
-              capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
-                ? 'All repositories'
-                : `${data.selectedRepositoryIds.length} selected`,
-          },
-        ];
+        });
 
   const resolveRowOnPress = (row: NonNullable<typeof rows>[number]) => {
     if (!canEdit) {

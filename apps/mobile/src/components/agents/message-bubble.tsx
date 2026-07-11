@@ -1,5 +1,5 @@
 import { type StoredMessage } from 'cloud-agent-sdk';
-import { Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 
 import { Bubble } from '@/components/ui/bubble';
 
@@ -32,6 +32,16 @@ export function MessageBubble({
     void copyMessage(message);
   };
 
+  // Long-press is an accelerator; expose the same "copy" action to
+  // accessibility tooling (VoiceOver/TalkBack rotor) since a long-press
+  // gesture isn't reliably discoverable there.
+  const copyAccessibilityActions = [{ name: 'copy', label: 'Copy message' }];
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'copy') {
+      void copyMessage(message);
+    }
+  };
+
   // Compaction-only message renders as a separator
   const firstPart = message.parts[0];
   if (message.parts.length === 1 && firstPart?.type === 'compaction') {
@@ -56,6 +66,8 @@ export function MessageBubble({
         accessibilityRole="text"
         accessibilityLabel="User message"
         accessibilityHint="Long press to copy message text"
+        accessibilityActions={copyAccessibilityActions}
+        onAccessibilityAction={handleAccessibilityAction}
       >
         <Bubble side="user">
           {textContent ? (
@@ -79,6 +91,8 @@ export function MessageBubble({
       accessibilityRole="text"
       accessibilityLabel="Assistant message"
       accessibilityHint="Long press to copy message text"
+      accessibilityActions={copyAccessibilityActions}
+      onAccessibilityAction={handleAccessibilityAction}
     >
       <View className="gap-2">
         {message.parts.map(part => (

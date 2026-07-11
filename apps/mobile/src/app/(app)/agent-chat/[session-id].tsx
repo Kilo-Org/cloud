@@ -1,10 +1,13 @@
 import { type KiloSessionId } from 'cloud-agent-sdk';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
+import {
+  SessionDetailContent,
+  SessionSkeletonMessages,
+} from '@/components/agents/session-detail-content';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
-import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTRPC } from '@/lib/trpc';
@@ -32,8 +35,9 @@ export default function SessionDetailScreen() {
 
   if (routeOrganizationId === undefined && sessionQuery.isPending) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator />
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Session" />
+        <SessionSkeletonMessages />
       </View>
     );
   }

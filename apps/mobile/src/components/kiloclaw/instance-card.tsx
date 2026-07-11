@@ -113,14 +113,16 @@ export function KiloClawCard({
   };
 
   return (
-    <View className="relative mx-4 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-5">
+    <View
+      className={`relative mx-4 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-5 ${tapDisabled ? 'opacity-60' : ''}`}
+    >
       <View className={`absolute bottom-0 left-0 top-0 w-[3px] ${hue.hueClass}`} />
       <View className="flex-row items-center gap-3">
         <Pressable
           onPress={handlePress}
           disabled={tapDisabled}
           accessibilityState={{ disabled: tapDisabled }}
-          className={`min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80 ${tapDisabled ? 'opacity-60' : ''}`}
+          className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80"
           accessibilityLabel={accessibilityLabel}
         >
           <View

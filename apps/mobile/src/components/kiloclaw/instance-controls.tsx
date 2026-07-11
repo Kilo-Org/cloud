@@ -10,11 +10,39 @@ type InstanceControlsProps = {
   mutations: ReturnType<typeof useKiloClawMutations>;
 };
 
+// Statuses where the backend is already mid-transition — starting or
+// redeploying now would race an in-flight lifecycle change. Anything NOT in
+// these sets (including 'stopped', 'provisioned', 'crashed', and any
+// unrecognized/null status) is fair game.
+const START_BLOCKING_STATUSES = new Set([
+  'running',
+  'starting',
+  'restarting',
+  'stopping',
+  'shutting_down',
+  'destroying',
+]);
+const REDEPLOY_BLOCKING_STATUSES = new Set([
+  'starting',
+  'restarting',
+  'stopping',
+  'shutting_down',
+  'destroying',
+]);
+
 export function InstanceControls({ status, mutations }: Readonly<InstanceControlsProps>) {
-  const canStart = status === 'stopped' || status === 'provisioned';
+  const canStart = status == null || !START_BLOCKING_STATUSES.has(status);
   const canStop = status === 'running';
   const canRestartOpenClaw = status === 'running';
-  const canRedeploy = status === 'running' || status === 'stopped' || status === 'provisioned';
+  const canRedeploy = status == null || !REDEPLOY_BLOCKING_STATUSES.has(status);
+
+  // Only one lifecycle mutation should ever be in flight at a time — while
+  // any of these is pending, disable the rest so they can't race each other.
+  const isLifecycleBusy =
+    mutations.start.isPending ||
+    mutations.stop.isPending ||
+    mutations.restartOpenClaw.isPending ||
+    mutations.restartMachine.isPending;
 
   const handleStart = () => {
     Alert.alert('Start Instance', 'Are you sure you want to start this instance?', [
@@ -74,32 +102,36 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       <View className="flex-row gap-2">
         <ActionButton
           icon={Play}
-          label="Start"
+          label={mutations.start.isPending ? 'Starting…' : 'Start'}
           tone="accent"
-          disabled={!canStart || mutations.start.isPending}
+          disabled={!canStart || isLifecycleBusy}
+          loading={mutations.start.isPending}
           onPress={handleStart}
         />
         <ActionButton
           icon={Power}
-          label="Stop"
+          label={mutations.stop.isPending ? 'Stopping…' : 'Stop'}
           tone="danger"
-          disabled={!canStop || mutations.stop.isPending}
+          disabled={!canStop || isLifecycleBusy}
+          loading={mutations.stop.isPending}
           onPress={handleStop}
         />
       </View>
       <View className="flex-row gap-2">
         <ActionButton
           icon={RotateCcw}
-          label="Restart"
+          label={mutations.restartOpenClaw.isPending ? 'Restarting…' : 'Restart'}
           tone="warn"
-          disabled={!canRestartOpenClaw || mutations.restartOpenClaw.isPending}
+          disabled={!canRestartOpenClaw || isLifecycleBusy}
+          loading={mutations.restartOpenClaw.isPending}
           onPress={handleRestartOpenClaw}
         />
         <ActionButton
           icon={RefreshCw}
-          label="Redeploy"
+          label={mutations.restartMachine.isPending ? 'Redeploying…' : 'Redeploy'}
           tone="accent"
-          disabled={!canRedeploy || mutations.restartMachine.isPending}
+          disabled={!canRedeploy || isLifecycleBusy}
+          loading={mutations.restartMachine.isPending}
           onPress={handleRedeploy}
         />
       </View>

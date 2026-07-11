@@ -4,7 +4,10 @@ import { Platform, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EmptyStateContent } from '@/components/kiloclaw/empty-state-content';
+import {
+  EmptyStateContent,
+  resolveAccessRequiredSubcase,
+} from '@/components/kiloclaw/empty-state-content';
 import { getKiloClawEntryDecision } from '@/components/kiloclaw/instance-entry-state';
 import { InstanceListScreen } from '@/components/kiloclaw/instance-list-screen';
 import { QueryError } from '@/components/query-error';
@@ -28,7 +31,13 @@ export default function KiloClawTab() {
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
   const refetchInstances = instancesQuery.refetch;
   const entryDecision = getKiloClawEntryDecision(instances);
-  const onboardingQuery = useKiloClawMobileOnboardingState(entryDecision.kind === 'empty');
+  // Always enabled (not just for the empty-list case) so a personal
+  // billing/access issue is still surfaced as a card annotation when the
+  // list is non-empty — see `personalAccessIssue` below.
+  const onboardingQuery = useKiloClawMobileOnboardingState();
+  const personalAccessIssue = onboardingQuery.data
+    ? resolveAccessRequiredSubcase(onboardingQuery.data)
+    : null;
   useForegroundInvalidateKiloclawState();
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
@@ -47,9 +56,11 @@ export default function KiloClawTab() {
     })();
   }, [refetchInstances]);
 
-  const onboardingQueryEnabled = entryDecision.kind === 'empty';
+  // A background billing-check failure while the list is already showing
+  // shouldn't blank the screen — only block on it before we have any
+  // instances to show (preserve stale/cached data).
   const hasQueryError =
-    instancesQuery.isError || (onboardingQueryEnabled && onboardingQuery.isError);
+    instancesQuery.isError || (entryDecision.kind !== 'list' && onboardingQuery.isError);
 
   if (hasQueryError) {
     return (
@@ -63,7 +74,7 @@ export default function KiloClawTab() {
               if (instancesQuery.isError) {
                 void instancesQuery.refetch();
               }
-              if (onboardingQueryEnabled && onboardingQuery.isError) {
+              if (onboardingQuery.isError) {
                 void onboardingQuery.refetch();
               }
             }}
@@ -89,6 +100,7 @@ export default function KiloClawTab() {
         onCreate={() => {
           router.push('/(app)/onboarding' as Href);
         }}
+        personalAccessIssue={personalAccessIssue}
       />
     );
   }

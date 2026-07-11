@@ -91,6 +91,9 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
+// No hook-level onError toast: dismiss-finding-screen.tsx is the sole caller
+// and is a form sheet that stays open on failure — it renders
+// `dismissFinding.isError` inline above the confirm button instead (P2).
 export function useDismissSecurityFinding(scope: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -102,9 +105,6 @@ export function useDismissSecurityFinding(scope: string) {
             organizationId: scope,
             ...vars,
           }),
-    onError: error => {
-      toast.error(error.message);
-    },
     onSuccess: result => {
       trackSecurityAgentCommand(queryClient, scope, result.commandId);
     },

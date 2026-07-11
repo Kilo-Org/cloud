@@ -1,10 +1,11 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Check, Lock, Search, Unlock } from 'lucide-react-native';
+import { Check, Info, Lock, Search, Unlock } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -61,9 +62,11 @@ export default function RepoPickerScreen() {
         onDone={closePicker}
         scrollable={false}
         fallback={
-          <View className="flex-1 items-center justify-center bg-background">
-            <Text className="text-muted-foreground">No repositories available</Text>
-          </View>
+          <EmptyState
+            icon={Info}
+            title="Options expired"
+            description="Go back and reopen this picker from the previous screen."
+          />
         }
       />
     );

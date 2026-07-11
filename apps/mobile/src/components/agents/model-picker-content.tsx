@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { Info, Search } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
+import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -139,9 +140,11 @@ export function ModelPickerContent() {
         onDone={closePicker}
         scrollable={false}
         fallback={
-          <View className="flex-1 items-center justify-center bg-background">
-            <Text className="text-muted-foreground">No models available</Text>
-          </View>
+          <EmptyState
+            icon={Info}
+            title="Options expired"
+            description="Go back and reopen this picker from the previous screen."
+          />
         }
       />
     );

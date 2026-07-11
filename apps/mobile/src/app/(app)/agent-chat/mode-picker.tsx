@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
 import { getModeIcon, MODE_OPTIONS, type ModeOption } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { EmptyState } from '@/components/empty-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -14,26 +15,25 @@ import { clearModePickerBridge, getModePickerBridge } from '@/lib/picker-bridge'
 export default function ModePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const [currentValue, setCurrentValue] = useState<AgentMode | null>(null);
-  const [onSelect, setOnSelect] = useState<((mode: AgentMode) => void) | null>(null);
+  // Lazy init reads the bridge synchronously on first render — no effect, no
+  // "No options available" flash before a later effect populates state.
+  const [bridge] = useState(() => getModePickerBridge());
 
-  useEffect(() => {
-    const bridge = getModePickerBridge();
-    if (bridge) {
-      setCurrentValue(bridge.currentValue);
-      // Wrap in a thunk so React doesn't call the function
-      setOnSelect(() => bridge.onSelect);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      clearModePickerBridge();
+    },
+    []
+  );
 
   function handleSelect(mode: AgentMode) {
     void Haptics.selectionAsync();
-    onSelect?.(mode);
+    bridge?.onSelect(mode);
     clearModePickerBridge();
     router.back();
   }
 
-  if (!onSelect) {
+  if (!bridge) {
     return (
       <View className="flex-1 bg-background">
         <SheetHeader
@@ -42,14 +42,16 @@ export default function ModePickerScreen() {
             router.back();
           }}
         />
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-muted-foreground" style={{ color: colors.mutedForeground }}>
-            No options available
-          </Text>
-        </View>
+        <EmptyState
+          icon={Info}
+          title="Options expired"
+          description="Go back and reopen this picker from the previous screen."
+        />
       </View>
     );
   }
+
+  const currentValue = bridge.currentValue;
 
   function renderItem({ item }: { item: ModeOption }) {
     const Icon = getModeIcon(item.value);
@@ -67,9 +69,7 @@ export default function ModePickerScreen() {
         <Icon size={20} color={colors.foreground} />
         <View className="flex-1">
           <Text className="text-base font-medium text-foreground">{item.label}</Text>
-          <Text className="text-sm text-muted-foreground" style={{ color: colors.mutedForeground }}>
-            {item.description}
-          </Text>
+          <Text className="text-sm text-muted-foreground">{item.description}</Text>
         </View>
         {selected && <Check size={18} color={colors.primary} />}
       </Pressable>

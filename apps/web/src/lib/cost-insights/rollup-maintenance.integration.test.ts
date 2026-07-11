@@ -208,6 +208,29 @@ describe('Cost Insights rollup maintenance integration', () => {
     expect(drivers).toHaveLength(0);
   });
 
+  test('targeted repair reconstructs a failed best-effort capture from canonical usage', async () => {
+    const userId = await createUser();
+    await db.insert(microdollar_usage).values(rawUsage(userId, 17, '2026-06-01T00:30:00.000Z'));
+
+    await repairOwnerSpendRollups(db, {
+      owner: { type: 'user', id: userId },
+      startHour: '2026-06-01T00:00:00.000Z',
+      endHourExclusive: '2026-06-01T01:00:00.000Z',
+      maxHours: 1,
+    });
+
+    const [total] = await db
+      .select()
+      .from(cost_insight_owner_hour_totals)
+      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, userId));
+    const [driver] = await db
+      .select()
+      .from(cost_insight_owner_hour_driver_buckets)
+      .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, userId));
+    expect(total).toMatchObject({ total_microdollars: 17, spend_record_count: 1 });
+    expect(driver).toMatchObject({ total_microdollars: 17, spend_record_count: 1 });
+  });
+
   test('reconciles multi-hour ranges in bounded repeatable-read chunks', async () => {
     await db.insert(cost_insight_rollup_coverage).values({
       rollup_version: 1,

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Alert, Linking, Pressable, View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -7,6 +7,7 @@ import {
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,7 +49,7 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const { data, isLoading, isError, error, refetch } = useReviewDetail(reviewId);
+  const { data, isLoading, isError, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
 
@@ -56,15 +57,12 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />
-        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
-          <Pressable
-            className="rounded-lg bg-secondary p-3 active:opacity-70"
-            onPress={() => {
-              void refetch();
-            }}
-          >
-            <Text className="text-sm text-destructive">{error.message}. Tap to retry.</Text>
-          </Pressable>
+        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
+          <QueryError
+            variant="server"
+            title="Could not load review"
+            onRetry={() => void refetch()}
+          />
         </TabScreenScrollView>
       </View>
     );
@@ -88,15 +86,12 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />
-        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
-          <Pressable
-            className="rounded-lg bg-secondary p-3 active:opacity-70"
-            onPress={() => {
-              void refetch();
-            }}
-          >
-            <Text className="text-sm text-destructive">{data.error}. Tap to retry.</Text>
-          </Pressable>
+        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
+          <QueryError
+            variant="server"
+            title="Could not load review"
+            onRetry={() => void refetch()}
+          />
         </TabScreenScrollView>
       </View>
     );

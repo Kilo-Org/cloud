@@ -11,6 +11,7 @@ import { MoreHorizontal, RefreshCw, Settings, ShieldAlert } from 'lucide-react-n
 import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -192,16 +193,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         )}
 
         {dashboardStats.isError && !data ? (
-          <Pressable
-            className="rounded-lg bg-secondary p-3 active:opacity-70"
-            onPress={() => {
-              void dashboardStats.refetch();
-            }}
-          >
-            <Text className="text-sm text-destructive">
-              Could not load dashboard data. Tap to retry.
-            </Text>
-          </Pressable>
+          <QueryError
+            variant="server"
+            placement="top"
+            title="Could not load dashboard data"
+            onRetry={() => void dashboardStats.refetch()}
+          />
         ) : null}
 
         {data ? (

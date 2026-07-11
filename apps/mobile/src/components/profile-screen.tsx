@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react-native';
-import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Platform, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -20,6 +20,7 @@ import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases
 import { NotificationsCard } from '@/components/notifications-card';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -191,16 +192,12 @@ export function ProfileScreen() {
           )}
 
           {providersError && (
-            <Pressable
-              className="rounded-lg bg-secondary p-3 active:opacity-70"
-              onPress={() => {
-                void refetchProviders();
-              }}
-            >
-              <Text className="text-sm text-destructive">
-                Failed to load accounts. Tap to retry.
-              </Text>
-            </Pressable>
+            <QueryError
+              variant="server"
+              placement="top"
+              title="Could not load accounts"
+              onRetry={() => void refetchProviders()}
+            />
           )}
 
           {data?.providers.map(p => {

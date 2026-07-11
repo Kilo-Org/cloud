@@ -9,6 +9,7 @@ import {
   isCodeReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -44,7 +45,7 @@ function reviewTime(review: Review): Date {
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const { data, isLoading, isError, error, refetch } = useReviewList(scope);
+  const { data, isLoading, isError, refetch } = useReviewList(scope);
 
   return (
     <View className="flex-1 bg-background">
@@ -63,25 +64,21 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               background poll failure with stale data should keep showing that data,
               not hide it behind a retry banner. */}
           {!isLoading && isError && !data && (
-            <Pressable
-              className="rounded-lg bg-secondary p-3 active:opacity-70"
-              onPress={() => {
-                void refetch();
-              }}
-            >
-              <Text className="text-sm text-destructive">{error.message}. Tap to retry.</Text>
-            </Pressable>
+            <QueryError
+              variant="server"
+              placement="top"
+              title="Could not load reviews"
+              onRetry={() => void refetch()}
+            />
           )}
 
           {!isLoading && data && !data.success && (
-            <Pressable
-              className="rounded-lg bg-secondary p-3 active:opacity-70"
-              onPress={() => {
-                void refetch();
-              }}
-            >
-              <Text className="text-sm text-destructive">{data.error}. Tap to retry.</Text>
-            </Pressable>
+            <QueryError
+              variant="server"
+              placement="top"
+              title="Could not load reviews"
+              onRetry={() => void refetch()}
+            />
           )}
 
           {!isLoading && data?.success && data.reviews.length === 0 && (

@@ -1,12 +1,12 @@
 import { type KiloSessionId } from 'cloud-agent-sdk';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Text } from '@/components/ui/text';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
@@ -42,17 +42,12 @@ export default function SessionDetailScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Session" />
-        <View className="flex-1 items-center justify-center gap-3 px-6">
-          <Text className="text-center text-sm text-muted-foreground">
-            Failed to load session details
-          </Text>
-          <Pressable
-            className="rounded-lg bg-secondary px-4 py-2"
-            onPress={() => void sessionQuery.refetch()}
-          >
-            <Text className="text-sm font-medium">Retry</Text>
-          </Pressable>
-        </View>
+        <QueryError
+          variant="server"
+          title="Could not load session"
+          description="Failed to load session details"
+          onRetry={() => void sessionQuery.refetch()}
+        />
       </View>
     );
   }

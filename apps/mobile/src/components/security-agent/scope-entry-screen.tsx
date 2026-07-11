@@ -1,13 +1,13 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import {
@@ -40,17 +40,7 @@ function ScopeEntryError({ onRetry }: Readonly<{ onRetry: () => void }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Security Agent" />
-      <View className="flex-1 items-center justify-center px-6">
-        <Pressable
-          className="rounded-lg bg-secondary p-3 active:opacity-70"
-          onPress={onRetry}
-          accessibilityRole="button"
-        >
-          <Text className="text-sm text-destructive">
-            Could not load Security Agent. Tap to retry.
-          </Text>
-        </Pressable>
-      </View>
+      <QueryError variant="server" title="Could not load Security Agent" onRetry={onRetry} />
     </View>
   );
 }

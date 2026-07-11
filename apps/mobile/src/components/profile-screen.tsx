@@ -56,7 +56,12 @@ export function ProfileScreen() {
     ...trpc.user.getAuthProviders.queryOptions(),
     enabled: isAuthenticated,
   });
-  const { data: orgs, isFetching: organizationsFetching } = useQuery({
+  const {
+    data: orgs,
+    isFetching: organizationsFetching,
+    isError: organizationsError,
+    refetch: refetchOrganizations,
+  } = useQuery({
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated,
   });
@@ -166,17 +171,28 @@ export function ProfileScreen() {
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               Organization
             </Text>
-            <ConfigureRow
-              icon={Building2}
-              title={orgRole === 'member' ? 'View organization' : 'Manage organization'}
-              subtitle={orgName}
-              className="rounded-lg bg-secondary px-3"
-              disabled={!orgRole}
-              last
-              onPress={() => {
-                router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
-              }}
-            />
+            {organizationsError ? (
+              <QueryError
+                variant="server"
+                placement="top"
+                title="Could not load organization"
+                description="Organization and agent settings are unavailable until this loads."
+                onRetry={() => void refetchOrganizations()}
+                isRetrying={organizationsFetching}
+              />
+            ) : (
+              <ConfigureRow
+                icon={Building2}
+                title={orgRole === 'member' ? 'View organization' : 'Manage organization'}
+                subtitle={orgName}
+                className="rounded-lg bg-secondary px-3"
+                disabled={!orgRole}
+                last
+                onPress={() => {
+                  router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
+                }}
+              />
+            )}
           </View>
         )}
 

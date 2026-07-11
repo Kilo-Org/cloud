@@ -2,13 +2,16 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
@@ -69,6 +72,15 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     : 'Personal';
 
   const hasOrgs = orgs && orgs.length > 0;
+
+  // Personal (non-org) credits are a consumable purchased directly by the end
+  // user, so Apple requires IAP for them — iOS can't show purchase language
+  // pointing at the web billing page. Org billing is exempt (business/seat
+  // billing), matching the always-on CTA on the organization hub screen.
+  const canShowZeroBalanceCta = selectedOrgId != null || Platform.OS !== 'ios';
+  const zeroBalanceUrl = selectedOrgId
+    ? `${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`
+    : `${WEB_BASE_URL}/credits`;
 
   const openPicker = () => {
     if (!orgs || orgs.length === 0) {
@@ -150,6 +162,26 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             )}
           </Animated.View>
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+        </View>
+      )}
+      {!balanceLoading && !balanceError && balanceDollars === 0 && (
+        <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
+          <Text className="flex-1 pr-3 text-xs text-muted-foreground">
+            {canShowZeroBalanceCta
+              ? 'Add credits to keep usage running.'
+              : "Add credits from a browser to keep using Kilo — you can't purchase credits in the app."}
+          </Text>
+          {canShowZeroBalanceCta && (
+            <Button
+              size="sm"
+              variant="outline"
+              onPress={() => {
+                void openExternalUrl(zeroBalanceUrl, { label: 'billing page' });
+              }}
+            >
+              <Text className="text-xs font-semibold">Add credits</Text>
+            </Button>
+          )}
         </View>
       )}
       {enabled && !selectedOrgId ? <KiloPassSubscriptionCard /> : null}

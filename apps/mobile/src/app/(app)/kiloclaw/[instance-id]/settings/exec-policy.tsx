@@ -1,5 +1,5 @@
 import { type LucideIcon, ShieldCheck, Zap } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ExecPreset, execPresetToConfig } from '@/lib/onboarding';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
@@ -60,6 +61,7 @@ export default function ExecPolicyScreen() {
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
+  const colors = useThemeColors();
 
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
 
@@ -104,11 +106,19 @@ export default function ExecPolicyScreen() {
     );
   }
 
+  const isPending = mutations.patchExecPreset.isPending;
+
   function handleSelect(option: PolicyOption) {
+    // Same-value guard (mirrors model-picker's handleSelectAutoModel) and
+    // serializing while a change is already in flight — one policy change
+    // at a time.
+    if (isPending || option.id === currentPreset) {
+      return;
+    }
     mutations.patchExecPreset.mutate(execPresetToConfig(option.id));
   }
 
-  const pendingPreset = mutations.patchExecPreset.isPending
+  const pendingPreset = isPending
     ? resolvePreset(
         mutations.patchExecPreset.variables.security,
         mutations.patchExecPreset.variables.ask
@@ -130,6 +140,7 @@ export default function ExecPolicyScreen() {
               pendingPreset !== undefined
                 ? pendingPreset === option.id
                 : currentPreset === option.id;
+            const isRowPending = isPending && pendingPreset === option.id;
             return (
               <Pressable
                 key={option.id}
@@ -137,8 +148,11 @@ export default function ExecPolicyScreen() {
                   'rounded-lg bg-secondary p-4 gap-3 border-2 active:opacity-70',
                   isSelected
                     ? 'border-primary bg-neutral-100 dark:bg-neutral-800'
-                    : 'border-transparent'
+                    : 'border-transparent',
+                  isPending && 'opacity-50'
                 )}
+                disabled={isPending}
+                accessibilityState={{ disabled: isPending, busy: isRowPending }}
                 onPress={() => {
                   handleSelect(option);
                 }}
@@ -146,14 +160,18 @@ export default function ExecPolicyScreen() {
                 <View className="flex-row items-center gap-3">
                   <Icon size={20} color={option.iconColor} />
                   <Text className="flex-1 text-base font-semibold">{option.label}</Text>
-                  <View
-                    className={cn(
-                      'h-5 w-5 rounded-full border-2',
-                      isSelected
-                        ? 'border-primary bg-primary'
-                        : 'border-muted-foreground bg-transparent'
-                    )}
-                  />
+                  {isRowPending ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <View
+                      className={cn(
+                        'h-5 w-5 rounded-full border-2',
+                        isSelected
+                          ? 'border-primary bg-primary'
+                          : 'border-muted-foreground bg-transparent'
+                      )}
+                    />
+                  )}
                 </View>
                 <Text variant="muted" className="text-sm">
                   {option.description}
@@ -161,14 +179,6 @@ export default function ExecPolicyScreen() {
               </Pressable>
             );
           })}
-
-          {mutations.patchExecPreset.isPending && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              <Text variant="muted" className="text-sm text-center">
-                Saving...
-              </Text>
-            </Animated.View>
-          )}
         </Animated.View>
       </ScrollView>
     </Animated.View>

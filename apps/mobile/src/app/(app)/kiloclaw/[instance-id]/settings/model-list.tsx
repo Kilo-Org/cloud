@@ -1,12 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import { Check, Eye } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { Check, Eye, Search } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  TextInput,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { EmptyState } from '@/components/empty-state';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
@@ -33,21 +42,35 @@ export default function ModelListScreen() {
   const paddingBottom = useDetailScreenBottomPadding();
   const trpc = useTRPC();
   const [searchFilter, setSearchFilter] = useState('');
+  const [searchKey, setSearchKey] = useState(0);
+  const [pendingModelId, setPendingModelId] = useState<string | null>(null);
 
-  const { data: config } = useKiloClawConfig(organizationId);
+  const handleClearSearch = useCallback(() => {
+    setSearchFilter('');
+    // TextInput below is uncontrolled (CLAUDE.md) — bump the key to force it
+    // to remount with an empty value instead of reading state per keystroke.
+    setSearchKey(k => k + 1);
+  }, []);
+
+  const configQuery = useKiloClawConfig(organizationId);
+  const config = configQuery.data;
   const mutations = useKiloClawMutations(organizationId);
   const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
 
   const {
     data: models,
     isLoading: isModelsLoading,
-    isError,
+    isError: isModelsError,
     refetch,
   } = useQuery(trpc.models.list.queryOptions(undefined, { staleTime: 5 * 60_000 }));
 
   // Instance context resolves organizationId — until it's ready, updateModel would
   // mutate with organizationId undefined (PERSONAL config) instead of the org's.
   const isLoading = isModelsLoading || instanceContext.status === 'loading';
+  // Without a known current model, rows would render selectable with no
+  // indication of what's actually selected — treat a config load failure
+  // the same as a models load failure.
+  const isError = isModelsError || configQuery.isError;
 
   const filtered = (models ?? []).filter((m: ModelItem) => {
     if (!searchFilter) {
@@ -60,13 +83,22 @@ export default function ModelListScreen() {
   const preferred = filtered.filter(m => m.isPreferred);
   const rest = filtered.filter(m => !m.isPreferred);
 
+  const listContentContainerStyle = useMemo(
+    () => ({ paddingBottom, flexGrow: 1 }) satisfies ViewStyle,
+    [paddingBottom]
+  );
+
   const handleSelect = useCallback(
     (modelId: string) => {
+      setPendingModelId(modelId);
       mutations.updateModel.mutate(
         { kilocodeDefaultModel: addModelPrefix(modelId) },
         {
           onSuccess: () => {
             router.back();
+          },
+          onSettled: () => {
+            setPendingModelId(null);
           },
         }
       );
@@ -77,6 +109,7 @@ export default function ModelListScreen() {
   const renderItem = useCallback(
     ({ item }: { item: ModelItem }) => {
       const selected = currentModel === item.id;
+      const isRowPending = mutations.updateModel.isPending && pendingModelId === item.id;
       return (
         <Pressable
           className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
@@ -84,13 +117,20 @@ export default function ModelListScreen() {
             handleSelect(item.id);
           }}
           disabled={mutations.updateModel.isPending}
+          accessibilityState={{ disabled: mutations.updateModel.isPending, busy: isRowPending }}
         >
           <View className="flex-1">
             <Text className="text-sm font-medium">{item.name}</Text>
             <Text className="text-xs text-muted-foreground">{item.id}</Text>
           </View>
-          {item.supportsVision && <Eye size={14} color={colors.mutedForeground} />}
-          {selected && <Check size={16} color={colors.primary} />}
+          {isRowPending ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : (
+            <>
+              {item.supportsVision && <Eye size={14} color={colors.mutedForeground} />}
+              {selected && <Check size={16} color={colors.primary} />}
+            </>
+          )}
         </Pressable>
       );
     },
@@ -98,6 +138,7 @@ export default function ModelListScreen() {
       currentModel,
       handleSelect,
       mutations.updateModel.isPending,
+      pendingModelId,
       colors.mutedForeground,
       colors.primary,
     ]
@@ -132,6 +173,7 @@ export default function ModelListScreen() {
       <ScreenHeader title="All Models" />
       <View className="px-4 pb-2 pt-2">
         <TextInput
+          key={searchKey}
           className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
           placeholder="Search models..."
           placeholderTextColor={colors.mutedForeground}
@@ -150,7 +192,13 @@ export default function ModelListScreen() {
       )}
       {isError && (
         <View className="flex-1 items-center justify-center">
-          <QueryError message="Could not load models" onRetry={() => void refetch()} />
+          <QueryError
+            message="Could not load models"
+            onRetry={() => {
+              void refetch();
+              void configQuery.refetch();
+            }}
+          />
         </View>
       )}
       {!isLoading && !isError && (
@@ -159,7 +207,25 @@ export default function ModelListScreen() {
           keyExtractor={(item, index) =>
             item.type === 'header' ? `header-${item.title}` : `model-${item.model.id}-${index}`
           }
-          contentContainerStyle={{ paddingBottom }}
+          contentContainerStyle={listContentContainerStyle}
+          ListEmptyComponent={
+            <EmptyState
+              icon={Search}
+              title={searchFilter ? 'No models match your search' : 'No models available'}
+              description={
+                searchFilter
+                  ? `No results for "${searchFilter}"`
+                  : 'Models will appear here once available.'
+              }
+              action={
+                searchFilter ? (
+                  <Button variant="outline" size="sm" onPress={handleClearSearch}>
+                    <Text>Clear search</Text>
+                  </Button>
+                ) : undefined
+              }
+            />
+          }
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (

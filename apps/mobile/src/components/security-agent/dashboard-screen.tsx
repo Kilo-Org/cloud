@@ -247,8 +247,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               disabled={triggerSync.isPending}
               accessibilityRole="button"
               accessibilityLabel="Sync findings"
-              className="min-h-11 justify-center active:opacity-70"
+              accessibilityState={{ disabled: triggerSync.isPending, busy: triggerSync.isPending }}
+              className="min-h-11 flex-row items-center gap-1.5 active:opacity-70"
             >
+              {triggerSync.isPending && (
+                <SpinningIcon icon={RefreshCw} size={12} color={colors.mutedForeground} spinning />
+              )}
               <Text className="text-xs font-medium text-primary">Sync findings</Text>
             </Pressable>
             <Pressable

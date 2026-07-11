@@ -21,6 +21,8 @@ const START_BLOCKING_STATUSES = new Set([
   'stopping',
   'shutting_down',
   'destroying',
+  'recovering',
+  'restoring',
 ]);
 const REDEPLOY_BLOCKING_STATUSES = new Set([
   'starting',
@@ -28,6 +30,8 @@ const REDEPLOY_BLOCKING_STATUSES = new Set([
   'stopping',
   'shutting_down',
   'destroying',
+  'recovering',
+  'restoring',
 ]);
 
 export function InstanceControls({ status, mutations }: Readonly<InstanceControlsProps>) {

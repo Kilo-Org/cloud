@@ -175,10 +175,18 @@ export function OnboardingFlow() {
   // skip re-provisioning: the DO row is live and the subsequent `channels-skipped`
   // step-save effects will re-apply any identity / exec-preset changes idempotently.
   const alreadyProvisioned = state.provisionSuccess && state.sandboxId !== null;
+  const instanceStopped = state.instanceStatus === 'stopped';
+  const startInstanceMutate = mutations.start.mutate;
   const handleStart = useCallback(
     (userLocation: string | null) => {
       if (alreadyProvisioned) {
         dispatch({ type: 'start-requested' });
+        // A stopped instance never restarts on its own — without this the
+        // `instance_stopped` terminal state's "Try again" just loops back
+        // to itself (nothing re-provisions, nothing starts).
+        if (instanceStopped) {
+          startInstanceMutate(undefined);
+        }
         return;
       }
       dispatch({ type: 'start-requested' });
@@ -208,7 +216,7 @@ export function OnboardingFlow() {
         }
       );
     },
-    [alreadyProvisioned, mutations.provision]
+    [alreadyProvisioned, instanceStopped, startInstanceMutate, mutations.provision]
   );
 
   // Save the bot identity to the instance as soon as both the user has

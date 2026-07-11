@@ -355,7 +355,7 @@ export default function NewSessionScreen() {
               autoFocus
             />
           </View>
-          {isModelsError ? (
+          {isModelsError && models.length === 0 ? (
             <QueryError
               placement="top"
               variant="server"
@@ -381,7 +381,7 @@ export default function NewSessionScreen() {
 
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">Repository</Text>
-          {isReposError ? (
+          {isReposError && repoData === undefined ? (
             <QueryError
               placement="top"
               variant="server"

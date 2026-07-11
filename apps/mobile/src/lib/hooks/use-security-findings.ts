@@ -319,8 +319,14 @@ export function useCancelSecurityRemediation(scope: string) {
       }
       toast.error(error.message);
     },
-    onSuccess: () => {
-      toast.success('Remediation cancelled');
+    onSuccess: result => {
+      // 'cancellation_requested' means the attempt was already running and
+      // was only asked to stop — it may still finish and produce a PR.
+      toast.success(
+        result.status === 'cancellation_requested'
+          ? 'Cancellation requested'
+          : 'Remediation cancelled'
+      );
     },
     onSettled: async (_result, _error, vars) => {
       await invalidateRemediationQueries(

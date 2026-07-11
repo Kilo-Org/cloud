@@ -75,32 +75,36 @@ export function useSessionMutations() {
 
   // Optimistic updates already make the row change land instantly, so a
   // second tap before the first mutation settles would just be a duplicate
-  // in-flight request for the same row — drop it instead of firing another.
-  const withPendingGuard = (sessionId: string, run: () => Promise<unknown>) => {
-    if (pendingSessionIds.current.has(sessionId)) {
+  // in-flight request for the same operation — drop it instead of firing
+  // another. Keyed by operation + session so a delete issued while a rename
+  // settles (or vice versa) still goes through.
+  const withPendingGuard = (pendingKey: string, run: () => Promise<unknown>) => {
+    if (pendingSessionIds.current.has(pendingKey)) {
       return;
     }
-    pendingSessionIds.current.add(sessionId);
+    pendingSessionIds.current.add(pendingKey);
     void (async () => {
       try {
         await run();
       } catch {
         // Already surfaced via the mutation's own onError (toast + rollback).
       } finally {
-        pendingSessionIds.current.delete(sessionId);
+        pendingSessionIds.current.delete(pendingKey);
       }
     })();
   };
 
   return {
     deleteSession: (sessionId: string) => {
-      withPendingGuard(sessionId, async () => {
+      withPendingGuard(`delete:${sessionId}`, async () => {
         const result = await deleteSessionMutation.mutateAsync({ session_id: sessionId });
         return result;
       });
     },
     renameSession: (sessionId: string, title: string) => {
-      withPendingGuard(sessionId, async () => {
+      // Title in the key: a re-rename to a different title is a new
+      // operation, only the identical duplicate gets dropped.
+      withPendingGuard(`rename:${sessionId}:${title}`, async () => {
         const result = await renameSessionMutation.mutateAsync({ session_id: sessionId, title });
         return result;
       });

@@ -172,9 +172,20 @@ export function useDeviceAuth(): DeviceAuthResult {
         verificationUrl: undefined,
       });
 
+      // Held in abortReference so cancel() can abort the in-flight POST too —
+      // otherwise a request resolving after Cancel would overwrite the idle
+      // state, start polling, and open the browser anyway.
       const startAbort = new AbortController();
+      abortReference.current = startAbort;
       const startTimeout = setTimeout(() => {
         startAbort.abort();
+        setState({
+          status: 'error',
+          code: undefined,
+          token: undefined,
+          error: 'Failed to start sign in. Please try again.',
+          verificationUrl: undefined,
+        });
       }, START_TIMEOUT_MS);
 
       try {
@@ -183,6 +194,12 @@ export function useDeviceAuth(): DeviceAuthResult {
           headers: { 'Content-Type': 'application/json' },
           signal: startAbort.signal,
         });
+
+        // Cancel can race request completion — if it landed while awaiting,
+        // the user is back on the idle screen; don't revive the flow.
+        if (startAbort.signal.aborted) {
+          return;
+        }
 
         if (!response.ok) {
           setState({
@@ -226,7 +243,13 @@ export function useDeviceAuth(): DeviceAuthResult {
         poll(data.code, abort);
 
         await openAuthBrowser(browserUrl);
-      } catch {
+      } catch (error: unknown) {
+        // An aborted POST is either the 15s start timeout (its callback set
+        // the error state already) or an explicit cancel (stays idle) —
+        // either way there's nothing more to do here.
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
         setState({
           status: 'error',
           code: undefined,

@@ -93,7 +93,9 @@ export function ChatComposer({
   // The backend requires a non-empty prompt even when attachments are present.
   const canSend = hasText && !disabled && !isStreaming && !isSending;
   const showToolbar = isFocused || hasText || upload.attachments.length > 0;
-  const toolbarDisabled = disabled || isStreaming;
+  // isSending locks the input and attachment controls too — otherwise text or
+  // attachments added while the send is in flight get wiped by the success path.
+  const toolbarDisabled = disabled || isStreaming || isSending;
   const paperclipDisabled =
     toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES;
 

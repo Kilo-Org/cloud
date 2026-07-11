@@ -73,11 +73,12 @@ export default function VersionPinScreen() {
 
   // Only a genuine initial-load failure (no cached data yet) is a hard
   // error. A background refetch failure (e.g. a failed Load More page)
-  // must not blank out already-rendered versions or pin status.
+  // must not blank out already-rendered versions or pin status. Compare
+  // against undefined: getMyPin legitimately resolves to null (unpinned).
   if (
-    (myPinQuery.isError && !myPinQuery.data) ||
-    (latestVersionQuery.isError && !latestVersionQuery.data) ||
-    (availableVersionsQuery.isError && !availableVersionsQuery.data)
+    (myPinQuery.isError && myPinQuery.data === undefined) ||
+    (latestVersionQuery.isError && latestVersionQuery.data === undefined) ||
+    (availableVersionsQuery.isError && availableVersionsQuery.data === undefined)
   ) {
     return (
       <View className="flex-1 bg-background">

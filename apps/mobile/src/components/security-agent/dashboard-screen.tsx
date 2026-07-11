@@ -201,9 +201,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         {refreshFailed ? (
-          <Text className="text-xs text-destructive">
-            Could not refresh — showing last synced data.
-          </Text>
+          <Text className="text-xs text-warn">Could not refresh — showing last synced data.</Text>
         ) : null}
 
         {dashboardStats.isLoading ? (
@@ -232,6 +230,39 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             ))}
           </View>
         )}
+
+        {slaEnabled && data && data.sla.overall.total === 0 ? (
+          <View className="flex-row items-center gap-4">
+            <Pressable
+              onPress={() => {
+                triggerSync.mutate(
+                  { repoFullName },
+                  {
+                    onSuccess: () => {
+                      toast.success('Sync queued');
+                    },
+                  }
+                );
+              }}
+              disabled={triggerSync.isPending}
+              accessibilityRole="button"
+              accessibilityLabel="Sync findings"
+              className="min-h-11 justify-center active:opacity-70"
+            >
+              <Text className="text-xs font-medium text-primary">Sync findings</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Manage repositories"
+              className="min-h-11 justify-center active:opacity-70"
+            >
+              <Text className="text-xs font-medium text-primary">Manage repositories</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {dashboardStats.isError && !data ? (
           <QueryError

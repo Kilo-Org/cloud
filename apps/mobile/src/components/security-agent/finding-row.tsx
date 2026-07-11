@@ -96,7 +96,7 @@ function FindingRowQuickAction({
       <Button
         variant="secondary"
         size="sm"
-        className="mt-1 h-8 self-start px-3"
+        className="mt-1 self-start px-3"
         onPress={() => {
           void Linking.openURL(prUrl);
         }}
@@ -112,7 +112,7 @@ function FindingRowQuickAction({
       <Button
         variant="secondary"
         size="sm"
-        className="mt-1 h-8 self-start px-3"
+        className="mt-1 self-start px-3"
         disabled={startAnalysis.isPending || !hasAnalysisCapacity}
         onPress={() => {
           startAnalysis.mutate({

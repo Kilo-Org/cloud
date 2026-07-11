@@ -1,10 +1,11 @@
 import { type SecurityFindingFilters } from '@kilocode/app-shared/security-agent';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Info } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
+import { EmptyState } from '@/components/empty-state';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
-import { Text } from '@/components/ui/text';
 import {
   clearSecurityFindingFilterBridge,
   getSecurityFindingFilterBridge,
@@ -36,10 +37,13 @@ export default function SecurityAgentFilterFindingsRoute() {
 
   if (!bridge) {
     return (
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text variant="muted" className="text-sm">
-          No filters available
-        </Text>
+      <View className="flex-1 bg-background">
+        <EmptyState
+          icon={Info}
+          className="flex-1"
+          title="No filters available"
+          description="Go back and reopen filters from the findings list."
+        />
       </View>
     );
   }

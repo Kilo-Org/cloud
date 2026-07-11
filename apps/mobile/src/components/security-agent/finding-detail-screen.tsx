@@ -140,8 +140,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               }}
               accessibilityRole="button"
               accessibilityLabel="Dismiss finding"
-              hitSlop={8}
-              className="active:opacity-70"
+              className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />
             </Pressable>
@@ -155,7 +154,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             <Pressable
               key={key}
               className={cn(
-                'flex-1 items-center rounded-lg py-2 active:opacity-80',
+                'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
                 selected ? 'bg-primary' : 'bg-secondary'
               )}
               onPress={() => {

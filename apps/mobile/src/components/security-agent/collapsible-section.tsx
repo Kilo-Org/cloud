@@ -49,6 +49,7 @@ export function CollapsibleSection({
     >
       <Pressable
         className="flex-row items-center justify-between gap-2"
+        hitSlop={12}
         onPress={() => {
           setExpanded(current => !current);
         }}

@@ -146,7 +146,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               hasAnalysisCapacity={hasAnalysisCapacity}
             />
           )}
-          contentContainerClassName="gap-3 px-6 pt-4"
+          contentContainerClassName="grow gap-3 px-6 pt-4"
           contentContainerStyle={{ paddingBottom }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={() => {
@@ -165,11 +165,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           ListEmptyComponent={
             <EmptyState
               icon={ShieldCheck}
-              className="pt-16"
-              title={filtersActive ? 'No matching findings' : 'No open findings'}
+              title={filtersActive ? 'No findings match filters' : 'No open findings'}
               description={
                 filtersActive
-                  ? 'No findings match the selected filters.'
+                  ? 'Try adjusting or clearing the selected filters.'
                   : 'No open findings need attention right now.'
               }
               action={
@@ -180,7 +179,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                       setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
                     }}
                   >
-                    <Text>Reset filters</Text>
+                    <Text>Clear filters</Text>
                   </Button>
                 ) : undefined
               }

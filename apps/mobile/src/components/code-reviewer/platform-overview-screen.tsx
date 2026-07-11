@@ -213,7 +213,7 @@ export function PlatformOverviewScreen({
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">
               {platform === 'gitlab' && hasWebhookSyncWarning && (
-                <View className="flex-row items-center justify-between rounded-lg bg-amber-100 p-4 dark:bg-amber-950">
+                <View className="flex-row items-center justify-between rounded-lg bg-warn-tile-bg p-4">
                   <View className="flex-1 pr-3">
                     <Text className="text-sm font-medium">Webhook setup incomplete</Text>
                     <Text variant="muted" className="text-xs">

@@ -262,10 +262,8 @@ export function SettingsCard({
             ))}
         </View>
         {item.configured ? (
-          <View className="rounded-full bg-green-500/15 px-2 py-0.5">
-            <Text className="text-xs font-medium text-green-600 dark:text-green-400">
-              Connected
-            </Text>
+          <View className="rounded-full bg-good-tile-bg px-2 py-0.5">
+            <Text className="text-xs font-medium text-good">Connected</Text>
           </View>
         ) : (
           <View className="rounded-full bg-muted px-2 py-0.5">

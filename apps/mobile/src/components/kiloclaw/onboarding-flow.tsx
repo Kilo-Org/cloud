@@ -418,7 +418,7 @@ export function OnboardingFlow() {
   } else if (isChannelsStep && !hasError) {
     headerRight = instanceReady ? (
       <View className="flex-row items-center gap-1.5">
-        <View className="h-2 w-2 rounded-full bg-green-500" />
+        <View className="h-2 w-2 rounded-full bg-good" />
         <Text className="text-xs text-muted-foreground">Ready</Text>
       </View>
     ) : (

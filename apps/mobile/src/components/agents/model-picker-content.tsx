@@ -137,7 +137,7 @@ export function ModelPickerContent() {
   if (!bridge) {
     return (
       <PickerSheet
-        title="Select Model"
+        title="Select model"
         onDone={closePicker}
         scrollable={false}
         fallback={
@@ -152,7 +152,7 @@ export function ModelPickerContent() {
   }
 
   return (
-    <PickerSheet title="Select Model" onDone={closePicker} scrollable={false}>
+    <PickerSheet title="Select model" onDone={closePicker} scrollable={false}>
       <FlatList
         className="flex-1 bg-background"
         data={rows}
@@ -178,7 +178,7 @@ export function ModelPickerContent() {
             {favoritesError ? (
               <View className="mx-4 mb-3 flex-row items-center gap-1.5">
                 <AlertCircle size={14} color={colors.destructive} />
-                <Text className="text-xs text-red-600 dark:text-red-400">{favoritesError}</Text>
+                <Text className="text-xs text-destructive">{favoritesError}</Text>
               </View>
             ) : null}
           </View>

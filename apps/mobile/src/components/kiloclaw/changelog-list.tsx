@@ -13,18 +13,18 @@ type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data'
 const DEPLOY_HINTS: Record<string, { label: string; bgClass: string; textClass: string }> = {
   redeploy_suggested: {
     label: 'Redeploy suggested',
-    bgClass: 'bg-blue-100 dark:bg-blue-950',
-    textClass: 'text-blue-700 dark:text-blue-300',
+    bgClass: 'bg-info-tile-bg',
+    textClass: 'text-info',
   },
   redeploy_required: {
     label: 'Redeploy required',
-    bgClass: 'bg-amber-100 dark:bg-amber-950',
-    textClass: 'text-amber-700 dark:text-amber-300',
+    bgClass: 'bg-warn-tile-bg',
+    textClass: 'text-warn',
   },
   upgrade_required: {
     label: 'Upgrade required',
-    bgClass: 'bg-red-100 dark:bg-red-950',
-    textClass: 'text-red-700 dark:text-red-300',
+    bgClass: 'bg-danger-tile-bg',
+    textClass: 'text-destructive',
   },
 };
 
@@ -80,7 +80,7 @@ export function ChangelogList({
             )}
             {entry.deployHint === 'upgrade_required' && (
               <Button size="sm" variant="outline" onPress={onUpgrade} className="self-start">
-                <Text>Manage Version</Text>
+                <Text>Manage version</Text>
               </Button>
             )}
           </View>

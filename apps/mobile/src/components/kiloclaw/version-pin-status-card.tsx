@@ -53,17 +53,15 @@ export function VersionPinStatusCard({
             )}
           </View>
           {isPinnedByAdmin && (
-            <Text className="text-xs text-amber-600 dark:text-amber-400">
+            <Text className="text-xs text-warn">
               Pinned by admin — contact your admin to change.
             </Text>
           )}
         </>
       ) : (
         <View className="flex-row items-center gap-2">
-          <View className="rounded-full bg-green-200 dark:bg-green-900 px-2 py-0.5">
-            <Text className="text-xs font-medium text-green-800 dark:text-green-100">
-              Following latest
-            </Text>
+          <View className="rounded-full bg-good-tile-bg px-2 py-0.5">
+            <Text className="text-xs font-medium text-good">Following latest</Text>
           </View>
           {latestVersion && (
             <Text variant="muted" className="text-xs">

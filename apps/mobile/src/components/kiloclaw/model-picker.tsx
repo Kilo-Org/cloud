@@ -31,7 +31,7 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     iconColorKey: 'agentYuki',
     cost: 3,
     performance: 3,
-    performanceDotColor: 'bg-purple-400',
+    performanceDotColor: 'bg-agent-yuki',
   },
   {
     id: 'kilo-auto/balanced',
@@ -42,7 +42,7 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     iconColorKey: 'agentSky',
     cost: 2,
     performance: 2,
-    performanceDotColor: 'bg-blue-400',
+    performanceDotColor: 'bg-agent-sky',
   },
 ];
 

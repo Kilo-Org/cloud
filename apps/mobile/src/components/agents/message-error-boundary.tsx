@@ -30,8 +30,8 @@ export class MessageErrorBoundary extends Component<Props, State> {
   override render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <View className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950">
-          <Text className="text-xs text-red-600 dark:text-red-400">Failed to render content</Text>
+        <View className="rounded-lg border border-danger-tile-border bg-danger-tile-bg px-3 py-2">
+          <Text className="text-xs text-destructive">Failed to render content</Text>
         </View>
       );
     }

@@ -24,11 +24,11 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 const STATUS_CLASSNAME: Record<CodeReviewStatus, string> = {
   pending: 'text-muted-foreground',
   queued: 'text-muted-foreground',
-  running: 'text-blue-600 dark:text-blue-400',
-  completed: 'text-green-600 dark:text-green-400',
+  running: 'text-info',
+  completed: 'text-good',
   failed: 'text-destructive',
   cancelled: 'text-muted-foreground',
-  interrupted: 'text-amber-600 dark:text-amber-400',
+  interrupted: 'text-warn',
 };
 
 type ReviewListData = NonNullable<ReturnType<typeof useReviewList>['data']>;
@@ -55,7 +55,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Recent Reviews" eyebrow="Code Reviewer" />
+      <ScreenHeader title="Recent reviews" eyebrow="Code Reviewer" />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (

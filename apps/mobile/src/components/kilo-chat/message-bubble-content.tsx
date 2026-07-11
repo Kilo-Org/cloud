@@ -126,9 +126,7 @@ export function MessageBubbleContent({
       {deliveryFailureLabel && (
         <View className="mt-2 flex-row items-center gap-1.5">
           <AlertCircle size={14} color={colors.destructive} />
-          <Text className="text-xs font-medium text-red-600 dark:text-red-400">
-            {deliveryFailureLabel}
-          </Text>
+          <Text className="text-xs font-medium text-destructive">{deliveryFailureLabel}</Text>
         </View>
       )}
     </>

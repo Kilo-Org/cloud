@@ -47,6 +47,10 @@
   --warn-tile-border: #9f661233;
   --danger-tile-bg: #be4e3f1a;
   --danger-tile-border: #be4e3f33;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+  --info-tile-bg: #2563eb1a;
+  --info-tile-border: #2563eb33;
 
   /* Per-agent hues + pre-tinted tile pairs.
    * The *-tile-bg (10% alpha) and *-tile-border (20% alpha) tokens exist
@@ -114,6 +118,10 @@
     --warn-tile-border: #f2b05f33;
     --danger-tile-bg: #f28b7a1a;
     --danger-tile-border: #f28b7a33;
+    --info: #60a5fa;
+    --info-foreground: #0e0e10;
+    --info-tile-bg: #60a5fa1a;
+    --info-tile-border: #60a5fa33;
 
     /* Per-agent hues + pre-tinted tile pairs (dark values) */
     --agent-yuki: #a78bfa;
@@ -175,6 +183,10 @@
   --color-warn-tile-border: var(--warn-tile-border);
   --color-danger-tile-bg: var(--danger-tile-bg);
   --color-danger-tile-border: var(--danger-tile-border);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-tile-bg: var(--info-tile-bg);
+  --color-info-tile-border: var(--info-tile-border);
 
   /* Per-agent colors (Tailwind classes: bg-agent-yuki, bg-agent-yuki-tile-bg, ...) */
   --color-agent-yuki: var(--agent-yuki);

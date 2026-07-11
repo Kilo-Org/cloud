@@ -40,7 +40,7 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
             </ScrollView>
           ) : null}
           {error ? (
-            <Text selectable className="text-xs text-red-500">
+            <Text selectable className="text-xs text-destructive">
               {error}
             </Text>
           ) : null}

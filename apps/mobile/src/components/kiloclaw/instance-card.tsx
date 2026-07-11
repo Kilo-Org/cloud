@@ -152,8 +152,8 @@ export function KiloClawCard({
           </View>
         </Pressable>
         {hasUnread ? (
-          <View className="min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5">
-            <Text className="text-xs font-semibold leading-none text-white">
+          <View className="min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5">
+            <Text className="text-xs font-semibold leading-none text-destructive-foreground">
               {formatUnreadCount(unreadCount)}
             </Text>
           </View>

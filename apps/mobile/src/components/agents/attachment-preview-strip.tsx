@@ -37,7 +37,7 @@ function AttachmentChip({
       className={cn(
         'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
         isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2',
-        isErrored && 'border-red-500 active:opacity-70 dark:border-red-400'
+        isErrored && 'border-destructive active:opacity-70'
       )}
       accessibilityRole={isErrored ? 'button' : undefined}
       accessibilityLabel={

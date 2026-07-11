@@ -279,7 +279,7 @@ function getStatusBorderColor(status: string, colors: ThemeColors): string {
   if (status === 'completed') {
     return colors.good;
   }
-  return colors.agentSky;
+  return colors.info;
 }
 
 function StatusBadge({ status }: Readonly<{ status: string }>) {
@@ -295,22 +295,22 @@ function StatusBadge({ status }: Readonly<{ status: string }>) {
 
 function getStatusBgClass(status: string): string {
   if (status === 'completed') {
-    return 'bg-green-100 dark:bg-green-900';
+    return 'bg-good-tile-bg';
   }
   if (status === 'error') {
-    return 'bg-red-100 dark:bg-red-900';
+    return 'bg-danger-tile-bg';
   }
-  return 'bg-blue-100 dark:bg-blue-900';
+  return 'bg-info-tile-bg';
 }
 
 function getStatusTextClass(status: string): string {
   if (status === 'completed') {
-    return 'text-green-700 dark:text-green-300';
+    return 'text-good';
   }
   if (status === 'error') {
-    return 'text-red-700 dark:text-red-300';
+    return 'text-destructive';
   }
-  return 'text-blue-700 dark:text-blue-300';
+  return 'text-info';
 }
 
 function truncateText(text: string, maxLength: number): string {

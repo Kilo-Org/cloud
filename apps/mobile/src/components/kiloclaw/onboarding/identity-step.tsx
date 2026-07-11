@@ -68,7 +68,7 @@ function locationFeedbackClassName(status: 'validated' | 'service_unavailable' |
     return 'text-destructive';
   }
   if (status === 'service_unavailable') {
-    return 'text-amber-700 dark:text-amber-400';
+    return 'text-warn';
   }
   return 'text-muted-foreground';
 }

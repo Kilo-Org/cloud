@@ -9,7 +9,7 @@ export function ConnectivityBanner() {
   const colors = useThemeColors();
   return (
     <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-      <View className="flex-row items-center justify-center gap-2 bg-yellow-50 px-4 py-2 dark:bg-yellow-950">
+      <View className="flex-row items-center justify-center gap-2 bg-warn-tile-bg px-4 py-2">
         <WifiOff size={14} color={colors.mutedForeground} />
         <Text className="text-sm text-muted-foreground">No internet connection</Text>
       </View>

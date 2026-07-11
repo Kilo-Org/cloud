@@ -50,8 +50,8 @@ export function VersionPinRow({
           <View className="flex-row items-center gap-2">
             <Text className="text-sm font-medium">{item.openclaw_version}</Text>
             {isLatest && (
-              <View className="rounded-full bg-blue-600 px-1.5 py-0.5">
-                <Text className="text-[10px] font-semibold text-white">latest</Text>
+              <View className="rounded-full bg-info px-1.5 py-0.5">
+                <Text className="text-[10px] font-semibold text-info-foreground">latest</Text>
               </View>
             )}
           </View>
@@ -96,7 +96,7 @@ export function VersionPinRow({
               accessibilityState={{ busy: isConfirmingThis }}
             />
             {isPinnedByAdmin && adminPinLabel && (
-              <Text className="text-xs text-amber-600 dark:text-amber-400">
+              <Text className="text-xs text-warn">
                 This replaces the admin-set pin (currently {adminPinLabel}).
               </Text>
             )}

@@ -164,7 +164,7 @@ export function ReviewDetailScreen({
         </View>
 
         {review.error_message ? (
-          <View className="rounded-lg bg-red-100 p-3 dark:bg-red-950">
+          <View className="rounded-lg bg-danger-tile-bg p-3">
             <Text className="text-xs text-destructive">{review.error_message}</Text>
           </View>
         ) : null}

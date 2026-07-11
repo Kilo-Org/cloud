@@ -117,7 +117,7 @@ export default function GoogleScreen() {
   }
 
   function handleRedeploy() {
-    Alert.alert('Redeploy Instance', 'Are you sure you want to redeploy this instance?', [
+    Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Redeploy',
@@ -150,13 +150,13 @@ export default function GoogleScreen() {
               <View
                 className={cn(
                   'px-2 py-1 rounded-full',
-                  isConnected ? 'bg-green-200 dark:bg-green-900' : 'bg-muted'
+                  isConnected ? 'bg-good-tile-bg' : 'bg-muted'
                 )}
               >
                 <Text
                   className={cn(
                     'text-xs font-medium',
-                    isConnected ? 'text-green-800 dark:text-green-100' : 'text-muted-foreground'
+                    isConnected ? 'text-good' : 'text-muted-foreground'
                   )}
                 >
                   {isConnected ? 'Connected' : 'Not connected'}
@@ -168,8 +168,8 @@ export default function GoogleScreen() {
           {!isConnected && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-4">
               {showRedeployPrompt && (
-                <View className="flex-row items-center gap-3 rounded-lg bg-amber-100 p-3 dark:bg-amber-950">
-                  <Text className="flex-1 text-xs text-amber-700 dark:text-amber-300">
+                <View className="flex-row items-center gap-3 rounded-lg bg-warn-tile-bg p-3">
+                  <Text className="flex-1 text-xs text-warn">
                     Google account disconnected. Redeploy your instance to apply the change.
                   </Text>
                   <Button
@@ -187,7 +187,7 @@ export default function GoogleScreen() {
                 </View>
               )}
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Setup Command
+                Setup command
               </Text>
               <Text variant="muted" className="text-xs">
                 Run this command in a terminal with Docker installed on your own computer to connect
@@ -233,7 +233,7 @@ export default function GoogleScreen() {
               <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">
                 <View className="flex-row items-center gap-3">
                   <GmailIcon size={20} />
-                  <Text className="flex-1 text-base font-semibold">Gmail Notifications</Text>
+                  <Text className="flex-1 text-base font-semibold">Gmail notifications</Text>
                   <Button
                     size="sm"
                     variant={gmailEnabled ? 'default' : 'outline'}

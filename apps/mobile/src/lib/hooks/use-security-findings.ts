@@ -267,9 +267,22 @@ export function useRetrySecurityRemediation(scope: string) {
   });
 }
 
+function getSecurityAnalysisQueryKey(
+  trpc: ReturnType<typeof useTRPC>,
+  scope: string,
+  findingId: string
+) {
+  return isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getAnalysis.queryKey({ findingId })
+    : trpc.organizations.securityAgent.getAnalysis.queryKey({ organizationId: scope, findingId });
+}
+
 // cancelRemediation resolves synchronously (no background command to track),
 // so — unlike start/retry — we invalidate the affected queries ourselves
-// once the immediate result comes back.
+// once the immediate result comes back. Reuses invalidateRemediationQueries
+// (the same helper start/retry use) so the analysis query — the one that
+// actually owns remediationAttempts — is never left stale, which the
+// hand-rolled invalidation list here used to miss.
 export function useCancelSecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -282,40 +295,38 @@ export function useCancelSecurityRemediation(scope: string) {
             organizationId: scope,
             attemptId: vars.attemptId,
           }),
-    onError: error => {
+    onMutate: async vars => {
+      const analysisQueryKey = getSecurityAnalysisQueryKey(trpc, scope, vars.findingId);
+      await queryClient.cancelQueries({ queryKey: analysisQueryKey });
+      const previous = queryClient.getQueryData<SecurityAnalysis>(analysisQueryKey);
+      queryClient.setQueryData<SecurityAnalysis>(analysisQueryKey, old =>
+        old
+          ? {
+              ...old,
+              remediationAttempts: old.remediationAttempts.map(attempt =>
+                attempt.id === vars.attemptId
+                  ? { ...attempt, cancellationRequestedAt: new Date().toISOString() }
+                  : attempt
+              ),
+            }
+          : old
+      );
+      return { previous, analysisQueryKey };
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.analysisQueryKey, context.previous);
+      }
       toast.error(error.message);
     },
-    onSuccess: async (_result, vars) => {
-      if (isPersonalSecurityScope(scope)) {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getFinding.queryKey({ id: vars.findingId }),
-          }),
-          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
-          }),
-        ]);
-        return;
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getFinding.queryKey({
-            organizationId: scope,
-            id: vars.findingId,
-          }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.listFindings.queryKey({
-            organizationId: scope,
-          }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey({
-            organizationId: scope,
-          }),
-        }),
-      ]);
+    onSuccess: () => {
+      toast.success('Remediation cancelled');
+    },
+    onSettled: async (_result, _error, vars) => {
+      await invalidateRemediationQueries(
+        { trpc, queryClient },
+        { scope, findingId: vars.findingId }
+      );
     },
   });
 }

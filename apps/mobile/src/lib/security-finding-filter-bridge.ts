@@ -4,7 +4,7 @@ import { type SecurityFindingFilters } from '@kilocode/app-shared/security-agent
 // agent-chat picker bridges in picker-bridge.ts: the caller sets it right
 // before pushing the formSheet route, the route reads it once focused, and
 // clears it on blur so a stale bridge never leaks into the next visit.
-export type SecurityFindingFilterRepositoryOption = {
+type SecurityFindingFilterRepositoryOption = {
   fullName: string;
 };
 

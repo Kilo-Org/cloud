@@ -131,7 +131,7 @@ export function FindingRemediationPanel({
           {startRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text className="text-primary-foreground">Start fix</Text>
+          <Text className="text-primary-foreground">Start remediation</Text>
         </Button>
       ) : null}
 
@@ -146,7 +146,7 @@ export function FindingRemediationPanel({
           {retryRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.foreground} />
           ) : null}
-          <Text>Retry fix</Text>
+          <Text>Retry remediation</Text>
         </Button>
       ) : null}
 
@@ -178,7 +178,7 @@ export function FindingRemediationPanel({
           {cancelRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text>Cancel fix</Text>
+          <Text>Cancel remediation</Text>
         </Button>
       ) : null}
 
@@ -200,6 +200,10 @@ export function FindingRemediationPanel({
         <CollapsibleSection
           title={`Attempt history (${remediationAttempts.length})`}
           defaultExpanded={remediationAttempts.length <= 2}
+          // Attempt rows below are already their own card surface — a second
+          // bg-secondary card wrapping them read as a card nested in a card.
+          // Transparent wrapper: one visible surface per attempt, not two.
+          className="bg-transparent"
         >
           <View className="gap-3">
             {remediationAttempts.map(attempt => {

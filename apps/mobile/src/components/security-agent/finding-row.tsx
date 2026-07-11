@@ -45,10 +45,10 @@ function getNextActionLabel(finding: SecurityFinding): string | null {
     return 'Remediation in progress';
   }
   if (capability.canRetry) {
-    return 'Retry fix available';
+    return 'Retry remediation available';
   }
   if (capability.canStart) {
-    return 'Fix available';
+    return 'Remediation available';
   }
   const needsAnalysis =
     finding.status === 'open' && (!finding.analysis_status || finding.analysis_status === 'failed');

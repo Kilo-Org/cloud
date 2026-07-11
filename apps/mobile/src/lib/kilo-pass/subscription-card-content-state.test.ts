@@ -169,7 +169,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'open-store-management',
         actionLabel: 'Manage',
-        description: '$19 monthly credits · Ends June 8, 2026',
+        description: '$19 monthly credits · Ends 6/8/2026',
         title: 'Kilo Pass canceling',
       },
     });
@@ -212,7 +212,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'none',
         actionLabel: null,
-        description: '$19 monthly credits · Ends June 8, 2026 · Managed in App Store',
+        description: '$19 monthly credits · Ends 6/8/2026 · Managed in App Store',
         title: 'Kilo Pass canceling',
       },
     });

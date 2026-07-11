@@ -59,7 +59,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'none',
       actionLabel: null,
-      description: '$49 monthly credits · Ends June 8, 2026 · This Kilo Pass is managed on web',
+      description: '$49 monthly credits · Ends 6/8/2026 · This Kilo Pass is managed on web',
       title: 'Kilo Pass canceling',
     });
   });
@@ -108,7 +108,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'open-store-management',
       actionLabel: 'Manage',
-      description: '$19 monthly credits · Ends June 8, 2026',
+      description: '$19 monthly credits · Ends 6/8/2026',
       title: 'Kilo Pass canceling',
     });
   });
@@ -148,7 +148,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'none',
       actionLabel: null,
-      description: '$19 monthly credits · Ends June 8, 2026 · Managed in App Store',
+      description: '$19 monthly credits · Ends 6/8/2026 · Managed in App Store',
       title: 'Kilo Pass canceling',
     });
   });
@@ -182,7 +182,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'none',
       actionLabel: null,
-      description: '$49 monthly credits · Ends June 8, 2026 · Managed on Google Play',
+      description: '$49 monthly credits · Ends 6/8/2026 · Managed on Google Play',
       title: 'Kilo Pass canceling',
     });
   });
@@ -196,7 +196,7 @@ describe('getKiloPassSubscriptionCardState', () => {
         refillAt: '2026-06-08 15:21:05+00',
         status: 'active',
       }).description
-    ).toContain('June 8, 2026');
+    ).toContain('6/8/2026');
   });
 
   it('treats canceled App Store-managed subscriptions as unsubscribed', () => {

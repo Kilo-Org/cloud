@@ -31,6 +31,10 @@ export function ReasoningSettingsModal({
           }}
         >
           <Text className="text-base font-semibold text-foreground">Reasoning</Text>
+          {/* The native Switch below is the single accessible control (it already
+              exposes an accessibility switch role/state on its own); this row is
+              a visual hit-target only, so a screen reader doesn't see two nested
+              switches. */}
           <Pressable
             onPress={() => {
               if (!hasLoaded) {
@@ -39,10 +43,8 @@ export function ReasoningSettingsModal({
               setDefaultExpanded(!defaultExpanded);
             }}
             disabled={!hasLoaded}
+            accessible={false}
             className="flex-row items-center justify-between gap-3 rounded-lg p-2 active:opacity-70 disabled:opacity-50"
-            accessibilityRole="switch"
-            accessibilityState={{ checked: defaultExpanded, disabled: !hasLoaded }}
-            accessibilityLabel="Expand reasoning by default"
             hitSlop={
               Platform.OS === 'android' ? { top: 12, bottom: 12, left: 12, right: 12 } : undefined
             }
@@ -59,6 +61,7 @@ export function ReasoningSettingsModal({
               value={defaultExpanded}
               onValueChange={setDefaultExpanded}
               disabled={!hasLoaded}
+              accessibilityLabel="Expand reasoning by default"
               trackColor={{ false: colors.muted, true: colors.accentSoft }}
               thumbColor={defaultExpanded ? colors.accentSoftForeground : '#FFFFFF'}
             />

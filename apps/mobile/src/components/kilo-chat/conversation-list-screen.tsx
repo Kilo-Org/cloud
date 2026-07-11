@@ -4,7 +4,14 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  RefreshControl,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
+import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
 import { EmptyConversationList } from './empty-conversation-list';
 import { groupConversationsByActivity } from './conversation-list-groups';
@@ -47,7 +55,6 @@ type ConversationHeaderItem = {
 type ConversationListEntry = ConversationHeaderItem | ConversationItem;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const TAB_BAR_FAB_CLEARANCE = 72;
 const FAB_SIZE = 56;
 const FAB_MARGIN = 16;
 
@@ -102,21 +109,22 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
+  const tabBarOverlayHeight = getTabBarOverlayHeight(bottom, Platform.OS);
   const listContentContainerStyle = useMemo(
     () =>
       ({
         flexGrow: 1,
-        paddingBottom: Math.max(bottom, 16) + TAB_BAR_FAB_CLEARANCE + FAB_SIZE + FAB_MARGIN,
+        paddingBottom: tabBarOverlayHeight + FAB_SIZE + FAB_MARGIN,
       }) satisfies ViewStyle,
-    [bottom]
+    [tabBarOverlayHeight]
   );
   const createButtonStyle = useMemo(
     () =>
       ({
-        bottom: Math.max(bottom, 16) + TAB_BAR_FAB_CLEARANCE,
+        bottom: tabBarOverlayHeight + FAB_MARGIN,
         right: 20,
       }) satisfies ViewStyle,
-    [bottom]
+    [tabBarOverlayHeight]
   );
 
   useInstancePresence(sandboxId);

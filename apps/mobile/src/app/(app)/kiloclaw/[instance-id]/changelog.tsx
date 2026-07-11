@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function ChangelogScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -20,6 +21,7 @@ export default function ChangelogScreen() {
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const changelogQuery = useKiloClawChangelog(organizationId);
   const entries = changelogQuery.data;
+  const paddingBottom = useDetailScreenBottomPadding();
 
   function renderContent() {
     if (changelogQuery.isPending) {
@@ -69,7 +71,11 @@ export default function ChangelogScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="What's New" />
-      <ScrollView contentContainerClassName="px-4 py-4 gap-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="px-4 pt-4 gap-4"
+        contentContainerStyle={{ paddingBottom }}
+        showsVerticalScrollIndicator={false}
+      >
         <View className="gap-3">
           <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Recent Updates

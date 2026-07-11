@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function SecretsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -19,6 +20,7 @@ export default function SecretsScreen() {
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const mutations = useKiloClawMutations(organizationId);
   const catalogQuery = useKiloClawSecretCatalog(organizationId);
+  const paddingBottom = useDetailScreenBottomPadding();
   const isLoading = catalogQuery.isPending;
 
   function renderContent() {
@@ -86,6 +88,7 @@ export default function SecretsScreen() {
       <View className="flex-1">
         <ScrollView
           contentContainerClassName="pt-4 gap-3"
+          contentContainerStyle={{ paddingBottom }}
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"

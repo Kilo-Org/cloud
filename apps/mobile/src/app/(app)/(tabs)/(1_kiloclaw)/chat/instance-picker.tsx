@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
 import { QueryError } from '@/components/query-error';
@@ -16,6 +17,7 @@ export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { currentId } = useLocalSearchParams<{ currentId: string }>();
+  const { bottom } = useSafeAreaInsets();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
 
@@ -30,7 +32,10 @@ export default function InstancePickerScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ paddingBottom: bottom + 16 }}
+    >
       <View className="border-b border-border px-4 pb-3 pt-4">
         <View className="h-11 flex-row items-center justify-center">
           <Text className="text-lg font-semibold text-foreground">Switch Instance</Text>

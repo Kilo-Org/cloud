@@ -18,6 +18,7 @@ import {
   useKiloClawMutations,
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 export default function GoogleScreen() {
@@ -27,6 +28,7 @@ export default function GoogleScreen() {
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
+  const paddingBottom = useDetailScreenBottomPadding();
 
   const [copied, setCopied] = useState(false);
 
@@ -109,7 +111,11 @@ export default function GoogleScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Google Account" />
-      <ScrollView contentContainerClassName="px-4 py-4 gap-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="px-4 pt-4 gap-4"
+        contentContainerStyle={{ paddingBottom }}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
           {/* Connection status card */}
           <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center">

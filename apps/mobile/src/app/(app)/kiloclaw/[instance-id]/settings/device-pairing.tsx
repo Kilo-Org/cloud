@@ -27,6 +27,7 @@ import {
   useKiloClawMutations,
   useKiloClawPairing,
 } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -46,6 +47,7 @@ export default function DevicePairingScreen() {
   const pairingQuery = useKiloClawPairing(organizationId);
   const devicePairingQuery = useKiloClawDevicePairing(organizationId);
   const mutations = useKiloClawMutations(organizationId);
+  const paddingBottom = useDetailScreenBottomPadding();
 
   const isLoading = pairingQuery.isPending || devicePairingQuery.isPending;
 
@@ -171,7 +173,11 @@ export default function DevicePairingScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Device Pairing" headerRight={refreshButton} />
-      <ScrollView contentContainerClassName="px-4 py-4 gap-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="px-4 pt-4 gap-4"
+        contentContainerStyle={{ paddingBottom }}
+        showsVerticalScrollIndicator={false}
+      >
         {channelRequests.length > 0 && (
           <Animated.View entering={FadeIn.duration(200)} className="gap-3">
             <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">

@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawChannelCatalog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function ChannelsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -19,6 +20,7 @@ export default function ChannelsScreen() {
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const catalogQuery = useKiloClawChannelCatalog(organizationId);
   const mutations = useKiloClawMutations(organizationId);
+  const paddingBottom = useDetailScreenBottomPadding();
 
   const isLoading = catalogQuery.isPending;
 
@@ -85,7 +87,8 @@ export default function ChannelsScreen() {
       <ScreenHeader title="Channels" />
       <View className="flex-1">
         <ScrollView
-          contentContainerClassName="py-4 gap-4"
+          contentContainerClassName="pt-4 gap-4"
+          contentContainerStyle={{ paddingBottom }}
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"

@@ -17,6 +17,7 @@ import {
   useKiloClawMutations,
   useKiloClawMyPin,
 } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -34,6 +35,7 @@ export default function VersionPinScreen() {
   const latestVersionQuery = useKiloClawLatestVersion();
   const availableVersionsQuery = useKiloClawAvailableVersions(organizationId);
   const mutations = useKiloClawMutations(organizationId);
+  const paddingBottom = useDetailScreenBottomPadding();
   const pendingReasonRef = useRef('');
   const [pendingItem, setPendingItem] = useState<VersionItem>();
   const flatListRef = useRef<FlatList<VersionItem>>(null);
@@ -221,7 +223,8 @@ export default function VersionPinScreen() {
         data={versions}
         keyExtractor={item => item.image_tag}
         renderItem={renderVersionItem}
-        contentContainerClassName="px-4 py-4 gap-4"
+        contentContainerClassName="px-4 pt-4 gap-4"
+        contentContainerStyle={{ paddingBottom }}
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"

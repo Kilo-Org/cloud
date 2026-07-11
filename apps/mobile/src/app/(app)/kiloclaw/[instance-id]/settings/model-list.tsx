@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, Eye } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
@@ -12,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 import { useTRPC } from '@/lib/trpc';
@@ -30,7 +30,7 @@ export default function ModelListScreen() {
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const paddingBottom = useDetailScreenBottomPadding();
   const trpc = useTRPC();
   const [searchFilter, setSearchFilter] = useState('');
 
@@ -159,7 +159,7 @@ export default function ModelListScreen() {
           keyExtractor={(item, index) =>
             item.type === 'header' ? `header-${item.title}` : `model-${item.model.id}-${index}`
           }
-          contentContainerStyle={{ paddingBottom: Math.max(bottom, 16) }}
+          contentContainerStyle={{ paddingBottom }}
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (

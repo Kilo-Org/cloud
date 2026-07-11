@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BillingBanner } from '@/components/kiloclaw/billing-banner';
 import {
@@ -40,11 +39,12 @@ import {
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatModelName, stripModelPrefix } from '@/lib/model-id';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const paddingBottom = useDetailScreenBottomPadding();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
   const organizationId =
@@ -186,7 +186,7 @@ export default function DashboardScreen() {
       <ScrollView
         className="flex-1"
         contentContainerClassName="flex-grow"
-        contentContainerStyle={{ paddingBottom: 32 + bottom }}
+        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

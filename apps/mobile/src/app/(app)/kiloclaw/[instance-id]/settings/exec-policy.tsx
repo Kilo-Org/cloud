@@ -11,6 +11,7 @@ import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { type ExecPreset, execPresetToConfig } from '@/lib/onboarding';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 type PolicyOption = {
@@ -58,6 +59,7 @@ export default function ExecPolicyScreen() {
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
+  const paddingBottom = useDetailScreenBottomPadding();
 
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
 
@@ -116,7 +118,11 @@ export default function ExecPolicyScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Execution Policy" />
-      <ScrollView contentContainerClassName="px-4 py-4 gap-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="px-4 pt-4 gap-4"
+        contentContainerStyle={{ paddingBottom }}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View entering={FadeIn.duration(200)} className="gap-3">
           {POLICY_OPTIONS.map(option => {
             const Icon = option.icon;

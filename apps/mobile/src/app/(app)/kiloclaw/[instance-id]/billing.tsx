@@ -14,6 +14,7 @@ import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { formatBillingDate, formatRemainingDays } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 function DetailRow({
@@ -98,6 +99,7 @@ export default function BillingScreen() {
   const instanceContext = useInstanceContext(instanceId);
   const isOrg = instanceContext.status === 'ready' && instanceContext.isOrg;
   const colors = useThemeColors();
+  const paddingBottom = useDetailScreenBottomPadding();
 
   const billingQuery = useKiloClawBillingStatus(instanceContext.status === 'ready' && !isOrg);
   const billing = billingQuery.data;
@@ -156,7 +158,11 @@ export default function BillingScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Billing" />
-      <ScrollView contentContainerClassName="gap-4 px-4 py-4" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerClassName="gap-4 px-4 pt-4"
+        contentContainerStyle={{ paddingBottom }}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
           {/* Plan details */}
           <View className="bg-secondary rounded-lg px-4">

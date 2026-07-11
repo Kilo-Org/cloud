@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, useLocalSearchParams } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Check, Lock } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
@@ -8,11 +8,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import {
-  parseReviewerPlatform,
-  PLATFORM_CAPABILITIES,
-  type ReviewerPlatform,
-} from '@/lib/code-reviewer-config';
+import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   useBitbucketReadiness,
   useGitHubRepositories,
@@ -21,22 +17,17 @@ import {
   useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { parseParam } from '@/lib/route-params';
 
 export default function ReposRoute() {
-  const { scope: rawScope, platform: rawPlatform } = useLocalSearchParams<{
-    scope: string;
-    platform: string;
-  }>();
-  const scope = parseParam(rawScope);
-  const platform = scope ? parseReviewerPlatform(scope, rawPlatform) : null;
+  const params = useValidatedReviewerRouteParams();
 
-  if (!scope || !platform) {
+  if (!params) {
     return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
   }
 
-  return <ReposRouteContent scope={scope} platform={platform} />;
+  return <ReposRouteContent scope={params.scope} platform={params.platform} />;
 }
 
 function ReposRouteContent({

@@ -194,12 +194,14 @@ function gitLabWebhookWarningQueryKey(scope: string, platform: ReviewerPlatform)
  * Durable warning surfaced when a GitLab config save partially fails to
  * sync repository webhooks (`saveReviewConfig` still resolves `success:
  * true` in that case — the sync errors are nested in `webhookSync.errors`
- * and easy to miss). Stored in the query cache rather than component
- * state so it survives navigation until the caller dismisses it (e.g.
- * after the user retries webhook setup).
+ * and easy to miss). Stored in the query cache rather than component state
+ * so it survives navigation. `useSaveReviewConfig`'s mutationFn recomputes
+ * this flag from the fresh `webhookSync.errors` on every successful save
+ * (including a "Retry" that just resubmits the current config), so it
+ * clears itself once the sync actually succeeds — there is no separate
+ * dismiss action.
  */
 export function useGitLabWebhookWarning(scope: string, platform: ReviewerPlatform) {
-  const queryClient = useQueryClient();
   const queryKey = gitLabWebhookWarningQueryKey(scope, platform);
   const { data } = useQuery({
     queryKey,
@@ -208,12 +210,7 @@ export function useGitLabWebhookWarning(scope: string, platform: ReviewerPlatfor
     staleTime: Infinity,
   });
 
-  return {
-    hasWebhookSyncWarning: data,
-    dismissWebhookSyncWarning: () => {
-      queryClient.setQueryData<boolean>(queryKey, false);
-    },
-  };
+  return { hasWebhookSyncWarning: data };
 }
 
 export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {

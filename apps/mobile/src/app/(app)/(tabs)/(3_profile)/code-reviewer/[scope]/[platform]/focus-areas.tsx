@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, useLocalSearchParams } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
@@ -7,32 +7,23 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import {
-  parseReviewerPlatform,
-  REVIEW_FOCUS_AREAS,
-  type ReviewerPlatform,
-} from '@/lib/code-reviewer-config';
+import { REVIEW_FOCUS_AREAS, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   useReviewConfig,
   useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { parseParam } from '@/lib/route-params';
 
 export default function FocusAreasRoute() {
-  const { scope: rawScope, platform: rawPlatform } = useLocalSearchParams<{
-    scope: string;
-    platform: string;
-  }>();
-  const scope = parseParam(rawScope);
-  const platform = scope ? parseReviewerPlatform(scope, rawPlatform) : null;
+  const params = useValidatedReviewerRouteParams();
 
-  if (!scope || !platform) {
+  if (!params) {
     return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
   }
 
-  return <FocusAreasRouteContent scope={scope} platform={platform} />;
+  return <FocusAreasRouteContent scope={params.scope} platform={params.platform} />;
 }
 
 function FocusAreasRouteContent({

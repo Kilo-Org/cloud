@@ -8,7 +8,7 @@ import {
   ScrollText,
   ShieldCheck,
 } from 'lucide-react-native';
-import { Switch, View } from 'react-native';
+import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -32,6 +32,7 @@ import {
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
@@ -40,16 +41,14 @@ export function PlatformOverviewScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
+  const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const config = useReviewConfig(scope, platform);
   const toggle = useToggleReviewer(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const canEdit = useCanEditReviewer(scope);
-  const { hasWebhookSyncWarning, dismissWebhookSyncWarning } = useGitLabWebhookWarning(
-    scope,
-    platform
-  );
+  const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useAvailableModels(
     scope === PERSONAL_SCOPE ? undefined : scope
   );
@@ -199,12 +198,15 @@ export function PlatformOverviewScreen({
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-row gap-2"
                     disabled={save.isPending}
                     onPress={() => {
-                      dismissWebhookSyncWarning();
                       save.mutate({});
                     }}
                   >
+                    {save.isPending ? (
+                      <ActivityIndicator size="small" color={colors.mutedForeground} />
+                    ) : null}
                     <Text>Retry</Text>
                   </Button>
                 </View>

@@ -1,5 +1,5 @@
 import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { deriveMobileOnboardingStateFromBilling } from '@/lib/derive-mobile-onboarding-state';
@@ -206,16 +206,19 @@ export function useKiloClawAvailableVersions(
 ) {
   const trpc = useTRPC();
   const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId);
+  // keepPreviousData: `limit` grows as the caller loads more pages — without
+  // this, bumping it would blank the already-rendered list while the bigger
+  // page refetches.
   const personal = useQuery(
     trpc.kiloclaw.listAvailableVersions.queryOptions(
       { offset, limit },
-      { enabled: personalEnabled, staleTime: 5 * 60_000 }
+      { enabled: personalEnabled, staleTime: 5 * 60_000, placeholderData: keepPreviousData }
     )
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.listAvailableVersions.queryOptions(
       { ...orgInput, offset, limit },
-      { enabled: orgEnabled, staleTime: 5 * 60_000 }
+      { enabled: orgEnabled, staleTime: 5 * 60_000, placeholderData: keepPreviousData }
     )
   );
   return isOrg ? org : personal;

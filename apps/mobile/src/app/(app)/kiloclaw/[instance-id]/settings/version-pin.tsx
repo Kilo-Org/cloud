@@ -1,10 +1,12 @@
-import { Check } from 'lucide-react-native';
+import { PackageSearch } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Alert, FlatList, TextInput, View } from 'react-native';
+import { Alert, FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { EmptyState } from '@/components/empty-state';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
+import { type VersionItem, VersionPinRow } from '@/components/kiloclaw/version-pin-row';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -18,22 +20,18 @@ import {
   useKiloClawMyPin,
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-type VersionItem = NonNullable<
-  ReturnType<typeof useKiloClawAvailableVersions>['data']
->['items'][number];
+const PAGE_SIZE = 25;
 
 export default function VersionPinScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
   const organizationId =
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
-  const colors = useThemeColors();
   const myPinQuery = useKiloClawMyPin(organizationId);
   const latestVersionQuery = useKiloClawLatestVersion();
-  const availableVersionsQuery = useKiloClawAvailableVersions(organizationId);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const availableVersionsQuery = useKiloClawAvailableVersions(organizationId, 0, limit);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
   const pendingReasonRef = useRef('');
@@ -41,6 +39,9 @@ export default function VersionPinScreen() {
   const flatListRef = useRef<FlatList<VersionItem>>(null);
 
   const isLoading = myPinQuery.isPending || latestVersionQuery.isPending;
+  // Only one pin/unpin mutation should ever be in flight at a time — while
+  // either is pending, every pin control is disabled so they can't race.
+  const isPinMutating = mutations.setMyPin.isPending || mutations.removeMyPin.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
@@ -88,6 +89,10 @@ export default function VersionPinScreen() {
   const myPin = myPinQuery.data;
   const latestVersion = latestVersionQuery.data;
   const versions = availableVersionsQuery.data?.items ?? [];
+  const pagination = availableVersionsQuery.data?.pagination;
+  const hasMoreVersions = pagination != null && versions.length < pagination.totalCount;
+  const isFetchingMoreVersions =
+    availableVersionsQuery.isFetching && !availableVersionsQuery.isPending;
 
   const isPinnedByAdmin = myPin != null && !myPin.pinnedBySelf;
 
@@ -144,74 +149,33 @@ export default function VersionPinScreen() {
 
   function renderVersionItem({ item }: { item: VersionItem }) {
     const isPinned = myPin?.image_tag === item.image_tag;
-    const publishedAgo = item.published_at ? timeAgo(parseTimestamp(item.published_at)) : undefined;
     const isLatest = latestVersion?.imageTag === item.image_tag;
-    const showVariant = item.variant && item.variant !== 'default';
-    const isPending = pendingItem?.image_tag === item.image_tag;
+    const isDraftOpen = pendingItem?.image_tag === item.image_tag;
+    const isConfirmingThis = isDraftOpen && mutations.setMyPin.isPending;
 
     return (
-      <View>
-        <View className="flex-row items-center gap-3 py-3">
-          <View className="flex-1 gap-0.5">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-sm font-medium">{item.openclaw_version}</Text>
-              {isLatest && (
-                <View className="rounded-full bg-blue-600 px-1.5 py-0.5">
-                  <Text className="text-[10px] font-semibold text-white">latest</Text>
-                </View>
-              )}
-            </View>
-            {Boolean(publishedAgo ?? showVariant) && (
-              <Text variant="muted" className="text-xs">
-                {[publishedAgo, showVariant ? item.variant : null].filter(Boolean).join(' · ')}
-              </Text>
-            )}
-          </View>
-          {isPinned ? (
-            <Check size={18} color={colors.foreground} />
-          ) : (
-            <Button
-              size="sm"
-              variant={isPending ? 'default' : 'outline'}
-              onPress={() => {
-                if (isPending) {
-                  cancelPin();
-                } else {
-                  handlePin(item);
-                }
-              }}
-            >
-              <Text>{isPending ? 'Cancel' : 'Pin'}</Text>
-            </Button>
-          )}
-        </View>
-        {isPending && (
-          <Animated.View entering={FadeIn.duration(150)} className="border-t border-border">
-            <View className="py-3 gap-3">
-              <Text className="text-xs font-medium text-muted-foreground">Reason (optional)</Text>
-              <TextInput
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
-                placeholder="Why are you pinning this version?"
-                placeholderTextColor={colors.mutedForeground}
-                onFocus={scrollToPendingItem}
-                onChangeText={val => {
-                  if (val.length <= 500) {
-                    pendingReasonRef.current = val;
-                  }
-                }}
-                autoCapitalize="sentences"
-                autoCorrect
-                multiline
-                maxLength={500}
-              />
-              <Button size="sm" disabled={mutations.setMyPin.isPending} onPress={confirmPin}>
-                <Check size={14} color={colors.primaryForeground} />
-                <Text className="text-xs text-primary-foreground">Confirm Pin</Text>
-              </Button>
-            </View>
-          </Animated.View>
-        )}
-      </View>
+      <VersionPinRow
+        item={item}
+        isPinned={isPinned}
+        isLatest={isLatest}
+        isDraftOpen={isDraftOpen}
+        isPinMutating={isPinMutating}
+        isConfirmingThis={isConfirmingThis}
+        isPinnedByAdmin={isPinnedByAdmin}
+        adminPinLabel={myPin ? (myPin.openclaw_version ?? myPin.image_tag) : null}
+        onToggle={() => {
+          if (isDraftOpen) {
+            cancelPin();
+          } else {
+            handlePin(item);
+          }
+        }}
+        onFocusReason={scrollToPendingItem}
+        onReasonChange={val => {
+          pendingReasonRef.current = val;
+        }}
+        onConfirm={confirmPin}
+      />
     );
   }
 
@@ -246,7 +210,13 @@ export default function VersionPinScreen() {
                       )}
                     </View>
                     {!isPinnedByAdmin && (
-                      <Button size="sm" variant="outline" onPress={handleUnpin}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={mutations.removeMyPin.isPending}
+                        disabled={isPinMutating}
+                        onPress={handleUnpin}
+                      >
                         <Text>Unpin</Text>
                       </Button>
                     )}
@@ -284,7 +254,31 @@ export default function VersionPinScreen() {
         ListEmptyComponent={
           availableVersionsQuery.isPending ? (
             <Skeleton className="h-12 w-full rounded-lg" />
-          ) : undefined
+          ) : (
+            <EmptyState
+              icon={PackageSearch}
+              title="No versions available"
+              description="Available OpenClaw versions will appear here."
+              className="px-0 pt-4"
+              placement="top"
+            />
+          )
+        }
+        ListFooterComponent={
+          hasMoreVersions ? (
+            <View className="items-center pt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                loading={isFetchingMoreVersions}
+                onPress={() => {
+                  setLimit(l => l + PAGE_SIZE);
+                }}
+              >
+                <Text>Load more versions</Text>
+              </Button>
+            </View>
+          ) : null
         }
         className="rounded-lg bg-secondary"
       />

@@ -13,7 +13,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
+type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
 const VARIANT_META: Record<
   QueryErrorVariant,

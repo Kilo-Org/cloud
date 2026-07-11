@@ -616,6 +616,55 @@ describe('send message cache settlement', () => {
     expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
   });
 
+  it('leaves exactly one message when a retried send settles after the original failed row', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8Y0000000000000000003');
+    const failedOriginal = message({
+      id: '01KQK8Y2222222222222222224',
+      senderId: 'user-current',
+      content: textContent('never delivered'),
+      deliveryFailed: true,
+    });
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, {
+      pageParams: [undefined],
+      pages: [messagePage([failedOriginal])],
+    });
+
+    const pendingId = 'pending-01KQK8Y1111111111111111113';
+    const retryOptimisticMessage = message({
+      id: pendingId,
+      senderId: 'user-current',
+      content: textContent('never delivered'),
+    });
+    const context = applyOptimisticSendMessageToCache(
+      queryClient,
+      queryKey,
+      pendingId,
+      retryOptimisticMessage
+    );
+    const resentMessage = message({
+      id: '01KQK8Y3333333333333333334',
+      senderId: 'user-current',
+      content: textContent('never delivered'),
+    });
+    settleSendMessageSuccess(
+      queryClient,
+      {
+        messageId: resentMessage.id,
+        clientId: '01KQK8Y1111111111111111113',
+        message: resentMessage,
+      },
+      context
+    );
+
+    // Mirrors handleRetrySend's onSuccess cache surgery: drop the original
+    // failed row now that the resend has settled successfully.
+    removeMessageFromCache(queryClient, queryKey, failedOriginal.id);
+
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(result?.pages.flatMap(page => page.messages)).toEqual([resentMessage]);
+  });
+
   it('creates the first page for message.created events when the messages cache is cold', () => {
     const queryClient = new QueryClient();
     const queryKey = messagesKey('01KQK8Z0000000000000000000');

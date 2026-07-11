@@ -1,5 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useEditMessage } from '@kilocode/kilo-chat-hooks';
+import { messagesKey, removeMessageFromCache, useEditMessage } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageEditContent,
   contentBlocksToText,
@@ -59,6 +60,7 @@ export function useConversationMessageController({
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [scrollToNewestRequest, setScrollToNewestRequest] = useState(0);
 
+  const queryClient = useQueryClient();
   const sendMutation = useSendMessage(client, conversationId, currentUserId);
   const editMessage = useEditMessage(client, conversationId);
   const editingTextValue = useMemo(
@@ -105,6 +107,10 @@ export function useConversationMessageController({
         }),
         {
           onSuccess: () => {
+            // The resend settled a brand-new message row; drop the original
+            // failed row so retrying doesn't leave a permanent "Not
+            // delivered" duplicate alongside the delivered message.
+            removeMessageFromCache(queryClient, messagesKey(conversationId), message.id);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: err => {
@@ -113,7 +119,7 @@ export function useConversationMessageController({
         }
       );
     },
-    [conversationId, sendMutation]
+    [conversationId, queryClient, sendMutation]
   );
 
   const messageActions = useConversationMessageActions({

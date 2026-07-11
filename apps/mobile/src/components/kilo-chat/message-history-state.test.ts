@@ -21,6 +21,12 @@ describe('getMessageHistoryContentState', () => {
       'ready'
     );
   });
+
+  it('prefers cached data over a refetch error', () => {
+    expect(getMessageHistoryContentState({ isPending: false, isError: true, hasData: true })).toBe(
+      'stale-error'
+    );
+  });
 });
 
 describe('shouldMarkLatestMessageRead', () => {

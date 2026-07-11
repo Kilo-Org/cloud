@@ -13,6 +13,7 @@ import { ConversationHeader } from './conversation-header';
 import {
   ConversationHistoryErrorView,
   ConversationHistoryLoadingView,
+  ConversationInlineRetryBanner,
 } from './conversation-history-state-views';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
@@ -78,7 +79,8 @@ export function ConversationScreen({
     isError: messagesQuery.isError,
     hasData: messagesQuery.data !== undefined,
   });
-  const hasInitialMessages = messageHistoryState === 'ready';
+  const hasInitialMessages =
+    messageHistoryState === 'ready' || messageHistoryState === 'stale-error';
   const messages = hasInitialMessages ? (messagesQuery.data?.messages ?? []) : [];
   const fetchOlder = useCallback(() => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
@@ -217,6 +219,14 @@ export function ConversationScreen({
         onSwitchInstance={handleSwitchInstance}
         onOpenOptions={handleOpenConversationOptions}
       />
+      {messageHistoryState === 'stale-error' ? (
+        <ConversationInlineRetryBanner
+          message="Couldn't refresh messages"
+          onRetry={() => {
+            void messagesQuery.refetch();
+          }}
+        />
+      ) : null}
       <AppAwareKeyboardPaddingView className="flex-1">
         <MessageList
           client={client}

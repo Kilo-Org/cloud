@@ -5,7 +5,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type Props = {
-  title: string;
+  title?: string;
   subtitle?: string;
   canSwitchInstance?: boolean;
   onSwitchInstance?: () => void;

@@ -25,7 +25,7 @@ describe('shouldRenderConversationScreen', () => {
   it('does not render while the conversation detail is loading', () => {
     expect(
       shouldRenderConversationScreen({
-        detail: { data: undefined, isError: false },
+        detail: { data: undefined, error: undefined, isError: false },
         routeSandboxId: 'sandbox-1',
       })
     ).toBe(false);
@@ -42,6 +42,7 @@ describe('shouldRenderConversationScreen', () => {
               { id: 'bot:kiloclaw:sandbox-1', kind: 'bot' },
             ],
           },
+          error: undefined,
           isError: false,
         },
         routeSandboxId: 'sandbox-1',
@@ -62,10 +63,36 @@ describe('getConversationRouteDecision', () => {
               { id: 'bot:kiloclaw:sandbox-b', kind: 'bot' },
             ],
           },
+          error: undefined,
           isError: false,
         },
         routeSandboxId: 'sandbox-a',
       })
     ).toBe('not-found');
+  });
+
+  it('redirects (not-found) for a confirmed forbidden/not-found API error', () => {
+    expect(
+      getConversationRouteDecision({
+        detail: { data: undefined, error: new KiloChatApiError(404, {}), isError: true },
+        routeSandboxId: 'sandbox-1',
+      })
+    ).toBe('not-found');
+  });
+
+  it('surfaces a retryable error in place for transport/server failures', () => {
+    expect(
+      getConversationRouteDecision({
+        detail: { data: undefined, error: new Error('network down'), isError: true },
+        routeSandboxId: 'sandbox-1',
+      })
+    ).toBe('retryable-error');
+
+    expect(
+      getConversationRouteDecision({
+        detail: { data: undefined, error: new KiloChatApiError(500, {}), isError: true },
+        routeSandboxId: 'sandbox-1',
+      })
+    ).toBe('retryable-error');
   });
 });

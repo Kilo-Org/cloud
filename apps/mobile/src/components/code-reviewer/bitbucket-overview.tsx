@@ -14,11 +14,14 @@ import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   classifyProviderState,
@@ -27,6 +30,7 @@ import {
   useSaveReviewConfig,
   type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
+import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -191,9 +195,22 @@ export function BitbucketOverview({
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">
               {readiness.data?.ready === false && (
-                <Text className="text-center text-xs text-muted-foreground">
-                  Setup incomplete — finish configuration on kilo.ai
-                </Text>
+                <View className="items-center gap-2 rounded-lg bg-secondary p-4">
+                  <Text className="text-center text-xs text-muted-foreground">
+                    Setup incomplete — finish configuration on kilo.ai
+                  </Text>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onPress={() => {
+                      void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
+                        label: 'Bitbucket setup',
+                      });
+                    }}
+                  >
+                    <Text>Finish setup</Text>
+                  </Button>
+                </View>
               )}
 
               <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">

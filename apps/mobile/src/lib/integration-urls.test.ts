@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getGitLabIntegrationUrl } from './integration-urls';
+import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from './integration-urls';
 
 describe('getGitLabIntegrationUrl', () => {
   it('builds personal and organization GitLab integration URLs', () => {
@@ -9,6 +9,17 @@ describe('getGitLabIntegrationUrl', () => {
     );
     expect(getGitLabIntegrationUrl('https://app.kilo.ai/', 'org_123')).toBe(
       'https://app.kilo.ai/organizations/org_123/integrations/gitlab'
+    );
+  });
+});
+
+describe('getBitbucketIntegrationUrl', () => {
+  it('links to the org code-reviews page with the Bitbucket tab selected', () => {
+    expect(getBitbucketIntegrationUrl('https://app.kilo.ai', 'org_123')).toBe(
+      'https://app.kilo.ai/organizations/org_123/code-reviews?platform=bitbucket'
+    );
+    expect(getBitbucketIntegrationUrl('https://app.kilo.ai/', 'org_123')).toBe(
+      'https://app.kilo.ai/organizations/org_123/code-reviews?platform=bitbucket'
     );
   });
 });

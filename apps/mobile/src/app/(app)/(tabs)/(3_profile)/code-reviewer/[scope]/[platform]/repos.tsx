@@ -1,15 +1,22 @@
 import * as Haptics from 'expo-haptics';
 import { type Href } from 'expo-router';
-import { Check, Lock } from 'lucide-react-native';
+import { Check, FolderGit2, Lock } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
+import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import {
+  PERSONAL_SCOPE,
   useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
@@ -20,6 +27,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { cn } from '@/lib/utils';
 
 export default function ReposRoute() {
@@ -58,13 +66,63 @@ function ReposRouteContent({
         }))
       : [];
   const reposByPlatform = {
-    github: { isLoading: githubRepos.isLoading, rows: githubRepos.data?.repositories ?? [] },
-    gitlab: { isLoading: gitlabRepos.isLoading, rows: gitlabRepos.data?.repositories ?? [] },
-    bitbucket: { isLoading: bitbucketReadiness.isLoading, rows: bitbucketRepos },
+    github: {
+      isLoading: githubRepos.isLoading,
+      isError: githubRepos.isError,
+      isFetching: githubRepos.isFetching,
+      refetch: () => void githubRepos.refetch(),
+      rows: githubRepos.data?.repositories ?? [],
+    },
+    gitlab: {
+      isLoading: gitlabRepos.isLoading,
+      isError: gitlabRepos.isError,
+      isFetching: gitlabRepos.isFetching,
+      refetch: () => void gitlabRepos.refetch(),
+      rows: gitlabRepos.data?.repositories ?? [],
+    },
+    bitbucket: {
+      isLoading: bitbucketReadiness.isLoading,
+      isError: bitbucketReadiness.isError,
+      isFetching: bitbucketReadiness.isFetching,
+      refetch: () => void bitbucketReadiness.refetch(),
+      rows: bitbucketRepos,
+    },
   };
-  const { isLoading: reposLoading, rows: repoRows } = reposByPlatform[platform];
+  const {
+    isLoading: reposLoading,
+    isError: reposError,
+    isFetching: reposFetching,
+    refetch: refetchRepos,
+    rows: repoRows,
+  } = reposByPlatform[platform];
   const selectedIds = data?.selectedRepositoryIds ?? [];
   const configDisabled = data == null;
+  const bitbucketNotReady =
+    platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
+  const confirmedEmpty =
+    !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
+  const orgScope = scope === PERSONAL_SCOPE ? undefined : scope;
+  const manageRepoAccessUrlByPlatform: Partial<Record<ReviewerPlatform, string>> = {
+    github: getGitHubIntegrationUrl(WEB_BASE_URL, orgScope),
+    gitlab: getGitLabIntegrationUrl(WEB_BASE_URL, orgScope),
+  };
+  const manageRepoAccessUrl = manageRepoAccessUrlByPlatform[platform];
+  const emptyStateCopyByPlatform: Record<ReviewerPlatform, { title: string; description: string }> =
+    {
+      github: {
+        title: 'Install the GitHub app on repositories',
+        description: 'Grant the Kilo GitHub App access to the repositories you want reviewed.',
+      },
+      gitlab: {
+        title: 'No repositories found',
+        description: 'You may need to grant access to more groups or projects on GitLab.',
+      },
+      bitbucket: {
+        title: 'No repositories found',
+        description: 'No repositories are available in this Bitbucket workspace.',
+      },
+    };
+  const emptyStateCopy = emptyStateCopyByPlatform[platform];
 
   const setMode = (nextMode: 'all' | 'selected') => {
     void Haptics.selectionAsync();
@@ -120,13 +178,57 @@ function ReposRouteContent({
                 <Skeleton className="h-12 w-full rounded-lg" />
               </View>
             )}
-            {!reposLoading &&
-              platform === 'bitbucket' &&
-              bitbucketReadiness.data?.repositoryCache.status !== 'available' && (
-                <Text variant="muted" className="pt-2 text-xs">
+
+            {!reposLoading && reposError && (
+              <QueryError
+                variant="server"
+                placement="top"
+                title="Could not load repositories"
+                onRetry={refetchRepos}
+                isRetrying={reposFetching}
+              />
+            )}
+
+            {!reposLoading && !reposError && bitbucketNotReady && (
+              <View className="items-center gap-2 pt-2">
+                <Text variant="muted" className="text-center text-xs">
                   Repositories unavailable — finish Bitbucket setup on kilo.ai.
                 </Text>
-              )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => {
+                    void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
+                      label: 'Bitbucket setup',
+                    });
+                  }}
+                >
+                  <Text>Finish setup</Text>
+                </Button>
+              </View>
+            )}
+
+            {confirmedEmpty && (
+              <EmptyState
+                placement="top"
+                icon={FolderGit2}
+                title={emptyStateCopy.title}
+                description={emptyStateCopy.description}
+                action={
+                  manageRepoAccessUrl ? (
+                    <Button
+                      variant="outline"
+                      onPress={() => {
+                        void openExternalUrl(manageRepoAccessUrl, { label: 'repository access' });
+                      }}
+                    >
+                      <Text>Manage access</Text>
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )}
+
             {repoRows.map(repo => (
               <Pressable
                 key={repo.id}

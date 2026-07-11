@@ -4,7 +4,7 @@ import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import { type ConversationDetailResponse } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 import { Alert, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -112,6 +112,10 @@ export function ConversationScreen({
 
   const handleSwitchInstance = useCallback(() => {
     router.push(chatInstancePickerPath(sandboxId));
+  }, [router, sandboxId]);
+
+  const handleOpenInstance = useCallback(() => {
+    router.push(`/(app)/kiloclaw/${sandboxId}/dashboard` as Href);
   }, [router, sandboxId]);
 
   const handleOpenConversationOptions = useCallback(() => {
@@ -264,6 +268,8 @@ export function ConversationScreen({
           disabled={messageController.inputAvailability.disabled}
           submitDisabled={messageController.inputAvailability.submitDisabled}
           disabledReason={messageController.inputAvailability.disabledReason}
+          showInstanceCta={messageController.inputAvailability.showInstanceCta}
+          onOpenInstance={handleOpenInstance}
           initialText={messageController.editingText}
           isEditing={messageController.editingMessage !== null}
           editableAttachments={messageController.visibleEditingAttachments}

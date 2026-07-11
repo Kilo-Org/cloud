@@ -19,6 +19,8 @@ type Props = {
   controlsDisabled: boolean;
   disabled?: boolean;
   disabledReason?: string | null;
+  showInstanceCta?: boolean;
+  onOpenInstance?: () => void;
   draftLength: number;
   editableAttachmentRows: QueuedAttachment[];
   inputHeight: number;
@@ -51,6 +53,8 @@ export function MessageInputView({
   controlsDisabled,
   disabled,
   disabledReason,
+  showInstanceCta,
+  onOpenInstance,
   draftLength,
   editableAttachmentRows,
   inputHeight,
@@ -104,8 +108,18 @@ export function MessageInputView({
         </View>
       )}
       {disabledReason && (
-        <View className="mb-2 rounded-md bg-secondary px-3 py-2">
-          <Text className="text-xs text-muted-foreground">{disabledReason}</Text>
+        <View className="mb-2 flex-row items-center justify-between gap-2 rounded-md bg-secondary px-3 py-2">
+          <Text className="flex-1 text-xs text-muted-foreground">{disabledReason}</Text>
+          {showInstanceCta && onOpenInstance ? (
+            <Pressable
+              onPress={onOpenInstance}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open instance"
+            >
+              <Text className="text-xs font-medium text-foreground">Open instance</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
       {attachmentQueue && (

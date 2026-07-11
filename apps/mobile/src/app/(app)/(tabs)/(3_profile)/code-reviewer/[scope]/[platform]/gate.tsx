@@ -40,7 +40,7 @@ function GateThresholdRouteContent({
 
   return (
     <OptionList
-      title="Merge Gate"
+      title="Merge gate"
       options={GATE_THRESHOLDS}
       selected={data?.gateThreshold}
       descriptions={DESCRIPTIONS}

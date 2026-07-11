@@ -75,7 +75,7 @@ function showDeleteConfirm(onDelete: () => void) {
 /** iOS-only — uses Alert.prompt which is unavailable on Android. */
 function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => void) {
   Alert.prompt(
-    'Rename Session',
+    'Rename session',
     'Enter a new name for this session',
     [
       { text: 'Cancel', style: 'cancel' },

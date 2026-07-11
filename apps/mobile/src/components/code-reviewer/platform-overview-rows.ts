@@ -71,7 +71,7 @@ export function buildOverviewRows({
           {
             field: 'gate',
             icon: Gauge,
-            title: 'Merge Gate',
+            title: 'Merge gate',
             subtitle: capitalize(data.gateThreshold),
           },
         ]

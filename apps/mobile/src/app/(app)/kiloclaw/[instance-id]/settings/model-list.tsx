@@ -153,7 +153,7 @@ export default function ModelListScreen() {
       : []),
     ...(rest.length > 0
       ? [
-          { type: 'header' as const, title: 'All Models' },
+          { type: 'header' as const, title: 'All models' },
           ...rest.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
@@ -170,7 +170,7 @@ export default function ModelListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="All Models" />
+      <ScreenHeader title="All models" />
       <View className="px-4 pb-2 pt-2">
         <TextInput
           key={searchKey}

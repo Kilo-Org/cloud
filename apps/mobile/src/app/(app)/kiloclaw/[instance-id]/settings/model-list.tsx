@@ -162,7 +162,7 @@ export default function ModelListScreen() {
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="All Models" />
+        <ScreenHeader title="All models" />
         <InstanceContextBoundary context={instanceContext} />
       </View>
     );

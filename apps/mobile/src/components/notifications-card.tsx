@@ -139,7 +139,7 @@ export function NotificationsCard() {
         const currentStatus = await getNotificationPermissionStatus();
         if (currentStatus === 'denied') {
           Alert.alert(
-            'Notifications Disabled',
+            'Notifications disabled',
             'To enable notifications, turn them on in your device settings.',
             [
               { text: 'Cancel', style: 'cancel' },
@@ -161,7 +161,7 @@ export function NotificationsCard() {
         }
       } else {
         Alert.alert(
-          'Disable Notifications',
+          'Disable notifications',
           'To disable notifications, turn them off in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -241,7 +241,7 @@ export function NotificationsCard() {
         className={`flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${!permissionGranted ? 'opacity-40' : ''}`}
       >
         <MessageSquare size={18} color={colors.secondaryForeground} />
-        <Text className="flex-1 text-sm font-medium">Chat Messages</Text>
+        <Text className="flex-1 text-sm font-medium">Chat messages</Text>
         {(permissionLoading || tokensLoading || deviceTokenLoading) && (
           <Skeleton className="h-8 w-12 rounded-full" />
         )}

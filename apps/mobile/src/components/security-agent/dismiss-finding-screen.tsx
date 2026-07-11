@@ -35,7 +35,7 @@ type DismissFindingScreenProps = {
 function DismissFindingSkeleton() {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Dismiss Finding" modal />
+      <ScreenHeader title="Dismiss finding" modal />
       <View className="gap-6 px-6 pt-4">
         <Skeleton className="h-[224px] w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
@@ -81,7 +81,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss Finding" modal />
+        <ScreenHeader title="Dismiss finding" modal />
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
@@ -95,7 +95,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (findingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss Finding" modal />
+        <ScreenHeader title="Dismiss finding" modal />
         <QueryError
           className="flex-1"
           message="Could not load this finding"
@@ -108,7 +108,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (capability.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss Finding" modal />
+        <ScreenHeader title="Dismiss finding" modal />
         <QueryError
           className="flex-1"
           message="Could not check dismiss permissions"
@@ -127,7 +127,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (!capability.canManage) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss Finding" modal />
+        <ScreenHeader title="Dismiss finding" modal />
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
@@ -141,7 +141,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   if (finding.status !== 'open') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Dismiss Finding" modal />
+        <ScreenHeader title="Dismiss finding" modal />
         <EmptyState
           icon={ShieldOff}
           className="flex-1"
@@ -154,7 +154,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Dismiss Finding" modal />
+      <ScreenHeader title="Dismiss finding" modal />
       <ScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pb-8 pt-4"

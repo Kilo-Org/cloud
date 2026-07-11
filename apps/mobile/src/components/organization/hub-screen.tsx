@@ -158,7 +158,7 @@ export function OrganizationHubScreen() {
 
       {renameVisible && (
         <RenameModal
-          title="Rename Organization"
+          title="Rename organization"
           placeholder="Enter organization name"
           initialValue={org.organizationName}
           onSave={async name => {

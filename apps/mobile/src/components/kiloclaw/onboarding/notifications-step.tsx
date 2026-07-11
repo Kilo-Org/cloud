@@ -116,7 +116,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
 
     if (currentStatus === 'denied') {
       Alert.alert(
-        'Notifications Disabled',
+        'Notifications disabled',
         'To enable notifications, turn them on in your device settings.',
         [
           { text: 'Cancel', style: 'cancel' },

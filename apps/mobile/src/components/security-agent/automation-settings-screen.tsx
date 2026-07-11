@@ -180,7 +180,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto Analysis
+            Auto analysis
           </Text>
           <ToggleRow
             title="Enable auto-analysis"
@@ -211,7 +211,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto Remediation
+            Auto remediation
           </Text>
           <ToggleRow
             title="Enable auto-remediation"
@@ -242,7 +242,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto Dismiss
+            Auto dismiss
           </Text>
           <ToggleRow
             title="Enable auto-dismiss"

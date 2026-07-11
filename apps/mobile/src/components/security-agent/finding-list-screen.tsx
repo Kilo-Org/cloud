@@ -82,7 +82,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         // Refresh only — never triggers a new sync.
         const result = await findings.refetch();
         if (result.isError) {
-          toast.error('Could not refresh — showing the last saved findings.');
+          toast.error('Could not refresh. Showing the last saved findings.');
         }
       } finally {
         setRefreshing(false);

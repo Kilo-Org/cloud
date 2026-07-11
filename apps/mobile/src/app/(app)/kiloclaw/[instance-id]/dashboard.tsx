@@ -92,7 +92,7 @@ export default function DashboardScreen() {
         ];
         const results = await Promise.all(refreshes);
         if (results.some(result => result.isError)) {
-          toast.error('Could not refresh — showing the last known status.');
+          toast.error('Could not refresh. Showing the last known status.');
         }
       } finally {
         setManualRefreshing(false);
@@ -163,7 +163,7 @@ export default function DashboardScreen() {
 
   const handleDestroy = () => {
     Alert.alert(
-      'Destroy Instance',
+      'Destroy instance',
       'This will permanently destroy your KiloClaw instance and all its data. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -306,7 +306,7 @@ export default function DashboardScreen() {
 
       {renameVisible && (
         <RenameModal
-          title="Rename Instance"
+          title="Rename instance"
           placeholder="Enter a new name (max 50 characters)"
           initialValue={status?.name ?? ''}
           onSave={async name => {

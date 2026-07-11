@@ -95,7 +95,7 @@ export default function ChannelsScreen() {
                 key={channel.id}
                 item={channel}
                 mutations={mutations}
-                removeAlertTitle="Disconnect Channel"
+                removeAlertTitle="Disconnect channel"
                 removeAlertMessage={`Remove ${channel.label}? This channel will be disconnected.`}
                 successMessage={`${channel.label} connected`}
               />

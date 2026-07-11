@@ -199,7 +199,7 @@ export function SessionFilterModal({
             e.stopPropagation();
           }}
         >
-          <Text className="text-base font-semibold">Filter Sessions</Text>
+          <Text className="text-base font-semibold">Filter sessions</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">

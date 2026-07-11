@@ -83,7 +83,7 @@ function InstructionsRouteContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Custom Instructions" />
+      <ScreenHeader title="Custom instructions" />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="pt-4"

@@ -50,7 +50,7 @@ const TERMINAL_CONTENT: Record<
   query_error: {
     title: "Couldn't check on setup",
     body: name =>
-      `We lost the connection while checking on ${name}'s setup. It may still be running — try again, or check back shortly.`,
+      `We lost the connection while checking on ${name}'s setup. It may still be running. Try again, or check back shortly.`,
   },
   instance_stopped: {
     title: 'Setup stopped',

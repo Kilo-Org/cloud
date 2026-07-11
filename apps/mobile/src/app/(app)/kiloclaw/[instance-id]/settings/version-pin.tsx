@@ -49,7 +49,7 @@ export default function VersionPinScreen() {
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Version Pinning" />
+        <ScreenHeader title="Version pinning" />
         <InstanceContextBoundary context={instanceContext} />
       </View>
     );
@@ -58,7 +58,7 @@ export default function VersionPinScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Version Pinning" />
+        <ScreenHeader title="Version pinning" />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-16 w-full rounded-lg" />
@@ -81,7 +81,7 @@ export default function VersionPinScreen() {
   ) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Version Pinning" />
+        <ScreenHeader title="Version pinning" />
         <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load version information"
@@ -109,7 +109,7 @@ export default function VersionPinScreen() {
   const isPinnedByAdmin = myPin != null && !myPin.pinnedBySelf;
 
   function handleUnpin() {
-    Alert.alert('Unpin Version', 'Switch back to the latest available version?', [
+    Alert.alert('Unpin version', 'Switch back to the latest available version?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Unpin',
@@ -241,7 +241,7 @@ export default function VersionPinScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Version Pinning" />
+      <ScreenHeader title="Version pinning" />
       <FlatList
         ref={flatListRef}
         data={versions}
@@ -266,7 +266,7 @@ export default function VersionPinScreen() {
 
             {versions.length > 0 && (
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Available Versions
+                Available versions
               </Text>
             )}
           </Animated.View>

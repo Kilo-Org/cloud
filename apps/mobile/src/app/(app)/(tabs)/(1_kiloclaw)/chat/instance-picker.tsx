@@ -73,7 +73,7 @@ export default function InstancePickerScreen() {
 
   return (
     <PickerSheet
-      title="Switch Instance"
+      title="Switch instance"
       onDone={() => {
         router.back();
       }}

@@ -58,7 +58,7 @@ export default function RepoPickerScreen() {
   if (!bridge) {
     return (
       <PickerSheet
-        title="Select Repository"
+        title="Select repository"
         onDone={closePicker}
         scrollable={false}
         fallback={
@@ -73,7 +73,7 @@ export default function RepoPickerScreen() {
   }
 
   return (
-    <PickerSheet title="Select Repository" onDone={closePicker} scrollable={false}>
+    <PickerSheet title="Select repository" onDone={closePicker} scrollable={false}>
       <FlatList
         className="flex-1 bg-background"
         data={filtered}

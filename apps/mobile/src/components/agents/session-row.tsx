@@ -182,7 +182,7 @@ export function StoredSessionRow({
       >
         <View className="flex-1 items-center justify-center bg-black/50 px-8">
           <View className="w-full gap-4 rounded-xl bg-card p-5">
-            <Text className="text-base font-semibold">Rename Session</Text>
+            <Text className="text-base font-semibold">Rename session</Text>
             <TextInput
               defaultValue={title}
               onChangeText={text => {

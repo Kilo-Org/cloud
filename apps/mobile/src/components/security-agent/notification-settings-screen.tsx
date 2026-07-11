@@ -190,7 +190,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
         )}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            New-finding Notification
+            New-finding notification
           </Text>
           <ToggleRow
             title={personal ? 'Email me about new findings' : 'Email organization owners'}
@@ -212,7 +212,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            SLA Warning Notification
+            SLA warning notification
           </Text>
           <ToggleRow
             title={personal ? 'Email me about SLA warnings' : 'Email organization owners'}

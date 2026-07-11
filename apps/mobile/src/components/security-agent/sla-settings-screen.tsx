@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 function SlaSettingsSkeleton() {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="SLA Policy" />
+      <ScreenHeader title="SLA policy" />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -203,7 +203,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isError && !config.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="SLA Policy" />
+        <ScreenHeader title="SLA policy" />
         <View className="flex-1" style={{ paddingBottom }}>
           <QueryError message="Could not load SLA settings" onRetry={() => void config.refetch()} />
         </View>
@@ -233,7 +233,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="SLA Policy"
+        title="SLA policy"
         onBack={onBack}
         headerRight={
           canManage ? (

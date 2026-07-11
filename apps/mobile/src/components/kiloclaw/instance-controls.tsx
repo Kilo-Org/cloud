@@ -47,7 +47,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
     mutations.destroy.isPending;
 
   const handleStart = () => {
-    Alert.alert('Start Instance', 'Are you sure you want to start this instance?', [
+    Alert.alert('Start instance', 'Are you sure you want to start this instance?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Start',
@@ -60,7 +60,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   };
 
   const handleStop = () => {
-    Alert.alert('Stop Instance', 'Are you sure you want to stop this instance?', [
+    Alert.alert('Stop instance', 'Are you sure you want to stop this instance?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Stop',
@@ -87,7 +87,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   };
 
   const handleRedeploy = () => {
-    Alert.alert('Redeploy Instance', 'Are you sure you want to redeploy this instance?', [
+    Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Redeploy',

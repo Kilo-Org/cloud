@@ -57,7 +57,7 @@ function FocusAreasRouteContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Focus Areas" />
+      <ScreenHeader title="Focus areas" />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Text variant="muted" className="mb-2 text-xs">
           Leave all unselected to review everything.

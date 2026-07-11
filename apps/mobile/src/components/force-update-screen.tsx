@@ -35,12 +35,12 @@ export function ForceUpdateScreen() {
   return (
     <View className="flex-1 items-center justify-center px-8">
       <Download size={48} color={colors.foreground} />
-      <Text className="mt-6 text-center text-2xl font-bold">Update Required</Text>
+      <Text className="mt-6 text-center text-2xl font-bold">Update required</Text>
       <Text className="mt-3 text-center text-base text-muted-foreground">
         A new version of Kilo is available. Please update to continue.
       </Text>
       <Button className="mt-8 w-full" size="lg" onPress={() => void openStore()}>
-        <Text>Update Now</Text>
+        <Text>Update now</Text>
       </Button>
 
       {storeOpenFailed && (

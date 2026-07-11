@@ -116,7 +116,7 @@ export function QuestionCard({
   }
 
   function handleReject() {
-    Alert.alert('Skip Questions?', 'The agent will skip this step.', [
+    Alert.alert('Skip questions?', 'The agent will skip this step.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Skip', style: 'destructive', onPress: onReject },
     ]);
@@ -127,7 +127,7 @@ export function QuestionCard({
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text className="text-sm font-medium">Agent Needs Input</Text>
+        <Text className="text-sm font-medium">Agent needs input</Text>
       </View>
 
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">

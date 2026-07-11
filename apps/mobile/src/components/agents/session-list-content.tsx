@@ -169,7 +169,7 @@ export function AgentSessionListContent({
       try {
         const hadError = await refetch();
         if (hadError) {
-          toast.error('Could not refresh sessions — showing the last saved list.');
+          toast.error('Could not refresh sessions. Showing the last saved list.');
         }
       } finally {
         setRefreshing(false);

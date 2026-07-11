@@ -41,19 +41,19 @@ const SETTINGS_ITEMS: SettingsItem[] = [
   },
   {
     icon: Link2,
-    label: 'Device Pairing',
+    label: 'Device pairing',
     description: 'Approve device requests',
     path: 'settings/device-pairing',
   },
   {
     icon: Shield,
-    label: 'Execution Policy',
+    label: 'Execution policy',
     description: 'Security settings',
     path: 'settings/exec-policy',
   },
   {
     icon: Pin,
-    label: 'Version Pinning',
+    label: 'Version pinning',
     description: 'Pin to a specific version',
     path: 'settings/version-pin',
   },

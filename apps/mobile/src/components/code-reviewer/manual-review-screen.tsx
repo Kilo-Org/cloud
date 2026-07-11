@@ -109,7 +109,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   if (!statusesLoading && !isConnected('github') && !isConnected('gitlab')) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Manual Review" eyebrow="Code Reviewer" />
+        <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
         <EmptyState
           icon={GitPullRequest}
           title="Connect a provider"
@@ -130,7 +130,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Manual Review" eyebrow="Code Reviewer" />
+      <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-6 pt-4"

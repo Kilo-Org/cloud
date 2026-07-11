@@ -173,7 +173,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       try {
         const result = await refetchConversations();
         if (result.isError) {
-          toast.error('Could not refresh — showing the last saved list.');
+          toast.error('Could not refresh. Showing the last saved list.');
         }
       } finally {
         setManualRefreshing(false);

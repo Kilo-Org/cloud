@@ -291,7 +291,7 @@ export default function NewSessionScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="New Session" />
+      <ScreenHeader title="New session" />
 
       <ScrollView
         className="flex-1"
@@ -416,7 +416,7 @@ export default function NewSessionScreen() {
                       }}
                     >
                       <ExternalLink size={16} color={colors.foreground} />
-                      <Text>Open</Text>
+                      <Text>Open GitHub</Text>
                     </Button>
                     <Button
                       variant="outline"
@@ -451,7 +451,7 @@ export default function NewSessionScreen() {
           {isCreating ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : (
-            <Text>Start Session</Text>
+            <Text>Start session</Text>
           )}
         </Button>
       </ScrollView>

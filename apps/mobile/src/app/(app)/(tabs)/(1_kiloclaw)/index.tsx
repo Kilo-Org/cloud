@@ -52,7 +52,7 @@ export default function KiloClawTab() {
       try {
         const result = await refetchInstances();
         if (result.isError) {
-          toast.error('Could not refresh — showing the last saved list.');
+          toast.error('Could not refresh. Showing the last saved list.');
         }
       } finally {
         setManualRefreshing(false);

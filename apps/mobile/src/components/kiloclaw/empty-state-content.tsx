@@ -44,7 +44,7 @@ export function EmptyStateContent({
       <EmptyState
         icon={Server}
         title="Finishing setup"
-        description="Hang tight — we're finalizing your account. This usually takes a moment."
+        description="Hang tight, we're finalizing your account. This usually takes a moment."
       />
     );
   }

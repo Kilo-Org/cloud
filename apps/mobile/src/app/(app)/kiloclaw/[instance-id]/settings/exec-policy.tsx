@@ -28,14 +28,14 @@ const POLICY_OPTIONS: PolicyOption[] = [
     id: 'always-ask',
     icon: ShieldCheck,
     iconColor: '#10b981',
-    label: 'Always Ask',
+    label: 'Always ask',
     description: 'Confirm every command before execution. Most secure.',
   },
   {
     id: 'never-ask',
     icon: Zap,
     iconColor: '#f59e0b',
-    label: 'Never Ask',
+    label: 'Never ask',
     description: 'Execute commands without confirmation. Faster but less safe.',
   },
 ];
@@ -68,7 +68,7 @@ export default function ExecPolicyScreen() {
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Execution Policy" />
+        <ScreenHeader title="Execution policy" />
         <InstanceContextBoundary context={instanceContext} />
       </View>
     );
@@ -77,7 +77,7 @@ export default function ExecPolicyScreen() {
   if (statusQuery.isPending) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Execution Policy" />
+        <ScreenHeader title="Execution policy" />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-20 w-full rounded-lg" />
@@ -93,7 +93,7 @@ export default function ExecPolicyScreen() {
   if (statusQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Execution Policy" />
+        <ScreenHeader title="Execution policy" />
         <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load execution policy"
@@ -127,7 +127,7 @@ export default function ExecPolicyScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Execution Policy" />
+      <ScreenHeader title="Execution policy" />
       <ScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
         contentContainerStyle={{ paddingBottom }}

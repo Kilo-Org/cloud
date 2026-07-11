@@ -141,7 +141,7 @@ export function FindingFilterModal({
       contentContainerClassName="gap-6 pb-8 pt-4"
       showsVerticalScrollIndicator={false}
     >
-      <Text className="text-center text-lg font-semibold text-foreground">Filter Findings</Text>
+      <Text className="text-center text-lg font-semibold text-foreground">Filter findings</Text>
       <View className="gap-4">
         <FilterSection
           title="Repository"

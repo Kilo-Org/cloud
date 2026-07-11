@@ -26,7 +26,7 @@ export default function ChangelogScreen() {
   const paddingBottom = useDetailScreenBottomPadding();
 
   function handleRedeploy() {
-    Alert.alert('Redeploy Instance', 'Are you sure you want to redeploy this instance?', [
+    Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Redeploy',
@@ -104,7 +104,7 @@ export default function ChangelogScreen() {
       >
         <View className="gap-3">
           <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Recent Updates
+            Recent updates
           </Text>
           <Animated.View entering={FadeIn.duration(200)}>
             <ChangelogList

@@ -95,7 +95,7 @@ export default function SecretsScreen() {
                 key={secret.id}
                 item={secret}
                 mutations={mutations}
-                removeAlertTitle="Remove Secret"
+                removeAlertTitle="Remove secret"
                 removeAlertMessage={`Remove ${secret.label}? This tool will lose access to its credentials.`}
                 successMessage={`${secret.label} saved`}
               />

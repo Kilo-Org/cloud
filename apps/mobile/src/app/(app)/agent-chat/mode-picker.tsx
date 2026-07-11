@@ -37,7 +37,7 @@ export default function ModePickerScreen() {
     return (
       <View className="flex-1 bg-background">
         <SheetHeader
-          title="Select Mode"
+          title="Select mode"
           onDone={() => {
             router.back();
           }}

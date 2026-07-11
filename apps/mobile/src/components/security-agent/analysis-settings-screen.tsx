@@ -40,7 +40,7 @@ const ANALYSIS_MODES: { value: AnalysisMode; label: string }[] = [
 function AnalysisSettingsSkeleton() {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Models & Analysis" />
+      <ScreenHeader title="Models & analysis" />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -111,7 +111,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isError && !config.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Models & Analysis" />
+        <ScreenHeader title="Models & analysis" />
         <View className="flex-1" style={{ paddingBottom }}>
           <QueryError
             message="Could not load analysis settings"
@@ -139,7 +139,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Models & Analysis"
+        title="Models & analysis"
         onBack={onBack}
         headerRight={
           canManage ? (

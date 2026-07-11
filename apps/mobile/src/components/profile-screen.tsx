@@ -89,12 +89,12 @@ export function ProfileScreen() {
 
   const confirmDeleteAccount = () => {
     Alert.alert(
-      'Delete Account?',
+      'Delete account?',
       'This will send a request to permanently delete your account and all associated data. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete Account',
+          text: 'Delete account',
           style: 'destructive',
           onPress: () => {
             deleteAccount.mutate();
@@ -108,7 +108,7 @@ export function ProfileScreen() {
     Alert.alert('Sign out?', 'You will need to sign in again to access your workspace.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: 'Sign out',
         style: 'destructive',
         onPress: () => {
           void signOut();
@@ -199,7 +199,7 @@ export function ProfileScreen() {
         {/* Linked accounts */}
         <Animated.View className="mt-6 gap-3" layout={LinearTransition}>
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Linked Accounts
+            Linked accounts
           </Text>
 
           {isLoading && (

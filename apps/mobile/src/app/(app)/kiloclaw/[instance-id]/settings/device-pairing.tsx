@@ -86,7 +86,7 @@ export default function DevicePairingScreen() {
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device Pairing" />
+        <ScreenHeader title="Device pairing" />
         <InstanceContextBoundary context={instanceContext} />
       </View>
     );
@@ -95,7 +95,7 @@ export default function DevicePairingScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device Pairing" headerRight={refreshButton} />
+        <ScreenHeader title="Device pairing" headerRight={refreshButton} />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-16 w-full rounded-lg" />
@@ -108,7 +108,7 @@ export default function DevicePairingScreen() {
   if (pairingQuery.isError || devicePairingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device Pairing" headerRight={refreshButton} />
+        <ScreenHeader title="Device pairing" headerRight={refreshButton} />
         <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load pairing requests"
@@ -128,7 +128,7 @@ export default function DevicePairingScreen() {
   function handleApproveChannel(channel: string, code: string) {
     const label = CHANNEL_LABELS[channel] ?? channel.charAt(0).toUpperCase() + channel.slice(1);
     Alert.alert(
-      'Approve Pairing Request',
+      'Approve pairing request',
       `Allow ${label} (code: ${code}) to connect to your instance?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -151,7 +151,7 @@ export default function DevicePairingScreen() {
   }
 
   function handleApproveDevice(requestId: string, platform = 'Unknown device') {
-    Alert.alert('Approve Device', `Allow ${platform} to connect to your instance?`, [
+    Alert.alert('Approve device', `Allow ${platform} to connect to your instance?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Approve',
@@ -173,7 +173,7 @@ export default function DevicePairingScreen() {
   if (!hasAnyRequests) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Device Pairing" headerRight={refreshButton} />
+        <ScreenHeader title="Device pairing" headerRight={refreshButton} />
         <Animated.View
           entering={FadeIn.duration(200)}
           className="flex-1 items-center justify-center"
@@ -190,7 +190,7 @@ export default function DevicePairingScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Device Pairing" headerRight={refreshButton} />
+      <ScreenHeader title="Device pairing" headerRight={refreshButton} />
       <ScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
         contentContainerStyle={{ paddingBottom }}
@@ -199,7 +199,7 @@ export default function DevicePairingScreen() {
         {channelRequests.length > 0 && (
           <Animated.View entering={FadeIn.duration(200)} className="gap-3">
             <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Channel Requests
+              Channel requests
             </Text>
             <View className="rounded-lg bg-secondary overflow-hidden">
               {channelRequests.map((request, index) => {
@@ -248,7 +248,7 @@ export default function DevicePairingScreen() {
         {deviceRequests.length > 0 && (
           <Animated.View entering={FadeIn.duration(200)} className="gap-3">
             <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Device Requests
+              Device requests
             </Text>
             <View className="rounded-lg bg-secondary overflow-hidden">
               {deviceRequests.map((request, index) => {

@@ -169,7 +169,7 @@ export function ConversationScreen({
   useConversationPresence(sandboxId, conversationId);
   useConversationEventSubscription(sandboxId, conversationId);
   const handleActionFailed = useCallback(() => {
-    toast.error("Couldn't reach the bot — please try again");
+    toast.error("Couldn't reach the bot. Please try again.");
   }, []);
   const handleMessageDeliveryFailed = useCallback(() => {
     toast.error('Message could not be delivered to the bot');

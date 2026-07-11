@@ -40,7 +40,7 @@ function ReviewStyleRouteContent({
 
   return (
     <OptionList
-      title="Review Style"
+      title="Review style"
       options={REVIEW_STYLES}
       selected={data?.reviewStyle}
       descriptions={DESCRIPTIONS}

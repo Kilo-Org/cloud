@@ -129,7 +129,7 @@ export function LoginScreen() {
                 accessibilityLabel="Open sign-in page in browser"
               >
                 <ExternalLink size={14} color={colors.foreground} />
-                <Text>Open</Text>
+                <Text>Open in browser</Text>
               </Button>
               <Button
                 variant="outline"
@@ -142,7 +142,7 @@ export function LoginScreen() {
                 }}
                 accessibilityLabel="Copy sign-in link"
               >
-                <Text numberOfLines={1}>Copy Link</Text>
+                <Text numberOfLines={1}>Copy link</Text>
               </Button>
             </View>
             <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">

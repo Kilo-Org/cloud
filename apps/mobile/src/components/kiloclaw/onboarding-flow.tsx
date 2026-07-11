@@ -128,6 +128,15 @@ export function OnboardingFlow() {
     dispatch({ type: 'instance-status-changed', status: instanceStatus });
   }, [instanceStatus]);
 
+  // Feed hard query errors into the machine once provisioning is underway —
+  // an errored status/gateway-ready poll is a terminal signal, not silent
+  // "keep waiting" (see `getProvisioningTerminalReason`).
+  useEffect(() => {
+    if (state.provisionStarted && (statusQuery.isError || gatewayReadyQuery.isError)) {
+      dispatch({ type: 'provisioning-query-errored' });
+    }
+  }, [state.provisionStarted, statusQuery.isError, gatewayReadyQuery.isError]);
+
   useEffect(() => {
     if (!gatewayReadyData) {
       return;
@@ -278,6 +287,10 @@ export function OnboardingFlow() {
     dispatch({ type: 'gateway-grace-elapsed' });
   }, []);
 
+  const onProvisioningTimeout = useCallback(() => {
+    dispatch({ type: 'provisioning-timeout-elapsed' });
+  }, []);
+
   const onDismiss = useCallback(() => {
     // When provision has started (or an instance exists), land on Home so the
     // user sees the live status card. Otherwise return to the entry screen.
@@ -377,9 +390,12 @@ export function OnboardingFlow() {
             // pending_settlement without an instance — the subscription is still
             // activating server-side. `resolveAccessRequiredSubcase` returns null
             // because this is neither an access-required nor a remediation case.
-            <Text variant="muted" className="px-6 text-center">
-              Finishing setup — hang tight while we finalize your account.
-            </Text>
+            <View className="items-center gap-3 px-6">
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+              <Text variant="muted" className="text-center">
+                Finishing setup — hang tight while we finalize your account.
+              </Text>
+            </View>
           )}
         </Animated.View>
       </View>
@@ -436,6 +452,8 @@ export function OnboardingFlow() {
           onProvisioningComplete={onProvisioningComplete}
           onRetry={onProvisioningRetry}
           onGraceElapsed={onGraceElapsed}
+          onProvisioningTimeout={onProvisioningTimeout}
+          onContinueInBackground={onDismiss}
           onOpenInstance={onOpenInstance}
         />
       </Animated.View>

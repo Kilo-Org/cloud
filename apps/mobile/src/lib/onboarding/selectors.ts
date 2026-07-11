@@ -90,9 +90,48 @@ export function shouldAdvanceFromProvisioning(state: OnboardingState): boolean {
 }
 
 /**
+ * Instance lifecycle statuses that mean provisioning cannot proceed
+ * automatically. Mirrors the web onboarding wizard's
+ * `CLAW_ONBOARDING_ERROR_STATUSES` (`stopped`). Mobile's `InstanceStatus`
+ * type has no `crashed` value today; add it here if the backend introduces
+ * one.
+ */
+const TERMINAL_INSTANCE_STATUSES = new Set(['stopped']);
+
+export type ProvisioningTerminalReason =
+  | 'query_error'
+  | 'instance_stopped'
+  | 'gateway_502'
+  | 'timeout';
+
+/**
+ * Why (if at all) the provisioning step should render its terminal view,
+ * in priority order: a hard query error outranks a stopped instance, which
+ * outranks the 502-grace timer, which outranks the overall wall-clock
+ * timeout. Returns `null` while provisioning is still progressing normally.
+ */
+export function getProvisioningTerminalReason(
+  state: OnboardingState
+): ProvisioningTerminalReason | null {
+  if (state.queryErrored) {
+    return 'query_error';
+  }
+  if (state.instanceStatus !== null && TERMINAL_INSTANCE_STATUSES.has(state.instanceStatus)) {
+    return 'instance_stopped';
+  }
+  if (state.gateway502Expired) {
+    return 'gateway_502';
+  }
+  if (state.provisioningTimedOut) {
+    return 'timeout';
+  }
+  return null;
+}
+
+/**
  * Whether the provisioning step should render its terminal "Provisioning failed"
- * view. True iff the 30s 502 grace window has elapsed.
+ * view. True iff `getProvisioningTerminalReason` finds a terminal cause.
  */
 export function isProvisioningTerminal(state: OnboardingState): boolean {
-  return state.gateway502Expired;
+  return getProvisioningTerminalReason(state) !== null;
 }

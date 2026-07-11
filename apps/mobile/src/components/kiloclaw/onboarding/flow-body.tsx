@@ -20,6 +20,8 @@ type FlowBodyProps = {
   onProvisioningComplete: () => void;
   onRetry: () => void;
   onGraceElapsed: () => void;
+  onProvisioningTimeout: () => void;
+  onContinueInBackground: () => void;
   onOpenInstance: () => void;
 };
 
@@ -31,6 +33,8 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
     onProvisioningComplete,
     onRetry,
     onGraceElapsed,
+    onProvisioningTimeout,
+    onContinueInBackground,
     onOpenInstance,
   } = props;
   const colors = useThemeColors();
@@ -134,7 +138,9 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
         state={state}
         onComplete={onProvisioningComplete}
         onGraceElapsed={onGraceElapsed}
+        onProvisioningTimeout={onProvisioningTimeout}
         onRetry={onRetry}
+        onContinueInBackground={onContinueInBackground}
       />
     </Animated.View>
   );

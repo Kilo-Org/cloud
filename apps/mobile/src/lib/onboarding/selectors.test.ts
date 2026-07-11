@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type BotIdentity } from './index';
 import { INITIAL_STATE, type OnboardingEvent, reduce } from './machine';
 import {
+  getProvisioningTerminalReason,
   isProvisioningTerminal,
   shouldAdvanceFromProvisioning,
   shouldFireCompletion,
@@ -230,6 +231,47 @@ describe('isProvisioningTerminal', () => {
       status: 502,
       nowMs: 0,
     });
+    expect(isProvisioningTerminal(s)).toBe(false);
+  });
+
+  it('is true once a hard query error is fed in', () => {
+    const s = reduce(INITIAL_STATE, { type: 'provisioning-query-errored' });
+    expect(isProvisioningTerminal(s)).toBe(true);
+    expect(getProvisioningTerminalReason(s)).toBe('query_error');
+  });
+
+  it('is true once the instance status is a terminal lifecycle state (stopped)', () => {
+    const s = reduce(INITIAL_STATE, { type: 'instance-status-changed', status: 'stopped' });
+    expect(isProvisioningTerminal(s)).toBe(true);
+    expect(getProvisioningTerminalReason(s)).toBe('instance_stopped');
+  });
+
+  it('is false for a non-terminal instance status', () => {
+    const s = reduce(INITIAL_STATE, { type: 'instance-status-changed', status: 'starting' });
+    expect(isProvisioningTerminal(s)).toBe(false);
+    expect(getProvisioningTerminalReason(s)).toBeNull();
+  });
+
+  it('is true once the overall provisioning timeout elapses', () => {
+    const s = reduce(INITIAL_STATE, { type: 'provisioning-timeout-elapsed' });
+    expect(isProvisioningTerminal(s)).toBe(true);
+    expect(getProvisioningTerminalReason(s)).toBe('timeout');
+  });
+
+  it('prioritizes query_error over an instance_stopped status', () => {
+    const s = run([
+      { type: 'instance-status-changed', status: 'stopped' },
+      { type: 'provisioning-query-errored' },
+    ]);
+    expect(getProvisioningTerminalReason(s)).toBe('query_error');
+  });
+
+  it('clears after retry-requested so a fresh attempt is not terminal', () => {
+    const s = run([
+      { type: 'provisioning-query-errored' },
+      { type: 'provisioning-timeout-elapsed' },
+      { type: 'retry-requested' },
+    ]);
     expect(isProvisioningTerminal(s)).toBe(false);
   });
 });

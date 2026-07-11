@@ -16,7 +16,9 @@ export {
 } from './machine';
 
 export {
+  getProvisioningTerminalReason,
   isProvisioningTerminal,
+  type ProvisioningTerminalReason,
   shouldAdvanceFromProvisioning,
   shouldFireCompletion,
   shouldFireOnboardingEntered,

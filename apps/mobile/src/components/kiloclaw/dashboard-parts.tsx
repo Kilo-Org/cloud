@@ -218,7 +218,7 @@ export function DangerZone({ pending, onDestroy }: Readonly<DangerZoneProps>) {
           <Trash2 size={16} color={colors.primaryForeground} />
         )}
         <Text className="text-sm font-semibold text-primary-foreground">
-          {pending ? 'Destroying…' : 'Destroy Instance'}
+          {pending ? 'Destroying…' : 'Destroy instance'}
         </Text>
       </Pressable>
     </View>

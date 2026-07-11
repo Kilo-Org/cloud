@@ -78,6 +78,8 @@ export default function DevicePairingScreen() {
       className="p-2 active:opacity-70"
       // 18px icon + p-2 = 34pt; slop brings the target to 44pt.
       hitSlop={5}
+      accessibilityRole="button"
+      accessibilityLabel="Refresh pairing requests"
     >
       <Animated.View style={spinStyle}>
         <RefreshCw size={18} color={colors.foreground} />

@@ -223,7 +223,7 @@ export default function GoogleScreen() {
                   void handleCopy();
                 }}
               >
-                <Text>{copied ? 'Copied!' : 'Copy Command'}</Text>
+                <Text>{copied ? 'Copied!' : 'Copy command'}</Text>
               </Button>
             </Animated.View>
           )}

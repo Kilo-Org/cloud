@@ -1,8 +1,11 @@
+import * as Sentry from '@sentry/react-native';
+
 // Session replay, screenshots, and view-hierarchy capture must not run
 // before the user accepts consent (the consent copy only promises
 // "anonymous performance and crash data" — see consent-card.tsx). This is
-// the pure decision function; src/app/_layout.tsx calls Sentry.init again
-// with these options whenever the stored consent state changes.
+// the pure decision function; src/app/_layout.tsx re-inits Sentry with
+// these options (via reinitSentryForConsent below) whenever the stored
+// consent state changes.
 type SentryConsentOptions = {
   readonly replaysSessionSampleRate: number;
   readonly replaysOnErrorSampleRate: number;
@@ -26,4 +29,26 @@ export function sentryOptionsForConsent(consented: boolean): SentryConsentOption
     attachScreenshot: true,
     attachViewHierarchy: true,
   };
+}
+
+// @sentry/react-native 7.x has no runtime start/stop API for Mobile Replay —
+// the native SDK samples replay once, from the rates passed to Sentry.init,
+// and Sentry.init alone neither closes the previous client nor stops an
+// in-flight native recording. Sentry.close() is the only supported teardown
+// (it awaits closeNativeSdk, which uninstalls the native replay integration),
+// so every consent transition is close-then-init. Chained through `lifecycle`
+// so a fast accept → revoke can't interleave close and init.
+let lifecycle: Promise<void> | undefined = undefined;
+
+export async function reinitSentryForConsent(
+  consented: boolean,
+  init: (consented: boolean) => void
+): Promise<void> {
+  const previous = lifecycle;
+  lifecycle = (async () => {
+    await previous;
+    await Sentry.close();
+    init(consented);
+  })();
+  await lifecycle;
 }

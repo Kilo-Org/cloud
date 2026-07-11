@@ -40,7 +40,7 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
-import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { reinitSentryForConsent, sentryOptionsForConsent } from '@/lib/sentry-consent';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -48,10 +48,12 @@ const navigationIntegration = Sentry.reactNavigationIntegration({
 
 // Session replay, screenshots, and view-hierarchy capture are gated on
 // stored consent (see src/lib/sentry-consent.ts) — the consent copy only
-// promises anonymous performance/crash data. The RN SDK decides whether
-// those integrations run once, at Sentry.init() time, so `consented` starts
-// `false` and RootLayoutNav below calls this again once consent is known or
-// changes (accepted, declined, or revoked).
+// promises anonymous performance/crash data. The RN SDK reads all of these
+// options only at Sentry.init() time (Mobile Replay has no runtime
+// start/stop API in 7.x), so `consented` starts `false` and every consent
+// transition goes through reinitSentryForConsent, which awaits
+// Sentry.close() first — the only way to stop an in-flight native replay
+// recording and dispose the previous client — before calling this again.
 function initSentry(consented: boolean) {
   Sentry.init({
     dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
@@ -106,7 +108,8 @@ function RootLayoutNav() {
     }
   }, [fontsError]);
 
-  const appliedSentryConsentRef = useRef<boolean | null>(null);
+  // Starts `false` because module scope above already ran initSentry(false).
+  const appliedSentryConsentRef = useRef(false);
 
   useEffect(() => {
     const consented = consentChecked && !needsConsent;
@@ -115,7 +118,7 @@ function RootLayoutNav() {
     }
 
     appliedSentryConsentRef.current = consented;
-    initSentry(consented);
+    void reinitSentryForConsent(consented, initSentry);
   }, [consentChecked, needsConsent]);
 
   const fontsReady = fontsLoaded || fontsError !== null;

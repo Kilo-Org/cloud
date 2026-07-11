@@ -19,11 +19,9 @@ export function useCreateConversation(client: KiloChatClient) {
 }
 
 export function useRenameConversation(client: KiloChatClient) {
-  return useSharedRenameConversation(client, {
-    onError: err => {
-      toast.error(formatKiloChatError(err, 'Failed to rename conversation'));
-    },
-  });
+  // No centralized toast here — the only caller is the rename form sheet,
+  // which stays open on failure and shows the error inline (see P2).
+  return useSharedRenameConversation(client);
 }
 
 export function useLeaveConversation(client: KiloChatClient) {

@@ -10,17 +10,25 @@ type QueryErrorProps = {
   message?: string;
   onRetry?: () => void;
   className?: string;
+  placement?: 'center' | 'top';
 };
 
 export function QueryError({
   message = 'Something went wrong',
   onRetry,
   className,
+  placement = 'center',
 }: Readonly<QueryErrorProps>) {
   const colors = useThemeColors();
 
   return (
-    <View className={cn('items-center justify-center gap-4 px-6', className)}>
+    <View
+      className={cn(
+        'gap-4 px-6',
+        placement === 'center' ? 'flex-1 items-center justify-center' : 'items-center pt-16',
+        className
+      )}
+    >
       <View className="items-center justify-center rounded-full bg-muted p-4">
         <WifiOff size={32} color={colors.mutedForeground} />
       </View>

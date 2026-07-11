@@ -12,6 +12,7 @@ type EmptyStateProps = {
   description: string;
   className?: string;
   action?: ReactNode;
+  placement?: 'center' | 'top';
 };
 
 export function EmptyState({
@@ -20,11 +21,18 @@ export function EmptyState({
   description,
   className,
   action,
+  placement = 'center',
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
 
   return (
-    <View className={cn('items-center justify-center gap-4 px-6', className)}>
+    <View
+      className={cn(
+        'gap-4 px-6',
+        placement === 'center' ? 'flex-1 items-center justify-center' : 'items-center pt-16',
+        className
+      )}
+    >
       <View className="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
         <Icon size={24} color={colors.mutedForeground} strokeWidth={1.5} />
       </View>

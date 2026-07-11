@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { captureEvent, CONVERSATION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -167,7 +168,10 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     void (async () => {
       setManualRefreshing(true);
       try {
-        await refetchConversations();
+        const result = await refetchConversations();
+        if (result.isError) {
+          toast.error('Could not refresh — showing the last saved list.');
+        }
       } finally {
         setManualRefreshing(false);
       }

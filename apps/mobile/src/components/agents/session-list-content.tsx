@@ -36,7 +36,7 @@ type AgentSessionListContentProps = {
   isSearchPending: boolean;
   isError: boolean;
   isFetchingNextPage: boolean;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<boolean>;
   onRetry: () => void;
   onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
@@ -167,9 +167,10 @@ export function AgentSessionListContent({
     void (async () => {
       setRefreshing(true);
       try {
-        await refetch();
-      } catch {
-        toast.error('Could not refresh sessions — showing the last saved list.');
+        const hadError = await refetch();
+        if (hadError) {
+          toast.error('Could not refresh sessions — showing the last saved list.');
+        }
       } finally {
         setRefreshing(false);
       }

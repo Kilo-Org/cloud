@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Platform, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { toast } from 'sonner-native';
 
 import {
   EmptyStateContent,
@@ -49,7 +50,10 @@ export default function KiloClawTab() {
     void (async () => {
       setManualRefreshing(true);
       try {
-        await refetchInstances();
+        const result = await refetchInstances();
+        if (result.isError) {
+          toast.error('Could not refresh — showing the last saved list.');
+        }
       } finally {
         setManualRefreshing(false);
       }

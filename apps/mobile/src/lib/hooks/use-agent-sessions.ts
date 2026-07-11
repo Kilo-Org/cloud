@@ -260,8 +260,12 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage: stored.fetchNextPage,
+    // Resolves to whether either underlying refetch failed, so a manual
+    // pull-to-refresh can show concise feedback — `refetch()` itself never
+    // rejects, it just resolves with a failed query result.
     refetch: async () => {
-      await Promise.all([stored.refetch(), active.refetch()]);
+      const [storedResult, activeResult] = await Promise.all([stored.refetch(), active.refetch()]);
+      return storedResult.isError || activeResult.isError;
     },
   };
 }

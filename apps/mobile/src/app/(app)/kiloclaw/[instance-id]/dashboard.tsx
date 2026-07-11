@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { toast } from 'sonner-native';
 
 import { BillingBanner } from '@/components/kiloclaw/billing-banner';
 import {
@@ -89,7 +90,10 @@ export default function DashboardScreen() {
           ...(isRunning ? [refetchGateway()] : []),
           ...(isPersonal ? [refetchBilling()] : []),
         ];
-        await Promise.all(refreshes);
+        const results = await Promise.all(refreshes);
+        if (results.some(result => result.isError)) {
+          toast.error('Could not refresh — showing the last known status.');
+        }
       } finally {
         setManualRefreshing(false);
       }

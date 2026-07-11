@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -79,7 +80,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       setRefreshing(true);
       try {
         // Refresh only — never triggers a new sync.
-        await findings.refetch();
+        const result = await findings.refetch();
+        if (result.isError) {
+          toast.error('Could not refresh — showing the last saved findings.');
+        }
       } finally {
         setRefreshing(false);
       }

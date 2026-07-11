@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Building2, User } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,11 +17,31 @@ import { useTRPC } from '@/lib/trpc';
 export function ScopeListScreen() {
   const router = useRouter();
   const trpc = useTRPC();
-  const { data: orgs, isLoading } = useQuery(trpc.organizations.list.queryOptions());
+  const {
+    data: orgs,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useQuery(trpc.organizations.list.queryOptions());
 
   const openScope = (scope: string) => {
     router.push(getSecurityAgentPath(scope));
   };
+
+  if (isError && !orgs) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Security Agent" />
+        <QueryError
+          variant="server"
+          title="Could not load organizations"
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">

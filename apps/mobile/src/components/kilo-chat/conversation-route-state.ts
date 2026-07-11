@@ -10,7 +10,7 @@ type ConversationRouteDetailState = {
   isError: boolean;
 };
 
-export type ConversationRouteDecision = 'pending' | 'ready' | 'retryable-error' | 'not-found';
+type ConversationRouteDecision = 'pending' | 'ready' | 'retryable-error' | 'not-found';
 
 function isConversationNotFoundError(error: unknown): boolean {
   const status = error instanceof KiloChatApiError ? error.status : undefined;

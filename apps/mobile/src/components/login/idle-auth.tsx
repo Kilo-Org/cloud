@@ -93,7 +93,7 @@ export function IdleAuth({
           void (async () => {
             const ok = await requestEmailCode(emailRef.current);
             if (ok) {
-              toast('Code sent');
+              toast.success('Code sent');
             }
           })();
         }}

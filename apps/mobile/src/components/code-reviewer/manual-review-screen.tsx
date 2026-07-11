@@ -7,6 +7,7 @@ import { Pressable, TextInput, View } from 'react-native';
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,6 +60,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const statusFor = { github: githubStatus, gitlab: gitlabStatus };
   const isConnected = (option: ManualReviewPlatform) => statusFor[option].data?.connected === true;
   const statusesLoading = githubStatus.isLoading || gitlabStatus.isLoading;
+  const statusesError = githubStatus.isError || gitlabStatus.isError;
   const firstConnected = MANUAL_REVIEW_PLATFORMS.find(option => isConnected(option));
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
@@ -106,7 +108,25 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     );
   };
 
-  if (!statusesLoading && !isConnected('github') && !isConnected('gitlab')) {
+  if (!statusesLoading && statusesError && !isConnected('github') && !isConnected('gitlab')) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
+        <QueryError
+          variant="server"
+          title="Couldn't check provider status"
+          description="We couldn't load your connected providers. Please try again."
+          onRetry={() => {
+            void githubStatus.refetch();
+            void gitlabStatus.refetch();
+          }}
+          isRetrying={githubStatus.isRefetching || gitlabStatus.isRefetching}
+        />
+      </View>
+    );
+  }
+
+  if (!statusesLoading && !statusesError && !isConnected('github') && !isConnected('gitlab')) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />

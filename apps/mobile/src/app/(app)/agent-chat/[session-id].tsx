@@ -1,5 +1,5 @@
 import { type KiloSessionId } from 'cloud-agent-sdk';
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 
@@ -10,6 +10,8 @@ import {
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 import { useTRPC } from '@/lib/trpc';
 
 export default function SessionDetailScreen() {
@@ -23,6 +25,7 @@ export default function SessionDetailScreen() {
     via?: string;
   }>();
   const trpc = useTRPC();
+  const router = useRouter();
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
       { session_id: sessionId },
@@ -46,13 +49,25 @@ export default function SessionDetailScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Session" />
-        <QueryError
-          variant="server"
-          title="Could not load session"
-          description="Failed to load session details"
-          onRetry={() => void sessionQuery.refetch()}
-          isRetrying={sessionQuery.isFetching}
-        />
+        <View className="flex-1 items-center justify-center gap-3 px-6">
+          <QueryError
+            variant="server"
+            placement="top"
+            className="px-0 pt-0"
+            title="Could not load session"
+            description="Failed to load session details"
+            onRetry={() => void sessionQuery.refetch()}
+            isRetrying={sessionQuery.isFetching}
+          />
+          <Button
+            variant="ghost"
+            onPress={() => {
+              router.replace('/(app)/(tabs)/(2_agents)' as Href);
+            }}
+          >
+            <Text>Back to sessions</Text>
+          </Button>
+        </View>
       </View>
     );
   }

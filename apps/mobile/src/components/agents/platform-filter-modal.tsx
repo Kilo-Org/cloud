@@ -191,9 +191,20 @@ export function SessionFilterModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-start px-6 pt-[20%]" onPress={onClose}>
+      <Pressable
+        // Backdrop tap-to-dismiss. accessible={false} so it doesn't collapse the
+        // whole sheet subtree into a single VoiceOver node (Pressable defaults to
+        // accessible=true) — the inner controls stay individually navigable.
+        accessible={false}
+        className="flex-1 justify-start px-6 pt-[20%]"
+        onPress={onClose}
+      >
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable
+          // Catches taps to stop backdrop dismissal; accessible={false} so the
+          // checkboxes/buttons inside stay individually navigable by VoiceOver
+          // (a pressable defaults to accessible=true and would collapse them).
+          accessible={false}
           className="gap-4 rounded-2xl bg-popover p-5"
           onPress={e => {
             e.stopPropagation();

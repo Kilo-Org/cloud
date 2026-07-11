@@ -13,13 +13,14 @@ import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 import { formatDate, parseTimestamp } from '@/lib/utils';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
-  orgs: { organizationId: string; organizationName: string }[] | undefined;
+  orgs: OrgListEntry[] | undefined;
 };
 
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
@@ -76,8 +77,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // Personal (non-org) credits are a consumable purchased directly by the end
   // user, so Apple requires IAP for them — iOS can't show purchase language
   // pointing at the web billing page. Org billing is exempt (business/seat
-  // billing), matching the always-on CTA on the organization hub screen.
-  const canShowZeroBalanceCta = selectedOrgId != null || Platform.OS !== 'ios';
+  // billing), but only members who can manage billing should see the CTA —
+  // matching the money-role gate on the organization hub screen.
+  const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
+  const canShowZeroBalanceCta =
+    selectedOrgId != null ? isMoneyRole(selectedOrgRole) : Platform.OS !== 'ios';
   const zeroBalanceUrl = selectedOrgId
     ? `${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`
     : `${WEB_BASE_URL}/credits`;

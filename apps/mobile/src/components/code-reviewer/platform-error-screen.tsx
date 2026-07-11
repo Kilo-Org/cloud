@@ -14,7 +14,7 @@ export function PlatformErrorScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} eyebrow="Code Reviewer" />
       <View className="flex-1" style={{ paddingBottom }}>
-        <QueryError onRetry={onRetry} isRetrying={isRetrying} />
+        <QueryError variant="server" onRetry={onRetry} isRetrying={isRetrying} />
       </View>
     </View>
   );

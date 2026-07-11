@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Alert, Linking, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { openExternalUrl } from '@/lib/external-link';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -143,7 +144,7 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              void Linking.openURL(review.pr_url);
+              void openExternalUrl(review.pr_url, { label: 'pull request' });
             }}
           >
             <Text>Open pull request</Text>

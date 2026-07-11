@@ -19,6 +19,7 @@ type ChatToolbarProps = {
   modelOptions: ModelOption[];
   onModelSelect: (modelId: string, variant: string) => void;
   disabled?: boolean;
+  isLoadingModels?: boolean;
   order?: ChatToolbarOrder;
   className?: string;
   showReasoningSettings?: boolean;
@@ -32,6 +33,7 @@ export function ChatToolbar({
   modelOptions,
   onModelSelect,
   disabled = false,
+  isLoadingModels = false,
   order = 'mode-first',
   className,
   showReasoningSettings = true,
@@ -46,6 +48,7 @@ export function ChatToolbar({
       options={modelOptions}
       onSelect={onModelSelect}
       disabled={disabled}
+      isLoading={isLoadingModels}
     />
   );
 

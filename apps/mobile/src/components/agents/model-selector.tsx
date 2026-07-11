@@ -5,6 +5,7 @@ import { BookOpenCheck, Brain, Check, ChevronDown, Star } from 'lucide-react-nat
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   BYOK_MODEL_LABEL,
@@ -31,6 +32,7 @@ type ModelSelectorProps = {
   options: (ModelOption | SessionModelOption)[];
   onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
   disabled?: boolean;
+  isLoading?: boolean;
 };
 
 type ModelPickerSelectionScopeContextValue = {
@@ -124,10 +126,16 @@ export function ModelSelector({
   options,
   onSelect,
   disabled = false,
+  isLoading = false,
 }: Readonly<ModelSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
+
+  if (isLoading) {
+    return <Skeleton className="h-8 w-28 rounded-full" />;
+  }
+
   const pickerOptions = options.map(option => toSessionModelOption(option));
   const effectivelyDisabled = disabled || pickerOptions.every(option => option.unavailable);
   const selectedModel = pickerOptions.find(option => option.id === value);

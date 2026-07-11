@@ -1,9 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
+import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
@@ -12,25 +14,27 @@ import {
   useOrgRole,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { firstNonEmpty } from '@/lib/utils';
 
 const MAX_DAILY_LIMIT_USD = 2000;
+const LIMIT_RANGE_ERROR = `Enter an amount between 0 and ${MAX_DAILY_LIMIT_USD}`;
 
-function parseLimit(value: string): number | null {
+// A blank field is valid — it means "no limit" (same as pressing Remove limit).
+function limitError(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === '') {
     return null;
   }
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_DAILY_LIMIT_USD) {
-    return null;
+    return LIMIT_RANGE_ERROR;
   }
-  return parsed;
+  return null;
 }
 
-function isValidLimit(value: string): boolean {
-  return parseLimit(value) != null;
+function parseLimit(value: string): number | null {
+  const trimmed = value.trim();
+  return trimmed === '' ? null : Number(trimmed);
 }
 
 type MemberLimitFormProps = Readonly<{
@@ -41,12 +45,14 @@ type MemberLimitFormProps = Readonly<{
 
 function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormProps) {
   const router = useRouter();
-  const colors = useThemeColors();
-  const mutations = useOrganizationMutations(organizationId ?? '');
+  const mutations = useOrganizationMutations(organizationId ?? '', {
+    silenceUpdateMemberToast: true,
+  });
   const currentLimit = member.dailyUsageLimitUsd;
 
   const limitRef = useRef(currentLimit != null ? String(currentLimit) : '');
-  const [canSave, setCanSave] = useState(isValidLimit(limitRef.current));
+  const [canSave, setCanSave] = useState(limitError(limitRef.current) == null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   const onSaved = () => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -54,10 +60,10 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   };
 
   const onSave = () => {
-    const parsed = parseLimit(limitRef.current);
-    if (parsed == null) {
+    if (!canSave) {
       return;
     }
+    const parsed = parseLimit(limitRef.current);
     mutations.updateMember.mutate({ memberId, dailyUsageLimitUsd: parsed }, { onSuccess: onSaved });
   };
 
@@ -67,32 +73,30 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 
   return (
     <>
-      <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Limit (USD per day)
-        </Text>
-        <TextInput
-          accessibilityLabel="Daily usage limit"
-          className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
-          placeholder="No limit"
-          placeholderTextColor={colors.mutedForeground}
-          keyboardType="decimal-pad"
-          defaultValue={currentLimit != null ? String(currentLimit) : undefined}
-          onChangeText={value => {
-            limitRef.current = value;
-            setCanSave(isValidLimit(value));
-          }}
-        />
-      </View>
+      <FormField
+        label="Limit (USD per day)"
+        accessibilityLabel="Daily usage limit"
+        placeholder="No limit"
+        keyboardType="decimal-pad"
+        defaultValue={currentLimit != null ? String(currentLimit) : undefined}
+        error={fieldError ?? undefined}
+        onChangeText={value => {
+          limitRef.current = value;
+          setCanSave(limitError(value) == null);
+          if (fieldError) {
+            setFieldError(limitError(value));
+          }
+        }}
+        onBlur={() => {
+          setFieldError(limitError(limitRef.current));
+        }}
+      />
 
       {mutations.updateMember.isError && (
         <Text className="text-sm text-destructive">{mutations.updateMember.error.message}</Text>
       )}
 
-      <Button disabled={!canSave || mutations.updateMember.isPending} onPress={onSave}>
-        {mutations.updateMember.isPending ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : null}
+      <Button disabled={!canSave} loading={mutations.updateMember.isPending} onPress={onSave}>
         <Text className="text-primary-foreground">Save</Text>
       </Button>
 
@@ -125,6 +129,19 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
           </Text>
         </View>
         <Skeleton className="h-11 rounded-lg" />
+      </ScrollView>
+    );
+  }
+
+  if (orgWithMembers.isError && !orgWithMembers.data) {
+    return (
+      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+        <Text className="text-center text-lg font-semibold text-foreground">Daily usage limit</Text>
+        <QueryError
+          onRetry={() => void orgWithMembers.refetch()}
+          isRetrying={orgWithMembers.isFetching}
+          placement="top"
+        />
       </ScrollView>
     );
   }

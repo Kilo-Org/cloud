@@ -2,11 +2,12 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { ROLE_LABEL } from '@/components/organization/member-row';
 import { captureEvent, ORGANIZATION_MEMBER_INVITED_EVENT } from '@/lib/analytics/posthog';
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type OrgRole, useOrgRole } from '@/lib/hooks/use-organization-queries';
@@ -14,6 +15,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, EMAIL_PATTERN } from '@/lib/utils';
 
 const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
+const EMAIL_ERROR = 'Enter a valid email address';
 
 export function InviteMemberSheet() {
   const router = useRouter();
@@ -22,12 +24,14 @@ export function InviteMemberSheet() {
   const mutations = useOrganizationMutations(organizationId ?? '');
   const emailRef = useRef('');
   const [canSubmit, setCanSubmit] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
 
   const onSubmit = () => {
     const email = emailRef.current.trim().toLowerCase();
     if (!EMAIL_PATTERN.test(email)) {
+      setEmailError(EMAIL_ERROR);
       return;
     }
     mutations.invite.mutate(
@@ -53,25 +57,27 @@ export function InviteMemberSheet() {
     >
       <Text className="text-center text-lg font-semibold text-foreground">Invite member</Text>
 
-      <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          Email
-        </Text>
-        <TextInput
-          accessibilityLabel="Email"
-          className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
-          placeholder="name@company.com"
-          placeholderTextColor={colors.mutedForeground}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus
-          onChangeText={value => {
-            emailRef.current = value;
-            setCanSubmit(EMAIL_PATTERN.test(value.trim()));
-          }}
-        />
-      </View>
+      <FormField
+        label="Email"
+        accessibilityLabel="Email"
+        placeholder="name@company.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoFocus
+        error={emailError ?? undefined}
+        onChangeText={value => {
+          emailRef.current = value;
+          const valid = EMAIL_PATTERN.test(value.trim());
+          setCanSubmit(valid);
+          if (emailError) {
+            setEmailError(valid ? null : EMAIL_ERROR);
+          }
+        }}
+        onBlur={() => {
+          setEmailError(EMAIL_PATTERN.test(emailRef.current.trim()) ? null : EMAIL_ERROR);
+        }}
+      />
 
       {isBillingManager ? (
         <Text variant="muted">Role: Member</Text>
@@ -109,10 +115,7 @@ export function InviteMemberSheet() {
         <Text className="text-sm text-destructive">{mutations.invite.error.message}</Text>
       )}
 
-      <Button disabled={!canSubmit || mutations.invite.isPending} onPress={onSubmit}>
-        {mutations.invite.isPending ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : null}
+      <Button disabled={!canSubmit} loading={mutations.invite.isPending} onPress={onSubmit}>
         <Text className="text-primary-foreground">Send invite</Text>
       </Button>
     </ScrollView>

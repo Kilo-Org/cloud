@@ -12,7 +12,21 @@ const onMutationError = (error: { message: string }) => {
   toast.error(error.message || 'Something went wrong');
 };
 
-export function useOrganizationMutations(organizationId: string) {
+type UseOrganizationMutationsOptions = {
+  /**
+   * member-limit-sheet renders `updateMember` errors inline (Pattern P2) and
+   * owns that mutation's error feedback for its caller. member-row.tsx's
+   * action-sheet role change has no persistent surface to show an inline
+   * error in, so it keeps the default toast — hence this is per-hook-call
+   * rather than a blanket change to the mutation itself.
+   */
+  silenceUpdateMemberToast?: boolean;
+};
+
+export function useOrganizationMutations(
+  organizationId: string,
+  { silenceUpdateMemberToast }: UseOrganizationMutationsOptions = {}
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -33,7 +47,10 @@ export function useOrganizationMutations(organizationId: string) {
   // Every optimistic mutation here only touches the withMembers cache, so the
   // key is fixed rather than threaded through like use-kiloclaw-mutations.ts
   // (which juggles many caches across a personal/org split).
-  function optimistic<TInput>(updater: (old: OrgWithMembers, input: TInput) => OrgWithMembers) {
+  function optimistic<TInput>(
+    updater: (old: OrgWithMembers, input: TInput) => OrgWithMembers,
+    { silent }: { silent?: boolean } = {}
+  ) {
     return {
       onMutate: async (input: TInput) => {
         await queryClient.cancelQueries({ queryKey: withMembersKey });
@@ -51,7 +68,9 @@ export function useOrganizationMutations(organizationId: string) {
         if (context?.previous) {
           queryClient.setQueryData(withMembersKey, context.previous);
         }
-        onMutationError(error);
+        if (!silent) {
+          onMutationError(error);
+        }
       },
       onSettled: invalidateAll,
     };
@@ -100,12 +119,13 @@ export function useOrganizationMutations(organizationId: string) {
       onSettled: invalidateAll,
     }),
 
+    // No onMutationError toast here: invite-member-sheet (the only caller)
+    // shows the error inline while it stays open (see Pattern P2).
     invite: useMutation({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { email: string; role: OrgRole }) =>
         trpcClient.organizations.members.invite.mutate({ organizationId, ...input }),
       onSuccess: invalidateWithMembers,
-      onError: onMutationError,
       onSettled: invalidateAll,
     }),
 
@@ -130,7 +150,8 @@ export function useOrganizationMutations(organizationId: string) {
                 }
               : member
           ),
-        })
+        }),
+        { silent: silenceUpdateMemberToast }
       ),
     }),
 
@@ -158,6 +179,8 @@ export function useOrganizationMutations(organizationId: string) {
       })),
     }),
 
+    // No onMutationError toast here: low-balance-alert-sheet (the only
+    // caller) shows the error inline while it stays open (see Pattern P2).
     updateMinimumBalanceAlert: useMutation({
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: {
@@ -173,20 +196,27 @@ export function useOrganizationMutations(organizationId: string) {
         enabled: boolean;
         minimum_balance?: number;
         minimum_balance_alert_email?: string[];
-      }>((old, input) => {
-        if (input.enabled) {
-          return {
-            ...old,
-            settings: {
-              ...old.settings,
-              minimum_balance: input.minimum_balance,
-              minimum_balance_alert_email: input.minimum_balance_alert_email,
-            },
-          };
-        }
-        const { minimum_balance: _mb, minimum_balance_alert_email: _mbae, ...rest } = old.settings;
-        return { ...old, settings: rest };
-      }),
+      }>(
+        (old, input) => {
+          if (input.enabled) {
+            return {
+              ...old,
+              settings: {
+                ...old.settings,
+                minimum_balance: input.minimum_balance,
+                minimum_balance_alert_email: input.minimum_balance_alert_email,
+              },
+            };
+          }
+          const {
+            minimum_balance: _mb,
+            minimum_balance_alert_email: _mbae,
+            ...rest
+          } = old.settings;
+          return { ...old, settings: rest };
+        },
+        { silent: true }
+      ),
     }),
   };
 }

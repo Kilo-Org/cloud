@@ -1,9 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Switch, TextInput, View } from 'react-native';
+import { type ReactNode, useRef, useState } from 'react';
+import { ScrollView, Switch, View } from 'react-native';
 
+import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -13,8 +15,10 @@ import {
   useOrgRole,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { EMAIL_PATTERN } from '@/lib/utils';
+
+const THRESHOLD_ERROR = 'Enter an amount greater than 0';
+const EMAILS_ERROR = 'Enter at least one valid email, separated by commas';
 
 function parseThreshold(value: string): number | null {
   const trimmed = value.trim();
@@ -32,6 +36,17 @@ function parseEmails(value: string): string[] {
     .filter(email => email !== '');
 }
 
+function thresholdError(value: string): string | null {
+  return parseThreshold(value) == null ? THRESHOLD_ERROR : null;
+}
+
+function emailsError(value: string): string | null {
+  const emails = parseEmails(value);
+  return emails.length === 0 || !emails.every(email => EMAIL_PATTERN.test(email))
+    ? EMAILS_ERROR
+    : null;
+}
+
 type LowBalanceAlertFormProps = Readonly<{
   organizationId: string | null;
   settings: OrgWithMembers['settings'];
@@ -39,7 +54,6 @@ type LowBalanceAlertFormProps = Readonly<{
 
 function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
   const router = useRouter();
-  const colors = useThemeColors();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const { email: myEmail } = useCurrentUserId();
 
@@ -47,24 +61,23 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   const thresholdRef = useRef(
     settings.minimum_balance != null ? String(settings.minimum_balance) : ''
   );
-  const emailsRef = useRef((settings.minimum_balance_alert_email ?? []).join(', '));
-  const [canSave, setCanSave] = useState(() => {
-    const emails = parseEmails(emailsRef.current);
-    return (
+  // Default to the signer's own email when no alert email is stored yet, so
+  // the field starts pre-filled with a real, savable value rather than a
+  // placeholder that looks filled in but saves as empty.
+  const emailsRef = useRef(
+    (settings.minimum_balance_alert_email ?? (myEmail ? [myEmail] : [])).join(', ')
+  );
+  const [canSave, setCanSave] = useState(
+    () =>
       !enabled ||
-      (parseThreshold(thresholdRef.current) != null &&
-        emails.length > 0 &&
-        emails.every(email => EMAIL_PATTERN.test(email)))
-    );
-  });
+      (thresholdError(thresholdRef.current) == null && emailsError(emailsRef.current) == null)
+  );
+  const [thresholdFieldError, setThresholdFieldError] = useState<string | null>(null);
+  const [emailsFieldError, setEmailsFieldError] = useState<string | null>(null);
 
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
-    const emails = parseEmails(emailsValue);
     setCanSave(
-      !nextEnabled ||
-        (parseThreshold(thresholdValue) != null &&
-          emails.length > 0 &&
-          emails.every(email => EMAIL_PATTERN.test(email)))
+      !nextEnabled || (thresholdError(thresholdValue) == null && emailsError(emailsValue) == null)
     );
   };
 
@@ -107,40 +120,44 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
       {enabled && (
         <>
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Alert below (USD)
-            </Text>
-            <TextInput
-              accessibilityLabel="Alert threshold"
-              className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
-              placeholder="10.00"
-              placeholderTextColor={colors.mutedForeground}
-              keyboardType="decimal-pad"
-              defaultValue={thresholdRef.current || undefined}
-              onChangeText={value => {
-                thresholdRef.current = value;
-                revalidate(enabled, value, emailsRef.current);
-              }}
-            />
-          </View>
+          <FormField
+            label="Alert below (USD)"
+            accessibilityLabel="Alert threshold"
+            placeholder="10.00"
+            keyboardType="decimal-pad"
+            defaultValue={thresholdRef.current || undefined}
+            error={thresholdFieldError ?? undefined}
+            onChangeText={value => {
+              thresholdRef.current = value;
+              revalidate(enabled, value, emailsRef.current);
+              if (thresholdFieldError) {
+                setThresholdFieldError(thresholdError(value));
+              }
+            }}
+            onBlur={() => {
+              setThresholdFieldError(thresholdError(thresholdRef.current));
+            }}
+          />
 
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              Notify emails
-            </Text>
-            <TextInput
+          <View className="gap-1.5">
+            <FormField
+              label="Notify emails"
               accessibilityLabel="Notify emails"
-              className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
-              placeholder={myEmail ?? 'name@company.com'}
-              placeholderTextColor={colors.mutedForeground}
+              placeholder="name@company.com"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
+              error={emailsFieldError ?? undefined}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);
+                if (emailsFieldError) {
+                  setEmailsFieldError(emailsError(value));
+                }
+              }}
+              onBlur={() => {
+                setEmailsFieldError(emailsError(emailsRef.current));
               }}
             />
             <Text variant="muted" className="text-xs">
@@ -156,10 +173,11 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         </Text>
       )}
 
-      <Button disabled={!canSave || mutations.updateMinimumBalanceAlert.isPending} onPress={onSave}>
-        {mutations.updateMinimumBalanceAlert.isPending ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : null}
+      <Button
+        disabled={!canSave}
+        loading={mutations.updateMinimumBalanceAlert.isPending}
+        onPress={onSave}
+      >
         <Text className="text-primary-foreground">Save</Text>
       </Button>
     </>
@@ -170,6 +188,31 @@ export function LowBalanceAlertSheet() {
   const { organizationId } = useOrgRole();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
+  let body: ReactNode = null;
+  if (orgWithMembers.data) {
+    body = (
+      <LowBalanceAlertForm
+        organizationId={organizationId}
+        settings={orgWithMembers.data.settings}
+      />
+    );
+  } else if (orgWithMembers.isError) {
+    body = (
+      <QueryError
+        onRetry={() => void orgWithMembers.refetch()}
+        isRetrying={orgWithMembers.isFetching}
+        placement="top"
+      />
+    );
+  } else {
+    body = (
+      <>
+        <Skeleton className="h-[52px] rounded-lg" />
+        <Skeleton className="h-11 rounded-lg" />
+      </>
+    );
+  }
+
   return (
     <ScrollView
       className="flex-1 bg-background px-6"
@@ -179,17 +222,7 @@ export function LowBalanceAlertSheet() {
     >
       <Text className="text-center text-lg font-semibold text-foreground">Low balance alert</Text>
 
-      {orgWithMembers.data ? (
-        <LowBalanceAlertForm
-          organizationId={organizationId}
-          settings={orgWithMembers.data.settings}
-        />
-      ) : (
-        <>
-          <Skeleton className="h-[52px] rounded-lg" />
-          <Skeleton className="h-11 rounded-lg" />
-        </>
-      )}
+      {body}
     </ScrollView>
   );
 }

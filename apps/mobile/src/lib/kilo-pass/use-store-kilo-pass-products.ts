@@ -9,7 +9,7 @@ import { getStoreKiloPassProductsState } from './store-products-state';
 import { loadAppStoreKiloPassProducts } from './store-products-loader';
 
 const STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
-// ponytail: fixed bound on the App Store connection handshake — raise if real
+// Fixed bound on the App Store connection handshake — raise if real
 // devices routinely need longer than this to connect.
 const APP_STORE_CONNECTION_TIMEOUT_MS = 8000;
 const APP_STORE_CONNECTION_TIMEOUT_MESSAGE =

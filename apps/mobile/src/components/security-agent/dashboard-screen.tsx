@@ -71,7 +71,15 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     })();
   };
 
+  // Repos aren't known yet (still loading or the fetch failed) — the filter
+  // stays disabled instead of silently offering a shrunken "All repositories
+  // only" option list.
+  const repoFilterUnavailable = repositories.isLoading || repositories.isError;
+
   const openRepoFilter = () => {
+    if (repoFilterUnavailable) {
+      return;
+    }
     const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
       repo => repo.fullName
     );
@@ -141,9 +149,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="flex-row items-center justify-between gap-3">
           <Pressable
             onPress={openRepoFilter}
-            className="flex-1 active:opacity-70"
+            disabled={repoFilterUnavailable}
+            className={cn('flex-1 active:opacity-70', repoFilterUnavailable && 'opacity-50')}
             accessibilityRole="button"
             accessibilityLabel="Filter by repository"
+            accessibilityState={{ disabled: repoFilterUnavailable }}
           >
             <Text className="text-sm font-medium" numberOfLines={1}>
               {repoFullName ?? 'All repositories'}

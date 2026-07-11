@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type FindingListScreenProps = {
   scope: string;
@@ -67,6 +68,9 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   const items = findings.data?.pages.flatMap(page => page.findings) ?? [];
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
+  // Repos aren't known yet (still loading or the fetch failed) — the filter
+  // stays disabled instead of silently offering a shrunken repository list.
+  const filterUnavailable = repositories.isLoading || repositories.isError;
 
   const handleRefresh = () => {
     void (async () => {
@@ -87,11 +91,18 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         headerRight={
           <Pressable
             onPress={() => {
-              setShowFilterModal(true);
+              if (!filterUnavailable) {
+                setShowFilterModal(true);
+              }
             }}
+            disabled={filterUnavailable}
             accessibilityRole="button"
             accessibilityLabel="Filter findings"
-            className="size-11 items-center justify-center active:opacity-70"
+            accessibilityState={{ disabled: filterUnavailable }}
+            className={cn(
+              'size-11 items-center justify-center active:opacity-70',
+              filterUnavailable && 'opacity-50'
+            )}
           >
             <SlidersHorizontal
               size={20}

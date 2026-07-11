@@ -1,18 +1,24 @@
 import {
   advanceSettingsBaseline,
   getSettingsDirtyState,
+  isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import * as Haptics from 'expo-haptics';
-import { Check, Lock } from 'lucide-react-native';
+import { Check, FolderGit2, Lock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -160,32 +166,72 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 <Skeleton className="h-12 w-full rounded-lg" />
               </View>
             )}
-            {(repositories.data ?? []).map(repo => (
-              <Pressable
-                key={repo.id}
-                disabled={!canManage}
-                className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
-                onPress={() => {
-                  toggleRepo(repo.id);
-                }}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selectedIds.includes(repo.id) }}
-              >
-                <View className="flex-1 flex-row items-center gap-2 pr-3">
-                  {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
-                  <Text className="text-sm" numberOfLines={1}>
-                    {repo.fullName}
-                  </Text>
-                </View>
-                <Check
-                  size={18}
-                  color={selectedIds.includes(repo.id) ? colors.foreground : 'transparent'}
-                />
-              </Pressable>
-            ))}
-            {selectedIds.length === 0 && (
-              <Text className="pt-2 text-xs text-destructive">Select at least one repository.</Text>
+            {repositories.isError && (
+              <QueryError
+                variant="server"
+                placement="top"
+                title="Could not load repositories"
+                onRetry={() => void repositories.refetch()}
+                isRetrying={repositories.isFetching}
+              />
             )}
+            {!repositories.isLoading && !repositories.isError && repositories.data?.length === 0 ? (
+              <EmptyState
+                placement="top"
+                icon={FolderGit2}
+                title="No repositories"
+                description="Grant the Kilo GitHub App access to repositories"
+                action={
+                  <Button
+                    variant="outline"
+                    onPress={() => {
+                      void openExternalUrl(
+                        getGitHubIntegrationUrl(
+                          WEB_BASE_URL,
+                          isPersonalSecurityScope(scope) ? undefined : scope
+                        ),
+                        { label: 'GitHub App settings' }
+                      );
+                    }}
+                  >
+                    <Text>Manage GitHub App access</Text>
+                  </Button>
+                }
+              />
+            ) : null}
+            {!repositories.isLoading &&
+              !repositories.isError &&
+              (repositories.data ?? []).map(repo => (
+                <Pressable
+                  key={repo.id}
+                  disabled={!canManage}
+                  className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+                  onPress={() => {
+                    toggleRepo(repo.id);
+                  }}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selectedIds.includes(repo.id) }}
+                >
+                  <View className="flex-1 flex-row items-center gap-2 pr-3">
+                    {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
+                    <Text className="text-sm" numberOfLines={1}>
+                      {repo.fullName}
+                    </Text>
+                  </View>
+                  <Check
+                    size={18}
+                    color={selectedIds.includes(repo.id) ? colors.foreground : 'transparent'}
+                  />
+                </Pressable>
+              ))}
+            {!repositories.isLoading &&
+              !repositories.isError &&
+              (repositories.data?.length ?? 0) > 0 &&
+              selectedIds.length === 0 && (
+                <Text className="pt-2 text-xs text-destructive">
+                  Select at least one repository.
+                </Text>
+              )}
           </View>
         )}
 

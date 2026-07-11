@@ -1,14 +1,15 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check, GitPullRequest } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
+import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
@@ -57,11 +58,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const gitlabStatus = useGitLabStatus(scope);
   const statusFor = { github: githubStatus, gitlab: gitlabStatus };
   const isConnected = (option: ManualReviewPlatform) => statusFor[option].data?.connected === true;
+  const statusesLoading = githubStatus.isLoading || gitlabStatus.isLoading;
   const firstConnected = MANUAL_REVIEW_PLATFORMS.find(option => isConnected(option));
   const [platformChoice, setPlatformChoice] = useState<ManualReviewPlatform | null>(null);
   const platform = platformChoice ?? firstConnected ?? 'github';
   const urlRef = useRef('');
   const instructionsRef = useRef('');
+  const [urlError, setUrlError] = useState<string | null>(null);
   const config = useReviewConfig(scope, platform);
   const createReview = useCreateManualReview(scope);
   const { models } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
@@ -77,9 +80,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const onSubmit = () => {
     const url = urlRef.current.trim();
     if (!isValidManualReviewUrl(platform, url)) {
-      toast.error('Enter a valid pull request URL');
+      setUrlError('Enter a valid pull request URL');
       return;
     }
+    setUrlError(null);
     if (!config.data) {
       return;
     }
@@ -102,6 +106,28 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     );
   };
 
+  if (!statusesLoading && !isConnected('github') && !isConnected('gitlab')) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Manual Review" eyebrow="Code Reviewer" />
+        <EmptyState
+          icon={GitPullRequest}
+          title="Connect a provider"
+          description="Connect GitHub to start a manual review of a pull request."
+          action={
+            <Button
+              onPress={() => {
+                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
+              }}
+            >
+              <Text>Connect GitHub</Text>
+            </Button>
+          }
+        />
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Manual Review" eyebrow="Code Reviewer" />
@@ -115,43 +141,51 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Platform
           </Text>
-          <View className="overflow-hidden rounded-lg bg-secondary">
-            {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
-              const connected = isConnected(option);
-              return (
-                <Pressable
-                  key={option}
-                  disabled={!connected}
-                  className={cn(
-                    'flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                    index < MANUAL_REVIEW_PLATFORMS.length - 1 &&
-                      'border-b-[0.5px] border-hair-soft',
-                    !connected && 'opacity-50'
-                  )}
-                  onPress={() => {
-                    void Haptics.selectionAsync();
-                    urlRef.current = '';
-                    setPlatformChoice(option);
-                  }}
-                >
-                  <View>
-                    <Text className="text-sm font-medium">
-                      {PLATFORM_CAPABILITIES[option].label}
-                    </Text>
-                    {!connected && (
-                      <Text variant="muted" className="text-xs">
-                        Not connected
-                      </Text>
+          {statusesLoading ? (
+            <View className="gap-2">
+              <Skeleton className="h-14 w-full rounded-lg" />
+              <Skeleton className="h-14 w-full rounded-lg" />
+            </View>
+          ) : (
+            <View className="overflow-hidden rounded-lg bg-secondary">
+              {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
+                const connected = isConnected(option);
+                return (
+                  <Pressable
+                    key={option}
+                    disabled={!connected}
+                    className={cn(
+                      'flex-row items-center justify-between px-4 py-3 active:opacity-70',
+                      index < MANUAL_REVIEW_PLATFORMS.length - 1 &&
+                        'border-b-[0.5px] border-hair-soft',
+                      !connected && 'opacity-50'
                     )}
-                  </View>
-                  <Check
-                    size={18}
-                    color={platform === option ? colors.foreground : 'transparent'}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
+                    onPress={() => {
+                      void Haptics.selectionAsync();
+                      urlRef.current = '';
+                      setUrlError(null);
+                      setPlatformChoice(option);
+                    }}
+                  >
+                    <View>
+                      <Text className="text-sm font-medium">
+                        {PLATFORM_CAPABILITIES[option].label}
+                      </Text>
+                      {!connected && (
+                        <Text variant="muted" className="text-xs">
+                          Not connected
+                        </Text>
+                      )}
+                    </View>
+                    <Check
+                      size={18}
+                      color={connected && platform === option ? colors.foreground : 'transparent'}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         <View className="gap-3">
@@ -168,8 +202,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             keyboardType="url"
             onChangeText={value => {
               urlRef.current = value;
+              if (urlError) {
+                setUrlError(null);
+              }
             }}
           />
+          {urlError ? <Text className="text-xs text-destructive">{urlError}</Text> : null}
         </View>
 
         <View className="gap-3">
@@ -206,10 +244,11 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         </View>
 
         <Button
-          disabled={createReview.isPending || !config.data || !isConnected(platform)}
+          loading={createReview.isPending}
+          disabled={!config.data || !isConnected(platform)}
           onPress={onSubmit}
         >
-          <Text>Start review</Text>
+          <Text>{createReview.isPending ? 'Starting review…' : 'Start review'}</Text>
         </Button>
       </TabScreenScrollView>
     </View>

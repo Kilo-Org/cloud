@@ -10,7 +10,7 @@ import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import {
@@ -42,6 +42,7 @@ function capitalize(value: string) {
 export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const config = useSecurityAgentConfig(scope);
   const canManage = useSecurityAgentEditCapability(scope);
   const setEnabled = useSetSecurityAgentEnabled(scope);
@@ -66,11 +67,12 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Settings" />
-        <QueryError
-          className="flex-1"
-          message="Could not load Security Agent settings"
-          onRetry={() => void config.refetch()}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            message="Could not load Security Agent settings"
+            onRetry={() => void config.refetch()}
+          />
+        </View>
       </View>
     );
   }

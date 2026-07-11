@@ -11,6 +11,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -47,15 +48,18 @@ function ScopeEntryError({
   onRetry,
   isRetrying,
 }: Readonly<{ onRetry: () => void; isRetrying: boolean }>) {
+  const paddingBottom = useTabBarBottomPadding();
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Security Agent" />
-      <QueryError
-        variant="server"
-        title="Could not load Security Agent"
-        onRetry={onRetry}
-        isRetrying={isRetrying}
-      />
+      <View className="flex-1" style={{ paddingBottom }}>
+        <QueryError
+          variant="server"
+          title="Could not load Security Agent"
+          onRetry={onRetry}
+          isRetrying={isRetrying}
+        />
+      </View>
     </View>
   );
 }

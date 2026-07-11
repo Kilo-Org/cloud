@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -49,6 +49,7 @@ export function BitbucketOverview({
   permissionLoading: boolean;
 }>) {
   const router = useRouter();
+  const paddingBottom = useTabBarBottomPadding();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useAvailableModels(scope);
@@ -65,12 +66,14 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-        <QueryError
-          onRetry={() => {
-            providerState.refetch();
-          }}
-          isRetrying={providerState.isRetrying}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            onRetry={() => {
+              providerState.refetch();
+            }}
+            isRetrying={providerState.isRetrying}
+          />
+        </View>
       </View>
     );
   }
@@ -86,12 +89,14 @@ export function BitbucketOverview({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-        <QueryError
-          onRetry={() => {
-            void config.refetch();
-          }}
-          isRetrying={config.isFetching}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            onRetry={() => {
+              void config.refetch();
+            }}
+            isRetrying={config.isFetching}
+          />
+        </View>
       </View>
     );
   }

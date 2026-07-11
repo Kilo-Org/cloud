@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertCircle, Info, Search } from 'lucide-react-native';
+import { AlertCircle, Info, Search, SearchX } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -184,11 +184,14 @@ export function ModelPickerContent() {
           </View>
         }
         ListEmptyComponent={
-          <View className="items-center justify-center px-6 py-16">
-            <Text className="text-center text-sm text-muted-foreground">
-              {search.trim() ? 'No models match your search' : 'No models available'}
-            </Text>
-          </View>
+          <EmptyState
+            icon={search.trim() ? SearchX : Info}
+            placement="top"
+            title={search.trim() ? 'No matches' : 'No models available'}
+            description={
+              search.trim() ? 'Try a different search term.' : 'No models are available to select.'
+            }
+          />
         }
         renderItem={({ item }) => {
           if (item.type === 'header') {

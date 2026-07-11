@@ -8,7 +8,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -16,6 +16,7 @@ import { useTRPC } from '@/lib/trpc';
 // org members to operate Security Agent, so members are not labeled "View only".
 export function ScopeListScreen() {
   const router = useRouter();
+  const paddingBottom = useTabBarBottomPadding();
   const trpc = useTRPC();
   const {
     data: orgs,
@@ -33,12 +34,14 @@ export function ScopeListScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Security Agent" />
-        <QueryError
-          variant="server"
-          title="Could not load organizations"
-          onRetry={() => void refetch()}
-          isRetrying={isFetching}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            variant="server"
+            title="Could not load organizations"
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
+        </View>
       </View>
     );
   }

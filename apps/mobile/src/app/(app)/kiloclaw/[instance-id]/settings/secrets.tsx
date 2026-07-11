@@ -23,20 +23,34 @@ export default function SecretsScreen() {
   const paddingBottom = useDetailScreenBottomPadding();
   const isLoading = catalogQuery.isPending;
 
-  function renderContent() {
-    if (isLoading) {
-      return (
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Secrets" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Secrets" />
+        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4 pt-4">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
         </Animated.View>
-      );
-    }
-    if (catalogQuery.isError) {
-      return (
-        <View className="flex-1 items-center justify-center py-12">
+      </View>
+    );
+  }
+
+  if (catalogQuery.isError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Secrets" />
+        <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load secrets"
             onRetry={() => {
@@ -44,40 +58,21 @@ export default function SecretsScreen() {
             }}
           />
         </View>
-      );
-    }
-    if (catalogQuery.data.length === 0) {
-      return (
-        <View className="flex-1 items-center justify-center py-12">
+      </View>
+    );
+  }
+
+  if (catalogQuery.data.length === 0) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Secrets" />
+        <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={KeyRound}
             title="No secrets available"
             description="Secret integrations will appear here."
           />
         </View>
-      );
-    }
-    return (
-      <Animated.View entering={FadeIn.duration(200)} className="gap-3">
-        {catalogQuery.data.map(secret => (
-          <SettingsCard
-            key={secret.id}
-            item={secret}
-            mutations={mutations}
-            removeAlertTitle="Remove Secret"
-            removeAlertMessage={`Remove ${secret.label}? This tool will lose access to its credentials.`}
-            successMessage={`${secret.label} saved`}
-          />
-        ))}
-      </Animated.View>
-    );
-  }
-
-  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Secrets" />
-        <InstanceContextBoundary context={instanceContext} />
       </View>
     );
   }
@@ -94,7 +89,18 @@ export default function SecretsScreen() {
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
         >
-          {renderContent()}
+          <Animated.View entering={FadeIn.duration(200)} className="gap-3">
+            {catalogQuery.data.map(secret => (
+              <SettingsCard
+                key={secret.id}
+                item={secret}
+                mutations={mutations}
+                removeAlertTitle="Remove Secret"
+                removeAlertMessage={`Remove ${secret.label}? This tool will lose access to its credentials.`}
+                successMessage={`${secret.label} saved`}
+              />
+            ))}
+          </Animated.View>
         </ScrollView>
       </View>
     </View>

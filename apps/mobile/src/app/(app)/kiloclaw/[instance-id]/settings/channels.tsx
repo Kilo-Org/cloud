@@ -24,19 +24,33 @@ export default function ChannelsScreen() {
 
   const isLoading = catalogQuery.isPending;
 
-  function renderContent() {
-    if (isLoading) {
-      return (
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Channels" />
+        <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Channels" />
+        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4 pt-4">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
         </Animated.View>
-      );
-    }
-    if (catalogQuery.isError) {
-      return (
-        <View className="flex-1 items-center justify-center py-12">
+      </View>
+    );
+  }
+
+  if (catalogQuery.isError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Channels" />
+        <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load channels"
             onRetry={() => {
@@ -44,40 +58,21 @@ export default function ChannelsScreen() {
             }}
           />
         </View>
-      );
-    }
-    if (catalogQuery.data.length === 0) {
-      return (
-        <View className="flex-1 items-center justify-center py-12">
+      </View>
+    );
+  }
+
+  if (catalogQuery.data.length === 0) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Channels" />
+        <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={MessageSquare}
             title="No channels available"
             description="Channel integrations will appear here."
           />
         </View>
-      );
-    }
-    return (
-      <Animated.View entering={FadeIn.duration(200)} className="gap-3">
-        {catalogQuery.data.map(channel => (
-          <SettingsCard
-            key={channel.id}
-            item={channel}
-            mutations={mutations}
-            removeAlertTitle="Disconnect Channel"
-            removeAlertMessage={`Remove ${channel.label}? This channel will be disconnected.`}
-            successMessage={`${channel.label} connected`}
-          />
-        ))}
-      </Animated.View>
-    );
-  }
-
-  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Channels" />
-        <InstanceContextBoundary context={instanceContext} />
       </View>
     );
   }
@@ -94,7 +89,18 @@ export default function ChannelsScreen() {
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
         >
-          {renderContent()}
+          <Animated.View entering={FadeIn.duration(200)} className="gap-3">
+            {catalogQuery.data.map(channel => (
+              <SettingsCard
+                key={channel.id}
+                item={channel}
+                mutations={mutations}
+                removeAlertTitle="Disconnect Channel"
+                removeAlertMessage={`Remove ${channel.label}? This channel will be disconnected.`}
+                successMessage={`${channel.label} connected`}
+              />
+            ))}
+          </Animated.View>
         </ScrollView>
       </View>
     </View>

@@ -15,7 +15,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -51,6 +51,7 @@ function RepositorySettingsSkeleton() {
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -93,11 +94,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Repositories" />
-        <QueryError
-          className="flex-1"
-          message="Could not load repository settings"
-          onRetry={() => void config.refetch()}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            message="Could not load repository settings"
+            onRetry={() => void config.refetch()}
+          />
+        </View>
       </View>
     );
   }

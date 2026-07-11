@@ -12,7 +12,7 @@ import { FindingDetailsPanel } from '@/components/security-agent/finding-details
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import {
   useSecurityAgentOrgRole,
   useTrackSecurityAgentInteraction,
@@ -49,6 +49,7 @@ type FindingDetailScreenProps = {
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
@@ -86,12 +87,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Finding" />
-        <EmptyState
-          icon={ShieldOff}
-          className="flex-1"
-          title="Finding not found"
-          description="This finding may have been removed, or you no longer have access to it."
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <EmptyState
+            icon={ShieldOff}
+            className="flex-1"
+            title="Finding not found"
+            description="This finding may have been removed, or you no longer have access to it."
+          />
+        </View>
       </View>
     );
   }
@@ -100,7 +103,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Finding" />
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center" style={{ paddingBottom }}>
           <QueryError
             message="Could not load this finding"
             onRetry={() => void findingQuery.refetch()}

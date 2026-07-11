@@ -121,12 +121,11 @@ export function OrganizationCreditActivityScreen() {
           data={transactions}
           keyExtractor={item => item.id}
           renderItem={({ item }) => <CreditRow transaction={item} />}
-          contentContainerClassName="gap-3 px-6 pt-4"
+          contentContainerClassName="grow gap-3 px-6 pt-4"
           contentContainerStyle={{ paddingBottom }}
           ListEmptyComponent={
             <EmptyState
               icon={Receipt}
-              className="pt-16"
               title="No credit activity"
               description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
             />

@@ -66,7 +66,11 @@ export default function KiloClawTab() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          className="flex-1"
+          style={emptyStateContainerStyle}
+        >
           <QueryError
             className="flex-1"
             message="Could not load KiloClaw instances"

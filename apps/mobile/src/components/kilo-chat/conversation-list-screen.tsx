@@ -195,7 +195,11 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={sandboxLabel} size="large" className="px-[22px]" />
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          className="flex-1"
+          style={{ paddingBottom: tabBarOverlayHeight }}
+        >
           <QueryError
             className="flex-1"
             message="Could not load conversations"

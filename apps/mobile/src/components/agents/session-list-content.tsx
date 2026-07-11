@@ -241,7 +241,11 @@ export function AgentSessionListContent({
   // cache (keepPreviousData) must never blank out what's already rendered.
   if (isError && !hasAnySessions) {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1 items-center justify-center">
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        className="flex-1 items-center justify-center"
+        style={tabBarClearanceStyle}
+      >
         <QueryError message="Could not load sessions" onRetry={onRetry} />
       </Animated.View>
     );

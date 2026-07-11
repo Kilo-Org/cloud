@@ -124,12 +124,11 @@ export function OrganizationInvoicesScreen() {
           data={invoices}
           keyExtractor={item => item.id}
           renderItem={({ item }) => <InvoiceRow invoice={item} />}
-          contentContainerClassName="gap-3 px-6 pt-4"
+          contentContainerClassName="grow gap-3 px-6 pt-4"
           contentContainerStyle={{ paddingBottom }}
           ListEmptyComponent={
             <EmptyState
               icon={FileText}
-              className="pt-16"
               title="No invoices"
               description="Invoices are generated automatically each billing cycle and will appear here once your organization is billed."
             />

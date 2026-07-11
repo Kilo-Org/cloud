@@ -2,6 +2,7 @@
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
+import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
 } from '@/components/agents/session-working-state';
+import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
@@ -476,7 +478,11 @@ export function SessionDetailContent({
         <View className="flex-1 items-center justify-center px-6">
           {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           {emptyStateText ? (
-            <Text className="text-center text-muted-foreground">{emptyStateText}</Text>
+            <EmptyState
+              icon={MessageSquare}
+              title={emptyStateText}
+              description="Send a message below to get started."
+            />
           ) : null}
         </View>
       );

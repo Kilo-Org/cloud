@@ -41,52 +41,55 @@ export default function ChangelogScreen() {
     router.push(`/(app)/kiloclaw/${instanceId}/settings/version-pin` as Href);
   }
 
-  function renderContent() {
-    if (changelogQuery.isPending) {
-      return (
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-          <Skeleton className="h-16 rounded-lg" />
-          <Skeleton className="h-16 rounded-lg" />
-          <Skeleton className="h-16 rounded-lg" />
-        </Animated.View>
-      );
-    }
-    if (changelogQuery.isError) {
-      return (
-        <QueryError
-          message="Could not load changelog"
-          onRetry={() => {
-            void changelogQuery.refetch();
-          }}
-        />
-      );
-    }
-    if (!entries || entries.length === 0) {
-      return (
-        <EmptyState
-          icon={Newspaper}
-          title="No updates yet"
-          description="Changelog entries will appear here."
-        />
-      );
-    }
-    return (
-      <Animated.View entering={FadeIn.duration(200)}>
-        <ChangelogList
-          entries={entries}
-          isRedeploying={mutations.restartMachine.isPending}
-          onRedeploy={handleRedeploy}
-          onUpgrade={handleUpgrade}
-        />
-      </Animated.View>
-    );
-  }
-
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="What's New" />
         <InstanceContextBoundary context={instanceContext} />
+      </View>
+    );
+  }
+
+  if (changelogQuery.isPending) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="What's New" />
+        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4 pt-4">
+          <Skeleton className="h-16 rounded-lg" />
+          <Skeleton className="h-16 rounded-lg" />
+          <Skeleton className="h-16 rounded-lg" />
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (changelogQuery.isError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="What's New" />
+        <View className="flex-1 items-center justify-center">
+          <QueryError
+            message="Could not load changelog"
+            onRetry={() => {
+              void changelogQuery.refetch();
+            }}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  if (!entries || entries.length === 0) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="What's New" />
+        <View className="flex-1 items-center justify-center">
+          <EmptyState
+            icon={Newspaper}
+            title="No updates yet"
+            description="Changelog entries will appear here."
+          />
+        </View>
       </View>
     );
   }
@@ -103,7 +106,14 @@ export default function ChangelogScreen() {
           <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Recent Updates
           </Text>
-          {renderContent()}
+          <Animated.View entering={FadeIn.duration(200)}>
+            <ChangelogList
+              entries={entries}
+              isRedeploying={mutations.restartMachine.isPending}
+              onRedeploy={handleRedeploy}
+              onUpgrade={handleUpgrade}
+            />
+          </Animated.View>
         </View>
       </ScrollView>
     </View>

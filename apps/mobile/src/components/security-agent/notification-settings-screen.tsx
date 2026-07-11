@@ -15,7 +15,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -58,6 +58,7 @@ function NotificationSettingsSkeleton() {
 
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -144,11 +145,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Notifications" />
-        <QueryError
-          className="flex-1"
-          message="Could not load notification settings"
-          onRetry={() => void config.refetch()}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            message="Could not load notification settings"
+            onRetry={() => void config.refetch()}
+          />
+        </View>
       </View>
     );
   }

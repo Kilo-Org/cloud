@@ -15,7 +15,7 @@ import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   useSecurityAgentSettingsRedirect,
@@ -53,6 +53,7 @@ function AnalysisSettingsSkeleton() {
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const paddingBottom = useTabBarBottomPadding();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -111,11 +112,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Models & Analysis" />
-        <QueryError
-          className="flex-1"
-          message="Could not load analysis settings"
-          onRetry={() => void config.refetch()}
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <QueryError
+            message="Could not load analysis settings"
+            onRetry={() => void config.refetch()}
+          />
+        </View>
       </View>
     );
   }

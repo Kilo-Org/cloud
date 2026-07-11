@@ -158,9 +158,16 @@ export default function DashboardScreen() {
           style: 'destructive',
           onPress: () => {
             captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
-            mutations.destroy.mutate(undefined);
-            router.dismissAll();
-            router.replace('/(app)/(tabs)/(0_home)' as Href);
+            // Stay on screen while the mutation is pending — DangerZone shows
+            // its own pending UI — and only navigate away once destruction
+            // actually succeeds. On error the centralized mutation hook
+            // toasts the failure and we stay put with context intact.
+            mutations.destroy.mutate(undefined, {
+              onSuccess: () => {
+                router.dismissAll();
+                router.replace('/(app)/(tabs)/(0_home)' as Href);
+              },
+            });
           },
         },
       ]

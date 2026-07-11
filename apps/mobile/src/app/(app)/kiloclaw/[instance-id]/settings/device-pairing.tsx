@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Monitor, RefreshCw } from 'lucide-react-native';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 import Animated, {
   Easing,
@@ -48,6 +48,8 @@ export default function DevicePairingScreen() {
   const devicePairingQuery = useKiloClawDevicePairing(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
+  const [pendingChannelKey, setPendingChannelKey] = useState<string | null>(null);
+  const [pendingDeviceRequestId, setPendingDeviceRequestId] = useState<string | null>(null);
 
   const isLoading = pairingQuery.isPending || devicePairingQuery.isPending;
 
@@ -73,7 +75,7 @@ export default function DevicePairingScreen() {
       onPress={() => {
         void handleRefresh();
       }}
-      className="p-2"
+      className="p-2 active:opacity-70"
     >
       <Animated.View style={spinStyle}>
         <RefreshCw size={18} color={colors.foreground} />
@@ -133,7 +135,11 @@ export default function DevicePairingScreen() {
         {
           text: 'Approve',
           onPress: () => {
-            mutations.approvePairingRequest.mutate({ channel, code });
+            setPendingChannelKey(`${channel}-${code}`);
+            mutations.approvePairingRequest.mutate(
+              { channel, code },
+              { onSettled: () =>{  setPendingChannelKey(null); } }
+            );
           },
         },
       ]
@@ -146,7 +152,11 @@ export default function DevicePairingScreen() {
       {
         text: 'Approve',
         onPress: () => {
-          mutations.approveDevicePairingRequest.mutate({ requestId });
+          setPendingDeviceRequestId(requestId);
+          mutations.approveDevicePairingRequest.mutate(
+            { requestId },
+            { onSettled: () =>{  setPendingDeviceRequestId(null); } }
+          );
         },
       },
     ]);
@@ -186,6 +196,7 @@ export default function DevicePairingScreen() {
             <View className="rounded-lg bg-secondary overflow-hidden">
               {channelRequests.map((request, index) => {
                 const ChannelIcon = CATALOG_ICONS[request.channel];
+                const isThisPending = pendingChannelKey === `${request.channel}-${request.code}`;
                 return (
                   <View key={`${request.channel}-${request.code}`}>
                     {index > 0 && <View className="ml-4 h-px bg-border" />}
@@ -210,6 +221,8 @@ export default function DevicePairingScreen() {
                       </View>
                       <Button
                         size="sm"
+                        loading={isThisPending}
+                        disabled={mutations.approvePairingRequest.isPending}
                         onPress={() => {
                           handleApproveChannel(request.channel, request.code);
                         }}
@@ -230,30 +243,35 @@ export default function DevicePairingScreen() {
               Device Requests
             </Text>
             <View className="rounded-lg bg-secondary overflow-hidden">
-              {deviceRequests.map((request, index) => (
-                <View key={request.requestId}>
-                  {index > 0 && <View className="ml-4 h-px bg-border" />}
-                  <View className="flex-row items-center gap-3 px-4 py-3">
-                    <Monitor size={18} color={colors.foreground} />
-                    <View className="flex-1 gap-0.5">
-                      <Text className="text-sm font-medium">{request.role ?? 'Device'}</Text>
-                      <Text variant="muted" className="text-xs">
-                        {[request.platform, request.requestId.slice(0, 12)]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Text>
+              {deviceRequests.map((request, index) => {
+                const isThisPending = pendingDeviceRequestId === request.requestId;
+                return (
+                  <View key={request.requestId}>
+                    {index > 0 && <View className="ml-4 h-px bg-border" />}
+                    <View className="flex-row items-center gap-3 px-4 py-3">
+                      <Monitor size={18} color={colors.foreground} />
+                      <View className="flex-1 gap-0.5">
+                        <Text className="text-sm font-medium">{request.role ?? 'Device'}</Text>
+                        <Text variant="muted" className="text-xs">
+                          {[request.platform, request.requestId.slice(0, 12)]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                      </View>
+                      <Button
+                        size="sm"
+                        loading={isThisPending}
+                        disabled={mutations.approveDevicePairingRequest.isPending}
+                        onPress={() => {
+                          handleApproveDevice(request.requestId, request.platform);
+                        }}
+                      >
+                        <Text>Approve</Text>
+                      </Button>
                     </View>
-                    <Button
-                      size="sm"
-                      onPress={() => {
-                        handleApproveDevice(request.requestId, request.platform);
-                      }}
-                    >
-                      <Text>Approve</Text>
-                    </Button>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </Animated.View>
         )}

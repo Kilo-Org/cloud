@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { Unplug } from 'lucide-react-native';
+import { RefreshCw, Unplug } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -19,6 +19,7 @@ import {
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 export default function GoogleScreen() {
@@ -29,8 +30,10 @@ export default function GoogleScreen() {
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
+  const colors = useThemeColors();
 
   const [copied, setCopied] = useState(false);
+  const [showRedeployPrompt, setShowRedeployPrompt] = useState(false);
 
   const isConnected = statusQuery.data?.googleConnected ?? false;
   const gmailEnabled = statusQuery.data?.gmailNotificationsEnabled ?? false;
@@ -101,11 +104,31 @@ export default function GoogleScreen() {
           text: 'Disconnect',
           style: 'destructive',
           onPress: () => {
-            mutations.disconnectGoogle.mutate(undefined);
+            mutations.disconnectGoogle.mutate(undefined, {
+              onSuccess: () => {
+                setShowRedeployPrompt(true);
+              },
+            });
           },
         },
       ]
     );
+  }
+
+  function handleRedeploy() {
+    Alert.alert('Redeploy Instance', 'Are you sure you want to redeploy this instance?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Redeploy',
+        onPress: () => {
+          mutations.restartMachine.mutate(undefined, {
+            onSuccess: () => {
+              setShowRedeployPrompt(false);
+            },
+          });
+        },
+      },
+    ]);
   }
 
   return (
@@ -142,13 +165,48 @@ export default function GoogleScreen() {
 
           {!isConnected && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-4">
+              {showRedeployPrompt && (
+                <View className="flex-row items-center gap-3 rounded-lg bg-amber-100 p-3 dark:bg-amber-950">
+                  <Text className="flex-1 text-xs text-amber-700 dark:text-amber-300">
+                    Google account disconnected. Redeploy your instance to apply the change.
+                  </Text>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={mutations.restartMachine.isPending}
+                    onPress={handleRedeploy}
+                    className="flex-row gap-1.5"
+                  >
+                    {!mutations.restartMachine.isPending && (
+                      <RefreshCw size={14} color={colors.foreground} />
+                    )}
+                    <Text>Redeploy</Text>
+                  </Button>
+                </View>
+              )}
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Setup Command
+              </Text>
+              <Text variant="muted" className="text-xs">
+                Run this command in a terminal with Docker installed on your own computer to connect
+                your Google account.
               </Text>
               <View className="rounded-lg bg-muted p-3 gap-2">
                 {setupQuery.isPending && <Skeleton className="h-4 w-full rounded" />}
                 {setupQuery.isError && (
-                  <Text className="text-xs text-destructive">Failed to load setup command</Text>
+                  <View className="gap-2">
+                    <Text className="text-xs text-destructive">Failed to load setup command</Text>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={setupQuery.isFetching}
+                      onPress={() => {
+                        void setupQuery.refetch();
+                      }}
+                    >
+                      <Text>Retry</Text>
+                    </Button>
+                  </View>
                 )}
                 {setupQuery.isSuccess && (
                   <Text className="font-mono text-xs text-foreground">
@@ -185,8 +243,13 @@ export default function GoogleScreen() {
                 </View>
               </View>
 
-              <Button variant="outline" onPress={handleDisconnect} className="flex-row gap-2">
-                <Unplug size={16} color="#ef4444" />
+              <Button
+                variant="outline"
+                onPress={handleDisconnect}
+                loading={mutations.disconnectGoogle.isPending}
+                className="flex-row gap-2"
+              >
+                {!mutations.disconnectGoogle.isPending && <Unplug size={16} color="#ef4444" />}
                 <Text className="text-destructive">Disconnect Google Account</Text>
               </Button>
             </Animated.View>

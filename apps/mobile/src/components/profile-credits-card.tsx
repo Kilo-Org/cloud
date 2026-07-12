@@ -164,19 +164,24 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
+      {!balanceLoading && !balanceError && balanceDollars === 0 && canShowZeroBalanceCta && (
+        <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
+      )}
+      {/* Personal-context IAP disclosure only — never show this personal "managed
+          outside the iOS app" copy under an org context (org billing isn't personal
+          IAP, and a non-money-role member just lacks access). */}
       {!balanceLoading &&
         !balanceError &&
         balanceDollars === 0 &&
-        (canShowZeroBalanceCta ? (
-          <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
-        ) : (
+        !canShowZeroBalanceCta &&
+        selectedOrgId == null && (
           <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
             <Text className="flex-1 pr-3 text-xs text-muted-foreground">
               Your credit balance is empty. Credits are managed outside the iOS app for this
               account.
             </Text>
           </View>
-        ))}
+        )}
       {enabled && !selectedOrgId ? <KiloPassSubscriptionCard /> : null}
     </View>
   );

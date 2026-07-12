@@ -168,7 +168,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchConversations,
-    'Could not refresh. Showing the last saved list.'
+    "Couldn't refresh. Pull down to try again."
   );
 
   const contentState = getConversationListContentState({

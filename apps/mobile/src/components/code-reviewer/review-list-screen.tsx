@@ -47,11 +47,22 @@ function reviewTime(review: Review): Date {
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const { data, isLoading, isError, isFetching, refetch } = useReviewList(scope);
+  const { data, isLoading, isError, isFetching, error, refetch } = useReviewList(scope);
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const hasConnectedProvider =
     githubStatus.data?.connected === true || gitlabStatus.data?.connected === true;
+
+  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — mirror
+  // the review-detail screen and show a permanent state with no retry. Any other
+  // thrown error (or the resolved success:false shape below) stays transient.
+  const errorCode = isError ? error.data?.code : undefined;
+  const isPermanentError =
+    errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
+  let errorVariant: 'server' | 'not-found' | 'permission' = 'server';
+  if (isPermanentError) {
+    errorVariant = errorCode === 'NOT_FOUND' ? 'not-found' : 'permission';
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -71,10 +82,10 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               not hide it behind a retry banner. */}
           {!isLoading && isError && !data && (
             <QueryError
-              variant="server"
+              variant={errorVariant}
               placement="top"
-              title="Could not load reviews"
-              onRetry={() => void refetch()}
+              title={isPermanentError ? undefined : 'Could not load reviews'}
+              onRetry={isPermanentError ? undefined : () => void refetch()}
               isRetrying={isFetching}
             />
           )}

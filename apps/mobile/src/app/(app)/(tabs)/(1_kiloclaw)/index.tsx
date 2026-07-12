@@ -46,14 +46,14 @@ export default function KiloClawTab() {
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchInstances,
-    'Could not refresh. Showing the last saved list.'
+    "Couldn't refresh. Pull down to try again."
   );
 
   // A background billing-check failure while the list is already showing
   // shouldn't blank the screen — only block on it before we have any
   // instances to show (preserve stale/cached data).
   const hasQueryError =
-    instancesQuery.isError || (entryDecision.kind !== 'list' && onboardingQuery.isError);
+    entryDecision.kind !== 'list' && (instancesQuery.isError || onboardingQuery.isError);
 
   if (hasQueryError) {
     return (

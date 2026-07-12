@@ -82,7 +82,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         // Refresh only — never triggers a new sync.
         const result = await findings.refetch();
         if (result.isError) {
-          toast.error('Could not refresh. Showing the last saved findings.');
+          toast.error("Couldn't refresh. Pull down to try again.");
         }
       } finally {
         setRefreshing(false);
@@ -151,7 +151,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             />
           )}
           contentContainerClassName="grow gap-3 px-6 pt-4"
-          contentContainerStyle={{ paddingBottom }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {
@@ -160,11 +159,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            <FindingsListFooter
-              loading={findings.isFetchingNextPage}
-              error={findings.isFetchNextPageError}
-              onRetry={() => void findings.fetchNextPage()}
-            />
+            <>
+              <FindingsListFooter
+                loading={findings.isFetchingNextPage}
+                error={findings.isFetchNextPageError}
+                onRetry={() => void findings.fetchNextPage()}
+              />
+              <View style={{ height: paddingBottom }} pointerEvents="none" />
+            </>
           }
           ListEmptyComponent={
             <EmptyState

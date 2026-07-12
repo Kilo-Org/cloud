@@ -1,10 +1,11 @@
 import * as Clipboard from 'expo-clipboard';
 import { RefreshCw, Unplug } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { GmailIcon, GoogleIcon } from '@/components/icons';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
@@ -19,7 +20,6 @@ import {
   useKiloClawMutations,
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw-queries';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +29,6 @@ export default function GoogleScreen() {
   const organizationId = instanceOrgId(instanceContext);
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
-  const paddingBottom = useDetailScreenBottomPadding();
   const colors = useThemeColors();
 
   const [copied, setCopied] = useState(false);
@@ -130,9 +129,8 @@ export default function GoogleScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Google Account" />
-      <ScrollView
+      <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
-        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
@@ -251,7 +249,7 @@ export default function GoogleScreen() {
             </Animated.View>
           )}
         </Animated.View>
-      </ScrollView>
+      </DetailScreenScrollView>
     </Animated.View>
   );
 }

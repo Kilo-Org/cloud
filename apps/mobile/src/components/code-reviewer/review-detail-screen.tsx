@@ -116,7 +116,7 @@ export function ReviewDetailScreen({
             instead of replacing it with a full error screen. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">
-            Couldn't refresh — showing the last known status.
+            Couldn't get the latest.
           </Text>
         )}
 

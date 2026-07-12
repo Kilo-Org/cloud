@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Monitor, RefreshCw } from 'lucide-react-native';
 import { useCallback } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { CATALOG_ICONS } from '@/components/icons';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
@@ -27,7 +28,6 @@ import {
   useKiloClawMutations,
   useKiloClawPairing,
 } from '@/lib/hooks/use-kiloclaw-queries';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -46,7 +46,6 @@ export default function DevicePairingScreen() {
   const pairingQuery = useKiloClawPairing(organizationId);
   const devicePairingQuery = useKiloClawDevicePairing(organizationId);
   const mutations = useKiloClawMutations(organizationId);
-  const paddingBottom = useDetailScreenBottomPadding();
 
   const isLoading = pairingQuery.isPending || devicePairingQuery.isPending;
 
@@ -171,9 +170,8 @@ export default function DevicePairingScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Device pairing" headerRight={refreshButton} />
-      <ScrollView
+      <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
-        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
       >
         {channelRequests.length > 0 && (
@@ -268,7 +266,7 @@ export default function DevicePairingScreen() {
             </View>
           </Animated.View>
         )}
-      </ScrollView>
+      </DetailScreenScrollView>
     </Animated.View>
   );
 }

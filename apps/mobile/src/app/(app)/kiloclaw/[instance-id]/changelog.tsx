@@ -1,8 +1,9 @@
 import { Newspaper } from 'lucide-react-native';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { ChangelogList } from '@/components/kiloclaw/changelog-list';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
@@ -12,7 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawChangelog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function ChangelogScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -22,7 +22,6 @@ export default function ChangelogScreen() {
   const mutations = useKiloClawMutations(organizationId);
   const router = useRouter();
   const entries = changelogQuery.data;
-  const paddingBottom = useDetailScreenBottomPadding();
 
   function handleRedeploy() {
     Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
@@ -81,9 +80,8 @@ export default function ChangelogScreen() {
     }
 
     return (
-      <ScrollView
+      <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
-        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-3">
@@ -99,7 +97,7 @@ export default function ChangelogScreen() {
             />
           </Animated.View>
         </View>
-      </ScrollView>
+      </DetailScreenScrollView>
     );
   }
 

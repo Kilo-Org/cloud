@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +24,6 @@ import {
   useInlinePurchaseErrorOwnership,
   useStoreKiloPassPurchase,
 } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 import { RestorePurchasesButton } from './restore-purchases-button';
 
@@ -40,7 +40,6 @@ function formatStorePrice(product: AppStoreKiloPassProduct): string {
 export function KiloPassSubscriptionScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  const paddingBottom = useDetailScreenBottomPadding();
   const router = useRouter();
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
@@ -71,10 +70,9 @@ export function KiloPassSubscriptionScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Kilo Pass" modal />
       <View className="flex-1 px-5">
-        <ScrollView
+        <DetailScreenScrollView
           className="-mx-1 flex-1"
           contentContainerClassName="gap-3 px-1"
-          contentContainerStyle={{ paddingBottom }}
           showsVerticalScrollIndicator={false}
         >
           <Text className="px-1 text-sm leading-5 text-muted-foreground">
@@ -189,7 +187,7 @@ export function KiloPassSubscriptionScreen() {
             </Text>
             .
           </Text>
-        </ScrollView>
+        </DetailScreenScrollView>
 
         {purchase.isPending && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>

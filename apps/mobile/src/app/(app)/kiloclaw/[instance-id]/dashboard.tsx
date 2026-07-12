@@ -1,17 +1,10 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CreditCard, Newspaper, Pencil } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  View,
-} from 'react-native';
+import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { BillingBanner } from '@/components/kiloclaw/billing-banner';
 import {
   DangerZone,
@@ -41,12 +34,10 @@ import {
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatModelName, stripModelPrefix } from '@/lib/model-id';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const paddingBottom = useDetailScreenBottomPadding();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
   const organizationId = instanceOrgId(instanceContext);
@@ -62,7 +53,10 @@ export default function DashboardScreen() {
   const isRunning = status?.status === 'running';
 
   const gatewayQuery = useKiloClawGatewayStatus(organizationId, isRunning);
-  const gateway = gatewayQuery.data;
+  // Gateway data stays cached when the query is disabled (instance not running)
+  // or errors on refetch, so scope it to a live successful read — otherwise a
+  // stopped/errored instance shows stale "running" state and uptime as if live.
+  const gateway = isRunning && !gatewayQuery.isError ? gatewayQuery.data : undefined;
   const configQuery = useKiloClawConfig(organizationId);
   const activeModel = formatModelName(stripModelPrefix(configQuery.data?.kilocodeDefaultModel));
 
@@ -98,7 +92,7 @@ export default function DashboardScreen() {
   ]);
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchAll,
-    'Could not refresh. Showing the last known status.'
+    "Couldn't refresh. Pull down to try again."
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
@@ -193,10 +187,9 @@ export default function DashboardScreen() {
           </Pressable>
         }
       />
-      <ScrollView
+      <DetailScreenScrollView
         className="flex-1"
         contentContainerClassName="flex-grow"
-        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -291,7 +284,7 @@ export default function DashboardScreen() {
 
           <DangerZone pending={mutations.destroy.isPending} onDestroy={handleDestroy} />
         </Animated.View>
-      </ScrollView>
+      </DetailScreenScrollView>
 
       {renameVisible && (
         <RenameModal

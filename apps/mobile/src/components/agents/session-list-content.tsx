@@ -114,7 +114,7 @@ export function AgentSessionListContent({
         ) : null}
         {showInlineError ? (
           <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
-            Could not refresh — showing the last saved list.
+            Couldn't refresh. Pull down to try again.
           </Text>
         ) : null}
       </View>

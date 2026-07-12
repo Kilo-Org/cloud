@@ -1,8 +1,9 @@
 import { type LucideIcon, ShieldCheck, Zap } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -12,7 +13,6 @@ import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-cont
 import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ExecPreset, execPresetToConfig } from '@/lib/onboarding';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 type PolicyOption = {
@@ -59,7 +59,6 @@ export default function ExecPolicyScreen() {
   const organizationId = instanceOrgId(instanceContext);
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
-  const paddingBottom = useDetailScreenBottomPadding();
   const colors = useThemeColors();
 
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
@@ -122,9 +121,8 @@ export default function ExecPolicyScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Execution policy" />
-      <ScrollView
+      <DetailScreenScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
-        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="gap-3">
@@ -174,7 +172,7 @@ export default function ExecPolicyScreen() {
             );
           })}
         </Animated.View>
-      </ScrollView>
+      </DetailScreenScrollView>
     </Animated.View>
   );
 }

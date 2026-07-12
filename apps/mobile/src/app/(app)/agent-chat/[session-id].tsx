@@ -46,17 +46,21 @@ export default function SessionDetailScreen() {
   }
 
   if (routeOrganizationId === undefined && sessionQuery.isError) {
+    // A NOT_FOUND (e.g. the stored session was deleted) can't be recovered by
+    // retrying — show a permanent "not available" state with no Retry. Other
+    // errors stay transient and retriable.
+    const notFound = sessionQuery.error.data?.code === 'NOT_FOUND';
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Session" />
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError
-            variant="server"
+            variant={notFound ? 'not-found' : 'server'}
             placement="top"
             className="px-0 pt-0"
-            title="Could not load session"
-            message="Failed to load session details"
-            onRetry={() => void sessionQuery.refetch()}
+            title={notFound ? undefined : 'Could not load session'}
+            message={notFound ? undefined : 'Failed to load session details'}
+            onRetry={notFound ? undefined : () => void sessionQuery.refetch()}
             isRetrying={sessionQuery.isFetching}
           />
           <Button

@@ -55,7 +55,10 @@ type QueryErrorProps = {
 };
 
 export function QueryError({
-  variant = 'offline',
+  // Default to the generic "unknown" state — asserting 'offline' when we don't
+  // actually know the cause is a false signal (a 500 is not a connectivity
+  // problem). Callers pass an explicit variant when the cause is known.
+  variant = 'neutral',
   title,
   message,
   onRetry,

@@ -24,12 +24,22 @@ const PLATFORM_ICONS: Record<ReviewerPlatform, typeof GitBranch> = {
 
 const ALL_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 
-function connectionSubtitle(status: { isLoading: boolean; data?: { connected: boolean } }) {
+function connectionSubtitle(status: {
+  isLoading: boolean;
+  isError: boolean;
+  data?: { connected: boolean };
+}) {
   // Reserve the subtitle line with a placeholder while loading instead of
   // omitting it — otherwise the row grows by a line once the real status
   // arrives, popping the layout.
   if (status.isLoading) {
     return 'Checking…';
+  }
+  // A failed status query must not read as "Not connected" — that's a false
+  // disconnected signal. Say the state is unavailable; tapping in shows the
+  // full error + retry.
+  if (status.isError) {
+    return 'Status unavailable';
   }
   return status.data?.connected ? 'Connected' : 'Not connected';
 }

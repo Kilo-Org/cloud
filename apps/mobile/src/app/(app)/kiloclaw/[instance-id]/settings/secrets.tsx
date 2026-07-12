@@ -1,8 +1,9 @@
 import { KeyRound } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { SettingsCard } from '@/components/kiloclaw/settings-card';
@@ -11,7 +12,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw-queries';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function SecretsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -19,7 +19,6 @@ export default function SecretsScreen() {
   const organizationId = instanceOrgId(instanceContext);
   const mutations = useKiloClawMutations(organizationId);
   const catalogQuery = useKiloClawSecretCatalog(organizationId);
-  const paddingBottom = useDetailScreenBottomPadding();
   const isLoading = catalogQuery.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
@@ -65,9 +64,8 @@ export default function SecretsScreen() {
 
     return (
       <View className="flex-1">
-        <ScrollView
+        <DetailScreenScrollView
           contentContainerClassName="pt-4 gap-3"
-          contentContainerStyle={{ paddingBottom }}
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
           keyboardDismissMode="interactive"
@@ -85,7 +83,7 @@ export default function SecretsScreen() {
               />
             ))}
           </Animated.View>
-        </ScrollView>
+        </DetailScreenScrollView>
       </View>
     );
   }

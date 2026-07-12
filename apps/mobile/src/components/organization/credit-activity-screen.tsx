@@ -102,7 +102,6 @@ export function OrganizationCreditActivityScreen() {
           keyExtractor={item => item.id}
           renderItem={({ item }) => <CreditRow transaction={item} />}
           contentContainerClassName="grow gap-3 px-6 pt-4"
-          contentContainerStyle={{ paddingBottom }}
           ListEmptyComponent={
             <EmptyState
               icon={Receipt}
@@ -110,6 +109,7 @@ export function OrganizationCreditActivityScreen() {
               description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
             />
           }
+          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
         />
       </Animated.View>
     );

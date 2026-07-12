@@ -105,7 +105,6 @@ export function OrganizationInvoicesScreen() {
           keyExtractor={item => item.id}
           renderItem={({ item }) => <InvoiceRow invoice={item} />}
           contentContainerClassName="grow gap-3 px-6 pt-4"
-          contentContainerStyle={{ paddingBottom }}
           ListEmptyComponent={
             <EmptyState
               icon={FileText}
@@ -113,6 +112,7 @@ export function OrganizationInvoicesScreen() {
               description="Invoices are generated automatically each billing cycle and will appear here once your organization is billed."
             />
           }
+          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
         />
       </Animated.View>
     );

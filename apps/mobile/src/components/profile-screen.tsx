@@ -11,9 +11,8 @@ import {
   ShieldCheck,
   Trash2,
 } from 'lucide-react-native';
-import { Alert, Platform, ScrollView, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
 import { toast } from 'sonner-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
@@ -22,6 +21,7 @@ import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -32,7 +32,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { getCodeReviewerProfilePath, getProfileAgentScope } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
 
 function providerIcon(_provider: string) {
@@ -73,8 +72,6 @@ export function ProfileScreen() {
   const orgName = selectedOrg?.organizationName;
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
-
-  const { bottom } = useSafeAreaInsets();
 
   const deleteAccount = useMutation(
     trpc.user.requestAccountDeletion.mutationOptions({
@@ -124,10 +121,9 @@ export function ProfileScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Profile" size="large" showBackButton={false} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="pt-4"
-        contentContainerStyle={{ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS) + 16 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
@@ -289,7 +285,7 @@ export function ProfileScreen() {
             v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})
           </Text>
         </View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

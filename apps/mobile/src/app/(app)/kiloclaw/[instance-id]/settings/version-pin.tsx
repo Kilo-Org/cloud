@@ -243,7 +243,6 @@ export default function VersionPinScreen() {
         keyExtractor={item => item.image_tag}
         renderItem={renderVersionItem}
         contentContainerClassName="px-4 pt-4 gap-4"
-        contentContainerStyle={{ paddingBottom }}
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
@@ -280,7 +279,12 @@ export default function VersionPinScreen() {
             />
           )
         }
-        ListFooterComponent={renderFooter()}
+        ListFooterComponent={
+          <>
+            {renderFooter()}
+            <View style={{ height: paddingBottom }} pointerEvents="none" />
+          </>
+        }
         className="rounded-lg bg-secondary"
       />
     </Animated.View>

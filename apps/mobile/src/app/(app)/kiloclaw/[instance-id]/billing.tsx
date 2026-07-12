@@ -2,10 +2,11 @@ import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { CreditCard, ExternalLink } from 'lucide-react-native';
-import { Linking, ScrollView, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { EmptyState } from '@/components/empty-state';
 import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
@@ -18,7 +19,6 @@ import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { formatBillingDate, formatRemainingDays } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -179,7 +179,6 @@ export default function BillingScreen() {
   const instanceContext = useInstanceContext(instanceId);
   const isOrg = instanceContext.status === 'ready' && instanceContext.isOrg;
   const colors = useThemeColors();
-  const paddingBottom = useDetailScreenBottomPadding();
 
   const billingQuery = useKiloClawBillingStatus(instanceContext.status === 'ready' && !isOrg);
   const billing = billingQuery.data;
@@ -249,9 +248,8 @@ export default function BillingScreen() {
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
       <ScreenHeader title="Billing" />
-      <ScrollView
+      <DetailScreenScrollView
         contentContainerClassName="gap-4 px-4 pt-4"
-        contentContainerStyle={{ paddingBottom }}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
@@ -272,7 +270,7 @@ export default function BillingScreen() {
             <Text className="font-medium">Manage Billing on Web</Text>
           </Button>
         </Animated.View>
-      </ScrollView>
+      </DetailScreenScrollView>
     </Animated.View>
   );
 }

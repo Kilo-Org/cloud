@@ -75,7 +75,7 @@ export function ReviewDetailScreen({
   // so it needs the same permanent classification as FORBIDDEN. Any other
   // thrown error (or a resolved `success: false`, the router's
   // generic-failure shape) is treated as transient and gets a retry button.
-  if (!data) {
+  if (!data || !data.success) {
     const errorCode = isError ? error.data?.code : undefined;
     if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
@@ -87,22 +87,6 @@ export function ReviewDetailScreen({
         </View>
       );
     }
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Review" />
-        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
-          <QueryError
-            variant="server"
-            title="Could not load review"
-            onRetry={() => void refetch()}
-            isRetrying={isFetching}
-          />
-        </TabScreenScrollView>
-      </View>
-    );
-  }
-
-  if (!data.success) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Review" />

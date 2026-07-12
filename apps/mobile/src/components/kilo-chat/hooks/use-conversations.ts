@@ -19,8 +19,8 @@ export function useCreateConversation(client: KiloChatClient) {
 }
 
 export function useRenameConversation(client: KiloChatClient) {
-  // No centralized toast here — the only caller is the rename form sheet,
-  // which stays open on failure and shows the error inline (see P2).
+  // No centralized toast here — callers rename via RenameModal, which stays
+  // open on failure and shows the error inline.
   return useSharedRenameConversation(client);
 }
 

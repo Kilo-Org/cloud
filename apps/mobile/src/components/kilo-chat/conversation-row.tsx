@@ -1,7 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
 import { MessageSquare, MoreVertical } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,8 +10,8 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { timeAgo } from '@/lib/utils';
 
+import { useConversationRename } from './hooks/use-conversation-rename';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
-import { useRenameConversation } from './hooks/use-conversations';
 
 type ConversationRowProps = {
   conversation: ConversationListItem;
@@ -46,8 +45,11 @@ export function ConversationRow({
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const client = useKiloChatClient();
-  const renameConversation = useRenameConversation(client);
-  const [renaming, setRenaming] = useState(false);
+  const { renaming, openRename, closeRename, saveRename } = useConversationRename(
+    client,
+    conversation.conversationId,
+    sandboxId
+  );
   const title = conversationTitle(conversation);
 
   function confirmLeave() {
@@ -76,7 +78,7 @@ export function ConversationRow({
       },
       index => {
         if (index === 0) {
-          setRenaming(true);
+          openRename();
         } else if (index === 1) {
           confirmLeave();
         }
@@ -133,16 +135,8 @@ export function ConversationRow({
           placeholder="Enter a new name"
           initialValue={conversation.title ?? ''}
           maxLength={CONVERSATION_TITLE_MAX_CHARS}
-          onSave={async name => {
-            await renameConversation.mutateAsync({
-              conversationId: conversation.conversationId,
-              title: name,
-              sandboxId,
-            });
-          }}
-          onClose={() => {
-            setRenaming(false);
-          }}
+          onSave={saveRename}
+          onClose={closeRename}
         />
       )}
     </>

@@ -78,5 +78,10 @@ export function useConversationOptionsSheet({
     showActionSheetWithOptions,
   ]);
 
-  return { openOptions, ...rename };
+  return {
+    openOptions,
+    renaming: rename.renaming,
+    closeRename: rename.closeRename,
+    saveRename: rename.saveRename,
+  };
 }

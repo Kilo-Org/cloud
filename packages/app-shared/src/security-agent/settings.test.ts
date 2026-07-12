@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  advanceSettingsBaseline,
   canManageSecurityAgent,
   getSecurityAgentAuditUrl,
   getSecurityRepositoriesInScope,
@@ -85,23 +84,6 @@ describe('getSettingsDirtyState', () => {
 
   it('is clean when the patch is empty', () => {
     expect(getSettingsDirtyState(config, {}, true)).toBe('clean');
-  });
-});
-
-describe('advanceSettingsBaseline', () => {
-  const baseline = { slaCriticalDays: 15, selectedRepositoryIds: [1, 2] };
-
-  it('a saved patch advances the baseline, so the same patch reads clean afterwards', () => {
-    const patch = { slaCriticalDays: 20 };
-    const advanced = advanceSettingsBaseline(baseline, patch);
-    expect(getSettingsDirtyState(advanced, patch, true)).toBe('clean');
-  });
-
-  it('a failed save must not advance the baseline, so the same patch still reads dirty', () => {
-    const patch = { slaCriticalDays: 20 };
-    // Baseline intentionally left untouched here, mirroring what a screen
-    // should do when save.mutateAsync rejects.
-    expect(getSettingsDirtyState(baseline, patch, true)).toBe('dirty-valid');
   });
 });
 

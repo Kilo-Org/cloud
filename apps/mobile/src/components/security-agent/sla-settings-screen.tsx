@@ -1,5 +1,4 @@
 import {
-  advanceSettingsBaseline,
   getSettingsDirtyState,
   isValidDayCount,
   parseDayCount,
@@ -195,7 +194,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = advanceSettingsBaseline(initialConfigRef.current, patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
   const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });

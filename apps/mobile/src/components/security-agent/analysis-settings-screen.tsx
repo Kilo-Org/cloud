@@ -1,5 +1,4 @@
 import {
-  advanceSettingsBaseline,
   getSettingsDirtyState,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
@@ -103,7 +102,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = advanceSettingsBaseline(initialConfigRef.current, patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
   const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });

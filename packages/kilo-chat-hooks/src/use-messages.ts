@@ -728,21 +728,37 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
 
 /**
  * Retries bot delivery of an existing delivery-failed message. The server
- * re-attempts delivery of the same message row (no new message) and is the
- * single source of truth for the flag: it pushes `message.redelivered`
- * (clears `deliveryFailed`, handled by useMessageCacheUpdater) right before
- * the attempt, and `message.delivery_failed` again if the retry fails.
+ * re-attempts delivery of the same message row (no new message) and pushes
+ * `message.redelivered` (clears `deliveryFailed`) right before the attempt,
+ * then `message.delivery_failed` again if the retry fails.
  *
- * Deliberately NOT optimistic: an optimistic clear here would race those
- * events (a rejected redelivery can't be told apart from a committed one on
- * an ambiguous HTTP error, and a reconciling refetch can capture a stale
- * pre-failure snapshot). Letting the event drive the flag keeps a single
- * authority and costs only one event round-trip before the indicator clears.
+ * Not optimistic: an `onMutate` clear would race those events (a rejected
+ * redelivery is indistinguishable from a committed one on an ambiguous HTTP
+ * error), and a reconciling invalidate/refetch can capture a stale
+ * pre-failure snapshot. Instead the clear is applied on HTTP SUCCESS, once the
+ * server has confirmed the redelivery — a targeted single-message write, not a
+ * refetch. This also covers a dropped `message.redelivered` event (the push is
+ * best-effort), which would otherwise strand the flag until an unrelated
+ * refetch. A subsequent, strictly-later `message.delivery_failed` event still
+ * restores failure if the retry ultimately fails.
  */
 export function useRedeliverMessage(client: KiloChatClient, conversationId: string | null) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId }: { messageId: string }) =>
       client.redeliverMessage(conversationId ?? '', messageId),
+    onSuccess: (_data, variables) => {
+      if (!conversationId) return;
+      const queryKey = messagesKey(conversationId);
+      queryClient.setQueryData<MessageInfiniteData>(queryKey, old =>
+        old
+          ? updateMessageInPages(old, variables.messageId, msg => ({
+              ...msg,
+              deliveryFailed: false,
+            }))
+          : old
+      );
+    },
   });
 }
 

@@ -115,7 +115,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         <QueryError
           variant="server"
           title="Couldn't check provider status"
-          description="We couldn't load your connected providers. Please try again."
+          message="We couldn't load your connected providers. Please try again."
           onRetry={() => {
             void githubStatus.refetch();
             void gitlabStatus.refetch();

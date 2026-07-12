@@ -1,12 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Check, Info } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 
 import { getModeIcon, MODE_OPTIONS, type ModeOption } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -41,13 +40,7 @@ export default function ModePickerScreen() {
           router.back();
         }}
         scrollable={false}
-        fallback={
-          <EmptyState
-            icon={Info}
-            title="Options expired"
-            description="Go back and reopen this picker from the previous screen."
-          />
-        }
+        expired
       />
     );
   }

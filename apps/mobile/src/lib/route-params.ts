@@ -9,20 +9,15 @@
  * for any value outside that allowlist (narrowing the result to the
  * allowlist's element type).
  */
-export function parseParam(value: string | string[] | undefined): string | null;
-export function parseParam<T extends string>(
+export function parseParam<T extends string = string>(
   value: string | string[] | undefined,
-  allowed: readonly T[]
-): T | null;
-export function parseParam(
-  value: string | string[] | undefined,
-  allowed?: readonly string[]
-): string | null {
+  allowed?: readonly T[]
+): T | null {
   if (typeof value !== 'string' || value.length === 0) {
     return null;
   }
-  if (allowed && !allowed.includes(value)) {
+  if (allowed && !allowed.includes(value as T)) {
     return null;
   }
-  return value;
+  return value as T;
 }

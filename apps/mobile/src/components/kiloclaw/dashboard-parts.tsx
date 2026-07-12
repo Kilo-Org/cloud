@@ -53,7 +53,7 @@ export function DashboardHero({ name, status, uptime }: Readonly<DashboardHeroPr
           {name}
         </Text>
         <View className="mt-1 flex-row items-center gap-1.5">
-          <StatusDot tone={tone} glow />
+          <StatusDot tone={tone} />
           <Text
             variant="mono"
             className="text-[10px] uppercase tracking-[1px] text-muted-foreground"

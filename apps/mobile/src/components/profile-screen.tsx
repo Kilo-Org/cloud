@@ -176,7 +176,7 @@ export function ProfileScreen() {
                 variant="server"
                 placement="top"
                 title="Could not load organization"
-                description="Organization and agent settings are unavailable until this loads."
+                message="Organization and agent settings are unavailable until this loads."
                 onRetry={() => void refetchOrganizations()}
                 isRetrying={organizationsFetching}
               />

@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { ChevronDown, ChevronLeft } from 'lucide-react-native';
 import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,10 +21,6 @@ type ScreenHeaderProps = {
   onBack?: () => void;
   onTitlePress?: () => void;
   backIcon?: 'back' | 'close';
-  /** Accessibility label for the back button. Defaults to "Close" when `backIcon` resolves to `close`, otherwise "Go back". */
-  backLabel?: string;
-  /** Where to navigate when there's no back history (direct-entry/deep-link screens). Renders the back button and calls `router.replace(fallbackHref)` instead of `router.back()`. */
-  fallbackHref?: Href;
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
 };
@@ -39,15 +35,12 @@ export function ScreenHeader({
   onBack,
   onTitlePress,
   backIcon,
-  backLabel,
-  fallbackHref,
   className,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const routerCanGoBack = router.canGoBack();
-  const canGoBack = showBackButton ?? (routerCanGoBack || fallbackHref !== undefined);
+  const canGoBack = showBackButton ?? router.canGoBack();
 
   // iOS modals are presented as cards already inset from the status bar
   const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
@@ -55,7 +48,6 @@ export function ScreenHeader({
   // When `backIcon` isn't specified, fall back to the historical behaviour
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
   const resolvedBackIcon = backIcon ?? (modal && Platform.OS === 'ios' ? 'close' : 'back');
-  const resolvedBackLabel = backLabel ?? (resolvedBackIcon === 'close' ? 'Close' : 'Go back');
 
   const titleClass =
     size === 'large'
@@ -94,15 +86,13 @@ export function ScreenHeader({
               onPress={() => {
                 if (onBack) {
                   onBack();
-                } else if (routerCanGoBack) {
+                } else {
                   router.back();
-                } else if (fallbackHref) {
-                  router.replace(fallbackHref);
                 }
               }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel={resolvedBackLabel}
+              accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
               className="-ml-1 mr-1 active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (

@@ -360,7 +360,7 @@ export default function NewSessionScreen() {
               placement="top"
               variant="server"
               title="Couldn't load models"
-              description="Check your connection and try again."
+              message="Check your connection and try again."
               onRetry={() => void refetchModels()}
               className="border-t border-border py-4"
             />
@@ -386,7 +386,7 @@ export default function NewSessionScreen() {
               placement="top"
               variant="server"
               title="Couldn't load repositories"
-              description="Check your connection and try again."
+              message="Check your connection and try again."
               onRetry={() => void refetchRepos()}
               isRetrying={isRefetchingRepos}
             />

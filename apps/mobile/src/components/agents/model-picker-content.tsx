@@ -135,20 +135,7 @@ export function ModelPickerContent() {
   );
 
   if (!bridge) {
-    return (
-      <PickerSheet
-        title="Select model"
-        onDone={closePicker}
-        scrollable={false}
-        fallback={
-          <EmptyState
-            icon={Info}
-            title="Options expired"
-            description="Go back and reopen this picker from the previous screen."
-          />
-        }
-      />
-    );
+    return <PickerSheet title="Select model" onDone={closePicker} scrollable={false} expired />;
   }
 
   return (

@@ -7,7 +7,6 @@ export type StatusDotTone = 'good' | 'warn' | 'danger' | 'muted';
 type StatusDotProps = {
   tone?: StatusDotTone;
   className?: string;
-  glow?: boolean;
 };
 
 // Solid inner-dot and outer-halo classes per tone. The halo uses the
@@ -21,14 +20,11 @@ const TONE: Record<StatusDotTone, { dot: string; halo: string }> = {
 };
 
 /**
- * Status indicator dot with an optional halo (replaces CSS box-shadow).
+ * Status indicator dot with a halo (replaces CSS box-shadow).
  * 7px inner dot centered inside a 13px halo.
  */
-export function StatusDot({ tone = 'good', glow = true, className }: Readonly<StatusDotProps>) {
+export function StatusDot({ tone = 'good', className }: Readonly<StatusDotProps>) {
   const styles = TONE[tone];
-  if (!glow) {
-    return <View className={cn('h-[7px] w-[7px] rounded-full', styles.dot, className)} />;
-  }
   return (
     <View
       className={cn(

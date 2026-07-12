@@ -6,6 +6,8 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
+const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-2xl border border-border bg-card';
+
 type EmptyStateProps = {
   icon: LucideIcon;
   title: string;
@@ -13,6 +15,10 @@ type EmptyStateProps = {
   className?: string;
   action?: ReactNode;
   placement?: 'center' | 'top';
+  /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
+  iconContainerClassName?: string;
+  iconSize?: number;
+  iconStrokeWidth?: number;
 };
 
 export function EmptyState({
@@ -22,6 +28,9 @@ export function EmptyState({
   className,
   action,
   placement = 'center',
+  iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
+  iconSize = 24,
+  iconStrokeWidth = 1.5,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
 
@@ -33,11 +42,13 @@ export function EmptyState({
         className
       )}
     >
-      <View className="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
-        <Icon size={24} color={colors.mutedForeground} strokeWidth={1.5} />
+      <View className={cn('items-center justify-center', iconContainerClassName)}>
+        <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
       </View>
       <View className="items-center gap-1">
-        <Text variant="large">{title}</Text>
+        <Text variant="large" accessibilityRole="header">
+          {title}
+        </Text>
         <Text variant="muted" className="text-center">
           {description}
         </Text>

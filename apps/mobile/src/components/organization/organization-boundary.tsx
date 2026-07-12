@@ -57,7 +57,7 @@ export function OrganizationBoundary({
     return (
       <QueryError
         title="Couldn't load your organizations"
-        description="Check your connection and try again."
+        message="Check your connection and try again."
         onRetry={refetch ? () => void refetch() : undefined}
         isRetrying={isFetching}
       />

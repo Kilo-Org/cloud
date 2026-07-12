@@ -88,7 +88,7 @@ export default function InstancePickerScreen() {
       {instancesQuery.isError ? (
         <QueryError
           className="py-12"
-          description="Could not load instances"
+          message="Could not load instances"
           onRetry={() => {
             void instancesQuery.refetch();
           }}

@@ -57,18 +57,7 @@ export default function RepoPickerScreen() {
 
   if (!bridge) {
     return (
-      <PickerSheet
-        title="Select repository"
-        onDone={closePicker}
-        scrollable={false}
-        fallback={
-          <EmptyState
-            icon={Info}
-            title="Options expired"
-            description="Go back and reopen this picker from the previous screen."
-          />
-        }
-      />
+      <PickerSheet title="Select repository" onDone={closePicker} scrollable={false} expired />
     );
   }
 

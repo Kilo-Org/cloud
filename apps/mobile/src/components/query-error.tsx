@@ -6,12 +6,10 @@ import {
   ServerCrash,
   WifiOff,
 } from 'lucide-react-native';
-import { View } from 'react-native';
 
+import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
@@ -49,9 +47,7 @@ const VARIANT_META: Record<
 type QueryErrorProps = {
   variant?: QueryErrorVariant;
   title?: string;
-  /** Same as `description`, kept for existing call sites. New call sites should use `description` instead. */
   message?: string;
-  description?: string;
   onRetry?: () => void;
   isRetrying?: boolean;
   className?: string;
@@ -62,40 +58,35 @@ export function QueryError({
   variant = 'offline',
   title,
   message,
-  description,
   onRetry,
   isRetrying = false,
   className,
   placement = 'center',
 }: Readonly<QueryErrorProps>) {
-  const colors = useThemeColors();
   const meta = VARIANT_META[variant];
-  const Icon = meta.icon;
 
   return (
-    <View
-      className={cn(
-        'gap-4 px-6',
-        placement === 'center' ? 'flex-1 items-center justify-center' : 'items-center pt-16',
-        className
-      )}
-    >
-      <View className="items-center justify-center rounded-full bg-muted p-4">
-        <Icon size={32} color={colors.mutedForeground} />
-      </View>
-      <View className="items-center gap-1">
-        <Text variant="large" accessibilityRole="header">
-          {title ?? meta.title}
-        </Text>
-        <Text variant="muted" className="text-center">
-          {description ?? message ?? meta.description}
-        </Text>
-      </View>
-      {onRetry && (
-        <Button variant="outline" onPress={onRetry} loading={isRetrying} accessibilityLabel="Retry">
-          <Text>Retry</Text>
-        </Button>
-      )}
-    </View>
+    <EmptyState
+      icon={meta.icon}
+      title={title ?? meta.title}
+      description={message ?? meta.description}
+      className={className}
+      placement={placement}
+      iconContainerClassName="rounded-full bg-muted p-4"
+      iconSize={32}
+      iconStrokeWidth={2}
+      action={
+        onRetry && (
+          <Button
+            variant="outline"
+            onPress={onRetry}
+            loading={isRetrying}
+            accessibilityLabel="Retry"
+          >
+            <Text>Retry</Text>
+          </Button>
+        )
+      }
+    />
   );
 }

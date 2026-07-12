@@ -55,7 +55,7 @@ export default function SessionDetailScreen() {
             placement="top"
             className="px-0 pt-0"
             title="Could not load session"
-            description="Failed to load session details"
+            message="Failed to load session details"
             onRetry={() => void sessionQuery.refetch()}
             isRetrying={sessionQuery.isFetching}
           />

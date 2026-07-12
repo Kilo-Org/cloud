@@ -34,7 +34,7 @@ export function ScopeListScreen() {
           <QueryError
             variant="server"
             title="Could not load organizations"
-            description="Personal repositories are still available below."
+            message="Personal repositories are still available below."
             placement="top"
             className="pb-6 pt-0"
             onRetry={() => void refetch()}

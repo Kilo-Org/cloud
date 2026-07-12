@@ -462,7 +462,7 @@ export function SessionDetailContent({
             placement="top"
             className="px-0 pt-0"
             title="Couldn't load this session"
-            description={error}
+            message={error}
             onRetry={() => {
               void manager.switchSession(sessionId);
             }}

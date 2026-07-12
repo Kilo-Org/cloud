@@ -146,7 +146,7 @@ export function KiloClawCard({
               </Text>
             </View>
             <View className="mt-1 flex-row items-center gap-1.5">
-              <StatusDot tone={tone} glow />
+              <StatusDot tone={tone} />
               <Text className="text-[12px] font-medium text-muted-foreground">{label}</Text>
             </View>
           </View>

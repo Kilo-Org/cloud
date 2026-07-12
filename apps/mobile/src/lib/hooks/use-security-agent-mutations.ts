@@ -5,6 +5,7 @@ import { toast } from 'sonner-native';
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { pick } from '@/lib/utils';
 
 // Split out of use-security-agent.ts (mutations only) to stay under the
 // 300-line file limit — these are the write-side hooks, kept alongside the
@@ -14,17 +15,6 @@ function useSecurityAgentConfigQueryKey(scope: string) {
   return isPersonalSecurityScope(scope)
     ? trpc.securityAgent.getConfig.queryKey()
     : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
-}
-
-function pick<K extends keyof SecurityAgentConfig>(
-  config: SecurityAgentConfig,
-  keys: readonly K[]
-): Pick<SecurityAgentConfig, K> {
-  const result: Partial<SecurityAgentConfig> = {};
-  for (const key of keys) {
-    result[key] = config[key];
-  }
-  return result as Pick<SecurityAgentConfig, K>;
 }
 
 export function useSaveSecurityAgentConfig(scope: string) {

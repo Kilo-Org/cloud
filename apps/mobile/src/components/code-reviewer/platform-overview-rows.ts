@@ -10,8 +10,7 @@ import {
 
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
-
-const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+import { capitalize } from '@/lib/utils';
 
 type OverviewRow = {
   field: string;
@@ -86,4 +85,23 @@ export function buildOverviewRows({
           : `${data.selectedRepositoryIds.length} selected`,
     },
   ];
+}
+
+/** Shared onPress resolution for an overview row: no-op when read-only, the
+ * row's own handler (e.g. the model picker) when it has one, otherwise a
+ * push to its settings field. */
+export function resolveRowOnPress(
+  row: OverviewRow,
+  canEdit: boolean,
+  pushField: (field: string) => void
+): (() => void) | undefined {
+  if (!canEdit) {
+    return undefined;
+  }
+  if ('onPress' in row) {
+    return row.onPress;
+  }
+  return () => {
+    pushField(row.field);
+  };
 }

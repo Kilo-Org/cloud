@@ -37,4 +37,28 @@ function timeAgo(date: Date): string {
 // eslint-disable-next-line no-empty-function -- intentional no-op
 async function asyncNoop() {}
 
-export { asyncNoop, cn, EMAIL_PATTERN, firstNonEmpty, formatDate, parseTimestamp, timeAgo };
+/** Builds a new object containing only the given keys of `obj`. */
+function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Pick<T, K> {
+  const result: Partial<T> = {};
+  for (const key of keys) {
+    result[key] = obj[key];
+  }
+  return result as Pick<T, K>;
+}
+
+/** Uppercases the first letter, e.g. for enum-like values used as labels. */
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export {
+  asyncNoop,
+  capitalize,
+  cn,
+  EMAIL_PATTERN,
+  firstNonEmpty,
+  formatDate,
+  parseTimestamp,
+  pick,
+  timeAgo,
+};

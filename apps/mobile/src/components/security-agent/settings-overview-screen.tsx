@@ -21,6 +21,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { capitalize } from '@/lib/utils';
 
 function SettingsOverviewSkeleton() {
   return (
@@ -33,10 +34,6 @@ function SettingsOverviewSkeleton() {
       </View>
     </View>
   );
-}
-
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {

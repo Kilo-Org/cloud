@@ -17,7 +17,7 @@ import { Text } from '@/components/ui/text';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import { cn } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 
 const SEVERITY_TEXT_CLASS: Record<string, string> = {
   critical: 'text-destructive',
@@ -25,10 +25,6 @@ const SEVERITY_TEXT_CLASS: Record<string, string> = {
   medium: 'text-muted-foreground',
   low: 'text-muted-foreground',
 };
-
-function severityLabel(severity: string): string {
-  return severity.length > 0 ? `${severity.charAt(0).toUpperCase()}${severity.slice(1)}` : severity;
-}
 
 // Clearest next action for this finding, mirroring the priority order in
 // apps/web/src/components/security-agent/SecurityFindingRow.tsx — but as a
@@ -179,7 +175,7 @@ export function FindingRow({
       <Pressable
         className="gap-1.5 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={`${severityLabel(finding.severity)} finding: ${finding.title}. ${finding.repo_full_name}. ${analysis.label}${deadline ? `. ${deadline.label}` : ''}`}
+        accessibilityLabel={`${capitalize(finding.severity)} finding: ${finding.title}. ${finding.repo_full_name}. ${analysis.label}${deadline ? `. ${deadline.label}` : ''}`}
         onPress={() => {
           router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
@@ -190,7 +186,7 @@ export function FindingRow({
             SEVERITY_TEXT_CLASS[finding.severity] ?? 'text-muted-foreground'
           )}
         >
-          {severityLabel(finding.severity)}
+          {capitalize(finding.severity)}
         </Text>
         <Text className="text-sm font-medium" numberOfLines={2}>
           {finding.title}

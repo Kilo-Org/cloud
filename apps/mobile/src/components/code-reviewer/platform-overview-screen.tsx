@@ -1,21 +1,22 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Building2 } from 'lucide-react-native';
 import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import { PlatformErrorScreen } from '@/components/code-reviewer/platform-error-screen';
-import { buildOverviewRows } from '@/components/code-reviewer/platform-overview-rows';
+import {
+  buildOverviewRows,
+  resolveRowOnPress,
+} from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
@@ -37,7 +38,6 @@ export function PlatformOverviewScreen({
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
   const colors = useThemeColors();
-  const paddingBottom = useTabBarBottomPadding();
   const capabilities = PLATFORM_CAPABILITIES[platform];
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -50,21 +50,6 @@ export function PlatformOverviewScreen({
   const { models, isLoading: modelsLoading } = useAvailableModels(
     scope === PERSONAL_SCOPE ? undefined : scope
   );
-
-  if (platform === 'bitbucket' && scope === PERSONAL_SCOPE) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Bitbucket" eyebrow="Code Reviewer" />
-        <View className="flex-1 items-center justify-center" style={{ paddingBottom }}>
-          <EmptyState
-            icon={Building2}
-            title="Not available"
-            description="Bitbucket is available for organizations only."
-          />
-        </View>
-      </View>
-    );
-  }
 
   if (permission.status === 'error') {
     return (
@@ -163,18 +148,6 @@ export function PlatformOverviewScreen({
             });
           },
         });
-
-  const resolveRowOnPress = (row: NonNullable<typeof rows>[number]) => {
-    if (!canEdit) {
-      return undefined;
-    }
-    if ('onPress' in row) {
-      return row.onPress;
-    }
-    return () => {
-      pushField(row.field);
-    };
-  };
 
   return (
     <View className="flex-1 bg-background">
@@ -283,7 +256,7 @@ export function PlatformOverviewScreen({
                     title={row.title}
                     subtitle={row.subtitle}
                     last={index === rows.length - 1}
-                    onPress={resolveRowOnPress(row)}
+                    onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}
               </View>

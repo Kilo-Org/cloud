@@ -10,6 +10,7 @@ import {
 } from '@/lib/code-reviewer-config';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { pick } from '@/lib/utils';
 
 export { PERSONAL_SCOPE };
 
@@ -136,17 +137,6 @@ export function useReviewConfigCacheReader(scope: string, platform: ReviewerPlat
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope, platform);
   return () => queryClient.getQueryData<ReviewConfigData>(queryKey);
-}
-
-function pick<K extends keyof ReviewConfigData>(
-  config: ReviewConfigData,
-  keys: readonly K[]
-): Pick<ReviewConfigData, K> {
-  const result: Partial<ReviewConfigData> = {};
-  for (const key of keys) {
-    result[key] = config[key];
-  }
-  return result as Pick<ReviewConfigData, K>;
 }
 
 export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {

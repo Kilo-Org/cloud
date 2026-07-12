@@ -1,17 +1,14 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import {
-  FileSliders,
-  FolderGit2,
-  MessageSquareText,
-  ScrollText,
-  ShieldCheck,
-} from 'lucide-react-native';
 import { Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import {
+  buildOverviewRows,
+  resolveRowOnPress,
+} from '@/components/code-reviewer/platform-overview-rows';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -33,7 +30,6 @@ import {
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
-const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export function BitbucketOverview({
   scope,
@@ -117,64 +113,22 @@ export function BitbucketOverview({
   const rows =
     data == null
       ? null
-      : [
-          {
-            field: 'style',
-            icon: MessageSquareText,
-            title: 'Review Style',
-            subtitle: capitalize(data.reviewStyle),
+      : buildOverviewRows({
+          data,
+          capabilities,
+          models,
+          modelsLoading,
+          onOpenModelPicker: () => {
+            openModelPicker(router, {
+              options: models,
+              value: data.modelSlug,
+              variant: data.thinkingEffort ?? '',
+              onSelect: (modelSlug, variant) => {
+                save.mutate({ modelSlug, thinkingEffort: variant || null });
+              },
+            });
           },
-          {
-            field: 'focus-areas',
-            icon: ShieldCheck,
-            title: 'Focus Areas',
-            subtitle:
-              data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
-          },
-          {
-            field: 'instructions',
-            icon: ScrollText,
-            title: 'Custom Instructions',
-            subtitle: data.customInstructions ? 'Set' : 'None',
-          },
-          {
-            field: 'model',
-            icon: FileSliders,
-            title: 'Model',
-            subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
-            onPress:
-              modelsLoading || models.length === 0
-                ? undefined
-                : () => {
-                    openModelPicker(router, {
-                      options: models,
-                      value: data.modelSlug,
-                      variant: data.thinkingEffort ?? '',
-                      onSelect: (modelSlug, variant) => {
-                        save.mutate({ modelSlug, thinkingEffort: variant || null });
-                      },
-                    });
-                  },
-          },
-          {
-            field: 'repos',
-            icon: FolderGit2,
-            title: 'Repositories',
-            subtitle: `${data.selectedRepositoryIds.length} selected`,
-          },
-        ];
-
-  const resolveRowOnPress = (row: NonNullable<typeof rows>[number]) => {
-    if (!canEdit) {
-      return undefined;
-    }
-    if ('onPress' in row) {
-      return row.onPress;
-    }
-    return () => {
-      pushField(row.field);
-    };
-  };
+        });
 
   return (
     <View className="flex-1 bg-background">
@@ -278,7 +232,7 @@ export function BitbucketOverview({
                     title={row.title}
                     subtitle={row.subtitle}
                     last={index === rows.length - 1}
-                    onPress={resolveRowOnPress(row)}
+                    onPress={resolveRowOnPress(row, canEdit, pushField)}
                   />
                 ))}
               </View>

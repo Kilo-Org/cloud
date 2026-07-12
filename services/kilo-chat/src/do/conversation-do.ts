@@ -509,7 +509,7 @@ export class ConversationDO extends DurableObject<Env> {
             : 'Redelivery is ambiguous with multiple bots',
       };
     }
-    const bot = bots[0]!;
+    const bot = bots[0];
 
     this.db
       .update(messages)

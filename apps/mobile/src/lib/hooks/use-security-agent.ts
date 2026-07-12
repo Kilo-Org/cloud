@@ -103,19 +103,31 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
 // app-wide for the org switcher, so this reuses that cache rather than adding
 // a new procedure (mirrors useCanEditReviewer in use-code-reviewer.ts:234).
 //
-// A disabled query never conflates with a failed one here — react-query
-// reports `isLoading`/`isError` as `false` for `enabled: false` — but a real
-// org-scope fetch failure otherwise collapses into the same `undefined` role
-// as "still loading" and "genuinely unauthorized", which callers used to read
-// as permission-denied. Consumers that must tell those apart use
-// `useSecurityAgentOrgRoleQuery`/`useSecurityAgentCapability` below; existing
-// boolean-only callers are unchanged.
+// A real org-scope fetch failure otherwise collapses into the same
+// `undefined` role as "still loading" and "genuinely unauthorized", which
+// callers used to read as permission-denied. Consumers that must tell those
+// apart use `useSecurityAgentOrgRoleQuery`/`useSecurityAgentCapability`
+// below; existing boolean-only callers are unchanged.
 function useSecurityAgentOrgRoleQuery(scope: string) {
   const trpc = useTRPC();
+  const isPersonal = isPersonalSecurityScope(scope);
   const query = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: !isPersonal,
   });
+  if (isPersonal) {
+    // The org list is irrelevant to the personal scope, but even a disabled
+    // observer surfaces the SHARED cache entry's error state (populated
+    // app-wide, e.g. by Profile) — mask it so an organizations.list outage
+    // can never block the personal Security Agent.
+    return {
+      role: undefined,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: query.refetch,
+    };
+  }
   return {
     role: query.data?.find(org => org.organizationId === scope)?.role,
     isLoading: query.isLoading,

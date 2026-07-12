@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
-type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
+export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
 const VARIANT_META: Record<
   QueryErrorVariant,

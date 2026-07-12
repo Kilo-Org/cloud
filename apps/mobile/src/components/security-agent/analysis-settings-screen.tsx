@@ -9,12 +9,13 @@ import { Pressable, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { openModelPicker } from '@/components/agents/model-selector';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   useSecurityAgentSettingsRedirect,
@@ -52,7 +53,6 @@ function AnalysisSettingsSkeleton() {
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const paddingBottom = useTabBarBottomPadding();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -109,15 +109,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Models & analysis" />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <QueryError
-            message="Could not load analysis settings"
-            onRetry={() => void config.refetch()}
-          />
-        </View>
-      </View>
+      <PlatformErrorScreen
+        title="Models & analysis"
+        variant="offline"
+        message="Could not load analysis settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {

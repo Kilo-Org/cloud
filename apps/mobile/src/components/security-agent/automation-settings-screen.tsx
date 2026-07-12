@@ -6,11 +6,11 @@ import { toast } from 'sonner-native';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -55,7 +55,6 @@ function AutomationSettingsSkeleton() {
 }
 
 export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const paddingBottom = useTabBarBottomPadding();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -139,15 +138,12 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Automation" />
-        <View className="flex-1" style={{ paddingBottom }}>
-          <QueryError
-            message="Could not load automation settings"
-            onRetry={() => void config.refetch()}
-          />
-        </View>
-      </View>
+      <PlatformErrorScreen
+        title="Automation"
+        variant="offline"
+        message="Could not load automation settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {

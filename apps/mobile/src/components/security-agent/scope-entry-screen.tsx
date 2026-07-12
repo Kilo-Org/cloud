@@ -7,11 +7,10 @@ import { MoreHorizontal } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { QueryError } from '@/components/query-error';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -39,26 +38,6 @@ function ScopeEntrySkeleton() {
         </View>
         <Skeleton className="h-32 w-full rounded-lg" />
         <Skeleton className="h-48 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
-
-function ScopeEntryError({
-  onRetry,
-  isRetrying,
-}: Readonly<{ onRetry: () => void; isRetrying: boolean }>) {
-  const paddingBottom = useTabBarBottomPadding();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Security Agent" />
-      <View className="flex-1" style={{ paddingBottom }}>
-        <QueryError
-          variant="server"
-          title="Could not load Security Agent"
-          onRetry={onRetry}
-          isRetrying={isRetrying}
-        />
       </View>
     </View>
   );
@@ -101,7 +80,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   if (isError) {
     return (
-      <ScopeEntryError
+      <PlatformErrorScreen
+        title="Security Agent"
+        errorTitle="Could not load Security Agent"
         onRetry={() => {
           void permission.refetch();
           void config.refetch();

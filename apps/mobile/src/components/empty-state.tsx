@@ -19,6 +19,8 @@ type EmptyStateProps = {
   iconContainerClassName?: string;
   iconSize?: number;
   iconStrokeWidth?: number;
+  /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
+  titleAccessibilityRole?: 'header';
 };
 
 export function EmptyState({
@@ -31,6 +33,7 @@ export function EmptyState({
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
   iconSize = 24,
   iconStrokeWidth = 1.5,
+  titleAccessibilityRole,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
 
@@ -46,7 +49,7 @@ export function EmptyState({
         <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
       </View>
       <View className="items-center gap-1">
-        <Text variant="large" accessibilityRole="header">
+        <Text variant="large" accessibilityRole={titleAccessibilityRole}>
           {title}
         </Text>
         <Text variant="muted" className="text-center">

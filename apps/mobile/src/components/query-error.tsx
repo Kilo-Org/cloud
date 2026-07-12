@@ -75,6 +75,7 @@ export function QueryError({
       iconContainerClassName="rounded-full bg-muted p-4"
       iconSize={32}
       iconStrokeWidth={2}
+      titleAccessibilityRole="header"
       action={
         onRetry && (
           <Button

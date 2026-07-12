@@ -23,8 +23,8 @@ import {
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
 } from '@/lib/hooks/use-security-agent';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
@@ -53,7 +53,7 @@ function AnalysisSettingsSkeleton() {
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
   const {

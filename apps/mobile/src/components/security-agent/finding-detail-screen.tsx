@@ -1,4 +1,3 @@
-import { canManageSecurityAgent } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Ban, ShieldOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -14,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import {
-  useSecurityAgentOrgRole,
+  useSecurityAgentCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
@@ -54,7 +53,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
-  const role = useSecurityAgentOrgRole(scope);
+  const capability = useSecurityAgentCapability(scope);
 
   // Ref indirection keeps the tracking effects independent of the mutation
   // object's identity (a new object every render), so they only re-fire on
@@ -128,7 +127,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }
 
   const finding = findingQuery.data;
-  const canDismiss = finding.status === 'open' && canManageSecurityAgent(scope, role);
+  const canDismiss = finding.status === 'open' && capability.canManage;
 
   return (
     <View className="flex-1 bg-background">

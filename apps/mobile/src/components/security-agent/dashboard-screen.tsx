@@ -19,9 +19,9 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentDashboardStats,
-  useSecurityAgentEditCapability,
   useSecurityAgentLastSyncTime,
   useSecurityAgentRepositories,
   useTriggerSecuritySync,
@@ -48,7 +48,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const dashboardStats = useSecurityAgentDashboardStats(scope, repoFullName);
   const lastSync = useSecurityAgentLastSyncTime(scope, repoFullName);
   const repositories = useSecurityAgentRepositories(scope);
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const triggerSync = useTriggerSecuritySync(scope);
 
   const slaEnabled = config.data?.slaEnabled ?? true;

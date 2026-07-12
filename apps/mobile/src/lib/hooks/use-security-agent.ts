@@ -4,7 +4,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { type OrganizationRole, type SecurityAgentConfig } from '@/lib/security-agent';
+import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
 // Mutation hooks (save config, set enabled, trigger sync, track interaction)
@@ -105,9 +105,8 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
 //
 // A real org-scope fetch failure otherwise collapses into the same
 // `undefined` role as "still loading" and "genuinely unauthorized", which
-// callers used to read as permission-denied. Consumers that must tell those
-// apart use `useSecurityAgentOrgRoleQuery`/`useSecurityAgentCapability`
-// below; existing boolean-only callers are unchanged.
+// callers used to read as permission-denied. `useSecurityAgentCapability`
+// below tells those apart; it's the only exported consumer of this query.
 function useSecurityAgentOrgRoleQuery(scope: string) {
   const trpc = useTRPC();
   const isPersonal = isPersonalSecurityScope(scope);
@@ -135,15 +134,6 @@ function useSecurityAgentOrgRoleQuery(scope: string) {
     isFetching: query.isFetching,
     refetch: query.refetch,
   };
-}
-
-export function useSecurityAgentOrgRole(scope: string): OrganizationRole | undefined {
-  return useSecurityAgentOrgRoleQuery(scope).role;
-}
-
-export function useSecurityAgentEditCapability(scope: string): boolean {
-  const role = useSecurityAgentOrgRole(scope);
-  return canManageSecurityAgent(scope, role);
 }
 
 // Discriminated capability state for consumers (e.g. audit-report access)

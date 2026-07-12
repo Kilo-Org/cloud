@@ -12,8 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
@@ -36,7 +36,7 @@ function SettingsOverviewSkeleton() {
 export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const config = useSecurityAgentConfig(scope);
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 

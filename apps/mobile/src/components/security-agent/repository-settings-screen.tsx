@@ -26,8 +26,8 @@ import {
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
@@ -49,7 +49,7 @@ function RepositorySettingsSkeleton() {
 }
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope);

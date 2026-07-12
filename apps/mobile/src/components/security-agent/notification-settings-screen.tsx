@@ -21,8 +21,8 @@ import {
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -57,7 +57,7 @@ function NotificationSettingsSkeleton() {
 
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);

@@ -122,10 +122,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 
   const [slaEnabled, setSlaEnabled] = useState(false);
-  const [slaCriticalDays, setSlaCriticalDays] = useState(Number.NaN);
-  const [slaHighDays, setSlaHighDays] = useState(Number.NaN);
-  const [slaMediumDays, setSlaMediumDays] = useState(Number.NaN);
-  const [slaLowDays, setSlaLowDays] = useState(Number.NaN);
+  const [slaDays, setSlaDays] = useState<Record<SlaSeverity, number>>({
+    critical: Number.NaN,
+    high: Number.NaN,
+    medium: Number.NaN,
+    low: Number.NaN,
+  });
   const hydratedRef = useRef(false);
   const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
@@ -141,10 +143,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     hydratedRef.current = true;
     initialConfigRef.current = config.data;
     setSlaEnabled(config.data.slaEnabled);
-    setSlaCriticalDays(config.data.slaCriticalDays);
-    setSlaHighDays(config.data.slaHighDays);
-    setSlaMediumDays(config.data.slaMediumDays);
-    setSlaLowDays(config.data.slaLowDays);
+    setSlaDays({
+      critical: config.data.slaCriticalDays,
+      high: config.data.slaHighDays,
+      medium: config.data.slaMediumDays,
+      low: config.data.slaLowDays,
+    });
   }, [config.data]);
 
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
@@ -167,25 +171,25 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // hidden by the toggle, an invalid day count can't block saving. If a
   // field is invalid at the moment it's hidden, fall back to its last
   // persisted value instead of sending an invalid one.
-  const daysValid = {
-    critical: isValidDayCount(slaCriticalDays),
-    high: isValidDayCount(slaHighDays),
-    medium: isValidDayCount(slaMediumDays),
-    low: isValidDayCount(slaLowDays),
+  const daysValid: Record<SlaSeverity, boolean> = {
+    critical: isValidDayCount(slaDays.critical),
+    high: isValidDayCount(slaDays.high),
+    medium: isValidDayCount(slaDays.medium),
+    low: isValidDayCount(slaDays.low),
   };
   const valid = !slaEnabled || Object.values(daysValid).every(Boolean);
   const patch = {
     slaEnabled,
     slaCriticalDays: daysValid.critical
-      ? slaCriticalDays
-      : (initialConfigRef.current.slaCriticalDays ?? slaCriticalDays),
+      ? slaDays.critical
+      : (initialConfigRef.current.slaCriticalDays ?? slaDays.critical),
     slaHighDays: daysValid.high
-      ? slaHighDays
-      : (initialConfigRef.current.slaHighDays ?? slaHighDays),
+      ? slaDays.high
+      : (initialConfigRef.current.slaHighDays ?? slaDays.high),
     slaMediumDays: daysValid.medium
-      ? slaMediumDays
-      : (initialConfigRef.current.slaMediumDays ?? slaMediumDays),
-    slaLowDays: daysValid.low ? slaLowDays : (initialConfigRef.current.slaLowDays ?? slaLowDays),
+      ? slaDays.medium
+      : (initialConfigRef.current.slaMediumDays ?? slaDays.medium),
+    slaLowDays: daysValid.low ? slaDays.low : (initialConfigRef.current.slaLowDays ?? slaDays.low),
   };
   const dirty =
     hydratedRef.current &&
@@ -214,19 +218,6 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (!config.data.isEnabled) {
     return null;
   }
-
-  const setters: Record<SlaSeverity, (value: number) => void> = {
-    critical: setSlaCriticalDays,
-    high: setSlaHighDays,
-    medium: setSlaMediumDays,
-    low: setSlaLowDays,
-  };
-  const values: Record<SlaSeverity, number> = {
-    critical: slaCriticalDays,
-    high: slaHighDays,
-    medium: slaMediumDays,
-    low: slaLowDays,
-  };
 
   return (
     <View className="flex-1 bg-background">
@@ -273,10 +264,10 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                 key={row.key}
                 label={row.label}
                 description={row.description}
-                initialValue={values[row.key]}
+                initialValue={slaDays[row.key]}
                 disabled={!canManage}
                 onChangeValue={value => {
-                  setters[row.key](value);
+                  setSlaDays(current => ({ ...current, [row.key]: value }));
                 }}
               />
             ))}

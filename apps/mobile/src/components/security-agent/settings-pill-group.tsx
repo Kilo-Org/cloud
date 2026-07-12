@@ -21,8 +21,9 @@ export function PillGroup<T extends string>({
   onChange,
 }: Readonly<{
   label: string;
-  options: { value: T; label: string }[];
-  value: T;
+  options: readonly { value: T; label: string }[];
+  /** `null` when nothing is selected yet, e.g. an unset dismissal reason. */
+  value: T | null;
   disabled: boolean;
   onChange: (value: T) => void;
 }>) {

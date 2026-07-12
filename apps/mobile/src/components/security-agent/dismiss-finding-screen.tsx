@@ -1,31 +1,31 @@
 import { useRouter } from 'expo-router';
-import { Check, ShieldOff } from 'lucide-react-native';
+import { ShieldOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 // The five GitHub dismissal reasons the backend's DismissReasonSchema accepts
 // (apps/web/src/lib/security-agent/core/schemas.ts:13-19) — exact value/label
 // pairs from the task brief, matching web's dismissal reason picker.
 const DISMISS_REASONS = [
-  ['fix_started', 'A fix has already started'],
-  ['no_bandwidth', 'No bandwidth is available'],
-  ['tolerable_risk', 'The risk is tolerable'],
-  ['inaccurate', 'The finding is inaccurate'],
-  ['not_used', 'Vulnerable code is not used'],
+  { value: 'fix_started', label: 'A fix has already started' },
+  { value: 'no_bandwidth', label: 'No bandwidth is available' },
+  { value: 'tolerable_risk', label: 'The risk is tolerable' },
+  { value: 'inaccurate', label: 'The finding is inaccurate' },
+  { value: 'not_used', label: 'Vulnerable code is not used' },
 ] as const;
 
-type DismissReason = (typeof DISMISS_REASONS)[number][0];
+type DismissReason = (typeof DISMISS_REASONS)[number]['value'];
 
 type DismissFindingScreenProps = {
   scope: string;
@@ -161,33 +161,13 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-2">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Reason
-          </Text>
-          <View className="overflow-hidden rounded-lg bg-secondary">
-            {DISMISS_REASONS.map(([value, label], index) => {
-              const selected = reason === value;
-              return (
-                <Pressable
-                  key={value}
-                  className={cn(
-                    'min-h-11 flex-row items-center justify-between px-4 py-3 active:opacity-70',
-                    index < DISMISS_REASONS.length - 1 && 'border-b-[0.5px] border-hair-soft'
-                  )}
-                  onPress={() => {
-                    setReason(value);
-                  }}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                >
-                  <Text className="flex-1 text-sm">{label}</Text>
-                  {selected && <Check size={16} color={colors.primary} />}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        <PillGroup
+          label="Reason"
+          options={DISMISS_REASONS}
+          value={reason}
+          disabled={false}
+          onChange={setReason}
+        />
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

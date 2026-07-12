@@ -55,6 +55,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
+        eyebrow="Code Reviewer"
         onRetry={() => {
           permission.refetch();
         }}
@@ -89,6 +90,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
+        eyebrow="Code Reviewer"
         onRetry={() => {
           providerState.refetch();
         }}
@@ -109,6 +111,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
+        eyebrow="Code Reviewer"
         onRetry={() => {
           void config.refetch();
         }}

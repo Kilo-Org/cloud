@@ -31,7 +31,6 @@ import { DEFAULT_BOT_IDENTITY } from './state';
 type ProvisioningStepProps = {
   state: OnboardingState;
   onGraceElapsed: () => void;
-  onProvisioningTimeout: () => void;
   onComplete: () => void;
   onRetry: () => void;
   onContinueInBackground: () => void;
@@ -83,7 +82,6 @@ function provisioningStageMessage(state: OnboardingState): string {
 export function ProvisioningStep({
   state,
   onGraceElapsed,
-  onProvisioningTimeout,
   onComplete,
   onRetry,
   onContinueInBackground,
@@ -94,7 +92,14 @@ export function ProvisioningStep({
   const botName = state.botIdentity?.botName ?? DEFAULT_BOT_IDENTITY.botName;
   const tint = agentColor(botEmoji);
 
-  const terminalReason = getProvisioningTerminalReason(state);
+  // Overall wall-clock timeout: local to this component since it's the only
+  // producer and consumer. Resets naturally on retry, same as `enteredAtMs`
+  // below — a retry sends `state.step` back to `identity`, which unmounts
+  // this component (see `key="provisioning"` in `flow-body.tsx`), so both
+  // reset fresh on the next entry into provisioning.
+  const [timedOut, setTimedOut] = useState(false);
+
+  const terminalReason = getProvisioningTerminalReason(state, timedOut);
   const stageMessage = useMemo(() => provisioningStageMessage(state), [state]);
 
   // Gentle breathing pulse on the avatar tile — signals "actively working"
@@ -129,8 +134,8 @@ export function ProvisioningStep({
 
   // Single 1s poll while provisioning is live and not yet terminal: checks
   // both the 502-grace sub-machine (pure `checkGraceExpired` helper) and the
-  // overall wall-clock budget, dispatching whichever fires.
-  const { first502AtMs, gateway502Expired, provisioningTimedOut } = state;
+  // overall wall-clock budget, acting on whichever fires.
+  const { first502AtMs, gateway502Expired } = state;
   useEffect(() => {
     if (terminalReason !== null) {
       return undefined;
@@ -144,22 +149,14 @@ export function ProvisioningStep({
       ) {
         onGraceElapsed();
       }
-      if (!provisioningTimedOut && nowMs - enteredAtMs >= OVERALL_TIMEOUT_MS) {
-        onProvisioningTimeout();
+      if (!timedOut && nowMs - enteredAtMs >= OVERALL_TIMEOUT_MS) {
+        setTimedOut(true);
       }
     }, 1000);
     return () => {
       clearInterval(interval);
     };
-  }, [
-    terminalReason,
-    first502AtMs,
-    gateway502Expired,
-    provisioningTimedOut,
-    enteredAtMs,
-    onGraceElapsed,
-    onProvisioningTimeout,
-  ]);
+  }, [terminalReason, first502AtMs, gateway502Expired, timedOut, enteredAtMs, onGraceElapsed]);
 
   // Advance to the done step once the instance + gateway gate holds. Step
   // saves are dispatched from OnboardingFlow and their apply is guaranteed by

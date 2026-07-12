@@ -13,12 +13,7 @@ export default function ModelSettingsScreen() {
   const paddingBottom = useDetailScreenBottomPadding();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Model" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Model" context={instanceContext} />;
   }
 
   return (

@@ -9,15 +9,14 @@ import { SettingsCard } from '@/components/kiloclaw/settings-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawChannelCatalog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function ChannelsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const catalogQuery = useKiloClawChannelCatalog(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
@@ -25,31 +24,22 @@ export default function ChannelsScreen() {
   const isLoading = catalogQuery.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Channels" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Channels" context={instanceContext} />;
   }
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Channels" />
+  function renderBody() {
+    if (isLoading) {
+      return (
         <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4 pt-4">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
         </Animated.View>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (catalogQuery.isError) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Channels" />
+    if (catalogQuery.isError) {
+      return (
         <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load channels"
@@ -58,14 +48,11 @@ export default function ChannelsScreen() {
             }}
           />
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (catalogQuery.data.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Channels" />
+    if (catalogQuery.data.length === 0) {
+      return (
         <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={MessageSquare}
@@ -73,13 +60,10 @@ export default function ChannelsScreen() {
             description="Channel integrations will appear here."
           />
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Channels" />
+    return (
       <View className="flex-1">
         <ScrollView
           contentContainerClassName="pt-4 gap-4"
@@ -103,6 +87,13 @@ export default function ChannelsScreen() {
           </Animated.View>
         </ScrollView>
       </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="Channels" />
+      {renderBody()}
     </View>
   );
 }

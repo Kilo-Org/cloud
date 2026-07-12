@@ -1,8 +1,9 @@
 /**
  * Reducer coverage for the provisioning terminal signals added alongside
- * `getProvisioningTerminalReason` (query errors, the overall wall-clock
- * timeout, and their reset on retry). Split out of `machine.test.ts` to stay
- * under the file's line budget.
+ * `getProvisioningTerminalReason` (query errors, and their reset on retry).
+ * The overall wall-clock timeout is tracked locally in `ProvisioningStep`,
+ * not in the reducer — see `machine.ts`. Split out of `machine.test.ts` to
+ * stay under the file's line budget.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -23,21 +24,9 @@ describe('provisioning-query-errored', () => {
   });
 });
 
-describe('provisioning-timeout-elapsed', () => {
-  it('flips provisioningTimedOut', () => {
-    const s = reduce(INITIAL_STATE, { type: 'provisioning-timeout-elapsed' });
-    expect(s.provisioningTimedOut).toBe(true);
-  });
-});
-
 describe('retry-requested clears terminal signals', () => {
-  it('clears queryErrored and provisioningTimedOut', () => {
-    const s = run([
-      { type: 'provisioning-query-errored' },
-      { type: 'provisioning-timeout-elapsed' },
-      { type: 'retry-requested' },
-    ]);
+  it('clears queryErrored', () => {
+    const s = run([{ type: 'provisioning-query-errored' }, { type: 'retry-requested' }]);
     expect(s.queryErrored).toBe(false);
-    expect(s.provisioningTimedOut).toBe(false);
   });
 });

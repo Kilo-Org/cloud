@@ -8,7 +8,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ExecPreset, execPresetToConfig } from '@/lib/onboarding';
@@ -56,8 +56,7 @@ function resolvePreset(
 export default function ExecPolicyScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
@@ -66,12 +65,7 @@ export default function ExecPolicyScreen() {
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Execution policy" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Execution policy" context={instanceContext} />;
   }
 
   if (statusQuery.isPending) {

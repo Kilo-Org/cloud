@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Check, Eye, Search } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,7 +18,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -35,21 +35,17 @@ type ModelItem = {
 export default function ModelListScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const router = useRouter();
   const colors = useThemeColors();
   const paddingBottom = useDetailScreenBottomPadding();
   const trpc = useTRPC();
   const [searchFilter, setSearchFilter] = useState('');
-  const [searchKey, setSearchKey] = useState(0);
-  const [pendingModelId, setPendingModelId] = useState<string | null>(null);
+  const searchInputRef = useRef<TextInput>(null);
 
   const handleClearSearch = useCallback(() => {
     setSearchFilter('');
-    // TextInput below is uncontrolled (CLAUDE.md) — bump the key to force it
-    // to remount with an empty value instead of reading state per keystroke.
-    setSearchKey(k => k + 1);
+    searchInputRef.current?.clear();
   }, []);
 
   const configQuery = useKiloClawConfig(organizationId);
@@ -90,21 +86,21 @@ export default function ModelListScreen() {
 
   const handleSelect = useCallback(
     (modelId: string) => {
-      setPendingModelId(modelId);
       mutations.updateModel.mutate(
         { kilocodeDefaultModel: addModelPrefix(modelId) },
         {
           onSuccess: () => {
             router.back();
           },
-          onSettled: () => {
-            setPendingModelId(null);
-          },
         }
       );
     },
     [mutations.updateModel, router]
   );
+
+  const pendingModelId = mutations.updateModel.isPending
+    ? stripModelPrefix(mutations.updateModel.variables.kilocodeDefaultModel)
+    : undefined;
 
   const renderItem = useCallback(
     ({ item }: { item: ModelItem }) => {
@@ -160,12 +156,7 @@ export default function ModelListScreen() {
   ];
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="All models" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="All models" context={instanceContext} />;
   }
 
   return (
@@ -173,7 +164,7 @@ export default function ModelListScreen() {
       <ScreenHeader title="All models" />
       <View className="px-4 pb-2 pt-2">
         <TextInput
-          key={searchKey}
+          ref={searchInputRef}
           className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
           placeholder="Search models..."
           placeholderTextColor={colors.mutedForeground}

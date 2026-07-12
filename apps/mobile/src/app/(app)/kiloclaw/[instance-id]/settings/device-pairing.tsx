@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, Monitor, RefreshCw } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 import Animated, {
   Easing,
@@ -21,7 +21,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawDevicePairing,
   useKiloClawMutations,
@@ -40,16 +40,13 @@ const CHANNEL_LABELS: Record<string, string> = {
 export default function DevicePairingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const pairingQuery = useKiloClawPairing(organizationId);
   const devicePairingQuery = useKiloClawDevicePairing(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
-  const [pendingChannelKey, setPendingChannelKey] = useState<string | null>(null);
-  const [pendingDeviceRequestId, setPendingDeviceRequestId] = useState<string | null>(null);
 
   const isLoading = pairingQuery.isPending || devicePairingQuery.isPending;
 
@@ -88,12 +85,7 @@ export default function DevicePairingScreen() {
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Device pairing" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Device pairing" context={instanceContext} />;
   }
 
   if (isLoading) {
@@ -139,15 +131,7 @@ export default function DevicePairingScreen() {
         {
           text: 'Approve',
           onPress: () => {
-            setPendingChannelKey(`${channel}-${code}`);
-            mutations.approvePairingRequest.mutate(
-              { channel, code },
-              {
-                onSettled: () => {
-                  setPendingChannelKey(null);
-                },
-              }
-            );
+            mutations.approvePairingRequest.mutate({ channel, code });
           },
         },
       ]
@@ -160,15 +144,7 @@ export default function DevicePairingScreen() {
       {
         text: 'Approve',
         onPress: () => {
-          setPendingDeviceRequestId(requestId);
-          mutations.approveDevicePairingRequest.mutate(
-            { requestId },
-            {
-              onSettled: () => {
-                setPendingDeviceRequestId(null);
-              },
-            }
-          );
+          mutations.approveDevicePairingRequest.mutate({ requestId });
         },
       },
     ]);
@@ -208,7 +184,10 @@ export default function DevicePairingScreen() {
             <View className="rounded-lg bg-secondary overflow-hidden">
               {channelRequests.map((request, index) => {
                 const ChannelIcon = CATALOG_ICONS[request.channel];
-                const isThisPending = pendingChannelKey === `${request.channel}-${request.code}`;
+                const isThisPending =
+                  mutations.approvePairingRequest.isPending &&
+                  mutations.approvePairingRequest.variables.channel === request.channel &&
+                  mutations.approvePairingRequest.variables.code === request.code;
                 return (
                   <View key={`${request.channel}-${request.code}`}>
                     {index > 0 && <View className="ml-4 h-px bg-border" />}
@@ -256,7 +235,9 @@ export default function DevicePairingScreen() {
             </Text>
             <View className="rounded-lg bg-secondary overflow-hidden">
               {deviceRequests.map((request, index) => {
-                const isThisPending = pendingDeviceRequestId === request.requestId;
+                const isThisPending =
+                  mutations.approveDevicePairingRequest.isPending &&
+                  mutations.approveDevicePairingRequest.variables.requestId === request.requestId;
                 return (
                   <View key={request.requestId}>
                     {index > 0 && <View className="ml-4 h-px bg-border" />}

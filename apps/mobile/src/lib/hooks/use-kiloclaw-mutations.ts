@@ -322,7 +322,11 @@ export function useKiloClawMutations(organizationId?: string | null) {
       },
       onSettled: invalidateStatusAndPin,
     }),
-    approvePairingRequest: useMutation({
+    approvePairingRequest: useMutation<
+      unknown,
+      { message: string },
+      { channel: string; code: string }
+    >({
       ...dispatch(
         trpc.kiloclaw.approvePairingRequest,
         trpc.organizations.kiloclaw.approvePairingRequest
@@ -332,7 +336,7 @@ export function useKiloClawMutations(organizationId?: string | null) {
       },
       onError: onMutationError,
     }),
-    approveDevicePairingRequest: useMutation({
+    approveDevicePairingRequest: useMutation<unknown, { message: string }, { requestId: string }>({
       ...dispatch(
         trpc.kiloclaw.approveDevicePairingRequest,
         trpc.organizations.kiloclaw.approveDevicePairingRequest
@@ -409,7 +413,10 @@ export function useKiloClawMutations(organizationId?: string | null) {
         trpc.kiloclaw.updateKiloCodeConfig,
         trpc.organizations.kiloclaw.updateKiloCodeConfig
       ),
-      ...optimistic(configKey, (old, input: Record<string, unknown>) => ({ ...old, ...input })),
+      ...optimistic(configKey, (old, input: { kilocodeDefaultModel: string }) => ({
+        ...old,
+        ...input,
+      })),
     }),
     // Errors are categorized at the onboarding screen (locked/billing conflict,
     // quarantined, generic). The screen's callsite `onError` owns user-visible

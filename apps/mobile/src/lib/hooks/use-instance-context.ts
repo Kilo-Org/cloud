@@ -26,6 +26,11 @@ export function useAllKiloClawInstances(refetchInterval: number | ListPollDecide
   );
 }
 
+/** The instance's org id once `useInstanceContext` resolves to `ready`, otherwise `undefined`. */
+export function instanceOrgId(context: InstanceContextResult): string | null | undefined {
+  return context.status === 'ready' ? context.organizationId : undefined;
+}
+
 export function useInstanceContext(sandboxId: string): InstanceContextResult {
   const trpc = useTRPC();
   const query = useQuery(

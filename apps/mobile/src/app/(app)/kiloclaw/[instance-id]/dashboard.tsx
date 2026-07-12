@@ -29,7 +29,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawBillingStatus,
   useKiloClawConfig,
@@ -49,8 +49,7 @@ export default function DashboardScreen() {
   const paddingBottom = useDetailScreenBottomPadding();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const isOrg = instanceContext.status === 'ready' && instanceContext.isOrg;
 
   const statusQuery = useKiloClawStatus(organizationId);
@@ -103,12 +102,7 @@ export default function DashboardScreen() {
   );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Dashboard" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Dashboard" context={instanceContext} />;
   }
 
   if (isLoading) {

@@ -220,7 +220,7 @@ describe('isProvisioningTerminal', () => {
       },
       { type: 'gateway-grace-elapsed' },
     ]);
-    expect(isProvisioningTerminal(s)).toBe(true);
+    expect(isProvisioningTerminal(s, false)).toBe(true);
   });
 
   it('is false during the grace window', () => {
@@ -231,31 +231,30 @@ describe('isProvisioningTerminal', () => {
       status: 502,
       nowMs: 0,
     });
-    expect(isProvisioningTerminal(s)).toBe(false);
+    expect(isProvisioningTerminal(s, false)).toBe(false);
   });
 
   it('is true once a hard query error is fed in', () => {
     const s = reduce(INITIAL_STATE, { type: 'provisioning-query-errored' });
-    expect(isProvisioningTerminal(s)).toBe(true);
-    expect(getProvisioningTerminalReason(s)).toBe('query_error');
+    expect(isProvisioningTerminal(s, false)).toBe(true);
+    expect(getProvisioningTerminalReason(s, false)).toBe('query_error');
   });
 
   it('is true once the instance status is a terminal lifecycle state (stopped)', () => {
     const s = reduce(INITIAL_STATE, { type: 'instance-status-changed', status: 'stopped' });
-    expect(isProvisioningTerminal(s)).toBe(true);
-    expect(getProvisioningTerminalReason(s)).toBe('instance_stopped');
+    expect(isProvisioningTerminal(s, false)).toBe(true);
+    expect(getProvisioningTerminalReason(s, false)).toBe('instance_stopped');
   });
 
   it('is false for a non-terminal instance status', () => {
     const s = reduce(INITIAL_STATE, { type: 'instance-status-changed', status: 'starting' });
-    expect(isProvisioningTerminal(s)).toBe(false);
-    expect(getProvisioningTerminalReason(s)).toBeNull();
+    expect(isProvisioningTerminal(s, false)).toBe(false);
+    expect(getProvisioningTerminalReason(s, false)).toBeNull();
   });
 
   it('is true once the overall provisioning timeout elapses', () => {
-    const s = reduce(INITIAL_STATE, { type: 'provisioning-timeout-elapsed' });
-    expect(isProvisioningTerminal(s)).toBe(true);
-    expect(getProvisioningTerminalReason(s)).toBe('timeout');
+    expect(isProvisioningTerminal(INITIAL_STATE, true)).toBe(true);
+    expect(getProvisioningTerminalReason(INITIAL_STATE, true)).toBe('timeout');
   });
 
   it('prioritizes query_error over an instance_stopped status', () => {
@@ -263,15 +262,11 @@ describe('isProvisioningTerminal', () => {
       { type: 'instance-status-changed', status: 'stopped' },
       { type: 'provisioning-query-errored' },
     ]);
-    expect(getProvisioningTerminalReason(s)).toBe('query_error');
+    expect(getProvisioningTerminalReason(s, false)).toBe('query_error');
   });
 
   it('clears after retry-requested so a fresh attempt is not terminal', () => {
-    const s = run([
-      { type: 'provisioning-query-errored' },
-      { type: 'provisioning-timeout-elapsed' },
-      { type: 'retry-requested' },
-    ]);
-    expect(isProvisioningTerminal(s)).toBe(false);
+    const s = run([{ type: 'provisioning-query-errored' }, { type: 'retry-requested' }]);
+    expect(isProvisioningTerminal(s, false)).toBe(false);
   });
 });

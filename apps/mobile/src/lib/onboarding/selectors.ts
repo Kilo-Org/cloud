@@ -109,9 +109,14 @@ export type ProvisioningTerminalReason =
  * in priority order: a hard query error outranks a stopped instance, which
  * outranks the 502-grace timer, which outranks the overall wall-clock
  * timeout. Returns `null` while provisioning is still progressing normally.
+ *
+ * `timedOut` is passed in rather than read from `state` because the overall
+ * wall-clock timeout has no other producer/consumer than `ProvisioningStep`,
+ * which tracks it as local `useState` instead of a machine round-trip.
  */
 export function getProvisioningTerminalReason(
-  state: OnboardingState
+  state: OnboardingState,
+  timedOut: boolean
 ): ProvisioningTerminalReason | null {
   if (state.queryErrored) {
     return 'query_error';
@@ -122,7 +127,7 @@ export function getProvisioningTerminalReason(
   if (state.gateway502Expired) {
     return 'gateway_502';
   }
-  if (state.provisioningTimedOut) {
+  if (timedOut) {
     return 'timeout';
   }
   return null;
@@ -132,6 +137,6 @@ export function getProvisioningTerminalReason(
  * Whether the provisioning step should render its terminal "Provisioning failed"
  * view. True iff `getProvisioningTerminalReason` finds a terminal cause.
  */
-export function isProvisioningTerminal(state: OnboardingState): boolean {
-  return getProvisioningTerminalReason(state) !== null;
+export function isProvisioningTerminal(state: OnboardingState, timedOut: boolean): boolean {
+  return getProvisioningTerminalReason(state, timedOut) !== null;
 }

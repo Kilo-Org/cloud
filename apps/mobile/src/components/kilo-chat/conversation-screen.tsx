@@ -29,7 +29,11 @@ import { useMessageCacheUpdater, useMessages } from './hooks/use-messages';
 import { useNowTicker } from './hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { useKiloChatTokenError } from './kilo-chat-provider';
-import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
+import {
+  instanceOrgId,
+  useAllKiloClawInstances,
+  useInstanceContext,
+} from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { kiloclawConversationEyebrow } from '@/lib/kiloclaw-display';
 import { chatInstancePickerPath } from '@/lib/kilo-chat-routes';
@@ -57,7 +61,7 @@ export function ConversationScreen({
   const tokenError = useKiloChatTokenError();
   const instanceContext = useInstanceContext(sandboxId);
   const instanceStatusQuery = useKiloClawStatus(
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined,
+    instanceOrgId(instanceContext),
     instanceContext.status === 'ready'
   );
   const { data: instances } = useAllKiloClawInstances();

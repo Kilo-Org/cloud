@@ -10,15 +10,14 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawChangelog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function ChangelogScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const changelogQuery = useKiloClawChangelog(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const router = useRouter();
@@ -42,31 +41,22 @@ export default function ChangelogScreen() {
   }
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="What's New" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="What's New" context={instanceContext} />;
   }
 
-  if (changelogQuery.isPending) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="What's New" />
+  function renderBody() {
+    if (changelogQuery.isPending) {
+      return (
         <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4 pt-4">
           <Skeleton className="h-16 rounded-lg" />
           <Skeleton className="h-16 rounded-lg" />
           <Skeleton className="h-16 rounded-lg" />
         </Animated.View>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (changelogQuery.isError) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="What's New" />
+    if (changelogQuery.isError) {
+      return (
         <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load changelog"
@@ -75,14 +65,11 @@ export default function ChangelogScreen() {
             }}
           />
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (!entries || entries.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="What's New" />
+    if (!entries || entries.length === 0) {
+      return (
         <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={Newspaper}
@@ -90,13 +77,10 @@ export default function ChangelogScreen() {
             description="Changelog entries will appear here."
           />
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="What's New" />
+    return (
       <ScrollView
         contentContainerClassName="px-4 pt-4 gap-4"
         contentContainerStyle={{ paddingBottom }}
@@ -116,6 +100,13 @@ export default function ChangelogScreen() {
           </Animated.View>
         </View>
       </ScrollView>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="What's New" />
+      {renderBody()}
     </View>
   );
 }

@@ -53,17 +53,15 @@ type BillingPollDecider = (data: BillingData | undefined) => number;
 
 export function useKiloClawBillingStatus(
   enabled = true,
-  refetchInterval: number | BillingPollDecider = 60_000
+  refetchInterval: BillingPollDecider = () => 60_000
 ) {
   const trpc = useTRPC();
-  const intervalOption =
-    typeof refetchInterval === 'function'
-      ? (query: { state: { data?: BillingData } }) => refetchInterval(query.state.data)
-      : refetchInterval;
   return useQuery(
     trpc.kiloclaw.getBillingStatus.queryOptions(undefined, {
       enabled,
-      refetchInterval: enabled ? intervalOption : false,
+      refetchInterval: enabled
+        ? (query: { state: { data?: BillingData } }) => refetchInterval(query.state.data)
+        : false,
     })
   );
 }

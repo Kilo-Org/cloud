@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawAvailableVersions,
   useKiloClawLatestVersion,
@@ -29,8 +29,7 @@ const MAX_LIMIT = 100;
 export default function VersionPinScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const myPinQuery = useKiloClawMyPin(organizationId);
   const latestVersionQuery = useKiloClawLatestVersion();
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -47,12 +46,7 @@ export default function VersionPinScreen() {
   const isPinMutating = mutations.setMyPin.isPending || mutations.removeMyPin.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Version pinning" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Version pinning" context={instanceContext} />;
   }
 
   if (isLoading) {

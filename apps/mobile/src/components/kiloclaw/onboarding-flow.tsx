@@ -292,10 +292,6 @@ export function OnboardingFlow() {
     dispatch({ type: 'gateway-grace-elapsed' });
   }, []);
 
-  const onProvisioningTimeout = useCallback(() => {
-    dispatch({ type: 'provisioning-timeout-elapsed' });
-  }, []);
-
   const onDismiss = useCallback(() => {
     // When provision has started (or an instance exists), land on Home so the
     // user sees the live status card. Otherwise return to the entry screen.
@@ -457,7 +453,6 @@ export function OnboardingFlow() {
           onProvisioningComplete={onProvisioningComplete}
           onRetry={onProvisioningRetry}
           onGraceElapsed={onGraceElapsed}
-          onProvisioningTimeout={onProvisioningTimeout}
           onContinueInBackground={onDismiss}
           onOpenInstance={onOpenInstance}
         />

@@ -1,5 +1,5 @@
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { CreditCard, ExternalLink } from 'lucide-react-native';
 import { Linking, ScrollView, View } from 'react-native';
@@ -44,14 +44,16 @@ function formatStandardPrice(microdollars: number | null | undefined): string {
 }
 
 /** "Continue month-to-month" CTA shown during a Commit plan's final term. */
-function ContinueMonthToMonthAction({
-  instanceId,
-  onSuccess,
-}: Readonly<{ instanceId: string; onSuccess: () => void }>) {
+function ContinueMonthToMonthAction({ instanceId }: Readonly<{ instanceId: string }>) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const mutation = useMutation(
     trpc.kiloclaw.continueCommitAsStandard.mutationOptions({
-      onSuccess,
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
+        });
+      },
       onError: error => {
         toast.error(error.message);
       },
@@ -74,10 +76,8 @@ function ContinueMonthToMonthAction({
 
 function FinalCommitTermDetails({
   billing,
-  onContinued,
 }: Readonly<{
   billing: NonNullable<ReturnType<typeof useKiloClawBillingStatus>['data']>;
-  onContinued: () => void;
 }>) {
   const subscription = billing.subscription;
   if (!subscription) {
@@ -108,7 +108,7 @@ function FinalCommitTermDetails({
             : `Your final Commit term ends on ${finalDate}. Continue as Standard at ${priceText}, or hosting ends.`}
         </Text>
         {!subscription.standardContinuationScheduled && instanceId ? (
-          <ContinueMonthToMonthAction instanceId={instanceId} onSuccess={onContinued} />
+          <ContinueMonthToMonthAction instanceId={instanceId} />
         ) : null}
       </View>
     </View>
@@ -117,13 +117,11 @@ function FinalCommitTermDetails({
 
 function PlanDetails({
   billing,
-  onContinued,
 }: Readonly<{
   billing: NonNullable<ReturnType<typeof useKiloClawBillingStatus>['data']>;
-  onContinued: () => void;
 }>) {
   if (billing.subscription?.isFinalCommitTerm) {
-    return <FinalCommitTermDetails billing={billing} onContinued={onContinued} />;
+    return <FinalCommitTermDetails billing={billing} />;
   }
   if (billing.subscription) {
     const planName =
@@ -187,12 +185,7 @@ export default function BillingScreen() {
   const billing = billingQuery.data;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Billing" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Billing" context={instanceContext} />;
   }
 
   if (isOrg) {
@@ -264,12 +257,7 @@ export default function BillingScreen() {
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
           {/* Plan details */}
           <View className="bg-secondary rounded-lg px-4">
-            <PlanDetails
-              billing={billing}
-              onContinued={() => {
-                void billingQuery.refetch();
-              }}
-            />
+            <PlanDetails billing={billing} />
           </View>
 
           {/* Manage billing button */}

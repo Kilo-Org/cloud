@@ -9,47 +9,37 @@ import { SettingsCard } from '@/components/kiloclaw/settings-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw-queries';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 export default function SecretsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const mutations = useKiloClawMutations(organizationId);
   const catalogQuery = useKiloClawSecretCatalog(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
   const isLoading = catalogQuery.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Secrets" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Secrets" context={instanceContext} />;
   }
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Secrets" />
+  function renderBody() {
+    if (isLoading) {
+      return (
         <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4 pt-4">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-24 w-full rounded-lg" />
         </Animated.View>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (catalogQuery.isError) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Secrets" />
+    if (catalogQuery.isError) {
+      return (
         <View className="flex-1 items-center justify-center">
           <QueryError
             message="Could not load secrets"
@@ -58,14 +48,11 @@ export default function SecretsScreen() {
             }}
           />
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (catalogQuery.data.length === 0) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Secrets" />
+    if (catalogQuery.data.length === 0) {
+      return (
         <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={KeyRound}
@@ -73,13 +60,10 @@ export default function SecretsScreen() {
             description="Secret integrations will appear here."
           />
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Secrets" />
+    return (
       <View className="flex-1">
         <ScrollView
           contentContainerClassName="pt-4 gap-3"
@@ -103,6 +87,13 @@ export default function SecretsScreen() {
           </Animated.View>
         </ScrollView>
       </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="Secrets" />
+      {renderBody()}
     </View>
   );
 }

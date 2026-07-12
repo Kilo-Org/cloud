@@ -12,19 +12,12 @@ type InstanceControlsProps = {
 
 // Statuses where the backend is already mid-transition — starting or
 // redeploying now would race an in-flight lifecycle change. Anything NOT in
-// these sets (including 'stopped', 'provisioned', 'crashed', and any
-// unrecognized/null status) is fair game.
+// this set (including 'stopped', 'provisioned', 'crashed', and any
+// unrecognized/null status) is fair game to start. Redeploy is additionally
+// allowed while 'running' (the only status this set adds beyond redeploy's
+// own blocking list).
 const START_BLOCKING_STATUSES = new Set([
   'running',
-  'starting',
-  'restarting',
-  'stopping',
-  'shutting_down',
-  'destroying',
-  'recovering',
-  'restoring',
-]);
-const REDEPLOY_BLOCKING_STATUSES = new Set([
   'starting',
   'restarting',
   'stopping',
@@ -38,7 +31,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   const canStart = status == null || !START_BLOCKING_STATUSES.has(status);
   const canStop = status === 'running';
   const canRestartOpenClaw = status === 'running';
-  const canRedeploy = status == null || !REDEPLOY_BLOCKING_STATUSES.has(status);
+  const canRedeploy = canStart || status === 'running';
 
   // Only one lifecycle mutation should ever be in flight at a time — while
   // any of these is pending (including destroy, initiated from DangerZone),

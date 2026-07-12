@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawGoogleSetup,
   useKiloClawMutations,
@@ -26,8 +26,7 @@ import { cn } from '@/lib/utils';
 export default function GoogleScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
-  const organizationId =
-    instanceContext.status === 'ready' ? instanceContext.organizationId : undefined;
+  const organizationId = instanceOrgId(instanceContext);
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
@@ -42,12 +41,7 @@ export default function GoogleScreen() {
   const setupQuery = useKiloClawGoogleSetup(organizationId, !statusQuery.isPending && !isConnected);
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Google Account" />
-        <InstanceContextBoundary context={instanceContext} />
-      </View>
-    );
+    return <InstanceContextBoundary title="Google Account" context={instanceContext} />;
   }
 
   if (statusQuery.isPending) {

@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAppStoreKiloPassPurchaseActions,
+  resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
   StoreKiloPassPurchaseProvider,
   useInlinePurchaseErrorOwnership,
@@ -196,7 +197,7 @@ function renderStoreKiloPassPurchaseProvider() {
 }
 
 /** Mounts `useInlinePurchaseErrorOwnership`, returning an `unmount` that runs its cleanup. */
-function InlineErrorOwnershipHarness() {
+function mountInlineErrorOwnership() {
   const reactInternals = React as typeof React & ReactInternals;
   let cleanup: (() => void) | undefined = undefined;
   const dispatcher = {
@@ -209,7 +210,10 @@ function InlineErrorOwnershipHarness() {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
   reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
   try {
-    useInlinePurchaseErrorOwnership();
+    // Same alias trick as renderProviderElement above: run the hook against
+    // the fake dispatcher without tripping rules-of-hooks lexically.
+    const mountOwnershipHook = useInlinePurchaseErrorOwnership;
+    mountOwnershipHook();
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
       previousDispatcher;
@@ -302,6 +306,7 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
 beforeEach(() => {
   vi.clearAllMocks();
   resetPurchaseErrorToastDedup();
+  resetInlinePurchaseErrorOwnership();
   mockedIap.availablePurchases = [];
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
@@ -862,8 +867,7 @@ describe('StoreKiloPassPurchaseProvider', () => {
 
   it('suppresses the purchase-error toast while a screen owns inline feedback, and resumes once it unmounts', async () => {
     const provider = renderStoreKiloPassPurchaseProvider();
-    const mountInlineErrorOwnershipHarness = InlineErrorOwnershipHarness;
-    const owner = mountInlineErrorOwnershipHarness();
+    const owner = mountInlineErrorOwnership();
 
     const initialValue = provider.render();
     await initialValue.purchase(product);

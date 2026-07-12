@@ -152,7 +152,12 @@ export function LowBalanceAlertSheet() {
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
-  if (isResolving || orgWithMembers.isLoading) {
+  // isPending (no data AND no error) rather than isLoading: an offline
+  // paused fetch has isLoading false but no data — it must show the skeleton
+  // instead of rendering nothing, while a real error still reaches QueryError.
+  // The organizationId guard keeps a disabled query (null org, isPending
+  // forever) falling through to OrganizationBoundary below.
+  if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
         <Skeleton className="h-[52px] rounded-lg" />

@@ -113,6 +113,10 @@ export function resetPurchaseErrorToastDedup() {
 // than one owner is ever mounted at once.
 let inlineErrorOwnerCount = 0;
 
+export function resetInlinePurchaseErrorOwnership() {
+  inlineErrorOwnerCount = 0;
+}
+
 export function useInlinePurchaseErrorOwnership() {
   useEffect(() => {
     inlineErrorOwnerCount += 1;

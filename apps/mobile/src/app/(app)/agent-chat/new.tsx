@@ -173,27 +173,6 @@ export default function NewSessionScreen() {
 
   const handleCreate = useCallback(async () => {
     const prompt = promptRef.current.trim();
-    // The backend requires a non-empty prompt even when attachments are present.
-    if (!prompt) {
-      toast.error('Enter a prompt first.');
-      return;
-    }
-    if (!selectedRepo) {
-      toast.error('Select a repository first.');
-      return;
-    }
-    if (!model) {
-      toast.error('Select a model first.');
-      return;
-    }
-    if (attachments.isUploading) {
-      toast.error('Wait for attachments to finish uploading.');
-      return;
-    }
-    if (attachments.hasFailedAttachments) {
-      toast.error('Remove or retry failed attachments first.');
-      return;
-    }
     if (prompt.startsWith('/') && attachments.attachments.length > 0) {
       toast.error('Attachments cannot be sent with slash commands.');
       return;

@@ -130,10 +130,10 @@ export function AgentSessionListScreen() {
   // it's the query actually driving what's on screen.
   const handleRefetch = useCallback(async () => {
     if (!isSearching) {
-      return refetch();
+      await refetch();
+      return;
     }
-    const [searchResult, listHadError] = await Promise.all([searchRefetch(), refetch()]);
-    return searchResult.isError || listHadError;
+    await Promise.all([searchRefetch(), refetch()]);
   }, [isSearching, refetch, searchRefetch]);
 
   const refetchRef = useRef(refetch);

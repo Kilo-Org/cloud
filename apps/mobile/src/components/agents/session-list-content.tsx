@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { type SessionItem, type SessionSection } from '@/components/agents/session-list-helpers';
 import { RemoteSessionRow, StoredSessionRow } from '@/components/agents/session-row';
@@ -36,7 +35,7 @@ type AgentSessionListContentProps = {
   isSearchPending: boolean;
   isError: boolean;
   isFetchingNextPage: boolean;
-  refetch: () => Promise<boolean>;
+  refetch: () => Promise<void>;
   onRetry: () => void;
   onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
@@ -189,10 +188,7 @@ export function AgentSessionListContent({
     void (async () => {
       setRefreshing(true);
       try {
-        const hadError = await refetch();
-        if (hadError) {
-          toast.error('Could not refresh sessions. Showing the last saved list.');
-        }
+        await refetch();
       } finally {
         setRefreshing(false);
       }

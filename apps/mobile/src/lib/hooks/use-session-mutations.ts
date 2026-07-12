@@ -1,8 +1,8 @@
 import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef } from 'react';
 import { toast } from 'sonner-native';
 
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
+import { chainSave } from '@/lib/hooks/save-chain';
 import {
   mapStoredSessions,
   removeStoredSession,
@@ -19,10 +19,6 @@ const onError = (error: { message: string }) => {
 export function useSessionMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  // Refs (not state) are enough — these only gate duplicate taps and order
-  // mutations per row, they never need to drive a re-render.
-  const sessionOpChains = useRef(new Map<string, Promise<unknown>>());
-  const sessionOpTailKeys = useRef(new Map<string, string>());
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();
 
   const invalidateSessions = async () => {
@@ -46,10 +42,9 @@ export function useSessionMutations() {
 
   const deleteSessionMutation = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions({
-      onMutate: async ({ session_id }) => {
-        const context = await snapshotAndUpdate(data => removeStoredSession(data, session_id));
-        return context;
-      },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      onMutate: ({ session_id }) =>
+        snapshotAndUpdate(data => removeStoredSession(data, session_id)),
       onError: (error, _input, context) => {
         rollback(context?.previous);
         onError(error);
@@ -60,12 +55,11 @@ export function useSessionMutations() {
 
   const renameSessionMutation = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions({
-      onMutate: async ({ session_id, title }) => {
-        const context = await snapshotAndUpdate(data =>
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      onMutate: ({ session_id, title }) =>
+        snapshotAndUpdate(data =>
           mapStoredSessions(data, session_id, session => ({ ...session, title }))
-        );
-        return context;
-      },
+        ),
       onError: (error, _input, context) => {
         rollback(context?.previous);
         onError(error);
@@ -76,50 +70,35 @@ export function useSessionMutations() {
 
   // Per session row: DISTINCT operations (a delete during a settling rename,
   // a re-rename to a different title) run serialized through a per-session
-  // promise chain so their optimistic snapshots/rollbacks can't interleave
-  // and an older request can never overwrite a newer one's result. Only an
-  // ADJACENT identical op is dropped — a repeat of whatever is currently the
-  // tail of the chain (the double-tap case). A non-adjacent repeat (rename
-  // A → B → A) must still run so the user's latest intent wins; keying dedup
-  // off the tail rather than a global set is what lets A run last.
-  const enqueueSessionOp = (sessionId: string, opKey: string, run: () => Promise<unknown>) => {
-    if (sessionOpTailKeys.current.get(sessionId) === opKey) {
-      return;
-    }
-    sessionOpTailKeys.current.set(sessionId, opKey);
-    const previous = sessionOpChains.current.get(sessionId);
-    let next: Promise<void> | undefined = undefined;
-    next = (async () => {
-      try {
-        await previous;
-      } catch {
-        // The prior op already reported via its mutation's onError.
-      }
-      try {
-        await run();
-      } catch {
-        // Already surfaced via the mutation's own onError (toast + rollback).
-      }
-      // Only the last op in the chain clears the per-session state, so a fresh
-      // tap after everything settles is never mistaken for an adjacent repeat.
-      if (sessionOpChains.current.get(sessionId) === next) {
-        sessionOpChains.current.delete(sessionId);
-        sessionOpTailKeys.current.delete(sessionId);
-      }
-    })();
-    sessionOpChains.current.set(sessionId, next);
-  };
-
+  // chain (chainSave, see save-chain.ts) so their optimistic
+  // snapshots/rollbacks can't interleave and an older request can never
+  // overwrite a newer one's result. Rename goes through a modal confirm and
+  // delete through Alert.alert, so an adjacent double-fire of the same op
+  // is already impossible — no dedupe needed here.
   return {
     deleteSession: (sessionId: string) => {
-      enqueueSessionOp(sessionId, `delete:${sessionId}`, async () => {
-        await deleteSessionMutation.mutateAsync({ session_id: sessionId });
-      });
+      void (async () => {
+        try {
+          // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+          await chainSave(sessionId, () =>
+            deleteSessionMutation.mutateAsync({ session_id: sessionId })
+          );
+        } catch {
+          // Already surfaced via the mutation's own onError (toast + rollback).
+        }
+      })();
     },
     renameSession: (sessionId: string, title: string) => {
-      enqueueSessionOp(sessionId, `rename:${sessionId}:${title}`, async () => {
-        await renameSessionMutation.mutateAsync({ session_id: sessionId, title });
-      });
+      void (async () => {
+        try {
+          // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+          await chainSave(sessionId, () =>
+            renameSessionMutation.mutateAsync({ session_id: sessionId, title })
+          );
+        } catch {
+          // Already surfaced via the mutation's own onError (toast + rollback).
+        }
+      })();
     },
   };
 }

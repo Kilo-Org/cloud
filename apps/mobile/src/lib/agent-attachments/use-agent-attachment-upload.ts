@@ -9,11 +9,7 @@ import {
   AGENT_ATTACHMENT_MIME_BY_EXTENSION,
   type AgentAttachmentExtension,
 } from '@/lib/agent-attachments/constants';
-import {
-  canAddAttachments,
-  classifyAttachment,
-  hasFailedAttachments,
-} from '@/lib/agent-attachments/validate';
+import { canAddAttachments, classifyAttachment } from '@/lib/agent-attachments/validate';
 
 export type AgentAttachmentKind = 'image' | 'document';
 export type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
@@ -248,7 +244,7 @@ export function useAgentAttachmentUpload(
   const isUploading = attachments.some(
     item => item.status === 'pending' || item.status === 'uploading'
   );
-  const failedAttachments = hasFailedAttachments(attachments);
+  const failedAttachments = attachments.some(item => item.status === 'error');
 
   return useMemo(
     () => ({

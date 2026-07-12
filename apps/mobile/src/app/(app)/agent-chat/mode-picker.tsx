@@ -7,7 +7,7 @@ import { FlatList, Pressable, View } from 'react-native';
 import { getModeIcon, MODE_OPTIONS, type ModeOption } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { EmptyState } from '@/components/empty-state';
-import { SheetHeader } from '@/components/sheet-header';
+import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearModePickerBridge, getModePickerBridge } from '@/lib/picker-bridge';
@@ -35,19 +35,20 @@ export default function ModePickerScreen() {
 
   if (!bridge) {
     return (
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title="Select mode"
-          onDone={() => {
-            router.back();
-          }}
-        />
-        <EmptyState
-          icon={Info}
-          title="Options expired"
-          description="Go back and reopen this picker from the previous screen."
-        />
-      </View>
+      <PickerSheet
+        title="Select mode"
+        onDone={() => {
+          router.back();
+        }}
+        scrollable={false}
+        fallback={
+          <EmptyState
+            icon={Info}
+            title="Options expired"
+            description="Go back and reopen this picker from the previous screen."
+          />
+        }
+      />
     );
   }
 
@@ -77,21 +78,20 @@ export default function ModePickerScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <SheetHeader
-        title="Select mode"
-        onDone={() => {
-          router.back();
-        }}
-      />
+    <PickerSheet
+      title="Select mode"
+      onDone={() => {
+        router.back();
+      }}
+      scrollable={false}
+    >
       <FlatList
         className="flex-1 bg-background"
         data={MODE_OPTIONS}
         keyExtractor={item => item.value}
         renderItem={renderItem}
-        contentInsetAdjustmentBehavior="automatic"
         ItemSeparatorComponent={() => <View className="mx-4 border-b border-border" />}
       />
-    </View>
+    </PickerSheet>
   );
 }

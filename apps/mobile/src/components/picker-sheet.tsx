@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetHeader } from '@/components/sheet-header';
@@ -26,14 +26,18 @@ export function PickerSheet({
   const { bottom } = useSafeAreaInsets();
   const body = fallback ?? children;
 
+  // No wrapping View: react-native-screens sizes a formSheet's scroll view
+  // natively and only honors a header when [header, scroll view] are the
+  // screen content's direct children. An extra wrapper makes it fall back to
+  // pinning the scroll view to the full sheet, painting it over the header.
   return (
-    <View className="flex-1 bg-background">
+    <>
       <SheetHeader title={title} onDone={onDone} />
       {scrollable ? (
         <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
       ) : (
         body
       )}
-    </View>
+    </>
   );
 }

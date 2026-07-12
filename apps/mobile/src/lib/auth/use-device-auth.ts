@@ -194,6 +194,11 @@ export function useDeviceAuth(): DeviceAuthResult {
           headers: { 'Content-Type': 'application/json' },
           signal: startAbort.signal,
         });
+        // The timeout guards ONLY the POST. This function stays suspended on
+        // `await openAuthBrowser(...)` for as long as the auth sheet is open,
+        // so a timer still running past this point would fire mid-sign-in and
+        // stomp the live pending/idle state with a bogus error.
+        clearTimeout(startTimeout);
 
         // Cancel can race request completion — if it landed while awaiting,
         // the user is back on the idle screen; don't revive the flow.

@@ -23,19 +23,10 @@ const EMAIL_ERROR = 'Enter a valid email address';
 export function InviteMemberSheet() {
   const router = useRouter();
   const colors = useThemeColors();
-  const {
-    organizationId,
-    role: myRole,
-    org,
-    isResolving,
-    isError: isOrgListError,
-    isFetching: isOrgListFetching,
-    refetch: refetchOrgList,
-  } = useOrgBoundary();
+  const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const emailRef = useRef('');
   const [canSubmit, setCanSubmit] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
 
@@ -48,16 +39,7 @@ export function InviteMemberSheet() {
     );
   }
   if (organizationId == null || org == null) {
-    return (
-      <View className="flex-1 bg-background">
-        <OrganizationBoundary
-          isError={isOrgListError}
-          isFetching={isOrgListFetching}
-          refetch={refetchOrgList}
-          organizationId={organizationId}
-        />
-      </View>
-    );
+    return <OrganizationBoundary />;
   }
   if (!isMoneyRole(myRole)) {
     return <PermissionDenied description="You don't have permission to invite members." />;
@@ -65,10 +47,6 @@ export function InviteMemberSheet() {
 
   const onSubmit = () => {
     const email = emailRef.current.trim().toLowerCase();
-    if (!EMAIL_PATTERN.test(email)) {
-      setEmailError(EMAIL_ERROR);
-      return;
-    }
     mutations.invite.mutate(
       { email, role: isBillingManager ? 'member' : role },
       {
@@ -100,17 +78,10 @@ export function InviteMemberSheet() {
         autoCapitalize="none"
         autoCorrect={false}
         autoFocus
-        error={emailError ?? undefined}
+        validate={value => (EMAIL_PATTERN.test(value.trim()) ? null : EMAIL_ERROR)}
         onChangeText={value => {
           emailRef.current = value;
-          const valid = EMAIL_PATTERN.test(value.trim());
-          setCanSubmit(valid);
-          if (emailError) {
-            setEmailError(valid ? null : EMAIL_ERROR);
-          }
-        }}
-        onBlur={() => {
-          setEmailError(EMAIL_PATTERN.test(emailRef.current.trim()) ? null : EMAIL_ERROR);
+          setCanSubmit(EMAIL_PATTERN.test(value.trim()));
         }}
       />
 

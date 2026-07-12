@@ -72,15 +72,10 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
   setPendingPurchaseCompletedCallback?: (callback: (() => void) | null) => void;
-  showError: (message: string, options?: ShowErrorOptions) => void;
+  showError: (message: string) => void;
 };
 
-type ShowErrorOptions = {
-  /** Skip the toast — an inline consumer (e.g. the subscription screen) already owns feedback. */
-  suppressToast?: boolean;
-};
-
-type StoreKiloPassPurchaseOptions = ShowErrorOptions & {
+type StoreKiloPassPurchaseOptions = {
   onCompleted?: () => void;
 };
 
@@ -92,7 +87,7 @@ type StoreKiloPassPurchaseContextValue = {
     product: AppStoreKiloPassProduct,
     options?: StoreKiloPassPurchaseOptions
   ) => Promise<void>;
-  restorePurchases: (options?: ShowErrorOptions) => Promise<StoreKiloPassRestorePurchasesResult>;
+  restorePurchases: () => Promise<StoreKiloPassRestorePurchasesResult>;
   isPending: boolean;
   isRestoringPurchases: boolean;
   /** Last purchase/restore failure message, for screens that render it inline. */
@@ -112,7 +107,22 @@ export function resetPurchaseErrorToastDedup() {
   lastPurchaseErrorToast = null;
 }
 
-type PurchaseCompletionOptions = ShowErrorOptions & {
+// Screens that render `errorMessage` inline (e.g. the subscription screen)
+// register ownership on mount so purchase/restore failures don't also pop a
+// toast behind them. Counter (not a boolean) so it degrades safely if more
+// than one owner is ever mounted at once.
+let inlineErrorOwnerCount = 0;
+
+export function useInlinePurchaseErrorOwnership() {
+  useEffect(() => {
+    inlineErrorOwnerCount += 1;
+    return () => {
+      inlineErrorOwnerCount -= 1;
+    };
+  }, []);
+}
+
+type PurchaseCompletionOptions = {
   invalidateAfterCompletion?: boolean;
   notifyErrors?: boolean;
 };
@@ -179,6 +189,10 @@ function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): stri
 }
 
 function showDedupedPurchaseError(message: string) {
+  if (inlineErrorOwnerCount > 0) {
+    return;
+  }
+
   const now = Date.now();
   if (
     lastPurchaseErrorToast?.message === message &&
@@ -219,7 +233,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     options: PurchaseCompletionOptions
   ) {
     if (!result.completed && result.errorMessage && (options.notifyErrors ?? true)) {
-      deps.showError(result.errorMessage, { suppressToast: options.suppressToast });
+      deps.showError(result.errorMessage);
     }
   }
 
@@ -309,7 +323,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
           'Failed to start App Store purchase.'
         );
         if (message) {
-          deps.showError(message, { suppressToast: options.suppressToast });
+          deps.showError(message);
         }
         deps.setPendingPurchaseCompletedCallback?.(null);
         return false;
@@ -317,17 +331,13 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     },
     handlePurchaseSuccess,
     recoverPurchases,
-    restorePurchases: async (
-      options: ShowErrorOptions = {}
-    ): Promise<StoreKiloPassRestorePurchasesResult> => {
+    restorePurchases: async (): Promise<StoreKiloPassRestorePurchasesResult> => {
       try {
         await deps.restorePurchases();
         const availablePurchases = await deps.getAvailablePurchases();
         const enabledAppleProductIds = await getEnabledAppleProductIdsForRestore();
         if (enabledAppleProductIds.length === 0) {
-          deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE, {
-            suppressToast: options.suppressToast,
-          });
+          deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE);
           return 'failed';
         }
 
@@ -341,11 +351,10 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         const completedPurchases = await recoverPurchases(kiloPassPurchases, {
           enabledAppleProductIds,
           notifyErrors: true,
-          suppressToast: options.suppressToast,
         });
         return completedPurchases.length > 0 ? 'restored' : 'failed';
       } catch {
-        deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE, { suppressToast: options.suppressToast });
+        deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE);
         return 'failed';
       }
     },
@@ -363,7 +372,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
   }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
-  const activePurchaseRequestRef = useRef<{ sku: string; suppressToast: boolean } | null>(null);
+  const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
   const pendingPurchaseCompletedCallbackRef = useRef<(() => void) | null>(null);
   const completeAppStorePurchase = useMutation(
     trpc.kiloPass.completeAppStorePurchase.mutationOptions()
@@ -394,16 +403,13 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
 
   const actionsRef = useIAP({
     onPurchaseError: error => {
-      const suppressToast = activePurchaseRequestRef.current?.suppressToast ?? false;
       pendingPurchaseCompletedCallbackRef.current = null;
       releasePurchaseRequest();
       // A null message means the user cancelled — not a failure.
       const message = getKiloPassPurchaseErrorMessage(error, error.message);
       if (message) {
         captureEvent(KILO_PASS_PURCHASE_FAILED_EVENT);
-        if (!suppressToast) {
-          showDedupedPurchaseError(message);
-        }
+        showDedupedPurchaseError(message);
         setErrorMessage(message);
       }
     },
@@ -417,10 +423,9 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         return;
       }
 
-      const suppressToast = activePurchaseRequestRef.current.suppressToast;
       void (async () => {
         try {
-          await actions.handlePurchaseSuccess(purchase, { suppressToast });
+          await actions.handlePurchaseSuccess(purchase);
         } finally {
           releasePurchaseRequest();
         }
@@ -472,10 +477,8 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         setPendingPurchaseCompletedCallback: onCompleted => {
           pendingPurchaseCompletedCallbackRef.current = onCompleted;
         },
-        showError: (message, showErrorOptions) => {
-          if (!showErrorOptions?.suppressToast) {
-            showDedupedPurchaseError(message);
-          }
+        showError: message => {
+          showDedupedPurchaseError(message);
           setErrorMessage(message);
         },
       }),
@@ -496,10 +499,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         return;
       }
 
-      activePurchaseRequestRef.current = {
-        sku: product.appleProductId,
-        suppressToast: options.suppressToast ?? false,
-      };
+      activePurchaseRequestRef.current = { sku: product.appleProductId };
       setIsRequestingPurchase(true);
       setErrorMessage(null);
       captureEvent(KILO_PASS_PURCHASE_STARTED_EVENT);
@@ -516,28 +516,23 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     [actions, completeAppStorePurchase.isPending, releasePurchaseRequest]
   );
 
-  const restorePurchases = useCallback(
-    async (
-      options: { suppressToast?: boolean } = {}
-    ): Promise<StoreKiloPassRestorePurchasesResult> => {
-      if (
-        activePurchaseRequestRef.current ||
-        isRestoringPurchases ||
-        completeAppStorePurchase.isPending
-      ) {
-        return 'failed';
-      }
+  const restorePurchases = useCallback(async (): Promise<StoreKiloPassRestorePurchasesResult> => {
+    if (
+      activePurchaseRequestRef.current ||
+      isRestoringPurchases ||
+      completeAppStorePurchase.isPending
+    ) {
+      return 'failed';
+    }
 
-      setIsRestoringPurchases(true);
-      setErrorMessage(null);
-      try {
-        return await actions.restorePurchases(options);
-      } finally {
-        setIsRestoringPurchases(false);
-      }
-    },
-    [actions, completeAppStorePurchase.isPending, isRestoringPurchases]
-  );
+    setIsRestoringPurchases(true);
+    setErrorMessage(null);
+    try {
+      return await actions.restorePurchases();
+    } finally {
+      setIsRestoringPurchases(false);
+    }
+  }, [actions, completeAppStorePurchase.isPending, isRestoringPurchases]);
 
   useEffect(() => {
     if (Platform.OS !== 'ios' || !connected) {

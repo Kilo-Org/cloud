@@ -25,9 +25,7 @@ export function classifyPollResponse(httpStatus: number): PollOutcome {
   if (httpStatus === 429 || httpStatus >= 500) {
     return { status: 'retry' };
   }
-  // Any other 4xx (400, 401, ...) is not something retrying will fix.
-  if (httpStatus >= 400) {
-    return { status: 'error', message: 'Sign-in failed. Please try again.' };
-  }
-  return { status: 'pending' };
+  // Any other 4xx (400, 401, ...) is not something retrying will fix — and
+  // 1xx/3xx are statuses this endpoint never returns, so treat them the same.
+  return { status: 'error', message: 'Sign-in failed. Please try again.' };
 }

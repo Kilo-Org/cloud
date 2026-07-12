@@ -36,10 +36,10 @@ export function sentryOptionsForConsent(consented: boolean): SentryConsentOption
 // and Sentry.init alone neither closes the previous client nor stops an
 // in-flight native recording. Sentry.close() is the only supported teardown
 // (it awaits closeNativeSdk, which uninstalls the native replay integration),
-// so every consent transition is close-then-init. Chained through `lifecycle`
+// so every consent transition is close-then-init, chained onto `lifecycle`
 // so a fast accept → revoke can't interleave close and init.
-// The chain promise never rejects (each transition resolves it in `finally`),
-// so a failed transition can't poison later ones — they re-attempt their own
+// Each transition catches its own failure, so the chain itself never
+// rejects and can't poison later ones — they re-attempt their own
 // close+init. Failures surface through the caller's `onFailure`.
 let lifecycle: Promise<void> | undefined = undefined;
 
@@ -49,17 +49,14 @@ export async function reinitSentryForConsent(
   onFailure?: () => void
 ): Promise<void> {
   const previous = lifecycle;
-  const gate: { release?: () => void } = {};
-  lifecycle = new Promise(resolve => {
-    gate.release = resolve;
-  });
-  try {
+  lifecycle = (async () => {
     await previous;
-    await Sentry.close();
-    init(consented);
-  } catch {
-    onFailure?.();
-  } finally {
-    gate.release?.();
-  }
+    try {
+      await Sentry.close();
+      init(consented);
+    } catch {
+      onFailure?.();
+    }
+  })();
+  await lifecycle;
 }

@@ -25,10 +25,13 @@ describe('classifyPollResponse', () => {
     });
   });
 
-  it.each([400, 401])('treats %i as a terminal error', httpStatus => {
-    const outcome = classifyPollResponse(httpStatus);
-    expect(outcome.status).toBe('error');
-  });
+  it.each([100, 301, 400, 401])(
+    'treats %i as a terminal error (including 1xx/3xx this endpoint never returns)',
+    httpStatus => {
+      const outcome = classifyPollResponse(httpStatus);
+      expect(outcome.status).toBe('error');
+    }
+  );
 
   it.each([429, 500, 503])('retries with backoff on %i', httpStatus => {
     expect(classifyPollResponse(httpStatus)).toEqual({ status: 'retry' });

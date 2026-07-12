@@ -34,7 +34,6 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 
   const limitRef = useRef(currentLimit != null ? String(currentLimit) : '');
   const [canSave, setCanSave] = useState(limitError(limitRef.current) == null);
-  const [fieldError, setFieldError] = useState<string | null>(null);
 
   const onSaved = () => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -61,16 +60,10 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         placeholder="No limit"
         keyboardType="decimal-pad"
         defaultValue={currentLimit != null ? String(currentLimit) : undefined}
-        error={fieldError ?? undefined}
+        validate={limitError}
         onChangeText={value => {
           limitRef.current = value;
           setCanSave(limitError(value) == null);
-          if (fieldError) {
-            setFieldError(limitError(value));
-          }
-        }}
-        onBlur={() => {
-          setFieldError(limitError(limitRef.current));
         }}
       />
 
@@ -96,15 +89,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
 }
 
 export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
-  const {
-    organizationId,
-    role,
-    org,
-    isResolving,
-    isError: isOrgListError,
-    isFetching: isOrgListFetching,
-    refetch: refetchOrgList,
-  } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const member = orgWithMembers.data?.members.find(
     (m): m is ActiveOrgMember => m.status === 'active' && m.id === memberId
@@ -124,16 +109,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
   }
 
   if (organizationId == null || org == null) {
-    return (
-      <View className="flex-1 bg-background">
-        <OrganizationBoundary
-          isError={isOrgListError}
-          isFetching={isOrgListFetching}
-          refetch={refetchOrgList}
-          organizationId={organizationId}
-        />
-      </View>
-    );
+    return <OrganizationBoundary />;
   }
 
   if (role !== 'owner') {

@@ -6,12 +6,11 @@ import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
@@ -165,26 +164,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-      {!balanceLoading && !balanceError && balanceDollars === 0 && (
-        <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
-          <Text className="flex-1 pr-3 text-xs text-muted-foreground">
-            {canShowZeroBalanceCta
-              ? 'Add credits to keep usage running.'
-              : 'Your credit balance is empty. Credits are managed outside the iOS app for this account.'}
-          </Text>
-          {canShowZeroBalanceCta && (
-            <Button
-              size="sm"
-              variant="outline"
-              onPress={() => {
-                void openExternalUrl(zeroBalanceUrl, { label: 'billing page' });
-              }}
-            >
-              <Text className="text-xs font-semibold">Add credits</Text>
-            </Button>
-          )}
-        </View>
-      )}
+      {!balanceLoading &&
+        !balanceError &&
+        balanceDollars === 0 &&
+        (canShowZeroBalanceCta ? (
+          <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
+        ) : (
+          <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
+            <Text className="flex-1 pr-3 text-xs text-muted-foreground">
+              Your credit balance is empty. Credits are managed outside the iOS app for this
+              account.
+            </Text>
+          </View>
+        ))}
       {enabled && !selectedOrgId ? <KiloPassSubscriptionCard /> : null}
     </View>
   );

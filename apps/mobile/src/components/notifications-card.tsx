@@ -22,6 +22,22 @@ import { useTRPC } from '@/lib/trpc';
 const permissionQueryKey = ['notificationPermission'];
 const deviceTokenQueryKey = ['devicePushToken'];
 
+type InlineRetryProps = Readonly<{ label: string; color: string; onPress: () => void }>;
+
+function InlineRetry({ label, color, onPress }: InlineRetryProps) {
+  return (
+    <Pressable
+      className="flex-row items-center gap-1 active:opacity-70"
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <RefreshCw size={14} color={color} />
+      <Text className="text-xs font-medium text-destructive">Retry</Text>
+    </Pressable>
+  );
+}
+
 export function NotificationsCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -65,6 +81,7 @@ export function NotificationsCard() {
     enabled: isAuthenticated,
   });
   const chatTokensError = deviceTokenError || pushTokensError;
+  const chatLoading = permissionLoading || tokensLoading || deviceTokenLoading;
 
   const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =
@@ -211,15 +228,11 @@ export function NotificationsCard() {
         <Text className="flex-1 text-sm font-medium">Notifications</Text>
         {permissionLoading && <Skeleton className="h-8 w-12 rounded-full" />}
         {!permissionLoading && permissionError && (
-          <Pressable
-            className="flex-row items-center gap-1 active:opacity-70"
+          <InlineRetry
+            label="Retry checking notification permission"
+            color={colors.destructive}
             onPress={() => void refetchPermission()}
-            accessibilityRole="button"
-            accessibilityLabel="Retry checking notification permission"
-          >
-            <RefreshCw size={14} color={colors.destructive} />
-            <Text className="text-xs font-medium text-destructive">Retry</Text>
-          </Pressable>
+          />
         )}
         {!permissionLoading && !permissionError && (
           <>
@@ -242,24 +255,18 @@ export function NotificationsCard() {
       >
         <MessageSquare size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium">Chat messages</Text>
-        {(permissionLoading || tokensLoading || deviceTokenLoading) && (
-          <Skeleton className="h-8 w-12 rounded-full" />
-        )}
-        {!permissionLoading && !tokensLoading && !deviceTokenLoading && chatTokensError && (
-          <Pressable
-            className="flex-row items-center gap-1 active:opacity-70"
+        {chatLoading && <Skeleton className="h-8 w-12 rounded-full" />}
+        {!chatLoading && chatTokensError && (
+          <InlineRetry
+            label="Retry loading chat message notification status"
+            color={colors.destructive}
             onPress={() => {
               void refetchDeviceToken();
               void refetchPushTokens();
             }}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading chat message notification status"
-          >
-            <RefreshCw size={14} color={colors.destructive} />
-            <Text className="text-xs font-medium text-destructive">Retry</Text>
-          </Pressable>
+          />
         )}
-        {!permissionLoading && !tokensLoading && !deviceTokenLoading && !chatTokensError && (
+        {!chatLoading && !chatTokensError && (
           <>
             {chatTogglePending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
             <Switch

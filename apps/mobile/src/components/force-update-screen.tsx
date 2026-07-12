@@ -1,8 +1,6 @@
-import * as Clipboard from 'expo-clipboard';
 import { Download } from 'lucide-react-native';
 import { useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -25,11 +23,6 @@ export function ForceUpdateScreen() {
     } catch {
       setStoreOpenFailed(true);
     }
-  };
-
-  const copyStoreUrl = async () => {
-    await Clipboard.setStringAsync(STORE_URL);
-    toast.success('Store link copied');
   };
 
   return (
@@ -59,9 +52,6 @@ export function ForceUpdateScreen() {
             }}
           >
             <Text>Open in browser</Text>
-          </Button>
-          <Button variant="outline" className="w-full" onPress={() => void copyStoreUrl()}>
-            <Text>Copy URL</Text>
           </Button>
         </View>
       )}

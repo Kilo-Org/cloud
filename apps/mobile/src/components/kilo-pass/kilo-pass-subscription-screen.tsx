@@ -19,7 +19,10 @@ import {
 } from '@/lib/kilo-pass/subscription-page-copy';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
-import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import {
+  useInlinePurchaseErrorOwnership,
+  useStoreKiloPassPurchase,
+} from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 import { RestorePurchasesButton } from './restore-purchases-button';
@@ -41,6 +44,7 @@ export function KiloPassSubscriptionScreen() {
   const router = useRouter();
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
+  useInlinePurchaseErrorOwnership();
   const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
   const feedback: SubscriptionScreenFeedback | null = purchase.errorMessage
     ? { type: 'error', text: purchase.errorMessage }
@@ -60,8 +64,6 @@ export function KiloPassSubscriptionScreen() {
       onCompleted: () => {
         ensureProfileAfterKiloPassPurchase(router);
       },
-      // This screen owns the inline error banner — don't double up with a toast.
-      suppressToast: true,
     });
   };
 

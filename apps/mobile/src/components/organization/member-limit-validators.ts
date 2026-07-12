@@ -1,4 +1,4 @@
-export const MAX_DAILY_LIMIT_USD = 2000;
+const MAX_DAILY_LIMIT_USD = 2000;
 const LIMIT_RANGE_ERROR = `Enter an amount between 0 and ${MAX_DAILY_LIMIT_USD}`;
 const LIMIT_BLANK_ERROR = 'Enter an amount, or use Remove limit below';
 

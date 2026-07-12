@@ -59,31 +59,12 @@ function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
 export function OrganizationMembersScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const {
-    organizationId,
-    role,
-    org,
-    isResolving,
-    isError: isOrgListError,
-    isFetching: isOrgListFetching,
-    refetch: refetchOrgList,
-  } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const { userId: currentUserId } = useCurrentUserId();
 
   if (isResolving || organizationId == null || org == null) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Members" />
-        <OrganizationBoundary
-          isResolving={isResolving}
-          isError={isOrgListError}
-          isFetching={isOrgListFetching}
-          refetch={refetchOrgList}
-          organizationId={organizationId}
-        />
-      </View>
-    );
+    return <OrganizationBoundary title="Members" />;
   }
 
   const isLoading = orgWithMembers.isLoading;

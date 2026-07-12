@@ -6,17 +6,16 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -28,32 +27,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export function OrganizationHubScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const {
-    organizationId,
-    role,
-    org,
-    isResolving,
-    isError: isOrgListError,
-    isFetching: isOrgListFetching,
-    refetch: refetchOrgList,
-  } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
 
   if (isResolving || organizationId == null || org == null) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Organization" />
-        <OrganizationBoundary
-          isResolving={isResolving}
-          isError={isOrgListError}
-          isFetching={isOrgListFetching}
-          refetch={refetchOrgList}
-          organizationId={organizationId}
-        />
-      </View>
-    );
+    return <OrganizationBoundary title="Organization" />;
   }
 
   const showMoney = isMoneyRole(role);
@@ -92,25 +72,10 @@ export function OrganizationHubScreen() {
             <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
           )}
           {showMoney && org.balance === 0 && (
-            <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-              <Text className="flex-1 pr-3 text-xs text-muted-foreground">
-                Add credits to keep usage running.
-              </Text>
-              <Button
-                size="sm"
-                variant="outline"
-                onPress={() => {
-                  void openExternalUrl(
-                    `${WEB_BASE_URL}/organizations/${organizationId}/payment-details`,
-                    {
-                      label: 'billing page',
-                    }
-                  );
-                }}
-              >
-                <Text className="text-xs font-semibold">Add credits</Text>
-              </Button>
-            </View>
+            <AddCreditsRow
+              url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
+              className="border-b-[0.5px] border-hair-soft py-3"
+            />
           )}
           <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
         </Animated.View>

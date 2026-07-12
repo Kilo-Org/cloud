@@ -50,8 +50,6 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       !enabled ||
       (thresholdError(thresholdRef.current) == null && emailsError(emailsRef.current) == null)
   );
-  const [thresholdFieldError, setThresholdFieldError] = useState<string | null>(null);
-  const [emailsFieldError, setEmailsFieldError] = useState<string | null>(null);
 
   const revalidate = (nextEnabled: boolean, thresholdValue: string, emailsValue: string) => {
     setCanSave(
@@ -104,16 +102,10 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             placeholder="10.00"
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
-            error={thresholdFieldError ?? undefined}
+            validate={thresholdError}
             onChangeText={value => {
               thresholdRef.current = value;
               revalidate(enabled, value, emailsRef.current);
-              if (thresholdFieldError) {
-                setThresholdFieldError(thresholdError(value));
-              }
-            }}
-            onBlur={() => {
-              setThresholdFieldError(thresholdError(thresholdRef.current));
             }}
           />
 
@@ -126,16 +118,10 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
-              error={emailsFieldError ?? undefined}
+              validate={emailsError}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);
-                if (emailsFieldError) {
-                  setEmailsFieldError(emailsError(value));
-                }
-              }}
-              onBlur={() => {
-                setEmailsFieldError(emailsError(emailsRef.current));
               }}
             />
             <Text variant="muted" className="text-xs">
@@ -163,18 +149,10 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 }
 
 export function LowBalanceAlertSheet() {
-  const {
-    organizationId,
-    role,
-    org,
-    isResolving,
-    isError: isOrgListError,
-    isFetching: isOrgListFetching,
-    refetch: refetchOrgList,
-  } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
-  if (isResolving) {
+  if (isResolving || orgWithMembers.isLoading) {
     return (
       <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
         <Skeleton className="h-[52px] rounded-lg" />
@@ -191,16 +169,7 @@ export function LowBalanceAlertSheet() {
     );
   }
   if (organizationId == null || org == null) {
-    return (
-      <View className="flex-1 bg-background">
-        <OrganizationBoundary
-          isError={isOrgListError}
-          isFetching={isOrgListFetching}
-          refetch={refetchOrgList}
-          organizationId={organizationId}
-        />
-      </View>
-    );
+    return <OrganizationBoundary />;
   }
   if (!isMoneyRole(role)) {
     return <PermissionDenied description="You don't have permission to manage billing alerts." />;
@@ -221,21 +190,6 @@ export function LowBalanceAlertSheet() {
         isRetrying={orgWithMembers.isFetching}
         placement="top"
       />
-    );
-  } else {
-    body = (
-      <>
-        <Skeleton className="h-[52px] rounded-lg" />
-        <View className="gap-1.5">
-          <Skeleton className="h-3.5 w-28 rounded" />
-          <Skeleton className="h-11 rounded-md" />
-        </View>
-        <View className="gap-1.5">
-          <Skeleton className="h-3.5 w-32 rounded" />
-          <Skeleton className="h-11 rounded-md" />
-        </View>
-        <Skeleton className="h-11 rounded-md" />
-      </>
     );
   }
 

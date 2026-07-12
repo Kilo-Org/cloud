@@ -1,12 +1,9 @@
-import {
-  getSecurityAgentAuditUrl,
-  isPersonalSecurityScope,
-} from '@kilocode/app-shared/security-agent';
+import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
-import { MoreHorizontal } from 'lucide-react-native';
 import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
@@ -14,14 +11,12 @@ import { SecurityAgentSetup } from '@/components/security-agent/security-agent-s
 import { Skeleton } from '@/components/ui/skeleton';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentPermissionStatus,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 function ScopeEntrySkeleton() {
@@ -45,7 +40,6 @@ function ScopeEntrySkeleton() {
 
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const colors = useThemeColors();
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -97,20 +91,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // enabled — it's a link to historical reports, not agent-managed UI — so
   // it's offered here in the shared shell, ahead of the setup/disabled
   // gates below, whenever the caller can manage the agent.
-  const auditAction = capability.canManage ? (
-    <Pressable
-      onPress={() => {
-        void openExternalUrl(getSecurityAgentAuditUrl(WEB_BASE_URL, scope), {
-          label: 'audit report',
-        });
-      }}
-      accessibilityRole="button"
-      accessibilityLabel="View audit report"
-      className="size-11 items-center justify-center active:opacity-70"
-    >
-      <MoreHorizontal size={20} color={colors.foreground} />
-    </Pressable>
-  ) : null;
+  const auditAction = capability.canManage ? <AuditReportButton scope={scope} /> : null;
 
   if (!hasIntegration) {
     return (

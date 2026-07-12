@@ -1,25 +1,22 @@
-import { getSecurityAgentAuditUrl } from '@kilocode/app-shared/security-agent';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Bell, Clock, Cpu, FolderGit2, MoreHorizontal, Zap } from 'lucide-react-native';
+import { Bell, Clock, Cpu, FolderGit2, Zap } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 
+import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import {
   useSecurityAgentConfig,
   useSecurityAgentEditCapability,
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { capitalize } from '@/lib/utils';
 
@@ -38,7 +35,6 @@ function SettingsOverviewSkeleton() {
 
 export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const colors = useThemeColors();
   const config = useSecurityAgentConfig(scope);
   const canManage = useSecurityAgentEditCapability(scope);
   const setEnabled = useSetSecurityAgentEnabled(scope);
@@ -103,20 +99,7 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   // connected-but-disabled counterpart: settings-overview-screen is where
   // scope-entry redirects once the agent is disabled, so the same action
   // needs to be reachable here too.
-  const auditAction = canManage ? (
-    <Pressable
-      onPress={() => {
-        void openExternalUrl(getSecurityAgentAuditUrl(WEB_BASE_URL, scope), {
-          label: 'audit report',
-        });
-      }}
-      accessibilityRole="button"
-      accessibilityLabel="View audit report"
-      className="size-11 items-center justify-center active:opacity-70"
-    >
-      <MoreHorizontal size={20} color={colors.foreground} />
-    </Pressable>
-  ) : null;
+  const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
 
   return (
     <View className="flex-1 bg-background">

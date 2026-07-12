@@ -1,25 +1,23 @@
 import {
   buildSecurityDashboardMetrics,
   type DashboardMetricTone,
-  getSecurityAgentAuditUrl,
   getSecurityRepositoriesInScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { MoreHorizontal, RefreshCw, Settings, ShieldAlert } from 'lucide-react-native';
+import { RefreshCw, Settings, ShieldAlert } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
+import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { WEB_BASE_URL } from '@/lib/config';
 import {
   useSecurityAgentConfig,
   useSecurityAgentDashboardStats,
@@ -104,15 +102,6 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     });
   };
 
-  const openMoreActions = () => {
-    const options = ['View audit report', 'Cancel'];
-    showActionSheetWithOptions({ options, cancelButtonIndex: 1 }, index => {
-      if (index === 0) {
-        void WebBrowser.openBrowserAsync(getSecurityAgentAuditUrl(WEB_BASE_URL, scope));
-      }
-    });
-  };
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -139,16 +128,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             >
               <Settings size={20} color={colors.foreground} />
             </Pressable>
-            {canManage ? (
-              <Pressable
-                onPress={openMoreActions}
-                accessibilityRole="button"
-                accessibilityLabel="More actions"
-                className="size-11 items-center justify-center active:opacity-70"
-              >
-                <MoreHorizontal size={20} color={colors.foreground} />
-              </Pressable>
-            ) : null}
+            {canManage ? <AuditReportButton scope={scope} /> : null}
           </View>
         }
       />

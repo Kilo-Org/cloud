@@ -21,8 +21,8 @@ export function useSessionMutations() {
   const queryClient = useQueryClient();
   // Refs (not state) are enough — these only gate duplicate taps and order
   // mutations per row, they never need to drive a re-render.
-  const pendingSessionIds = useRef(new Set<string>());
   const sessionOpChains = useRef(new Map<string, Promise<unknown>>());
+  const sessionOpTailKeys = useRef(new Map<string, string>());
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();
 
   const invalidateSessions = async () => {
@@ -74,18 +74,19 @@ export function useSessionMutations() {
     })
   );
 
-  // Two rules per session row:
-  // - identical duplicate taps (same op + args) are dropped while pending —
-  //   optimistic updates make the first tap land instantly, a second is noise;
-  // - DISTINCT operations (a delete during a settling rename, a re-rename to
-  //   a different title) run, but serialized through a per-session promise
-  //   chain so their optimistic snapshots/rollbacks can't interleave and an
-  //   older request can never overwrite a newer one's result.
+  // Per session row: DISTINCT operations (a delete during a settling rename,
+  // a re-rename to a different title) run serialized through a per-session
+  // promise chain so their optimistic snapshots/rollbacks can't interleave
+  // and an older request can never overwrite a newer one's result. Only an
+  // ADJACENT identical op is dropped — a repeat of whatever is currently the
+  // tail of the chain (the double-tap case). A non-adjacent repeat (rename
+  // A → B → A) must still run so the user's latest intent wins; keying dedup
+  // off the tail rather than a global set is what lets A run last.
   const enqueueSessionOp = (sessionId: string, opKey: string, run: () => Promise<unknown>) => {
-    if (pendingSessionIds.current.has(opKey)) {
+    if (sessionOpTailKeys.current.get(sessionId) === opKey) {
       return;
     }
-    pendingSessionIds.current.add(opKey);
+    sessionOpTailKeys.current.set(sessionId, opKey);
     const previous = sessionOpChains.current.get(sessionId);
     let next: Promise<void> | undefined = undefined;
     next = (async () => {
@@ -99,9 +100,11 @@ export function useSessionMutations() {
       } catch {
         // Already surfaced via the mutation's own onError (toast + rollback).
       }
-      pendingSessionIds.current.delete(opKey);
+      // Only the last op in the chain clears the per-session state, so a fresh
+      // tap after everything settles is never mistaken for an adjacent repeat.
       if (sessionOpChains.current.get(sessionId) === next) {
         sessionOpChains.current.delete(sessionId);
+        sessionOpTailKeys.current.delete(sessionId);
       }
     })();
     sessionOpChains.current.set(sessionId, next);

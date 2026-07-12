@@ -511,11 +511,10 @@ export class ConversationDO extends DurableObject<Env> {
     }
     const bot = bots[0];
 
-    this.db
-      .update(messages)
-      .set({ delivery_failed: 0 })
-      .where(eq(messages.id, params.messageId))
-      .run();
+    // Clear synchronously so a double-tap (flag now 0) short-circuits at the
+    // check above instead of double-delivering. If the retry fails again,
+    // deliverToBot -> notifyDeliveryFailed re-sets the flag.
+    this.db.update(messages).set({ delivery_failed: 0 }).where(eq(messages.id, row.id)).run();
 
     const conversationId = this.getConversationId();
     const content = parseStoredContent(row.content, row.id);
@@ -539,39 +538,44 @@ export class ConversationDO extends DurableObject<Env> {
       }
     }
 
-    // Publish the flag-clear event BEFORE the delivery attempt is enqueued:
-    // the bot acks receipt before processing and can asynchronously report a
-    // fresh message.delivery_failed — publishing after enqueue would let that
-    // failure land first and then be wrongly cleared by a delayed
-    // message.redelivered.
-    if (memberContext.sandboxId) {
-      await pushEventToHumanMembers(
-        this.env,
-        conversationId,
-        memberContext.sandboxId,
-        memberContext.humanMemberIds,
-        'message.redelivered',
-        { messageId: row.id }
-      );
-    }
-
     const sentAt = new Date().toISOString();
-    await this.enqueueMessageWebhook(
-      {
-        targetBotId: bot.id,
-        conversationId,
-        messageId: row.id,
-        from: row.sender_id,
-        content,
-        sentAt,
-        ...(row.in_reply_to_message_id !== null && {
-          inReplyToMessageId: row.in_reply_to_message_id,
-        }),
-        ...(inReplyToBody !== undefined && { inReplyToBody }),
-        ...(inReplyToSender !== undefined && { inReplyToSender }),
-      },
-      memberContext
-    );
+    const webhookMessage: WebhookMessage = {
+      targetBotId: bot.id,
+      conversationId,
+      messageId: row.id,
+      from: row.sender_id,
+      content,
+      sentAt,
+      ...(row.in_reply_to_message_id !== null && {
+        inReplyToMessageId: row.in_reply_to_message_id,
+      }),
+      ...(inReplyToBody !== undefined && { inReplyToBody }),
+      ...(inReplyToSender !== undefined && { inReplyToSender }),
+    };
+
+    // Reserve the webhook-chain slot synchronously — no external await runs
+    // between the check above and this assignment — so a concurrent DO request
+    // can't slot a later message ahead of this redelivery (or run deliverToBot
+    // out of order). The redelivered event is pushed INSIDE the task, strictly
+    // before deliverToBot, so a failure re-flag (deliverToBot ->
+    // notifyDeliveryFailed) always lands after it and is never clobbered by a
+    // delayed clear.
+    this.webhookChain = this.webhookChain
+      .catch(() => {})
+      .then(async () => {
+        if (memberContext.sandboxId) {
+          await pushEventToHumanMembers(
+            this.env,
+            conversationId,
+            memberContext.sandboxId,
+            memberContext.humanMemberIds,
+            'message.redelivered',
+            { messageId: row.id }
+          );
+        }
+        await deliverToBot(this.env, webhookMessage, memberContext);
+      });
+    this.ctx.waitUntil(this.webhookChain);
 
     return { ok: true, redelivered: true, memberContext };
   }

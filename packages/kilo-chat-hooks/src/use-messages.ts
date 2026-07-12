@@ -728,45 +728,21 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
 
 /**
  * Retries bot delivery of an existing delivery-failed message. The server
- * re-attempts delivery of the same message row (no new message), so the cache
- * update is just an optimistic clear of `deliveryFailed`. If the retry fails
- * permanently again the server pushes a fresh `message.delivery_failed` event.
+ * re-attempts delivery of the same message row (no new message) and is the
+ * single source of truth for the flag: it pushes `message.redelivered`
+ * (clears `deliveryFailed`, handled by useMessageCacheUpdater) right before
+ * the attempt, and `message.delivery_failed` again if the retry fails.
+ *
+ * Deliberately NOT optimistic: an optimistic clear here would race those
+ * events (a rejected redelivery can't be told apart from a committed one on
+ * an ambiguous HTTP error, and a reconciling refetch can capture a stale
+ * pre-failure snapshot). Letting the event drive the flag keeps a single
+ * authority and costs only one event round-trip before the indicator clears.
  */
 export function useRedeliverMessage(client: KiloChatClient, conversationId: string | null) {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId }: { messageId: string }) =>
       client.redeliverMessage(conversationId ?? '', messageId),
-    onMutate: async variables => {
-      if (!conversationId) return;
-      const queryKey = messagesKey(conversationId);
-      await queryClient.cancelQueries({ queryKey });
-      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
-      const optimisticMessage = snapshot ? { ...snapshot, deliveryFailed: false } : undefined;
-      queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
-        if (!old) return old;
-        return updateMessageInPages(old, variables.messageId, msg => ({
-          ...msg,
-          deliveryFailed: false,
-        }));
-      });
-      return { queryKey, snapshot, optimisticMessage };
-    },
-    onError: (_err, _variables, context) => {
-      if (!context) return;
-      restoreOptimisticMessage(
-        queryClient,
-        context.queryKey,
-        context.snapshot,
-        context.optimisticMessage
-      );
-      // Always reconcile (not just when restore fails): a lost HTTP response
-      // can mean the server actually committed the redelivery — its
-      // message.redelivered event may have already updated the row to the
-      // same value as our optimistic one, in which case the restore above
-      // resurrected a stale deliveryFailed with no later event to correct it.
-      invalidateMessages(queryClient, context.queryKey);
-    },
   });
 }
 

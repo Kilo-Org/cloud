@@ -1,21 +1,15 @@
-import { type Href, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import {
-  useReviewConfig,
-  useReviewerEditGuard,
-  useSaveReviewConfig,
-} from '@/lib/hooks/use-code-reviewer';
-import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 
 // Mounted only once `data != null`, so useRef(initial) captures the real
 // loaded value instead of the pre-fetch default.
@@ -60,24 +54,8 @@ function InstructionsEditor({
 }
 
 export default function InstructionsRoute() {
-  const params = useValidatedReviewerRouteParams();
-
-  if (!params) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
-  }
-
-  return <InstructionsRouteContent scope={params.scope} platform={params.platform} />;
-}
-
-function InstructionsRouteContent({
-  scope,
-  platform,
-}: Readonly<{
-  scope: string;
-  platform: ReviewerPlatform;
-}>) {
+  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   const router = useRouter();
-  useReviewerEditGuard(scope, platform);
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
 

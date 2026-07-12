@@ -1,14 +1,8 @@
-import { type Href } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { OptionList } from '@/components/code-reviewer/option-list';
-import { InvalidRouteState } from '@/components/invalid-route-state';
 import { GATE_THRESHOLDS, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import {
-  useReviewConfig,
-  useReviewerEditGuard,
-  useSaveReviewConfig,
-} from '@/lib/hooks/use-code-reviewer';
-import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 
 const DESCRIPTIONS = {
   off: 'Never fail the PR check',
@@ -18,23 +12,7 @@ const DESCRIPTIONS = {
 } as const;
 
 export default function GateThresholdRoute() {
-  const params = useValidatedReviewerRouteParams();
-
-  if (!params) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
-  }
-
-  return <GateThresholdRouteContent scope={params.scope} platform={params.platform} />;
-}
-
-function GateThresholdRouteContent({
-  scope,
-  platform,
-}: Readonly<{
-  scope: string;
-  platform: ReviewerPlatform;
-}>) {
-  useReviewerEditGuard(scope, platform);
+  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
 

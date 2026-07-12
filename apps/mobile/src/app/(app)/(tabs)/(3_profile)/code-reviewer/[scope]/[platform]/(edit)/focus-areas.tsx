@@ -1,42 +1,19 @@
-import * as Haptics from 'expo-haptics';
-import { type Href } from 'expo-router';
-import { Check } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { View } from 'react-native';
 
-import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { REVIEW_FOCUS_AREAS, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   useReviewConfig,
   useReviewConfigCacheReader,
-  useReviewerEditGuard,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 export default function FocusAreasRoute() {
-  const params = useValidatedReviewerRouteParams();
-
-  if (!params) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
-  }
-
-  return <FocusAreasRouteContent scope={params.scope} platform={params.platform} />;
-}
-
-function FocusAreasRouteContent({
-  scope,
-  platform,
-}: Readonly<{
-  scope: string;
-  platform: ReviewerPlatform;
-}>) {
-  const colors = useThemeColors();
-  useReviewerEditGuard(scope, platform);
+  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);
@@ -44,7 +21,6 @@ function FocusAreasRouteContent({
   const disabled = data == null;
 
   const toggleArea = (area: string) => {
-    void Haptics.selectionAsync();
     // Read the cache at call time, not the render-time snapshot above, so
     // two rapid taps each build the next array from the latest committed
     // selection instead of dropping one another.
@@ -63,22 +39,17 @@ function FocusAreasRouteContent({
           Leave all unselected to review everything.
         </Text>
         {REVIEW_FOCUS_AREAS.map(area => (
-          <Pressable
+          <ChoiceRow
             key={area}
-            className={cn(
-              'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
-              disabled && 'opacity-50'
-            )}
+            label={area}
+            multi
+            selected={selected.includes(area)}
             disabled={disabled}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: selected.includes(area), disabled }}
+            className="border-b-[0.5px] border-hair-soft"
             onPress={() => {
               toggleArea(area);
             }}
-          >
-            <Text className="text-sm font-medium capitalize">{area}</Text>
-            <Check size={18} color={selected.includes(area) ? colors.foreground : 'transparent'} />
-          </Pressable>
+          />
         ))}
       </TabScreenScrollView>
     </View>

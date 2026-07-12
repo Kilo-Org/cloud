@@ -1,10 +1,9 @@
 import * as Haptics from 'expo-haptics';
-import { type Href } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Check, FolderGit2, Lock } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
-import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -22,33 +21,15 @@ import {
   useGitLabRepositories,
   useReviewConfig,
   useReviewConfigCacheReader,
-  useReviewerEditGuard,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { cn } from '@/lib/utils';
 
 export default function ReposRoute() {
-  const params = useValidatedReviewerRouteParams();
-
-  if (!params) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
-  }
-
-  return <ReposRouteContent scope={params.scope} platform={params.platform} />;
-}
-
-function ReposRouteContent({
-  scope,
-  platform,
-}: Readonly<{
-  scope: string;
-  platform: ReviewerPlatform;
-}>) {
+  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   const colors = useThemeColors();
-  useReviewerEditGuard(scope, platform);
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);

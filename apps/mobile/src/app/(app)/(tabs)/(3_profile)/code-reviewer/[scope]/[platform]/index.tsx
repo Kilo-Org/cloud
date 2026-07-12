@@ -1,15 +1,13 @@
-import { type Href } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { PlatformOverviewScreen } from '@/components/code-reviewer/platform-overview-screen';
-import { InvalidRouteState } from '@/components/invalid-route-state';
-import { useValidatedReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
 
+// The `[platform]/_layout.tsx` above already rejects a malformed scope+
+// platform combination via InvalidRouteState, so this route never mounts
+// with bad params — no need to re-validate.
 export default function CodeReviewerPlatformRoute() {
-  const params = useValidatedReviewerRouteParams();
+  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
 
-  if (!params) {
-    return <InvalidRouteState backTo={'/(app)/(tabs)/(3_profile)/code-reviewer' as Href} />;
-  }
-
-  return <PlatformOverviewScreen scope={params.scope} platform={params.platform} />;
+  return <PlatformOverviewScreen scope={scope} platform={platform} />;
 }

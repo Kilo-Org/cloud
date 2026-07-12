@@ -1153,7 +1153,6 @@ describe('ConversationDO', () => {
     expect(result).toEqual({
       ok: true,
       redelivered: true,
-      memberContext: { humanMemberIds: ['user-alice'], sandboxId: null },
     });
 
     const { messages } = await stub.listMessages({ limit: 10 });

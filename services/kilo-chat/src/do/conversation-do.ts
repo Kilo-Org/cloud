@@ -10,6 +10,7 @@ import {
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { logger } from '../util/logger';
+import { contentBlocksToText } from '../util/content';
 import { headObject } from '../util/presigner';
 import {
   deliverToBot,
@@ -262,7 +263,7 @@ export type RedeliverMessageParams = {
 };
 
 export type RedeliverMessageResult =
-  | { ok: true; redelivered: boolean; memberContext: MemberContext }
+  | { ok: true; redelivered: boolean }
   | { ok: false; code: 'not_found' | 'forbidden' | 'conflict'; error: string };
 
 export type InitAttachmentParams = {
@@ -489,7 +490,7 @@ export class ConversationDO extends DurableObject<Env> {
     // Already delivered (or a concurrent redeliver won) — idempotent no-op so
     // a double-tap cannot double-deliver to the bot.
     if (row.delivery_failed !== 1) {
-      return { ok: true, redelivered: false, memberContext };
+      return { ok: true, redelivered: false };
     }
 
     // delivery_failed is one message-level bit — it doesn't record which
@@ -530,10 +531,7 @@ export class ConversationDO extends DurableObject<Env> {
         .where(eq(messages.id, row.in_reply_to_message_id))
         .get();
       if (parent && parent.deleted !== 1) {
-        inReplyToBody = parseStoredContent(parent.content, parent.id)
-          .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
-          .map(b => b.text)
-          .join('');
+        inReplyToBody = contentBlocksToText(parseStoredContent(parent.content, parent.id));
         inReplyToSender = parent.sender_id;
       }
     }
@@ -577,7 +575,7 @@ export class ConversationDO extends DurableObject<Env> {
       });
     this.ctx.waitUntil(this.webhookChain);
 
-    return { ok: true, redelivered: true, memberContext };
+    return { ok: true, redelivered: true };
   }
 
   revertActionResolution(params: {

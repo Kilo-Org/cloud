@@ -1,9 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
 import { Platform, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import {
   EmptyStateContent,
@@ -17,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useForegroundInvalidateKiloclawState } from '@/lib/hooks/use-foreground-invalidate-kiloclaw-state';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMobileOnboardingState } from '@/lib/hooks/use-kiloclaw-queries';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
@@ -26,7 +25,6 @@ export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const [manualRefreshing, setManualRefreshing] = useState(false);
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
@@ -46,19 +44,10 @@ export default function KiloClawTab() {
     paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS),
   };
 
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setManualRefreshing(true);
-      try {
-        const result = await refetchInstances();
-        if (result.isError) {
-          toast.error('Could not refresh. Showing the last saved list.');
-        }
-      } finally {
-        setManualRefreshing(false);
-      }
-    })();
-  }, [refetchInstances]);
+  const [manualRefreshing, handleRefresh] = useManualRefresh(
+    refetchInstances,
+    'Could not refresh. Showing the last saved list.'
+  );
 
   // A background billing-check failure while the list is already showing
   // shouldn't blank the screen — only block on it before we have any

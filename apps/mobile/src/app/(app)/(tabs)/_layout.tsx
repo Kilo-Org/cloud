@@ -42,8 +42,7 @@ export default function TabsLayout() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const pathParts = pathname.split('/').filter(Boolean);
-  const hideTabs =
-    pathParts[0] === 'chat' && pathParts.length === 3 && pathParts[2] !== 'rename-conversation';
+  const hideTabs = pathParts[0] === 'chat' && pathParts.length === 3;
 
   return (
     <Tabs

@@ -10,10 +10,7 @@ import {
   ConversationHistoryErrorView,
   ConversationHistoryLoadingView,
 } from '@/components/kilo-chat/conversation-history-state-views';
-import {
-  getConversationRouteDecision,
-  getConversationRouteErrorMessage,
-} from '@/components/kilo-chat/conversation-route-state';
+import { getConversationRouteDecision } from '@/components/kilo-chat/conversation-route-state';
 import { useConversationDetail } from '@/components/kilo-chat/hooks/use-conversations';
 import { useKiloChatClient } from '@/components/kilo-chat/hooks/use-kilo-chat-client';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
@@ -63,7 +60,7 @@ export default function ChatConversationRoute() {
   if (routeDecision === 'retryable-error') {
     return (
       <ConversationHistoryErrorView
-        message={getConversationRouteErrorMessage(conversationDetail.error)}
+        message="Failed to load conversation"
         onRetry={() => {
           void conversationDetail.refetch();
         }}

@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { BillingBanner } from '@/components/kiloclaw/billing-banner';
 import {
@@ -39,6 +38,7 @@ import {
   useKiloClawServiceDegraded,
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw-queries';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatModelName, stripModelPrefix } from '@/lib/model-id';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -72,32 +72,22 @@ export default function DashboardScreen() {
   const isLoading = statusQuery.isPending || (isPersonal && billingQuery.isPending);
 
   const [renameVisible, setRenameVisible] = useState(false);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
   const refetchStatus = statusQuery.refetch;
   const refetchBilling = billingQuery.refetch;
   const refetchServiceDegraded = serviceDegradedQuery.refetch;
   const refetchGateway = gatewayQuery.refetch;
   const refetchConfig = configQuery.refetch;
 
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setManualRefreshing(true);
-      try {
-        const refreshes = [
-          refetchStatus(),
-          refetchConfig(),
-          refetchServiceDegraded(),
-          ...(isRunning ? [refetchGateway()] : []),
-          ...(isPersonal ? [refetchBilling()] : []),
-        ];
-        const results = await Promise.all(refreshes);
-        if (results.some(result => result.isError)) {
-          toast.error('Could not refresh. Showing the last known status.');
-        }
-      } finally {
-        setManualRefreshing(false);
-      }
-    })();
+  const refetchAll = useCallback(async () => {
+    const refreshes = [
+      refetchStatus(),
+      refetchConfig(),
+      refetchServiceDegraded(),
+      ...(isRunning ? [refetchGateway()] : []),
+      ...(isPersonal ? [refetchBilling()] : []),
+    ];
+    const results = await Promise.all(refreshes);
+    return { isError: results.some(result => result.isError) };
   }, [
     refetchBilling,
     refetchConfig,
@@ -107,6 +97,10 @@ export default function DashboardScreen() {
     isPersonal,
     isRunning,
   ]);
+  const [manualRefreshing, handleRefresh] = useManualRefresh(
+    refetchAll,
+    'Could not refresh. Showing the last known status.'
+  );
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (

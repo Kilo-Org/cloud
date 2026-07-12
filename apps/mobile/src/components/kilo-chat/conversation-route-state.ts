@@ -17,12 +17,6 @@ function isConversationNotFoundError(error: unknown): boolean {
   return status === 400 || status === 403 || status === 404;
 }
 
-export function getConversationRouteErrorMessage(error: unknown): string {
-  return isConversationNotFoundError(error)
-    ? 'Conversation not found'
-    : 'Failed to load conversation';
-}
-
 export function getConversationRouteDecision({
   detail,
   routeSandboxId,

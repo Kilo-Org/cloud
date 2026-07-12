@@ -1,12 +1,11 @@
-import { useActionSheet } from '@expo/react-native-action-sheet';
-import * as Haptics from 'expo-haptics';
 import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
-import { type ConversationDetailResponse } from '@kilocode/kilo-chat';
+import { CONVERSATION_TITLE_MAX_CHARS, type ConversationDetailResponse } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+
+import { RenameModal } from '@/components/rename-modal';
 
 import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 import { ConversationHeader } from './conversation-header';
@@ -21,7 +20,7 @@ import { MessageReactionPickerSheet } from './message-reaction-picker-sheet';
 import { getMessageHistoryContentState } from './message-history-state';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
-import { useLeaveConversation } from './hooks/use-conversations';
+import { useConversationOptionsSheet } from './hooks/use-conversation-options-sheet';
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useConversationMarkRead } from './hooks/use-conversation-mark-read';
@@ -33,11 +32,7 @@ import { useKiloChatTokenError } from './kilo-chat-provider';
 import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { kiloclawConversationEyebrow } from '@/lib/kiloclaw-display';
-import {
-  chatInstancePickerPath,
-  chatRenameConversationPath,
-  chatSandboxPath,
-} from '@/lib/kilo-chat-routes';
+import { chatInstancePickerPath } from '@/lib/kilo-chat-routes';
 import { setActiveChatLocation } from '@/lib/notifications';
 
 type Props = {
@@ -60,8 +55,6 @@ export function ConversationScreen({
   const router = useRouter();
   const currentUserId = useCurrentUserId();
   const tokenError = useKiloChatTokenError();
-  const { showActionSheetWithOptions } = useActionSheet();
-  const { bottom } = useSafeAreaInsets();
   const instanceContext = useInstanceContext(sandboxId);
   const instanceStatusQuery = useKiloClawStatus(
     instanceContext.status === 'ready' ? instanceContext.organizationId : undefined,
@@ -90,7 +83,12 @@ export function ConversationScreen({
     }
   }, [messagesQuery]);
 
-  const leaveConversation = useLeaveConversation(client);
+  const { openOptions, renaming, closeRename, saveRename } = useConversationOptionsSheet({
+    client,
+    conversationId,
+    sandboxId,
+    conversationTitle,
+  });
   const { typingMembers, clearTypingForMember } = useMobileTypingState({
     client,
     currentUserId,
@@ -118,54 +116,6 @@ export function ConversationScreen({
     router.push(`/(app)/kiloclaw/${sandboxId}/dashboard` as Href);
   }, [router, sandboxId]);
 
-  const handleOpenConversationOptions = useCallback(() => {
-    void Haptics.selectionAsync();
-    showActionSheetWithOptions(
-      {
-        title: conversationTitle,
-        options: ['Rename', 'Leave', 'Cancel'],
-        cancelButtonIndex: 2,
-        destructiveButtonIndex: 1,
-        containerStyle: { paddingBottom: bottom },
-      },
-      index => {
-        if (index === 0) {
-          const params = new URLSearchParams({ conversationId, title: conversationRenameTitle });
-          router.push(chatRenameConversationPath(sandboxId, params));
-          return;
-        }
-        if (index === 1) {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          Alert.alert('Leave conversation?', 'This removes it from your list.', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Leave',
-              style: 'destructive',
-              onPress: () => {
-                leaveConversation.mutate(
-                  { conversationId, sandboxId },
-                  {
-                    onSuccess: () => {
-                      router.replace(chatSandboxPath(sandboxId));
-                    },
-                  }
-                );
-              },
-            },
-          ]);
-        }
-      }
-    );
-  }, [
-    bottom,
-    conversationId,
-    conversationRenameTitle,
-    conversationTitle,
-    leaveConversation,
-    router,
-    sandboxId,
-    showActionSheetWithOptions,
-  ]);
   useConversationPresence(sandboxId, conversationId);
   useConversationEventSubscription(sandboxId, conversationId);
   const handleActionFailed = useCallback(() => {
@@ -223,7 +173,7 @@ export function ConversationScreen({
         subtitle={instanceLabel}
         canSwitchInstance={canSwitchInstance}
         onSwitchInstance={handleSwitchInstance}
-        onOpenOptions={handleOpenConversationOptions}
+        onOpenOptions={openOptions}
       />
       {tokenError.hasError ? (
         <ConversationInlineRetryBanner
@@ -308,6 +258,16 @@ export function ConversationScreen({
           messageController.setReactionPickerMessage(null);
         }}
       />
+      {renaming && (
+        <RenameModal
+          title="Rename conversation"
+          placeholder="Enter a new name"
+          initialValue={conversationRenameTitle}
+          maxLength={CONVERSATION_TITLE_MAX_CHARS}
+          onSave={saveRename}
+          onClose={closeRename}
+        />
+      )}
     </View>
   );
 }

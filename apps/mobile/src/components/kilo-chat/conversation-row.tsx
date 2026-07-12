@@ -1,15 +1,18 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { MessageSquare, MoreVertical } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { chatRenameConversationPath } from '@/lib/kilo-chat-routes';
 import { timeAgo } from '@/lib/utils';
+
+import { useKiloChatClient } from './hooks/use-kilo-chat-client';
+import { useRenameConversation } from './hooks/use-conversations';
 
 type ConversationRowProps = {
   conversation: ConversationListItem;
@@ -39,19 +42,13 @@ export function ConversationRow({
   onPress,
   onLeave,
 }: Readonly<ConversationRowProps>) {
-  const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
+  const client = useKiloChatClient();
+  const renameConversation = useRenameConversation(client);
+  const [renaming, setRenaming] = useState(false);
   const title = conversationTitle(conversation);
-
-  function openRenameSheet() {
-    const params = new URLSearchParams({
-      conversationId: conversation.conversationId,
-      title: (conversation.title ?? '').slice(0, CONVERSATION_TITLE_MAX_CHARS),
-    });
-    router.push(chatRenameConversationPath(sandboxId, params));
-  }
 
   function confirmLeave() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -79,7 +76,7 @@ export function ConversationRow({
       },
       index => {
         if (index === 0) {
-          openRenameSheet();
+          setRenaming(true);
         } else if (index === 1) {
           confirmLeave();
         }
@@ -88,46 +85,66 @@ export function ConversationRow({
   }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      accessibilityHint="Opens the conversation. Long press for rename and leave options."
-      className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:opacity-80"
-      onPress={() => {
-        onPress(conversation.conversationId);
-      }}
-      onLongPress={openActions}
-    >
-      <View className="h-10 w-10 items-center justify-center rounded-xl border border-border bg-secondary">
-        <MessageSquare size={18} color={colors.mutedForeground} strokeWidth={1.75} />
-      </View>
-      <View className="min-w-0 flex-1 gap-1">
-        <View className="flex-row items-center gap-2">
-          <Text
-            className="min-w-0 flex-1 text-base font-semibold text-foreground"
-            numberOfLines={1}
-          >
-            {title}
-          </Text>
-        </View>
-        <View className="flex-row items-center gap-2">
-          {hasUnread(conversation) ? (
-            <View className="h-2.5 w-2.5 rounded-full bg-primary" accessibilityLabel="Unread" />
-          ) : null}
-          <Text variant="muted" numberOfLines={1}>
-            {timeAgo(new Date(conversationTimestamp(conversation)))}
-          </Text>
-        </View>
-      </View>
+    <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Conversation options for ${title}`}
-        hitSlop={8}
-        className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
-        onPress={openActions}
+        accessibilityLabel={title}
+        accessibilityHint="Opens the conversation. Long press for rename and leave options."
+        className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:opacity-80"
+        onPress={() => {
+          onPress(conversation.conversationId);
+        }}
+        onLongPress={openActions}
       >
-        <MoreVertical size={20} color={colors.mutedForeground} />
+        <View className="h-10 w-10 items-center justify-center rounded-xl border border-border bg-secondary">
+          <MessageSquare size={18} color={colors.mutedForeground} strokeWidth={1.75} />
+        </View>
+        <View className="min-w-0 flex-1 gap-1">
+          <View className="flex-row items-center gap-2">
+            <Text
+              className="min-w-0 flex-1 text-base font-semibold text-foreground"
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-2">
+            {hasUnread(conversation) ? (
+              <View className="h-2.5 w-2.5 rounded-full bg-primary" accessibilityLabel="Unread" />
+            ) : null}
+            <Text variant="muted" numberOfLines={1}>
+              {timeAgo(new Date(conversationTimestamp(conversation)))}
+            </Text>
+          </View>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Conversation options for ${title}`}
+          hitSlop={8}
+          className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
+          onPress={openActions}
+        >
+          <MoreVertical size={20} color={colors.mutedForeground} />
+        </Pressable>
       </Pressable>
-    </Pressable>
+      {renaming && (
+        <RenameModal
+          title="Rename conversation"
+          placeholder="Enter a new name"
+          initialValue={conversation.title ?? ''}
+          maxLength={CONVERSATION_TITLE_MAX_CHARS}
+          onSave={async name => {
+            await renameConversation.mutateAsync({
+              conversationId: conversation.conversationId,
+              title: name,
+              sandboxId,
+            });
+          }}
+          onClose={() => {
+            setRenaming(false);
+          }}
+        />
+      )}
+    </>
   );
 }

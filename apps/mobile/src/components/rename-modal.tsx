@@ -12,6 +12,7 @@ type RenameModalProps = {
   initialValue: string;
   onSave: (name: string) => Promise<unknown>;
   onClose: () => void;
+  maxLength?: number;
 };
 
 // Mount this component only while the modal should be open (e.g. `{visible && <RenameModal ... />}`)
@@ -22,6 +23,7 @@ export function RenameModal({
   initialValue,
   onSave,
   onClose,
+  maxLength = 50,
 }: Readonly<RenameModalProps>) {
   const colors = useThemeColors();
   const nameRef = useRef(initialValue);
@@ -91,7 +93,7 @@ export function RenameModal({
               setCanSave(trimmed.length > 0 && trimmed !== initialValue);
             }}
             autoFocus={Platform.OS !== 'android'}
-            maxLength={50}
+            maxLength={maxLength}
             editable={!pending}
             accessibilityState={{ disabled: pending }}
           />

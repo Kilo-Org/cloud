@@ -18,12 +18,6 @@ export function chatConversationPath(sandboxId: string, conversationId: string):
   return chatConversationRoute(sandboxId, conversationId) as Href;
 }
 
-export function chatRenameConversationPath(sandboxId: string, params: URLSearchParams): Href {
-  const renameParams = new URLSearchParams(params);
-  renameParams.set('sandboxId', sandboxId);
-  return `/(app)/(tabs)/(1_kiloclaw)/rename-conversation?${renameParams.toString()}` as Href;
-}
-
 export function chatInstancePickerPath(currentId: string): Href {
   return `${KILOCLAW_TAB_CHAT_ROOT}/instance-picker?currentId=${currentId}` as Href;
 }

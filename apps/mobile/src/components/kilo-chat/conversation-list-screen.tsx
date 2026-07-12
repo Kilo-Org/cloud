@@ -3,7 +3,7 @@ import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -14,13 +14,13 @@ import {
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { captureEvent, CONVERSATION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
@@ -107,7 +107,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
   const now = useNowTicker(60_000);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
@@ -167,19 +166,10 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setManualRefreshing(true);
-      try {
-        const result = await refetchConversations();
-        if (result.isError) {
-          toast.error('Could not refresh. Showing the last saved list.');
-        }
-      } finally {
-        setManualRefreshing(false);
-      }
-    })();
-  }, [refetchConversations]);
+  const [manualRefreshing, handleRefresh] = useManualRefresh(
+    refetchConversations,
+    'Could not refresh. Showing the last saved list.'
+  );
 
   const contentState = getConversationListContentState({
     isPending: listQuery.isPending,

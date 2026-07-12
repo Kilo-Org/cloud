@@ -8,13 +8,12 @@ import {
   selectSecurityFindingOutcome,
   selectSecurityFindingStatus,
 } from '@kilocode/app-shared/security-agent';
-import { Check } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const STATUS_OPTIONS: { value: SecurityFindingStatusFilter; label: string }[] = [
   { value: 'open', label: 'Open' },
@@ -75,20 +74,12 @@ type FilterOptionRowProps = {
 };
 
 function FilterOptionRow({ label, isSelected, onPress }: Readonly<FilterOptionRowProps>) {
-  const colors = useThemeColors();
-
   return (
-    <Pressable
-      className="min-h-11 flex-row items-center justify-between rounded-lg px-3 py-2.5 active:bg-secondary"
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: isSelected }}
-    >
+    <ChoiceRow selected={isSelected} onPress={onPress} className="rounded-lg px-3 py-2.5">
       <Text className="flex-1 text-sm" numberOfLines={1}>
         {label}
       </Text>
-      {isSelected && <Check size={16} color={colors.primary} />}
-    </Pressable>
+    </ChoiceRow>
   );
 }
 

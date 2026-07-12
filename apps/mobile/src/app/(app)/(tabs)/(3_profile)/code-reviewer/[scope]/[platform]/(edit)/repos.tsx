@@ -1,12 +1,13 @@
-import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
-import { Check, FolderGit2, Lock } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { FolderGit2 } from 'lucide-react-native';
+import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -23,13 +24,10 @@ import {
   useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
-import { cn } from '@/lib/utils';
 
 export default function ReposRoute() {
   const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
-  const colors = useThemeColors();
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);
@@ -106,12 +104,10 @@ export default function ReposRoute() {
   const emptyStateCopy = emptyStateCopyByPlatform[platform];
 
   const setMode = (nextMode: 'all' | 'selected') => {
-    void Haptics.selectionAsync();
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
   const toggleRepo = (id: number | string) => {
-    void Haptics.selectionAsync();
     // Read the cache at call time, not the render-time snapshot above, so
     // two rapid taps each build the next array from the latest committed
     // selection instead of dropping one another.
@@ -128,24 +124,16 @@ export default function ReposRoute() {
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {capabilities.selectionModePicker &&
           (['all', 'selected'] as const).map(option => (
-            <Pressable
+            <ChoiceRow
               key={option}
-              className={cn(
-                'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
-                configDisabled && 'opacity-50'
-              )}
+              label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+              selected={mode === option}
               disabled={configDisabled}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: mode === option, disabled: configDisabled }}
+              className="border-b-[0.5px] border-hair-soft"
               onPress={() => {
                 setMode(option);
               }}
-            >
-              <Text className="text-sm font-medium">
-                {option === 'all' ? 'All repositories' : 'Selected repositories'}
-              </Text>
-              <Check size={18} color={mode === option ? colors.foreground : 'transparent'} />
-            </Pressable>
+            />
           ))}
 
         {(!capabilities.selectionModePicker || mode === 'selected') && (
@@ -211,33 +199,16 @@ export default function ReposRoute() {
             )}
 
             {repoRows.map(repo => (
-              <Pressable
+              <RepoToggleRow
                 key={repo.id}
-                className={cn(
-                  'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
-                  configDisabled && 'opacity-50'
-                )}
+                repo={repo}
+                selected={selectedIds.includes(repo.id)}
                 disabled={configDisabled}
-                accessibilityRole="checkbox"
-                accessibilityState={{
-                  checked: selectedIds.includes(repo.id),
-                  disabled: configDisabled,
-                }}
+                className="border-b-[0.5px] border-hair-soft"
                 onPress={() => {
                   toggleRepo(repo.id);
                 }}
-              >
-                <View className="flex-1 flex-row items-center gap-2 pr-3">
-                  {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
-                  <Text className="text-sm" numberOfLines={1}>
-                    {repo.fullName}
-                  </Text>
-                </View>
-                <Check
-                  size={18}
-                  color={selectedIds.includes(repo.id) ? colors.foreground : 'transparent'}
-                />
-              </Pressable>
+              />
             ))}
           </View>
         )}

@@ -2,17 +2,18 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import * as Haptics from 'expo-haptics';
-import { Check, FolderGit2, Lock } from 'lucide-react-native';
+import { FolderGit2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { EmptyState } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -29,9 +30,7 @@ import {
   useSecurityAgentEditCapability,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
-import { cn } from '@/lib/utils';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
@@ -50,7 +49,6 @@ function RepositorySettingsSkeleton() {
 }
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const colors = useThemeColors();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -107,12 +105,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }
 
   const setModeOption = (option: RepositorySelectionMode) => {
-    void Haptics.selectionAsync();
     setMode(option);
   };
 
   const toggleRepo = (id: number) => {
-    void Haptics.selectionAsync();
     setSelectedIds(current =>
       current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]
     );
@@ -142,24 +138,16 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           </Text>
         )}
         {(['all', 'selected'] as const).map(option => (
-          <Pressable
+          <ChoiceRow
             key={option}
+            label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+            selected={mode === option}
             disabled={!canManage}
-            className={cn(
-              'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
-              !canManage && 'opacity-50'
-            )}
+            className="border-b-[0.5px] border-hair-soft"
             onPress={() => {
               setModeOption(option);
             }}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: mode === option, disabled: !canManage }}
-          >
-            <Text className="text-sm font-medium">
-              {option === 'all' ? 'All repositories' : 'Selected repositories'}
-            </Text>
-            <Check size={18} color={mode === option ? colors.foreground : 'transparent'} />
-          </Pressable>
+          />
         ))}
 
         {mode === 'selected' && (
@@ -209,33 +197,16 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             {!repositories.isLoading &&
               !repositories.isError &&
               (repositories.data ?? []).map(repo => (
-                <Pressable
+                <RepoToggleRow
                   key={repo.id}
+                  repo={repo}
+                  selected={selectedIds.includes(repo.id)}
                   disabled={!canManage}
-                  className={cn(
-                    'flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70',
-                    !canManage && 'opacity-50'
-                  )}
+                  className="border-b-[0.5px] border-hair-soft"
                   onPress={() => {
                     toggleRepo(repo.id);
                   }}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{
-                    checked: selectedIds.includes(repo.id),
-                    disabled: !canManage,
-                  }}
-                >
-                  <View className="flex-1 flex-row items-center gap-2 pr-3">
-                    {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
-                    <Text className="text-sm" numberOfLines={1}>
-                      {repo.fullName}
-                    </Text>
-                  </View>
-                  <Check
-                    size={18}
-                    color={selectedIds.includes(repo.id) ? colors.foreground : 'transparent'}
-                  />
-                </Pressable>
+                />
               ))}
             {!repositories.isLoading &&
               !repositories.isError &&

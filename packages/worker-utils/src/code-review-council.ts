@@ -148,9 +148,31 @@ export const COUNCIL_RESULT_MAX_BYTES = 128 * 1024;
 /**
  * The combined council manifest: one array of per-specialist results. This is the
  * single-session capture shape; our code parses it and computes the decision.
+ *
+ * `specialistId` must be unique across the array. A duplicate is a coverage-integrity
+ * violation: without this, a `Map`-based reconcile would silently keep the last entry,
+ * letting a later `{id: pass}` override an earlier `{id: block}`. Rejecting duplicates
+ * here makes such a manifest INVALID (→ no coverage → the decision fails closed), and
+ * keeps the computed decision in agreement with `summarizeCouncilManifest` (which
+ * iterates the raw array).
  */
 export const CouncilResultManifestSchema = z.object({
-  specialists: z.array(CouncilSpecialistResultSchema).max(8),
+  specialists: z
+    .array(CouncilSpecialistResultSchema)
+    .max(8)
+    .superRefine((specialists, ctx) => {
+      const seen = new Set<string>();
+      for (const specialist of specialists) {
+        if (seen.has(specialist.specialistId)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate specialistId: ${specialist.specialistId}`,
+          });
+          return;
+        }
+        seen.add(specialist.specialistId);
+      }
+    }),
 });
 export type CouncilResultManifest = z.infer<typeof CouncilResultManifestSchema>;
 
@@ -268,7 +290,11 @@ export function summarizeCouncilManifest(
 export type CouncilCoverage = {
   /** One entry per configured specialist that actually reported a result. */
   votes: SpecialistVote[];
-  /** Configured specialists with NO captured result (the orchestrator dropped them). */
+  /**
+   * Configured specialists without a single reliable result — either absent from the
+   * manifest (dropped), or reported more than once (duplicate/ambiguous). Both are
+   * treated as no coverage so the decision fails closed.
+   */
   missingSpecialistIds: string[];
 };
 
@@ -278,18 +304,33 @@ export type CouncilCoverage = {
  * specialists absent from the manifest are surfaced separately in `missingSpecialistIds`
  * rather than being laundered into an `abstain` vote. Manifest entries for specialists
  * we did not configure are ignored. Callers enforce coverage via `decideCouncilFromManifest`.
+ *
+ * Defense in depth: `CouncilResultManifestSchema` already rejects duplicate ids at parse
+ * time, so a captured manifest is unique. But if a manifest is constructed without going
+ * through the parser, a configured specialist reported MORE THAN ONCE is treated as
+ * missing (unreliable coverage) rather than letting a `Map` silently keep the last vote
+ * (which could override an earlier, more severe one).
  */
 export function reconcileCouncilVotes(
   configuredSpecialistIds: readonly string[],
   manifest: CouncilResultManifest
 ): CouncilCoverage {
+  const counts = new Map<string, number>();
+  for (const specialist of manifest.specialists) {
+    counts.set(specialist.specialistId, (counts.get(specialist.specialistId) ?? 0) + 1);
+  }
   const reported = new Map(manifest.specialists.map(s => [s.specialistId, s.vote]));
   const votes: SpecialistVote[] = [];
   const missingSpecialistIds: string[] = [];
   for (const specialistId of configuredSpecialistIds) {
+    // Exactly one reported result is reliable coverage; 0 = absent (dropped), >1 =
+    // duplicate/ambiguous — neither counts.
     const vote = reported.get(specialistId);
-    if (vote === undefined) missingSpecialistIds.push(specialistId);
-    else votes.push({ specialistId, vote });
+    if (counts.get(specialistId) === 1 && vote !== undefined) {
+      votes.push({ specialistId, vote });
+    } else {
+      missingSpecialistIds.push(specialistId);
+    }
   }
   return { votes, missingSpecialistIds };
 }
@@ -367,6 +408,8 @@ export function parseGovernanceMarker(text: string | null | undefined): Governan
   // member `reason` must not truncate the payload.
   const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
   if (json === null) return null;
+  // Bound parse cost on untrusted model output, symmetric with the manifest parser.
+  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) return null;
   try {
     const parsed: unknown = JSON.parse(json);
     const result = GovernanceSchema.safeParse(parsed);

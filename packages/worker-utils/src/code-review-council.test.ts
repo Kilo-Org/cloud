@@ -215,6 +215,25 @@ describe('parseCouncilResultManifest', () => {
     expect(capture.manifest.specialists[0].vote).toBe('block');
   });
 
+  it('treats a duplicate specialistId as invalid (a later entry cannot override an earlier vote)', () => {
+    const dup = {
+      specialists: [
+        { specialistId: 'security', vote: 'block', findings: [] },
+        { specialistId: 'security', vote: 'pass', findings: [] },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(dup)} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+    // And a duplicate manifest must fail closed at the decision layer.
+    const decision = decideCouncilFromManifest(
+      ['security'],
+      dup as unknown as CouncilResultManifest,
+      'any_blocking_member'
+    );
+    expect(decision.decision).toBe('block');
+    expect(decision.missingSpecialistIds).toEqual(['security']);
+  });
+
   it('returns invalid when the payload exceeds the size cap', () => {
     const huge = {
       specialists: [

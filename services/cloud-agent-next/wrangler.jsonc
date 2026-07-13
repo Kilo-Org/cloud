@@ -163,7 +163,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 400,
+      "max_instances": 200,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -177,7 +177,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 300,
+      "max_instances": 150,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -205,7 +205,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 1000,
+      "max_instances": 500,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -219,7 +219,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 400,
+      "max_instances": 750,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -247,7 +247,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 1000,
+      "max_instances": 1500,
       "rollout_active_grace_period": 1800,
     },
   ],

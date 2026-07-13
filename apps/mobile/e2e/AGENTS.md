@@ -38,6 +38,58 @@ Restart the app (or reload from the Expo dev server) after this so Expo picks up
 - Sign in with **fake-login**: the local sign-in page (reached via the app's normal sign-in flow) has a "Test Account" form — enter any email (an account is created on first login, e.g. `e2e-mobile@example.com`); appending `?fakeUser=<email>` to the sign-in URL auto-submits.
 - Seed data with `pnpm dev:seed` (topics in `dev/seed/`): `app:user-id <email>` to look up a user id, `app:add-credits <userId> <usd>` if completions return 402. Local Postgres is `postgres://postgres:postgres@localhost:5432/postgres`.
 
+### Fully fresh iOS install from a worktree
+
+Use this when the installed binary, app state, saved Metro URL, or checkout provenance is uncertain. Run repository commands from the target worktree, not the main checkout, and do not stop unrelated tmux sessions.
+
+1. Start or verify the complete stack from the target worktree:
+
+```bash
+pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw event-service
+pnpm dev:status --json
+pnpm drizzle migrate
+pnpm dev:env:mobile
+pnpm dev:restart nextjs
+```
+
+`dev:env:mobile` writes LAN-address service URLs to `apps/mobile/.env.local` and updates the web auth URL. Next.js must be restarted afterward so native auth callbacks use those values. Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are reported as `up`; use the reported ports rather than assuming defaults.
+
+2. Boot a simulator and remove the existing app, including all persisted app and dev-client state:
+
+```bash
+xcrun simctl list devices available
+xcrun simctl boot <udid>
+open -a Simulator
+xcrun simctl bootstatus <udid> -b
+xcrun simctl uninstall <udid> com.kilocode.kiloapp 2>/dev/null || true
+```
+
+3. Build, install, and open the binary from this worktree while reusing its already-running Metro:
+
+```bash
+cd apps/mobile
+npx expo run:ios --device <udid> --no-bundler
+```
+
+`expo run:ios` installs the freshly built `.app` and opens the `exp+kilo-app://expo-development-client/?url=...` URL for Metro. If the app later opens the dev-client home screen or attaches to the wrong checkout, reconnect it explicitly using the Metro URL printed in this worktree's `mobile` tmux window:
+
+```bash
+xcrun simctl openurl <udid> \
+  "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
+```
+
+4. Verify checkout provenance before testing:
+
+```bash
+tmux capture-pane -p -t <dev-session>:mobile -S -120
+```
+
+The Metro output must say `Starting project at <target-worktree>/apps/mobile` and show a new `iOS Bundled` line after launch. This check catches the easy-to-miss case where a fresh binary loads JavaScript from Metro in another checkout.
+
+5. Complete clean-install prompts. iOS first shows the App Tracking Transparency alert; choose either response. The Expo dev menu then shows its one-time introduction; tap **Continue**, then **Close**. The Kilo sign-in screen is now ready for `e2e/login.sh`.
+
+Learned on a fully clean simulator: uninstalling is necessary even when rebuilding because a normal install preserves the old data container and saved packager URL; `--no-bundler` is necessary when the repository dev stack already owns Metro; and seeing the Kilo login screen alone does not prove checkout provenance, while the Metro project path and fresh bundle line do.
+
 ## 3. Kilo CLI against the local backend
 
 Needed for flows involving remote CLI sessions (the session list, session mirroring, sending messages from the app).

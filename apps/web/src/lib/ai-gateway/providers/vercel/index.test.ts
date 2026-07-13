@@ -25,12 +25,7 @@ describe('applyVercelSettings', () => {
   it('removes Novita from an explicit DeepSeek provider list', async () => {
     const request = createDeepseekRequest(['Novita/fp8', 'deepseek']);
 
-    await applyVercelSettings(
-      'deepseek/deepseek-v3.2',
-      request,
-      null,
-      getVercelInferenceProviders
-    );
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null, getVercelInferenceProviders);
 
     expect(request.body.providerOptions?.gateway?.only).toEqual(['deepseek']);
     expect(getVercelInferenceProviders).not.toHaveBeenCalled();
@@ -39,12 +34,7 @@ describe('applyVercelSettings', () => {
   it('keeps Novita when it is the only explicit DeepSeek provider', async () => {
     const request = createDeepseekRequest(['novita']);
 
-    await applyVercelSettings(
-      'deepseek/deepseek-v3.2',
-      request,
-      null,
-      getVercelInferenceProviders
-    );
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null, getVercelInferenceProviders);
 
     expect(request.body.providerOptions?.gateway?.only).toEqual(['novita']);
     expect(getVercelInferenceProviders).not.toHaveBeenCalled();
@@ -54,12 +44,7 @@ describe('applyVercelSettings', () => {
     getVercelInferenceProviders.mockResolvedValueOnce(['novita', 'deepseek', 'bedrock']);
     const request = createDeepseekRequest();
 
-    await applyVercelSettings(
-      'deepseek/deepseek-v3.2',
-      request,
-      null,
-      getVercelInferenceProviders
-    );
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null, getVercelInferenceProviders);
 
     expect(request.body.providerOptions?.gateway?.only).toEqual(['deepseek', 'bedrock']);
   });
@@ -68,12 +53,7 @@ describe('applyVercelSettings', () => {
     getVercelInferenceProviders.mockResolvedValueOnce(null);
     const request = createDeepseekRequest();
 
-    await applyVercelSettings(
-      'deepseek/deepseek-v3.2',
-      request,
-      null,
-      getVercelInferenceProviders
-    );
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null, getVercelInferenceProviders);
 
     expect(request.body.providerOptions?.gateway?.only).toBe(undefined);
   });

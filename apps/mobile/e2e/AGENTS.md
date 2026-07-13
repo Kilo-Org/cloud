@@ -50,9 +50,10 @@ pnpm dev:status --json
 pnpm drizzle migrate
 pnpm dev:env:mobile
 pnpm dev:restart nextjs
+pnpm dev:restart mobile
 ```
 
-`dev:env:mobile` writes LAN-address service URLs to `apps/mobile/.env.local` and updates the web auth URL. Next.js must be restarted afterward so native auth callbacks use those values. Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are reported as `up`; use the reported ports rather than assuming defaults.
+`dev:env:mobile` writes LAN-address service URLs to `apps/mobile/.env.local` and updates the web auth URL. Next.js must be restarted afterward so native auth callbacks use those values. Metro must also be restarted because Expo reads `.env.local` when the dev server starts; reloading the app does not update an already-running Metro's bundled config. Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are reported as `up`; use the reported ports rather than assuming defaults.
 
 2. Boot a simulator and remove the existing app, including all persisted app and dev-client state:
 
@@ -88,7 +89,7 @@ The Metro output must say `Starting project at <target-worktree>/apps/mobile` an
 
 5. Complete clean-install prompts. iOS first shows the App Tracking Transparency alert; choose either response. The Expo dev menu then shows its one-time introduction; tap **Continue**, then **Close**. The Kilo sign-in screen is now ready for `e2e/login.sh`.
 
-Learned on a fully clean simulator: uninstalling is necessary even when rebuilding because a normal install preserves the old data container and saved packager URL; `--no-bundler` is necessary when the repository dev stack already owns Metro; and seeing the Kilo login screen alone does not prove checkout provenance, while the Metro project path and fresh bundle line do.
+Learned on a fully clean simulator: uninstalling is necessary even when rebuilding because a normal install preserves the old data container and saved packager URL; `--no-bundler` is necessary when the repository dev stack already owns Metro; both Next.js and Metro must restart after `dev:env:mobile`; and seeing the Kilo login screen alone does not prove checkout provenance, while the Metro project path and fresh bundle line do. A stale Metro env can look deceptively healthy: requesting an OTP advances to the code screen, but the generated worktree outbox stays empty or verification never signs in because the bundle is calling a different backend.
 
 ## 3. Kilo CLI against the local backend
 

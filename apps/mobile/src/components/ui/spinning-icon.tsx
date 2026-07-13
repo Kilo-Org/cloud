@@ -31,7 +31,12 @@ export function SpinningIcon({
 
   useEffect(() => {
     if (isAnimating) {
-      rotation.value = withRepeat(withTiming(360, { duration: 1000, easing: Easing.linear }), -1);
+      rotation.value = 0;
+      rotation.value = withRepeat(
+        withTiming(360, { duration: 1000, easing: Easing.linear }),
+        -1,
+        false
+      );
     } else {
       cancelAnimation(rotation);
       rotation.value = 0;

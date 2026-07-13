@@ -48,12 +48,14 @@ Use this when the installed binary, app state, saved Metro URL, or checkout prov
 pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw event-service
 pnpm dev:status --json
 pnpm drizzle migrate
+pnpm dev:env -y cloudflare-session-ingest
 pnpm dev:env:mobile
+pnpm dev:restart cloudflare-session-ingest
 pnpm dev:restart nextjs
 pnpm dev:restart mobile
 ```
 
-`dev:env:mobile` writes LAN-address service URLs to `apps/mobile/.env.local` and updates the web auth URL. Next.js must be restarted afterward so native auth callbacks use those values. Metro must also be restarted because Expo reads `.env.local` when the dev server starts; reloading the app does not update an already-running Metro's bundled config. Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are reported as `up`; use the reported ports rather than assuming defaults.
+`dev:env -y cloudflare-session-ingest` creates the local Secrets Store bindings that validate the app and CLI JWTs. Without it the worker can be reported as up while every session request fails with `Secret "NEXTAUTH_SECRET_PROD" not found`; restart the worker after creating the secret. `dev:env:mobile` writes LAN-address service URLs to `apps/mobile/.env.local` and updates the web auth URL. Next.js must be restarted afterward so native auth callbacks use those values. Metro must also be restarted because Expo reads `.env.local` when the dev server starts; reloading the app does not update an already-running Metro's bundled config. Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are reported as `up`; use the reported ports rather than assuming defaults.
 
 2. Boot a simulator and remove the existing app, including all persisted app and dev-client state:
 

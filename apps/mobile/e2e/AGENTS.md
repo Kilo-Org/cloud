@@ -101,6 +101,40 @@ Gotchas:
 - Elements are matched by `accessibilityLabel` via the `text:` selector (the app has no testIDs); `id:` does not match a11y labels.
 - Attach screenshots from the e2e run to the PR description where applicable — e.g. the screen a UI change touches, or a key step of the flow being verified. They're the evidence the flow actually works and make review faster.
 
+## Login / logout helper flows
+
+Reusable flows to get the app into a signed-in or signed-out state, so a test can start from a known point. They live in `e2e/flows/` with `e2e/login.sh` / `e2e/logout.sh` wrappers. Backend + Metro must be running (§1) and the dev build installed on the device (§2).
+
+```bash
+e2e/login.sh  <device-udid> [email]   # end: signed in, Home
+e2e/logout.sh <device-udid>           # end: signed out, login page
+```
+
+`<device-udid>` is the simulator/emulator id from `maestro list-devices` / `xcrun simctl list devices`. `login.sh`'s email defaults to `e2e-mobile@example.com`; a first-time address creates the account. Both wrappers are idempotent (no-op if already in the target state).
+
+**Login is two steps** because the 6-digit code only exists after the app requests it. `login.sh` runs `flows/login-request-code.yaml` (submits the email), reads the code from the local email outbox (`dev/logs/emails/*.html`, written by the Next.js dev server), then runs `flows/login-verify-code.yaml -e OTP=<code>`. To do it by hand:
+
+```bash
+maestro --device <udid> test -e EMAIL=e2e-mobile@example.com e2e/flows/login-request-code.yaml
+# newest code for that address (the letter-spacing span; ignores the footer PMB number):
+code=$(perl -0777 -ne 'print $1 if /letter-spacing:\s*8px.*?>\s*(\d{6})\s*</s' \
+  "$(ls -t dev/logs/emails/*.html | head -1)")
+maestro --device <udid> test -e OTP=$code e2e/flows/login-verify-code.yaml
+```
+
+Why it works the way it does (learned on-device — keep these or the flows break):
+
+- **Launch by tapping the home-screen icon, not `launchApp`.** `launchApp` cold-restarts the Expo dev client and bounces to SpringBoard; the flows `stopApp` then `tapOn: "Kilo"` instead.
+- **Sign-in options are Apple / Google / email-OTP / browser.** Only email OTP is drivable in-process (Apple/Google are native sheets; the browser path opens `ASWebAuthenticationSession`, a separate process Maestro can't touch). So login = email OTP.
+- **A brand-new account shows a consent screen ("Accept and continue") after verifying** and before Home; the verify flow accepts it. `login.sh`'s consent-accept is also what satisfies "accept permissions" in a fresh-install run.
+- **Three launch states** are handled: Home (signed in), the consent gate (signed in, not consented), and the login page (signed out).
+- **Do not add a flow-level `env:` default for `EMAIL`/`OTP`.** In this Maestro version an `env:` default silently overrides the `-e` value, so the code goes to the wrong address / an empty OTP is typed. Pass them with `-e` only.
+- **Tap the email field via its `you@example.com` placeholder**, not "Email address" — the label shares the input's accessibility text and would match the (non-focusable) label.
+- **The OTP number pad has no dismiss key**; "Verify code" sits above it, so tap it directly (no `hideKeyboard`).
+- The native "Sign out" alert button collides with the screen's "Sign Out" button under Maestro's case-insensitive match; the confirm is `index: 0` (topmost by position).
+
+Note: OTP sign-in sessions don't always survive a later cold relaunch on the dev build, so treat "signed in" as the state right after `login.sh`, and re-run it if a subsequent relaunch drops to the login page.
+
 ## 6. Android emulator
 
 One-time toolchain setup (Homebrew):

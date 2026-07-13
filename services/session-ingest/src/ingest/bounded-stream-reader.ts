@@ -1,20 +1,14 @@
 export type BoundedStreamReadResult =
   | { ok: true; bytes: Uint8Array }
-  | { ok: false; reason: 'too_large'; limit: 'declared_bytes' | 'configured_cap' };
+  | { ok: false; reason: 'too_large' };
 
 export async function readBoundedStream(
   stream: ReadableStream<Uint8Array>,
-  declaredBytes: number,
-  configuredCap: number
+  declaredBytes: number
 ): Promise<BoundedStreamReadResult> {
   const reader = stream.getReader();
 
   try {
-    if (declaredBytes > configuredCap) {
-      await cancelReader(reader);
-      return { ok: false, reason: 'too_large', limit: 'configured_cap' };
-    }
-
     const chunks: Uint8Array[] = [];
     let totalBytes = 0;
 
@@ -31,16 +25,9 @@ export async function readBoundedStream(
       }
 
       totalBytes += result.value.byteLength;
-      if (totalBytes > declaredBytes || totalBytes > configuredCap) {
+      if (totalBytes > declaredBytes) {
         await cancelReader(reader);
-        return {
-          ok: false,
-          reason: 'too_large',
-          // Route callers reject declaredBytes > configuredCap before reading, so the
-          // streaming overflow normally reports declared_bytes. The cap branch keeps
-          // this helper defensive for standalone callers.
-          limit: totalBytes > configuredCap ? 'configured_cap' : 'declared_bytes',
-        };
+        return { ok: false, reason: 'too_large' };
       }
       chunks.push(result.value);
     }

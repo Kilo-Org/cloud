@@ -166,31 +166,77 @@ export type CouncilManifestCapture =
   | { status: 'invalid' };
 
 /**
+ * Extracts the JSON object payload of the LAST occurrence of an HTML-comment marker
+ * (`<!-- TAG {json} -->`) from free text.
+ *
+ * Does NOT rely on the payload being `-->`-free: a finding's `rationale`/`path` can
+ * legitimately contain `-->` or `}` (e.g. reviewing HTML, or `while (i --> 0)`). So we
+ * locate the last marker tag, then do a brace-depth scan from the first `{` — honoring
+ * JSON string literals and escapes — to its matching `}`. The trailing `-->` is not
+ * required for extraction (real models add prose after it).
+ *
+ * Returns `tagPresent` so callers can distinguish "no marker at all" (missing) from
+ * "marker present but no balanced JSON object" (invalid).
+ */
+function extractLastMarkerJson(
+  text: string,
+  tag: string
+): { tagPresent: boolean; json: string | null } {
+  const starter = new RegExp(`<!--\\s*${tag}\\s*`, 'g');
+  let searchFrom = -1;
+  for (const match of text.matchAll(starter)) {
+    searchFrom = match.index + match[0].length;
+  }
+  if (searchFrom < 0) return { tagPresent: false, json: null };
+
+  const open = text.indexOf('{', searchFrom);
+  if (open < 0) return { tagPresent: true, json: null };
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) {
+      return { tagPresent: true, json: text.slice(open, i + 1) };
+    }
+  }
+  return { tagPresent: true, json: null }; // unbalanced
+}
+
+/**
  * Extracts and validates the combined council manifest from the orchestrator's final
  * message.
  *
  * The marker may appear ANYWHERE in the message and the LAST occurrence wins — real
  * models often add a trailing sentence after the marker, and that must not cause a
- * false miss. The payload is captured up to the closing `-->` (which valid JSON never
- * contains), so nested JSON in `findings` is tolerated. Size-capped; schema is strict
- * only where it must be (each specialist's `vote`).
+ * false miss. The JSON object is extracted by a brace-aware scan (see
+ * `extractLastMarkerJson`), so a `-->` or `}` inside a finding's free-form text does not
+ * truncate a legitimate manifest. Size-capped; schema is strict only where it must be
+ * (each specialist's `vote`).
  */
 export function parseCouncilResultManifest(
   text: string | null | undefined
 ): CouncilManifestCapture {
   if (!text) return { status: 'missing' };
 
-  const marker = new RegExp(`<!--\\s*${COUNCIL_RESULT_MARKER_TAG}\\s*([\\s\\S]*?)\\s*-->`, 'g');
-  const matches = [...text.matchAll(marker)];
-  if (matches.length === 0) return { status: 'missing' };
-
-  const payload = matches[matches.length - 1][1].trim();
-  if (new TextEncoder().encode(payload).length > COUNCIL_RESULT_MAX_BYTES) {
+  const { tagPresent, json } = extractLastMarkerJson(text, COUNCIL_RESULT_MARKER_TAG);
+  if (!tagPresent) return { status: 'missing' };
+  if (json === null) return { status: 'invalid' };
+  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) {
     return { status: 'invalid' };
   }
 
   try {
-    const parsed: unknown = JSON.parse(payload);
+    const parsed: unknown = JSON.parse(json);
     const result = CouncilResultManifestSchema.safeParse(parsed);
     return result.success ? { status: 'captured', manifest: result.data } : { status: 'invalid' };
   } catch {
@@ -317,11 +363,12 @@ export type GovernanceMember = z.infer<typeof GovernanceMemberSchema>;
  */
 export function parseGovernanceMarker(text: string | null | undefined): Governance | null {
   if (!text) return null;
-  const marker = new RegExp(`<!--\\s*${GOVERNANCE_MARKER_TAG}\\s*(\\{[\\s\\S]*?\\})\\s*-->`);
-  const match = text.match(marker);
-  if (!match) return null;
+  // Brace-aware extraction (see `extractLastMarkerJson`): a `-->` or `}` inside a
+  // member `reason` must not truncate the payload.
+  const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
+  if (json === null) return null;
   try {
-    const parsed: unknown = JSON.parse(match[1]);
+    const parsed: unknown = JSON.parse(json);
     const result = GovernanceSchema.safeParse(parsed);
     return result.success ? result.data : null;
   } catch {

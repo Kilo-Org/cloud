@@ -170,6 +170,51 @@ describe('parseCouncilResultManifest', () => {
     expect(capture.manifest.specialists[0].vote).toBe('block');
   });
 
+  it('captures a manifest whose finding text contains --> and braces (no false invalid)', () => {
+    const tricky = {
+      specialists: [
+        {
+          specialistId: 'correctness',
+          vote: 'warn',
+          highestSeverity: 'medium',
+          findings: [
+            {
+              path: 'src/loop.ts',
+              line: 12,
+              severity: 'medium',
+              rationale: 'Confusing "goes to" operator: while (i --> 0) {} reads like an arrow.',
+            },
+          ],
+        },
+      ],
+    };
+    const text = `Summary here.\n<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(tricky)} -->\nthanks!`;
+    const capture = parseCouncilResultManifest(text);
+    expect(capture.status).toBe('captured');
+    if (capture.status !== 'captured') throw new Error('unreachable');
+    expect(capture.manifest.specialists[0].findings[0].rationale).toContain('i --> 0');
+  });
+
+  it('captures the last marker even when an earlier finding contains -->', () => {
+    const first = {
+      specialists: [
+        {
+          specialistId: 'security',
+          vote: 'pass',
+          findings: [{ path: 'a.ts', line: 1, severity: 'low', rationale: 'note --> here' }],
+        },
+      ],
+    };
+    const last = {
+      specialists: [{ specialistId: 'security', vote: 'block', findings: [] }],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(first)} -->\n<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(last)} -->`;
+    const capture = parseCouncilResultManifest(text);
+    expect(capture.status).toBe('captured');
+    if (capture.status !== 'captured') throw new Error('unreachable');
+    expect(capture.manifest.specialists[0].vote).toBe('block');
+  });
+
   it('returns invalid when the payload exceeds the size cap', () => {
     const huge = {
       specialists: [
@@ -306,6 +351,18 @@ describe('parseGovernanceMarker', () => {
       `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
     );
     expect(parsed?.members[0].highestSeverity).toBeNull();
+  });
+
+  it('parses when a member reason contains --> and braces', () => {
+    const gov = {
+      members: [{ id: 'security', vote: 'warn', reason: 'template `${x}` and --> in code' }],
+      decision: 'warn',
+    };
+    const parsed = parseGovernanceMarker(
+      `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
+    );
+    expect(parsed?.decision).toBe('warn');
+    expect(parsed?.members[0].reason).toContain('-->');
   });
 });
 

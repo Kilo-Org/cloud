@@ -203,9 +203,17 @@ function utf8ByteLengthExceeds(str: string, limit: number): boolean {
     if (code < 0x80) bytes += 1;
     else if (code < 0x800) bytes += 2;
     else if (code >= 0xd800 && code <= 0xdbff) {
-      bytes += 4; // surrogate pair (one code point across two code units)
-      i++;
-    } else bytes += 3;
+      // High surrogate: only a valid pair (followed by a low surrogate) is one 4-byte
+      // code point. An unpaired high surrogate is encoded as the 3-byte replacement
+      // character (U+FFFD) and does NOT consume the next unit — matching TextEncoder.
+      const next = str.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        i++;
+      } else {
+        bytes += 3;
+      }
+    } else bytes += 3; // BMP char, or an unpaired low surrogate (3-byte replacement char)
     if (bytes > limit) return true;
   }
   return false;

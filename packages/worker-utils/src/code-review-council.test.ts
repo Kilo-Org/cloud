@@ -355,6 +355,16 @@ describe('parseCouncilResultManifest', () => {
     expect(capture.manifest.specialists[0].vote).toBe('block');
   });
 
+  it('enforces the byte cap for unpaired surrogates (cannot undercount past 128 KiB)', () => {
+    // `\uD800\u0800` = an unpaired high surrogate + a BMP char = 6 UTF-8 bytes (3-byte
+    // replacement char + 3-byte char), NOT 4. 25k of them is ~150 KiB, over the cap.
+    // Character count (~50k) stays under the scan bound, so the byte cap must catch it.
+    const seq = '\uD800\u0800'.repeat(25_000);
+    const payload = `{"specialists":[],"x":"${seq}"}`;
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${payload} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
   it('does not treat a mid-line (non-line-anchored) marker as top-level', () => {
     const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
     // Marker preceded by non-whitespace on the same line is not a top-level marker.

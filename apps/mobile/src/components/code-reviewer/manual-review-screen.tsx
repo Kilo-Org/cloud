@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   PERSONAL_SCOPE,
@@ -109,17 +110,29 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   };
 
   if (!statusesLoading && statusesError && !isConnected('github') && !isConnected('gitlab')) {
+    // A permission/not-found error can't be fixed by retrying — show the
+    // permanent variant with no retry instead of a misleading "try again".
+    const statusErrorCode =
+      (githubStatus.error as { data?: { code?: string } } | null)?.data?.code ??
+      (gitlabStatus.error as { data?: { code?: string } } | null)?.data?.code;
+    const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Manual review" eyebrow="Code Reviewer" />
         <QueryError
-          variant="server"
-          title="Couldn't check provider status"
-          message="We couldn't load your connected providers. Please try again."
-          onRetry={() => {
-            void githubStatus.refetch();
-            void gitlabStatus.refetch();
-          }}
+          variant={variant}
+          title={permanent ? undefined : "Couldn't check provider status"}
+          message={
+            permanent ? undefined : "We couldn't load your connected providers. Please try again."
+          }
+          onRetry={
+            permanent
+              ? undefined
+              : () => {
+                  void githubStatus.refetch();
+                  void gitlabStatus.refetch();
+                }
+          }
           isRetrying={githubStatus.isRefetching || gitlabStatus.isRefetching}
         />
       </View>
@@ -156,6 +169,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

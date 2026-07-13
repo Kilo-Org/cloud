@@ -119,6 +119,21 @@ function buildRows(params: {
   return rows;
 }
 
+// Whether the Home "Agent sessions" section has anything to render — mirrors
+// buildRows' inclusion rule (any active session, or a cloud-agent stored
+// session; stored CLI/other-platform sessions live on the Agents tab, not
+// Home). The Home screen gates its section/promo/new-task button on this so a
+// CLI-only account shows the first-use promo instead of an empty section.
+export function hasDisplayableAgentSessions(
+  storedSessions: StoredSession[],
+  activeSessions: ActiveSession[]
+): boolean {
+  return (
+    activeSessions.length > 0 ||
+    storedSessions.some(s => CLOUD_AGENT_PLATFORMS.has(s.created_on_platform))
+  );
+}
+
 type AgentSessionsSectionProps = {
   organizationId: string | null;
 };

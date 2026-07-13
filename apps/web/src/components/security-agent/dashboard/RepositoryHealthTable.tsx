@@ -20,7 +20,8 @@ type RepoHealth = {
   medium: number;
   low: number;
   overdue: number;
-  slaCompliancePercent: number;
+  /** null when the repo has no open SLA-tracked findings — "not measured", not 100%. */
+  slaCompliancePercent: number | null;
 };
 
 type RepositoryHealthTableProps = {
@@ -107,10 +108,14 @@ export function RepositoryHealthTable({
                           <span
                             className={cn(
                               'font-mono font-medium tabular-nums',
-                              complianceColor(repo.slaCompliancePercent)
+                              repo.slaCompliancePercent == null
+                                ? 'text-muted-foreground'
+                                : complianceColor(repo.slaCompliancePercent)
                             )}
                           >
-                            {repo.slaCompliancePercent}%
+                            {repo.slaCompliancePercent == null
+                              ? 'Not measured'
+                              : `${repo.slaCompliancePercent}%`}
                           </span>
                         </TableCell>
                       )}

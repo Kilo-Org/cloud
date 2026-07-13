@@ -192,47 +192,50 @@ export function ProfileScreen() {
           </View>
         )}
 
-        {/* Linked accounts */}
-        <Animated.View className="mt-6 gap-3" layout={LinearTransition}>
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Linked accounts
-          </Text>
+        {/* Linked accounts — hide the whole section when there are no linked
+            providers (and we're not loading/erroring) so the header never dangles. */}
+        {(isLoading || providersError || (data?.providers.length ?? 0) > 0) && (
+          <Animated.View className="mt-6 gap-3" layout={LinearTransition}>
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              Linked accounts
+            </Text>
 
-          {isLoading && (
-            <Animated.View exiting={FadeOut.duration(150)}>
-              <Skeleton className="h-12 w-full rounded-lg" />
-            </Animated.View>
-          )}
-
-          {providersError && (
-            <QueryError
-              variant="server"
-              placement="top"
-              title="Could not load accounts"
-              onRetry={() => void refetchProviders()}
-              isRetrying={providersFetching}
-            />
-          )}
-
-          {data?.providers.map(p => {
-            const Icon = providerIcon(p.provider);
-            return (
-              <Animated.View
-                key={`${p.provider}-${p.email}`}
-                className="flex-row items-center gap-3 rounded-lg bg-secondary p-3"
-                entering={FadeIn.duration(200)}
-              >
-                <Icon size={18} color={colors.secondaryForeground} />
-                <View className="flex-1">
-                  <Text className="text-sm font-medium capitalize">{p.provider}</Text>
-                  <Text variant="muted" className="text-xs">
-                    {p.email}
-                  </Text>
-                </View>
+            {isLoading && (
+              <Animated.View exiting={FadeOut.duration(150)}>
+                <Skeleton className="h-12 w-full rounded-lg" />
               </Animated.View>
-            );
-          })}
-        </Animated.View>
+            )}
+
+            {providersError && (
+              <QueryError
+                variant="server"
+                placement="top"
+                title="Could not load accounts"
+                onRetry={() => void refetchProviders()}
+                isRetrying={providersFetching}
+              />
+            )}
+
+            {data?.providers.map(p => {
+              const Icon = providerIcon(p.provider);
+              return (
+                <Animated.View
+                  key={`${p.provider}-${p.email}`}
+                  className="flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                  entering={FadeIn.duration(200)}
+                >
+                  <Icon size={18} color={colors.secondaryForeground} />
+                  <View className="flex-1">
+                    <Text className="text-sm font-medium capitalize">{p.provider}</Text>
+                    <Text variant="muted" className="text-xs">
+                      {p.email}
+                    </Text>
+                  </View>
+                </Animated.View>
+              );
+            })}
+          </Animated.View>
+        )}
 
         {/* Notifications */}
         <View className="mt-6">

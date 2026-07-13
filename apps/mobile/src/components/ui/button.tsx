@@ -19,11 +19,12 @@ const buttonVariants = cva(
         'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-black/5',
       },
       size: {
-        // h-11 (44pt) meets the minimum touch target; sm/icon stay compact
-        // visually and reach 44pt via hitSlop instead (see SM_HIT_SLOP below).
-        default: 'h-11 px-4 py-2',
-        sm: 'h-9 gap-1.5 rounded-md px-3',
-        lg: 'h-11 rounded-md px-6',
+        // min-h (not fixed h) so the button grows to fit text scaled by large
+        // Dynamic Type instead of clipping the label; the min still guarantees
+        // the 44pt (default/lg) / 36pt-plus-hitSlop (sm) touch target.
+        default: 'min-h-11 px-4 py-2',
+        sm: 'min-h-9 gap-1.5 rounded-md px-3 py-1.5',
+        lg: 'min-h-11 rounded-md px-6 py-2',
         icon: 'h-11 w-11',
       },
     },

@@ -132,17 +132,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         )}
       </View>
 
-      {balanceLoading && <Skeleton className="h-16 w-full rounded-lg" />}
+      {balanceLoading && <Skeleton className="min-h-16 w-full rounded-lg" />}
       {balanceError && (
         <Pressable
-          className="h-16 justify-center rounded-lg bg-secondary px-3 active:opacity-70"
+          className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
           onPress={() => void refetchBalance()}
         >
           <Text className="text-sm text-destructive">Failed to load balance. Tap to retry.</Text>
         </Pressable>
       )}
       {!balanceLoading && !balanceError && (
-        <View className="h-16 flex-row items-center rounded-lg bg-secondary px-3">
+        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
             <Text className="text-2xl font-bold">{formatDollars(balanceDollars)}</Text>
             {creditsLoading ? (

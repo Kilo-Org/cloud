@@ -1,6 +1,38 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { classifyPermission, classifyProviderState } from './code-reviewer-status';
+import {
+  classifyPermission,
+  classifyProviderErrorCode,
+  classifyProviderState,
+} from './code-reviewer-status';
+
+describe('classifyProviderErrorCode', () => {
+  it('treats FORBIDDEN and UNAUTHORIZED as a permanent permission error (no retry)', () => {
+    expect(classifyProviderErrorCode('FORBIDDEN')).toEqual({
+      permanent: true,
+      variant: 'permission',
+    });
+    expect(classifyProviderErrorCode('UNAUTHORIZED')).toEqual({
+      permanent: true,
+      variant: 'permission',
+    });
+  });
+
+  it('treats NOT_FOUND as a permanent not-found error', () => {
+    expect(classifyProviderErrorCode('NOT_FOUND')).toEqual({
+      permanent: true,
+      variant: 'not-found',
+    });
+  });
+
+  it('treats other/unknown codes as a transient, retriable server error', () => {
+    expect(classifyProviderErrorCode('INTERNAL_SERVER_ERROR')).toEqual({
+      permanent: false,
+      variant: 'server',
+    });
+    expect(classifyProviderErrorCode(undefined)).toEqual({ permanent: false, variant: 'server' });
+  });
+});
 
 describe('classifyProviderState', () => {
   it('is loading while the query is loading', () => {

@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  KeyRound,
   Trash2,
 } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
@@ -164,6 +165,7 @@ export function SettingsCard({
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const fieldValuesRef = useRef<Record<string, string>>({});
+  const colors = useThemeColors();
   const ItemIcon = CATALOG_ICONS[item.id];
 
   const updateCanSave = useCallback(() => {
@@ -242,7 +244,9 @@ export function SettingsCard({
     <View className="mx-4 overflow-hidden rounded-lg bg-secondary">
       {/* Header row */}
       <View className="flex-row items-center gap-3 px-4 py-3">
-        {ItemIcon && <ItemIcon size={18} />}
+        {/* Fall back to a neutral key icon for catalog items without a brand
+            icon (e.g. Linear, Composio) so every row has one. */}
+        {ItemIcon ? <ItemIcon size={18} /> : <KeyRound size={18} color={colors.mutedForeground} />}
         <View className="flex-1 gap-0.5">
           <Text className="text-sm font-medium">{item.label}</Text>
           {item.helpText &&

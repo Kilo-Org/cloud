@@ -84,6 +84,7 @@ export function PlatformOverviewScreen({
     connected: status.data?.connected,
     hasData: status.data !== undefined,
     refetch: () => void status.refetch(),
+    errorCode: (status.error as { data?: { code?: string } } | null)?.data?.code,
   });
 
   if (providerState.status === 'error') {
@@ -91,9 +92,15 @@ export function PlatformOverviewScreen({
       <PlatformErrorScreen
         title={capabilities.label}
         eyebrow="Code Reviewer"
-        onRetry={() => {
-          providerState.refetch();
-        }}
+        variant={providerState.variant}
+        // A permission/not-found error can't be fixed by retrying — hide retry.
+        onRetry={
+          providerState.permanent
+            ? undefined
+            : () => {
+                providerState.refetch();
+              }
+        }
         isRetrying={providerState.isRetrying}
       />
     );

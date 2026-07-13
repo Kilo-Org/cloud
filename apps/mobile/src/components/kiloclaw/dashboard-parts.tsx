@@ -46,10 +46,7 @@ export function DashboardHero({ name, status, uptime }: Readonly<DashboardHeroPr
         <Bot size={22} color={colors[tint.hueThemeKey]} />
       </View>
       <View className="flex-1">
-        <Text
-          className="text-[26px] font-bold tracking-tight leading-7 text-foreground"
-          numberOfLines={1}
-        >
+        <Text className="text-[26px] font-bold tracking-tight text-foreground" numberOfLines={1}>
           {name}
         </Text>
         <View className="mt-1 flex-row items-center gap-1.5">

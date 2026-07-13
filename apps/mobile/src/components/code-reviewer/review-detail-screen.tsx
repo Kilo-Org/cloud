@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -130,7 +131,7 @@ export function ReviewDetailScreen({
 
         <View className="gap-1 rounded-lg bg-secondary p-4">
           <MetaRow label="Branch" value={`${review.head_ref} → ${review.base_ref}`} />
-          <MetaRow label="Platform" value={review.platform} valueClassName="capitalize" />
+          <MetaRow label="Platform" value={reviewerPlatformLabel(review.platform)} />
           {review.model ? <MetaRow label="Model" value={review.model} /> : null}
           <MetaRow label="Created" value={timeAgo(parseTimestamp(review.created_at))} />
           {review.started_at ? (

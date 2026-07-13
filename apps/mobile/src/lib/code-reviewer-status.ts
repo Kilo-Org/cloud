@@ -11,9 +11,39 @@ import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations
 // treating every non-connected state as the same "show the connect card"
 // case — a query failure on an already-connected account must not render
 // the connect card.
+type ProviderErrorVariant = 'server' | 'permission' | 'not-found';
+
+/**
+ * Classify a TRPC error code into a provider error variant. A thrown
+ * FORBIDDEN/UNAUTHORIZED/NOT_FOUND can't be fixed by retrying, so it's
+ * `permanent` (rendered with the permission/not-found QueryError variant and
+ * no retry); anything else is a transient server error.
+ */
+export function classifyProviderErrorCode(errorCode: string | undefined): {
+  permanent: boolean;
+  variant: ProviderErrorVariant;
+} {
+  const permanent =
+    errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED' || errorCode === 'NOT_FOUND';
+  let variant: ProviderErrorVariant = 'server';
+  if (errorCode === 'NOT_FOUND') {
+    variant = 'not-found';
+  } else if (permanent) {
+    variant = 'permission';
+  }
+  return { permanent, variant };
+}
+
 type ProviderState =
   | { status: 'loading' }
-  | { status: 'error'; refetch: () => void; isRetrying: boolean }
+  | {
+      status: 'error';
+      refetch: () => void;
+      isRetrying: boolean;
+      /** FORBIDDEN/UNAUTHORIZED/NOT_FOUND — a retry can't fix it, so hide retry. */
+      permanent: boolean;
+      variant: ProviderErrorVariant;
+    }
   | { status: 'connected' }
   | { status: 'disconnected' };
 
@@ -24,6 +54,8 @@ export function classifyProviderState(input: {
   connected: boolean | undefined;
   hasData: boolean;
   refetch: () => unknown;
+  /** TRPC error code (error.data?.code) when isError, for permanent-vs-transient classification. */
+  errorCode?: string;
 }): ProviderState {
   if (input.isLoading) {
     return { status: 'loading' };
@@ -32,7 +64,14 @@ export function classifyProviderState(input: {
   // out an already-connected screen — only an initial-load failure (no
   // cached data yet) is a hard error.
   if (input.isError && !input.hasData) {
-    return { status: 'error', refetch: () => void input.refetch(), isRetrying: input.isFetching };
+    const { permanent, variant } = classifyProviderErrorCode(input.errorCode);
+    return {
+      status: 'error',
+      refetch: () => void input.refetch(),
+      isRetrying: input.isFetching,
+      permanent,
+      variant,
+    };
   }
   return input.connected ? { status: 'connected' } : { status: 'disconnected' };
 }

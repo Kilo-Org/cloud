@@ -141,7 +141,12 @@ export default function DashboardScreen() {
     );
   }
 
-  const instanceName = status?.name ?? status?.sandboxId ?? 'Instance';
+  // Prefer the instance's friendly name from the list/context (the gateway
+  // status query doesn't carry it, so relying on status.name showed the raw
+  // sandbox id for named instances).
+  const contextName =
+    instanceContext.status === 'ready' ? instanceContext.instance.name : undefined;
+  const instanceName = contextName ?? status?.name ?? status?.sandboxId ?? 'Instance';
 
   const handleDestroy = () => {
     Alert.alert(
@@ -290,7 +295,7 @@ export default function DashboardScreen() {
         <RenameModal
           title="Rename instance"
           placeholder="Enter a new name (max 50 characters)"
-          initialValue={status?.name ?? ''}
+          initialValue={contextName ?? status?.name ?? ''}
           onSave={async name => {
             await mutations.renameInstance.mutateAsync({ name });
           }}

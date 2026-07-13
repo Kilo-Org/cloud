@@ -30,7 +30,7 @@ import { RestorePurchasesButton } from './restore-purchases-button';
 type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
 
 function formatTier(product: AppStoreKiloPassProduct): string {
-  return `$${product.webMonthlyPriceUsd} credits`;
+  return `$${product.webMonthlyPriceUsd} in credits`;
 }
 
 function formatStorePrice(product: AppStoreKiloPassProduct): string {

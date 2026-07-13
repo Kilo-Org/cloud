@@ -4,7 +4,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
-import { trpcErrorFormatter } from '@/lib/trpc/transport';
+import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
 
 export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
@@ -21,6 +21,10 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'User not authenticated - no user to set on context',
+      // Marks this as a genuine session failure (vs a procedure-level
+      // UNAUTHORIZED like org-access denial) so the mobile client signs out
+      // only here — see AuthContextError / data.authRequired.
+      cause: new AuthContextError(),
     });
   }
   setTag('userId', user.id);

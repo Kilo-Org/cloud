@@ -1404,6 +1404,31 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.is_enabled).toBe(false);
   });
 
+  it('does not enable Code Reviewer when a fresh personal config is saved without isEnabled', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    // No pre-existing agent_configs row: this sub-setting save creates it.
+    // Regression guard — the insert default used to be `?? true`, which
+    // silently turned on auto-reviews the moment a user edited any setting.
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      disableReviewMd: true,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(false);
+  });
+
   it('preserves personal review feature settings during a full config save', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({

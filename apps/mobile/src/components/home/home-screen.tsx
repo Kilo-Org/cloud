@@ -8,7 +8,10 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 
 import { badgeBucketForInstance } from '@kilocode/notifications';
 
-import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
+import {
+  AgentSessionsSection,
+  hasDisplayableAgentSessions,
+} from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { KiloClawPromoCard } from '@/components/home/kiloclaw-promo-card';
@@ -98,7 +101,10 @@ export function HomeScreen() {
 
   const isLoading = instancesPending || sessionsLoading;
 
-  const hasAnySession = storedSessions.length > 0 || activeSessions.length > 0;
+  // Match what the Home Agent-sessions section actually renders (cloud-agent
+  // stored + any active), so a CLI-only account shows the first-use promo
+  // instead of an empty section + orphaned "New coding task" button.
+  const hasAnySession = hasDisplayableAgentSessions(storedSessions, activeSessions);
   const headerTitle = buildTimedGreeting();
 
   const handleRefresh = useCallback(() => {

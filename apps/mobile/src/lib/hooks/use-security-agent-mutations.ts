@@ -185,8 +185,9 @@ export function useTrackSecurityAgentInteraction(scope: string) {
             organizationId: scope,
             ...vars,
           }),
-    onError: error => {
-      toast.error(error.message);
-    },
+    // Intentionally no onError handler: this is fire-and-forget telemetry that
+    // pings on nav/tab/toggle. A failure must never surface a user-facing toast —
+    // it would spam errors and stack on top of real mutation errors. React Query
+    // captures the rejection internally; we deliberately don't act on it.
   });
 }

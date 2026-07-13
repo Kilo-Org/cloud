@@ -36,7 +36,7 @@ const SETTINGS_ITEMS: SettingsItem[] = [
   {
     icon: MessageSquare,
     label: 'Channels',
-    description: 'Telegram, Discord, Slack, GitHub',
+    description: 'Telegram, Discord, Slack',
     path: 'settings/channels',
   },
   {

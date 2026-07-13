@@ -77,7 +77,17 @@ export function OrganizationHubScreen() {
               className="border-b-[0.5px] border-hair-soft py-3"
             />
           )}
-          <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
+          <KvRow
+            label="Seats"
+            // A 0 total means no seat limit is set; "1 / 0" reads like an
+            // overflow error, so show just the in-use count in that case.
+            value={
+              org.seatCount.total > 0
+                ? `${org.seatCount.used} / ${org.seatCount.total}`
+                : String(org.seatCount.used)
+            }
+            last
+          />
         </Animated.View>
 
         <OrgUsageStats organizationId={organizationId} />

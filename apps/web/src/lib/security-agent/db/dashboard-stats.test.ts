@@ -135,7 +135,8 @@ describe('getDashboardStats', () => {
         overdue: 0,
         exploitable: 0,
         needsAction: 1,
-        slaCompliancePercent: 100,
+        // No open SLA-tracked findings for this repo → "not measured" (null), not a misleading 100%.
+        slaCompliancePercent: null,
       },
     ]);
   });

@@ -287,6 +287,7 @@ export function IdentityStep({
             }}
             autoCapitalize="words"
             autoCorrect={false}
+            spellCheck={false}
             maxLength={80}
             returnKeyType="done"
           />

@@ -68,7 +68,8 @@ export type DashboardStats = {
     overdue: number;
     exploitable: number;
     needsAction: number;
-    slaCompliancePercent: number;
+    /** null when the repo has no open SLA-tracked findings — "not measured", not 100%. */
+    slaCompliancePercent: number | null;
   }>;
   repositoryCount: number;
 };
@@ -169,7 +170,7 @@ type RepoHealthRow = {
   overdue: string;
   exploitable: string;
   needs_action: string;
-  sla_compliance_percent: string;
+  sla_compliance_percent: string | null;
   repository_count: string;
 };
 
@@ -383,7 +384,7 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
                 )
             ) AS needs_action,
             CASE
-              WHEN COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL) = 0 THEN 100
+              WHEN COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL) = 0 THEN NULL
               ELSE ROUND(
                 COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} > now()) * 100.0 /
                 COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL), 1
@@ -550,7 +551,8 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       overdue: Number(row.overdue),
       exploitable: Number(row.exploitable),
       needsAction: Number(row.needs_action),
-      slaCompliancePercent: Number(row.sla_compliance_percent),
+      slaCompliancePercent:
+        row.sla_compliance_percent == null ? null : Number(row.sla_compliance_percent),
     }));
     const repositoryCount = Number(repoHealthResult.rows[0]?.repository_count ?? 0);
 

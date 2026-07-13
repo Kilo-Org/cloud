@@ -53,6 +53,17 @@ export const PLATFORM_CAPABILITIES: Record<
 const REVIEWER_PLATFORMS = Object.keys(PLATFORM_CAPABILITIES) as ReviewerPlatform[];
 
 /**
+ * Display label for a code-review platform (e.g. 'github' → 'GitHub'), falling
+ * back to the raw value for anything unrecognized. Use this instead of a CSS
+ * `capitalize`, which renders 'github' → 'Github'.
+ */
+export function reviewerPlatformLabel(platform: string): string {
+  return REVIEWER_PLATFORMS.includes(platform as ReviewerPlatform)
+    ? PLATFORM_CAPABILITIES[platform as ReviewerPlatform].label
+    : platform;
+}
+
+/**
  * Strictly parses a route's platform segment against the supported
  * scope+platform combinations. Replaces the old `asReviewerPlatform`
  * coercion, which silently fell back to `'github'` for any unrecognized

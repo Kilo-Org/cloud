@@ -27,7 +27,8 @@ export function PlatformErrorScreen({
   errorTitle?: string;
   message?: string;
   variant?: QueryErrorVariant;
-  onRetry: () => void;
+  /** Omit to render a non-retriable state (e.g. permission/not-found errors). */
+  onRetry?: () => void;
   isRetrying?: boolean;
 }>) {
   const paddingBottom = useTabBarBottomPadding();

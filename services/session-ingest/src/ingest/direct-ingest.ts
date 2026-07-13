@@ -49,6 +49,8 @@ type LegacyReason =
 
 type DirectRejectReason = 'declared_bytes_exceeded' | 'configured_cap_exceeded';
 
+type DirectNoopReason = 'missing_data' | 'wrong_type_data' | 'empty_data' | 'no_valid_items';
+
 type DirectIngestMetrics = {
   declaredBytes: number | null;
   actualBytes: number | null;
@@ -144,11 +146,22 @@ export async function handleDirectIngestRequest(
     });
   }
 
-  const buffered = await readBoundedStream(
-    request.body,
-    contentLength,
-    configResult.config.maxBytes
-  );
+  let buffered: Awaited<ReturnType<typeof readBoundedStream>>;
+  try {
+    buffered = await readBoundedStream(request.body, contentLength, configResult.config.maxBytes);
+  } catch (error) {
+    logEvent('warn', {
+      event: 'direct_ingest_error',
+      ...eventBase(request, startedAt, {
+        declaredBytes: contentLength,
+        actualBytes: null,
+        items: null,
+      }),
+      stage: 'body_read',
+      error: errorMessage(error),
+    });
+    throw error;
+  }
   if (!buffered.ok) {
     logEvent('warn', {
       event: 'direct_ingest_reject',
@@ -183,9 +196,9 @@ export async function handleDirectIngestRequest(
 
   if (validation.dataArray !== 'present' || validation.validItemCount === 0) {
     logEvent('info', {
-      event: 'direct_ingest_ok',
+      event: 'direct_ingest_noop',
       ...eventBase(request, startedAt, { declaredBytes: contentLength, actualBytes, items: 0 }),
-      metadataChanges: 0,
+      reason: directNoopReason(validation),
     });
     return { status: 200, body: { success: true } };
   }
@@ -274,7 +287,7 @@ async function legacy(
   options: LegacyOptions
 ): Promise<DirectIngestResponse> {
   try {
-    await stageAndEnqueue(request.env, queueParams(request, r2Key), body);
+    await stageAndEnqueue(request.env, legacyQueueParams(request, r2Key), body);
   } catch (error) {
     logEvent('warn', {
       event: 'direct_ingest_legacy',
@@ -302,7 +315,7 @@ async function fallbackAfterDirectFailure(
   directError: unknown
 ): Promise<DirectIngestResponse> {
   try {
-    await stageAndEnqueue(request.env, queueParams(request, r2Key), bytes);
+    await stageAndEnqueue(request.env, directFallbackQueueParams(request, r2Key), bytes);
   } catch (error) {
     logFallback(request, metrics, startedAt, error, undefined, directError);
     throw error;
@@ -346,12 +359,18 @@ function parseContentLength(value: string | undefined): number | 'missing' | 'in
   return parsed === 0 ? 'empty' : parsed;
 }
 
-function queueParams(request: DirectIngestRequest, r2Key: string) {
+function legacyQueueParams(request: DirectIngestRequest, r2Key: string) {
   return {
     r2Key,
     kiloUserId: request.kiloUserId,
     sessionId: request.sessionId,
     ingestVersion: request.ingestVersion,
+  };
+}
+
+function directFallbackQueueParams(request: DirectIngestRequest, r2Key: string) {
+  return {
+    ...legacyQueueParams(request, r2Key),
     ingestedAt: request.ingestedAt,
   };
 }
@@ -381,6 +400,15 @@ function unknownMetrics(): DirectIngestMetrics {
 
 function directRejectReason(limit: 'declared_bytes' | 'configured_cap'): DirectRejectReason {
   return limit === 'declared_bytes' ? 'declared_bytes_exceeded' : 'configured_cap_exceeded';
+}
+
+function directNoopReason(validation: {
+  dataArray: 'present' | 'missing' | 'wrong_type';
+  skippedItemCount: number;
+}): DirectNoopReason {
+  if (validation.dataArray === 'missing') return 'missing_data';
+  if (validation.dataArray === 'wrong_type') return 'wrong_type_data';
+  return validation.skippedItemCount > 0 ? 'no_valid_items' : 'empty_data';
 }
 
 function eventBase(

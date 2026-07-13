@@ -413,14 +413,14 @@ describe('api routes', () => {
     expect(typeof queueMsg['ingestedAt']).toBe('number');
   });
 
-  it('preserves request-entry ingestedAt in legacy fallback', async () => {
+  it('timestamps a gate-miss legacy message after R2 staging', async () => {
     const { db } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
     vi.mocked(getSessionAccessCacheDO).mockReturnValue({ has: vi.fn(async () => true) } as never);
 
     const app = makeApiApp();
     const env = makeTestEnv();
-    const now = vi.spyOn(Date, 'now').mockReturnValue(123);
+    const now = vi.spyOn(Date, 'now').mockReturnValueOnce(123).mockReturnValueOnce(456);
 
     const response = await app.fetch(
       new Request('http://local/session/ses_12345678901234567890123456/ingest', {
@@ -433,7 +433,7 @@ describe('api routes', () => {
 
     expect(response.status).toBe(200);
     expect(env.INGEST_QUEUE.send).toHaveBeenCalledWith(
-      expect.objectContaining({ ingestedAt: 123 })
+      expect.objectContaining({ ingestedAt: 456 })
     );
   });
 
@@ -683,6 +683,43 @@ describe('api routes', () => {
       warn.mockRestore();
     });
 
+    it('logs a terminal event when the selected request body stream fails', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const body = new ReadableStream<Uint8Array>({
+        pull() {
+          throw new Error('body disconnected');
+        },
+      });
+      const request = new Request(
+        'http://local/session/ses_12345678901234567890123456/ingest?v=1',
+        {
+          method: 'POST',
+          headers: { 'content-length': '10' },
+          body,
+          duplex: 'half',
+        } as RequestInit
+      );
+
+      const response = await app.fetch(request, env);
+
+      expect(response.status).toBe(500);
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_error',
+          stage: 'body_read',
+          error: 'body disconnected',
+        })
+      );
+      warn.mockRestore();
+      error.mockRestore();
+    });
+
     it('accepts a body exactly at the configured cap', async () => {
       const { app, ingest } = prepareIngestRoute();
       const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_cap' } }] });
@@ -719,11 +756,11 @@ describe('api routes', () => {
     });
 
     it.each([
-      ['empty', { data: [] }],
-      ['missing', {}],
-      ['wrong-shaped', { data: {} }],
-      ['all-invalid', { data: [{ type: 'message', data: {} }] }],
-    ])('returns a no-op for %s data', async (_name, payload) => {
+      ['empty', { data: [] }, 'empty_data'],
+      ['missing', {}, 'missing_data'],
+      ['wrong-shaped', { data: {} }, 'wrong_type_data'],
+      ['all-invalid', { data: [{ type: 'message', data: {} }] }, 'no_valid_items'],
+    ])('returns a no-op for %s data', async (_name, payload, reason) => {
       const { app, ingest } = prepareIngestRoute();
       const env = directIngestEnv();
       const info = vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -735,6 +772,10 @@ describe('api routes', () => {
       expect(ingest).not.toHaveBeenCalled();
       expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
       expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_noop', reason, items: 0 })
+      );
+      expect(info).not.toHaveBeenCalledWith(expect.objectContaining({ event: 'direct_ingest_ok' }));
       info.mockRestore();
       warn.mockRestore();
     });

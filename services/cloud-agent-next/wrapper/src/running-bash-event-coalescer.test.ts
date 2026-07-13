@@ -135,6 +135,42 @@ describe('running bash event coalescer', () => {
     expect(sent.map(item => item.timestamp)).toEqual(['session-one', 'message-two', 'session-two']);
   });
 
+  it('scopes a session.idle boundary flush to that session only', () => {
+    const scheduler = createScheduler();
+    const sent: IngestEvent[] = [];
+    const coalescer = createRunningBashEventCoalescer(sent.push.bind(sent), callback => {
+      const task = scheduler.schedule(callback);
+      return () => scheduler.cancel(task);
+    });
+    const childIdle: IngestEvent = {
+      streamEventType: 'kilocode',
+      timestamp: 'child-idle',
+      data: { event: 'session.idle', type: 'session.idle', properties: { sessionID: 'child' } },
+    };
+
+    coalescer.forward(bashEvent('part-1', 'running', 'root-first', 'root', 'msg-1'));
+    coalescer.forward(bashEvent('part-1', 'running', 'root-pending', 'root', 'msg-1'));
+    coalescer.forward(bashEvent('part-2', 'running', 'child-first', 'child', 'msg-1'));
+    coalescer.forward(bashEvent('part-2', 'running', 'child-pending', 'child', 'msg-1'));
+    coalescer.forward(childIdle);
+
+    expect(sent.map(item => item.timestamp)).toEqual([
+      'root-first',
+      'child-first',
+      'child-pending',
+      'child-idle',
+    ]);
+
+    scheduler.runNext();
+    expect(sent.map(item => item.timestamp)).toEqual([
+      'root-first',
+      'child-first',
+      'child-pending',
+      'child-idle',
+      'root-pending',
+    ]);
+  });
+
   it('flushes pending snapshots in latest event arrival order', () => {
     const scheduler = createScheduler();
     const sent: IngestEvent[] = [];

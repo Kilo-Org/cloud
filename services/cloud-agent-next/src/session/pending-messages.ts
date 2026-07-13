@@ -557,10 +557,10 @@ export async function recordPendingFlushFailure(
     safeFailureMessage,
     deliveryDisposition: exhausted ? 'terminalization-pending' : undefined,
   };
+  await replaceStoredPendingSessionMessage(storage, message, updated);
   if (exhausted) {
     await options.scheduleTerminalizationRepair?.();
   }
-  await replaceStoredPendingSessionMessage(storage, message, updated);
   if (flushFailureCode === 'SANDBOX_CONNECT_FAILED') {
     logger
       .withFields({ messageId: message.messageId, attempts, nextFlushAttemptAt })

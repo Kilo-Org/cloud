@@ -425,11 +425,11 @@ describe('recordPendingFlushFailure', () => {
     expect(result.nextFlushAttemptAt).toBeUndefined();
   });
 
-  it('schedules terminalization repair before persisting an exhausted disposition', async () => {
+  it('persists an exhausted disposition before scheduling terminalization repair', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage();
     await storePendingSessionMessage(storage, message);
-    let repairScheduled = false;
+    const sequence: string[] = [];
     const originalPut = storage.put.bind(storage);
     storage.put = async (key, value) => {
       if (
@@ -438,7 +438,7 @@ describe('recordPendingFlushFailure', () => {
         'deliveryDisposition' in value &&
         value.deliveryDisposition === 'terminalization-pending'
       ) {
-        expect(repairScheduled).toBe(true);
+        sequence.push('persisted');
       }
       await originalPut(key, value);
     };
@@ -447,14 +447,14 @@ describe('recordPendingFlushFailure', () => {
       policy: 'warm-followup',
       code: 'BAD_REQUEST',
       scheduleTerminalizationRepair: async () => {
-        repairScheduled = true;
+        sequence.push('scheduled');
       },
     });
 
-    expect(repairScheduled).toBe(true);
+    expect(sequence).toEqual(['persisted', 'scheduled']);
   });
 
-  it('does not persist an exhausted disposition when repair scheduling fails', async () => {
+  it('persists an exhausted disposition even when repair scheduling fails', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage();
     await storePendingSessionMessage(storage, message);
@@ -472,8 +472,8 @@ describe('recordPendingFlushFailure', () => {
     const [stored] = await listPendingSessionMessages(storage);
     expect(stored).toMatchObject({
       messageId: message.messageId,
-      flushAttempts: undefined,
-      deliveryDisposition: undefined,
+      flushAttempts: 1,
+      deliveryDisposition: 'terminalization-pending',
     });
   });
 

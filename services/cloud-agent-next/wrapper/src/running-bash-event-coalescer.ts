@@ -5,6 +5,7 @@ const DEFAULT_COALESCE_INTERVAL_MS = 150;
 type Scheduler = (callback: () => void, delayMs: number) => () => void;
 
 type ThrottledPart = {
+  sessionId: string;
   latest?: IngestEvent;
   latestSequence?: number;
   cancel: () => void;
@@ -12,6 +13,7 @@ type ThrottledPart = {
 
 type BashPartUpdate = {
   key: string;
+  sessionId: string;
   running: boolean;
 };
 
@@ -40,6 +42,7 @@ function classifyBashPartUpdate(event: IngestEvent): BashPartUpdate | undefined 
   const state = part.state;
   return {
     key: partKey(part.sessionID, part.messageID, part.id),
+    sessionId: part.sessionID,
     running: isRecord(state) && state.status === 'running',
   };
 }
@@ -59,30 +62,39 @@ function removedPartKey(event: IngestEvent): string | undefined {
   return partKey(properties.sessionID, properties.messageID, properties.partID);
 }
 
-function isBoundaryEvent(event: IngestEvent): boolean {
+function sessionIdFromProperties(properties: unknown): string | undefined {
+  return isRecord(properties) && typeof properties.sessionID === 'string'
+    ? properties.sessionID
+    : undefined;
+}
+
+function classifyBoundary(event: IngestEvent): { sessionId?: string } | undefined {
   if (
     event.streamEventType === 'complete' ||
     event.streamEventType === 'error' ||
     event.streamEventType === 'interrupted'
   ) {
-    return true;
+    return {};
   }
-  if (event.streamEventType !== 'kilocode' || !isRecord(event.data)) return false;
+  if (event.streamEventType !== 'kilocode' || !isRecord(event.data)) return undefined;
   if (
     event.data.event === 'session.idle' ||
     event.data.event === 'session.error' ||
     event.data.event === 'payment_required' ||
     event.data.event === 'insufficient_funds'
   ) {
-    return true;
+    return { sessionId: sessionIdFromProperties(event.data.properties) };
   }
-  if (event.data.event !== 'message.updated') return false;
+  if (event.data.event !== 'message.updated') return undefined;
   const properties = event.data.properties;
-  if (!isRecord(properties)) return false;
+  if (!isRecord(properties)) return undefined;
   const info = properties.info;
-  if (!isRecord(info) || info.role !== 'assistant') return false;
+  if (!isRecord(info) || info.role !== 'assistant') return undefined;
   const time = info.time;
-  return (isRecord(time) && typeof time.completed === 'number') || info.error != null;
+  if (!((isRecord(time) && typeof time.completed === 'number') || info.error != null)) {
+    return undefined;
+  }
+  return { sessionId: typeof info.sessionID === 'string' ? info.sessionID : undefined };
 }
 
 const defaultScheduler: Scheduler = (callback, delayMs) => {
@@ -137,6 +149,22 @@ export function createRunningBashEventCoalescer(
     }
   }
 
+  function flushSession(sessionId: string): void {
+    const updates: Array<{ event: IngestEvent; sequence: number }> = [];
+    for (const [key, part] of throttledParts) {
+      if (part.sessionId !== sessionId) continue;
+      part.cancel();
+      if (part.latest && part.latestSequence !== undefined) {
+        updates.push({ event: part.latest, sequence: part.latestSequence });
+      }
+      throttledParts.delete(key);
+    }
+    updates.sort((left, right) => left.sequence - right.sequence);
+    if (!closed) {
+      for (const update of updates) send(update.event);
+    }
+  }
+
   function forward(event: IngestEvent): void {
     if (closed) return;
 
@@ -149,7 +177,10 @@ export function createRunningBashEventCoalescer(
         return;
       }
       send(event);
-      throttledParts.set(bashPart.key, { cancel: scheduleThrottleExpiry(bashPart.key) });
+      throttledParts.set(bashPart.key, {
+        sessionId: bashPart.sessionId,
+        cancel: scheduleThrottleExpiry(bashPart.key),
+      });
       return;
     }
 
@@ -157,8 +188,15 @@ export function createRunningBashEventCoalescer(
       cancelPart(bashPart.key);
     } else {
       const removedKey = removedPartKey(event);
-      if (removedKey) cancelPart(removedKey);
-      else if (isBoundaryEvent(event)) flushAll();
+      if (removedKey) {
+        cancelPart(removedKey);
+      } else {
+        const boundary = classifyBoundary(event);
+        if (boundary) {
+          if (boundary.sessionId) flushSession(boundary.sessionId);
+          else flushAll();
+        }
+      }
     }
     send(event);
   }

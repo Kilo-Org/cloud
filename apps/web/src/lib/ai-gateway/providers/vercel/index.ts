@@ -142,6 +142,9 @@ async function convertProviderOptions(
         ) ?? undefined;
     } else {
       only = only.filter(providerId => providerId !== 'novita');
+      if (only.length === 0) {
+        only = undefined;
+      }
     }
   }
 

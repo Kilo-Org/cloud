@@ -1411,12 +1411,24 @@ describe('SessionMessageQueue', () => {
     const [pending] = await listPendingSessionMessages(harness.storage);
     expect(pending).toMatchObject({
       messageId: FIRST_MESSAGE_ID,
-      flushAttempts: undefined,
+      flushAttempts: 1,
       nextFlushAttemptAt: undefined,
-      deliveryDisposition: undefined,
+      deliveryDisposition: 'terminalization-pending',
     });
     expect(harness.deliver).toHaveBeenCalledOnce();
     expect(harness.terminalizations).toHaveLength(0);
+
+    const settled = await harness.queue.drainNextPendingMessage();
+
+    expect(settled).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      reason: 'exhausted',
+      completionSource: 'delivery_failure',
+    });
   });
 
   it('repairs interrupted exhausted terminalization without redispatch', async () => {

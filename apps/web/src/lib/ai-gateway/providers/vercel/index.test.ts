@@ -9,9 +9,7 @@ import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getCachedVercelInferenceProviderIdsForModel } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
-}));
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
 
 const mockedGetCachedVercelInferenceProviderIdsForModel = jest.mocked(
   getCachedVercelInferenceProviderIdsForModel

@@ -1,0 +1,8 @@
+What's new:
+• Manage your organization directly from the app
+• Security Agent: review and fix vulnerabilities on the go
+• Sign in with Apple, Google, or a one-time email code
+• Code reviewer support for GitHub, GitLab, and Bitbucket
+• Feedback flow replaces the old Support tile
+• Push notification when a session becomes controllable
+• Various bug fixes and polish

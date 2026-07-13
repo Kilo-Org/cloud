@@ -18,7 +18,9 @@ describe('tRPC unauthorized handling', () => {
     // Regression guard: a procedure-level UNAUTHORIZED (e.g. org-access denial)
     // is also HTTP 401 but must be handled in-screen, not by signing out.
     expect(isUnauthorizedTrpcError({ data: { httpStatus: 401 } })).toBe(false);
-    expect(isUnauthorizedTrpcError({ data: { code: 'UNAUTHORIZED', httpStatus: 401 } })).toBe(false);
+    expect(isUnauthorizedTrpcError({ data: { code: 'UNAUTHORIZED', httpStatus: 401 } })).toBe(
+      false
+    );
     expect(isUnauthorizedTrpcError({ data: { httpStatus: 403 } })).toBe(false);
   });
 

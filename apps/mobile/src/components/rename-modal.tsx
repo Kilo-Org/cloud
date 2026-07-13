@@ -4,7 +4,10 @@ import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { withUiDeadline } from '@/lib/ui-deadline';
 import { cn } from '@/lib/utils';
+
+const SAVE_UI_DEADLINE_MS = 15_000;
 
 type RenameModalProps = {
   title: string;
@@ -30,6 +33,7 @@ export function RenameModal({
   const inputRef = useRef<TextInput>(null);
   const [canSave, setCanSave] = useState(false);
   const [pending, setPending] = useState(false);
+  const [saveInFlight, setSaveInFlight] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
   // autoFocus doesn't reliably raise the keyboard inside Modal on Android
@@ -55,9 +59,20 @@ export function RenameModal({
   const handleSave = async () => {
     const trimmed = nameRef.current.trim();
     setPending(true);
+    setSaveInFlight(true);
     setErrorText(null);
+    const operation = onSave(trimmed);
+    void (async () => {
+      try {
+        await operation;
+      } catch {
+        // The main save path below owns user-visible error feedback.
+      } finally {
+        setSaveInFlight(false);
+      }
+    })();
     try {
-      await onSave(trimmed);
+      await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
       setErrorText(error instanceof Error ? error.message : 'Something went wrong');
@@ -68,9 +83,14 @@ export function RenameModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={handleClose}>
-      <Pressable className="flex-1 justify-start px-6 pt-[25%]" onPress={handleClose}>
+      <Pressable
+        accessible={false}
+        className="flex-1 justify-start px-6 pt-[25%]"
+        onPress={handleClose}
+      >
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable
+          accessible={false}
           className="rounded-xl bg-card p-5 gap-4"
           accessibilityViewIsModal
           onPress={e => {
@@ -80,6 +100,8 @@ export function RenameModal({
           <Text className="text-base font-semibold">{title}</Text>
           <TextInput
             ref={inputRef}
+            accessible
+            accessibilityLabel={placeholder}
             className={cn(
               'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
               pending && 'opacity-50'
@@ -106,7 +128,7 @@ export function RenameModal({
               onPress={() => {
                 void handleSave();
               }}
-              disabled={!canSave}
+              disabled={!canSave || saveInFlight}
               loading={pending}
             >
               <Text className="text-primary-foreground">Save</Text>

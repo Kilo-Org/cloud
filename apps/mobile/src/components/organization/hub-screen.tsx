@@ -79,10 +79,10 @@ export function OrganizationHubScreen() {
           )}
           <KvRow
             label="Seats"
-            // A 0 total means no seat limit is set; "1 / 0" reads like an
-            // overflow error, so show just the in-use count in that case.
+            // `requireSeats` is the enforcement switch; total is the raw
+            // purchased capacity and can legitimately be zero.
             value={
-              org.seatCount.total > 0
+              org.requireSeats
                 ? `${org.seatCount.used} / ${org.seatCount.total}`
                 : String(org.seatCount.used)
             }

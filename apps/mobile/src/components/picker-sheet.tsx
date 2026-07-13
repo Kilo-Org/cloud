@@ -9,12 +9,16 @@ import { SheetHeader } from '@/components/sheet-header';
 export function PickerSheet({
   title,
   onDone,
+  onCancel,
+  doneLabel,
   children,
   expired = false,
   scrollable = true,
 }: {
   title: string;
   onDone: () => void;
+  onCancel?: () => void;
+  doneLabel?: string;
   children?: ReactNode;
   /** Set when the caller's data source (picker bridge) is gone — renders the standard "Options expired" empty state instead of children. */
   expired?: boolean;
@@ -42,7 +46,7 @@ export function PickerSheet({
   // pinning the scroll view to the full sheet, painting it over the header.
   return (
     <>
-      <SheetHeader title={title} onDone={onDone} />
+      <SheetHeader title={title} onDone={onDone} onCancel={onCancel} doneLabel={doneLabel} />
       {scrollable ? (
         <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
       ) : (

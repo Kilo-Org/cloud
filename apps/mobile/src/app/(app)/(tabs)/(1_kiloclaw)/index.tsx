@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,6 +25,7 @@ export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
@@ -41,7 +42,7 @@ export default function KiloClawTab() {
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
   const emptyStateContainerStyle = {
-    paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS),
+    paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale),
   };
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(

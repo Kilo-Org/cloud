@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
 import { agentColor, toneColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -220,7 +221,7 @@ export function ProvisioningStep({
           tint.tileBorderClass
         )}
       >
-        <Text className="text-5xl">{botEmoji}</Text>
+        <BotAvatar emoji={botEmoji} size={48} color={colors.foreground} />
       </Animated.View>
 
       <View className="items-center gap-3">

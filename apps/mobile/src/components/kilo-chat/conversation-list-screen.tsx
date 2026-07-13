@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  useWindowDimensions,
   View,
   type ViewStyle,
 } from 'react-native';
@@ -101,6 +102,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
   const listQuery = useConversations(client, sandboxId);
@@ -112,7 +114,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
-  const tabBarOverlayHeight = getTabBarOverlayHeight(bottom, Platform.OS);
+  const tabBarOverlayHeight = getTabBarOverlayHeight(bottom, Platform.OS, fontScale);
   const listContentContainerStyle = useMemo(
     () =>
       ({

@@ -68,8 +68,10 @@ export type DashboardStats = {
     overdue: number;
     exploitable: number;
     needsAction: number;
-    /** null when the repo has no open SLA-tracked findings — "not measured", not 100%. */
-    slaCompliancePercent: number | null;
+    /** Kept numeric for compatibility with installed mobile clients. */
+    slaCompliancePercent: number;
+    /** False when the repo has no open SLA-tracked findings. */
+    slaComplianceMeasured: boolean;
   }>;
   repositoryCount: number;
 };
@@ -552,7 +554,8 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       exploitable: Number(row.exploitable),
       needsAction: Number(row.needs_action),
       slaCompliancePercent:
-        row.sla_compliance_percent == null ? null : Number(row.sla_compliance_percent),
+        row.sla_compliance_percent == null ? 100 : Number(row.sla_compliance_percent),
+      slaComplianceMeasured: row.sla_compliance_percent != null,
     }));
     const repositoryCount = Number(repoHealthResult.rows[0]?.repository_count ?? 0);
 

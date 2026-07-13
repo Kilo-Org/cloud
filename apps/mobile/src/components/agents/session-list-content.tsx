@@ -6,6 +6,7 @@ import {
   RefreshControl,
   SectionList,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -66,6 +67,7 @@ export function AgentSessionListContent({
 }: Readonly<AgentSessionListContentProps>) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
   const [refreshing, setRefreshing] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
@@ -80,8 +82,8 @@ export function AgentSessionListContent({
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
-    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS) }),
-    [bottom]
+    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale) }),
+    [bottom, fontScale]
   );
 
   // When the list is empty the error surface below (QueryError + retry)
@@ -95,7 +97,7 @@ export function AgentSessionListContent({
           <Search size={18} color={colors.mutedForeground} />
           <TextInput
             ref={searchInputRef}
-            className="flex-1 text-[15px] text-foreground"
+            className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
             placeholder="Search sessions..."
             placeholderTextColor={colors.mutedForeground}
             onChangeText={onSearchChange}

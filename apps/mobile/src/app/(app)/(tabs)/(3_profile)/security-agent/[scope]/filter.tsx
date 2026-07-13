@@ -1,10 +1,14 @@
-import { type SecurityFindingFilters } from '@kilocode/app-shared/security-agent';
+import {
+  DEFAULT_SECURITY_FINDING_FILTERS,
+  type SecurityFindingFilters,
+} from '@kilocode/app-shared/security-agent';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Info } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { PickerSheet } from '@/components/picker-sheet';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
 import {
   clearSecurityFindingFilterBridge,
@@ -14,21 +18,24 @@ import {
 export default function SecurityAgentFilterFindingsRoute() {
   const router = useRouter();
   const [bridge, setBridge] = useState(() => getSecurityFindingFilterBridge());
+  const [draft, setDraft] = useState<SecurityFindingFilters>(
+    () => getSecurityFindingFilterBridge()?.filters ?? DEFAULT_SECURITY_FINDING_FILTERS
+  );
 
   const handleClose = useCallback(() => {
     router.back();
   }, [router]);
 
-  const handleApply = useCallback(
-    (filters: SecurityFindingFilters) => {
-      bridge?.onApply(filters);
-    },
-    [bridge]
-  );
+  const handleApply = useCallback(() => {
+    bridge?.onApply(draft);
+    router.back();
+  }, [bridge, draft, router]);
 
   useFocusEffect(
     useCallback(() => {
-      setBridge(getSecurityFindingFilterBridge());
+      const nextBridge = getSecurityFindingFilterBridge();
+      setBridge(nextBridge);
+      setDraft(nextBridge?.filters ?? DEFAULT_SECURITY_FINDING_FILTERS);
       return () => {
         clearSecurityFindingFilterBridge();
       };
@@ -49,11 +56,13 @@ export default function SecurityAgentFilterFindingsRoute() {
   }
 
   return (
-    <FindingFilterModal
-      filters={bridge.filters}
-      repositories={bridge.repositories}
-      onClose={handleClose}
-      onApply={handleApply}
-    />
+    <PickerSheet
+      title="Filter findings"
+      onDone={handleApply}
+      onCancel={handleClose}
+      doneLabel="Apply"
+    >
+      <FindingFilterModal filters={draft} repositories={bridge.repositories} onChange={setDraft} />
+    </PickerSheet>
   );
 }

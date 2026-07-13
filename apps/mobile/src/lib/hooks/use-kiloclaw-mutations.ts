@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
+import { renameKiloClawInstance } from '@/lib/kiloclaw-display';
 import { useTRPC } from '@/lib/trpc';
 import { asyncNoop } from '@/lib/utils';
 
@@ -367,12 +368,37 @@ export function useKiloClawMutations(organizationId?: string | null) {
     }),
     renameInstance: useMutation({
       ...dispatch(trpc.kiloclaw.renameInstance, trpc.organizations.kiloclaw.renameInstance),
-      // silent: RenameModal (the only caller) shows the error inline (P2).
-      ...optimistic(
-        statusKey,
-        (old, input: { name: string | null }) => ({ ...old, name: input.name }),
-        { settle: invalidateStatus, silent: true }
-      ),
+      scope: { id: `kiloclaw-rename:${organizationId ?? 'personal'}` },
+      onMutate: async (input: { name: string | null }) => {
+        await Promise.all([
+          queryClient.cancelQueries({ queryKey: statusKey }),
+          queryClient.cancelQueries({ queryKey: listAllInstancesKey }),
+        ]);
+        const previousStatus = queryClient.getQueryData<Record<string, unknown>>(statusKey);
+        const previousInstances = queryClient.getQueryData<ClawInstance[]>(listAllInstancesKey);
+        queryClient.setQueryData<Record<string, unknown>>(statusKey, old =>
+          old ? { ...old, name: input.name } : old
+        );
+        queryClient.setQueryData<ClawInstance[]>(listAllInstancesKey, old =>
+          renameKiloClawInstance(old, organizationId ?? null, input.name)
+        );
+        return { previousInstances, previousStatus };
+      },
+      onError: (error, _input, context) => {
+        if (context?.previousStatus) {
+          queryClient.setQueryData(statusKey, context.previousStatus);
+        }
+        if (context?.previousInstances) {
+          queryClient.setQueryData(listAllInstancesKey, context.previousInstances);
+        }
+        onMutationError(error);
+      },
+      onSettled: async () => {
+        await Promise.all([
+          invalidateStatus(),
+          queryClient.invalidateQueries({ queryKey: listAllInstancesKey }),
+        ]);
+      },
     }),
     destroy: useMutation({
       ...dispatch(trpc.kiloclaw.destroy, trpc.organizations.kiloclaw.destroy),

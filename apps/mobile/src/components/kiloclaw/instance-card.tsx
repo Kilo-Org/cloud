@@ -4,6 +4,7 @@ import { AlertTriangle, ExternalLink, Settings2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { isTransitionalStatus, statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
@@ -129,7 +130,7 @@ export function KiloClawCard({
             className={`h-[38px] w-[38px] items-center justify-center rounded-[10px] border ${hue.tileBgClass} ${hue.tileBorderClass}`}
           >
             {botEmoji ? (
-              <Text className="text-lg">{botEmoji}</Text>
+              <BotAvatar emoji={botEmoji} size={18} color={colors.foreground} />
             ) : (
               <Text className={`text-[15px] font-bold ${hue.hueTextClass}`}>
                 {firstLetter(displayName)}
@@ -140,14 +141,14 @@ export function KiloClawCard({
             <View className="flex-row items-center justify-between gap-2">
               <Text
                 className="shrink text-[17px] font-semibold tracking-tight text-foreground"
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {displayName}
               </Text>
             </View>
             <View className="mt-1 flex-row items-center gap-1.5">
               <StatusDot tone={tone} />
-              <Text className="text-[12px] font-medium text-muted-foreground">{label}</Text>
+              <Text className="shrink text-[12px] font-medium text-muted-foreground">{label}</Text>
             </View>
           </View>
         </Pressable>

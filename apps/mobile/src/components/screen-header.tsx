@@ -57,7 +57,7 @@ export function ScreenHeader({
   let titleNode: React.ReactNode = null;
   if (title != null) {
     const titleText = (
-      <Text className={titleClass} numberOfLines={1} accessibilityRole="header">
+      <Text className={titleClass} numberOfLines={2} accessibilityRole="header">
         {title}
       </Text>
     );

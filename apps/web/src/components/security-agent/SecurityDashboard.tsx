@@ -992,15 +992,13 @@ function RepositoryActionRow({
 }) {
   const needsActionPercentage =
     repository.open > 0 ? Math.round((repository.needsAction / repository.open) * 100) : 0;
-  // null slaCompliancePercent = no open SLA-tracked findings → "Not measured",
-  // shown muted rather than as a misleading green 100%.
-  const isSlaMeasured = repository.slaCompliancePercent != null;
+  const isSlaMeasured = repository.slaComplianceMeasured;
   const complianceTone =
-    repository.slaCompliancePercent != null && repository.slaCompliancePercent < 70
-      ? 'danger'
-      : 'success';
+    isSlaMeasured && repository.slaCompliancePercent < 70 ? 'danger' : 'success';
   const slaComplianceLabel = isSlaMeasured ? `${repository.slaCompliancePercent}%` : 'Not measured';
-  const complianceTextClass = isSlaMeasured ? toneTextClass(complianceTone) : 'text-muted-foreground';
+  const complianceTextClass = isSlaMeasured
+    ? toneTextClass(complianceTone)
+    : 'text-muted-foreground';
   const actionTone = repository.needsAction > 0 ? 'warning' : 'success';
 
   return (
@@ -1029,7 +1027,13 @@ function RepositoryActionRow({
           </span>
         </div>
         <Progress
-          value={slaEnabled ? (repository.slaCompliancePercent ?? 0) : needsActionPercentage}
+          value={
+            slaEnabled
+              ? isSlaMeasured
+                ? repository.slaCompliancePercent
+                : undefined
+              : needsActionPercentage
+          }
           aria-label={
             slaEnabled
               ? `${repository.repoFullName} SLA compliance`

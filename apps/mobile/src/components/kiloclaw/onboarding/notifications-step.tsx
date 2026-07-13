@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-nativ
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -170,7 +171,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
       <View className="rounded-2xl border border-border bg-card p-4">
         <View className="flex-row items-start gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-xl bg-neutral-200 dark:bg-neutral-800">
-            <Text className="text-xl">{botEmoji}</Text>
+            <BotAvatar emoji={botEmoji} size={20} color={colors.foreground} />
           </View>
           <View className="flex-1 gap-1">
             <View className="flex-row items-center justify-between">

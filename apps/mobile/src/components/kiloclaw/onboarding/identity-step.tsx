@@ -9,6 +9,8 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
+import { botAvatarName } from '@/components/kiloclaw/bot-avatar-options';
 import { agentColor } from '@/lib/agent-color';
 import { useTRPC } from '@/lib/trpc';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -275,7 +277,7 @@ export function IdentityStep({
               avatarExpanded ? 'border-primary' : selectedTint.tileBorderClass
             )}
           >
-            <Text className="text-2xl">{selectedEmoji}</Text>
+            <BotAvatar emoji={selectedEmoji} size={24} color={colors.foreground} />
           </Pressable>
           <TextInput
             className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-6 text-foreground"
@@ -301,7 +303,7 @@ export function IdentityStep({
               return (
                 <Pressable
                   key={emoji}
-                  accessibilityLabel={`Select ${emoji} as avatar`}
+                  accessibilityLabel={`Select ${botAvatarName(emoji)} as avatar`}
                   accessibilityRole="button"
                   onPress={() => {
                     setSelectedEmoji(emoji);
@@ -313,7 +315,7 @@ export function IdentityStep({
                     isSelected ? 'border-primary' : tint.tileBorderClass
                   )}
                 >
-                  <Text className="text-2xl">{emoji}</Text>
+                  <BotAvatar emoji={emoji} size={24} color={colors.foreground} />
                 </Pressable>
               );
             })}
@@ -343,7 +345,7 @@ export function IdentityStep({
                     : 'border-transparent bg-secondary active:opacity-70'
                 )}
               >
-                <Text className="text-2xl">{preset.emoji}</Text>
+                <BotAvatar emoji={preset.emoji} size={24} color={colors.foreground} />
                 <View className="flex-1 gap-0.5">
                   <Text className="text-base font-medium">{preset.label}</Text>
                   <Text className="text-sm text-muted-foreground">{preset.vibe}</Text>
@@ -369,7 +371,7 @@ export function IdentityStep({
             }}
             className="flex-row items-center gap-3 rounded-xl bg-secondary px-3 py-3 active:opacity-70"
           >
-            <Text className="text-2xl">{nature.emoji}</Text>
+            <BotAvatar emoji={nature.emoji} size={24} color={colors.foreground} />
             <View className="flex-1 gap-0.5">
               <Text className="text-base font-medium">{nature.label}</Text>
               <Text className="text-sm text-muted-foreground">{nature.vibe}</Text>

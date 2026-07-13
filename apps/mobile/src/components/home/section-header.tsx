@@ -11,7 +11,7 @@ type SectionHeaderProps = {
 
 export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<SectionHeaderProps>) {
   return (
-    <View className="flex-row items-center justify-between px-4 pb-2 pt-5">
+    <View className="flex-row flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-5">
       <Text variant="eyebrow">{label}</Text>
       {actionLabel && onActionPress ? (
         <Pressable
@@ -21,7 +21,7 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
           accessibilityLabel={actionLabel}
           className="active:opacity-70"
         >
-          <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+          <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
             {actionLabel}
           </Text>
         </Pressable>

@@ -8,8 +8,7 @@ import {
   selectSecurityFindingOutcome,
   selectSecurityFindingStatus,
 } from '@kilocode/app-shared/security-agent';
-import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
@@ -63,8 +62,7 @@ type FindingRepositoryOption = {
 type FindingFilterModalProps = {
   filters: SecurityFindingFilters;
   repositories: FindingRepositoryOption[];
-  onClose: () => void;
-  onApply: (filters: SecurityFindingFilters) => void;
+  onChange: (filters: SecurityFindingFilters) => void;
 };
 
 type FilterOptionRowProps = {
@@ -116,97 +114,74 @@ function FilterSection<T>({
 export function FindingFilterModal({
   filters,
   repositories,
-  onClose,
-  onApply,
+  onChange,
 }: Readonly<FindingFilterModalProps>) {
-  const [draft, setDraft] = useState<SecurityFindingFilters>(filters);
-
   const repoOptions: { value: string | null; label: string }[] = [
     { value: null, label: 'All repositories' },
     ...repositories.map(repo => ({ value: repo.fullName, label: repo.fullName })),
   ];
 
   return (
-    <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
-      showsVerticalScrollIndicator={false}
-    >
-      <Text className="text-center text-lg font-semibold text-foreground">Filter findings</Text>
+    <View className="gap-6 bg-background px-6 pb-8 pt-4">
+      <Button
+        variant="ghost"
+        className="self-start"
+        onPress={() => {
+          onChange(DEFAULT_SECURITY_FINDING_FILTERS);
+        }}
+      >
+        <Text>Reset</Text>
+      </Button>
       <View className="gap-4">
         <FilterSection
           title="Repository"
           options={repoOptions}
-          selected={draft.repoFullName}
+          selected={filters.repoFullName}
           onSelect={repoFullName => {
-            setDraft(prev => ({ ...prev, repoFullName }));
+            onChange({ ...filters, repoFullName });
           }}
         />
         <FilterSection
           title="Status"
           options={STATUS_OPTIONS}
-          selected={draft.status}
+          selected={filters.status}
           onSelect={status => {
-            setDraft(prev => selectSecurityFindingStatus(prev, status));
+            onChange(selectSecurityFindingStatus(filters, status));
           }}
         />
         <FilterSection
           title="Severity"
           options={SEVERITY_OPTIONS}
-          selected={draft.severity}
+          selected={filters.severity}
           onSelect={severity => {
-            setDraft(prev => ({ ...prev, severity }));
+            onChange({ ...filters, severity });
           }}
         />
         <FilterSection
           title="Outcome"
           options={OUTCOME_OPTIONS}
-          selected={draft.outcome}
+          selected={filters.outcome}
           onSelect={outcome => {
-            setDraft(prev => selectSecurityFindingOutcome(prev, outcome));
+            onChange(selectSecurityFindingOutcome(filters, outcome));
           }}
         />
         <FilterSection
           title="SLA status"
           options={SLA_STATUS_OPTIONS}
-          selected={Boolean(draft.overdue)}
+          selected={Boolean(filters.overdue)}
           onSelect={overdue => {
-            setDraft(prev => ({ ...prev, overdue: overdue ? true : undefined }));
+            onChange({ ...filters, overdue: overdue ? true : undefined });
           }}
         />
         <FilterSection
           title="Sort by"
           options={SORT_OPTIONS}
-          selected={draft.sortBy}
+          selected={filters.sortBy}
           onSelect={sortBy => {
-            setDraft(prev => ({ ...prev, sortBy }));
+            onChange({ ...filters, sortBy });
           }}
         />
       </View>
-      <View className="flex-row items-center justify-between gap-3">
-        <Button
-          variant="ghost"
-          onPress={() => {
-            onApply(DEFAULT_SECURITY_FINDING_FILTERS);
-            onClose();
-          }}
-        >
-          <Text>Reset</Text>
-        </Button>
-        <View className="flex-row gap-3">
-          <Button variant="outline" onPress={onClose}>
-            <Text>Cancel</Text>
-          </Button>
-          <Button
-            onPress={() => {
-              onApply(draft);
-              onClose();
-            }}
-          >
-            <Text className="text-primary-foreground">Apply</Text>
-          </Button>
-        </View>
-      </View>
-    </ScrollView>
+    </View>
   );
 }

@@ -26,16 +26,14 @@ type SectionProps = Readonly<{
   repoFullName: string | undefined;
 }>;
 
-// A null slaCompliancePercent means the repo has no open SLA-tracked findings,
-// so show "Not measured" rather than a misleading 100%.
 function repoTrailingLabel(
-  repo: { slaCompliancePercent: number | null; needsAction: number },
+  repo: { slaCompliancePercent: number; slaComplianceMeasured: boolean; needsAction: number },
   slaEnabled: boolean
 ): string {
   if (!slaEnabled) {
     return `${repo.needsAction} findings`;
   }
-  return repo.slaCompliancePercent == null ? 'Not measured' : `${repo.slaCompliancePercent}%`;
+  return repo.slaComplianceMeasured ? `${repo.slaCompliancePercent}%` : 'Not measured';
 }
 
 function findingsHref(

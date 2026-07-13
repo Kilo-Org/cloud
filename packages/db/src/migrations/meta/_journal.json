@@ -1282,6 +1282,13 @@
       "when": 1783685839514,
       "tag": "0182_powerful_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 183,
+      "version": "7",
+      "when": 1783951280560,
+      "tag": "0183_exotic_talisman",
+      "breakpoints": true
     }
   ]
 }

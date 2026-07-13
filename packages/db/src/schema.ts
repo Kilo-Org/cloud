@@ -2916,6 +2916,75 @@ export const cost_insight_evaluation_dirty_owners = pgTable(
 export type CostInsightEvaluationDirtyOwner =
   typeof cost_insight_evaluation_dirty_owners.$inferSelect;
 
+export const cost_insight_rollup_repairs = pgTable(
+  'cost_insight_rollup_repairs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    usage_id: uuid()
+      .notNull()
+      .unique()
+      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    generation: bigint({ mode: 'number' })
+      .default(sql`'1'`)
+      .notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
+    attempt_count: integer().default(0).notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cost_insight_rollup_repairs_user_hour').on(table.owned_by_user_id, table.hour_start),
+    index('IDX_cost_insight_rollup_repairs_org_hour').on(
+      table.owned_by_organization_id,
+      table.hour_start
+    ),
+    index('IDX_cost_insight_rollup_repairs_claim').on(
+      table.attempt_count,
+      table.next_attempt_at,
+      table.claimed_at,
+      table.hour_start,
+      table.id
+    ),
+    check(
+      'cost_insight_rollup_repairs_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_rollup_repairs_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_repairs_generation_check',
+      sql`${table.generation} > 0 AND ${table.generation} <= 9007199254740991`
+    ),
+    check('cost_insight_rollup_repairs_attempt_count_check', sql`${table.attempt_count} >= 0`),
+    check(
+      'cost_insight_rollup_repairs_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightRollupRepair = typeof cost_insight_rollup_repairs.$inferSelect;
+
 export const cost_insight_hourly_sweep_checkpoints = pgTable(
   'cost_insight_hourly_sweep_checkpoints',
   {

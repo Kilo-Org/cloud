@@ -34,7 +34,10 @@ import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
-import { repairOwnerSpendRollups } from '@/lib/cost-insights/rollup-maintenance';
+import {
+  acknowledgeCostInsightRollupCapture,
+  enqueueCostInsightRollupRepair,
+} from '@/lib/cost-insights/rollup-repairs';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
@@ -80,6 +83,8 @@ import {
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 import {
+  acquireCostInsightOwnerHourLock,
+  acquireCostInsightOwnerHourSharedLock,
   captureCostInsightSpend,
   getCostInsightUtcHourStart,
 } from '@kilocode/db/cost-insights-rollups';
@@ -87,10 +92,7 @@ import {
   getAiGatewayCostInsightFeatureKey,
   getAiGatewayCostInsightProductKey,
 } from '@/lib/cost-insights/canonical-sources';
-import {
-  evaluateCostInsightsForOwner,
-  scheduleCostInsightEvaluationAfterSpend,
-} from '@/lib/cost-insights/evaluation';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 
 const posthogClient = PostHogClient();
 
@@ -446,11 +448,31 @@ async function insertUsageTransaction(
   metadataFields: UsageMetaData
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
+    if (coreUsageFields.cost > 0) {
+      const owner = coreUsageFields.organization_id
+        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
+        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
+      await acquireCostInsightOwnerHourSharedLock(
+        tx,
+        owner,
+        getCostInsightUtcHourStart(coreUsageFields.created_at)
+      );
+    }
     const inserted = await insertUsageAndMetadataWithBalanceUpdate(
       tx,
       coreUsageFields,
       metadataFields
     );
+    if (coreUsageFields.cost > 0) {
+      const owner = coreUsageFields.organization_id
+        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
+        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
+      await enqueueCostInsightRollupRepair(tx, {
+        usageId: coreUsageFields.id,
+        owner,
+        occurredAt: coreUsageFields.created_at,
+      });
+    }
     return { inserted };
   });
 }
@@ -502,17 +524,6 @@ function reportPostCommitFailure(
   });
 }
 
-function getUtcHourRange(occurredAt: string): {
-  startHour: string;
-  endHourExclusive: string;
-} {
-  const startHour = getCostInsightUtcHourStart(occurredAt);
-  return {
-    startHour,
-    endHourExclusive: new Date(Date.parse(startHour) + 60 * 60 * 1_000).toISOString(),
-  };
-}
-
 function scheduleCostInsightEvaluationSafely(
   owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
   usageId: string
@@ -532,34 +543,16 @@ function scheduleCostInsightEvaluationSafely(
   }
 }
 
-async function evaluateRepairedCostInsightOwner(
-  owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
-  usageId: string
-): Promise<void> {
-  try {
-    await evaluateCostInsightsForOwner(db, owner);
-  } catch (error) {
-    reportPostCommitFailure(
-      'post-commit repaired cost insight evaluation failed',
-      error,
-      {
-        source: 'postCommitRepairedCostInsightEvaluation',
-        ownerType: owner.type,
-      },
-      usageId
-    );
-  }
-}
-
 function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
   const organizationId = usage.organization_id;
   if (!organizationId) return null;
 
   return {
     run: async () => {
-      const result: OrganizationUsageMutationResult = await db.transaction(tx =>
-        mutateOrganizationUsage(tx, usage)
-      );
+      const result: OrganizationUsageMutationResult = await db.transaction(async tx => {
+        await setCostInsightCaptureTimeouts(tx);
+        return mutateOrganizationUsage(tx, usage);
+      });
       scheduleOrganizationLowBalanceAlert(organizationId, result);
     },
     reportError: error => {
@@ -587,6 +580,12 @@ function costInsightSpendCaptureTask(
     run: async () => {
       await db.transaction(async tx => {
         await setCostInsightCaptureTimeouts(tx);
+        await acquireCostInsightOwnerHourLock(
+          tx,
+          owner,
+          getCostInsightUtcHourStart(usage.created_at)
+        );
+        if (!(await acknowledgeCostInsightRollupCapture(tx, usage.id))) return;
         await captureCostInsightSpend(tx, {
           owner,
           actorUserId: usage.kilo_user_id,
@@ -614,26 +613,6 @@ function costInsightSpendCaptureTask(
         },
         usage.id
       );
-      try {
-        await repairOwnerSpendRollups(db, {
-          owner,
-          ...getUtcHourRange(usage.created_at),
-          maxHours: 1,
-        });
-      } catch (repairError) {
-        reportPostCommitFailure(
-          'post-commit cost insight owner-hour repair failed',
-          repairError,
-          {
-            source: 'postCommitCostInsightOwnerHourRepair',
-            spendSource: 'ai_gateway',
-            ownerType: owner.type,
-          },
-          usage.id
-        );
-        return;
-      }
-      await evaluateRepairedCostInsightOwner(owner, usage.id);
     },
   };
 }

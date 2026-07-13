@@ -6,11 +6,14 @@ const mockSentryLog = jest.fn();
 jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSentryLog) }));
 
 import { runCostInsightHourlySweep } from '@/lib/cost-insights/jobs';
+import type { CostInsightHourlySweepSummary } from '@/lib/cost-insights/jobs';
 import { GET, maxDuration } from './route';
 
 const mockRunCostInsightHourlySweep = jest.mocked(runCostInsightHourlySweep);
 
-function summary(failedOwners: Array<{ owner: { type: 'user'; id: string }; error: string }> = []) {
+function summary(
+  failedOwners: Array<{ owner: { type: 'user'; id: string }; error: string }> = []
+): CostInsightHourlySweepSummary {
   return {
     evaluatedOwners: 2,
     failedOwners,
@@ -21,6 +24,11 @@ function summary(failedOwners: Array<{ owner: { type: 'user'; id: string }; erro
       evaluationDurationMs: 25,
       rawCanonicalFallbackCount: 0,
       rollupDegradedIntervalCount: 0,
+    },
+    rollupRepairs: {
+      claimed: 0,
+      repaired: 0,
+      failed: [],
     },
     notifications: {
       claimed: 1,
@@ -107,6 +115,29 @@ describe('GET /api/cron/cost-insights-hourly', () => {
         evaluatedOwnerCount: 2,
         deadlineReached: false,
       })
+    );
+  });
+
+  test('returns failure status when a rollup repair fails', async () => {
+    const result = summary();
+    result.rollupRepairs.failed.push({
+      owner: { type: 'user', id: 'user-3' },
+      hourStart: '2026-07-13T10:00:00.000Z',
+      error: 'repair failed',
+    });
+    mockRunCostInsightHourlySweep.mockResolvedValue(result);
+
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/cron/cost-insights-hourly', {
+        headers: { authorization: 'Bearer cron-secret' },
+      })
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({ success: false, partialFailure: true });
+    expect(mockSentryLog).toHaveBeenCalledWith(
+      'Cost Insights hourly sweep completed with partial failures',
+      expect.objectContaining({ failedRollupRepairCount: 1 })
     );
   });
 

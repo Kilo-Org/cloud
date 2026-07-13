@@ -27,6 +27,7 @@ import {
   cost_insight_owner_hour_driver_buckets,
   cost_insight_owner_hour_totals,
   cost_insight_rollup_degraded_intervals,
+  cost_insight_rollup_repairs,
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_metadata,
@@ -588,7 +589,7 @@ describe('logMicrodollarUsage', () => {
     expect(totals).toHaveLength(0);
   });
 
-  test('keeps AI source rows without globally degrading coverage when capture and repair fail', async () => {
+  test('keeps AI source rows when legacy usage owner does not exist', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const { core, metadata } = await defineMicrodollarUsage();
     const missingUserId = `missing-ai-user-${crypto.randomUUID()}`;
@@ -625,7 +626,7 @@ describe('logMicrodollarUsage', () => {
     }
   });
 
-  test('keeps usage and balance write when post-commit capture and repair fail', async () => {
+  test('keeps usage and balance write and enqueues owner-hour repair after capture fails', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const user = await insertTestUser({
       id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
@@ -664,7 +665,21 @@ describe('logMicrodollarUsage', () => {
         .from(cost_insight_rollup_degraded_intervals)
         .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
       expect(degradedIntervals).toHaveLength(0);
+
+      const repairs = await db
+        .select()
+        .from(cost_insight_rollup_repairs)
+        .where(eq(cost_insight_rollup_repairs.owned_by_user_id, user.id));
+      expect(repairs).toHaveLength(1);
+      expect(repairs[0].usage_id).toBe(core.id);
+      expect(new Date(repairs[0].hour_start).toISOString()).toBe(
+        new Date(Math.floor(Date.parse(core.created_at) / 3_600_000) * 3_600_000).toISOString()
+      );
+      expect(Date.parse(repairs[0].next_attempt_at)).toBeGreaterThan(Date.parse(core.created_at));
     } finally {
+      await db
+        .delete(cost_insight_rollup_repairs)
+        .where(eq(cost_insight_rollup_repairs.owned_by_user_id, user.id));
       consoleErrorSpy.mockRestore();
     }
   });

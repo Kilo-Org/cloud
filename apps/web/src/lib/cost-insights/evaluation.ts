@@ -653,6 +653,14 @@ async function claimDirtyCostInsightOwners(
             mins => ${COST_INSIGHT_EVALUATION_LEASE_MINUTES}
           )
         )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM cost_insight_rollup_repairs repair
+          WHERE (
+            repair.owned_by_user_id = dirty_owner.owned_by_user_id
+            OR repair.owned_by_organization_id = dirty_owner.owned_by_organization_id
+          )
+        )
         AND ${ownerPredicate}
       ORDER BY dirty_owner.dirty_at ASC, dirty_owner.id ASC
       LIMIT ${options.limit}

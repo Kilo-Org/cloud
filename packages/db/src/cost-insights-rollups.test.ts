@@ -19,6 +19,7 @@ import {
   cost_insight_evaluation_dirty_owners,
   cost_insight_rollup_coverage,
   cost_insight_rollup_degraded_intervals,
+  cost_insight_rollup_repairs,
   kilocode_users,
   organizations,
 } from './schema';
@@ -60,6 +61,14 @@ async function withCostInsightFixture(
   try {
     await testFn({ userId, organizationId });
   } finally {
+    await testDatabase.db
+      .delete(cost_insight_rollup_repairs)
+      .where(
+        or(
+          eq(cost_insight_rollup_repairs.owned_by_user_id, userId),
+          eq(cost_insight_rollup_repairs.owned_by_organization_id, organizationId)
+        )
+      );
     await testDatabase.db
       .delete(cost_insight_evaluation_dirty_owners)
       .where(

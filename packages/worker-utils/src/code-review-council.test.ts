@@ -5,6 +5,7 @@ import {
   COUNCIL_SPECIALIST_PRESETS,
   computeCouncilDecision,
   councilDecisionBlocksMerge,
+  decideCouncilFromManifest,
   describeAggregationStrategy,
   determineAutomatedReviewType,
   enabledSpecialists,
@@ -17,6 +18,7 @@ import {
   summarizeCouncilManifest,
   type SpecialistVote,
 } from './code-review-council.js';
+import type { CouncilResultManifest } from './code-review-council.js';
 import type {
   CodeReviewCouncilConfig,
   CouncilAggregationStrategy,
@@ -207,31 +209,77 @@ describe('summarizeCouncilManifest', () => {
 });
 
 describe('reconcileCouncilVotes', () => {
-  const manifest = {
+  const manifest: CouncilResultManifest = {
     specialists: [
-      { specialistId: 'security', vote: 'block' as const, findings: [] },
-      { specialistId: 'unknown', vote: 'pass' as const, findings: [] },
+      { specialistId: 'security', vote: 'block', findings: [] },
+      { specialistId: 'unknown', vote: 'pass', findings: [] },
     ],
   };
 
-  it('maps a configured specialist absent from the manifest to abstain', () => {
-    const reconciled = reconcileCouncilVotes(['security', 'performance'], manifest);
-    expect(reconciled).toEqual([
-      { specialistId: 'security', vote: 'block' },
-      { specialistId: 'performance', vote: 'abstain' },
-    ]);
+  it('surfaces a configured specialist absent from the manifest as missing (not abstain)', () => {
+    const coverage = reconcileCouncilVotes(['security', 'performance'], manifest);
+    expect(coverage.votes).toEqual([{ specialistId: 'security', vote: 'block' }]);
+    expect(coverage.missingSpecialistIds).toEqual(['performance']);
   });
 
   it('ignores manifest entries for specialists we did not configure', () => {
-    const reconciled = reconcileCouncilVotes(['security'], manifest);
-    expect(reconciled).toEqual([{ specialistId: 'security', vote: 'block' }]);
+    const coverage = reconcileCouncilVotes(['security'], manifest);
+    expect(coverage.votes).toEqual([{ specialistId: 'security', vote: 'block' }]);
+    expect(coverage.missingSpecialistIds).toEqual([]);
   });
 
-  it('a dropped specialist cannot let the council pass', () => {
-    const reconciled = reconcileCouncilVotes(['security', 'performance'], {
-      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
+  it('keeps a legitimately returned abstain vote as abstain', () => {
+    const coverage = reconcileCouncilVotes(['security'], {
+      specialists: [{ specialistId: 'security', vote: 'abstain', findings: [] }],
     });
-    expect(computeCouncilDecision(reconciled, 'unanimous_required')).toBe('block');
+    expect(coverage.votes).toEqual([{ specialistId: 'security', vote: 'abstain' }]);
+    expect(coverage.missingSpecialistIds).toEqual([]);
+  });
+});
+
+describe('decideCouncilFromManifest (coverage-aware)', () => {
+  const strategies = ['any_blocking_member', 'majority', 'unanimous_required'] as const;
+
+  it('blocks under EVERY strategy when a configured specialist is missing (fail closed)', () => {
+    const manifest: CouncilResultManifest = {
+      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
+    };
+    for (const strategy of strategies) {
+      const result = decideCouncilFromManifest(['security', 'performance'], manifest, strategy);
+      expect(result.decision).toBe('block');
+      expect(result.missingSpecialistIds).toEqual(['performance']);
+    }
+  });
+
+  it('passes when every configured specialist reported and all pass', () => {
+    const manifest: CouncilResultManifest = {
+      specialists: [
+        { specialistId: 'security', vote: 'pass', findings: [] },
+        { specialistId: 'performance', vote: 'pass', findings: [] },
+      ],
+    };
+    const result = decideCouncilFromManifest(
+      ['security', 'performance'],
+      manifest,
+      'any_blocking_member'
+    );
+    expect(result.decision).toBe('pass');
+    expect(result.missingSpecialistIds).toEqual([]);
+  });
+
+  it('does not block on a legitimately returned abstain under any_blocking_member (strategy A)', () => {
+    const manifest: CouncilResultManifest = {
+      specialists: [
+        { specialistId: 'security', vote: 'abstain', findings: [] },
+        { specialistId: 'performance', vote: 'pass', findings: [] },
+      ],
+    };
+    const result = decideCouncilFromManifest(
+      ['security', 'performance'],
+      manifest,
+      'any_blocking_member'
+    );
+    expect(result.decision).toBe('pass');
   });
 });
 

@@ -31,11 +31,7 @@ import {
 // Governance decision (code-owned, deterministic)
 // ============================================================================
 
-/**
- * A specialist's vote as seen by aggregation. A specialist whose result could not be
- * captured contributes `abstain` (abstain-never-pass), so a lost/garbled result can
- * never silently produce a passing council decision.
- */
+/** A specialist's vote as seen by aggregation. */
 export type SpecialistVote = { specialistId: string; vote: CouncilVote };
 
 /**
@@ -44,10 +40,18 @@ export type SpecialistVote = { specialistId: string; vote: CouncilVote };
  * the model to compute the decision. The semantics MUST stay in lockstep with
  * `describeAggregationStrategy` (the prompt text the specialists/orchestrator see).
  *
- * When there is no usable coverage — no votes at all, OR every specialist abstained —
- * the decision is `block` for every strategy (never pass on absent coverage). This
- * subsumes abstain-never-pass: a lost/garbled result contributes `abstain`, and if
- * that is all we have, the council blocks.
+ * Abstain semantics (deliberate): a returned `abstain` vote is treated leniently — it
+ * is NOT counted under `any_blocking_member` or `majority` (so a specialist that ran
+ * but had nothing to flag does not force a block), and only `unanimous_required`
+ * blocks on it. The one universal guard is total no-coverage: if there is no usable
+ * vote at all (empty, or every specialist abstained), the decision is `block` for
+ * every strategy (never pass on absent coverage).
+ *
+ * IMPORTANT: this operates only on the votes it is GIVEN. It does NOT know which
+ * specialists were configured, so it cannot detect a missing/dropped specialist. That
+ * coverage-integrity guard (missing configured specialist → block regardless of
+ * strategy) lives in `decideCouncilFromManifest`, which callers should use when
+ * deciding from a captured manifest.
  */
 export function computeCouncilDecision(
   votes: readonly SpecialistVote[],
@@ -214,21 +218,67 @@ export function summarizeCouncilManifest(
   }));
 }
 
+/** Coverage of a captured manifest against the specialists we asked to run. */
+export type CouncilCoverage = {
+  /** One entry per configured specialist that actually reported a result. */
+  votes: SpecialistVote[];
+  /** Configured specialists with NO captured result (the orchestrator dropped them). */
+  missingSpecialistIds: string[];
+};
+
 /**
- * The votes to feed `computeCouncilDecision`, reconciled against the specialists we
- * ASKED to run. Any configured specialist absent from the manifest (the orchestrator
- * dropped it) contributes `abstain` — so a dropped specialist can never silently let
- * the council pass. Manifest entries for unknown specialists are ignored.
+ * Reconciles a captured manifest against the specialists we ASKED to run. Reported
+ * votes are returned as-is (a real returned `abstain` stays `abstain`); configured
+ * specialists absent from the manifest are surfaced separately in `missingSpecialistIds`
+ * rather than being laundered into an `abstain` vote. Manifest entries for specialists
+ * we did not configure are ignored. Callers enforce coverage via `decideCouncilFromManifest`.
  */
 export function reconcileCouncilVotes(
   configuredSpecialistIds: readonly string[],
   manifest: CouncilResultManifest
-): SpecialistVote[] {
+): CouncilCoverage {
   const reported = new Map(manifest.specialists.map(s => [s.specialistId, s.vote]));
-  return configuredSpecialistIds.map(specialistId => ({
-    specialistId,
-    vote: reported.get(specialistId) ?? 'abstain',
-  }));
+  const votes: SpecialistVote[] = [];
+  const missingSpecialistIds: string[] = [];
+  for (const specialistId of configuredSpecialistIds) {
+    const vote = reported.get(specialistId);
+    if (vote === undefined) missingSpecialistIds.push(specialistId);
+    else votes.push({ specialistId, vote });
+  }
+  return { votes, missingSpecialistIds };
+}
+
+/** A council decision plus the coverage that produced it. */
+export type CouncilDecision = {
+  decision: CouncilVote;
+  votes: SpecialistVote[];
+  missingSpecialistIds: string[];
+};
+
+/**
+ * The deterministic, coverage-aware council decision — the entry point callers should
+ * use to decide from a captured manifest.
+ *
+ * COVERAGE INTEGRITY (fail closed): if ANY configured specialist has no captured result
+ * (`missingSpecialistIds` is non-empty), the decision is `block` regardless of strategy.
+ * We cannot vouch for a dimension we never got a result for, so a dropped/lost specialist
+ * can never silently let the council pass. Only when every configured specialist reported
+ * does the decision defer to `computeCouncilDecision` over the reported votes.
+ *
+ * Note: a failed capture (`parseCouncilResultManifest` returned `missing`/`invalid`)
+ * means NO coverage at all — callers must treat that as `block` (e.g. pass an empty
+ * manifest, which yields all-missing → block).
+ */
+export function decideCouncilFromManifest(
+  configuredSpecialistIds: readonly string[],
+  manifest: CouncilResultManifest,
+  strategy: CouncilAggregationStrategy
+): CouncilDecision {
+  const { votes, missingSpecialistIds } = reconcileCouncilVotes(configuredSpecialistIds, manifest);
+  if (missingSpecialistIds.length > 0) {
+    return { decision: 'block', votes, missingSpecialistIds };
+  }
+  return { decision: computeCouncilDecision(votes, strategy), votes, missingSpecialistIds };
 }
 
 // ============================================================================

@@ -1,11 +1,65 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
+  applyVercelSettings,
   getAnthropicProviderOptionsForVercel,
   hasCompatibleVercelInferenceProvider,
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { getCachedVercelInferenceProviderIdsForModel } from '@/lib/ai-gateway/providers/gateway-models-cache';
+
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
+}));
+
+const mockedGetCachedVercelInferenceProviderIdsForModel = jest.mocked(
+  getCachedVercelInferenceProviderIdsForModel
+);
+
+function createDeepseekRequest(only?: string[]): GatewayRequest {
+  return {
+    kind: 'chat_completions',
+    body: {
+      model: 'deepseek/deepseek-v3.2',
+      messages: [{ role: 'user', content: 'hello' }],
+      provider: only ? { only } : undefined,
+    },
+  };
+}
+
+describe('applyVercelSettings', () => {
+  it('removes Novita from an explicit DeepSeek provider list', async () => {
+    const request = createDeepseekRequest(['Novita/fp8', 'deepseek']);
+
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null);
+
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['deepseek']);
+    expect(mockedGetCachedVercelInferenceProviderIdsForModel).not.toHaveBeenCalled();
+  });
+
+  it('uses the cached Vercel providers without Novita for DeepSeek', async () => {
+    mockedGetCachedVercelInferenceProviderIdsForModel.mockResolvedValueOnce([
+      'novita',
+      'deepseek',
+      'bedrock',
+    ]);
+    const request = createDeepseekRequest();
+
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null);
+
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['deepseek', 'bedrock']);
+  });
+
+  it('leaves only undefined when DeepSeek has no cached provider list', async () => {
+    mockedGetCachedVercelInferenceProviderIdsForModel.mockResolvedValueOnce(null);
+    const request = createDeepseekRequest();
+
+    await applyVercelSettings('deepseek/deepseek-v3.2', request, null);
+
+    expect(request.body.providerOptions?.gateway?.only).toBe(undefined);
+  });
+});
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {

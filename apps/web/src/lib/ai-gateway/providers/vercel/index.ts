@@ -27,7 +27,6 @@ import {
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -83,21 +82,12 @@ export function passesVercelRoutingPercentage(randomSeed: string, routingPercent
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  kiloExclusiveModel: KiloExclusiveModel | null,
   request: GatewayRequest,
   randomSeed: string
 ) {
   if (hasOpenRouterExclusiveProviderOptions(request)) {
     console.debug(
       '[shouldRouteToVercel] not routing to Vercel because of unsupported provider options'
-    );
-    return false;
-  }
-
-  if (!kiloExclusiveModel?.flags.includes('vercel-routing') && isDeepseekModel(requestedModel)) {
-    // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
-    console.debug(
-      '[shouldRouteToVercel] not routing to Vercel because some of its DeepSeek providers have tool call issues'
     );
     return false;
   }
@@ -133,11 +123,31 @@ export async function shouldRouteToVercel(
   return true;
 }
 
-function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig {
+async function convertProviderOptions(
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+): Promise<VercelProviderConfig> {
   const provider = requestToMutate.body.provider;
+  let only = provider?.only?.map(p => openRouterToVercelInferenceProviderId(p));
+
+  if (isDeepseekModel(requestedModel)) {
+    if (!only) {
+      const vercelModelId = mapModelIdToVercel(
+        requestedModel,
+        isReasoningExplicitlyDisabled(requestToMutate)
+      );
+      only =
+        (await getCachedVercelInferenceProviderIdsForModel(vercelModelId))?.filter(
+          providerId => providerId !== 'novita'
+        ) ?? undefined;
+    } else {
+      only = only.filter(providerId => providerId !== 'novita');
+    }
+  }
+
   return {
     gateway: {
-      only: provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
+      only,
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny',
@@ -201,7 +211,7 @@ export function getVercelInferenceProviderConfigForUserByok(
   return [key, list];
 }
 
-export function applyVercelSettings(
+export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
@@ -231,7 +241,10 @@ export function applyVercelSettings(
       },
     };
   } else {
-    requestToMutate.body.providerOptions = convertProviderOptions(requestToMutate);
+    requestToMutate.body.providerOptions = await convertProviderOptions(
+      requestedModel,
+      requestToMutate
+    );
   }
 
   if (requestToMutate.body.providerOptions) {

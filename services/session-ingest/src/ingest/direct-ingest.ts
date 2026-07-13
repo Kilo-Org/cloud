@@ -47,6 +47,8 @@ type LegacyReason =
   | 'oversized_item'
   | 'multi_chunk';
 
+type DirectRejectReason = 'declared_bytes_exceeded' | 'configured_cap_exceeded';
+
 type DirectIngestMetrics = {
   declaredBytes: number | null;
   actualBytes: number | null;
@@ -155,7 +157,7 @@ export async function handleDirectIngestRequest(
         actualBytes: null,
         items: null,
       }),
-      reason: 'declared_bytes_exceeded',
+      reason: directRejectReason(buffered.limit),
     });
     return { status: 413, body: { success: false, error: 'payload_too_large' } };
   }
@@ -375,6 +377,10 @@ function logFallback(
 
 function unknownMetrics(): DirectIngestMetrics {
   return { declaredBytes: null, actualBytes: null, items: null };
+}
+
+function directRejectReason(limit: 'declared_bytes' | 'configured_cap'): DirectRejectReason {
+  return limit === 'declared_bytes' ? 'declared_bytes_exceeded' : 'configured_cap_exceeded';
 }
 
 function eventBase(

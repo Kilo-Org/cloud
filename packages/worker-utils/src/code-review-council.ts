@@ -94,14 +94,18 @@ export function councilDecisionBlocksMerge(decision: CouncilVote): boolean {
  * Every configured specialist is a voting member; all votes count equally. Keep the
  * wording in lockstep with `computeCouncilDecision`. */
 export function describeAggregationStrategy(strategy: CouncilAggregationStrategy): string {
+  // Every strategy blocks when there is no usable coverage (no votes at all, or every
+  // specialist abstained) — this MUST match the guard in `computeCouncilDecision`.
+  const noCoverageRule =
+    ' If no specialist produced a usable vote (all abstained, or no votes at all), the decision is block.';
   switch (strategy) {
     case 'majority':
-      return 'Majority: count votes across all specialists. If block votes outnumber pass votes, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.';
+      return `Majority: count votes across all specialists. If block votes outnumber pass votes, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
     case 'unanimous_required':
-      return 'Unanimous: every specialist must vote pass. If any specialist voted block or abstain, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.';
+      return `Unanimous: every specialist must vote pass. If any specialist voted block or abstain, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
     case 'any_blocking_member':
     default:
-      return 'Any blocking member: if any specialist voted block, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.';
+      return `Any blocking member: if any specialist voted block, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
   }
 }
 
@@ -188,32 +192,11 @@ export type CouncilManifestCapture =
   | { status: 'invalid' };
 
 /**
- * Extracts the JSON object payload of the LAST occurrence of an HTML-comment marker
- * (`<!-- TAG {json} -->`) from free text.
- *
- * Does NOT rely on the payload being `-->`-free: a finding's `rationale`/`path` can
- * legitimately contain `-->` or `}` (e.g. reviewing HTML, or `while (i --> 0)`). So we
- * locate the last marker tag, then do a brace-depth scan from the first `{` — honoring
- * JSON string literals and escapes — to its matching `}`. The trailing `-->` is not
- * required for extraction (real models add prose after it).
- *
- * Returns `tagPresent` so callers can distinguish "no marker at all" (missing) from
- * "marker present but no balanced JSON object" (invalid).
+ * Balanced-brace scan from `open`, honoring JSON string literals and escapes, returning
+ * the JSON object substring (inclusive of its braces) or null if never balanced. Because
+ * it tracks string state, a `-->` or `}` inside a string value does not truncate it.
  */
-function extractLastMarkerJson(
-  text: string,
-  tag: string
-): { tagPresent: boolean; json: string | null } {
-  const starter = new RegExp(`<!--\\s*${tag}\\s*`, 'g');
-  let searchFrom = -1;
-  for (const match of text.matchAll(starter)) {
-    searchFrom = match.index + match[0].length;
-  }
-  if (searchFrom < 0) return { tagPresent: false, json: null };
-
-  const open = text.indexOf('{', searchFrom);
-  if (open < 0) return { tagPresent: true, json: null };
-
+function scanBalancedJson(text: string, open: number): string | null {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -227,43 +210,80 @@ function extractLastMarkerJson(
     }
     if (ch === '"') inString = true;
     else if (ch === '{') depth++;
-    else if (ch === '}' && --depth === 0) {
-      return { tagPresent: true, json: text.slice(open, i + 1) };
-    }
+    else if (ch === '}' && --depth === 0) return text.slice(open, i + 1);
   }
-  return { tagPresent: true, json: null }; // unbalanced
+  return null; // unbalanced
+}
+
+/**
+ * Enumerates the balanced JSON payloads of every HTML-comment marker (`<!-- TAG {json} -->`)
+ * in free text, in document order.
+ *
+ * Two robustness properties:
+ * - **Version isolation:** the tag must be followed by whitespace (`\\s+`), so a longer
+ *   version like `${tag}0` or `${tag}junk` is NOT matched as `tag`.
+ * - **Embedded-marker safety:** a finding's `rationale`/`path` can legitimately contain
+ *   the marker text (JSON does not escape `<!-- ... {}`), which would appear as its own
+ *   occurrence. Rather than trusting the last textual occurrence, we return ALL candidates
+ *   so the caller can pick the last one that actually validates — an embedded fragment
+ *   fails the schema and is skipped, so PR content quoting the marker cannot displace the
+ *   real manifest. Payloads with `-->`/`}` inside strings are preserved (string-aware scan).
+ *
+ * `tagPresent` lets callers distinguish "no marker at all" (missing) from "marker present
+ * but no valid payload" (invalid).
+ */
+function markerJsonCandidates(
+  text: string,
+  tag: string
+): { tagPresent: boolean; candidates: string[] } {
+  const starter = new RegExp(`<!--\\s*${tag}\\s+`, 'g');
+  const candidates: string[] = [];
+  let tagPresent = false;
+  for (const match of text.matchAll(starter)) {
+    tagPresent = true;
+    const open = text.indexOf('{', match.index + match[0].length);
+    if (open < 0) continue;
+    const json = scanBalancedJson(text, open);
+    if (json !== null) candidates.push(json);
+  }
+  return { tagPresent, candidates };
 }
 
 /**
  * Extracts and validates the combined council manifest from the orchestrator's final
  * message.
  *
- * The marker may appear ANYWHERE in the message and the LAST occurrence wins — real
- * models often add a trailing sentence after the marker, and that must not cause a
- * false miss. The JSON object is extracted by a brace-aware scan (see
- * `extractLastMarkerJson`), so a `-->` or `}` inside a finding's free-form text does not
- * truncate a legitimate manifest. Size-capped; schema is strict only where it must be
- * (each specialist's `vote`).
+ * The marker may appear ANYWHERE in the message and the LAST schema-valid occurrence
+ * wins — real models often add a trailing sentence after the marker, and that must not
+ * cause a false miss. Each candidate JSON object is extracted by a brace-aware scan (see
+ * `markerJsonCandidates`), so a `-->`/`}` inside a finding's free-form text does not
+ * truncate it, and marker text quoted inside a finding fails the schema and is skipped
+ * rather than displacing the real manifest. Size-capped; schema is strict only where it
+ * must be (each specialist's `vote`).
  */
 export function parseCouncilResultManifest(
   text: string | null | undefined
 ): CouncilManifestCapture {
   if (!text) return { status: 'missing' };
 
-  const { tagPresent, json } = extractLastMarkerJson(text, COUNCIL_RESULT_MARKER_TAG);
+  const { tagPresent, candidates } = markerJsonCandidates(text, COUNCIL_RESULT_MARKER_TAG);
   if (!tagPresent) return { status: 'missing' };
-  if (json === null) return { status: 'invalid' };
-  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) {
-    return { status: 'invalid' };
-  }
 
-  try {
-    const parsed: unknown = JSON.parse(json);
-    const result = CouncilResultManifestSchema.safeParse(parsed);
-    return result.success ? { status: 'captured', manifest: result.data } : { status: 'invalid' };
-  } catch {
-    return { status: 'invalid' };
+  // Prefer the last candidate that is a valid manifest; skip oversized or malformed
+  // candidates (including marker-like text embedded in a finding) rather than failing on
+  // them, so embedded content cannot force a false no-coverage block.
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    const json = candidates[i];
+    if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) continue;
+    try {
+      const parsed: unknown = JSON.parse(json);
+      const result = CouncilResultManifestSchema.safeParse(parsed);
+      if (result.success) return { status: 'captured', manifest: result.data };
+    } catch {
+      // try an earlier candidate
+    }
   }
+  return { status: 'invalid' };
 }
 
 /** Per-specialist rollup for the Kilo UI: vote, highest severity, and findings count. */
@@ -305,28 +325,42 @@ export type CouncilCoverage = {
  * rather than being laundered into an `abstain` vote. Manifest entries for specialists
  * we did not configure are ignored. Callers enforce coverage via `decideCouncilFromManifest`.
  *
- * Defense in depth: `CouncilResultManifestSchema` already rejects duplicate ids at parse
- * time, so a captured manifest is unique. But if a manifest is constructed without going
- * through the parser, a configured specialist reported MORE THAN ONCE is treated as
- * missing (unreliable coverage) rather than letting a `Map` silently keep the last vote
- * (which could override an earlier, more severe one).
+ * Defense in depth (fail closed on ambiguity):
+ * - `CouncilResultManifestSchema` already rejects duplicate REPORTED ids at parse time,
+ *   but if a manifest is constructed without the parser, a specialist reported MORE THAN
+ *   ONCE is treated as missing rather than letting a `Map` silently keep the last vote.
+ * - A duplicate CONFIGURED id is a config-integrity violation (a specialist must not vote
+ *   twice — otherwise duplicating a passing specialist could flip a majority). Each
+ *   duplicated configured id is counted once and treated as missing coverage.
  */
 export function reconcileCouncilVotes(
   configuredSpecialistIds: readonly string[],
   manifest: CouncilResultManifest
 ): CouncilCoverage {
+  const configuredSeen = new Set<string>();
+  const duplicateConfigured = new Set<string>();
+  for (const specialistId of configuredSpecialistIds) {
+    if (configuredSeen.has(specialistId)) duplicateConfigured.add(specialistId);
+    configuredSeen.add(specialistId);
+  }
+
   const counts = new Map<string, number>();
   for (const specialist of manifest.specialists) {
     counts.set(specialist.specialistId, (counts.get(specialist.specialistId) ?? 0) + 1);
   }
   const reported = new Map(manifest.specialists.map(s => [s.specialistId, s.vote]));
+
   const votes: SpecialistVote[] = [];
   const missingSpecialistIds: string[] = [];
-  for (const specialistId of configuredSpecialistIds) {
-    // Exactly one reported result is reliable coverage; 0 = absent (dropped), >1 =
-    // duplicate/ambiguous — neither counts.
+  // Iterate the DEDUPED configured ids so a specialist is never counted more than once.
+  for (const specialistId of configuredSeen) {
     const vote = reported.get(specialistId);
-    if (counts.get(specialistId) === 1 && vote !== undefined) {
+    // Reliable coverage requires exactly one configured entry AND exactly one report.
+    if (
+      !duplicateConfigured.has(specialistId) &&
+      counts.get(specialistId) === 1 &&
+      vote !== undefined
+    ) {
       votes.push({ specialistId, vote });
     } else {
       missingSpecialistIds.push(specialistId);
@@ -404,19 +438,21 @@ export type GovernanceMember = z.infer<typeof GovernanceMemberSchema>;
  */
 export function parseGovernanceMarker(text: string | null | undefined): Governance | null {
   if (!text) return null;
-  // Brace-aware extraction (see `extractLastMarkerJson`): a `-->` or `}` inside a
-  // member `reason` must not truncate the payload.
-  const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
-  if (json === null) return null;
-  // Bound parse cost on untrusted model output, symmetric with the manifest parser.
-  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) return null;
-  try {
-    const parsed: unknown = JSON.parse(json);
-    const result = GovernanceSchema.safeParse(parsed);
-    return result.success ? result.data : null;
-  } catch {
-    return null;
+  // Same brace-aware, embedded-marker-safe, size-capped extraction as the manifest parser:
+  // return the last candidate that validates; skip oversized/malformed ones.
+  const { candidates } = markerJsonCandidates(text, GOVERNANCE_MARKER_TAG);
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    const json = candidates[i];
+    if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) continue;
+    try {
+      const parsed: unknown = JSON.parse(json);
+      const result = GovernanceSchema.safeParse(parsed);
+      if (result.success) return result.data;
+    } catch {
+      // try an earlier candidate
+    }
   }
+  return null;
 }
 
 // ============================================================================

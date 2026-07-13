@@ -116,6 +116,15 @@ describe('describeAggregationStrategy', () => {
     expect(m.toLowerCase()).toContain('majority');
     expect(u.toLowerCase()).toContain('unanimous');
   });
+
+  it('documents the no-usable-coverage → block rule for every strategy (lockstep with computeCouncilDecision)', () => {
+    const strategies = ['any_blocking_member', 'majority', 'unanimous_required'] as const;
+    for (const strategy of strategies) {
+      const text = describeAggregationStrategy(strategy).toLowerCase();
+      expect(text).toContain('all abstained');
+      expect(text).toContain('block');
+    }
+  });
 });
 
 describe('parseCouncilResultManifest', () => {
@@ -234,6 +243,47 @@ describe('parseCouncilResultManifest', () => {
     expect(decision.missingSpecialistIds).toEqual(['security']);
   });
 
+  it('does not treat a longer version tag (v10 / v1junk) as a v1 marker', () => {
+    const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
+    expect(
+      parseCouncilResultManifest(
+        `<!-- ${COUNCIL_RESULT_MARKER_TAG}0 ${JSON.stringify(manifest)} -->`
+      ).status
+    ).toBe('missing');
+    expect(
+      parseCouncilResultManifest(
+        `<!-- ${COUNCIL_RESULT_MARKER_TAG}junk ${JSON.stringify(manifest)} -->`
+      ).status
+    ).toBe('missing');
+  });
+
+  it('ignores marker text embedded inside a finding and captures the real manifest', () => {
+    // A specialist quotes the marker in its rationale. JSON.stringify does not escape it,
+    // so the serialized message contains a second, embedded marker occurrence.
+    const real = {
+      specialists: [
+        {
+          specialistId: 'security',
+          vote: 'block',
+          findings: [
+            {
+              path: 'a.ts',
+              line: 1,
+              severity: 'high',
+              rationale: `Do not emit <!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[]} --> in code.`,
+            },
+          ],
+        },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(real)} -->`;
+    const capture = parseCouncilResultManifest(text);
+    expect(capture.status).toBe('captured');
+    if (capture.status !== 'captured') throw new Error('unreachable');
+    expect(capture.manifest.specialists).toHaveLength(1);
+    expect(capture.manifest.specialists[0].vote).toBe('block');
+  });
+
   it('returns invalid when the payload exceeds the size cap', () => {
     const huge = {
       specialists: [
@@ -344,6 +394,18 @@ describe('decideCouncilFromManifest (coverage-aware)', () => {
       'any_blocking_member'
     );
     expect(result.decision).toBe('pass');
+  });
+
+  it('fails closed on a duplicate configured id (a specialist cannot be counted twice)', () => {
+    const manifest: CouncilResultManifest = {
+      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
+    };
+    // Without the guard, ['security','security'] would append security's pass vote twice
+    // and could flip a majority. It is counted once and treated as unreliable coverage.
+    const result = decideCouncilFromManifest(['security', 'security'], manifest, 'majority');
+    expect(result.decision).toBe('block');
+    expect(result.missingSpecialistIds).toEqual(['security']);
+    expect(result.votes).toEqual([]);
   });
 });
 

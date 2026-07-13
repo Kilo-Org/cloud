@@ -141,7 +141,20 @@ describe('applyKiloExclusiveModelSettings', () => {
         inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
       })
     );
-    expect(req.body.provider).toEqual({ zdr: true, only: ['anthropic'] });
+    expect(req.body.provider).toEqual({ only: ['anthropic'] });
+  });
+
+  it('overwrites a malformed provider value', () => {
+    const req = makeRequest();
+    Object.assign(req.body, { provider: 'lmstudio' });
+    applyKiloExclusiveModelSettings(
+      req,
+      makeModel({
+        internal_id: 'vendor/x',
+        inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
+      })
+    );
+    expect(req.body.provider).toEqual({ only: ['anthropic'] });
   });
 
   it('intersects caller-supplied only with the restriction', () => {

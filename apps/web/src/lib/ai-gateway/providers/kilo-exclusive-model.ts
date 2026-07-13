@@ -169,8 +169,6 @@ export function applyKiloExclusiveModelSettings(
   const provider = requestToMutate.body.provider;
   if (provider?.only) {
     provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
-  } else if (provider) {
-    provider.only = [...restriction];
   } else {
     requestToMutate.body.provider = { only: [...restriction] };
   }

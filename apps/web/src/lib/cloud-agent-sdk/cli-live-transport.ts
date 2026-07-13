@@ -6,12 +6,13 @@ import { normalizeCliEvent, isChatEvent } from './normalizer';
 import {
   cliConnectionDataSchema,
   heartbeatDataSchema,
+  remoteCommandCatalogV1Schema,
   remoteModelCatalogV1Schema,
   sessionsListDataSchema,
 } from './schemas';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { TransportFactory, TransportSendInput, TransportSink } from './transport';
-import type { KiloSessionId, SessionSnapshot } from './types';
+import type { KiloSessionId, SessionSnapshot, SlashCommandInfo } from './types';
 import {
   UserWebCommandError,
   type UserWebCliEvent,
@@ -41,6 +42,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     let lastForwardedHeartbeatStatus: string | null = null;
     let catalogRequestGeneration = 0;
     let catalogRequestInFlight: { ownerConnectionId: string; generation: number } | null = null;
+    let commandCatalogRequestGeneration = 0;
+    let commandCatalogRequestInFlight: {
+      ownerConnectionId: string;
+      generation: number;
+    } | null = null;
     let remoteModelState: RemoteModelState = {
       ownerConnectionId: null,
       protocol: 'unknown',
@@ -52,12 +58,20 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onRemoteModelStateChange?.(next);
     }
 
+    function publishCommands(commands: SlashCommandInfo[]): void {
+      sink.onServiceEvent({ type: 'commands.available', commands });
+    }
+
     function setOwnerConnectionId(nextOwnerConnectionId: string | null): void {
       if (ownerConnectionId === nextOwnerConnectionId) return;
 
+      const previousOwnerConnectionId = ownerConnectionId;
       ownerConnectionId = nextOwnerConnectionId;
       catalogRequestGeneration += 1;
       catalogRequestInFlight = null;
+      commandCatalogRequestGeneration += 1;
+      commandCatalogRequestInFlight = null;
+      if (previousOwnerConnectionId) publishCommands([]);
       publishRemoteModelState({
         ownerConnectionId: nextOwnerConnectionId,
         protocol: 'unknown',
@@ -65,7 +79,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       });
       config.onCapabilityChange?.();
 
-      if (nextOwnerConnectionId) discoverModels(nextOwnerConnectionId);
+      if (nextOwnerConnectionId) {
+        discoverModels(nextOwnerConnectionId);
+        discoverCommands(nextOwnerConnectionId);
+      }
     }
 
     function handleCatalogFailure(
@@ -168,6 +185,99 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .finally(() => {
           if (catalogRequestInFlight?.generation === expectedRequestGeneration) {
             catalogRequestInFlight = null;
+          }
+        });
+    }
+
+    function handleCommandCatalogFailure(
+      error: unknown,
+      expectedOwnerConnectionId: string,
+      expectedGeneration: number,
+      expectedRequestGeneration: number,
+      clearCatalog = false
+    ): void {
+      if (
+        expectedGeneration !== generation ||
+        expectedRequestGeneration !== commandCatalogRequestGeneration ||
+        ownerConnectionId !== expectedOwnerConnectionId
+      ) {
+        return;
+      }
+
+      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
+        setOwnerConnectionId(null);
+        return;
+      }
+
+      if (error instanceof Error && error.message.includes('unknown command')) {
+        publishCommands([]);
+        return;
+      }
+
+      if (
+        clearCatalog ||
+        (error instanceof UserWebCommandError && error.code === 'CATALOG_TOO_LARGE')
+      ) {
+        publishCommands([]);
+      }
+      config.onError?.(
+        error instanceof Error ? error.message : 'Failed to discover remote commands'
+      );
+    }
+
+    function discoverCommands(expectedOwnerConnectionId: string): void {
+      if (commandCatalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
+
+      commandCatalogRequestGeneration += 1;
+      const expectedRequestGeneration = commandCatalogRequestGeneration;
+      const expectedGeneration = generation;
+      commandCatalogRequestInFlight = {
+        ownerConnectionId: expectedOwnerConnectionId,
+        generation: expectedRequestGeneration,
+      };
+
+      void config.userWebConnection
+        .sendCommand(
+          config.kiloSessionId,
+          'list_commands',
+          { protocolVersion: 1 },
+          expectedOwnerConnectionId
+        )
+        .then(
+          result => {
+            if (
+              expectedGeneration !== generation ||
+              expectedRequestGeneration !== commandCatalogRequestGeneration ||
+              ownerConnectionId !== expectedOwnerConnectionId
+            ) {
+              return;
+            }
+
+            const parsed = remoteCommandCatalogV1Schema.safeParse(result);
+            if (!parsed.success) {
+              handleCommandCatalogFailure(
+                new Error('Invalid remote command catalog'),
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration,
+                true
+              );
+              return;
+            }
+
+            publishCommands(parsed.data.commands);
+          },
+          error =>
+            handleCommandCatalogFailure(
+              error,
+              expectedOwnerConnectionId,
+              expectedGeneration,
+              expectedRequestGeneration
+            )
+        )
+        .finally(() => {
+          if (commandCatalogRequestInFlight?.generation === expectedRequestGeneration) {
+            commandCatalogRequestInFlight = null;
           }
         });
     }
@@ -357,6 +467,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         lastForwardedHeartbeatStatus = null;
         catalogRequestGeneration += 1;
         catalogRequestInFlight = null;
+        commandCatalogRequestGeneration += 1;
+        commandCatalogRequestInFlight = null;
         publishRemoteModelState({
           ownerConnectionId: null,
           protocol: 'unknown',
@@ -457,7 +569,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             resyncTimer = null;
             replayCurrentSnapshot(false);
           }, RECONNECT_RESYNC_DELAY_MS);
-          if (ownerConnectionId) discoverModels(ownerConnectionId);
+          if (ownerConnectionId) {
+            discoverModels(ownerConnectionId);
+            discoverCommands(ownerConnectionId);
+          }
         });
         const releaseSubscription = config.userWebConnection.subscribeToCliSession(
           config.kiloSessionId
@@ -480,9 +595,22 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       },
       send: async (input: TransportSendInput) => {
         if (input.payload.type === 'command') {
-          return Promise.reject(
-            new Error('Slash commands are not supported on the CLI live transport yet')
-          );
+          const remoteModel = getRemoteModelFields(input);
+          return sendCommand('send_command', {
+            protocolVersion: 1,
+            command: input.payload.command,
+            arguments: input.payload.arguments,
+            ...(input.messageId ? { messageID: input.messageId } : {}),
+            ...(remoteModel.kind === 'none'
+              ? {}
+              : {
+                  model:
+                    remoteModel.kind === 'structured'
+                      ? remoteModel.model
+                      : { providerID: 'kilo', modelID: remoteModel.model },
+                  ...(remoteModel.variant ? { variant: remoteModel.variant } : {}),
+                }),
+          });
         }
         const payload = input.payload;
         const remoteModel = getRemoteModelFields(input);

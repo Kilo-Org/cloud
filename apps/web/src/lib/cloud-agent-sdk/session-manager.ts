@@ -911,6 +911,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onEvent: event => {
         if (event.type === 'commands.available') {
+          if (expectedGeneration !== switchGeneration) return;
           // Replace the catalog wholesale. The DO sends the full list on
           // every connect, so we never need to merge incrementally.
           store.set(availableCommandsAtom, event.commands);

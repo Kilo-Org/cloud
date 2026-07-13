@@ -49,10 +49,22 @@ const CATALOG_TOO_LARGE_ERROR = {
   message: 'Model catalog response is too large',
 };
 
+const COMMAND_CATALOG_TOO_LARGE_ERROR = {
+  source: 'relay',
+  code: 'CATALOG_TOO_LARGE',
+  message: 'Command catalog response is too large',
+};
+
 const CATALOG_REQUEST_PENDING_ERROR = {
   source: 'relay',
   code: 'CATALOG_REQUEST_PENDING',
   message: 'Model catalog request already pending',
+};
+
+const COMMAND_CATALOG_REQUEST_PENDING_ERROR = {
+  source: 'relay',
+  code: 'CATALOG_REQUEST_PENDING',
+  message: 'Command catalog request already pending',
 };
 
 const PENDING_COMMAND_LIMIT_ERROR = {
@@ -71,6 +83,10 @@ const CLI_COMMAND_ERROR = {
   source: 'cli',
   message: 'Command failed',
 };
+
+function isCatalogCommand(command: string): command is 'list_models' | 'list_commands' {
+  return command === 'list_models' || command === 'list_commands';
+}
 
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
@@ -468,14 +484,17 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (!entry || entry.targetCliWs !== respondingWs) return;
     this.pendingCommands.delete(id);
 
-    if (entry.command === 'list_models' && result !== undefined) {
+    if (isCatalogCommand(entry.command) && result !== undefined) {
       const serializedResult = JSON.stringify(result);
       const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
       if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
         this.sendToWeb(entry.ws, {
           type: 'response',
           id: entry.originalId,
-          error: CATALOG_TOO_LARGE_ERROR,
+          error:
+            entry.command === 'list_models'
+              ? CATALOG_TOO_LARGE_ERROR
+              : COMMAND_CATALOG_TOO_LARGE_ERROR,
         });
         return;
       }
@@ -633,11 +652,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     const targetConnectionId = targetAttachment.connectionId;
 
     if (
-      msg.command === 'list_models' &&
+      isCatalogCommand(msg.command) &&
       [...this.pendingCommands.values()].some(
         entry =>
           entry.ws === ws &&
-          entry.command === 'list_models' &&
+          entry.command === msg.command &&
           entry.sessionId === msg.sessionId &&
           entry.targetConnectionId === targetConnectionId
       )
@@ -645,7 +664,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       this.sendToWeb(ws, {
         type: 'response',
         id: msg.id,
-        error: CATALOG_REQUEST_PENDING_ERROR,
+        error:
+          msg.command === 'list_models'
+            ? CATALOG_REQUEST_PENDING_ERROR
+            : COMMAND_CATALOG_REQUEST_PENDING_ERROR,
       });
       return;
     }

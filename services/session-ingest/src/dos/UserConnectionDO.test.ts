@@ -1352,6 +1352,38 @@ describe('UserConnectionDO', () => {
       expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(1);
     });
 
+    it('rejects a duplicate in-flight list_commands request for the same viewer session and owner', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'list_commands',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+      });
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-2',
+        command: 'list_commands',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-2',
+        error: {
+          source: 'relay',
+          code: 'CATALOG_REQUEST_PENDING',
+          message: 'Command catalog request already pending',
+        },
+      });
+      expect(allSent(cliWs).filter(message => message.type === 'command')).toHaveLength(1);
+    });
+
     it('expires pending commands before handling another command', () => {
       const now = 1_000_000;
       vi.spyOn(Date, 'now').mockReturnValue(now);
@@ -1520,6 +1552,38 @@ describe('UserConnectionDO', () => {
           source: 'relay',
           code: 'CATALOG_TOO_LARGE',
           message: 'Model catalog response is too large',
+        },
+      });
+    });
+
+    it('rejects a list_commands result one byte over 512 KiB', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'list_commands',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: createResultWithSerializedBytes(MAX_CATALOG_RESULT_BYTES + 1),
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'CATALOG_TOO_LARGE',
+          message: 'Command catalog response is too large',
         },
       });
     });

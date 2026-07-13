@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { type SlashCommandInfo } from 'cloud-agent-sdk';
 import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -14,9 +15,15 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import {
+  getSlashCommandCandidate,
+  getSlashCommandSuggestions,
+  prepareChatComposerSubmission,
+} from '@/components/agents/chat-composer-slash-commands';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
@@ -36,9 +43,11 @@ const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
 
 const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+const EMPTY_COMMANDS: SlashCommandInfo[] = [];
 
 type ChatComposerProps = {
   onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
+  onSendCommand: (command: string, argumentsText: string) => void | Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -52,10 +61,12 @@ type ChatComposerProps = {
   organizationId?: string;
   /** Only Cloud Agent sessions can receive attachments. */
   attachmentsEnabled?: boolean;
+  commands?: SlashCommandInfo[];
 };
 
 export function ChatComposer({
   onSend,
+  onSendCommand,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -68,12 +79,14 @@ export function ChatComposer({
   onModelSelect,
   organizationId,
   attachmentsEnabled = true,
+  commands = EMPTY_COMMANDS,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [hasText, setHasText] = useState(false);
+  const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const upload = useAgentAttachmentUpload({ organizationId });
@@ -91,11 +104,14 @@ export function ChatComposer({
   const canSend = hasText && !disabled && !isStreaming;
   const showToolbar = isFocused || hasText || upload.attachments.length > 0;
   const toolbarDisabled = disabled || isStreaming;
+  const slashCommandSuggestions =
+    slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commands);
 
   function handleChangeText(value: string) {
     textRef.current = value;
     measure.setText(value);
     setHasText(value.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(value));
   }
 
   function handleSend() {
@@ -107,20 +123,42 @@ export function ChatComposer({
       toast.error('Wait for attachments to finish uploading.');
       return;
     }
-    if (trimmed.startsWith('/') && upload.attachments.length > 0) {
+    const submission = prepareChatComposerSubmission(
+      trimmed,
+      commands,
+      upload.attachments.length > 0
+    );
+    if (submission.type === 'attachment-error') {
       toast.error('Attachments cannot be sent with slash commands.');
       return;
     }
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const payload = upload.toWirePayload();
-    void onSend(trimmed, payload);
+    if (submission.type === 'command') {
+      void onSendCommand(submission.command, submission.arguments);
+    } else {
+      void onSend(submission.prompt, upload.toWirePayload());
+    }
     textRef.current = '';
     setHasText(false);
+    setSlashCommandInput(null);
     measure.reset();
     inputRef.current?.clear();
     upload.reset();
     Keyboard.dismiss();
+  }
+
+  function handleSelectSlashCommand(command: SlashCommandInfo) {
+    const value = `/${command.name} `;
+    textRef.current = value;
+    measure.setText(value);
+    setHasText(true);
+    setSlashCommandInput(null);
+    inputRef.current?.setNativeProps({
+      text: value,
+      selection: { start: value.length, end: value.length },
+    });
+    inputRef.current?.focus();
   }
 
   function handleStop() {
@@ -171,6 +209,15 @@ export function ChatComposer({
 
       {attachmentsEnabled ? (
         <AttachmentPreviewStrip attachments={upload.attachments} onRemove={removeAttachment} />
+      ) : null}
+
+      {slashCommandSuggestions.length > 0 ? (
+        <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
+          <SlashCommandSuggestions
+            commands={slashCommandSuggestions}
+            onSelect={handleSelectSlashCommand}
+          />
+        </Animated.View>
       ) : null}
 
       <View className="flex-row items-center p-2.5 px-3">

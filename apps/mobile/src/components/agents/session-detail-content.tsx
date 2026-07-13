@@ -78,6 +78,7 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const availableCommands = useAtomValue(manager.atoms.availableCommands);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -343,6 +344,21 @@ export function SessionDetailContent({
     ]
   );
 
+  const handleSendCommand = useCallback(
+    async (command: string, argumentsText: string) => {
+      // send() reports failures via its return value instead of throwing.
+      const accepted = await manager.send({
+        payload: { type: 'command', command, arguments: argumentsText },
+      });
+      if (!accepted) {
+        toast.error('Failed to send command. Please try again.');
+        return;
+      }
+      captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
+    },
+    [analyticsSurface, manager]
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -415,6 +431,7 @@ export function SessionDetailContent({
               >
                 <ChatComposer
                   onSend={handleSend}
+                  onSendCommand={handleSendCommand}
                   onStop={handleStop}
                   disabled={isComposerDisabled}
                   isStreaming={isStreaming}
@@ -427,6 +444,7 @@ export function SessionDetailContent({
                   onModelSelect={handleModelSelect}
                   organizationId={organizationId}
                   attachmentsEnabled={supportsAttachments}
+                  commands={availableCommands}
                 />
               </ModelPickerSelectionScopeProvider>
             </>

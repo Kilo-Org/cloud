@@ -2688,6 +2688,23 @@ describe('createSessionManager', () => {
 
       await switchPromise;
     });
+
+    it('ignores a command catalog emitted by the previous session after switching', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+      const previousSessionEvent = mockedCreate.mock.calls[0][0].onEvent;
+
+      await mgr.switchSession(kiloId('ses-2'));
+      previousSessionEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'stale', description: 'Old workspace command', hints: [] }],
+      });
+
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toEqual([]);
+    });
   });
 
   // -------------------------------------------------------------------------

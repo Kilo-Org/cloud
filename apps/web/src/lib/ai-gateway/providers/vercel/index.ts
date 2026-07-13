@@ -125,7 +125,8 @@ export async function shouldRouteToVercel(
 
 async function convertProviderOptions(
   requestedModel: string,
-  requestToMutate: GatewayRequest
+  requestToMutate: GatewayRequest,
+  getVercelInferenceProviders: typeof getCachedVercelInferenceProviderIdsForModel
 ): Promise<VercelProviderConfig> {
   const provider = requestToMutate.body.provider;
   let only = provider?.only?.map(p => openRouterToVercelInferenceProviderId(p));
@@ -137,7 +138,7 @@ async function convertProviderOptions(
         isReasoningExplicitlyDisabled(requestToMutate)
       );
       only =
-        (await getCachedVercelInferenceProviderIdsForModel(vercelModelId))?.filter(
+        (await getVercelInferenceProviders(vercelModelId))?.filter(
           providerId => providerId !== 'novita'
         ) ?? undefined;
     } else {
@@ -217,7 +218,8 @@ export function getVercelInferenceProviderConfigForUserByok(
 export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  userByok: BYOKResult[] | null
+  userByok: BYOKResult[] | null,
+  getVercelInferenceProviders = getCachedVercelInferenceProviderIdsForModel
 ) {
   requestToMutate.body.model = mapModelIdToVercel(
     requestedModel,
@@ -246,7 +248,8 @@ export async function applyVercelSettings(
   } else {
     requestToMutate.body.providerOptions = await convertProviderOptions(
       requestedModel,
-      requestToMutate
+      requestToMutate,
+      getVercelInferenceProviders
     );
   }
 

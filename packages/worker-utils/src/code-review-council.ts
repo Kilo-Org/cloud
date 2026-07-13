@@ -192,15 +192,43 @@ export type CouncilManifestCapture =
   | { status: 'invalid' };
 
 /**
+ * Whether the UTF-8 byte length of `str` exceeds `limit`, computed incrementally with an
+ * early exit so we never allocate a full byte array just to measure (important for a
+ * Worker handling untrusted model output).
+ */
+function utf8ByteLengthExceeds(str: string, limit: number): boolean {
+  let bytes = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      bytes += 4; // surrogate pair (one code point across two code units)
+      i++;
+    } else bytes += 3;
+    if (bytes > limit) return true;
+  }
+  return false;
+}
+
+/**
  * Balanced-brace scan from `open`, honoring JSON string literals and escapes, returning
  * the JSON object substring (inclusive of its braces) or null if never balanced. Because
  * it tracks string state, a `-->` or `}` inside a string value does not truncate it.
+ *
+ * The scan is bounded: it aborts (returns null) once it has traversed more than `maxChars`
+ * characters, so an oversized untrusted payload cannot cause unbounded scanning or
+ * materialize an oversized slice. `maxChars` is a byte budget used as a character bound;
+ * since a string's byte length is >= its character length, a payload within the byte cap
+ * is never aborted, and one that would exceed the cap in characters certainly exceeds it
+ * in bytes (fail closed either way — both null results are treated as invalid upstream).
  */
-function scanBalancedJson(text: string, open: number): string | null {
+function scanBalancedJson(text: string, open: number, maxChars: number): string | null {
   let depth = 0;
   let inString = false;
   let escaped = false;
   for (let i = open; i < text.length; i++) {
+    if (i - open > maxChars) return null; // oversized — abort before allocating a slice
     const ch = text[i];
     if (inString) {
       if (escaped) escaped = false;
@@ -222,9 +250,13 @@ function scanBalancedJson(text: string, open: number): string | null {
  *
  * Robustness properties:
  * - **Embedded-marker safety (structural):** the orchestrator emits the marker on its own
- *   final line, and `JSON.stringify` escapes newlines, so marker text quoted inside a
- *   finding's JSON string is NEVER at line start. Anchoring to line start therefore
- *   excludes embedded occurrences structurally — no need to try-and-validate candidates.
+ *   final line, and `JSON.stringify` escapes `\n`/`\r`, so marker text quoted inside a
+ *   finding's JSON string is NEVER at the start of a real line. Anchoring to a real line
+ *   break therefore excludes embedded occurrences structurally. NOTE: we deliberately do
+ *   NOT use `^` with the `m` flag — JS also treats U+2028/U+2029 as line terminators for
+ *   `^m`, but those can appear UNESCAPED inside JSON strings, so an `^m` anchor would let
+ *   a finding containing `\u2028<!-- tag` masquerade as a top-level marker. We anchor only
+ *   to `\n`/`\r` (or start-of-text).
  * - **Version isolation:** the tag must be followed by horizontal whitespace, so a longer
  *   version like `${tag}0` / `${tag}junk` is NOT matched as `tag`.
  * - **`-->`/`}` tolerance:** the JSON is read by a string-aware brace scan, so those chars
@@ -239,11 +271,14 @@ function extractLastMarkerJson(
   text: string,
   tag: string
 ): { tagPresent: boolean; json: string | null } {
-  // `^` (multiline) + horizontal-whitespace classes so a match cannot span lines and an
-  // embedded, mid-line marker is never selected.
-  const starter = new RegExp(`^[ \\t]*<!--[ \\t]*${tag}[ \\t]+`, 'gm');
+  const starter = new RegExp(`<!--[ \\t]*${tag}[ \\t]+`, 'g');
   let searchFrom = -1;
   for (const match of text.matchAll(starter)) {
+    // Top-level = only horizontal whitespace between this `<!--` and a real line break
+    // (`\n`/`\r`) or start-of-text. Skip mid-line occurrences (embedded in a finding).
+    let p = match.index - 1;
+    while (p >= 0 && (text[p] === ' ' || text[p] === '\t')) p--;
+    if (p >= 0 && text[p] !== '\n' && text[p] !== '\r') continue;
     searchFrom = match.index + match[0].length;
   }
   if (searchFrom < 0) return { tagPresent: false, json: null };
@@ -252,7 +287,7 @@ function extractLastMarkerJson(
   // separating whitespace). Do NOT scan ahead for a `{` — otherwise a malformed marker
   // with no payload could swallow unrelated JSON later in the message.
   if (text[searchFrom] !== '{') return { tagPresent: true, json: null };
-  const json = scanBalancedJson(text, searchFrom);
+  const json = scanBalancedJson(text, searchFrom, COUNCIL_RESULT_MAX_BYTES);
   if (json === null) return { tagPresent: true, json: null };
 
   // Require the marker to be framed: optional horizontal whitespace then its closing
@@ -285,8 +320,7 @@ export function parseCouncilResultManifest(
   const { tagPresent, json } = extractLastMarkerJson(text, COUNCIL_RESULT_MARKER_TAG);
   if (!tagPresent) return { status: 'missing' };
   if (json === null) return { status: 'invalid' };
-  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES)
-    return { status: 'invalid' };
+  if (utf8ByteLengthExceeds(json, COUNCIL_RESULT_MAX_BYTES)) return { status: 'invalid' };
 
   try {
     const parsed: unknown = JSON.parse(json);
@@ -455,7 +489,7 @@ export function parseGovernanceMarker(text: string | null | undefined): Governan
   // Same line-anchored, brace-aware, size-capped extraction as the manifest parser.
   const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
   if (json === null) return null;
-  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) return null;
+  if (utf8ByteLengthExceeds(json, COUNCIL_RESULT_MAX_BYTES)) return null;
   try {
     const parsed: unknown = JSON.parse(json);
     const result = GovernanceSchema.safeParse(parsed);

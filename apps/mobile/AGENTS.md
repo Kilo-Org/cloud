@@ -153,9 +153,12 @@ rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
 - Wrap each dynamically appearing item in `<Animated.View entering={FadeIn.duration(200)}>` to fade in instead of popping.
 - **Skeleton → content swap pattern**: Wrap skeletons in `<Animated.View exiting={FadeOut.duration(150)}>` and loaded items in `<Animated.View entering={FadeIn.duration(200)}>`, with `LinearTransition` on the parent container. This gives a smooth crossfade with no jump.
 
-### Empty States
+### Screen States
 
-- Use the `EmptyState` component (`src/components/empty-state.tsx`) for screens with no data. It takes a Lucide icon, title, and description.
+- Every data screen must explicitly handle empty, error, and happy states.
+- For empty states, use `EmptyState` (`src/components/empty-state.tsx`) with a Lucide icon, title, and description.
+- Distinguish recoverable or retryable errors from terminal errors. Offer a retry only when it can recover; otherwise explain what the user can do next.
+- In the happy state, use pagination or incremental loading whenever the result set can grow beyond a single useful screenful.
 
 ### Confirmations
 

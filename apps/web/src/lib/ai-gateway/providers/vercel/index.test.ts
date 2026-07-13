@@ -38,12 +38,12 @@ describe('applyVercelSettings', () => {
     expect(mockedGetCachedVercelInferenceProviderIdsForModel).not.toHaveBeenCalled();
   });
 
-  it('allows DeepSeek when the explicit provider list only contains Novita', async () => {
+  it('keeps Novita when it is the only explicit DeepSeek provider', async () => {
     const request = createDeepseekRequest(['novita']);
 
     await applyVercelSettings('deepseek/deepseek-v3.2', request, null);
 
-    expect(request.body.providerOptions?.gateway?.only).toBe(undefined);
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['novita']);
     expect(mockedGetCachedVercelInferenceProviderIdsForModel).not.toHaveBeenCalled();
   });
 

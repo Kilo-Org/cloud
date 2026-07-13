@@ -141,9 +141,9 @@ async function convertProviderOptions(
           providerId => providerId !== 'novita'
         ) ?? undefined;
     } else {
-      only = only.filter(providerId => providerId !== 'novita');
-      if (only.length === 0) {
-        only = undefined;
+      const onlyWithoutNovita = only.filter(providerId => providerId !== 'novita');
+      if (onlyWithoutNovita.length > 0) {
+        only = onlyWithoutNovita;
       }
     }
   }

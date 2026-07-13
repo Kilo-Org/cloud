@@ -501,6 +501,7 @@ export async function recordPendingFlushFailure(
     subtype?: WorkspaceFailureSubtype;
     safeFailureMessage?: string;
     retryable?: boolean;
+    scheduleTerminalizationRepair?: () => Promise<void>;
   }
 ): Promise<PendingFlushFailureResult> {
   if (options.code === undefined || options.code === 'UNKNOWN') {
@@ -556,6 +557,9 @@ export async function recordPendingFlushFailure(
     safeFailureMessage,
     deliveryDisposition: exhausted ? 'terminalization-pending' : undefined,
   };
+  if (exhausted) {
+    await options.scheduleTerminalizationRepair?.();
+  }
   await replaceStoredPendingSessionMessage(storage, message, updated);
   if (flushFailureCode === 'SANDBOX_CONNECT_FAILED') {
     logger

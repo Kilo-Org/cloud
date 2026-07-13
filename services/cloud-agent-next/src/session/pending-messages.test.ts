@@ -425,6 +425,58 @@ describe('recordPendingFlushFailure', () => {
     expect(result.nextFlushAttemptAt).toBeUndefined();
   });
 
+  it('schedules terminalization repair before persisting an exhausted disposition', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+    let repairScheduled = false;
+    const originalPut = storage.put.bind(storage);
+    storage.put = async (key, value) => {
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        'deliveryDisposition' in value &&
+        value.deliveryDisposition === 'terminalization-pending'
+      ) {
+        expect(repairScheduled).toBe(true);
+      }
+      await originalPut(key, value);
+    };
+
+    await recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+      policy: 'warm-followup',
+      code: 'BAD_REQUEST',
+      scheduleTerminalizationRepair: async () => {
+        repairScheduled = true;
+      },
+    });
+
+    expect(repairScheduled).toBe(true);
+  });
+
+  it('does not persist an exhausted disposition when repair scheduling fails', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    await expect(
+      recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+        policy: 'warm-followup',
+        code: 'BAD_REQUEST',
+        scheduleTerminalizationRepair: async () => {
+          throw new Error('alarm unavailable');
+        },
+      })
+    ).rejects.toThrow('alarm unavailable');
+
+    const [stored] = await listPendingSessionMessages(storage);
+    expect(stored).toMatchObject({
+      messageId: message.messageId,
+      flushAttempts: undefined,
+      deliveryDisposition: undefined,
+    });
+  });
+
   it('keeps exhausted messages in storage for caller terminalization', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage();

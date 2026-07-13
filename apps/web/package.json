@@ -168,7 +168,7 @@
     "tailwind-merge": "3.5.0",
     "tldts": "7.0.30",
     "ulid": "catalog:",
-    "uuid": "11.1.1",
+    "uuid": "14.0.0",
     "vaul": "1.1.2",
     "zod": "catalog:"
   },

@@ -1,8 +1,8 @@
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { Bot, ChevronRight, Loader2 } from 'lucide-react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
-import { type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
+import Animated, { LinearTransition } from 'react-native-reanimated';
+import { type KiloSessionId, type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
@@ -16,14 +16,15 @@ const MAX_NESTING_DEPTH = 5;
 export type RenderPartFn = (props: {
   part: Part;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  onOpenChildSession?: OpenChildSession;
 }) => ReactNode;
+
+export type OpenChildSession = (sessionId: KiloSessionId, title: string) => void;
 
 type ChildSessionSectionProps = {
   part: ToolPart;
   childMessages: StoredMessage[];
-  getChildMessages: (sessionId: string) => StoredMessage[];
-  renderPart: RenderPartFn;
-  depth?: number;
+  onOpenChildSession: OpenChildSession;
 };
 
 function getStringProperty(obj: unknown, key: string): string | undefined {
@@ -34,13 +35,13 @@ function getStringProperty(obj: unknown, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-export function getTaskToolSessionId(part: ToolPart): string | undefined {
+export function getTaskToolSessionId(part: ToolPart): KiloSessionId | undefined {
   if (part.tool !== 'task') {
     return undefined;
   }
   const { state } = part;
   if (state.status === 'running' || state.status === 'completed') {
-    return getStringProperty(state.metadata, 'sessionId');
+    return getStringProperty(state.metadata, 'sessionId') as KiloSessionId | undefined;
   }
   return undefined;
 }
@@ -101,11 +102,8 @@ function getToolContext(p: ToolPart): string | undefined {
 export function ChildSessionSection({
   part,
   childMessages,
-  getChildMessages,
-  renderPart,
-  depth = 0,
+  onOpenChildSession,
 }: Readonly<ChildSessionSectionProps>) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const colors = useThemeColors();
 
   const description = getStringProperty(part.state.input, 'description');
@@ -119,10 +117,6 @@ export function ChildSessionSection({
 
   const borderColor = getStatusBorderColor(status, colors);
 
-  const handlePress = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
-
   return (
     <Animated.View
       layout={LinearTransition.duration(200)}
@@ -132,16 +126,18 @@ export function ChildSessionSection({
     >
       <Pressable
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
-        onPress={handlePress}
+        onPress={() => {
+          if (sessionId) {
+            onOpenChildSession(sessionId, subtitle);
+          }
+        }}
+        disabled={!sessionId}
         accessibilityRole="button"
         accessibilityLabel={`${subtitle}, ${status}`}
+        accessibilityHint={sessionId ? 'Open subagent session' : undefined}
+        accessibilityState={{ disabled: !sessionId }}
       >
-        <ChevronRight
-          size={14}
-          color={colors.mutedForeground}
-          // eslint-disable-next-line react-native/no-inline-styles -- animated rotation
-          style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
-        />
+        <ChevronRight size={14} color={colors.mutedForeground} />
 
         {isRunning ? (
           <SpinningIcon icon={Loader2} size={16} color={colors.agentSky} />
@@ -169,80 +165,27 @@ export function ChildSessionSection({
 
         <StatusBadge status={status} />
       </Pressable>
-
-      {isExpanded ? (
-        <Animated.View entering={FadeIn.duration(150)} className="gap-2 px-3 pb-3 pt-1">
-          <ExpandedContent
-            childMessages={childMessages}
-            depth={depth}
-            sessionId={sessionId}
-            isRunning={isRunning}
-            getChildMessages={getChildMessages}
-            renderPart={renderPart}
-          />
-        </Animated.View>
-      ) : null}
     </Animated.View>
   );
 }
 
-function ExpandedContent({
-  childMessages,
-  depth,
-  sessionId,
-  isRunning,
-  getChildMessages,
-  renderPart,
-}: Readonly<{
-  childMessages: StoredMessage[];
-  depth: number;
-  sessionId: string | undefined;
-  isRunning: boolean;
-  getChildMessages: (sessionId: string) => StoredMessage[];
-  renderPart: RenderPartFn;
-}>) {
-  if (childMessages.length > 0) {
-    if (depth >= MAX_NESTING_DEPTH) {
-      return <Text className="text-xs text-muted-foreground">Maximum nesting depth reached.</Text>;
-    }
-    return (
-      <>
-        {childMessages.map(msg => (
-          <MessageErrorBoundary key={msg.info.id}>
-            <ChildSessionMessage
-              message={msg}
-              depth={depth}
-              getChildMessages={getChildMessages}
-              renderPart={renderPart}
-            />
-          </MessageErrorBoundary>
-        ))}
-      </>
-    );
-  }
-
-  if (sessionId) {
-    return (
-      <Text className="text-xs text-muted-foreground">
-        {isRunning ? 'Waiting for child session messages…' : 'No messages in child session'}
-      </Text>
-    );
-  }
-
-  return null;
-}
-
-function ChildSessionMessage({
+export function ChildSessionMessage({
   message,
   depth,
   getChildMessages,
   renderPart,
+  onOpenChildSession,
 }: Readonly<{
   message: StoredMessage;
   depth: number;
   getChildMessages: (sessionId: string) => StoredMessage[];
   renderPart: RenderPartFn;
+  onOpenChildSession: OpenChildSession;
 }>) {
+  if (depth >= MAX_NESTING_DEPTH) {
+    return <Text className="text-xs text-muted-foreground">Maximum nesting depth reached.</Text>;
+  }
+
   return (
     <View className="gap-1 rounded-md bg-secondary p-2">
       {message.parts.map(p => {
@@ -255,16 +198,14 @@ function ChildSessionMessage({
               key={p.id}
               part={p}
               childMessages={nestedMessages}
-              getChildMessages={getChildMessages}
-              renderPart={renderPart}
-              depth={depth + 1}
+              onOpenChildSession={onOpenChildSession}
             />
           );
         }
 
         return (
           <MessageErrorBoundary key={p.id}>
-            {renderPart({ part: p, getChildMessages })}
+            {renderPart({ part: p, getChildMessages, onOpenChildSession })}
           </MessageErrorBoundary>
         );
       })}

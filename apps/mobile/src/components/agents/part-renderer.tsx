@@ -14,12 +14,14 @@ import {
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { ToolPartRenderer } from './tool-part-renderer';
+import { type OpenChildSession } from './child-session-section';
 
 type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
+  onOpenChildSession?: OpenChildSession;
 };
 
 export function PartRenderer({
@@ -27,6 +29,7 @@ export function PartRenderer({
   isStreaming,
   getChildMessages,
   defaultReasoningExpanded,
+  onOpenChildSession,
 }: Readonly<PartRendererProps>) {
   if (isTextPart(part)) {
     return (
@@ -42,6 +45,7 @@ export function PartRenderer({
           part={part}
           getChildMessages={getChildMessages}
           renderPart={props => <PartRenderer {...props} />}
+          onOpenChildSession={onOpenChildSession}
         />
       </MessageErrorBoundary>
     );

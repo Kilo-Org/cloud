@@ -9,6 +9,7 @@ import { MarkdownText } from './markdown-text';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
+import { type OpenChildSession } from './child-session-section';
 
 type MessageBubbleProps = {
   message: StoredMessage;
@@ -16,6 +17,7 @@ type MessageBubbleProps = {
   isSessionStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
+  onOpenChildSession?: OpenChildSession;
 };
 
 export function MessageBubble({
@@ -24,6 +26,7 @@ export function MessageBubble({
   isSessionStreaming,
   getChildMessages,
   defaultReasoningExpanded,
+  onOpenChildSession,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
@@ -102,6 +105,7 @@ export function MessageBubble({
             isStreaming={isStreaming}
             getChildMessages={getChildMessages}
             defaultReasoningExpanded={defaultReasoningExpanded}
+            onOpenChildSession={onOpenChildSession}
           />
         ))}
       </View>

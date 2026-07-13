@@ -24,13 +24,16 @@ OUTBOX="${OUTBOX:-$REPO_ROOT/dev/logs/emails}"
 # Newest sign-in-code email for EMAIL, or empty.
 latest_email() {
   [ -d "$OUTBOX" ] || return 0
-  local f
-  for f in $(ls -t "$OUTBOX"/*.html 2>/dev/null); do
-    if grep -q "Intended recipient: $EMAIL" "$f" 2>/dev/null; then
-      echo "$f"
-      return 0
+  local f newest=""
+  shopt -s nullglob
+  for f in "$OUTBOX"/*.html; do
+    if grep -q "Intended recipient: $EMAIL" "$f" 2>/dev/null &&
+      { [ -z "$newest" ] || [ "$f" -nt "$newest" ]; }; then
+      newest="$f"
     fi
   done
+  [ -n "$newest" ] && printf '%s\n' "$newest"
+  return 0
 }
 
 before="$(latest_email)"
@@ -50,10 +53,12 @@ for _ in $(seq 1 10); do
 done
 
 if [ -z "$code" ]; then
-  echo "==> no new sign-in code (already signed in?) — assuming logged in"
-  exit 0
+  echo "==> no new sign-in code; verifying existing session"
+  maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/login-assert-home.yaml"
+  echo "==> already signed in"
+  exit
 fi
 
-echo "==> verifying code $code"
+echo "==> verifying sign-in code"
 maestro --device "$DEVICE" test -e "OTP=$code" "$SCRIPT_DIR/flows/login-verify-code.yaml"
 echo "==> signed in"

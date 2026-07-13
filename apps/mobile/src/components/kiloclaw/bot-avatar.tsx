@@ -1,6 +1,8 @@
 import {
   Bot,
   Brain,
+  CircleDot,
+  Dumbbell,
   Eye,
   Flame,
   FlameKindling,
@@ -11,6 +13,9 @@ import {
   Orbit,
   Rainbow,
   Satellite,
+  ScanEye,
+  Settings,
+  Shapes,
   Sparkles,
   Telescope,
   WandSparkles,
@@ -18,9 +23,17 @@ import {
   Zap,
 } from 'lucide-react-native';
 
+import { botAvatarFallbackIndex } from '@/components/kiloclaw/bot-avatar-options';
+
 type Avatar = { Icon: LucideIcon };
 
 const DEFAULT_AVATAR: Avatar = { Icon: Bot };
+const FALLBACK_AVATARS: readonly Avatar[] = [
+  { Icon: CircleDot },
+  { Icon: Orbit },
+  { Icon: Shapes },
+  { Icon: Sparkles },
+];
 const AVATARS: ReadonlyMap<string, Avatar> = new Map([
   ['🤖', DEFAULT_AVATAR],
   ['👾', { Icon: Gamepad2 }],
@@ -38,6 +51,9 @@ const AVATARS: ReadonlyMap<string, Avatar> = new Map([
   ['🪄', { Icon: WandSparkles }],
   ['👽', { Icon: Telescope }],
   ['🪬', { Icon: Eye }],
+  ['🦾', { Icon: Dumbbell }],
+  ['⚙️', { Icon: Settings }],
+  ['🧿', { Icon: ScanEye }],
 ]);
 
 type BotAvatarProps = {
@@ -47,6 +63,7 @@ type BotAvatarProps = {
 };
 
 export function BotAvatar({ emoji, color, size }: Readonly<BotAvatarProps>) {
-  const { Icon } = AVATARS.get(emoji) ?? DEFAULT_AVATAR;
+  const fallback = FALLBACK_AVATARS[botAvatarFallbackIndex(emoji, FALLBACK_AVATARS.length)];
+  const { Icon } = AVATARS.get(emoji) ?? fallback ?? DEFAULT_AVATAR;
   return <Icon size={size} color={color} />;
 }

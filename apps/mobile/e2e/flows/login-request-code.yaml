@@ -21,7 +21,7 @@ appId: com.kilocode.kiloapp
 # not yet consented), or the login page (signed out).
 - extendedWaitUntil:
     visible:
-      text: 'Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+      text: 'HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
     timeout: 30000
 # Grant the notification permission prompt if iOS shows one on first launch.
 - runFlow:
@@ -36,14 +36,8 @@ appId: com.kilocode.kiloapp
     commands:
       - tapOn: 'Accept and continue'
       - extendedWaitUntil:
-          visible: 'Home, tab, 1 of 4'
+          visible: 'HOME|Home, tab, 1 of 4'
           timeout: 15000
-# Already signed in -> nothing to request.
-- runFlow:
-    when:
-      visible: 'Home, tab, 1 of 4'
-    commands:
-      - stopApp
 # Signed out -> submit the email to trigger the code.
 - runFlow:
     when:

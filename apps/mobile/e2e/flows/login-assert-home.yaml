@@ -1,0 +1,4 @@
+# Confirms the login helper's already-authenticated branch leaves the app on Home.
+appId: com.kilocode.kiloapp
+---
+- assertVisible: 'HOME|Home, tab, 1 of 4'

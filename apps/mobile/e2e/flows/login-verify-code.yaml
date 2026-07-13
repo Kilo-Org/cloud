@@ -17,7 +17,7 @@ appId: com.kilocode.kiloapp
 # A brand-new account's first sign-in shows a consent screen before Home.
 - extendedWaitUntil:
     visible:
-      text: 'Accept and continue|Home, tab, 1 of 4'
+      text: 'Accept and continue|HOME|Home, tab, 1 of 4'
     timeout: 20000
 - runFlow:
     when:
@@ -31,5 +31,5 @@ appId: com.kilocode.kiloapp
     commands:
       - tapOn: 'Allow'
 - extendedWaitUntil:
-    visible: 'Home, tab, 1 of 4'
+    visible: 'HOME|Home, tab, 1 of 4'
     timeout: 15000

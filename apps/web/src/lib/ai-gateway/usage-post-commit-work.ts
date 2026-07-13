@@ -1,6 +1,6 @@
 export type BestEffortPostCommitTask = {
   run: () => Promise<void>;
-  reportError: (error: unknown) => void;
+  reportError: (error: unknown) => void | Promise<void>;
 };
 
 export async function runBestEffortPostCommitTasks(
@@ -11,7 +11,7 @@ export async function runBestEffortPostCommitTasks(
       try {
         await task.run();
       } catch (error) {
-        task.reportError(error);
+        await task.reportError(error);
       }
     })
   );

@@ -500,6 +500,7 @@ export async function recordCostInsightDegradedInterval(
   const range = normalizeHourRange({ ...params, maxHours: Number.MAX_SAFE_INTEGER });
   return database.transaction(
     async transaction => {
+      await setCostInsightMaintenanceTimeouts(transaction);
       await transaction.execute(
         sql`SELECT pg_catalog.pg_advisory_xact_lock(
           pg_catalog.hashtextextended('cost-insight-degraded-intervals:v1', 0::bigint)

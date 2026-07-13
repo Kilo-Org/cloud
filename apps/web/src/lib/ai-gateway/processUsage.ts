@@ -34,6 +34,7 @@ import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+import { recordCostInsightDegradedInterval } from '@/lib/cost-insights/rollup-maintenance';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
@@ -78,7 +79,10 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
-import { captureCostInsightSpend } from '@kilocode/db/cost-insights-rollups';
+import {
+  captureCostInsightSpend,
+  getCostInsightUtcHourStart,
+} from '@kilocode/db/cost-insights-rollups';
 import {
   getAiGatewayCostInsightFeatureKey,
   getAiGatewayCostInsightProductKey,
@@ -495,6 +499,17 @@ function reportPostCommitFailure(
   });
 }
 
+function getUtcHourRange(occurredAt: string): {
+  startHour: string;
+  endHourExclusive: string;
+} {
+  const startHour = getCostInsightUtcHourStart(occurredAt);
+  return {
+    startHour,
+    endHourExclusive: new Date(Date.parse(startHour) + 60 * 60 * 1_000).toISOString(),
+  };
+}
+
 function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
   const organizationId = usage.organization_id;
   if (!organizationId) return null;
@@ -546,7 +561,7 @@ function costInsightSpendCaptureTask(
       });
       scheduleCostInsightEvaluationAfterSpend(owner);
     },
-    reportError: error => {
+    reportError: async error => {
       reportPostCommitFailure(
         'post-commit cost insight spend capture failed',
         error,
@@ -558,6 +573,24 @@ function costInsightSpendCaptureTask(
         },
         usage.id
       );
+      try {
+        await recordCostInsightDegradedInterval(db, {
+          ...getUtcHourRange(usage.created_at),
+          source: 'ai_gateway',
+          reason: 'capture_bypass',
+        });
+      } catch (repairSignalError) {
+        reportPostCommitFailure(
+          'post-commit cost insight repair signal failed',
+          repairSignalError,
+          {
+            source: 'postCommitCostInsightRepairSignal',
+            spendSource: 'ai_gateway',
+            ownerType: owner.type,
+          },
+          usage.id
+        );
+      }
     },
   };
 }

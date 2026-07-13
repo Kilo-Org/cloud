@@ -20,7 +20,7 @@ describe('runBestEffortPostCommitTasks', () => {
   test('awaits personal Cost Insights transaction through commit and connection release', async () => {
     const transactionMayCommit = deferred();
     const events: string[] = [];
-    const reportError = jest.fn();
+    const reportError = jest.fn((_error: unknown): void => {});
 
     const lifecycleWork = runBestEffortPostCommitTasks([
       {
@@ -63,14 +63,14 @@ describe('runBestEffortPostCommitTasks', () => {
           await personalMayCommit.promise;
           completed.push('personal');
         },
-        reportError: jest.fn(),
+        reportError: jest.fn((_error: unknown): void => {}),
       },
       {
         run: async () => {
           await organizationMayCommit.promise;
           completed.push('organization');
         },
-        reportError: jest.fn(),
+        reportError: jest.fn((_error: unknown): void => {}),
       },
     ]);
 
@@ -85,7 +85,7 @@ describe('runBestEffortPostCommitTasks', () => {
 
   test('reports rollback without rejecting lifecycle work or creating an unhandled rejection', async () => {
     const failure = new Error('transaction_failed');
-    const reportError = jest.fn();
+    const reportError = jest.fn((_error: unknown): void => {});
     const unhandledRejection = jest.fn();
     process.on('unhandledRejection', unhandledRejection);
 
@@ -100,7 +100,7 @@ describe('runBestEffortPostCommitTasks', () => {
           },
           {
             run: async () => {},
-            reportError: jest.fn(),
+            reportError: jest.fn((_error: unknown): void => {}),
           },
         ])
       ).resolves.toBeUndefined();
@@ -111,5 +111,30 @@ describe('runBestEffortPostCommitTasks', () => {
     } finally {
       process.off('unhandledRejection', unhandledRejection);
     }
+  });
+
+  test('awaits durable failure reporting before completing lifecycle work', async () => {
+    const repairSignalMayCommit = deferred();
+    const events: string[] = [];
+
+    const lifecycleWork = runBestEffortPostCommitTasks([
+      {
+        run: async () => {
+          throw new Error('transaction_failed');
+        },
+        reportError: async () => {
+          events.push('repair-signal-started');
+          await repairSignalMayCommit.promise;
+          events.push('repair-signal-committed');
+        },
+      },
+    ]);
+
+    await Promise.resolve();
+    expect(events).toEqual(['repair-signal-started']);
+
+    repairSignalMayCommit.resolve();
+    await lifecycleWork;
+    expect(events).toEqual(['repair-signal-started', 'repair-signal-committed']);
   });
 });

@@ -26,6 +26,7 @@ import { db } from '@/lib/drizzle';
 import {
   cost_insight_owner_hour_driver_buckets,
   cost_insight_owner_hour_totals,
+  cost_insight_rollup_degraded_intervals,
   microdollar_usage,
   microdollar_usage_daily,
   microdollar_usage_metadata,
@@ -613,6 +614,21 @@ describe('logMicrodollarUsage', () => {
         .from(cost_insight_owner_hour_totals)
         .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
       expect(totals).toHaveLength(0);
+
+      const [degradedInterval] = await db
+        .select()
+        .from(cost_insight_rollup_degraded_intervals)
+        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
+      expect(degradedInterval).toMatchObject({
+        reason: 'capture_bypass',
+        resolved_at: null,
+      });
+      expect(new Date(degradedInterval.start_hour).toISOString()).toBe(
+        new Date(Math.floor(Date.parse(core.created_at) / 3_600_000) * 3_600_000).toISOString()
+      );
+      expect(
+        Date.parse(degradedInterval.end_hour_exclusive) - Date.parse(degradedInterval.start_hour)
+      ).toBe(3_600_000);
     } finally {
       consoleErrorSpy.mockRestore();
     }

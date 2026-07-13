@@ -522,24 +522,76 @@ async function handleManagedGitLabOutbound(
   capability: { capability: string },
   outboundContainerId: string
 ): Promise<Response> {
+  const logFields = {
+    ...getSafeRequestLogFields(request),
+    provider: 'gitlab',
+    capabilityVersion: getCapabilityVersion(capability.capability),
+    outboundContainerId,
+  };
+  logDiagnostic('debug', logFields, 'Redeeming managed GitLab outbound request');
+
   const tokenService = env.GIT_TOKEN_SERVICE;
   if (!supportsGitLabSessionCapabilityRedemption(tokenService)) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-binding' },
+      'Managed GitLab outbound redemption unavailable'
+    );
     return new Response('GitLab authorization unavailable', { status: 502 });
   }
+
+  let result: Awaited<ReturnType<GitLabTokenRedemptionBinding['redeemGitLabSessionCapability']>>;
   try {
-    const result = await tokenService.redeemGitLabSessionCapability({
+    result = await tokenService.redeemGitLabSessionCapability({
       capability: capability.capability,
       outboundContainerId,
       requestMethod: request.method,
       requestUrl: request.url,
     });
-    if (!result.success) {
-      return new Response('GitLab authorization unavailable', { status: 502 });
-    }
-    return await forwardRedeemedRequest(request, result.headers, true);
-  } catch {
+  } catch (error) {
+    logDiagnostic(
+      'warn',
+      {
+        ...logFields,
+        failureStage: 'redemption-rpc',
+        errorClass: classifyDiagnosticError(error),
+      },
+      'Managed GitLab outbound redemption failed'
+    );
     return new Response('GitLab authorization unavailable', { status: 502 });
   }
+
+  if (!result.success) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
+      'Managed GitLab outbound redemption rejected'
+    );
+    return new Response('GitLab authorization unavailable', { status: 502 });
+  }
+
+  let response: Response;
+  try {
+    response = await forwardRedeemedRequest(request, result.headers, true);
+  } catch (error) {
+    logDiagnostic(
+      'warn',
+      {
+        ...logFields,
+        failureStage: 'upstream-forward',
+        errorClass: classifyDiagnosticError(error),
+      },
+      'Managed GitLab outbound forwarding failed'
+    );
+    return new Response('GitLab authorization unavailable', { status: 502 });
+  }
+
+  logDiagnostic(
+    'info',
+    { ...logFields, upstreamStatus: response.status },
+    'Managed GitLab outbound request forwarded'
+  );
+  return response;
 }
 
 export function handleManagedScmOutbound(

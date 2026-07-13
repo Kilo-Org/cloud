@@ -4,7 +4,10 @@ import {
   type OpenRouterInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  isOpenRouterProviderConfig,
+  type GatewayRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag =
   | 'reasoning'
@@ -167,9 +170,9 @@ export function applyKiloExclusiveModelSettings(
     return;
   }
   const provider = requestToMutate.body.provider;
-  if (provider?.only) {
+  if (isOpenRouterProviderConfig(provider) && provider.only) {
     provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
-  } else if (provider) {
+  } else if (isOpenRouterProviderConfig(provider)) {
     provider.only = [...restriction];
   } else {
     requestToMutate.body.provider = { only: [...restriction] };

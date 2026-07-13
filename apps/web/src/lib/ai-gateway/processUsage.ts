@@ -34,6 +34,14 @@ import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+import {
+  acknowledgeCostInsightRollupCapture,
+  enqueueCostInsightRollupRepair,
+} from '@/lib/cost-insights/rollup-repairs';
+import {
+  runBestEffortPostCommitTasks,
+  type BestEffortPostCommitTask,
+} from './usage-post-commit-work';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { reportAbuseCost } from '@/lib/ai-gateway/abuse-service';
@@ -74,7 +82,12 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
-import { captureCostInsightSpend } from '@kilocode/db/cost-insights-rollups';
+import {
+  acquireCostInsightOwnerHourLock,
+  acquireCostInsightOwnerHourSharedLock,
+  captureCostInsightSpend,
+  getCostInsightUtcHourStart,
+} from '@kilocode/db/cost-insights-rollups';
 import {
   getAiGatewayCostInsightFeatureKey,
   getAiGatewayCostInsightProductKey,
@@ -435,71 +448,184 @@ async function insertUsageTransaction(
   metadataFields: UsageMetaData
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
+    if (coreUsageFields.cost > 0) {
+      const owner = coreUsageFields.organization_id
+        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
+        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
+      await acquireCostInsightOwnerHourSharedLock(
+        tx,
+        owner,
+        getCostInsightUtcHourStart(coreUsageFields.created_at)
+      );
+    }
     const inserted = await insertUsageAndMetadataWithBalanceUpdate(
       tx,
       coreUsageFields,
       metadataFields
     );
+    if (coreUsageFields.cost > 0) {
+      const owner = coreUsageFields.organization_id
+        ? { type: 'organization' as const, id: coreUsageFields.organization_id }
+        : { type: 'user' as const, id: coreUsageFields.kilo_user_id };
+      await enqueueCostInsightRollupRepair(tx, {
+        usageId: coreUsageFields.id,
+        owner,
+        occurredAt: coreUsageFields.created_at,
+      });
+    }
     return { inserted };
   });
 }
 
-function scheduleOrganizationUsageMutation(usage: MicrodollarUsage): void {
-  const organizationId = usage.organization_id;
-  if (!organizationId) return;
+const COST_INSIGHT_CAPTURE_LOCK_TIMEOUT_MS = 2_000;
+const COST_INSIGHT_CAPTURE_STATEMENT_TIMEOUT_MS = 5_000;
+const COST_INSIGHT_CAPTURE_IDLE_TRANSACTION_TIMEOUT_MS = 10_000;
 
-  void db
-    .transaction(tx => mutateOrganizationUsage(tx, usage))
-    .then((result: OrganizationUsageMutationResult) =>
-      scheduleOrganizationLowBalanceAlert(organizationId, result)
-    )
-    .catch(error => {
-      console.error('post-commit organization usage mutation failed', error);
-      captureException(error, {
-        tags: { source: 'postCommitOrganizationUsageMutation' },
-        extra: { usageId: usage.id, organizationId },
-      });
-    });
+async function setCostInsightCaptureTimeouts(tx: UsageStatementExecutor): Promise<void> {
+  await tx.execute(sql`
+    SELECT
+      pg_catalog.set_config(
+        'lock_timeout',
+        ${`${COST_INSIGHT_CAPTURE_LOCK_TIMEOUT_MS}ms`},
+        true
+      ),
+      pg_catalog.set_config(
+        'statement_timeout',
+        ${`${COST_INSIGHT_CAPTURE_STATEMENT_TIMEOUT_MS}ms`},
+        true
+      ),
+      pg_catalog.set_config(
+        'idle_in_transaction_session_timeout',
+        ${`${COST_INSIGHT_CAPTURE_IDLE_TRANSACTION_TIMEOUT_MS}ms`},
+        true
+      )
+  `);
 }
 
-function scheduleCostInsightSpendCapture(
+function getPostgresErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  if ('code' in error && typeof error.code === 'string' && /^[0-9A-Z]{5}$/.test(error.code)) {
+    return error.code;
+  }
+  return 'cause' in error ? getPostgresErrorCode(error.cause) : null;
+}
+
+function reportPostCommitFailure(
+  message: string,
+  error: unknown,
+  tags: Record<string, string>,
+  usageId: string
+): void {
+  const databaseErrorCode = getPostgresErrorCode(error);
+  console.error(message, { databaseErrorCode });
+  captureException(new Error(message), {
+    tags,
+    extra: { usageId, databaseErrorCode },
+  });
+}
+
+function scheduleCostInsightEvaluationSafely(
+  owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
+  usageId: string
+): void {
+  try {
+    scheduleCostInsightEvaluationAfterSpend(owner);
+  } catch (error) {
+    reportPostCommitFailure(
+      'post-commit cost insight evaluation scheduling failed',
+      error,
+      {
+        source: 'postCommitCostInsightEvaluationScheduling',
+        ownerType: owner.type,
+      },
+      usageId
+    );
+  }
+}
+
+function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
+  const organizationId = usage.organization_id;
+  if (!organizationId) return null;
+
+  return {
+    run: async () => {
+      const result: OrganizationUsageMutationResult = await db.transaction(async tx => {
+        await setCostInsightCaptureTimeouts(tx);
+        return mutateOrganizationUsage(tx, usage);
+      });
+      scheduleOrganizationLowBalanceAlert(organizationId, result);
+    },
+    reportError: error => {
+      reportPostCommitFailure(
+        'post-commit organization usage mutation failed',
+        error,
+        { source: 'postCommitOrganizationUsageMutation' },
+        usage.id
+      );
+    },
+  };
+}
+
+function costInsightSpendCaptureTask(
   usage: MicrodollarUsage,
   metadataFields: UsageMetaData
-): void {
-  if (usage.cost <= 0) return;
+): BestEffortPostCommitTask | null {
+  if (usage.cost <= 0) return null;
 
   const owner = usage.organization_id
     ? { type: 'organization' as const, id: usage.organization_id }
     : { type: 'user' as const, id: usage.kilo_user_id };
 
-  void db
-    .transaction(tx =>
-      captureCostInsightSpend(tx, {
-        owner,
-        actorUserId: usage.kilo_user_id,
-        occurredAt: usage.created_at,
-        amountMicrodollars: usage.cost,
-        category: 'variable',
-        source: 'ai_gateway',
-        productKey: getAiGatewayCostInsightProductKey(metadataFields.feature),
-        featureKey: getAiGatewayCostInsightFeatureKey(metadataFields.api_kind),
-        modelOrPlanKey: usage.requested_model || usage.model || 'other',
-        providerKey: usage.inference_provider || usage.provider || 'other',
-      })
-    )
-    .then(() => scheduleCostInsightEvaluationAfterSpend(owner))
-    .catch(error => {
-      console.error('post-commit cost insight spend capture failed', error);
-      captureException(error, {
-        tags: {
+  return {
+    run: async () => {
+      await db.transaction(async tx => {
+        await setCostInsightCaptureTimeouts(tx);
+        await acquireCostInsightOwnerHourLock(
+          tx,
+          owner,
+          getCostInsightUtcHourStart(usage.created_at)
+        );
+        if (!(await acknowledgeCostInsightRollupCapture(tx, usage.id))) return;
+        await captureCostInsightSpend(tx, {
+          owner,
+          actorUserId: usage.kilo_user_id,
+          occurredAt: usage.created_at,
+          amountMicrodollars: usage.cost,
+          category: 'variable',
+          source: 'ai_gateway',
+          productKey: getAiGatewayCostInsightProductKey(metadataFields.feature),
+          featureKey: getAiGatewayCostInsightFeatureKey(metadataFields.api_kind),
+          modelOrPlanKey: usage.requested_model || usage.model || 'other',
+          providerKey: usage.inference_provider || usage.provider || 'other',
+        });
+      });
+      scheduleCostInsightEvaluationSafely(owner, usage.id);
+    },
+    reportError: async error => {
+      reportPostCommitFailure(
+        'post-commit cost insight spend capture failed',
+        error,
+        {
           source: 'postCommitCostInsightSpendCapture',
           spendCategory: 'variable',
           spendSource: 'ai_gateway',
           ownerType: owner.type,
         },
-        extra: { usageId: usage.id, ownerId: owner.id },
-      });
-    });
+        usage.id
+      );
+    },
+  };
+}
+
+async function runPostCommitUsageWork(
+  usage: MicrodollarUsage,
+  metadataFields: UsageMetaData
+): Promise<void> {
+  const tasks = [
+    organizationUsageMutationTask(usage),
+    costInsightSpendCaptureTask(usage, metadataFields),
+  ].filter(task => task !== null);
+  await runBestEffortPostCommitTasks(tasks);
 }
 
 function scheduleKiloPassBonusIfNeeded(
@@ -562,8 +688,7 @@ export async function insertUsageRecord(
       }
     );
 
-    scheduleOrganizationUsageMutation(coreUsageFields);
-    scheduleCostInsightSpendCapture(coreUsageFields, metadataFields);
+    await runPostCommitUsageWork(coreUsageFields, metadataFields);
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
     return {
       usageId: result.inserted.usageId,

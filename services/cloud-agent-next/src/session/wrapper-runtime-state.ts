@@ -742,6 +742,34 @@ export async function recordWrapperPong(
   }));
 }
 
+/**
+ * Reset liveness deadlines that went stale with the previous socket after an
+ * accepted reconnect. A ping (or its pong) lost with the old socket can never
+ * be satisfied, so a fresh ping is scheduled instead of letting the stale
+ * deadline expire into a wrapper_ping_timeout. The no-output deadline kept
+ * ticking while delivery was impossible, so it is extended to a fresh window
+ * rather than firing wrapper_no_output before buffered output can drain.
+ */
+export async function resetWrapperLivenessAfterReconnect(
+  storage: DurableObjectStorage,
+  wrapperGeneration: number,
+  wrapperConnectionId: string,
+  nextPingAt: number,
+  noOutputDeadlineAt: number
+): Promise<WrapperRuntimeState | null> {
+  return updateIfCurrent(storage, wrapperGeneration, wrapperConnectionId, current => {
+    const next = { ...current };
+    if (next.pingDeadlineAt !== undefined) {
+      next.pingDeadlineAt = undefined;
+      next.nextPingAt = nextPingAt;
+    }
+    if (next.noOutputDeadlineAt !== undefined) {
+      next.noOutputDeadlineAt = Math.max(next.noOutputDeadlineAt, noOutputDeadlineAt);
+    }
+    return next;
+  });
+}
+
 export async function markWrapperFinalizing(
   storage: DurableObjectStorage,
   wrapperRunId: string

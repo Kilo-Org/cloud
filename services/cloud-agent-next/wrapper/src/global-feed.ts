@@ -18,11 +18,18 @@ type OpenKiloGlobalFeedOptions = {
   fetchImpl?: typeof fetch;
   WebSocketImpl?: WebSocketCtor;
   retryDelayMs?: number;
+  backpressureStallMs?: number;
 };
 
 const OPEN_READY_STATE = 1;
 const GLOBAL_FEED_RETRY_DELAY_MS = 1_000;
 const MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES = 1024 * 1024;
+/**
+ * How long outbound backpressure may persist before the attempt is failed so
+ * the outer loop reconnects on a fresh socket. Catches half-open sockets that
+ * stay OPEN but never drain, which would otherwise drop events forever.
+ */
+const GLOBAL_FEED_BACKPRESSURE_STALL_MS = 60_000;
 const encoder = new TextEncoder();
 
 type RequiredGlobalFeedSession = SessionContext & {
@@ -156,6 +163,7 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
   const fetchImpl = options.fetchImpl ?? fetch;
   const WebSocketWithHeaders = (options.WebSocketImpl ?? WebSocket) as WebSocketCtor;
   const retryDelayMs = options.retryDelayMs ?? GLOBAL_FEED_RETRY_DELAY_MS;
+  const backpressureStallMs = options.backpressureStallMs ?? GLOBAL_FEED_BACKPRESSURE_STALL_MS;
   const closeController = new AbortController();
   let closed = false;
   let attemptAbortController: AbortController | undefined;
@@ -235,6 +243,7 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
       throw new Error(`Kilo global event stream failed: ${response.status}`);
     }
 
+    let backpressureSince: number | undefined;
     for await (const data of parseSseDataStream(response.body)) {
       if (closed || abortController.signal.aborted) break;
       let parsed: unknown;
@@ -249,14 +258,53 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
         continue;
       }
 
-      if (ws.readyState === OPEN_READY_STATE) {
-        const serialized = JSON.stringify(parsed);
-        const pendingBytes = ws.bufferedAmount + encoder.encode(serialized).byteLength;
-        if (pendingBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
-          throw new Error('Kilo global feed WebSocket buffer limit exceeded');
-        }
-        ws.send(serialized);
+      if (ws.readyState !== OPEN_READY_STATE) {
+        continue;
       }
+
+      const serialized = JSON.stringify(parsed);
+      const eventBytes = encoder.encode(serialized).byteLength;
+
+      // The global feed is best-effort: it does not own session completion, and
+      // the primary /ingest path remains authoritative. A single oversized
+      // event or transient backpressure never fatals the feed loop — drop the
+      // event, log a structured signal, and keep consuming so later events
+      // still flow once pressure clears. Backpressure that never clears is
+      // treated as a dead socket and fails the attempt so the outer loop
+      // reconnects.
+
+      if (eventBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
+        logToFile(
+          JSON.stringify({
+            message: 'kilo_global_feed_event_dropped_oversized',
+            eventBytes,
+            limitBytes: MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES,
+          })
+        );
+        continue;
+      }
+
+      const bufferedAmount = ws.bufferedAmount;
+      const pendingBytes = bufferedAmount + eventBytes;
+      if (pendingBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
+        const now = Date.now();
+        if (backpressureSince !== undefined && now - backpressureSince >= backpressureStallMs) {
+          throw new Error('Kilo global feed WebSocket backpressure stalled');
+        }
+        backpressureSince ??= now;
+        logToFile(
+          JSON.stringify({
+            message: 'kilo_global_feed_event_dropped_backpressure',
+            bufferedAmount,
+            eventBytes,
+            limitBytes: MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES,
+          })
+        );
+        continue;
+      }
+
+      backpressureSince = undefined;
+      ws.send(serialized);
     }
   }
 

@@ -50,7 +50,7 @@
     },
     {
       "path": "/api/cron/cost-insights-hourly",
-      "schedule": "0 * * * *"
+      "schedule": "5 * * * *"
     },
     {
       "path": "/api/cron/cost-insights-retention",

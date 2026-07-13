@@ -44,9 +44,11 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Managed SCM credential containment org IDs (optional)
-# Comma-separated list of org IDs that use managed SCM containment, or `*` for all orgs
-MANAGED_SCM_CONTAINMENT_ORG_IDS=
+# Credential containment org IDs (optional)
+# Each value is a comma-separated list of org IDs, or `*` for all orgs.
+GITHUB_TOKEN_CONTAINMENT_ORG_IDS=
+GITLAB_TOKEN_CONTAINMENT_ORG_IDS=
+KILOCODE_TOKEN_CONTAINMENT_ORG_IDS=
 
 # Repo snapshot org IDs (optional)
 # Comma-separated list of org IDs that receive workspace repo snapshots, or `*` for all orgs/users
@@ -87,6 +89,10 @@ R2_SECRET_ACCESS_KEY=""
 # Sandbox containers reach the host via `host.docker.internal`.
 # @url cloudflare-session-ingest
 KILO_SESSION_INGEST_URL=http://host.docker.internal:8800
+
+# Local debugging only. Set to 1 to log full URLs rejected during Kilo capability
+# redemption. Those URLs can contain tokens; never enable this in a deployed Worker.
+LOG_REJECTED_KILO_URLS=0
 
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next

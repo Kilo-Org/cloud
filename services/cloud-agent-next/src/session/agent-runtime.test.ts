@@ -329,7 +329,14 @@ describe('AgentRuntime', () => {
     } as unknown as AgentSandbox;
     const runtime = createAgentRuntime({
       storage,
-      env: { WORKER_URL: 'https://worker.example.com' } as Env,
+      env: {
+        WORKER_URL: 'https://worker.example.com',
+        NEXTAUTH_SECRET: 'test-secret',
+        SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
+        GIT_TOKEN_SERVICE: {
+          issueKiloSessionCapability: async () => ({ success: true, capability: 'kka1.test' }),
+        },
+      } as unknown as Env,
       getMetadata: async () => createMetadata(),
       getSessionIdForLogs: () => 'agent_runtime',
       sendToWrapper: () => false,
@@ -388,7 +395,14 @@ describe('AgentRuntime', () => {
     } as unknown as AgentSandbox;
     const runtime = createAgentRuntime({
       storage,
-      env: { WORKER_URL: 'https://worker.example.com' } as Env,
+      env: {
+        WORKER_URL: 'https://worker.example.com',
+        NEXTAUTH_SECRET: 'test-secret',
+        SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
+        GIT_TOKEN_SERVICE: {
+          issueKiloSessionCapability: async () => ({ success: true, capability: 'kka1.test' }),
+        },
+      } as unknown as Env,
       getMetadata: async () => createMetadata(),
       getSessionIdForLogs: () => 'agent_runtime',
       sendToWrapper: () => false,
@@ -445,7 +459,14 @@ describe('AgentRuntime', () => {
     } as unknown as AgentSandbox;
     const runtime = createAgentRuntime({
       storage,
-      env: { WORKER_URL: 'https://worker.example.com' } as Env,
+      env: {
+        WORKER_URL: 'https://worker.example.com',
+        NEXTAUTH_SECRET: 'test-secret',
+        SandboxSmall: { idFromName: () => ({ toString: () => 'container-id' }) },
+        GIT_TOKEN_SERVICE: {
+          issueKiloSessionCapability: async () => ({ success: true, capability: 'kka1.test' }),
+        },
+      } as unknown as Env,
       getMetadata: async () => createMetadata(),
       getSessionIdForLogs: () => 'agent_runtime',
       sendToWrapper: () => false,

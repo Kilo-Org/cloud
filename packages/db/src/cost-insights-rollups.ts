@@ -255,6 +255,20 @@ export async function acquireCostInsightOwnerHourLock(
   );
 }
 
+export async function acquireCostInsightOwnerHourSharedLock(
+  tx: CostInsightRollupTransactionWriter,
+  owner: CostInsightSpendOwner,
+  hourStart: string
+): Promise<void> {
+  assertOwner(owner);
+  const normalizedHourStart = getCostInsightUtcHourStart(hourStart);
+  const lockKey = buildCostInsightOwnerHourLockKey(owner, normalizedHourStart);
+
+  await tx.execute(
+    sql`SELECT pg_catalog.pg_advisory_xact_lock_shared(pg_catalog.hashtextextended(${lockKey}, 0::bigint))`
+  );
+}
+
 type CostInsightCaptureOutcome = {
   outcome: 'ok' | 'cost_insight_driver_digest_collision';
 };

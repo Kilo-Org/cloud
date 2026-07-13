@@ -30,8 +30,9 @@ Prefer one generated migration per unshipped feature branch.
 Load `database-migrations` for shared PostgreSQL migration work. Load
 `git-rebase` for migration conflicts during a rebase.
 
-For shared-schema PII additions, follow root `AGENTS.md`'s `softDeleteUser` and
-corresponding test invariant; do not duplicate that rule here.
+When adding user or account PII to shared PostgreSQL, update `softDeleteUser` in
+`apps/web/src/lib/user/index.ts` to delete or anonymize it and add corresponding
+coverage in `apps/web/src/lib/user/index.test.ts`.
 
 ## Timestamp boundaries
 

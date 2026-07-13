@@ -252,7 +252,7 @@ type GroupedRegisterSessionInput = {
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
-    'sandboxId' | 'sandboxRoute' | 'shallow' | 'devcontainerRequested'
+    'sandboxId' | 'sandboxRoute' | 'shallow' | 'credentialContainment' | 'devcontainerRequested'
   >;
 };
 
@@ -951,6 +951,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const disconnected = await ingestHandler.handleIngestClose(ws);
 
       if (disconnected) {
+        if (code === 1009) {
+          logger
+            .withFields({
+              sessionId: this.sessionId,
+              wrapperRunId: disconnected.wrapperRunId,
+              wrapperGeneration: disconnected.wrapperGeneration,
+              wrapperConnectionId: disconnected.wrapperConnectionId,
+              logTag: 'wrapper_ingest_closed_message_too_large',
+            })
+            .warn('Wrapper ingest closed because a message exceeded the platform size limit');
+        }
         const wrapperSupervisor = this.getWrapperSupervisor();
         await wrapperSupervisor.onDisconnected({
           disconnected,

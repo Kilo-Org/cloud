@@ -7,7 +7,11 @@
  */
 
 import type { AlertSeverity } from './slo-config';
-import { PAGE_COOLDOWN_SECONDS, TICKET_COOLDOWN_SECONDS } from './slo-config';
+import {
+  PAGE_COOLDOWN_SECONDS,
+  TICKET_COOLDOWN_SECONDS,
+  INFO_COOLDOWN_SECONDS,
+} from './slo-config';
 
 function alertKey(
   severity: AlertSeverity,
@@ -19,9 +23,24 @@ function alertKey(
   return `o11y:alert:${severity}:${alertType}:${provider}:${model}:${clientName}`;
 }
 
+const COOLDOWN_SECONDS: Record<AlertSeverity, number> = {
+  page: PAGE_COOLDOWN_SECONDS,
+  ticket: TICKET_COOLDOWN_SECONDS,
+  info: INFO_COOLDOWN_SECONDS,
+};
+
 function cooldownForSeverity(severity: AlertSeverity): number {
-  return severity === 'page' ? PAGE_COOLDOWN_SECONDS : TICKET_COOLDOWN_SECONDS;
+  return COOLDOWN_SECONDS[severity];
 }
+
+// Higher severities that suppress a given severity for the same dimension.
+// Lower severities never suppress higher ones, so an early warning does not
+// block escalation (e.g. an info alert at 60% does not suppress a ticket at 80%).
+const HIGHER_SEVERITIES: Record<AlertSeverity, AlertSeverity[]> = {
+  page: [],
+  ticket: ['page'],
+  info: ['page', 'ticket'],
+};
 
 /**
  * Check whether an alert should be suppressed.
@@ -41,12 +60,10 @@ export async function shouldSuppress(
   const existing = await kv.get(key);
   if (existing) return true;
 
-  // If this is a ticket, also check if a page-level alert is active
-  // (page suppresses ticket for the same dimension).
-  if (severity === 'ticket') {
-    const pageKey = alertKey('page', alertType, provider, model, clientName);
-    const pageExisting = await kv.get(pageKey);
-    if (pageExisting) return true;
+  // A higher-severity marker for the same dimension suppresses this alert.
+  for (const higher of HIGHER_SEVERITIES[severity]) {
+    const higherExisting = await kv.get(alertKey(higher, alertType, provider, model, clientName));
+    if (higherExisting) return true;
   }
 
   return false;

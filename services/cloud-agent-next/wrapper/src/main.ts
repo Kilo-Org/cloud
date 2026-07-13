@@ -594,7 +594,8 @@ async function main() {
         request.session,
         serverConfig,
         serverDeps,
-        'close-until-runtime-ready'
+        'close-until-runtime-ready',
+        request.kiloSessionId
       );
       if (bindError) {
         const error = (await bindError.json()) as {

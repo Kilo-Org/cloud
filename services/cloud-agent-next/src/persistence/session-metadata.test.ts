@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CurrentSessionMetadataSchema,
+  getEffectiveCredentialContainment,
   parseSessionMetadata,
+  requiresContainmentSandbox,
   serializeSessionMetadata,
 } from './session-metadata.js';
 
@@ -24,6 +26,59 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it('maps legacy managed SCM containment to GitHub and Kilo only', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_legacy_containment', userId: 'user_containment' },
+      auth: {},
+      workspace: { managedScmContainment: true },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: true,
+      gitlab: false,
+      kilocode: true,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(true);
+  });
+
+  it('prefers an explicit grouped policy over legacy containment metadata', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_migrated_containment', userId: 'user_containment' },
+      auth: {},
+      workspace: {
+        credentialContainment: { github: false, gitlab: false, kilocode: false },
+        managedScmContainment: true,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: false,
+      kilocode: false,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(false);
+  });
+
+  it('defaults missing credential containment to uncontained', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_no_containment', userId: 'user_containment' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(getEffectiveCredentialContainment(metadata)).toEqual({
+      github: false,
+      gitlab: false,
+      kilocode: false,
+    });
+    expect(requiresContainmentSandbox(metadata)).toBe(false);
+  });
+
   it('parses and serializes current grouped metadata with canonical attachments', () => {
     const current = {
       metadataSchemaVersion: 2 as const,

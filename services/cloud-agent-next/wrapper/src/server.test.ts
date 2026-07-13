@@ -549,6 +549,46 @@ describe('wrapper Kilo proxy route', () => {
 });
 
 describe('wrapper session binding', () => {
+  it('binds the kiloSessionId supplied by the caller even when config has not been updated yet', async () => {
+    // A freshly bootstrapped wrapper's ServerConfig.sessionId starts out empty
+    // and is only set by the caller after the ready request's binding is
+    // processed. bindSessionContext must use the id the caller already knows
+    // (from the ready request), not a stale config value, since that id also
+    // seeds the log uploader's kiloSessionId for the wrapper's entire life.
+    const state = new WrapperState();
+
+    const response = await bindSessionContext(
+      {
+        ingestUrl: 'ws://worker.test/ingest',
+        workerAuthToken: 'worker-token',
+        wrapperRunId: 'run_1',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_1',
+      },
+      {
+        port: 5000,
+        workspacePath: '/workspace/repo',
+        version: 'test',
+        sessionId: '',
+        agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+        userId: 'user_test',
+      },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        openConnection: async () => {},
+        closeConnection: async () => {},
+        setAborted: () => {},
+        resetLifecycle: () => {},
+      },
+      'close-until-runtime-ready',
+      'kilo_sess_real'
+    );
+
+    expect(response).toBeNull();
+    expect(state.currentSession?.kiloSessionId).toBe('kilo_sess_real');
+  });
+
   it('rejects even the current binding while the wrapper is finalizing', async () => {
     const state = new WrapperState();
     const sessionBinding = {

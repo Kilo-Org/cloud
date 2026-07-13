@@ -81,6 +81,14 @@ const cloudMessageCompletedEventSchema = z.object({
   completionSource: z.literal('manual_compact_summarize'),
 });
 
+const wrapperEventTruncatedSchema = z.object({
+  originalStreamEventType: z.string(),
+  kiloEventName: z.string().optional(),
+  originalBytes: z.number(),
+  compactedBytes: z.number().optional(),
+  reason: z.string(),
+});
+
 const wrapperGenerationParamSchema = z.coerce.number().int().nonnegative();
 
 function getAssistantErrorMessage(error: unknown): string | undefined {
@@ -454,10 +462,10 @@ export function createIngestHandler(
       state.acceptWebSocket(server, [ingestTag]);
       server.serializeAttachment(attachment);
 
-      await doContext.wrapperSupervisor.recordReconnectAccepted({
-        wrapperGeneration,
-        wrapperConnectionId,
-      });
+      await doContext.wrapperSupervisor.recordReconnectAccepted(
+        { wrapperGeneration, wrapperConnectionId },
+        now
+      );
 
       doContext.keepContainerAlive?.();
       logger
@@ -530,11 +538,46 @@ export function createIngestHandler(
           : Date.now();
 
         const eventType = ingestEvent.streamEventType;
+        const now = Date.now();
+
+        // Internal size-safety signal: the wrapper compacted/replaced an event
+        // to fit the frame budget. Count it as liveness-relevant (the wrapper
+        // is actively sending) but do not persist or broadcast it to /stream
+        // clients; it is an internal diagnostic only.
+        if (eventType === 'wrapper_event_truncated') {
+          const parsedTruncation = wrapperEventTruncatedSchema.safeParse(ingestEvent.data);
+          logger
+            .withFields({
+              sessionId,
+              wrapperRunId,
+              wrapperGeneration,
+              wrapperConnectionId,
+              ...(parsedTruncation.success
+                ? {
+                    originalStreamEventType: parsedTruncation.data.originalStreamEventType,
+                    kiloEventName: parsedTruncation.data.kiloEventName,
+                    originalBytes: parsedTruncation.data.originalBytes,
+                    compactedBytes: parsedTruncation.data.compactedBytes,
+                    reason: parsedTruncation.data.reason,
+                  }
+                : { parseError: parsedTruncation.error.message }),
+              logTag: 'wrapper_event_truncated',
+            })
+            .warn('Wrapper ingest event was truncated to fit the frame budget');
+          if (wrapperGeneration !== undefined && wrapperConnectionId) {
+            await doContext.wrapperSupervisor.observeMeaningfulOutput(
+              wrapperGeneration,
+              wrapperConnectionId,
+              now
+            );
+          }
+          return;
+        }
+
         const publicEventData = sanitizePublicEventData(eventType, ingestEvent.data ?? {});
         const payload = JSON.stringify(publicEventData);
         const eventTypeStr: string = eventType;
 
-        const now = Date.now();
         const kiloEventName =
           eventType === 'kilocode'
             ? ((ingestEvent.data as Record<string, unknown> | undefined)?.event as

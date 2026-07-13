@@ -2,6 +2,8 @@ import { dirname, relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
+import { validateWrapperDispatchTicket } from './auth.js';
+import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 
 vi.mock('./logger.js', () => ({
   logger: {
@@ -82,7 +84,10 @@ import {
   writeGlobalRules,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
-import { parseSessionMetadata } from './persistence/session-metadata.js';
+import {
+  parseSessionMetadata,
+  type CredentialContainment,
+} from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxId, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
@@ -112,7 +117,7 @@ describe('SessionService.buildRuntimeEnv', () => {
     const runtimeEnv = service.buildRuntimeEnv({
       context,
       env: createEnv(),
-      originalToken: 'kilo-token',
+      kiloCapability: 'kilo-token',
     });
 
     expect(runtimeEnv.HOME).toBe('/home/agent_test');
@@ -382,6 +387,11 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
       }),
       issueGitLabSessionCapability: vi.fn(),
       redeemGitLabSessionCapability: vi.fn(),
+      issueKiloSessionCapability: vi.fn().mockResolvedValue({
+        success: true,
+        capability: 'kka1.default',
+      }),
+      redeemKiloSessionCapability: vi.fn(),
     },
     NOTIFICATIONS: {} as unknown as PersistenceEnv['NOTIFICATIONS'],
   } satisfies PersistenceEnv;
@@ -401,14 +411,17 @@ function createMetadata(overrides: Record<string, unknown> = {}): CloudAgentSess
     platform: 'gitlab',
     ...overrides,
   });
-  const managedScmContainment =
-    overrides.managedScmContainment === true ||
-    (overrides.managedScmContainment !== false &&
-      overrides.platform === 'github' &&
-      !(typeof overrides.sandboxId === 'string' && overrides.sandboxId.startsWith('dind-')));
+  const credentialContainment =
+    (overrides.credentialContainment as CredentialContainment | undefined) ??
+    (overrides.platform === 'github' &&
+    !(typeof overrides.sandboxId === 'string' && overrides.sandboxId.startsWith('dind-'))
+      ? ({ github: true, gitlab: false, kilocode: true } as CredentialContainment)
+      : undefined);
   return {
     ...metadata,
-    workspace: { ...metadata.workspace, managedScmContainment },
+    ...(credentialContainment
+      ? { workspace: { ...metadata.workspace, credentialContainment } }
+      : {}),
   };
 }
 
@@ -430,7 +443,9 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
       platform: 'gitlab',
     },
     agent: { mode: 'code', model: 'kilo/test-model' },
-    workspace: { managedScmContainment: true },
+    workspace: {
+      credentialContainment: { github: false, gitlab: true, kilocode: true },
+    },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -740,6 +755,104 @@ describe('SessionService.prepareWorkspace', () => {
     expect(workspaceMocks.updateGitRemoteUrl.mock.invocationCallOrder[0]).toBeLessThan(
       session.exec.mock.invocationCallOrder[restoreCallIndex] ?? 0
     );
+  });
+
+  it('writes the opaque Kilo capability to the sandbox auth file, never the raw token', async () => {
+    const session = createSession(false);
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(session, false, writeFile);
+    const metadata = createMetadata({
+      credentialContainment: { github: false, gitlab: false, kilocode: true },
+    });
+    const env = createEnv();
+    const issueKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kka1.workspace-issued',
+    });
+    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env,
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(issueKiloSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userToken: 'kilo-token',
+        outboundContainerId: 'containment-small-sandbox-do-id',
+      })
+    );
+    const authFileCall = writeFile.mock.calls.find(
+      ([path]) => path === '/home/agent_test/.local/share/kilo/auth.json'
+    );
+    expect(authFileCall).toBeDefined();
+    const authFileContent = authFileCall?.[1] as string;
+    expect(authFileContent).toContain('kka1.workspace-issued');
+    expect(authFileContent).not.toContain('kilo-token');
+    for (const [, content] of writeFile.mock.calls) {
+      if (typeof content === 'string') {
+        expect(content).not.toContain('kilo-token');
+      }
+    }
+  });
+
+  it('binds the restore-token file to the opaque Kilo capability for a standard devcontainer session, never the raw token', async () => {
+    const session = createSession(false);
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(session, false, writeFile);
+    const metadata = {
+      ...createMetadata({ preparedAt: 1 }),
+      workspace: {
+        sandboxId: 'ses-abcdef' as const,
+        devcontainerRequested: true,
+        credentialContainment: { github: false, gitlab: false, kilocode: true },
+      },
+    } satisfies CloudAgentSessionState;
+    const env = createEnv();
+    const issueKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kka1.restore-issued',
+    });
+    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env,
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    const restoreTokenCall = writeFile.mock.calls.find(
+      ([path]) => path === '/home/agent_test/.local/share/kilo/session-restore-token'
+    );
+    expect(restoreTokenCall).toBeDefined();
+    expect(restoreTokenCall?.[1]).toBe('kka1.restore-issued');
+    const restoreCall = session.exec.mock.calls.find(
+      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
+    );
+    expect(restoreCall?.[0]).not.toContain('kilo-token');
   });
 
   it('types ENOSPC during the cold devcontainer probe before provisioning', async () => {
@@ -1439,7 +1552,9 @@ describe('SessionService.prepareWorkspace', () => {
         userId: 'user_test',
         sessionId: 'agent_test' as SessionId,
         env: createEnv(),
-        metadata: createMetadata({ managedScmContainment: true }),
+        metadata: createMetadata({
+          credentialContainment: { github: false, gitlab: true, kilocode: false },
+        }),
       })
     ).rejects.toThrow('GitLab token lookup failed (rpc_error)');
 
@@ -1581,10 +1696,38 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   }
 
+  it('uses a containment sandbox with a Kilo capability and raw GitLab token for Kilo-only containment', async () => {
+    const issueKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kka1.default',
+    });
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        credentialContainment: { github: false, gitlab: false, kilocode: true },
+      }),
+      env => {
+        if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+        env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
+      }
+    );
+
+    expect(issueKiloSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({ outboundContainerId: 'containment-small-sandbox-do-id' })
+    );
+    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
+    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gitlab-token' });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kka1.default');
+  });
+
   it('uses a managed GitLab capability when containment is explicitly set for a standard sandbox', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata(),
-      workspace: { sandboxId: 'ses-abcdef', managedScmContainment: true },
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
+      },
     } satisfies CloudAgentSessionState);
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
@@ -1604,7 +1747,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
   it('uses a managed GitLab capability when containment is explicitly set for shared sandboxes', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata(),
-      workspace: { sandboxId: 'usr-abcdef', managedScmContainment: true },
+      workspace: {
+        sandboxId: 'usr-abcdef',
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
+      },
     } satisfies CloudAgentSessionState);
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
@@ -1626,7 +1772,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const result = await buildPromptWrapperRequests(
       createMetadata({
         gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/repo.git',
-        managedScmContainment: false,
       })
     );
 
@@ -1634,7 +1779,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_SUBFOLDER).toBe('gitlab');
   });
 
-  it('uses a managed GitHub capability for every standard sandbox', async () => {
+  it('uses a GitHub capability and raw Kilo token for GitHub-only containment', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata({
         githubRepo: 'acme/repo',
@@ -1643,7 +1788,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         platform: 'github',
         createdOnPlatform: 'cloud-agent-web',
       }),
-      workspace: { sandboxId: 'ses-abcdef', managedScmContainment: true },
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        credentialContainment: { github: true, gitlab: false, kilocode: false },
+      },
     } satisfies CloudAgentSessionState);
 
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
@@ -1658,6 +1806,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({ token: 'kgh2.default' });
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
   });
 
   it('uses a managed GitHub capability for shared standard sandboxes', async () => {
@@ -1669,7 +1818,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         platform: 'github',
         createdOnPlatform: 'cloud-agent-web',
       }),
-      workspace: { sandboxId: 'usr-abcdef', managedScmContainment: true },
+      workspace: {
+        sandboxId: 'usr-abcdef',
+        credentialContainment: { github: true, gitlab: false, kilocode: true },
+      },
     } satisfies CloudAgentSessionState);
 
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
@@ -1741,7 +1893,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
   it('derives a managed capability from the SandboxSmallContainment container ID', async () => {
     await buildPromptWrapperRequests({
       ...createMetadata(),
-      workspace: { sandboxId: 'ses-abcdef', managedScmContainment: true },
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
+      },
     } satisfies CloudAgentSessionState);
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
@@ -1753,7 +1908,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
   it('derives a managed capability from the shared SandboxContainment container ID', async () => {
     await buildPromptWrapperRequests({
       ...createMetadata(),
-      workspace: { sandboxId: 'usr-abcdef', managedScmContainment: true },
+      workspace: {
+        sandboxId: 'usr-abcdef',
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
+      },
     } satisfies CloudAgentSessionState);
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
@@ -1788,7 +1946,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
 
     await expect(
-      buildPromptWrapperRequests(createMetadata({ managedScmContainment: true }))
+      buildPromptWrapperRequests(
+        createMetadata({
+          credentialContainment: { github: false, gitlab: true, kilocode: false },
+        })
+      )
     ).rejects.toThrow('GitLab token lookup failed (rpc_error)');
 
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
@@ -1816,7 +1978,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
   it('uses a managed GitLab capability for an explicitly contained prepared wrapper workspace', async () => {
     const result = await buildPromptWrapperRequests(
-      createMetadata({ preparedAt: 1, managedScmContainment: true })
+      createMetadata({
+        preparedAt: 1,
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
+      })
     );
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
@@ -1898,15 +2063,21 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.devcontainer).toEqual({ requested: true, resolved: devcontainer });
   });
 
-  it('materializes workspace setup and prompt delivery without using provider token overrides for ingest auth', async () => {
+  it('materializes workspace setup and prompt delivery behind an opaque Kilo capability, never the raw tokens', async () => {
     const service = new SessionService();
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
-    env.KILOCODE_TOKEN_OVERRIDE = 'provider-override-token';
+    const issueKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kka1.issued',
+    });
+    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
     const metadata = createMetadata({
       setupCommands: ['pnpm install'],
       envVars: { PUBLIC_VALUE: 'visible' },
       upstreamBranch: 'main',
+      credentialContainment: { github: false, gitlab: true, kilocode: true },
     });
 
     const result = await service.buildWrapperSessionReadyAndPromptRequests({
@@ -1952,11 +2123,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       sessionHome: '/home/agent_test',
       branchName: 'main',
       kiloSessionId: 'kilo-session',
-      gitToken: 'resolved-gitlab-token',
+      gitToken: 'kgl2.default',
       gitlabTokenManaged: true,
     });
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
     expect(result.readyRequest).toMatchObject({
       agentSessionId: 'agent_test',
       userId: 'user_test',
@@ -1971,7 +2142,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       repo: {
         kind: 'git',
         url: 'https://gitlab.com/acme/repo.git',
-        token: 'resolved-gitlab-token',
+        token: 'kgl2.default',
         platform: 'gitlab',
       },
       materialized: {
@@ -1984,15 +2155,41 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('workspace');
     expect(result.promptRequest).not.toHaveProperty('materialized');
     expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
-    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('provider-override-token');
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kka1.issued');
     expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
-      kilo: { type: 'api', key: 'kilo-token' },
+      kilo: { type: 'api', key: 'kka1.issued' },
     });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
-    expect(JSON.stringify(result.readyRequest)).not.toContain('kgl2.default');
+    expect(issueKiloSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user_test',
+        cloudAgentSessionId: 'agent_test',
+        kiloSessionId: 'kilo-session',
+        userToken: 'kilo-token',
+        outboundContainerId: 'containment-small-sandbox-do-id',
+      })
+    );
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('kgl2.default');
+    expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
+    expect(JSON.stringify(result.readyRequest)).not.toContain('kilo-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBe('true');
-    expect(result.readyRequest.session.workerAuthToken).toBe('kilo-token');
+    expect(result.readyRequest.session.workerAuthToken).not.toBe('kilo-token');
+    const ticketResult = await validateWrapperDispatchTicket(
+      `Bearer ${result.readyRequest.session.workerAuthToken}`,
+      'secret'
+    );
+    expect(ticketResult).toMatchObject({
+      success: true,
+      claims: {
+        type: 'wrapper_dispatch_ticket',
+        userId: 'user_test',
+        cloudAgentSessionId: 'agent_test',
+        kiloSessionId: 'kilo-session',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'conn_test',
+      },
+    });
     expect(result.readyRequest.session.wrapperRunId).toBe('wr_test');
     expect(result.readyRequest).not.toHaveProperty('message');
     expect(result.readyRequest).not.toHaveProperty('agent');
@@ -2016,6 +2213,167 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.promptRequest).not.toHaveProperty('prompt');
     expect(result.promptRequest).not.toHaveProperty('attachments');
     expect(result.promptRequest.session).toEqual(result.readyRequest.session);
+  });
+
+  it('pins the provider baseURL to the target baked into the issued capability, not env.KILO_OPENROUTER_BASE independently', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    env.KILO_OPENROUTER_BASE = 'https://openrouter.wrong-base.example.com';
+    env.KILO_SESSION_INGEST_URL = 'http://localhost:8800/ingest/';
+    const issueKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kka1.issued',
+    });
+    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
+    // The stored Kilo token can encode its own provider base URL (e.g. a
+    // self-hosted proxy) — that must win over the worker's static
+    // KILO_OPENROUTER_BASE — the capability's baked-in target and the
+    // sandbox's actual outbound baseURL must agree, or the outbound
+    // interceptor rejects the request as upstream_not_allowed.
+    const metadata = createMetadata({
+      upstreamBranch: 'main',
+      kilocodeToken: 'http://localhost:9911/api/openrouter/:provider-token',
+      credentialContainment: { github: false, gitlab: false, kilocode: true },
+    });
+    const derivedTargets = deriveKiloSandboxTargets(env, metadata.auth.kilocodeToken ?? '');
+    if (!derivedTargets.success) throw new Error('Expected valid derived Kilo sandbox targets');
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bPayloadTestAAAA',
+          prompt: 'Do the work',
+        },
+        agent: { mode: 'code', model: 'test-model', variant: 'thinking' },
+        finalization: { autoCommit: true, condenseOnComplete: false },
+        workspace: { sandboxId: 'ses-abcdef', metadata },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_test',
+            wrapperGeneration: 2,
+            wrapperConnectionId: 'conn_test',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    const configContent = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      provider: { kilo: { options: { baseURL?: string } } };
+    };
+    expect(configContent.provider.kilo.options.baseURL).toBe(
+      derivedTargets.targets.providerBaseUrl
+    );
+    expect(result.readyRequest.materialized.env.KILO_SESSION_INGEST_URL).toBe(
+      derivedTargets.targets.sessionIngestBaseUrl
+    );
+    expect(issueKiloSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({ targets: derivedTargets.targets })
+    );
+    expect(configContent.provider.kilo.options.baseURL).not.toBe(
+      'https://openrouter.wrong-base.example.com'
+    );
+    expect(result.readyRequest.materialized.env.KILO_SESSION_INGEST_URL).not.toBe(
+      'http://localhost:8800/ingest/'
+    );
+  });
+
+  it('treats transient Kilo capability issuance failures as retryable workspace setup failures', async () => {
+    await expect(
+      buildPromptWrapperRequests(
+        createMetadata({
+          credentialContainment: { github: false, gitlab: false, kilocode: true },
+        }),
+        env => {
+          if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+          env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = vi
+            .fn()
+            .mockRejectedValue(new Error('binding unavailable'));
+        }
+      )
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      message: 'Kilo session capability issuance failed (rpc_error)',
+    });
+  });
+
+  it('falls back to the raw Kilo token for DIND sandboxes, which have no outbound interceptor to redeem a capability against', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const issueKiloSessionCapability = vi.fn();
+    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
+    const metadata = createMetadata({ sandboxId: 'dind-abcdef' });
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bDindFallbackAA',
+          prompt: 'Do the work',
+        },
+        agent: { mode: 'code', model: 'test-model' },
+        workspace: { sandboxId: 'dind-abcdef', metadata },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_dind',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_dind',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(issueKiloSessionCapability).not.toHaveBeenCalled();
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
+      kilo: { type: 'api', key: 'kilo-token' },
+    });
+  });
+
+  it('falls back to the raw Kilo token for an uncontained session', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const issueKiloSessionCapability = vi.fn();
+    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
+    const metadata = createMetadata();
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bContainmentFallbackAA',
+          prompt: 'Do the work',
+        },
+        agent: { mode: 'code', model: 'test-model' },
+        workspace: { sandboxId: 'ses-abcdef', metadata },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_containment_fallback',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_cf',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    expect(issueKiloSessionCapability).not.toHaveBeenCalled();
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
+    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
+      kilo: { type: 'api', key: 'kilo-token' },
+    });
   });
 
   it('allowlists only the active session attachment directory for Kilo file access', async () => {
@@ -2108,7 +2466,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
 
     await expect(
-      buildPromptWrapperRequests(createMetadata({ managedScmContainment: true }))
+      buildPromptWrapperRequests(
+        createMetadata({
+          credentialContainment: { github: false, gitlab: true, kilocode: false },
+        })
+      )
     ).rejects.toThrow('GitLab token lookup failed (rpc_error)');
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalled();
@@ -2310,7 +2672,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       createMetadata({
         gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo',
         platform: 'gitlab',
-        managedScmContainment: true,
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
       })
     );
 
@@ -2342,7 +2704,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
   it('preserves explicit profile GitLab CLI values over a managed capability', async () => {
     const result = await buildPromptWrapperRequests(
       createMetadata({
-        managedScmContainment: true,
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
         envVars: {
           GITLAB_TOKEN: 'explicit-profile-token',
           GITLAB_HOST: 'profile.gitlab.example.com',
@@ -2363,7 +2725,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
   it('preserves an explicit profile GLAB_IS_OAUTH2 value when injecting a managed GitLab token', async () => {
     const result = await buildPromptWrapperRequests(
       createMetadata({
-        managedScmContainment: true,
+        credentialContainment: { github: false, gitlab: true, kilocode: false },
         envVars: {
           GLAB_IS_OAUTH2: 'false',
         },

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { Env } from './types.js';
+import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 
 const {
   getRunningTerminalClientMock,
@@ -139,6 +140,22 @@ function signKiloToken(userId = 'usr_1'): string {
     },
     secret,
     { algorithm: 'HS256' }
+  );
+}
+
+function signWrapperDispatchTicket(overrides: Partial<WrapperDispatchTicketClaims> = {}): string {
+  return mintWrapperDispatchTicket(
+    {
+      type: 'wrapper_dispatch_ticket',
+      userId: 'usr_feed',
+      cloudAgentSessionId: 'agent_live',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      wrapperRunId: 'wr_1',
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_1',
+      ...overrides,
+    },
+    secret
   );
 }
 
@@ -513,7 +530,7 @@ describe('server raw global feed route', () => {
     );
     env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
     env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
-    const token = signKiloToken('usr_feed');
+    const ticket = signWrapperDispatchTicket();
 
     const response = await fetchWorker(
       new Request(
@@ -521,7 +538,7 @@ describe('server raw global feed route', () => {
         {
           headers: {
             Upgrade: 'websocket',
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${ticket}`,
             Cookie: 'session=secret',
             'x-kilo-facade-user-id': 'usr_attacker',
             'x-kilo-facade-auth-token': 'attacker-token',
@@ -565,6 +582,77 @@ describe('server raw global feed route', () => {
     });
     const facadeFetch = vi.fn();
     env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${ticket}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(409);
+    expect(facadeFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects repeated producer identity parameters before session validation', async () => {
+    const env = createEnv();
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperRunId=wr_2&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${ticket}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed producer generation before session validation', async () => {
+    const env = createEnv();
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2abc&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${ticket}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it('accepts a legacy raw Kilo JWT for wrapper processes bound before dispatch tickets shipped', async () => {
+    const env = createEnv();
+    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () => new Response('accepted', { status: 200 })
+    );
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
     const token = signKiloToken('usr_feed');
 
     const response = await fetchWorker(
@@ -580,49 +668,225 @@ describe('server raw global feed route', () => {
       env
     );
 
-    expect(response.status).toBe(409);
-    expect(facadeFetch).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
+    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledWith({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      wrapperRunId: 'wr_1',
+      wrapperGeneration: 2,
+      wrapperConnectionId: 'conn_1',
+    });
   });
 
-  it('rejects repeated producer identity parameters before session validation', async () => {
+  it('rejects a ticket whose fence claims disagree with the request query', async () => {
     const env = createEnv();
-    const token = signKiloToken('usr_feed');
+    const ticket = signWrapperDispatchTicket({ wrapperRunId: 'wr_stale' });
 
     const response = await fetchWorker(
       new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperRunId=wr_2&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
         {
           headers: {
             Upgrade: 'websocket',
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${ticket}`,
           },
         }
       ),
       env
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
   });
+});
 
-  it('rejects malformed producer generation before session validation', async () => {
+describe('server wrapper ingest route', () => {
+  it('accepts a valid wrapper dispatch ticket and forwards to the session Durable Object', async () => {
     const env = createEnv();
-    const token = signKiloToken('usr_feed');
+    const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    const ticket = signWrapperDispatchTicket();
 
     const response = await fetchWorker(
       new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2abc&wrapperConnectionId=conn_1',
+        'http://worker.test/sessions/usr_feed/agent_live/ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
         {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Upgrade: 'websocket', Authorization: `Bearer ${ticket}` },
         }
       ),
       env
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
+    expect(doFetch).toHaveBeenCalledOnce();
+    expect(new URL(doFetch.mock.calls[0][0].url).pathname).toBe('/ingest');
+  });
+
+  it('accepts a legacy raw Kilo JWT for wrapper processes bound before dispatch tickets shipped', async () => {
+    const env = createEnv();
+    const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
+    expect(doFetch).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a ticket minted for a different user', async () => {
+    const env = createEnv();
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_other/agent_live/ingest', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${ticket}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Token does not match session user');
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
+  it('rejects a ticket whose fence claims disagree with the request query', async () => {
+    const env = createEnv();
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=99&wrapperConnectionId=conn_1',
+        {
+          headers: { Upgrade: 'websocket', Authorization: `Bearer ${ticket}` },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+});
+
+describe('server wrapper log upload route', () => {
+  function createLogEnv() {
+    const env = createEnv();
+    return Object.assign(env, {
+      R2_BUCKET: { put: vi.fn().mockResolvedValue(undefined) },
+    });
+  }
+
+  it('accepts a valid wrapper dispatch ticket and stores the upload in R2', async () => {
+    const env = createLogEnv();
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${ticket}` },
+          body: new Uint8Array([1, 2, 3]),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+    expect(env.R2_BUCKET.put.mock.calls[0][0]).toBe('logs/usr_feed/agent_live/session/logs.tar.gz');
+  });
+
+  it('accepts a legacy raw Kilo JWT for wrapper processes bound before dispatch tickets shipped', async () => {
+    const env = createLogEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` },
+          body: new Uint8Array([1, 2, 3]),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+  });
+
+  it('accepts the old legacy log upload URL without a kiloSessionId query parameter', async () => {
+    const env = createLogEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'usr_feed',
+      cloudAgentSessionId: 'agent_live',
+    });
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+    expect(env.R2_BUCKET.put.mock.calls[0][0]).toBe('logs/usr_feed/agent_live/session/logs.tar.gz');
+  });
+
+  it('rejects an upload missing the kiloSessionId parameter', async () => {
+    const env = createLogEnv();
+    const ticket = signWrapperDispatchTicket();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ticket}` },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+  });
+
+  it('rejects a ticket whose kiloSessionId disagrees with the request query', async () => {
+    const env = createLogEnv();
+    const ticket = signWrapperDispatchTicket({ kiloSessionId: 'ses_other0000000000000000000' });
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${ticket}` },
+          body: new Uint8Array([1, 2, 3]),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
   });
 });

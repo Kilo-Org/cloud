@@ -11,6 +11,10 @@ import {
 } from './hourly-sweep-repository';
 import { dispatchPendingCostInsightNotifications } from './notifications';
 import {
+  listPendingCostInsightRepairOwnerKeys,
+  processPendingCostInsightRollupRepairs,
+} from './rollup-repairs';
+import {
   deleteExpiredCostInsightEvents,
   listEnabledCostInsightOwnerPage,
   type CostInsightDatabase,
@@ -21,6 +25,7 @@ const DEFAULT_SWEEP_TIME_BUDGET_MS = 240_000;
 const OWNER_PAGE_SIZE = 20;
 const OWNER_CONCURRENCY = 4;
 const DIRTY_OWNER_LIMIT = 20;
+const ROLLUP_REPAIR_LIMIT = 2;
 const NOTIFICATION_LIMIT = 25;
 const CHECKPOINT_LEASE_SECONDS = 5 * 60;
 
@@ -28,6 +33,7 @@ export type CostInsightHourlySweepSummary = {
   evaluatedOwners: number;
   failedOwners: Array<{ owner: CostInsightSpendOwner; error: string }>;
   dirtyEvaluations: Awaited<ReturnType<typeof processPendingCostInsightEvaluations>>;
+  rollupRepairs: Awaited<ReturnType<typeof processPendingCostInsightRollupRepairs>>;
   notifications: Awaited<ReturnType<typeof dispatchPendingCostInsightNotifications>>;
   dirtyQueueDepthBefore: number;
   dirtyQueueDepthAfter: number;
@@ -49,6 +55,7 @@ export async function runCostInsightHourlySweep(
   options: {
     asOf?: string;
     dirtyOwnerLimit?: number;
+    rollupRepairLimit?: number;
     timeBudgetMs?: number;
     ownerPageSize?: number;
     ownerConcurrency?: number;
@@ -59,12 +66,39 @@ export async function runCostInsightHourlySweep(
   const deadline = performance.now() + (options.timeBudgetMs ?? DEFAULT_SWEEP_TIME_BUDGET_MS);
   const ownerConcurrency = options.ownerConcurrency ?? OWNER_CONCURRENCY;
   const dirtyQueueDepthBefore = await countCostInsightDirtyOwnerQueueDepth(database);
-  const dirtyEvaluations = await processPendingCostInsightEvaluations(database, {
-    limit: options.dirtyOwnerLimit ?? DIRTY_OWNER_LIMIT,
+  let rollupRepairs: Awaited<ReturnType<typeof processPendingCostInsightRollupRepairs>> = {
+    claimed: 0,
+    repaired: 0,
+    failed: [],
+  };
+  let dirtyEvaluations: Awaited<ReturnType<typeof processPendingCostInsightEvaluations>> = {
+    claimed: 0,
+    evaluatedOwners: [],
+    failedOwners: [],
+    evaluationDurationMs: 0,
+    rawCanonicalFallbackCount: 0,
+    rollupDegradedIntervalCount: 0,
+  };
+  const lease = await acquireCostInsightHourlySweepLease(database, {
     asOf,
-    recoverCompletedHour: true,
-    concurrency: ownerConcurrency,
+    leaseSeconds: CHECKPOINT_LEASE_SECONDS,
   });
+  if (lease) {
+    try {
+      rollupRepairs = await processPendingCostInsightRollupRepairs(database, {
+        limit: options.rollupRepairLimit ?? ROLLUP_REPAIR_LIMIT,
+      });
+      dirtyEvaluations = await processPendingCostInsightEvaluations(database, {
+        limit: options.dirtyOwnerLimit ?? DIRTY_OWNER_LIMIT,
+        asOf,
+        recoverCompletedHour: true,
+        concurrency: ownerConcurrency,
+      });
+    } catch (error) {
+      await releaseCostInsightHourlySweepLease(database, lease.leaseToken);
+      throw error;
+    }
+  }
   const claimedOwnerKeys = new Set(
     [
       ...dirtyEvaluations.evaluatedOwners,
@@ -83,10 +117,6 @@ export async function runCostInsightHourlySweep(
   let ownerCycleComplete = false;
   let cycleId: string | null = null;
 
-  const lease = await acquireCostInsightHourlySweepLease(database, {
-    asOf,
-    leaseSeconds: CHECKPOINT_LEASE_SECONDS,
-  });
   if (!lease) {
     alreadyRunning = true;
   } else {
@@ -105,10 +135,17 @@ export async function runCostInsightHourlySweep(
           await completeCostInsightHourlySweepCycle(database, lease.leaseToken);
           break;
         }
+        const pendingRepairOwnerKeys = await listPendingCostInsightRepairOwnerKeys(
+          database,
+          page.owners
+        );
         const outcomes = await Promise.all(
           page.owners.map(owner =>
             limitOwnerWork(async () => {
               if (claimedOwnerKeys.has(ownerKey(owner))) return { owner, skipped: true as const };
+              if (pendingRepairOwnerKeys.has(ownerKey(owner))) {
+                return { owner, skipped: true as const };
+              }
               try {
                 const evaluation = await evaluateCostInsightsForOwner(database, owner, {
                   asOf: lease.cycleAsOf,
@@ -161,6 +198,7 @@ export async function runCostInsightHourlySweep(
     evaluatedOwners,
     failedOwners,
     dirtyEvaluations,
+    rollupRepairs,
     notifications: await dispatchPendingCostInsightNotifications(
       database,
       options.notificationLimit ?? NOTIFICATION_LIMIT

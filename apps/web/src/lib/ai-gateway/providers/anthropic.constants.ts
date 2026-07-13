@@ -114,7 +114,7 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   gateway: 'openrouter',
-  flags: ['reasoning', 'vision'],
+  flags: ['reasoning', 'vision', 'vercel-routing'],
   pricing: null,
   exclusive_to: [],
   inference_provider_restriction: [],

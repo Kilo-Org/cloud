@@ -32,11 +32,13 @@ function asFetch(
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
   static initialBufferedAmount = 0;
+  /** Per-instance sequence returned by `bufferedAmount`, consumed left-to-right. */
+  static bufferedAmountSequence: number[] | undefined;
 
   readonly url: string;
   readonly options?: { headers?: Record<string, string> } | string | string[];
   readyState: number = WebSocket.CONNECTING;
-  bufferedAmount = FakeWebSocket.initialBufferedAmount;
+  private readonly bufferedAmountQueue: number[];
   sent: string[] = [];
   onopen: ((event: Event) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
@@ -45,11 +47,21 @@ class FakeWebSocket {
   constructor(url: string, options?: { headers?: Record<string, string> } | string | string[]) {
     this.url = url;
     this.options = options;
+    this.bufferedAmountQueue = FakeWebSocket.bufferedAmountSequence
+      ? [...FakeWebSocket.bufferedAmountSequence]
+      : [];
     FakeWebSocket.instances.push(this);
     queueMicrotask(() => {
       this.readyState = WebSocket.OPEN;
       this.onopen?.(new Event('open'));
     });
+  }
+
+  get bufferedAmount(): number {
+    if (this.bufferedAmountQueue.length > 0) {
+      return this.bufferedAmountQueue.shift() as number;
+    }
+    return FakeWebSocket.initialBufferedAmount;
   }
 
   send(data: string): void {
@@ -86,6 +98,7 @@ function makeKiloClient(serverUrl = 'http://127.0.0.1:4321'): WrapperKiloClient 
 afterEach(() => {
   FakeWebSocket.instances = [];
   FakeWebSocket.initialBufferedAmount = 0;
+  FakeWebSocket.bufferedAmountSequence = undefined;
 });
 
 describe('buildKiloGlobalFeedWebSocketUrl', () => {
@@ -257,6 +270,120 @@ describe('openKiloGlobalFeed', () => {
     connection.close();
     await connection.done;
 
+    expect(FakeWebSocket.instances[0].sent).toEqual([]);
+  });
+
+  it('drops a single oversized event without restarting the feed loop', async () => {
+    const state = new WrapperState();
+    bindGlobalFeedSession(state);
+    const fetchImpl = asFetch(async () => {
+      return new Response(
+        streamFromChunks([
+          'data: {"big":"' + 'x'.repeat(1_500_000) + '"}\n\n',
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_after_oversized"}}}\n\n',
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const connection = openKiloGlobalFeed({
+      state,
+      kiloClient: makeKiloClient(),
+      fetchImpl,
+      WebSocketImpl: FakeWebSocket as unknown as GlobalFeedWebSocketImpl,
+      retryDelayMs: 60_000,
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    connection.close();
+    await connection.done;
+
+    // No reconnect (single WebSocket instance); the oversized event was
+    // dropped and the following normal event was still forwarded.
+    expect(FakeWebSocket.instances.length).toBe(1);
+    expect(FakeWebSocket.instances[0].sent).toEqual([
+      JSON.stringify({
+        directory: '/workspace/root',
+        payload: { type: 'message.updated', properties: { id: 'msg_after_oversized' } },
+      }),
+    ]);
+  });
+
+  it('drops an event under backpressure then forwards later events once pressure clears', async () => {
+    const state = new WrapperState();
+    bindGlobalFeedSession(state);
+    // First read is backed up; the second read has drained.
+    FakeWebSocket.bufferedAmountSequence = [Number.MAX_SAFE_INTEGER, 0];
+    const fetchImpl = asFetch(async () => {
+      return new Response(
+        streamFromChunks([
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_dropped"}}}\n\n',
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_sent"}}}\n\n',
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const connection = openKiloGlobalFeed({
+      state,
+      kiloClient: makeKiloClient(),
+      fetchImpl,
+      WebSocketImpl: FakeWebSocket as unknown as GlobalFeedWebSocketImpl,
+      retryDelayMs: 60_000,
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+    connection.close();
+    await connection.done;
+
+    expect(FakeWebSocket.instances.length).toBe(1);
+    expect(FakeWebSocket.instances[0].sent).toEqual([
+      JSON.stringify({
+        directory: '/workspace/root',
+        payload: { type: 'message.updated', properties: { id: 'msg_sent' } },
+      }),
+    ]);
+  });
+
+  it('fails the attempt and reconnects when backpressure never clears', async () => {
+    const state = new WrapperState();
+    bindGlobalFeedSession(state);
+    FakeWebSocket.initialBufferedAmount = Number.MAX_SAFE_INTEGER;
+    let fetchCount = 0;
+    let secondFetchStarted: (() => void) | undefined;
+    const secondFetch = new Promise<void>(resolve => {
+      secondFetchStarted = resolve;
+    });
+    const fetchImpl = asFetch(async () => {
+      fetchCount += 1;
+      if (fetchCount === 2) {
+        secondFetchStarted?.();
+      }
+      return new Response(
+        streamFromChunks([
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_1"}}}\n\n',
+          'data: {"directory":"/workspace/root","payload":{"type":"message.updated","properties":{"id":"msg_2"}}}\n\n',
+        ]),
+        { status: 200 }
+      );
+    });
+
+    const connection = openKiloGlobalFeed({
+      state,
+      kiloClient: makeKiloClient(),
+      fetchImpl,
+      WebSocketImpl: FakeWebSocket as unknown as GlobalFeedWebSocketImpl,
+      retryDelayMs: 1,
+      backpressureStallMs: 0,
+    });
+
+    // The first drop starts the stall window; the second drop exceeds it and
+    // fails the attempt, forcing a reconnect on a fresh socket.
+    await secondFetch;
+    connection.close();
+    await connection.done;
+
+    expect(FakeWebSocket.instances.length).toBeGreaterThanOrEqual(2);
     expect(FakeWebSocket.instances[0].sent).toEqual([]);
   });
 

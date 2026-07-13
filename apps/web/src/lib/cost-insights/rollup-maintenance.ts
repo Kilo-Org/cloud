@@ -500,6 +500,7 @@ export async function recordCostInsightDegradedInterval(
   const range = normalizeHourRange({ ...params, maxHours: Number.MAX_SAFE_INTEGER });
   return database.transaction(
     async transaction => {
+      await setCostInsightMaintenanceTimeouts(transaction);
       await transaction.execute(
         sql`SELECT pg_catalog.pg_advisory_xact_lock(
           pg_catalog.hashtextextended('cost-insight-degraded-intervals:v1', 0::bigint)
@@ -748,6 +749,19 @@ export async function repairOwnerSpendRollups(
   }
 ): Promise<CostInsightHourReplacementResult[]> {
   const range = normalizeHourRange(params);
+  const { owner } = params;
+  const ownerRepairPredicate =
+    owner.type === 'user'
+      ? sql`owned_by_user_id = ${owner.id} AND owned_by_organization_id IS NULL`
+      : sql`owned_by_organization_id = ${owner.id} AND owned_by_user_id IS NULL`;
+  const dirtyConflictTarget =
+    owner.type === 'user'
+      ? sql.raw('(owned_by_user_id) WHERE owned_by_organization_id IS NULL')
+      : sql.raw('(owned_by_organization_id) WHERE owned_by_user_id IS NULL');
+  const ownerColumns =
+    owner.type === 'user'
+      ? { ownedByUserId: owner.id, ownedByOrganizationId: null }
+      : { ownedByUserId: null, ownedByOrganizationId: owner.id };
   const results: CostInsightHourReplacementResult[] = [];
   for (
     let hourTimestamp = Date.parse(range.startHour);
@@ -760,13 +774,39 @@ export async function repairOwnerSpendRollups(
     const result = await database.transaction(
       async transaction => {
         await setCostInsightMaintenanceTimeouts(transaction);
-        await acquireCostInsightOwnerHourLock(transaction, params.owner, hourStart);
+        await acquireCostInsightOwnerHourLock(transaction, owner, hourStart);
         const aggregation = await loadCanonicalCostInsightAggregation(transaction, {
-          owner: params.owner,
+          owner,
           startInclusive: hourStart,
           endExclusive: endHourExclusive,
         });
-        await replaceOwnerRollupsForHour(transaction, params.owner, hourStart, aggregation);
+        await replaceOwnerRollupsForHour(transaction, owner, hourStart, aggregation);
+        await transaction.execute(sql`
+          DELETE FROM cost_insight_rollup_repairs
+          WHERE ${ownerRepairPredicate}
+            AND hour_start = ${hourStart}
+        `);
+        await transaction.execute(sql`
+          INSERT INTO cost_insight_evaluation_dirty_owners AS dirty_owner (
+            owned_by_user_id,
+            owned_by_organization_id,
+            dirty_at,
+            next_attempt_at
+          ) VALUES (
+            ${ownerColumns.ownedByUserId},
+            ${ownerColumns.ownedByOrganizationId},
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+          )
+          ON CONFLICT ${dirtyConflictTarget}
+          DO UPDATE SET
+            generation = dirty_owner.generation + 1,
+            dirty_at = CURRENT_TIMESTAMP,
+            next_attempt_at = CURRENT_TIMESTAMP,
+            claimed_at = NULL,
+            claim_token = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        `);
         return summarizeReplacement(hourStart, aggregation, false, startedAt);
       },
       { isolationLevel: 'read committed' }

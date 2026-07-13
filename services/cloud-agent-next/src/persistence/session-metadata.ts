@@ -195,6 +195,14 @@ const MetadataSharedSandboxRouteSchema = z
   })
   .strip();
 
+const CredentialContainmentSchema = z
+  .object({
+    github: z.boolean(),
+    gitlab: z.boolean(),
+    kilocode: z.boolean(),
+  })
+  .strip();
+
 const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
@@ -203,6 +211,7 @@ const MetadataWorkspaceSchema = z
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),
+    credentialContainment: CredentialContainmentSchema.optional(),
     managedScmContainment: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
   })
@@ -275,6 +284,22 @@ export const CurrentSessionMetadataSchema = z
   .strip();
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
+export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
+
+export function getEffectiveCredentialContainment(
+  metadata: SessionMetadata
+): CredentialContainment {
+  if (metadata.workspace?.credentialContainment) {
+    return metadata.workspace.credentialContainment;
+  }
+  const legacyContainment = metadata.workspace?.managedScmContainment === true;
+  return { github: legacyContainment, gitlab: false, kilocode: legacyContainment };
+}
+
+export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
+  const containment = getEffectiveCredentialContainment(metadata);
+  return containment.github || containment.gitlab || containment.kilocode;
+}
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;
 

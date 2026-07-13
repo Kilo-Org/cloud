@@ -5,7 +5,13 @@ import { appRouter } from './router.js';
 import type { Env } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
-import { resolveSecret, validateStreamTicket, validateKiloToken } from './auth.js';
+import {
+  resolveSecret,
+  validateStreamTicket,
+  validateKiloToken,
+  validateWrapperDispatchTicket,
+  type WrapperAuthClaims,
+} from './auth.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
@@ -163,6 +169,52 @@ function createSanitizedForwardRequest(
   return new Request(url, init);
 }
 
+function parseOptionalWrapperGeneration(raw: string | null): number | undefined {
+  if (raw === null) return undefined;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
+
+/**
+ * Defense-in-depth on top of the DO's own fencing checks: reject a wrapper
+ * dispatch ticket whose claims disagree with the fence tuple carried on the
+ * request itself. Only compares fields the caller supplies — a route that
+ * doesn't parse a given fence field yet is not forced to require it.
+ *
+ * A legacy raw Kilo JWT (see auth.ts) carries no fence claims to compare, so
+ * it is exempt — wrapper processes bound before ticket support shipped rely
+ * on requireCurrentSessionAccess/the DO's own checks until their next dispatch.
+ */
+function ticketClaimsMismatchRequestFence(
+  claims: WrapperAuthClaims,
+  expected: {
+    cloudAgentSessionId: string;
+    kiloSessionId?: string | null;
+    wrapperRunId?: string | null;
+    wrapperGeneration?: number;
+    wrapperConnectionId?: string | null;
+  }
+): boolean {
+  if (claims.type !== 'wrapper_dispatch_ticket') return false;
+  if (claims.cloudAgentSessionId !== expected.cloudAgentSessionId) return true;
+  if (expected.kiloSessionId != null && claims.kiloSessionId !== expected.kiloSessionId)
+    return true;
+  if (expected.wrapperRunId != null && claims.wrapperRunId !== expected.wrapperRunId) return true;
+  if (
+    expected.wrapperGeneration !== undefined &&
+    claims.wrapperGeneration !== expected.wrapperGeneration
+  ) {
+    return true;
+  }
+  if (
+    expected.wrapperConnectionId != null &&
+    claims.wrapperConnectionId !== expected.wrapperConnectionId
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function stripPublicCredentialHeaders(headers: Headers): Headers {
   const sanitized = new Headers(headers);
   sanitized.delete('Authorization');
@@ -290,11 +342,14 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
   }
 
   const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, nextAuthSecret);
+  const authResult = await validateWrapperDispatchTicket(
+    c.req.header('Authorization') ?? null,
+    nextAuthSecret
+  );
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
-  if (authResult.userId !== userId) {
+  if (authResult.claims.userId !== userId) {
     return c.text('Token does not match session user', 403);
   }
 
@@ -316,6 +371,18 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     !wrapperConnectionId
   ) {
     return c.text('Invalid global feed producer identity', 400);
+  }
+
+  if (
+    ticketClaimsMismatchRequestFence(authResult.claims, {
+      cloudAgentSessionId,
+      kiloSessionId,
+      wrapperRunId,
+      wrapperGeneration,
+      wrapperConnectionId,
+    })
+  ) {
+    return c.text('Ticket does not match dispatch fence', 403);
   }
 
   try {
@@ -379,12 +446,30 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
 
   const authHeader = c.req.header('Authorization');
   const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateKiloToken(authHeader ?? null, nextAuthSecret);
+  const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
-  if (authResult.userId !== userId) {
+  if (authResult.claims.userId !== userId) {
     return c.text('Token does not match session user', 403);
+  }
+
+  const url = new URL(c.req.url);
+  const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
+  const wrapperGeneration = parseOptionalWrapperGeneration(wrapperGenerationParam);
+  if (wrapperGenerationParam !== null && wrapperGeneration === undefined) {
+    return c.text('Invalid wrapperGeneration parameter', 400);
+  }
+  if (
+    ticketClaimsMismatchRequestFence(authResult.claims, {
+      cloudAgentSessionId: sessionId,
+      kiloSessionId: url.searchParams.get('kiloSessionId'),
+      wrapperRunId: url.searchParams.get('wrapperRunId'),
+      wrapperGeneration,
+      wrapperConnectionId: url.searchParams.get('wrapperConnectionId'),
+    })
+  ) {
+    return c.text('Ticket does not match dispatch fence', 403);
   }
 
   try {
@@ -432,20 +517,39 @@ app.put(
 
     const authHeader = c.req.header('Authorization');
     const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    const authResult = await validateKiloToken(authHeader ?? null, nextAuthSecret);
+    const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
     if (!authResult.success) {
       return c.text(authResult.error, 401);
     }
-    if (authResult.userId !== userId) {
+    if (authResult.claims.userId !== userId) {
       return c.text('Token does not match session user', 403);
     }
 
+    const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
+    if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {
+      return c.text('Missing kiloSessionId parameter', 400);
+    }
+
+    if (
+      ticketClaimsMismatchRequestFence(authResult.claims, {
+        cloudAgentSessionId: sessionId,
+        kiloSessionId,
+      })
+    ) {
+      return c.text('Ticket does not match dispatch fence', 403);
+    }
+
     try {
-      await requireCurrentSessionAccess({
+      const sessionAccess = await requireCurrentSessionAccess({
         env: c.env,
         kiloUserId: userId,
         cloudAgentSessionId: sessionId,
+        expectedKiloSessionId: kiloSessionId ?? undefined,
       });
+      const authoritativeKiloSessionId = kiloSessionId ?? sessionAccess.kiloSessionId;
+      if (!authoritativeKiloSessionId) {
+        return c.text('Missing kiloSessionId parameter', 400);
+      }
     } catch (error) {
       return projectSessionAccessHttpError(error);
     }

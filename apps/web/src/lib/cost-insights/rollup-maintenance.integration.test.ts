@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import {
   cost_insight_owner_hour_driver_buckets,
   cost_insight_owner_hour_totals,
+  cost_insight_evaluation_dirty_owners,
   cost_insight_rollup_coverage,
   cost_insight_rollup_degraded_intervals,
+  cost_insight_rollup_repairs,
   kilocode_users,
   microdollar_usage,
 } from '@kilocode/db/schema';
@@ -21,6 +23,13 @@ import {
   repairOwnerSpendRollups,
   resolveCostInsightDegradedInterval,
 } from './rollup-maintenance';
+import {
+  claimPendingCostInsightRollupRepairs,
+  completeCostInsightRollupRepair,
+  enqueueCostInsightRollupRepair,
+  failCostInsightRollupRepair,
+  processPendingCostInsightRollupRepairs,
+} from './rollup-repairs';
 
 const userIds = new Set<string>();
 
@@ -59,6 +68,12 @@ afterEach(async () => {
     .delete(cost_insight_rollup_coverage)
     .where(eq(cost_insight_rollup_coverage.rollup_version, 1));
   for (const userId of userIds) {
+    await db
+      .delete(cost_insight_rollup_repairs)
+      .where(eq(cost_insight_rollup_repairs.owned_by_user_id, userId));
+    await db
+      .delete(cost_insight_evaluation_dirty_owners)
+      .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId));
     await db
       .delete(cost_insight_owner_hour_driver_buckets)
       .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, userId));
@@ -206,6 +221,201 @@ describe('Cost Insights rollup maintenance integration', () => {
       .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, userId));
     expect(totals).toHaveLength(0);
     expect(drivers).toHaveLength(0);
+  });
+
+  test('targeted repair reconstructs a failed best-effort capture from canonical usage', async () => {
+    const userId = await createUser();
+    await db.insert(microdollar_usage).values(rawUsage(userId, 17, '2026-06-01T00:30:00.000Z'));
+
+    await repairOwnerSpendRollups(db, {
+      owner: { type: 'user', id: userId },
+      startHour: '2026-06-01T00:00:00.000Z',
+      endHourExclusive: '2026-06-01T01:00:00.000Z',
+      maxHours: 1,
+    });
+
+    const [total] = await db
+      .select()
+      .from(cost_insight_owner_hour_totals)
+      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, userId));
+    const [driver] = await db
+      .select()
+      .from(cost_insight_owner_hour_driver_buckets)
+      .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, userId));
+    expect(total).toMatchObject({ total_microdollars: 17, spend_record_count: 1 });
+    expect(driver).toMatchObject({ total_microdollars: 17, spend_record_count: 1 });
+  });
+
+  test('deferred owner-hour repair reconstructs canonical usage and schedules evaluation', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const occurredAt = '2026-06-01T00:30:00.000Z';
+    const [usage] = await db
+      .insert(microdollar_usage)
+      .values(rawUsage(userId, 19, occurredAt))
+      .returning({ id: microdollar_usage.id });
+
+    await enqueueCostInsightRollupRepair(db, { usageId: usage.id, owner, occurredAt });
+    await db
+      .update(cost_insight_rollup_repairs)
+      .set({ next_attempt_at: '2026-06-01T01:01:00.000Z' })
+      .where(eq(cost_insight_rollup_repairs.owned_by_user_id, userId));
+
+    const summary = await processPendingCostInsightRollupRepairs(db, { limit: 1 });
+    expect(summary).toMatchObject({ claimed: 1, repaired: 1, failed: [] });
+
+    const [total] = await db
+      .select()
+      .from(cost_insight_owner_hour_totals)
+      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, userId));
+    expect(total).toMatchObject({ total_microdollars: 19, spend_record_count: 1 });
+    expect(
+      await db
+        .select()
+        .from(cost_insight_rollup_repairs)
+        .where(eq(cost_insight_rollup_repairs.owned_by_user_id, userId))
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(cost_insight_evaluation_dirty_owners)
+        .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId))
+    ).toHaveLength(1);
+  });
+
+  test('coalesces repeated owner-hour repair requests without losing newer work', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const occurredAt = '2026-06-01T00:30:00.000Z';
+    const [firstUsage, secondUsage] = await db
+      .insert(microdollar_usage)
+      .values([rawUsage(userId, 1, occurredAt), rawUsage(userId, 2, occurredAt)])
+      .returning({ id: microdollar_usage.id });
+
+    await enqueueCostInsightRollupRepair(db, { usageId: firstUsage.id, owner, occurredAt });
+    await enqueueCostInsightRollupRepair(db, { usageId: secondUsage.id, owner, occurredAt });
+
+    const repairs = await db
+      .select()
+      .from(cost_insight_rollup_repairs)
+      .where(eq(cost_insight_rollup_repairs.owned_by_user_id, userId));
+    expect(repairs).toHaveLength(2);
+    expect(repairs).toEqual([
+      expect.objectContaining({ generation: 1, attempt_count: 0 }),
+      expect.objectContaining({ generation: 1, attempt_count: 0 }),
+    ]);
+  });
+
+  test('preserves a newer repair request enqueued while an earlier claim is blocked', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const occurredAt = '2026-06-01T00:30:00.000Z';
+    const [usage] = await db
+      .insert(microdollar_usage)
+      .values(rawUsage(userId, 3, occurredAt))
+      .returning({ id: microdollar_usage.id });
+    await enqueueCostInsightRollupRepair(db, { usageId: usage.id, owner, occurredAt });
+    await db
+      .update(cost_insight_rollup_repairs)
+      .set({ next_attempt_at: '2026-06-01T01:01:00.000Z' })
+      .where(eq(cost_insight_rollup_repairs.owned_by_user_id, userId));
+
+    const [claim] = await claimPendingCostInsightRollupRepairs(db, 1);
+    await enqueueCostInsightRollupRepair(db, { usageId: usage.id, owner, occurredAt });
+
+    await expect(completeCostInsightRollupRepair(db, claim, owner)).resolves.toBe(false);
+    const [remaining] = await db
+      .select()
+      .from(cost_insight_rollup_repairs)
+      .where(eq(cost_insight_rollup_repairs.owned_by_user_id, userId));
+    expect(remaining).toMatchObject({ generation: 2, claim_token: null });
+  });
+
+  test('retains a failed claimed repair with bounded retry and safe error classification', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const occurredAt = '2026-06-01T00:30:00.000Z';
+    const [usage] = await db
+      .insert(microdollar_usage)
+      .values(rawUsage(userId, 5, occurredAt))
+      .returning({ id: microdollar_usage.id });
+    await enqueueCostInsightRollupRepair(db, { usageId: usage.id, owner, occurredAt });
+    await db
+      .update(cost_insight_rollup_repairs)
+      .set({ next_attempt_at: '2026-06-01T01:01:00.000Z' })
+      .where(eq(cost_insight_rollup_repairs.usage_id, usage.id));
+
+    const [claim] = await claimPendingCostInsightRollupRepairs(db, 1);
+    const failedAt = Date.now();
+    await failCostInsightRollupRepair(db, claim, 'secret=value database failed with 55P03');
+
+    const [repair] = await db
+      .select()
+      .from(cost_insight_rollup_repairs)
+      .where(eq(cost_insight_rollup_repairs.usage_id, usage.id));
+    expect(repair).toMatchObject({
+      attempt_count: 1,
+      claimed_at: null,
+      claim_token: null,
+      last_error_redacted: 'postgres:55P03',
+    });
+    expect(Date.parse(repair.next_attempt_at)).toBeGreaterThan(failedAt);
+  });
+
+  test('processor reports canonical repair failure and leaves durable retry state', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const occurredAt = '2026-06-01T00:30:00.000Z';
+    const result = await db.execute<{ id: string }>(sql`
+      INSERT INTO microdollar_usage (
+        kilo_user_id,
+        cost,
+        input_tokens,
+        output_tokens,
+        cache_write_tokens,
+        cache_hit_tokens,
+        created_at,
+        provider,
+        model
+      ) VALUES (
+        ${userId},
+        9007199254740992,
+        0,
+        0,
+        0,
+        0,
+        ${occurredAt},
+        'provider',
+        'model'
+      )
+      RETURNING id::text
+    `);
+    const usageId = result.rows[0]?.id;
+    if (!usageId) throw new Error('Failed repair fixture did not return usage ID.');
+    await enqueueCostInsightRollupRepair(db, { usageId, owner, occurredAt });
+    await db
+      .update(cost_insight_rollup_repairs)
+      .set({ next_attempt_at: '2026-06-01T01:01:00.000Z' })
+      .where(eq(cost_insight_rollup_repairs.usage_id, usageId));
+
+    const summary = await processPendingCostInsightRollupRepairs(db, { limit: 1 });
+    expect(summary.failed).toEqual([
+      expect.objectContaining({
+        owner,
+        hourStart: '2026-06-01T00:00:00.000Z',
+        error: 'cost_insight_rollup_repair_failed',
+      }),
+    ]);
+    const [repair] = await db
+      .select()
+      .from(cost_insight_rollup_repairs)
+      .where(eq(cost_insight_rollup_repairs.usage_id, usageId));
+    expect(repair).toMatchObject({
+      attempt_count: 1,
+      claimed_at: null,
+      claim_token: null,
+      last_error_redacted: 'cost_insight_rollup_repair_failed',
+    });
   });
 
   test('reconciles multi-hour ranges in bounded repeatable-read chunks', async () => {

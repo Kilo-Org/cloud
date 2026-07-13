@@ -208,6 +208,24 @@ function liveRuntimeState(overrides?: Record<string, unknown>): [string, unknown
   ];
 }
 
+function disconnectGraceForCurrentConnection(
+  disconnectedAt: number,
+  overrides?: Record<string, unknown>
+): [string, unknown] {
+  return [
+    'disconnect_grace',
+    {
+      wrapperRunId: WRAPPER_RUN_ID,
+      disconnectedAt,
+      wsCloseCode: 1009,
+      wsCloseReason: 'message too large',
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      ...overrides,
+    },
+  ];
+}
+
 describe('WrapperSupervisor', () => {
   it('starts disconnect grace for current accepted work and cancels it after an approved fenced reconnect', async () => {
     const harness = createHarness([liveRuntimeState()]);
@@ -926,6 +944,175 @@ describe('WrapperSupervisor', () => {
       error: 'Wrapper did not respond to liveness ping',
       failureCode: 'wrapper_ping_timeout',
     });
+  });
+
+  it('defers liveness failure while disconnect grace is active for the current connection', async () => {
+    const pingDeadlineAt = 92_000;
+    const noOutputDeadlineAt = 332_000;
+    // Grace active from 90_000 through 100_000; ping deadline (92_000) already expired.
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(95_000);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'owns_wrapper',
+    });
+    expect(harness.events).toHaveLength(0);
+  });
+
+  it('does not defer liveness for a stale disconnect grace left by a previous wrapper run', async () => {
+    const pingDeadlineAt = 92_000;
+    const harness = createHarness([
+      liveRuntimeState({
+        wrapperRunId: 'wr_newer_current',
+        wrapperGeneration: 5,
+        wrapperConnectionId: 'conn_newer',
+        pingDeadlineAt,
+        noOutputDeadlineAt: 332_000,
+      }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000, {
+        wrapperRunId: 'wr_stale_run',
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      }),
+    ]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      wrapperRunId: 'wr_newer_current',
+    });
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_ping_timeout',
+    });
+  });
+
+  it('clears grace without terminalizing accepted work when the same wrapper reconnects during grace', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt: 332_000, nextPingAt: 200_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    const decision = await harness.supervisor.checkReconnect({
+      wrapperRunId: WRAPPER_RUN_ID,
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+    });
+    expect(decision).toEqual({ accepted: true } satisfies WrapperReconnectDecision);
+    await harness.supervisor.recordReconnectAccepted({
+      wrapperGeneration: 4,
+      wrapperConnectionId: WRAPPER_CONNECTION_ID,
+    });
+
+    await expect(harness.storage.get('disconnect_grace')).resolves.toBeUndefined();
+    // Grace is cleared, so liveness is no longer suppressed. No deadline has
+    // expired yet (nextPingAt 200_000, noOutput 332_000), so work stays accepted.
+    await harness.supervisor.runMaintenance(95_000);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+  });
+
+  it('clears a stale in-flight ping when a reconnect is accepted during grace', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 332_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.recordReconnectAccepted(
+      { wrapperGeneration: 4, wrapperConnectionId: WRAPPER_CONNECTION_ID },
+      95_000
+    );
+
+    // The ping (or its pong) died with the old socket and can never resolve on
+    // the new one; a fresh ping is scheduled instead of letting the stale
+    // expired deadline fire wrapper_ping_timeout right after reconnecting.
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      pingDeadlineAt: undefined,
+      nextPingAt: 155_000,
+    });
+    await harness.supervisor.runMaintenance(95_000);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+  });
+
+  it('extends an expired no-output deadline when a reconnect is accepted during grace', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt: 94_000, nextPingAt: 200_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.recordReconnectAccepted(
+      { wrapperGeneration: 4, wrapperConnectionId: WRAPPER_CONNECTION_ID },
+      95_000
+    );
+
+    // Output could not be delivered while the socket was down, so the stale
+    // deadline gets a fresh window instead of firing wrapper_no_output on the
+    // first maintenance tick after the reconnect.
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
+      noOutputDeadlineAt: 95_000 + WRAPPER_NO_OUTPUT_TIMEOUT_MS,
+    });
+    await harness.supervisor.runMaintenance(95_000);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+  });
+
+  it('terminalizes accepted work as wrapper_disconnected once grace expires without reconnect', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 332_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    // Grace expired at 100_000; liveness was deferred while it was active.
+    await harness.supervisor.runMaintenance(100_001);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_disconnected',
+      failureCode: 'wrapper_disconnected',
+    });
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'unhealthy-wrapper',
+    });
+  });
+
+  it('includes the disconnect grace expiry deadline even when the ping deadline is earlier', async () => {
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt: 92_000, noOutputDeadlineAt: 332_000 }),
+      OWNED_WRAPPER_LEASE,
+      disconnectGraceForCurrentConnection(90_000),
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    const deadlines = await harness.supervisor.nextMaintenanceDeadlines();
+
+    // Grace expiry (100_000) must remain scheduled alongside the earlier
+    // expired ping deadline (92_000) so reconnect gets its full window.
+    expect(deadlines).toContain(100_000);
+    expect(deadlines).toContain(92_000);
   });
 
   it('releases a finalizing callback on liveness expiry but holds a queued follow-up until physical absence', async () => {

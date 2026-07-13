@@ -13,7 +13,10 @@ import type {
   SandboxInstance,
   SessionId as ServiceSessionId,
 } from '../../types.js';
-import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import {
+  requiresContainmentSandbox,
+  type SessionMetadata,
+} from '../../persistence/session-metadata.js';
 import type { SandboxDeleteReason, WrapperStopReason } from '../protocol.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { posix } from 'node:path';
@@ -177,21 +180,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sessionService = dependencies.sessionService ?? new SessionService();
     this.resolveSandbox =
       dependencies.resolveSandbox ??
-      ((sandboxId, options) =>
-        options
-          ? getSandbox(
-              getSandboxNamespace(this.env, sandboxId, {
-                managedScmContainment: this.metadata.workspace?.managedScmContainment === true,
-              }),
-              sandboxId,
-              options
-            )
-          : getSandbox(
-              getSandboxNamespace(this.env, sandboxId, {
-                managedScmContainment: this.metadata.workspace?.managedScmContainment === true,
-              }),
-              sandboxId
-            ));
+      ((sandboxId, options) => {
+        const namespace = getSandboxNamespace(this.env, sandboxId, {
+          managedScmContainment: requiresContainmentSandbox(this.metadata),
+        });
+        return options
+          ? getSandbox(namespace, sandboxId, options)
+          : getSandbox(namespace, sandboxId);
+      });
     this.stopObserved = dependencies.stopObservedWrappers ?? stopObservedWrappers;
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.stopObservationDelaysMs =
@@ -529,7 +525,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sandboxIdPromise = Promise.resolve(plan.workspace.sandboxId as SandboxId);
     const sandboxId = await this.resolveSandboxId();
     const sandbox = await this.getSandbox({ sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS });
-    if (this.metadata.workspace?.managedScmContainment === true) {
+    if (requiresContainmentSandbox(this.metadata)) {
       if (sandboxId.startsWith('dind-')) {
         throw ExecutionError.invalidRequest(
           'Managed SCM containment is not supported for DIND sandboxes'

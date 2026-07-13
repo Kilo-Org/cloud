@@ -284,6 +284,41 @@ describe('parseCouncilResultManifest', () => {
     expect(capture.manifest.specialists[0].vote).toBe('block');
   });
 
+  it('a malformed LATEST top-level marker stays invalid and does not fall back to an earlier valid one', () => {
+    const earlierPass = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
+    // Later top-level marker is malformed (missing vote) — must fail closed, not reuse the earlier pass.
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(earlierPass)} -->\n<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"specialistId":"security"}]} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('ignores many embedded marker prefixes inside a finding and captures the real manifest', () => {
+    const noise = `prefix <!-- ${COUNCIL_RESULT_MARKER_TAG} `.repeat(20);
+    const real = {
+      specialists: [
+        {
+          specialistId: 'security',
+          vote: 'block',
+          findings: [{ path: 'a.ts', line: 1, severity: 'high', rationale: noise }],
+        },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(real)} -->`;
+    const capture = parseCouncilResultManifest(text);
+    expect(capture.status).toBe('captured');
+    if (capture.status !== 'captured') throw new Error('unreachable');
+    expect(capture.manifest.specialists[0].vote).toBe('block');
+  });
+
+  it('does not treat a mid-line (non-line-anchored) marker as top-level', () => {
+    const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
+    // Marker preceded by non-whitespace on the same line is not a top-level marker.
+    expect(
+      parseCouncilResultManifest(
+        `prefix <!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(manifest)} -->`
+      ).status
+    ).toBe('missing');
+  });
+
   it('returns invalid when the payload exceeds the size cap', () => {
     const huge = {
       specialists: [

@@ -216,74 +216,73 @@ function scanBalancedJson(text: string, open: number): string | null {
 }
 
 /**
- * Enumerates the balanced JSON payloads of every HTML-comment marker (`<!-- TAG {json} -->`)
- * in free text, in document order.
+ * Extracts the balanced JSON payload of the LAST top-level marker (`<!-- TAG {json} -->`)
+ * in free text. "Top-level" = the marker starts its own line (only leading horizontal
+ * whitespace before `<!--`).
  *
- * Two robustness properties:
- * - **Version isolation:** the tag must be followed by whitespace (`\\s+`), so a longer
- *   version like `${tag}0` or `${tag}junk` is NOT matched as `tag`.
- * - **Embedded-marker safety:** a finding's `rationale`/`path` can legitimately contain
- *   the marker text (JSON does not escape `<!-- ... {}`), which would appear as its own
- *   occurrence. Rather than trusting the last textual occurrence, we return ALL candidates
- *   so the caller can pick the last one that actually validates — an embedded fragment
- *   fails the schema and is skipped, so PR content quoting the marker cannot displace the
- *   real manifest. Payloads with `-->`/`}` inside strings are preserved (string-aware scan).
+ * Robustness properties:
+ * - **Embedded-marker safety (structural):** the orchestrator emits the marker on its own
+ *   final line, and `JSON.stringify` escapes newlines, so marker text quoted inside a
+ *   finding's JSON string is NEVER at line start. Anchoring to line start therefore
+ *   excludes embedded occurrences structurally — no need to try-and-validate candidates.
+ * - **Version isolation:** the tag must be followed by horizontal whitespace, so a longer
+ *   version like `${tag}0` / `${tag}junk` is NOT matched as `tag`.
+ * - **`-->`/`}` tolerance:** the JSON is read by a string-aware brace scan, so those chars
+ *   inside a finding's text do not truncate it.
  *
- * `tagPresent` lets callers distinguish "no marker at all" (missing) from "marker present
- * but no valid payload" (invalid).
+ * Only the LAST such marker is scanned (single pass), and callers validate it
+ * authoritatively — a malformed/oversized latest marker stays invalid rather than falling
+ * back to an earlier one (fail closed, last-marker-wins). `tagPresent` distinguishes "no
+ * marker" (missing) from "marker present but no balanced JSON" (invalid).
  */
-function markerJsonCandidates(
+function extractLastMarkerJson(
   text: string,
   tag: string
-): { tagPresent: boolean; candidates: string[] } {
-  const starter = new RegExp(`<!--\\s*${tag}\\s+`, 'g');
-  const candidates: string[] = [];
-  let tagPresent = false;
+): { tagPresent: boolean; json: string | null } {
+  // `^` (multiline) + horizontal-whitespace classes so a match cannot span lines and an
+  // embedded, mid-line marker is never selected.
+  const starter = new RegExp(`^[ \\t]*<!--[ \\t]*${tag}[ \\t]+`, 'gm');
+  let searchFrom = -1;
   for (const match of text.matchAll(starter)) {
-    tagPresent = true;
-    const open = text.indexOf('{', match.index + match[0].length);
-    if (open < 0) continue;
-    const json = scanBalancedJson(text, open);
-    if (json !== null) candidates.push(json);
+    searchFrom = match.index + match[0].length;
   }
-  return { tagPresent, candidates };
+  if (searchFrom < 0) return { tagPresent: false, json: null };
+
+  const open = text.indexOf('{', searchFrom);
+  if (open < 0) return { tagPresent: true, json: null };
+  return { tagPresent: true, json: scanBalancedJson(text, open) };
 }
 
 /**
  * Extracts and validates the combined council manifest from the orchestrator's final
  * message.
  *
- * The marker may appear ANYWHERE in the message and the LAST schema-valid occurrence
- * wins — real models often add a trailing sentence after the marker, and that must not
- * cause a false miss. Each candidate JSON object is extracted by a brace-aware scan (see
- * `markerJsonCandidates`), so a `-->`/`}` inside a finding's free-form text does not
- * truncate it, and marker text quoted inside a finding fails the schema and is skipped
- * rather than displacing the real manifest. Size-capped; schema is strict only where it
- * must be (each specialist's `vote`).
+ * The LAST top-level marker (see `extractLastMarkerJson`) is authoritative — real models
+ * add a trailing sentence after the marker, but a later marker supersedes an earlier one.
+ * The JSON is read by a brace-aware scan, so `-->`/`}` inside a finding's text does not
+ * truncate it, and marker text quoted inside a finding is excluded structurally (it is not
+ * at line start). A malformed or oversized latest marker stays `invalid` (fail closed) —
+ * it never falls back to an earlier result. Schema is strict only where it must be
+ * (each specialist's `vote`).
  */
 export function parseCouncilResultManifest(
   text: string | null | undefined
 ): CouncilManifestCapture {
   if (!text) return { status: 'missing' };
 
-  const { tagPresent, candidates } = markerJsonCandidates(text, COUNCIL_RESULT_MARKER_TAG);
+  const { tagPresent, json } = extractLastMarkerJson(text, COUNCIL_RESULT_MARKER_TAG);
   if (!tagPresent) return { status: 'missing' };
+  if (json === null) return { status: 'invalid' };
+  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES)
+    return { status: 'invalid' };
 
-  // Prefer the last candidate that is a valid manifest; skip oversized or malformed
-  // candidates (including marker-like text embedded in a finding) rather than failing on
-  // them, so embedded content cannot force a false no-coverage block.
-  for (let i = candidates.length - 1; i >= 0; i--) {
-    const json = candidates[i];
-    if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) continue;
-    try {
-      const parsed: unknown = JSON.parse(json);
-      const result = CouncilResultManifestSchema.safeParse(parsed);
-      if (result.success) return { status: 'captured', manifest: result.data };
-    } catch {
-      // try an earlier candidate
-    }
+  try {
+    const parsed: unknown = JSON.parse(json);
+    const result = CouncilResultManifestSchema.safeParse(parsed);
+    return result.success ? { status: 'captured', manifest: result.data } : { status: 'invalid' };
+  } catch {
+    return { status: 'invalid' };
   }
-  return { status: 'invalid' };
 }
 
 /** Per-specialist rollup for the Kilo UI: vote, highest severity, and findings count. */
@@ -438,21 +437,17 @@ export type GovernanceMember = z.infer<typeof GovernanceMemberSchema>;
  */
 export function parseGovernanceMarker(text: string | null | undefined): Governance | null {
   if (!text) return null;
-  // Same brace-aware, embedded-marker-safe, size-capped extraction as the manifest parser:
-  // return the last candidate that validates; skip oversized/malformed ones.
-  const { candidates } = markerJsonCandidates(text, GOVERNANCE_MARKER_TAG);
-  for (let i = candidates.length - 1; i >= 0; i--) {
-    const json = candidates[i];
-    if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) continue;
-    try {
-      const parsed: unknown = JSON.parse(json);
-      const result = GovernanceSchema.safeParse(parsed);
-      if (result.success) return result.data;
-    } catch {
-      // try an earlier candidate
-    }
+  // Same line-anchored, brace-aware, size-capped extraction as the manifest parser.
+  const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
+  if (json === null) return null;
+  if (new TextEncoder().encode(json).length > COUNCIL_RESULT_MAX_BYTES) return null;
+  try {
+    const parsed: unknown = JSON.parse(json);
+    const result = GovernanceSchema.safeParse(parsed);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 // ============================================================================

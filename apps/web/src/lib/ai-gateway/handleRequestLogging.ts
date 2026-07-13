@@ -11,6 +11,7 @@ const users = [
   'a8cd59cc6df67645c2f509948ee9a579582a7593db43fbad9bcf37cce38f2d87', // https://kilo-code.slack.com/archives/C09H2GDAJ75/p1776149178143169
   'de30ace080f1ea4d269c0d37b68fd41f3e6895751ce032a713fe6e07eb314dfb', // https://kilo-code.slack.com/archives/C090U1NLQUC/p1778487038443649?thread_ts=1778480356.436739&cid=C090U1NLQUC
   '1a4310f6b09d4ab3a84ff778cb1c77046ce50b21b85d3837a668a38b09faa5f3', // https://app.usepylon.com/support/issues/views/9243f7cb-081d-4484-9138-dc1cefe86ce5?issueNumber=22891
+  '4c8c9532aba4b75a3778d28b7b8201724dc0065820c1c515bd5aeda76cf203bf', // https://app.usepylon.com/support/issues/views/all-issues?issueNumber=24166
 ];
 
 const organizations = [

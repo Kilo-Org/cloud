@@ -17,6 +17,10 @@ export type OpenRouterProviderConfig = {
   require_parameters?: boolean;
 };
 
+export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export type VercelInferenceProviderConfig = { apiKey: string; baseURL?: string } | AwsCredentials;
 
 export type VercelProviderConfig = {

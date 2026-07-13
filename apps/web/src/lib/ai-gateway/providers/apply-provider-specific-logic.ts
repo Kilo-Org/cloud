@@ -1,8 +1,9 @@
-import type {
-  GatewayResponsesRequest,
-  OpenRouterChatCompletionRequest,
-  GatewayRequest,
-  GatewayMessagesRequest,
+import {
+  isOpenRouterProviderConfig,
+  type GatewayResponsesRequest,
+  type OpenRouterChatCompletionRequest,
+  type GatewayRequest,
+  type GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
@@ -75,7 +76,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   return [];
 }
 
-function applyPreferredProvider(
+export function applyPreferredProvider(
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
@@ -89,7 +90,7 @@ function applyPreferredProvider(
   console.debug(
     `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
   );
-  if (!requestToMutate.provider) {
+  if (!isOpenRouterProviderConfig(requestToMutate.provider)) {
     requestToMutate.provider = { order: preferredProviderOrder };
   } else if (!requestToMutate.provider.order) {
     requestToMutate.provider.order = preferredProviderOrder;

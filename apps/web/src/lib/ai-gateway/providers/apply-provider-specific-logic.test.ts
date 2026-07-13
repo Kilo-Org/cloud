@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { applyGatewayModelsFallback } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import {
+  applyGatewayModelsFallback,
+  applyPreferredProvider,
+} from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
@@ -44,5 +47,28 @@ describe('applyGatewayModelsFallback', () => {
     applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
 
     expect(request.body.models).toBeUndefined();
+  });
+});
+
+describe('applyPreferredProvider', () => {
+  it('preserves valid provider options when adding order', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    request.body.provider = { zdr: true };
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+
+    expect(request.body.provider).toEqual({
+      zdr: true,
+      order: ['amazon-bedrock', 'anthropic'],
+    });
+  });
+
+  it('overwrites a malformed provider value', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    Object.assign(request.body, { provider: 'lmstudio' });
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+
+    expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'anthropic'] });
   });
 });

@@ -141,7 +141,7 @@ describe('applyKiloExclusiveModelSettings', () => {
         inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
       })
     );
-    expect(req.body.provider).toEqual({ only: ['anthropic'] });
+    expect(req.body.provider).toEqual({ zdr: true, only: ['anthropic'] });
   });
 
   it('overwrites a malformed provider value', () => {

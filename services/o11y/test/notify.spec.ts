@@ -229,4 +229,17 @@ describe('buildSlackMessage — container_capacity alert', () => {
     ]);
     expect(allText.some(t => t.includes('230'))).toBe(true);
   });
+
+  it('includes INFO severity label for an info-tier alert', () => {
+    const infoAlert: ContainerCapacityAlertPayload = {
+      ...alert,
+      severity: 'info',
+      usedInstances: 60,
+      maxInstances: 100,
+      utilizationFraction: 0.6,
+      thresholdFraction: 0.6,
+    };
+    const msg = buildSlackMessage(infoAlert) as { blocks: Array<{ text?: { text: string } }> };
+    expect(msg.blocks[0].text?.text).toContain('INFO');
+  });
 });

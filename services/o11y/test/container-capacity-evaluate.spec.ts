@@ -129,6 +129,51 @@ describe('evaluateContainerCapacity', () => {
     expect(kv.store.has(pageKey)).toBe(true);
   });
 
+  it('fires an info alert at 60% utilization', async () => {
+    const queryFn = vi.fn(
+      async (): Promise<ContainerApplication[]> => [
+        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 60, maxInstances: 100 },
+      ]
+    );
+    await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
+    expect(sentAlerts).toHaveLength(1);
+    expect(sentAlerts[0].severity).toBe('info');
+    expect(sentAlerts[0].thresholdFraction).toBe(0.6);
+    const [key] = [...kv.store.keys()];
+    expect(key).toContain('info');
+    expect(key).toContain('container_capacity');
+    expect(key).toContain('cloud-agent-next-sandbox');
+  });
+
+  it('does not suppress a ticket alert when only an info marker exists (escalation is independent)', async () => {
+    kv.store.set(
+      'o11y:alert:info:container_capacity:cloudflare:cloud-agent-next-sandbox:containers',
+      new Date().toISOString()
+    );
+    const queryFn = vi.fn(
+      async (): Promise<ContainerApplication[]> => [
+        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 81, maxInstances: 100 },
+      ]
+    );
+    await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
+    expect(sentAlerts).toHaveLength(1);
+    expect(sentAlerts[0].severity).toBe('ticket');
+  });
+
+  it('suppresses an info alert when a ticket marker exists for the same dimension', async () => {
+    kv.store.set(
+      'o11y:alert:ticket:container_capacity:cloudflare:cloud-agent-next-sandbox:containers',
+      new Date().toISOString()
+    );
+    const queryFn = vi.fn(
+      async (): Promise<ContainerApplication[]> => [
+        { id: 'id1', name: 'cloud-agent-next-sandbox', instances: 60, maxInstances: 100 },
+      ]
+    );
+    await evaluateContainerCapacity(makeEnv(kv), queryFn, notifyFn);
+    expect(sentAlerts).toHaveLength(0);
+  });
+
   it('propagates API query failure as thrown error', async () => {
     const failingQuery = vi.fn(async (): Promise<ContainerApplication[]> => {
       throw new Error('API unreachable');

@@ -8,7 +8,7 @@
  * exceed the burn rate threshold for a given provider:model.
  */
 
-export type AlertSeverity = 'page' | 'ticket';
+export type AlertSeverity = 'page' | 'ticket' | 'info';
 
 export type BurnRateWindow = {
   severity: AlertSeverity;
@@ -27,3 +27,4 @@ export const BURN_RATE_WINDOWS: BurnRateWindow[] = [
 // Alert dedup cooldowns
 export const PAGE_COOLDOWN_SECONDS = 15 * 60; // 15 minutes
 export const TICKET_COOLDOWN_SECONDS = 4 * 60 * 60; // 4 hours
+export const INFO_COOLDOWN_SECONDS = 4 * 60 * 60; // 4 hours

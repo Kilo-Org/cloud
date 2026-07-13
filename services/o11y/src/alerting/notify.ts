@@ -84,6 +84,17 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`;
 }
 
+function formatSeverityLabel(severity: AlertSeverity): string {
+  switch (severity) {
+    case 'page':
+      return ':rotating_light: PAGE';
+    case 'ticket':
+      return ':ticket: TICKET';
+    case 'info':
+      return ':information_source: INFO';
+  }
+}
+
 function formatAlertTypeLabel(alertType: AlertPayload['alertType']): string {
   switch (alertType) {
     case 'error_rate':
@@ -109,7 +120,7 @@ function buildSloMetricLine(alert: SloAlertPayload): string {
 }
 
 function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
-  const severityLabel = alert.severity === 'page' ? ':rotating_light: PAGE' : ':ticket: TICKET';
+  const severityLabel = formatSeverityLabel(alert.severity);
   const typeLabel = formatAlertTypeLabel(alert.alertType);
 
   return [
@@ -143,7 +154,7 @@ function buildSloSlackBlocks(alert: SloAlertPayload): object[] {
 }
 
 function buildCapacitySlackBlocks(alert: ContainerCapacityAlertPayload): object[] {
-  const severityLabel = alert.severity === 'page' ? ':rotating_light: PAGE' : ':ticket: TICKET';
+  const severityLabel = formatSeverityLabel(alert.severity);
   const utilizationPct = (alert.utilizationFraction * 100).toFixed(1);
   const thresholdPct = (alert.thresholdFraction * 100).toFixed(1);
 
@@ -183,7 +194,7 @@ function buildCapacitySlackBlocks(alert: ContainerCapacityAlertPayload): object[
 }
 
 function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[] {
-  const severityLabel = alert.severity === 'page' ? ':rotating_light: PAGE' : ':ticket: TICKET';
+  const severityLabel = formatSeverityLabel(alert.severity);
   const oldestMessageTimestamp = alert.oldestMessageTimestamp?.toISOString() ?? 'Unknown';
 
   return [

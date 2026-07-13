@@ -309,6 +309,23 @@ describe('parseCouncilResultManifest', () => {
     expect(capture.manifest.specialists[0].vote).toBe('block');
   });
 
+  it('does not swallow unrelated JSON when the marker has no immediate payload', () => {
+    // Marker with no `{` on its line, followed later by manifest-shaped JSON that is NOT
+    // framed by this marker. Must not be captured.
+    const stray = JSON.stringify({
+      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
+    });
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} -->\nHere is some JSON: ${stray}`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('requires the closing --> frame after the JSON object', () => {
+    const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
+    // Object present after the tag but not framed by a closing `-->`.
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(manifest)} and then prose`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
   it('does not treat a mid-line (non-line-anchored) marker as top-level', () => {
     const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
     // Marker preceded by non-whitespace on the same line is not a top-level marker.
@@ -445,14 +462,15 @@ describe('decideCouncilFromManifest (coverage-aware)', () => {
 });
 
 describe('parseGovernanceMarker', () => {
-  it('parses a valid governance marker', () => {
+  it('parses member votes and strips any model-authored overall decision', () => {
+    // The model emits `decision`, but it is code-owned — the parsed result must not carry
+    // it (it could contradict computeCouncilDecision in the UI).
     const gov = { members: [{ id: 'security', vote: 'pass' }], decision: 'pass' };
-    expect(
-      parseGovernanceMarker(`<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`)
-    ).toEqual({
-      members: [{ id: 'security', vote: 'pass', highestSeverity: null }],
-      decision: 'pass',
-    });
+    const parsed = parseGovernanceMarker(
+      `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
+    );
+    expect(parsed).toEqual({ members: [{ id: 'security', vote: 'pass', highestSeverity: null }] });
+    expect(parsed as unknown as Record<string, unknown>).not.toHaveProperty('decision');
   });
 
   it('returns null when absent or malformed', () => {
@@ -477,12 +495,13 @@ describe('parseGovernanceMarker', () => {
     const parsed = parseGovernanceMarker(
       `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
     );
-    expect(parsed?.decision).toBe('warn');
+    expect(parsed?.members[0].vote).toBe('warn');
     expect(parsed?.members[0].reason).toContain('-->');
   });
 });
 
 describe('council config helpers', () => {
+  // One enabled (security) + one disabled (performance).
   const council: CodeReviewCouncilConfig = {
     enabled: true,
     aggregation_strategy: 'any_blocking_member',
@@ -491,15 +510,26 @@ describe('council config helpers', () => {
       { ...presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[1]), enabled: false },
     ],
   };
+  // Two enabled specialists (meets COUNCIL_MIN_SPECIALISTS).
+  const activeCouncil: CodeReviewCouncilConfig = {
+    enabled: true,
+    aggregation_strategy: 'any_blocking_member',
+    specialists: [
+      presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[0]),
+      presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[1]),
+    ],
+  };
 
   it('enabledSpecialists filters to enabled', () => {
     expect(enabledSpecialists(council).map(s => s.id)).toEqual(['security']);
   });
 
-  it('isCouncilActive requires enabled + at least one enabled specialist', () => {
-    expect(isCouncilActive(council)).toBe(true);
-    expect(isCouncilActive({ ...council, enabled: false })).toBe(false);
-    expect(isCouncilActive({ ...council, specialists: [] })).toBe(false);
+  it('isCouncilActive requires enabled + at least COUNCIL_MIN_SPECIALISTS enabled specialists', () => {
+    expect(isCouncilActive(activeCouncil)).toBe(true);
+    // Below the minimum (only one enabled) must NOT be active.
+    expect(isCouncilActive(council)).toBe(false);
+    expect(isCouncilActive({ ...activeCouncil, enabled: false })).toBe(false);
+    expect(isCouncilActive({ ...activeCouncil, specialists: [] })).toBe(false);
     expect(isCouncilActive(null)).toBe(false);
   });
 

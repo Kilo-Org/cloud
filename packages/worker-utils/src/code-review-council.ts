@@ -248,9 +248,21 @@ function extractLastMarkerJson(
   }
   if (searchFrom < 0) return { tagPresent: false, json: null };
 
-  const open = text.indexOf('{', searchFrom);
-  if (open < 0) return { tagPresent: true, json: null };
-  return { tagPresent: true, json: scanBalancedJson(text, open) };
+  // The JSON object must begin immediately after the tag (the `[ \t]+` above consumed the
+  // separating whitespace). Do NOT scan ahead for a `{` — otherwise a malformed marker
+  // with no payload could swallow unrelated JSON later in the message.
+  if (text[searchFrom] !== '{') return { tagPresent: true, json: null };
+  const json = scanBalancedJson(text, searchFrom);
+  if (json === null) return { tagPresent: true, json: null };
+
+  // Require the marker to be framed: optional horizontal whitespace then its closing
+  // `-->` immediately after the balanced object. This confirms the object belongs to this
+  // marker rather than being loose JSON that merely follows the tag.
+  let after = searchFrom + json.length;
+  while (text[after] === ' ' || text[after] === '\t') after++;
+  if (text.slice(after, after + 3) !== '-->') return { tagPresent: true, json: null };
+
+  return { tagPresent: true, json };
 }
 
 /**
@@ -423,17 +435,20 @@ const GovernanceMemberSchema = z.object({
   reason: z.string().max(1000).optional(),
 });
 
+// The overall `decision` is deliberately NOT part of this schema: it is code-owned
+// (`computeCouncilDecision`), and a model-authored decision here could contradict it in
+// the UI. Consumers render the per-member votes from this marker and inject the computed
+// decision. Any `decision` key the model emits is ignored (non-strict object strips it).
 export const GovernanceSchema = z.object({
   members: z.array(GovernanceMemberSchema).max(8),
-  decision: CouncilVoteSchema,
 });
 export type Governance = z.infer<typeof GovernanceSchema>;
 export type GovernanceMember = z.infer<typeof GovernanceMemberSchema>;
 
 /**
- * Extracts and validates the display-only governance marker from an assistant message.
- * Returns null when absent or malformed. This drives display only; never derive the
- * merge decision from it.
+ * Extracts and validates the display-only governance marker (per-member votes/reasons)
+ * from an assistant message. Returns null when absent or malformed. This drives display
+ * only; the overall merge decision comes from `computeCouncilDecision`, never from here.
  */
 export function parseGovernanceMarker(text: string | null | undefined): Governance | null {
   if (!text) return null;
@@ -460,12 +475,16 @@ export function enabledSpecialists(council: CodeReviewCouncilConfig): CouncilSpe
 }
 
 /**
- * Whether there is a renderable council definition (enabled with at least one enabled
- * specialist). This only guards prompt rendering — whether a run IS a council run is
- * recorded per-run via `review_type`, not inferred here.
+ * Whether there is a runnable council definition: enabled, with at least
+ * `COUNCIL_MIN_SPECIALISTS` enabled specialists. A council below the minimum must not
+ * render or execute as a council (it falls back to a standard review). This only guards
+ * whether the council is renderable — whether a run IS a council run is recorded per-run
+ * via `review_type`, not inferred here.
  */
 export function isCouncilActive(council: CodeReviewCouncilConfig | undefined | null): boolean {
-  return !!council && council.enabled && enabledSpecialists(council).length > 0;
+  return (
+    !!council && council.enabled && enabledSpecialists(council).length >= COUNCIL_MIN_SPECIALISTS
+  );
 }
 
 const AGGREGATION_STRATEGY_LABELS: Record<CouncilAggregationStrategy, string> = {

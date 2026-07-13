@@ -4,7 +4,18 @@ import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   NOTE_MAX_LENGTH,
+  VercelRoutingPercentageSchema,
 } from './gateway-config';
+
+describe('VercelRoutingPercentageSchema', () => {
+  test.each([0, 0.001, 12.345, 99.9, 99.999, 100])('accepts %s', percentage => {
+    expect(VercelRoutingPercentageSchema.parse(percentage)).toBe(percentage);
+  });
+
+  test.each([-0.001, 12.3456, 100.001])('rejects %s', percentage => {
+    expect(() => VercelRoutingPercentageSchema.parse(percentage)).toThrow();
+  });
+});
 
 describe('GatewayPercentageSchema', () => {
   test('accepts a numeric percentage', () => {

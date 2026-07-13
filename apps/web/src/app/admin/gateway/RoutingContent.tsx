@@ -9,7 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DEFAULT_VERCEL_PERCENTAGE, NOTE_MAX_LENGTH } from '@/lib/ai-gateway/gateway-config';
+import {
+  DEFAULT_VERCEL_PERCENTAGE,
+  NOTE_MAX_LENGTH,
+  VercelRoutingPercentageSchema,
+} from '@/lib/ai-gateway/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -55,8 +59,10 @@ export function RoutingContent() {
       mutation.mutate({ vercel_routing_percentage: null, note });
     } else {
       const num = Number(trimmed);
-      if (!Number.isInteger(num) || num < 0 || num > 100) {
-        toast.error('Please enter a whole number between 0 and 100, or leave empty for default');
+      if (!VercelRoutingPercentageSchema.safeParse(num).success) {
+        toast.error(
+          'Enter a percentage between 0 and 100 with up to 3 decimal places, or leave it empty for the default.'
+        );
         return;
       }
       mutation.mutate({ vercel_routing_percentage: num, note });
@@ -92,6 +98,7 @@ export function RoutingContent() {
               type="number"
               min={0}
               max={100}
+              step={0.001}
               placeholder={`Default: ${DEFAULT_VERCEL_PERCENTAGE}%`}
               value={inputValue}
               onChange={e => {

@@ -73,6 +73,14 @@ export function hasCompatibleVercelInferenceProvider(
   );
 }
 
+export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
+  const routingSeed = 'vercel_routing_' + randomSeed;
+  const wholePercentageBucket = getRandomNumber(routingSeed, 100);
+  const fractionalPercentageBucket = getRandomNumber(routingSeed + '_fractional', 1_000);
+
+  return wholePercentageBucket + fractionalPercentageBucket / 1_000 < routingPercentage;
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   kiloExclusiveModel: KiloExclusiveModel | null,
@@ -97,8 +105,7 @@ export async function shouldRouteToVercel(
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const routingPercentage = await getVercelRoutingPercentage();
 
-  const passedRandomization =
-    getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
+  const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
 
   if (!passedRandomization) {
     return false;

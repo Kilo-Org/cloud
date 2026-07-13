@@ -633,17 +633,20 @@ describe('logMicrodollarUsage', () => {
       microdollars_used: 0,
       google_user_email: 'cost-insight-failure@example.com',
     });
+    const organization = await createTestOrganization(
+      'Cost insight capture failure organization',
+      user.id,
+      10_000
+    );
     const { core, metadata } = await defineMicrodollarUsage();
 
     try {
       const result = await insertUsageRecord(
-        { ...core, kilo_user_id: user.id, organization_id: null, cost: 1000 },
+        { ...core, kilo_user_id: user.id, organization_id: organization.id, cost: 1000 },
         metadata
       );
 
-      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: 1000 });
-      const updatedUser = await findUserById(user.id);
-      expect(updatedUser?.microdollars_used).toBe(1000);
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
 
       const sourceRows = await db
         .select()
@@ -657,7 +660,7 @@ describe('logMicrodollarUsage', () => {
       const totals = await db
         .select()
         .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
       expect(totals).toHaveLength(0);
 
       const degradedIntervals = await db
@@ -669,7 +672,7 @@ describe('logMicrodollarUsage', () => {
       const repairs = await db
         .select()
         .from(cost_insight_rollup_repairs)
-        .where(eq(cost_insight_rollup_repairs.owned_by_user_id, user.id));
+        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
       expect(repairs).toHaveLength(1);
       expect(repairs[0].usage_id).toBe(core.id);
       expect(new Date(repairs[0].hour_start).toISOString()).toBe(
@@ -679,7 +682,7 @@ describe('logMicrodollarUsage', () => {
     } finally {
       await db
         .delete(cost_insight_rollup_repairs)
-        .where(eq(cost_insight_rollup_repairs.owned_by_user_id, user.id));
+        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
       consoleErrorSpy.mockRestore();
     }
   });

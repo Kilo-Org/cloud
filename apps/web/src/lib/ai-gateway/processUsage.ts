@@ -34,7 +34,7 @@ import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
-import { recordCostInsightDegradedInterval } from '@/lib/cost-insights/rollup-maintenance';
+import { repairOwnerSpendRollups } from '@/lib/cost-insights/rollup-maintenance';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
@@ -87,7 +87,10 @@ import {
   getAiGatewayCostInsightFeatureKey,
   getAiGatewayCostInsightProductKey,
 } from '@/lib/cost-insights/canonical-sources';
-import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
+import {
+  evaluateCostInsightsForOwner,
+  scheduleCostInsightEvaluationAfterSpend,
+} from '@/lib/cost-insights/evaluation';
 
 const posthogClient = PostHogClient();
 
@@ -510,6 +513,44 @@ function getUtcHourRange(occurredAt: string): {
   };
 }
 
+function scheduleCostInsightEvaluationSafely(
+  owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
+  usageId: string
+): void {
+  try {
+    scheduleCostInsightEvaluationAfterSpend(owner);
+  } catch (error) {
+    reportPostCommitFailure(
+      'post-commit cost insight evaluation scheduling failed',
+      error,
+      {
+        source: 'postCommitCostInsightEvaluationScheduling',
+        ownerType: owner.type,
+      },
+      usageId
+    );
+  }
+}
+
+async function evaluateRepairedCostInsightOwner(
+  owner: Parameters<typeof scheduleCostInsightEvaluationAfterSpend>[0],
+  usageId: string
+): Promise<void> {
+  try {
+    await evaluateCostInsightsForOwner(db, owner);
+  } catch (error) {
+    reportPostCommitFailure(
+      'post-commit repaired cost insight evaluation failed',
+      error,
+      {
+        source: 'postCommitRepairedCostInsightEvaluation',
+        ownerType: owner.type,
+      },
+      usageId
+    );
+  }
+}
+
 function organizationUsageMutationTask(usage: MicrodollarUsage): BestEffortPostCommitTask | null {
   const organizationId = usage.organization_id;
   if (!organizationId) return null;
@@ -559,7 +600,7 @@ function costInsightSpendCaptureTask(
           providerKey: usage.inference_provider || usage.provider || 'other',
         });
       });
-      scheduleCostInsightEvaluationAfterSpend(owner);
+      scheduleCostInsightEvaluationSafely(owner, usage.id);
     },
     reportError: async error => {
       reportPostCommitFailure(
@@ -574,23 +615,25 @@ function costInsightSpendCaptureTask(
         usage.id
       );
       try {
-        await recordCostInsightDegradedInterval(db, {
+        await repairOwnerSpendRollups(db, {
+          owner,
           ...getUtcHourRange(usage.created_at),
-          source: 'ai_gateway',
-          reason: 'capture_bypass',
+          maxHours: 1,
         });
-      } catch (repairSignalError) {
+      } catch (repairError) {
         reportPostCommitFailure(
-          'post-commit cost insight repair signal failed',
-          repairSignalError,
+          'post-commit cost insight owner-hour repair failed',
+          repairError,
           {
-            source: 'postCommitCostInsightRepairSignal',
+            source: 'postCommitCostInsightOwnerHourRepair',
             spendSource: 'ai_gateway',
             ownerType: owner.type,
           },
           usage.id
         );
+        return;
       }
+      await evaluateRepairedCostInsightOwner(owner, usage.id);
     },
   };
 }

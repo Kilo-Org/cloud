@@ -588,7 +588,7 @@ describe('logMicrodollarUsage', () => {
     expect(totals).toHaveLength(0);
   });
 
-  test('keeps AI source rows when post-commit cost insight capture fails', async () => {
+  test('keeps AI source rows without globally degrading coverage when capture and repair fail', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const { core, metadata } = await defineMicrodollarUsage();
     const missingUserId = `missing-ai-user-${crypto.randomUUID()}`;
@@ -615,26 +615,17 @@ describe('logMicrodollarUsage', () => {
         .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
       expect(totals).toHaveLength(0);
 
-      const [degradedInterval] = await db
+      const degradedIntervals = await db
         .select()
         .from(cost_insight_rollup_degraded_intervals)
         .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
-      expect(degradedInterval).toMatchObject({
-        reason: 'capture_bypass',
-        resolved_at: null,
-      });
-      expect(new Date(degradedInterval.start_hour).toISOString()).toBe(
-        new Date(Math.floor(Date.parse(core.created_at) / 3_600_000) * 3_600_000).toISOString()
-      );
-      expect(
-        Date.parse(degradedInterval.end_hour_exclusive) - Date.parse(degradedInterval.start_hour)
-      ).toBe(3_600_000);
+      expect(degradedIntervals).toHaveLength(0);
     } finally {
       consoleErrorSpy.mockRestore();
     }
   });
 
-  test('keeps usage and balance write when post-commit cost insight capture fails', async () => {
+  test('keeps usage and balance write when post-commit capture and repair fail', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const user = await insertTestUser({
       id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
@@ -667,6 +658,12 @@ describe('logMicrodollarUsage', () => {
         .from(cost_insight_owner_hour_totals)
         .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
       expect(totals).toHaveLength(0);
+
+      const degradedIntervals = await db
+        .select()
+        .from(cost_insight_rollup_degraded_intervals)
+        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
+      expect(degradedIntervals).toHaveLength(0);
     } finally {
       consoleErrorSpy.mockRestore();
     }

@@ -4,11 +4,7 @@
 #
 #   maestro --device <udid> test e2e/flows/logout.yaml
 #
-# Notes:
-# - Launches the dev build by tapping its home-screen icon. `launchApp` cold-
-#   restarts the Expo dev client and bounces back to SpringBoard, so we stop the
-#   app and relaunch via the icon instead (reliable for dev builds).
-# - See e2e/AGENTS.md ("Login / logout helper flows") for the full workflow.
+# See e2e/AGENTS.md for the full workflow.
 appId: com.kilocode.kiloapp
 ---
 - runFlow:

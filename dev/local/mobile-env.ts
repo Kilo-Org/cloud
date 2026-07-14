@@ -21,7 +21,6 @@ const URL_KEY_TO_SERVICE = new Map<string, { service: string; protocol: 'http' |
 type MobileEnvValues = ReadonlyMap<string, string>;
 type PreparedMobileEnvironment = {
   appUrl: string;
-  host: string;
   sessionEnv: Record<string, string>;
 };
 
@@ -202,10 +201,7 @@ function prepareMobileEnvironment(repoRoot: string, host: string): PreparedMobil
   const appUrl = serviceUrl(host, 'nextjs', 'http');
   return {
     appUrl,
-    host,
-    sessionEnv: {
-      ...Object.fromEntries(mobileValues),
-    },
+    sessionEnv: Object.fromEntries(mobileValues),
   };
 }
 

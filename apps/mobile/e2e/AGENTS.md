@@ -32,7 +32,7 @@ pnpm drizzle migrate
 pnpm dev:status --json
 ```
 
-`dev:env:mobile` writes this stack's LAN URLs. Restart Next.js for native auth callbacks and Metro for bundled Expo env values. The session-ingest env step creates the JWT Secrets Store binding; without it the worker can appear healthy while rejecting every session request. `event-service` is required for presence and notification behavior.
+The session-ingest env step creates the JWT Secrets Store binding; without it the worker can appear healthy while rejecting every session request. `event-service` is required for presence and notification behavior.
 
 Secrets Store state is local to each Worker directory. `dev:start` runs env sync for its selected service graph and refreshes every source-backed secret before launching Workers; secret creation failures are fatal. Do not run bare `wrangler secrets-store` commands: use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source and Wrangler receives a complete non-interactive prompt.
 
@@ -53,7 +53,6 @@ Do not guess a tmux window from `tmux ls` or use `<session>:<service>` directly;
 ```bash
 tmux ls
 tmux list-windows -t <dev-session>
-tmux capture-pane -p -t <dev-session>:<service> -S -200
 ```
 
 Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.

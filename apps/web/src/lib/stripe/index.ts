@@ -1280,7 +1280,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
             previousScheduleStatus: typeof previousStatus === 'string' ? previousStatus : null,
             scheduleStatusForDb,
             softDeleted: shouldDeleteFromStatus,
-            effectiveAt: row.effective_at,
+            effectiveAt: new Date(row.effective_at).toISOString(),
             unexpectedPreEffectiveRelease:
               scheduleStatus === KiloPassScheduledChangeStatus.Released &&
               new Date(row.effective_at).getTime() > Date.now(),

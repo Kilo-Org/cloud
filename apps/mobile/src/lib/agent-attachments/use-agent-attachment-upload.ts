@@ -49,8 +49,10 @@ type UseAgentAttachmentUploadReturn = {
   attachments: AgentAttachment[];
   addCandidates: (candidates: AgentAttachmentCandidate[]) => void;
   removeAttachment: (id: string) => void;
+  retryAttachment: (id: string) => void;
   reset: () => void;
   isUploading: boolean;
+  hasFailedAttachments: boolean;
   toWirePayload: () => AgentAttachmentWire | undefined;
 };
 
@@ -127,7 +129,7 @@ export function useAgentAttachmentUpload(
       };
 
       const run = async () => {
-        update({ status: 'uploading' });
+        update({ status: 'uploading', error: undefined });
         try {
           const { key } = await uploadOne({
             organizationId,
@@ -212,6 +214,17 @@ export function useAgentAttachmentUpload(
     setAttachments(current => current.filter(item => item.id !== id));
   }, []);
 
+  const retryAttachment = useCallback(
+    (id: string) => {
+      const attachment = attachments.find(item => item.id === id);
+      if (!attachment) {
+        return;
+      }
+      startUpload(attachment, pathRef.current);
+    },
+    [attachments, startUpload]
+  );
+
   const reset = useCallback(() => {
     setAttachments([]);
     pathRef.current = Crypto.randomUUID();
@@ -231,16 +244,28 @@ export function useAgentAttachmentUpload(
   const isUploading = attachments.some(
     item => item.status === 'pending' || item.status === 'uploading'
   );
+  const failedAttachments = attachments.some(item => item.status === 'error');
 
   return useMemo(
     () => ({
       attachments,
       addCandidates,
       removeAttachment,
+      retryAttachment,
       reset,
       isUploading,
+      hasFailedAttachments: failedAttachments,
       toWirePayload,
     }),
-    [attachments, addCandidates, removeAttachment, reset, isUploading, toWirePayload]
+    [
+      attachments,
+      addCandidates,
+      removeAttachment,
+      retryAttachment,
+      reset,
+      isUploading,
+      failedAttachments,
+      toWirePayload,
+    ]
   );
 }

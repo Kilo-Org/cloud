@@ -61,7 +61,7 @@ export function StatusBadge({
 
   return (
     <View className={cn('flex-row items-center gap-1.5', className)}>
-      <StatusDot tone={tone} glow />
+      <StatusDot tone={tone} />
       <Text variant="mono" className="text-[10px] uppercase tracking-[1px] text-muted-foreground">
         {label}
       </Text>

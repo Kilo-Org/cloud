@@ -9,7 +9,9 @@ describe('createKiloAppQueryClient', () => {
     const signOut = vi.fn();
     const clear = setTrpcUnauthorizedHandler(signOut);
     const queryClient = createKiloAppQueryClient();
-    const error = Object.assign(new Error('unauthorized'), { data: { httpStatus: 401 } });
+    const error = Object.assign(new Error('unauthorized'), {
+      data: { authRequired: true, httpStatus: 401 },
+    });
 
     const mutation = queryClient.getMutationCache().build(queryClient, {
       mutationFn: async () => {
@@ -28,7 +30,7 @@ describe('createKiloAppQueryClient', () => {
     const clear = setTrpcUnauthorizedHandler(signOut);
     const queryClient = createKiloAppQueryClient();
     const error = Object.assign(new Error('unauthorized'), {
-      shape: { data: { httpStatus: 401 } },
+      shape: { data: { authRequired: true, httpStatus: 401 } },
     });
 
     const mutation = queryClient.getMutationCache().build(queryClient, {

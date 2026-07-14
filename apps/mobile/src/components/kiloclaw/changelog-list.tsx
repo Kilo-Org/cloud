@@ -1,8 +1,11 @@
-import { Bug, Sparkles } from 'lucide-react-native';
+import { Bug, RefreshCw, Sparkles } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { type useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data']>[number];
@@ -10,22 +13,34 @@ type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data'
 const DEPLOY_HINTS: Record<string, { label: string; bgClass: string; textClass: string }> = {
   redeploy_suggested: {
     label: 'Redeploy suggested',
-    bgClass: 'bg-blue-100 dark:bg-blue-950',
-    textClass: 'text-blue-700 dark:text-blue-300',
+    bgClass: 'bg-info-tile-bg',
+    textClass: 'text-info',
   },
   redeploy_required: {
     label: 'Redeploy required',
-    bgClass: 'bg-amber-100 dark:bg-amber-950',
-    textClass: 'text-amber-700 dark:text-amber-300',
+    bgClass: 'bg-warn-tile-bg',
+    textClass: 'text-warn',
   },
   upgrade_required: {
     label: 'Upgrade required',
-    bgClass: 'bg-red-100 dark:bg-red-950',
-    textClass: 'text-red-700 dark:text-red-300',
+    bgClass: 'bg-danger-tile-bg',
+    textClass: 'text-destructive',
   },
 };
 
-export function ChangelogList({ entries }: Readonly<{ entries: ChangelogEntry[] }>) {
+export function ChangelogList({
+  entries,
+  isRedeploying,
+  onRedeploy,
+  onUpgrade,
+}: Readonly<{
+  entries: ChangelogEntry[];
+  isRedeploying: boolean;
+  onRedeploy: () => void;
+  onUpgrade: () => void;
+}>) {
+  const colors = useThemeColors();
+
   return (
     <View className="gap-3">
       {entries.map((entry, index) => {
@@ -48,6 +63,26 @@ export function ChangelogList({ entries }: Readonly<{ entries: ChangelogEntry[] 
               )}
             </View>
             <Text className="text-sm leading-relaxed">{entry.description}</Text>
+            {entry.deployHint === 'redeploy_required' && (
+              <Button
+                size="sm"
+                variant="outline"
+                loading={isRedeploying}
+                onPress={() => {
+                  captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'redeploy' });
+                  onRedeploy();
+                }}
+                className="flex-row gap-1.5 self-start"
+              >
+                {!isRedeploying && <RefreshCw size={14} color={colors.foreground} />}
+                <Text>Redeploy</Text>
+              </Button>
+            )}
+            {entry.deployHint === 'upgrade_required' && (
+              <Button size="sm" variant="outline" onPress={onUpgrade} className="self-start">
+                <Text>Manage version</Text>
+              </Button>
+            )}
           </View>
         );
       })}

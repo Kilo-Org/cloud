@@ -2,17 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchProducts as fetchIapProducts, type ProductOrSubscription, useIAP } from 'expo-iap';
-import { toast } from 'sonner-native';
 
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
 import { getStoreKiloPassProductsState } from './store-products-state';
-import {
-  loadAppStoreKiloPassProducts,
-  NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE,
-} from './store-products-loader';
+import { loadAppStoreKiloPassProducts } from './store-products-loader';
 
 const STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
+// Fixed bound on the App Store connection handshake — raise if real
+// devices routinely need longer than this to connect.
+const APP_STORE_CONNECTION_TIMEOUT_MS = 8000;
+const APP_STORE_CONNECTION_TIMEOUT_MESSAGE =
+  'Could not connect to the App Store. Check your connection and try again.';
 
 function toStoreKiloPassProduct(product: ProductOrSubscription): StoreKiloPassProduct | null {
   if (product.type !== 'subs') {
@@ -48,14 +49,27 @@ export function useStoreKiloPassProducts() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
 
   const { connected } = useIAP({
     onError: error => {
-      const message = error.message;
-      setStoreErrorMessage(message);
-      toast.error(message);
+      setStoreErrorMessage(error.message);
     },
   });
+
+  // Bounded wait for the StoreKit connection — without this, a stuck
+  // connection leaves the screen showing loading skeletons forever.
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || connected) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setStoreErrorMessage(current => current ?? APP_STORE_CONNECTION_TIMEOUT_MESSAGE);
+    }, APP_STORE_CONNECTION_TIMEOUT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [connected, connectionAttempt]);
 
   const productsQuery = useQuery({
     queryKey: ['kilo-pass', 'app-store-products'],
@@ -78,17 +92,12 @@ export function useStoreKiloPassProducts() {
   const { refetch: refetchProducts } = productsQuery;
   const refetch = useCallback(async () => {
     setStoreErrorMessage(null);
+    setConnectionAttempt(attempt => attempt + 1);
     await refetchProducts();
   }, [refetchProducts]);
 
   const queryErrorMessage =
     productsQuery.error instanceof Error ? productsQuery.error.message : null;
-
-  useEffect(() => {
-    if (queryErrorMessage && queryErrorMessage !== NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE) {
-      toast.error(queryErrorMessage);
-    }
-  }, [queryErrorMessage]);
 
   useEffect(() => {
     if (productsQuery.isSuccess) {

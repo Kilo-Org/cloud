@@ -6,10 +6,11 @@ import { ChevronDown, ChevronRight, ChevronUp, MapPin } from 'lucide-react-nativ
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
+import { botAvatarName } from '@/components/kiloclaw/bot-avatar-options';
 import { agentColor } from '@/lib/agent-color';
 import { useTRPC } from '@/lib/trpc';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -64,6 +65,16 @@ type IdentityStepProps = {
 const GPS_TIMEOUT_MS = 10_000;
 const GPS_COORDINATE_PRECISION = 2;
 
+function locationFeedbackClassName(status: 'validated' | 'service_unavailable' | 'error'): string {
+  if (status === 'error') {
+    return 'text-destructive';
+  }
+  if (status === 'service_unavailable') {
+    return 'text-warn';
+  }
+  return 'text-muted-foreground';
+}
+
 async function getCurrentPositionWithTimeout(): Promise<Location.LocationObject> {
   let triggerTimeout: (() => void) | null = null;
   const timeoutPromise = new Promise<Location.LocationObject>((_resolve, reject) => {
@@ -111,7 +122,7 @@ export function IdentityStep({
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [locationFeedback, setLocationFeedback] = useState<{
     message: string;
-    status: 'validated' | 'service_unavailable';
+    status: 'validated' | 'service_unavailable' | 'error';
   } | null>(null);
   const [validatedLocation, setValidatedLocation] = useState<string | null>(null);
 
@@ -153,10 +164,9 @@ export function IdentityStep({
       if (locationTextRef.current.trim() !== trimmed) {
         return;
       }
-      setLocationFeedback(null);
       setValidatedLocation(null);
       const message = error instanceof Error ? error.message : 'Location could not be validated.';
-      toast.error(message);
+      setLocationFeedback({ message, status: 'error' });
     }
   }, [
     applyLocationText,
@@ -190,13 +200,18 @@ export function IdentityStep({
       } catch (validateError) {
         Sentry.captureException(validateError);
         applyLocationText(coords);
-        setLocationFeedback(null);
         setValidatedLocation(null);
-        toast.error('Could not resolve your location. You can edit it manually.');
+        setLocationFeedback({
+          message: 'Could not resolve your location. You can edit it manually.',
+          status: 'error',
+        });
       }
     } catch (error) {
       Sentry.captureException(error);
-      toast.error('Could not get your location. Enter it manually.');
+      setLocationFeedback({
+        message: 'Could not get your location. Enter it manually.',
+        status: 'error',
+      });
     } finally {
       setIsGpsLoading(false);
     }
@@ -225,10 +240,10 @@ export function IdentityStep({
     validateLocationMutate(
       { location: trimmedLocation },
       {
+        // Advancing to the next step unmounts this screen either way, so
+        // there's no inline slot left to show feedback in — same as the
+        // onError path below, just continue silently.
         onSuccess: result => {
-          if (result.status === 'service_unavailable') {
-            toast("wttr.in is down right now. We'll store your location as entered.");
-          }
           onContinue(identity, result.location);
         },
         onError: () => {
@@ -262,7 +277,7 @@ export function IdentityStep({
               avatarExpanded ? 'border-primary' : selectedTint.tileBorderClass
             )}
           >
-            <Text className="text-2xl">{selectedEmoji}</Text>
+            <BotAvatar emoji={selectedEmoji} size={24} color={colors.foreground} />
           </Pressable>
           <TextInput
             className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-6 text-foreground"
@@ -274,6 +289,7 @@ export function IdentityStep({
             }}
             autoCapitalize="words"
             autoCorrect={false}
+            spellCheck={false}
             maxLength={80}
             returnKeyType="done"
           />
@@ -287,7 +303,7 @@ export function IdentityStep({
               return (
                 <Pressable
                   key={emoji}
-                  accessibilityLabel={`Select ${emoji} as avatar`}
+                  accessibilityLabel={`Select ${botAvatarName(emoji)} as avatar`}
                   accessibilityRole="button"
                   onPress={() => {
                     setSelectedEmoji(emoji);
@@ -299,7 +315,7 @@ export function IdentityStep({
                     isSelected ? 'border-primary' : tint.tileBorderClass
                   )}
                 >
-                  <Text className="text-2xl">{emoji}</Text>
+                  <BotAvatar emoji={emoji} size={24} color={colors.foreground} />
                 </Pressable>
               );
             })}
@@ -329,7 +345,7 @@ export function IdentityStep({
                     : 'border-transparent bg-secondary active:opacity-70'
                 )}
               >
-                <Text className="text-2xl">{preset.emoji}</Text>
+                <BotAvatar emoji={preset.emoji} size={24} color={colors.foreground} />
                 <View className="flex-1 gap-0.5">
                   <Text className="text-base font-medium">{preset.label}</Text>
                   <Text className="text-sm text-muted-foreground">{preset.vibe}</Text>
@@ -355,7 +371,7 @@ export function IdentityStep({
             }}
             className="flex-row items-center gap-3 rounded-xl bg-secondary px-3 py-3 active:opacity-70"
           >
-            <Text className="text-2xl">{nature.emoji}</Text>
+            <BotAvatar emoji={nature.emoji} size={24} color={colors.foreground} />
             <View className="flex-1 gap-0.5">
               <Text className="text-base font-medium">{nature.label}</Text>
               <Text className="text-sm text-muted-foreground">{nature.vibe}</Text>
@@ -400,7 +416,11 @@ export function IdentityStep({
               void handleGpsPress();
             }}
             disabled={isGpsLoading || isValidating}
-            className="h-11 w-11 items-center justify-center rounded-xl bg-secondary active:opacity-70 disabled:opacity-50"
+            accessibilityState={{ disabled: isValidating, busy: isGpsLoading }}
+            className={cn(
+              'h-11 w-11 items-center justify-center rounded-xl bg-secondary active:opacity-70',
+              isValidating && !isGpsLoading && 'opacity-50'
+            )}
           >
             {isGpsLoading ? (
               <ActivityIndicator size="small" color={colors.mutedForeground} />
@@ -410,14 +430,7 @@ export function IdentityStep({
           </Pressable>
         </View>
         {locationFeedback && (
-          <Text
-            className={cn(
-              'px-1 text-sm',
-              locationFeedback.status === 'service_unavailable'
-                ? 'text-amber-700 dark:text-amber-400'
-                : 'text-muted-foreground'
-            )}
-          >
+          <Text className={cn('px-1 text-sm', locationFeedbackClassName(locationFeedback.status))}>
             {locationFeedback.message}
           </Text>
         )}

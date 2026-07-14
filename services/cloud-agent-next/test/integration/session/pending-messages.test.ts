@@ -838,6 +838,116 @@ describe('pending session messages', () => {
     expect(result.pending).toHaveLength(0);
   });
 
+  it('repairs terminalization after interruption immediately following exhausted disposition persistence', async () => {
+    const userId = 'user_pending_terminalization_repair';
+    const sessionId = 'agent_pending_terminalization_repair';
+    const messageId = 'msg_018f1e2d3c4bTermRepairABCD';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      let deliveryAttempts = 0;
+      instance['executeDirectly'] = async () => {
+        deliveryAttempts += 1;
+        return { success: false, code: 'BAD_REQUEST', error: 'invalid queued turn' };
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '45454545-4545-4545-8545-454545454546',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-terminalization-repair',
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId,
+          content: 'repair exhausted terminalization',
+          createdAt: 1,
+          flushAttempts: 1,
+          nextFlushAttemptAt: Date.now() - 1,
+        })
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId,
+        status: 'queued',
+        prompt: 'repair exhausted terminalization',
+        createdAt: 1,
+        queuedAt: 1,
+      });
+      const previousAlarm = Date.now() + 60_000;
+      await instance.ctx.storage.setAlarm(previousAlarm);
+
+      const originalPut = instance.ctx.storage.put.bind(instance.ctx.storage);
+      let repairAlarmAtDisposition: number | null = null;
+      let interruptBeforeTerminalState = false;
+      instance.ctx.storage.put = async (key, value) => {
+        if (
+          interruptBeforeTerminalState &&
+          key === `session_message:${messageId}` &&
+          typeof value === 'object' &&
+          value !== null &&
+          'status' in value &&
+          value.status === 'failed'
+        ) {
+          interruptBeforeTerminalState = false;
+          throw new Error('interrupted before terminal state');
+        }
+        await originalPut(key, value);
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          'deliveryDisposition' in value &&
+          value.deliveryDisposition === 'terminalization-pending'
+        ) {
+          repairAlarmAtDisposition = await instance.ctx.storage.getAlarm();
+          interruptBeforeTerminalState = true;
+        }
+      };
+
+      await instance.alarm();
+      const interruptedPending = await listPendingSessionMessages(instance.ctx.storage);
+      instance.ctx.storage.put = originalPut;
+      await instance.alarm();
+
+      const db = drizzle(instance.ctx.storage, { logger: false });
+      const eventQueries = createEventQueries(db, instance.ctx.storage.sql);
+      const failedEvents = eventQueries.findByFilters({ eventTypes: ['cloud.message.failed'] });
+      return {
+        deliveryAttempts,
+        previousAlarm,
+        repairAlarmAtDisposition,
+        interruptedPending,
+        finalPending: await listPendingSessionMessages(instance.ctx.storage),
+        message: await getSessionMessageState(instance.ctx.storage, messageId),
+        failedEventCount: failedEvents.filter(
+          event => JSON.parse(event.payload).messageId === messageId
+        ).length,
+      };
+    });
+
+    expect(result.repairAlarmAtDisposition).not.toBeNull();
+    expect(result.repairAlarmAtDisposition).toBeLessThan(result.previousAlarm);
+    expect(result.interruptedPending).toMatchObject([
+      {
+        messageId,
+        deliveryDisposition: 'terminalization-pending',
+        nextFlushAttemptAt: undefined,
+      },
+    ]);
+    expect(result.deliveryAttempts).toBe(1);
+    expect(result.finalPending).toHaveLength(0);
+    expect(result.message).toMatchObject({
+      status: 'failed',
+      completionSource: 'delivery_failure',
+      failureReason: 'exhausted',
+    });
+    expect(result.failedEventCount).toBe(1);
+  });
+
   it('exhausts failed flush retries, emits cloud.message.failed, and removes the pending message', async () => {
     const userId = 'user_pending_flush_exhaust';
     const sessionId = 'agent_pending_flush_exhaust';

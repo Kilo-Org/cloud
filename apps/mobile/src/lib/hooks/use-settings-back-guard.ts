@@ -54,9 +54,22 @@ export function useSettingsBackGuard({
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
 
+  // Set by SettingsSaveButton right before it calls `router.back()` after a
+  // successful header-Save. `dirty` won't flip to false until this screen
+  // re-hydrates from a refetched query — which hasn't happened yet at that
+  // point — so without this bypass the back navigation the Save button
+  // itself triggers gets intercepted as if it were an unconfirmed exit,
+  // popping a spurious "Unsaved changes" alert whose own Save button would
+  // save a second time.
+  const skipNextGuardRef = useRef(false);
+
   useEffect(
     () =>
       navigation.addListener('beforeRemove', event => {
+        if (skipNextGuardRef.current) {
+          skipNextGuardRef.current = false;
+          return;
+        }
         if (!dirty) {
           return;
         }
@@ -100,5 +113,6 @@ export function useSettingsBackGuard({
     onBack: () => {
       navigation.goBack();
     },
+    skipNextGuardRef,
   };
 }

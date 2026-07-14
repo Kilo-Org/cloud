@@ -425,6 +425,58 @@ describe('recordPendingFlushFailure', () => {
     expect(result.nextFlushAttemptAt).toBeUndefined();
   });
 
+  it('persists an exhausted disposition before scheduling terminalization repair', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+    const sequence: string[] = [];
+    const originalPut = storage.put.bind(storage);
+    storage.put = async (key, value) => {
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        'deliveryDisposition' in value &&
+        value.deliveryDisposition === 'terminalization-pending'
+      ) {
+        sequence.push('persisted');
+      }
+      await originalPut(key, value);
+    };
+
+    await recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+      policy: 'warm-followup',
+      code: 'BAD_REQUEST',
+      scheduleTerminalizationRepair: async () => {
+        sequence.push('scheduled');
+      },
+    });
+
+    expect(sequence).toEqual(['persisted', 'scheduled']);
+  });
+
+  it('persists an exhausted disposition even when repair scheduling fails', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    await expect(
+      recordPendingFlushFailure(storage, message, 'bad', 100_000, {
+        policy: 'warm-followup',
+        code: 'BAD_REQUEST',
+        scheduleTerminalizationRepair: async () => {
+          throw new Error('alarm unavailable');
+        },
+      })
+    ).rejects.toThrow('alarm unavailable');
+
+    const [stored] = await listPendingSessionMessages(storage);
+    expect(stored).toMatchObject({
+      messageId: message.messageId,
+      flushAttempts: 1,
+      deliveryDisposition: 'terminalization-pending',
+    });
+  });
+
   it('keeps exhausted messages in storage for caller terminalization', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage();

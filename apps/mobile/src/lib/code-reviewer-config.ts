@@ -1,5 +1,7 @@
 import { type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
 
+import { parseParam } from '@/lib/route-params';
+
 export {
   buildSaveConfigInput,
   GATE_THRESHOLDS,
@@ -9,9 +11,7 @@ export {
 
 export type ReviewerPlatform = CodeReviewPlatform;
 
-export function asReviewerPlatform(value: string): ReviewerPlatform {
-  return value === 'gitlab' || value === 'bitbucket' ? value : 'github';
-}
+export const PERSONAL_SCOPE = 'personal';
 
 export const PLATFORM_CAPABILITIES: Record<
   ReviewerPlatform,
@@ -49,6 +49,39 @@ export const PLATFORM_CAPABILITIES: Record<
     label: 'Bitbucket',
   },
 };
+
+const REVIEWER_PLATFORMS = Object.keys(PLATFORM_CAPABILITIES) as ReviewerPlatform[];
+
+/**
+ * Display label for a code-review platform (e.g. 'github' → 'GitHub'), falling
+ * back to the raw value for anything unrecognized. Use this instead of a CSS
+ * `capitalize`, which renders 'github' → 'Github'.
+ */
+export function reviewerPlatformLabel(platform: string): string {
+  return REVIEWER_PLATFORMS.includes(platform as ReviewerPlatform)
+    ? PLATFORM_CAPABILITIES[platform as ReviewerPlatform].label
+    : platform;
+}
+
+/**
+ * Strictly parses a route's platform segment against the supported
+ * scope+platform combinations. Replaces the old `asReviewerPlatform`
+ * coercion, which silently fell back to `'github'` for any unrecognized
+ * value — so a malformed deep link (e.g. a personal-scope route to
+ * Bitbucket, which is org-only per PLATFORM_CAPABILITIES) could end up
+ * reading/mutating a different platform's config than the URL claimed.
+ * Returns `null` for an unknown platform or an unsupported combination.
+ */
+export function parseReviewerPlatform(
+  scope: string,
+  rawPlatform: string | string[] | undefined
+): ReviewerPlatform | null {
+  const platform = parseParam(rawPlatform, REVIEWER_PLATFORMS);
+  if (platform && PLATFORM_CAPABILITIES[platform].scopes === 'org' && scope === PERSONAL_SCOPE) {
+    return null;
+  }
+  return platform;
+}
 
 export type ReviewConfigData = {
   isEnabled: boolean;

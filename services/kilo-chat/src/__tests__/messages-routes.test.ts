@@ -1534,6 +1534,58 @@ describe('recipient conversation read state after message delivery', () => {
   });
 });
 
+describe('POST /v1/conversations/:conversationId/messages/:messageId/redeliver', () => {
+  it('clears deliveryFailed and re-enqueues the bot webhook for the same message', async () => {
+    await recordingKiloclaw.__clearWebhookCalls();
+    const { conversationId, userId, userApp } = await createConversation('redeliver-1');
+    const convStub = getConvStub(conversationId);
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'retry payload' }],
+        }),
+      },
+      env
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    // Wait for the original delivery, then clear the buffer so the
+    // redelivered webhook is distinguishable from the initial one.
+    await waitForWebhookCalls(calls => calls.some(call => call.messageId === messageId));
+    await recordingKiloclaw.__clearWebhookCalls();
+
+    await unwrap(convStub.notifyDeliveryFailed(messageId));
+
+    const res = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${messageId}/redeliver`,
+      { method: 'POST' },
+      env
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
+
+    // The existing row is intact with the flag cleared — no new message.
+    const list = await convStub.listMessages({ limit: 10 });
+    const messagesById = list.messages.filter(m => m.id === messageId);
+    expect(messagesById).toHaveLength(1);
+    expect(messagesById[0]!.deliveryFailed).toBe(false);
+
+    // The same message was re-delivered to the bot.
+    const calls = await waitForWebhookCalls(cs => cs.some(call => call.messageId === messageId));
+    expect(calls.find(call => call.messageId === messageId)).toMatchObject({
+      messageId,
+      from: userId,
+      text: 'retry payload',
+    });
+  });
+});
+
 describe('POST /v1/conversations/:conversationId/messages/:messageId/execute-action', () => {
   it('returns the canonical resolved action content', async () => {
     const { conversationId, userApp, botId } = await createConversation('execute-action-result');

@@ -35,7 +35,7 @@ function mapError(errorCode: string | undefined): string {
   return (errorCode && AUTH_ERROR_MESSAGES[errorCode]) ?? DEFAULT_ERROR_MESSAGE;
 }
 
-// ponytail: only the callers we have need the error code + parsed body; a generic
+// Only the callers we have need the error code + parsed body; a generic
 // fetch client would be speculative for two endpoints.
 async function postAuth(
   path: string,
@@ -74,7 +74,7 @@ function hasStringCode(error: unknown): error is { code: string } {
   );
 }
 
-// ponytail: module-level guard — GoogleSignin.configure() is cheap but re-calling it
+// Module-level guard — GoogleSignin.configure() is cheap but re-calling it
 // on every button press is pointless; upgrade to a re-configure path if client IDs
 // ever need to change at runtime.
 let googleSignInConfigured = false;

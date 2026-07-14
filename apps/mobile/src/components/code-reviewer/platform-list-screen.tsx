@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   PERSONAL_SCOPE,
@@ -23,9 +24,22 @@ const PLATFORM_ICONS: Record<ReviewerPlatform, typeof GitBranch> = {
 
 const ALL_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 
-function connectionSubtitle(status: { isLoading: boolean; data?: { connected: boolean } }) {
+function connectionSubtitle(status: {
+  isLoading: boolean;
+  isError: boolean;
+  data?: { connected: boolean };
+}) {
+  // Reserve the subtitle line with a placeholder while loading instead of
+  // omitting it — otherwise the row grows by a line once the real status
+  // arrives, popping the layout.
   if (status.isLoading) {
-    return undefined;
+    return 'Checking…';
+  }
+  // A failed status query must not read as "Not connected" — that's a false
+  // disconnected signal. Say the state is unavailable; tapping in shows the
+  // full error + retry.
+  if (status.isError) {
+    return 'Status unavailable';
   }
   return status.data?.connected ? 'Connected' : 'Not connected';
 }
@@ -64,7 +78,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={scopeTitle} eyebrow="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Platforms
@@ -114,7 +128,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
             />
           </View>
         </View>
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

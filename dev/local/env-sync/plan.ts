@@ -477,7 +477,11 @@ function collectLocalSecretSources(
 // Plan computation
 // ---------------------------------------------------------------------------
 
-function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan {
+function computePlan(
+  repoRoot: string,
+  serviceFilter?: Set<string>,
+  refreshSourceBackedSecrets = true
+): EnvSyncPlan {
   const envLocalPath = path.join(repoRoot, '.env.local');
   if (!fs.existsSync(envLocalPath)) {
     return {
@@ -734,11 +738,8 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         storeOutputCache.set(cacheKey, output);
       }
 
-      if (output.includes(b.secret_name)) {
-        continue; // Secret exists, nothing to do
-      }
-
       if (b.devGeneratedBase64Bytes) {
+        if (output.includes(b.secret_name)) continue;
         secretStoreAutoCreates.push({
           workerDir: svc.dir,
           binding: b,
@@ -750,14 +751,15 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
       const source = resolveSecretStoreSource(b.secret_name, envLocal, localSecretSources);
       if (source) {
-        // Can auto-create from .env.local or another local worker's dev vars.
+        if (!refreshSourceBackedSecrets && output.includes(b.secret_name)) continue;
+        // Recreate source-backed secrets so metadata-only entries and stale values self-heal.
         secretStoreAutoCreates.push({
           workerDir: svc.dir,
           binding: b,
           sourceKey: source.sourceKey,
           value: source.value,
         });
-      } else {
+      } else if (!output.includes(b.secret_name)) {
         // Missing and no source value - warn
         missingBindings.push(b);
       }

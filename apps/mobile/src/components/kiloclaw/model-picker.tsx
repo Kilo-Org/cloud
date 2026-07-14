@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
@@ -31,7 +31,7 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     iconColorKey: 'agentYuki',
     cost: 3,
     performance: 3,
-    performanceDotColor: 'bg-purple-400',
+    performanceDotColor: 'bg-agent-yuki',
   },
   {
     id: 'kilo-auto/balanced',
@@ -42,7 +42,7 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     iconColorKey: 'agentSky',
     cost: 2,
     performance: 2,
-    performanceDotColor: 'bg-blue-400',
+    performanceDotColor: 'bg-agent-sky',
   },
 ];
 
@@ -85,7 +85,8 @@ function PerformanceIndicator({ level, dotColor }: { level: number; dotColor: st
 export function ModelPicker() {
   const router = useRouter();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId = instanceOrgId(instanceContext);
   const { data: config, isLoading } = useKiloClawConfig(organizationId);
   const mutations = useKiloClawMutations(organizationId);
   const colors = useThemeColors();
@@ -100,7 +101,10 @@ export function ModelPicker() {
     mutations.updateModel.mutate({ kilocodeDefaultModel: addModelPrefix(modelId) });
   };
 
-  if (isLoading) {
+  // Disabled queries (organizationId unresolved) have isLoading === false, so
+  // also skeleton while instance context is loading — otherwise the cards render
+  // interactive but taps silently no-op.
+  if (isLoading || instanceContext.status !== 'ready') {
     return (
       <View className="gap-3">
         <Skeleton className="h-40 w-full rounded-lg" />

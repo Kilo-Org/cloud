@@ -278,10 +278,9 @@ describe('coding plans router', () => {
     if (!installedKey) {
       throw new Error('Expected Coding Plan activation to install a BYOK key');
     }
-    await ownerCaller.byok.update({ id: installedKey.id, api_key: 'owner-replacement-key' });
     await expect(
       ownerCaller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
-    ).resolves.toMatchObject({ hasInstalledByokKey: false });
+    ).resolves.toMatchObject({ hasInstalledByokKey: true });
 
     await expect(
       otherCaller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })

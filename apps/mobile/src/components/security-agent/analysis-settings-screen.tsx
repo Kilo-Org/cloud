@@ -5,15 +5,17 @@ import {
 import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { openModelPicker } from '@/components/agents/model-selector';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   useSecurityAgentSettingsRedirect,
@@ -21,8 +23,8 @@ import {
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
 } from '@/lib/hooks/use-security-agent';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
@@ -38,7 +40,7 @@ const ANALYSIS_MODES: { value: AnalysisMode; label: string }[] = [
 function AnalysisSettingsSkeleton() {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Models & Analysis" />
+      <ScreenHeader title="Models & analysis" />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -51,12 +53,15 @@ function AnalysisSettingsSkeleton() {
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
-  const { models, isLoading: modelsLoading } = useAvailableModels(
-    isPersonalSecurityScope(scope) ? undefined : scope
-  );
+  const {
+    models,
+    isLoading: modelsLoading,
+    isError: modelsError,
+    refetch: refetchModels,
+  } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
 
   const [triageModelSlug, setTriageModelSlug] = useState('');
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
@@ -97,20 +102,19 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Models & Analysis" />
-        <QueryError
-          className="flex-1"
-          message="Could not load analysis settings"
-          onRetry={() => void config.refetch()}
-        />
-      </View>
+      <PlatformErrorScreen
+        title="Models & analysis"
+        variant="offline"
+        message="Could not load analysis settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {
@@ -131,7 +135,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Models & Analysis"
+        title="Models & analysis"
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -140,11 +144,17 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+        {!canManage && (
+          <Text className="text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Analysis depth
@@ -158,13 +168,14 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                   disabled={!canManage}
                   className={cn(
                     'flex-1 items-center rounded-full py-2 active:opacity-70',
-                    active && 'bg-foreground'
+                    active && 'bg-foreground',
+                    !canManage && 'opacity-50'
                   )}
                   onPress={() => {
                     setAnalysisMode(option.value);
                   }}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
+                  accessibilityState={{ selected: active, disabled: !canManage }}
                 >
                   <Text
                     className={cn(
@@ -180,34 +191,49 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         </View>
 
-        <View>
-          <ConfigureRow
-            icon={Search}
-            title="Triage model"
-            subtitle={modelName(triageModelSlug)}
-            onPress={modelRowOnPress(triageModelSlug, setTriageModelSlug)}
-          />
-          <ConfigureRow
-            icon={Brain}
-            title="Analysis model"
-            subtitle={modelName(analysisModelSlug)}
-            onPress={modelRowOnPress(analysisModelSlug, setAnalysisModelSlug)}
-          />
-          <ConfigureRow
-            icon={Wrench}
-            title="Remediation model"
-            subtitle={modelName(remediationModelSlug)}
-            last
-            onPress={modelRowOnPress(remediationModelSlug, setRemediationModelSlug)}
-          />
-        </View>
-
-        {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
+        {modelsLoading && (
+          <View className="gap-3">
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </View>
         )}
-      </ScrollView>
+        {modelsError && (
+          <QueryError
+            variant="server"
+            placement="top"
+            title="Could not load models"
+            onRetry={() => void refetchModels()}
+            isRetrying={modelsLoading}
+          />
+        )}
+        {!modelsLoading && !modelsError && (
+          <View>
+            <ConfigureRow
+              icon={Search}
+              title="Triage model"
+              subtitle={modelName(triageModelSlug)}
+              disabled={!canManage}
+              onPress={modelRowOnPress(triageModelSlug, setTriageModelSlug)}
+            />
+            <ConfigureRow
+              icon={Brain}
+              title="Analysis model"
+              subtitle={modelName(analysisModelSlug)}
+              disabled={!canManage}
+              onPress={modelRowOnPress(analysisModelSlug, setAnalysisModelSlug)}
+            />
+            <ConfigureRow
+              icon={Wrench}
+              title="Remediation model"
+              subtitle={modelName(remediationModelSlug)}
+              last
+              disabled={!canManage}
+              onPress={modelRowOnPress(remediationModelSlug, setRemediationModelSlug)}
+            />
+          </View>
+        )}
+      </TabScreenScrollView>
     </View>
   );
 }

@@ -65,6 +65,8 @@ export function MessageInputContent({
   replyingTo,
   onCancelReply,
   disabledReason,
+  showInstanceCta,
+  onOpenInstance,
   clearOnSubmit,
   botName,
   typingMembers = new Map(),
@@ -256,6 +258,8 @@ export function MessageInputContent({
         controlsDisabled={controlsDisabled}
         disabled={disabled}
         disabledReason={disabledReason}
+        showInstanceCta={showInstanceCta}
+        onOpenInstance={onOpenInstance}
         draftLength={draftLength}
         editableAttachmentRows={editableAttachmentRows}
         inputHeight={inputMeasure.height}

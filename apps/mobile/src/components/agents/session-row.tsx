@@ -75,7 +75,7 @@ function showDeleteConfirm(onDelete: () => void) {
 /** iOS-only — uses Alert.prompt which is unavailable on Android. */
 function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => void) {
   Alert.prompt(
-    'Rename Session',
+    'Rename session',
     'Enter a new name for this session',
     [
       { text: 'Cancel', style: 'cancel' },
@@ -182,7 +182,7 @@ export function StoredSessionRow({
       >
         <View className="flex-1 items-center justify-center bg-black/50 px-8">
           <View className="w-full gap-4 rounded-xl bg-card p-5">
-            <Text className="text-base font-semibold">Rename Session</Text>
+            <Text className="text-base font-semibold">Rename session</Text>
             <TextInput
               defaultValue={title}
               onChangeText={text => {
@@ -201,10 +201,19 @@ export function StoredSessionRow({
                   setRenameVisible(false);
                 }}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                className="active:opacity-70"
               >
                 <Text className="text-sm text-muted-foreground">Cancel</Text>
               </Pressable>
-              <Pressable onPress={handleRenameConfirm} hitSlop={8}>
+              <Pressable
+                onPress={handleRenameConfirm}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Rename"
+                className="active:opacity-70"
+              >
                 <Text className="text-sm font-semibold text-primary">Rename</Text>
               </Pressable>
             </View>

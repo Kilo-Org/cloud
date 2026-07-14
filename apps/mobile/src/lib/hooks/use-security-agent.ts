@@ -2,16 +2,21 @@ import {
   canManageSecurityAgent,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
-import {
-  type OrganizationRole,
-  type SecurityAgentConfig,
-  type SecurityAgentConfigPatch,
-} from '@/lib/security-agent';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { useTRPC } from '@/lib/trpc';
+
+// Mutation hooks (save config, set enabled, trigger sync, track interaction)
+// live in use-security-agent-mutations.ts — split out to stay under the
+// 300-line file limit. Re-exported here so existing call sites importing
+// from this module are unaffected.
+export {
+  useSaveSecurityAgentConfig,
+  useSetSecurityAgentEnabled,
+  useTrackSecurityAgentInteraction,
+  useTriggerSecuritySync,
+} from '@/lib/hooks/use-security-agent-mutations';
 
 // Personal and org procedures resolve to nominally distinct tRPC option
 // types even when structurally identical, so we can't pick between them
@@ -46,13 +51,6 @@ export function useSecurityAgentConfig(scope: string): UseQueryResult<SecurityAg
   return (
     isPersonalSecurityScope(scope) ? personal : organization
   ) as UseQueryResult<SecurityAgentConfig>;
-}
-
-function useSecurityAgentConfigQueryKey(scope: string) {
-  const trpc = useTRPC();
-  return isPersonalSecurityScope(scope)
-    ? trpc.securityAgent.getConfig.queryKey()
-    : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
 }
 
 export function useSecurityAgentRepositories(scope: string) {
@@ -104,25 +102,71 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
 // billing_manager can manage config. `organizations.list` is already fetched
 // app-wide for the org switcher, so this reuses that cache rather than adding
 // a new procedure (mirrors useCanEditReviewer in use-code-reviewer.ts:234).
-export function useSecurityAgentOrgRole(scope: string): OrganizationRole | undefined {
+//
+// A real org-scope fetch failure otherwise collapses into the same
+// `undefined` role as "still loading" and "genuinely unauthorized", which
+// callers used to read as permission-denied. `useSecurityAgentCapability`
+// below tells those apart; it's the only exported consumer of this query.
+function useSecurityAgentOrgRoleQuery(scope: string) {
   const trpc = useTRPC();
-  const { data: orgs } = useQuery({
+  const isPersonal = isPersonalSecurityScope(scope);
+  const query = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: !isPersonal,
   });
-  return orgs?.find(org => org.organizationId === scope)?.role;
+  if (isPersonal) {
+    // The org list is irrelevant to the personal scope, but even a disabled
+    // observer surfaces the SHARED cache entry's error state (populated
+    // app-wide, e.g. by Profile) — mask it so an organizations.list outage
+    // can never block the personal Security Agent.
+    return {
+      role: undefined,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: query.refetch,
+    };
+  }
+  return {
+    role: query.data?.find(org => org.organizationId === scope)?.role,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+  };
 }
 
-export function useSecurityAgentEditCapability(scope: string): boolean {
-  const role = useSecurityAgentOrgRole(scope);
-  return canManageSecurityAgent(scope, role);
+// Discriminated capability state for consumers (e.g. audit-report access)
+// that must distinguish "still loading"/"failed to load" from "resolved:
+// no access" instead of treating an undefined role as permission-denied.
+export function useSecurityAgentCapability(scope: string): {
+  canManage: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  refetch: () => unknown;
+} {
+  const { role, isLoading, isError, isFetching, refetch } = useSecurityAgentOrgRoleQuery(scope);
+  return {
+    canManage: canManageSecurityAgent(scope, role),
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  };
 }
 
 // Reuses listFindings (status: 'open', limit 1) instead of a dedicated
 // procedure — the concurrency numbers ride along on every findings fetch.
+// `isLoading`/`isError` are exposed alongside the counts so callers can tell
+// "still loading" and "failed to load" apart from "loaded: capacity full" —
+// all three previously collapsed into the same undefined counts.
 export function useSecurityAnalysisCapacity(scope: string): {
   runningCount: number | undefined;
   concurrencyLimit: number | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => unknown;
 } {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
@@ -137,191 +181,12 @@ export function useSecurityAnalysisCapacity(scope: string): {
     }),
     enabled: !isPersonalSecurityScope(scope),
   });
-  const data = isPersonalSecurityScope(scope) ? personal.data : organization.data;
-  return { runningCount: data?.runningCount, concurrencyLimit: data?.concurrencyLimit };
-}
-
-function pick<K extends keyof SecurityAgentConfig>(
-  config: SecurityAgentConfig,
-  keys: readonly K[]
-): Pick<SecurityAgentConfig, K> {
-  const result: Partial<SecurityAgentConfig> = {};
-  for (const key of keys) {
-    result[key] = config[key];
-  }
-  return result as Pick<SecurityAgentConfig, K>;
-}
-
-export function useSaveSecurityAgentConfig(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const configQueryKey = useSecurityAgentConfigQueryKey(scope);
-
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (patch: SecurityAgentConfigPatch) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.saveConfig.mutate(patch)
-        : trpcClient.organizations.securityAgent.saveConfig.mutate({
-            organizationId: scope,
-            ...patch,
-          }),
-    onMutate: async patch => {
-      await queryClient.cancelQueries({ queryKey: configQueryKey });
-      const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
-        old ? { ...old, ...patch } : old
-      );
-      return { previous, patch };
-    },
-    onError: (error, _patch, context) => {
-      if (context?.previous) {
-        const keys = Object.keys(context.patch) as (keyof SecurityAgentConfigPatch)[];
-        const restoredFields = pick(context.previous, keys);
-        queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
-          old ? { ...old, ...restoredFields } : old
-        );
-      }
-      toast.error(error.message);
-    },
-    onSuccess: result => {
-      if (result.existingRemediationCommandId) {
-        trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
-      }
-      if (result.backlogAdmissionWarning) {
-        toast.error(result.backlogAdmissionWarning);
-      }
-      if (result.remediationBacklogAdmissionWarning) {
-        toast.error(result.remediationBacklogAdmissionWarning);
-      }
-    },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: configQueryKey });
-      if (isPersonalSecurityScope(scope)) {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
-          }),
-          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
-        ]);
-        return;
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey({
-            organizationId: scope,
-          }),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.listFindings.queryKey({
-            organizationId: scope,
-          }),
-        }),
-      ]);
-    },
-  });
-}
-
-export function useSetSecurityAgentEnabled(scope: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const configQueryKey = useSecurityAgentConfigQueryKey(scope);
-
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.setEnabled.mutate>[0]) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.setEnabled.mutate(vars)
-        : trpcClient.organizations.securityAgent.setEnabled.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
-    onMutate: async vars => {
-      await queryClient.cancelQueries({ queryKey: configQueryKey });
-      const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
-        old ? { ...old, isEnabled: vars.isEnabled } : old
-      );
-      return { previous };
-    },
-    onError: (error, _vars, context) => {
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
-        old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
-      );
-      toast.error(error.message);
-    },
-    onSuccess: result => {
-      if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
-        toast.error(
-          'Security Agent was enabled, but the initial sync could not be queued. Sync again.'
-        );
-      } else if ('initialSync' in result && result.initialSync) {
-        trackSecurityAgentCommand(queryClient, scope, result.initialSync.commandId);
-      }
-    },
-    onSettled: async () => {
-      if (isPersonalSecurityScope(scope)) {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getPermissionStatus.queryKey(),
-          }),
-          queryClient.invalidateQueries({ queryKey: configQueryKey }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getRepositories.queryKey(),
-          }),
-        ]);
-        return;
-      }
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getPermissionStatus.queryKey({
-            organizationId: scope,
-          }),
-        }),
-        queryClient.invalidateQueries({ queryKey: configQueryKey }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getRepositories.queryKey({
-            organizationId: scope,
-          }),
-        }),
-      ]);
-    },
-  });
-}
-
-export function useTriggerSecuritySync(scope: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.triggerSync.mutate(vars)
-        : trpcClient.organizations.securityAgent.triggerSync.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
-    onError: error => {
-      toast.error(error.message);
-    },
-    onSuccess: result => {
-      trackSecurityAgentCommand(queryClient, scope, result.commandId);
-    },
-  });
-}
-
-export function useTrackSecurityAgentInteraction(scope: string) {
-  return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.trackUiInteraction.mutate>[0]) =>
-      isPersonalSecurityScope(scope)
-        ? trpcClient.securityAgent.trackUiInteraction.mutate(vars)
-        : trpcClient.organizations.securityAgent.trackUiInteraction.mutate({
-            organizationId: scope,
-            ...vars,
-          }),
-    onError: error => {
-      toast.error(error.message);
-    },
-  });
+  const active = isPersonalSecurityScope(scope) ? personal : organization;
+  return {
+    runningCount: active.data?.runningCount,
+    concurrencyLimit: active.data?.concurrencyLimit,
+    isLoading: active.isLoading,
+    isError: active.isError,
+    refetch: active.refetch,
+  };
 }

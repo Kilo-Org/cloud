@@ -67,6 +67,7 @@ type AgentConfigUpserter = (params: {
   agentType: string;
   platform: string;
   config: AutoTriageAgentConfig;
+  isEnabled: boolean;
   createdBy: string;
 }) => Promise<void>;
 
@@ -240,6 +241,7 @@ export function createAutoTriageRouter({
               max_classification_time_minutes: input.max_classification_time_minutes ?? 5,
               max_pr_creation_time_minutes: input.max_pr_creation_time_minutes ?? 15,
             },
+            isEnabled: input.enabled_for_issues,
             createdBy: ctx.user.id,
           });
 
@@ -304,6 +306,7 @@ export function createAutoTriageRouter({
               agentType: 'auto_triage',
               platform: 'github',
               config: updatedConfig,
+              isEnabled: input.isEnabled,
               createdBy: ctx.user.id,
             });
           }

@@ -17,6 +17,7 @@ import {
 } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
+import { contentBlocksToText } from '../util/content';
 import {
   extractConversationContext,
   pushEventToHumanMembers,
@@ -167,13 +168,7 @@ export async function postCommitFanOut(
     if (replyParent) {
       const parent = await replyParent;
       if (parent && !parent.deleted) {
-        inReplyToBody = parent.content
-          .filter(
-            (b): b is { type: 'text'; text: string } =>
-              b.type === 'text' && typeof b.text === 'string'
-          )
-          .map(b => b.text)
-          .join('');
+        inReplyToBody = contentBlocksToText(parent.content);
         inReplyToSender = parent.senderId;
       }
     }
@@ -207,14 +202,7 @@ export async function postCommitFanOut(
   // pure computation; the write lives inside the combined fan-out below.
   const computeAutoTitle = (): string | null => {
     if (info.title !== null) return null;
-    const text = content
-      .filter(
-        (b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string'
-      )
-      .map(b => b.text)
-      .join(' ')
-      .replace(/\n/g, ' ')
-      .trim();
+    const text = contentBlocksToText(content, ' ').replace(/\n/g, ' ').trim();
     if (text.length === 0) return null;
     return truncateByGrapheme(text, 80);
   };

@@ -11,6 +11,7 @@ import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachme
 type Props = {
   attachments: AgentAttachment[];
   onRemove: (id: string) => void;
+  onRetry: (id: string) => void;
 };
 
 const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
@@ -18,9 +19,11 @@ const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 function AttachmentChip({
   attachment,
   onRemove,
+  onRetry,
 }: {
   attachment: AgentAttachment;
   onRemove: () => void;
+  onRetry: () => void;
 }) {
   const colors = useThemeColors();
   const isImage = attachment.kind === 'image';
@@ -28,13 +31,20 @@ function AttachmentChip({
   const isErrored = attachment.status === 'error';
 
   return (
-    <View
+    <Pressable
+      onPress={isErrored ? onRetry : undefined}
+      disabled={!isErrored}
       className={cn(
         'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
         isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2',
-        isErrored && 'border-red-500 dark:border-red-400'
+        isErrored && 'border-destructive active:opacity-70'
       )}
-      accessibilityLabel={`${attachment.filename}, ${attachment.status}`}
+      accessibilityRole={isErrored ? 'button' : undefined}
+      accessibilityLabel={
+        isErrored
+          ? `Retry uploading ${attachment.filename}`
+          : `${attachment.filename}, ${attachment.status}`
+      }
     >
       {isImage ? (
         <Image
@@ -67,6 +77,12 @@ function AttachmentChip({
         </View>
       ) : null}
 
+      {isImage && isErrored ? (
+        <View className="absolute inset-0 items-center justify-center bg-black/30">
+          <AlertCircle size={20} color="white" />
+        </View>
+      ) : null}
+
       <Pressable
         onPress={onRemove}
         hitSlop={REMOVE_HIT_SLOP}
@@ -76,11 +92,11 @@ function AttachmentChip({
       >
         <X size={14} color={colors.foreground} />
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
-export function AttachmentPreviewStrip({ attachments, onRemove }: Readonly<Props>) {
+export function AttachmentPreviewStrip({ attachments, onRemove, onRetry }: Readonly<Props>) {
   if (attachments.length === 0) {
     return null;
   }
@@ -98,6 +114,9 @@ export function AttachmentPreviewStrip({ attachments, onRemove }: Readonly<Props
           attachment={attachment}
           onRemove={() => {
             onRemove(attachment.id);
+          }}
+          onRetry={() => {
+            onRetry(attachment.id);
           }}
         />
       ))}

@@ -40,30 +40,41 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
 
-Sentry.init({
-  dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
+// Session replay, screenshots, and view-hierarchy capture are gated on
+// stored consent (see src/lib/sentry-consent.ts) — the consent copy only
+// promises anonymous performance/crash data. The RN SDK reads all of these
+// options only at Sentry.init() time (Mobile Replay has no runtime
+// start/stop API in 7.x), so `consented` starts `false` and every consent
+// transition goes through reinitSentryForConsent, which awaits
+// Sentry.close() first — the only way to stop an in-flight native replay
+// recording and dispose the previous client — before calling this again.
+function initSentry(consented: boolean) {
+  Sentry.init({
+    dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
-  enabled: true,
+    enabled: true,
 
-  sendDefaultPii: false,
+    sendDefaultPii: false,
 
-  enableLogs: true,
-  tracesSampleRate: 0,
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  attachScreenshot: true,
-  attachViewHierarchy: true,
+    enableLogs: true,
+    tracesSampleRate: 0,
+    ...sentryOptionsForConsent(consented),
 
-  integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
-  enableNativeFramesTracking: false,
+    integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
+    enableNativeFramesTracking: false,
 
-  spotlight: __DEV__,
-});
+    spotlight: __DEV__,
+  });
+}
+
+initSentry(false);
 
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
@@ -97,6 +108,8 @@ function RootLayoutNav() {
       Sentry.captureException(fontsError);
     }
   }, [fontsError]);
+
+  useSentryConsentSync(consentChecked && !needsConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
   const isLoading = authLoading || updateChecking || !fontsReady;

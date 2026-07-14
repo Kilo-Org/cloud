@@ -3,8 +3,16 @@ import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  RefreshControl,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,8 +21,10 @@ import { captureEvent, CONVERSATION_CREATED_EVENT } from '@/lib/analytics/postho
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
+import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
 import { EmptyConversationList } from './empty-conversation-list';
 import { groupConversationsByActivity } from './conversation-list-groups';
@@ -47,14 +57,17 @@ type ConversationHeaderItem = {
 type ConversationListEntry = ConversationHeaderItem | ConversationItem;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const TAB_BAR_FAB_CLEARANCE = 72;
 const FAB_SIZE = 56;
 const FAB_MARGIN = 16;
 
 function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolean }>) {
   return (
-    <View className="gap-3 px-4 pt-2">
-      {showHeader ? <Skeleton className="mx-1 mb-1 h-4 w-24 rounded-md" /> : null}
+    <View className="gap-3 px-4">
+      {showHeader ? (
+        <View className="px-1 pb-2 pt-4">
+          <Skeleton className="h-4 w-24 rounded-md" />
+        </View>
+      ) : null}
       {[0, 1, 2, 3].map(i => (
         <View
           key={i}
@@ -65,7 +78,6 @@ function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolea
             <Skeleton className="h-5 w-2/3 rounded-md" />
             <Skeleton className="h-4 w-24 rounded-md" />
           </View>
-          <Skeleton className="h-10 w-10 rounded-full" />
         </View>
       ))}
     </View>
@@ -90,33 +102,34 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
   const now = useNowTicker(60_000);
-  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
+  const tabBarOverlayHeight = getTabBarOverlayHeight(bottom, Platform.OS, fontScale);
   const listContentContainerStyle = useMemo(
     () =>
       ({
         flexGrow: 1,
-        paddingBottom: Math.max(bottom, 16) + TAB_BAR_FAB_CLEARANCE + FAB_SIZE + FAB_MARGIN,
+        paddingBottom: tabBarOverlayHeight + FAB_SIZE + FAB_MARGIN,
       }) satisfies ViewStyle,
-    [bottom]
+    [tabBarOverlayHeight]
   );
   const createButtonStyle = useMemo(
     () =>
       ({
-        bottom: Math.max(bottom, 16) + TAB_BAR_FAB_CLEARANCE,
+        bottom: tabBarOverlayHeight + FAB_MARGIN,
         right: 20,
       }) satisfies ViewStyle,
-    [bottom]
+    [tabBarOverlayHeight]
   );
 
   useInstancePresence(sandboxId);
@@ -155,16 +168,10 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setManualRefreshing(true);
-      try {
-        await refetchConversations();
-      } finally {
-        setManualRefreshing(false);
-      }
-    })();
-  }, [refetchConversations]);
+  const [manualRefreshing, handleRefresh] = useManualRefresh(
+    refetchConversations,
+    "Couldn't refresh. Pull down to try again."
+  );
 
   const contentState = getConversationListContentState({
     isPending: listQuery.isPending,
@@ -187,7 +194,11 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={sandboxLabel} size="large" className="px-[22px]" />
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          className="flex-1"
+          style={{ paddingBottom: tabBarOverlayHeight }}
+        >
           <QueryError
             className="flex-1"
             message="Could not load conversations"
@@ -271,20 +282,24 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           }
         />
       </Animated.View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="New conversation"
-        disabled={createConversation.isPending}
-        onPress={handleCreateAndNavigate}
-        className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
-        style={createButtonStyle}
-      >
-        {createConversation.isPending ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : (
-          <Plus size={24} color={colors.primaryForeground} />
-        )}
-      </Pressable>
+      {/* The empty state below already renders its own "Create conversation" CTA —
+          only one creation affordance should be visible at a time. */}
+      {entries.length > 0 && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New conversation"
+          disabled={createConversation.isPending}
+          onPress={handleCreateAndNavigate}
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
+          style={createButtonStyle}
+        >
+          {createConversation.isPending ? (
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : (
+            <Plus size={24} color={colors.primaryForeground} />
+          )}
+        </Pressable>
+      )}
     </View>
   );
 }

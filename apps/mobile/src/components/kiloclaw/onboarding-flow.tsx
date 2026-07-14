@@ -16,7 +16,6 @@ import { X } from 'lucide-react-native';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { toast } from 'sonner-native';
 
 import { AccessRequiredScreen } from '@/components/kiloclaw/access-required-screen';
 import { resolveAccessRequiredSubcase } from '@/components/kiloclaw/empty-state-content';
@@ -59,9 +58,6 @@ function categorizeProvisionError(error: {
 function uiCategoryToAnalyticsCategory(category: ProvisionErrorCategory): ProvisionFailedCategory {
   return category === 'access_conflict' ? 'access' : 'generic';
 }
-
-const GENERIC_PROVISION_ERROR_MESSAGE =
-  "We couldn't set up your instance just now. Please try again.";
 
 function resolveHeaderTitle(
   isIdentityStep: boolean,
@@ -128,6 +124,15 @@ export function OnboardingFlow() {
     dispatch({ type: 'instance-status-changed', status: instanceStatus });
   }, [instanceStatus]);
 
+  // Feed hard query errors into the machine once provisioning is underway —
+  // an errored status/gateway-ready poll is a terminal signal, not silent
+  // "keep waiting" (see `getProvisioningTerminalReason`).
+  useEffect(() => {
+    if (state.provisionStarted && (statusQuery.isError || gatewayReadyQuery.isError)) {
+      dispatch({ type: 'provisioning-query-errored' });
+    }
+  }, [state.provisionStarted, statusQuery.isError, gatewayReadyQuery.isError]);
+
   useEffect(() => {
     if (!gatewayReadyData) {
       return;
@@ -170,10 +175,18 @@ export function OnboardingFlow() {
   // skip re-provisioning: the DO row is live and the subsequent `channels-skipped`
   // step-save effects will re-apply any identity / exec-preset changes idempotently.
   const alreadyProvisioned = state.provisionSuccess && state.sandboxId !== null;
+  const instanceStopped = state.instanceStatus === 'stopped';
+  const startInstanceMutate = mutations.start.mutate;
   const handleStart = useCallback(
     (userLocation: string | null) => {
       if (alreadyProvisioned) {
         dispatch({ type: 'start-requested' });
+        // A stopped instance never restarts on its own — without this the
+        // `instance_stopped` terminal state's "Try again" just loops back
+        // to itself (nothing re-provisions, nothing starts).
+        if (instanceStopped) {
+          startInstanceMutate(undefined);
+        }
         return;
       }
       dispatch({ type: 'start-requested' });
@@ -190,11 +203,12 @@ export function OnboardingFlow() {
             trackEvent(PROVISION_SUCCEEDED_EVENT);
           },
           onError: error => {
+            // No toast here: `errorCategory` drives FlowBody's inline
+            // "Something went wrong" / access-conflict screens, so a toast
+            // on top of that would just be a redundant, modal-invisible
+            // duplicate (see `flow-body.tsx`).
             const category = categorizeProvisionError(error);
             dispatch({ type: 'provision-failed', category });
-            if (category === 'generic') {
-              toast.error(GENERIC_PROVISION_ERROR_MESSAGE);
-            }
             trackEvent(PROVISION_FAILED_EVENT, {
               category: uiCategoryToAnalyticsCategory(category),
             });
@@ -202,7 +216,7 @@ export function OnboardingFlow() {
         }
       );
     },
-    [alreadyProvisioned, mutations.provision]
+    [alreadyProvisioned, instanceStopped, startInstanceMutate, mutations.provision]
   );
 
   // Save the bot identity to the instance as soon as both the user has
@@ -377,9 +391,12 @@ export function OnboardingFlow() {
             // pending_settlement without an instance — the subscription is still
             // activating server-side. `resolveAccessRequiredSubcase` returns null
             // because this is neither an access-required nor a remediation case.
-            <Text variant="muted" className="px-6 text-center">
-              Finishing setup — hang tight while we finalize your account.
-            </Text>
+            <View className="items-center gap-3 px-6">
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+              <Text variant="muted" className="text-center">
+                Finishing setup — hang tight while we finalize your account.
+              </Text>
+            </View>
           )}
         </Animated.View>
       </View>
@@ -405,7 +422,7 @@ export function OnboardingFlow() {
   } else if (isChannelsStep && !hasError) {
     headerRight = instanceReady ? (
       <View className="flex-row items-center gap-1.5">
-        <View className="h-2 w-2 rounded-full bg-green-500" />
+        <View className="h-2 w-2 rounded-full bg-good" />
         <Text className="text-xs text-muted-foreground">Ready</Text>
       </View>
     ) : (
@@ -436,6 +453,7 @@ export function OnboardingFlow() {
           onProvisioningComplete={onProvisioningComplete}
           onRetry={onProvisioningRetry}
           onGraceElapsed={onGraceElapsed}
+          onContinueInBackground={onDismiss}
           onOpenInstance={onOpenInstance}
         />
       </Animated.View>

@@ -28,6 +28,7 @@ import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
+import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -497,7 +498,7 @@ export function createConnectionManager(
    * Send an event to the ingest WebSocket.
    * Buffers the prepared frame if disconnected.
    */
-  function sendToIngest(event: IngestEvent): void {
+  function sendToIngestImmediately(event: IngestEvent): void {
     const frame = prepareFrameForSend(event, state);
     if (frame.kind === 'dropped') return;
 
@@ -521,6 +522,12 @@ export function createConnectionManager(
         limitBytes: MAX_INGEST_BUFFERED_BYTES,
       });
     }
+  }
+
+  const runningBashEventCoalescer = createRunningBashEventCoalescer(sendToIngestImmediately);
+
+  function sendToIngest(event: IngestEvent): void {
+    runningBashEventCoalescer.forward(event);
   }
 
   /**
@@ -1363,6 +1370,7 @@ export function createConnectionManager(
   return {
     open: async () => {
       logToFile('opening connections');
+      runningBashEventCoalescer.reopen();
 
       // Open ingest WS first
       await openIngestWs();
@@ -1390,6 +1398,7 @@ export function createConnectionManager(
         eventSubscriptionAbort?.abort();
         eventSubscriptionAbort = null;
         eventSubscriptionActive = false;
+        runningBashEventCoalescer.close();
         if (ingestWs) {
           closedByUs = true;
           try {
@@ -1412,6 +1421,7 @@ export function createConnectionManager(
       logToFile('closing connections');
       generation++;
       cancelReconnect();
+      runningBashEventCoalescer.close();
       clearBuffer();
 
       // Stop event subscription — abort the HTTP stream so the for-await

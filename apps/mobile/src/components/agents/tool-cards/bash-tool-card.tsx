@@ -25,11 +25,9 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
         <View className="gap-2">
           {command.length > 0 ? (
             <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <Text selectable className="font-mono text-xs leading-4 text-foreground">
-                  $ {command}
-                </Text>
-              </ScrollView>
+              <Text selectable className="font-mono text-xs leading-4 text-foreground">
+                $ {command}
+              </Text>
             </View>
           ) : null}
           {output ? (
@@ -40,7 +38,7 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
             </ScrollView>
           ) : null}
           {error ? (
-            <Text selectable className="text-xs text-red-500">
+            <Text selectable className="text-xs text-destructive">
               {error}
             </Text>
           ) : null}

@@ -10,6 +10,19 @@ import {
   MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
 } from '../../src/dos/kilo-sdk-materialization';
+import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
+
+const encoder = new TextEncoder();
+
+function makeMessageWithDataBytes(id: string, targetBytes: number) {
+  const baseBytes = encoder.encode(JSON.stringify({ id, content: '' })).byteLength;
+  const contentBytes = targetBytes - baseBytes;
+  if (contentBytes < 0) throw new Error(`Target byte length is too small for ${id}`);
+
+  const item = { type: 'message' as const, data: { id, content: 'x'.repeat(contentBytes) } };
+  expect(encoder.encode(JSON.stringify(item.data)).byteLength).toBe(targetBytes);
+  return item;
+}
 
 function getStub(kiloUserId: string, sessionId: string) {
   const doKey = `${kiloUserId}/${sessionId}`;
@@ -19,6 +32,51 @@ function getStub(kiloUserId: string, sessionId: string) {
 
 describe('SessionIngestDO integration', () => {
   const kiloUserId = 'usr_test_integration';
+
+  describe('ingest RPC envelope', () => {
+    it('accepts and persists the maximum direct-ingest byte envelope', async () => {
+      const suffix = crypto.randomUUID().replaceAll('-', '');
+      const envelopeUserId = `usr_rpc_envelope_${suffix}`;
+      const sessionId = `ses_${suffix.slice(0, 26)}`;
+      const stub = getStub(envelopeUserId, sessionId);
+      const remainingBytes = INGEST_CHUNK_MAX_BYTES - 2 * MAX_INGEST_ITEM_BYTES;
+      const items = [
+        makeMessageWithDataBytes('msg_rpc_envelope_1', MAX_INGEST_ITEM_BYTES),
+        makeMessageWithDataBytes('msg_rpc_envelope_2', MAX_INGEST_ITEM_BYTES),
+        makeMessageWithDataBytes('msg_rpc_envelope_3', remainingBytes),
+      ];
+      const itemByteLengths = items.map(
+        item => encoder.encode(JSON.stringify(item.data)).byteLength
+      );
+
+      expect(Math.max(...itemByteLengths)).toBeLessThanOrEqual(MAX_INGEST_ITEM_BYTES);
+      expect(itemByteLengths.reduce((sum, bytes) => sum + bytes, 0)).toBe(INGEST_CHUNK_MAX_BYTES);
+
+      try {
+        await expect(stub.ingest(items, envelopeUserId, sessionId, 1, 1)).resolves.toEqual({
+          accepted: true,
+          changes: [],
+        });
+        await runInDurableObject(stub, async (_instance, state) => {
+          const rows = [
+            ...state.storage.sql.exec<{ item_id: string; item_data_bytes: number }>(
+              `SELECT item_id, length(CAST(item_data AS BLOB)) AS item_data_bytes
+               FROM ingest_items
+               WHERE item_type = 'message'
+               ORDER BY item_id`
+            ),
+          ];
+          expect(rows).toEqual([
+            { item_id: 'message/msg_rpc_envelope_1', item_data_bytes: MAX_INGEST_ITEM_BYTES },
+            { item_id: 'message/msg_rpc_envelope_2', item_data_bytes: MAX_INGEST_ITEM_BYTES },
+            { item_id: 'message/msg_rpc_envelope_3', item_data_bytes: remainingBytes },
+          ]);
+        });
+      } finally {
+        await stub.clear();
+      }
+    });
+  });
 
   describe('ingest + getAllStream round-trip', () => {
     it('ingests a single session item and exports it', async () => {

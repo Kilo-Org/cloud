@@ -3,6 +3,7 @@ import { type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
 import {
   ChildSessionSection,
   getTaskToolSessionId,
+  type OpenChildSession,
   type RenderPartFn,
 } from './child-session-section';
 import {
@@ -23,18 +24,20 @@ type ToolPartRendererProps = {
   part: ToolPart;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   renderPart?: RenderPartFn;
+  onOpenChildSession?: OpenChildSession;
 };
 
 export function ToolPartRenderer({
   part,
   getChildMessages,
   renderPart,
+  onOpenChildSession,
 }: Readonly<ToolPartRendererProps>) {
   if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
     return null;
   }
 
-  if (part.tool === 'task' && getChildMessages && renderPart) {
+  if (part.tool === 'task' && getChildMessages && renderPart && onOpenChildSession) {
     const sessionId = getTaskToolSessionId(part);
     const childMessages = sessionId ? getChildMessages(sessionId) : [];
 
@@ -42,8 +45,7 @@ export function ToolPartRenderer({
       <ChildSessionSection
         part={part}
         childMessages={childMessages}
-        getChildMessages={getChildMessages}
-        renderPart={renderPart}
+        onOpenChildSession={onOpenChildSession}
       />
     );
   }

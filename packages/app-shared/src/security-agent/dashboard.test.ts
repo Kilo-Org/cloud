@@ -100,7 +100,7 @@ describe('buildSecurityDashboardMetrics', () => {
     ]);
   });
 
-  it('reports 100% SLA compliance instead of dividing by zero when there are no findings', () => {
+  it('reports "Not measured" instead of dividing by zero when there are no SLA-tracked findings', () => {
     const data = makeStats({
       sla: {
         overall: { total: 0, withinSla: 0, overdue: 0 },
@@ -117,8 +117,8 @@ describe('buildSecurityDashboardMetrics', () => {
     expect(complianceMetric).toEqual({
       id: 'slaCompliance',
       label: 'SLA compliance',
-      value: '100%',
-      detail: 'No assigned deadlines',
+      value: 'Not measured',
+      detail: 'No findings with an SLA deadline yet',
       tone: 'neutral',
     });
   });

@@ -59,13 +59,14 @@ const sharedHandlers = createAutoTriageRouter({
     return await getAgentConfig(owner.id, agentType, platform);
   },
 
-  agentConfigUpserter: async ({ owner, agentType, platform, config, createdBy }) => {
+  agentConfigUpserter: async ({ owner, agentType, platform, config, isEnabled, createdBy }) => {
     if (owner.type !== 'org') return;
     await upsertAgentConfig({
       organizationId: owner.id,
       agentType,
       platform,
       config,
+      isEnabled,
       createdBy,
     });
   },

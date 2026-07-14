@@ -22,6 +22,7 @@ const colors = {
   accentSoftForeground: '#1A1A10',
   good: '#2F9A5F',
   warn: '#B27214',
+  info: '#2563EB',
   agentYuki: '#6B4FD6',
   agentWorkclaw: '#4F5A10',
   agentCloud: '#2F9A5F',

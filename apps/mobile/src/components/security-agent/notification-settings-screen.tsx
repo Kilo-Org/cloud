@@ -5,27 +5,29 @@ import {
   parseDayCount,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { cn } from '@/lib/utils';
 
 type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeverity'];
 
@@ -55,7 +57,7 @@ function NotificationSettingsSkeleton() {
 
 export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const colors = useThemeColors();
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
@@ -111,13 +113,20 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     trackRef.current({ interaction: 'settings_notifications_viewed' });
   }, []);
 
-  const valid = isValidDayCount(slaNotificationWarningDays);
+  // Only validate the lead-time field while the SLA notification feature
+  // that owns it is enabled — once hidden by the toggle, its value can't
+  // block saving. If the field is invalid at the moment it's hidden, fall
+  // back to the last persisted value instead of sending an invalid one.
+  const warningDaysValid = isValidDayCount(slaNotificationWarningDays);
+  const valid = !slaNotificationsEnabled || warningDaysValid;
   const patch = {
     newFindingNotificationsEnabled,
     newFindingNotificationMinSeverity,
     slaNotificationsEnabled,
     slaNotificationMinSeverity,
-    slaNotificationWarningDays,
+    slaNotificationWarningDays: warningDaysValid
+      ? slaNotificationWarningDays
+      : (initialConfigRef.current.slaNotificationWarningDays ?? slaNotificationWarningDays),
   };
   const dirty =
     hydratedRef.current &&
@@ -125,20 +134,19 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Notifications" />
-        <QueryError
-          className="flex-1"
-          message="Could not load notification settings"
-          onRetry={() => void config.refetch()}
-        />
-      </View>
+      <PlatformErrorScreen
+        title="Notifications"
+        variant="offline"
+        message="Could not load notification settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {
@@ -160,18 +168,24 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }
       />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-24"
+        contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
       >
+        {!canManage && (
+          <Text className="text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            New-finding Notification
+            New-finding notification
           </Text>
           <ToggleRow
             title={personal ? 'Email me about new findings' : 'Email organization owners'}
@@ -193,7 +207,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            SLA Warning Notification
+            SLA warning notification
           </Text>
           <ToggleRow
             title={personal ? 'Email me about SLA warnings' : 'Email organization owners'}
@@ -222,7 +236,10 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       ? undefined
                       : 'Enter a whole number between 1 and 365'
                   }
-                  className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
+                  className={cn(
+                    'h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground',
+                    !canManage && 'opacity-50'
+                  )}
                   editable={canManage}
                   keyboardType="number-pad"
                   defaultValue={warningDaysRef.current}
@@ -242,13 +259,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
             </>
           )}
         </View>
-
-        {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
-        )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

@@ -4,31 +4,33 @@ import {
   parseDayCount,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { cn } from '@/lib/utils';
 
 function SlaSettingsSkeleton() {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="SLA Policy" />
+      <ScreenHeader title="SLA policy" />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -75,7 +77,12 @@ function SlaDayRow({
   const [days, setDays] = useState(initialValue);
 
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
+    <View
+      className={cn(
+        'flex-row items-center justify-between rounded-lg bg-secondary p-4',
+        disabled && 'opacity-50'
+      )}
+    >
       <View className="flex-1 pr-3">
         <Text className="text-sm font-medium">{label}</Text>
         <Text variant="muted" className="text-xs">
@@ -93,6 +100,7 @@ function SlaDayRow({
         className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-5 text-foreground"
         textAlign="center"
         editable={!disabled}
+        accessibilityState={{ disabled }}
         keyboardType="number-pad"
         defaultValue={rawRef.current}
         placeholderTextColor={colors.mutedForeground}
@@ -108,16 +116,18 @@ function SlaDayRow({
 }
 
 export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 
   const [slaEnabled, setSlaEnabled] = useState(false);
-  const [slaCriticalDays, setSlaCriticalDays] = useState(Number.NaN);
-  const [slaHighDays, setSlaHighDays] = useState(Number.NaN);
-  const [slaMediumDays, setSlaMediumDays] = useState(Number.NaN);
-  const [slaLowDays, setSlaLowDays] = useState(Number.NaN);
+  const [slaDays, setSlaDays] = useState<Record<SlaSeverity, number>>({
+    critical: Number.NaN,
+    high: Number.NaN,
+    medium: Number.NaN,
+    low: Number.NaN,
+  });
   const hydratedRef = useRef(false);
   const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
@@ -133,10 +143,12 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     hydratedRef.current = true;
     initialConfigRef.current = config.data;
     setSlaEnabled(config.data.slaEnabled);
-    setSlaCriticalDays(config.data.slaCriticalDays);
-    setSlaHighDays(config.data.slaHighDays);
-    setSlaMediumDays(config.data.slaMediumDays);
-    setSlaLowDays(config.data.slaLowDays);
+    setSlaDays({
+      critical: config.data.slaCriticalDays,
+      high: config.data.slaHighDays,
+      medium: config.data.slaMediumDays,
+      low: config.data.slaLowDays,
+    });
   }, [config.data]);
 
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
@@ -155,17 +167,29 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     trackRef.current({ interaction: 'settings_sla_viewed' });
   }, []);
 
-  const valid =
-    isValidDayCount(slaCriticalDays) &&
-    isValidDayCount(slaHighDays) &&
-    isValidDayCount(slaMediumDays) &&
-    isValidDayCount(slaLowDays);
+  // Only validate the four day fields while SLA tracking is enabled — once
+  // hidden by the toggle, an invalid day count can't block saving. If a
+  // field is invalid at the moment it's hidden, fall back to its last
+  // persisted value instead of sending an invalid one.
+  const daysValid: Record<SlaSeverity, boolean> = {
+    critical: isValidDayCount(slaDays.critical),
+    high: isValidDayCount(slaDays.high),
+    medium: isValidDayCount(slaDays.medium),
+    low: isValidDayCount(slaDays.low),
+  };
+  const valid = !slaEnabled || Object.values(daysValid).every(Boolean);
   const patch = {
     slaEnabled,
-    slaCriticalDays,
-    slaHighDays,
-    slaMediumDays,
-    slaLowDays,
+    slaCriticalDays: daysValid.critical
+      ? slaDays.critical
+      : (initialConfigRef.current.slaCriticalDays ?? slaDays.critical),
+    slaHighDays: daysValid.high
+      ? slaDays.high
+      : (initialConfigRef.current.slaHighDays ?? slaDays.high),
+    slaMediumDays: daysValid.medium
+      ? slaDays.medium
+      : (initialConfigRef.current.slaMediumDays ?? slaDays.medium),
+    slaLowDays: daysValid.low ? slaDays.low : (initialConfigRef.current.slaLowDays ?? slaDays.low),
   };
   const dirty =
     hydratedRef.current &&
@@ -173,20 +197,19 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="SLA Policy" />
-        <QueryError
-          className="flex-1"
-          message="Could not load SLA settings"
-          onRetry={() => void config.refetch()}
-        />
-      </View>
+      <PlatformErrorScreen
+        title="SLA policy"
+        variant="offline"
+        message="Could not load SLA settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {
@@ -196,23 +219,10 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     return null;
   }
 
-  const setters: Record<SlaSeverity, (value: number) => void> = {
-    critical: setSlaCriticalDays,
-    high: setSlaHighDays,
-    medium: setSlaMediumDays,
-    low: setSlaLowDays,
-  };
-  const values: Record<SlaSeverity, number> = {
-    critical: slaCriticalDays,
-    high: slaHighDays,
-    medium: slaMediumDays,
-    low: slaLowDays,
-  };
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="SLA Policy"
+        title="SLA policy"
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -221,15 +231,21 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }
       />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-24"
+        contentContainerClassName="gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
       >
+        {!canManage && (
+          <Text className="text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         <ToggleRow
           title="Enable SLA tracking"
           subtitle="Set remediation deadlines based on finding severity."
@@ -248,22 +264,16 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                 key={row.key}
                 label={row.label}
                 description={row.description}
-                initialValue={values[row.key]}
+                initialValue={slaDays[row.key]}
                 disabled={!canManage}
                 onChangeValue={value => {
-                  setters[row.key](value);
+                  setSlaDays(current => ({ ...current, [row.key]: value }));
                 }}
               />
             ))}
           </View>
         )}
-
-        {!canManage && (
-          <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
-        )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

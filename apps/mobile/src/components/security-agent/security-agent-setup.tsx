@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SecurityAgentSetupProps = {
@@ -25,6 +26,7 @@ export function SecurityAgentSetup({
   onConnected,
 }: Readonly<SecurityAgentSetupProps>) {
   const colors = useThemeColors();
+  const tabBarPadding = useTabBarBottomPadding();
   const [connecting, setConnecting] = useState(false);
 
   const connect = async () => {
@@ -40,7 +42,10 @@ export function SecurityAgentSetup({
   };
 
   return (
-    <View className="flex-1 items-center justify-center gap-3 bg-background px-6">
+    <View
+      className="flex-1 items-center justify-center gap-3 bg-background px-6"
+      style={{ paddingBottom: tabBarPadding }}
+    >
       <ShieldCheck size={28} color={colors.mutedForeground} />
       <Text className="text-center text-base font-semibold">{title}</Text>
       <Text className="text-center text-sm text-muted-foreground">{description}</Text>
@@ -51,7 +56,7 @@ export function SecurityAgentSetup({
           void connect();
         }}
       >
-        {connecting ? <ActivityIndicator size="small" /> : null}
+        {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
         <Text>{buttonLabel}</Text>
       </Button>
     </View>

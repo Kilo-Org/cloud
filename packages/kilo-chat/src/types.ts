@@ -56,6 +56,7 @@ import type {
   messageUpdatedEventSchema,
   messageDeletedEventSchema,
   messageDeliveryFailedEventSchema,
+  messageRedeliveredEventSchema,
   typingEventSchema,
   reactionAddedEventSchema,
   reactionRemovedEventSchema,
@@ -104,6 +105,7 @@ export type MessageCreatedEvent = z.infer<typeof messageCreatedEventSchema>;
 export type MessageUpdatedEvent = z.infer<typeof messageUpdatedEventSchema>;
 export type MessageDeletedEvent = z.infer<typeof messageDeletedEventSchema>;
 export type MessageDeliveryFailedEvent = z.infer<typeof messageDeliveryFailedEventSchema>;
+export type MessageRedeliveredEvent = z.infer<typeof messageRedeliveredEventSchema>;
 export type TypingEvent = z.infer<typeof typingEventSchema>;
 export type ReactionAddedEvent = z.infer<typeof reactionAddedEventSchema>;
 export type ReactionRemovedEvent = z.infer<typeof reactionRemovedEventSchema>;

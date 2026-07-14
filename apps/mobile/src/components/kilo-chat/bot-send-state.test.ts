@@ -5,7 +5,7 @@ import { resolveMobileMessageInputAvailability } from './bot-send-state';
 const NOW = 1_000_000;
 
 describe('mobile bot send gate', () => {
-  it('blocks sends while bot status is unknown', () => {
+  it('blocks sends but hides the instance CTA while bot status is unknown (cold cache)', () => {
     const state = resolveMobileMessageInputAvailability({
       currentUserId: 'user-1',
       instanceStatus: 'running',
@@ -17,30 +17,31 @@ describe('mobile bot send gate', () => {
 
     expect(state.disabled).toBe(true);
     expect(state.disabledReason).toBe('Waiting for bot status...');
+    expect(state.showInstanceCta).toBe(false);
   });
 
   it('blocks sends when the bot is offline or stale', () => {
-    expect(
-      resolveMobileMessageInputAvailability({
-        currentUserId: 'user-1',
-        instanceStatus: 'running',
-        presence: { online: false, lastAt: NOW },
-        now: NOW,
-        pendingMutation: false,
-        editing: false,
-      }).disabled
-    ).toBe(true);
+    const stoppedOffline = resolveMobileMessageInputAvailability({
+      currentUserId: 'user-1',
+      instanceStatus: 'running',
+      presence: { online: false, lastAt: NOW },
+      now: NOW,
+      pendingMutation: false,
+      editing: false,
+    });
+    expect(stoppedOffline.disabled).toBe(true);
+    expect(stoppedOffline.showInstanceCta).toBe(true);
 
-    expect(
-      resolveMobileMessageInputAvailability({
-        currentUserId: 'user-1',
-        instanceStatus: 'running',
-        presence: { online: true, lastAt: NOW - 91_000 },
-        now: NOW,
-        pendingMutation: false,
-        editing: false,
-      }).disabled
-    ).toBe(true);
+    const staleOffline = resolveMobileMessageInputAvailability({
+      currentUserId: 'user-1',
+      instanceStatus: 'running',
+      presence: { online: true, lastAt: NOW - 91_000 },
+      now: NOW,
+      pendingMutation: false,
+      editing: false,
+    });
+    expect(staleOffline.disabled).toBe(true);
+    expect(staleOffline.showInstanceCta).toBe(true);
   });
 
   it('allows sends when the bot is online or recently idle', () => {
@@ -93,6 +94,20 @@ describe('mobile bot send gate', () => {
 
     expect(state.botDisplay.state).toBe('offline');
     expect(state.disabled).toBe(true);
+    expect(state.showInstanceCta).toBe(true);
+  });
+
+  it('never shows the instance CTA while sends are allowed', () => {
+    expect(
+      resolveMobileMessageInputAvailability({
+        currentUserId: 'user-1',
+        instanceStatus: 'running',
+        presence: { online: true, lastAt: NOW - 10_000 },
+        now: NOW,
+        pendingMutation: false,
+        editing: false,
+      }).showInstanceCta
+    ).toBe(false);
   });
 
   it('keeps the composer enabled during pending sends when the bot can receive messages', () => {

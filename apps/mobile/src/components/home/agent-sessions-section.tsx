@@ -5,8 +5,9 @@ import {
   expandPlatformFilter,
   formatGitUrlProject,
 } from '@/components/agents/session-list-helpers';
-import { CompactSessionRow } from '@/components/home/compact-session-row';
 import { SectionHeader } from '@/components/home/section-header';
+import { SessionRow } from '@/components/ui/session-row';
+import { Text } from '@/components/ui/text';
 import {
   type ActiveSession,
   type StoredSession,
@@ -118,6 +119,21 @@ function buildRows(params: {
   return rows;
 }
 
+// Whether the Home "Agent sessions" section has anything to render — mirrors
+// buildRows' inclusion rule (any active session, or a cloud-agent stored
+// session; stored CLI/other-platform sessions live on the Agents tab, not
+// Home). The Home screen gates its section/promo/new-task button on this so a
+// CLI-only account shows the first-use promo instead of an empty section.
+export function hasDisplayableAgentSessions(
+  storedSessions: StoredSession[],
+  activeSessions: ActiveSession[]
+): boolean {
+  return (
+    activeSessions.length > 0 ||
+    storedSessions.some(s => CLOUD_AGENT_PLATFORMS.has(s.created_on_platform))
+  );
+}
+
 type AgentSessionsSectionProps = {
   organizationId: string | null;
 };
@@ -147,7 +163,7 @@ function storedSessionLabel(session: StoredSession): string {
 
 export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
-  const { activeSessions, storedSessions, activeSessionIds } = useAgentSessions({
+  const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
     organizationId,
   });
 
@@ -173,6 +189,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
           router.push('/(app)/(tabs)/(2_agents)' as Href);
         }}
       />
+      {activeIsError ? (
+        <Text variant="muted" className="mx-4 mb-2 text-xs">
+          Showing saved sessions — live status may be out of date
+        </Text>
+      ) : null}
       <View className="mx-4 gap-2">
         {rows.map(row => {
           if (row.kind === 'active') {
@@ -182,10 +203,10 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
                 key={row.key}
                 className="overflow-hidden rounded-2xl border border-border bg-card"
               >
-                <CompactSessionRow
+                <SessionRow
                   agentLabel={activeSessionLabel(session)}
                   title={activeSessionTitle(session)}
-                  isLive
+                  live
                   last
                   onPress={() => {
                     navigateTo(session.id);
@@ -200,11 +221,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
               key={row.key}
               className="overflow-hidden rounded-2xl border border-border bg-card"
             >
-              <CompactSessionRow
+              <SessionRow
                 agentLabel={storedSessionLabel(session)}
                 title={storedSessionTitle(session)}
                 meta={storedSessionMeta(session)}
-                isLive={row.isLive}
+                live={row.isLive}
                 last
                 onPress={() => {
                   navigateTo(session.session_id, session.organization_id);

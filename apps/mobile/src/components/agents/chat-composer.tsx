@@ -3,6 +3,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Keyboard,
   type LayoutChangeEvent,
   Pressable,
@@ -26,6 +27,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
@@ -76,6 +78,7 @@ export function ChatComposer({
   const [hasText, setHasText] = useState(false);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({
@@ -88,9 +91,13 @@ export function ChatComposer({
   });
 
   // The backend requires a non-empty prompt even when attachments are present.
-  const canSend = hasText && !disabled && !isStreaming;
+  const canSend = hasText && !disabled && !isStreaming && !isSending;
   const showToolbar = isFocused || hasText || upload.attachments.length > 0;
-  const toolbarDisabled = disabled || isStreaming;
+  // isSending locks the input and attachment controls too — otherwise text or
+  // attachments added while the send is in flight get wiped by the success path.
+  const toolbarDisabled = disabled || isStreaming || isSending;
+  const paperclipDisabled =
+    toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES;
 
   function handleChangeText(value: string) {
     textRef.current = value;
@@ -98,13 +105,17 @@ export function ChatComposer({
     setHasText(value.trim().length > 0);
   }
 
-  function handleSend() {
+  async function handleSend() {
     const trimmed = textRef.current.trim();
     if (!trimmed || !canSend) {
       return;
     }
     if (upload.isUploading) {
       toast.error('Wait for attachments to finish uploading.');
+      return;
+    }
+    if (upload.hasFailedAttachments) {
+      toast.error('Remove or retry failed attachments first.');
       return;
     }
     if (trimmed.startsWith('/') && upload.attachments.length > 0) {
@@ -114,13 +125,23 @@ export function ChatComposer({
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const payload = upload.toWirePayload();
-    void onSend(trimmed, payload);
-    textRef.current = '';
-    setHasText(false);
-    measure.reset();
-    inputRef.current?.clear();
-    upload.reset();
-    Keyboard.dismiss();
+    setIsSending(true);
+    try {
+      // Only clear the draft once the send actually succeeds — a failed
+      // send must leave the text and attachments exactly as the user left
+      // them (the parent already surfaces the error toast).
+      await onSend(trimmed, payload);
+      textRef.current = '';
+      setHasText(false);
+      measure.reset();
+      inputRef.current?.clear();
+      upload.reset();
+      Keyboard.dismiss();
+    } catch {
+      // Draft preserved; error already surfaced by the caller.
+    } finally {
+      setIsSending(false);
+    }
   }
 
   function handleStop() {
@@ -133,7 +154,7 @@ export function ChatComposer({
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
-  const { addCandidates, removeAttachment } = upload;
+  const { addCandidates, removeAttachment, retryAttachment } = upload;
 
   const handleAddAttachment = useCallback(async () => {
     addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
@@ -170,7 +191,11 @@ export function ChatComposer({
       ) : null}
 
       {attachmentsEnabled ? (
-        <AttachmentPreviewStrip attachments={upload.attachments} onRemove={removeAttachment} />
+        <AttachmentPreviewStrip
+          attachments={upload.attachments}
+          onRemove={removeAttachment}
+          onRetry={retryAttachment}
+        />
       ) : null}
 
       <View className="flex-row items-center p-2.5 px-3">
@@ -179,18 +204,25 @@ export function ChatComposer({
             onPress={() => {
               void handleAddAttachment();
             }}
-            disabled={toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
+            disabled={paperclipDisabled}
             hitSlop={PAPERCLIP_HIT_SLOP}
-            className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full active:opacity-70',
+              paperclipDisabled && 'opacity-50'
+            )}
             accessibilityRole="button"
             accessibilityLabel="Add attachment"
+            accessibilityState={{ disabled: paperclipDisabled }}
           >
             <Paperclip size={18} color={colors.mutedForeground} />
           </Pressable>
         ) : null}
 
         <View
-          className="mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card"
+          className={cn(
+            'mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
+            toolbarDisabled && 'opacity-50'
+          )}
           onLayout={handleInputLayout}
         >
           <TextInput
@@ -209,6 +241,7 @@ export function ChatComposer({
             style={textInputStyle}
             scrollEnabled={measure.height >= TEXT_INPUT_MAX_HEIGHT}
             editable={!toolbarDisabled}
+            accessibilityState={{ disabled: toolbarDisabled }}
             returnKeyType="default"
             submitBehavior="newline"
             autoCapitalize="sentences"
@@ -224,27 +257,36 @@ export function ChatComposer({
             accessibilityRole="button"
             accessibilityLabel="Stop generating"
             accessibilityState={{ disabled }}
-            className="h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500"
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
+              disabled && 'opacity-50'
+            )}
           >
             <Square size={14} color="white" fill="white" />
           </Pressable>
         ) : (
           <Pressable
-            onPress={handleSend}
+            onPress={() => {
+              void handleSend();
+            }}
             disabled={!canSend}
             hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel="Send message"
-            accessibilityState={{ disabled: !canSend }}
+            accessibilityState={{ disabled: !canSend, busy: isSending }}
             className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
               canSend ? 'bg-accent-soft' : 'bg-muted'
             }`}
           >
-            <ArrowUp
-              size={18}
-              color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
-              strokeWidth={2.5}
-            />
+            {isSending ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <ArrowUp
+                size={18}
+                color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
+                strokeWidth={2.5}
+              />
+            )}
           </Pressable>
         )}
       </View>

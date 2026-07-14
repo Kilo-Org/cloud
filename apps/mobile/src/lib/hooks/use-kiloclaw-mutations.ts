@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
+import { renameKiloClawInstance } from '@/lib/kiloclaw-display';
 import { useTRPC } from '@/lib/trpc';
 import { asyncNoop } from '@/lib/utils';
 
@@ -118,7 +119,9 @@ export function useKiloClawMutations(organizationId?: string | null) {
   function optimistic<TInput, TData extends Record<string, unknown>>(
     key: unknown[],
     updater: (old: TData, input: TInput) => TData,
-    settle?: () => Promise<void>
+    // silent: caller shows the error inline (e.g. a modal that stays open on
+    // failure per Pattern P2) instead of the default centralized toast.
+    options?: { settle?: () => Promise<void>; silent?: boolean }
   ) {
     return {
       onMutate: async (input: TInput) => {
@@ -131,10 +134,12 @@ export function useKiloClawMutations(organizationId?: string | null) {
         if (context?.previous) {
           queryClient.setQueryData(key, context.previous);
         }
-        onMutationError(error);
+        if (!options?.silent) {
+          onMutationError(error);
+        }
       },
       onSettled:
-        settle ??
+        options?.settle ??
         (async () => {
           await queryClient.invalidateQueries({ queryKey: key });
         }),
@@ -263,7 +268,7 @@ export function useKiloClawMutations(organizationId?: string | null) {
           ...(input.security != null && { execSecurity: input.security }),
           ...(input.ask != null && { execAsk: input.ask }),
         }),
-        invalidateStatus
+        { settle: invalidateStatus }
       ),
       retry: retryTransient,
       retryDelay: retryTransientDelay,
@@ -318,7 +323,11 @@ export function useKiloClawMutations(organizationId?: string | null) {
       },
       onSettled: invalidateStatusAndPin,
     }),
-    approvePairingRequest: useMutation({
+    approvePairingRequest: useMutation<
+      unknown,
+      { message: string },
+      { channel: string; code: string }
+    >({
       ...dispatch(
         trpc.kiloclaw.approvePairingRequest,
         trpc.organizations.kiloclaw.approvePairingRequest
@@ -328,7 +337,7 @@ export function useKiloClawMutations(organizationId?: string | null) {
       },
       onError: onMutationError,
     }),
-    approveDevicePairingRequest: useMutation({
+    approveDevicePairingRequest: useMutation<unknown, { message: string }, { requestId: string }>({
       ...dispatch(
         trpc.kiloclaw.approveDevicePairingRequest,
         trpc.organizations.kiloclaw.approveDevicePairingRequest
@@ -354,16 +363,42 @@ export function useKiloClawMutations(organizationId?: string | null) {
           ...old,
           gmailNotificationsEnabled: input.enabled,
         }),
-        invalidateStatus
+        { settle: invalidateStatus }
       ),
     }),
     renameInstance: useMutation({
       ...dispatch(trpc.kiloclaw.renameInstance, trpc.organizations.kiloclaw.renameInstance),
-      ...optimistic(
-        statusKey,
-        (old, input: { name: string | null }) => ({ ...old, name: input.name }),
-        invalidateStatus
-      ),
+      scope: { id: `kiloclaw-rename:${organizationId ?? 'personal'}` },
+      onMutate: async (input: { name: string | null }) => {
+        await Promise.all([
+          queryClient.cancelQueries({ queryKey: statusKey }),
+          queryClient.cancelQueries({ queryKey: listAllInstancesKey }),
+        ]);
+        const previousStatus = queryClient.getQueryData<Record<string, unknown>>(statusKey);
+        const previousInstances = queryClient.getQueryData<ClawInstance[]>(listAllInstancesKey);
+        queryClient.setQueryData<Record<string, unknown>>(statusKey, old =>
+          old ? { ...old, name: input.name } : old
+        );
+        queryClient.setQueryData<ClawInstance[]>(listAllInstancesKey, old =>
+          renameKiloClawInstance(old, organizationId ?? null, input.name)
+        );
+        return { previousInstances, previousStatus };
+      },
+      onError: (error, _input, context) => {
+        if (context?.previousStatus) {
+          queryClient.setQueryData(statusKey, context.previousStatus);
+        }
+        if (context?.previousInstances) {
+          queryClient.setQueryData(listAllInstancesKey, context.previousInstances);
+        }
+        onMutationError(error);
+      },
+      onSettled: async () => {
+        await Promise.all([
+          invalidateStatus(),
+          queryClient.invalidateQueries({ queryKey: listAllInstancesKey }),
+        ]);
+      },
     }),
     destroy: useMutation({
       ...dispatch(trpc.kiloclaw.destroy, trpc.organizations.kiloclaw.destroy),
@@ -404,7 +439,10 @@ export function useKiloClawMutations(organizationId?: string | null) {
         trpc.kiloclaw.updateKiloCodeConfig,
         trpc.organizations.kiloclaw.updateKiloCodeConfig
       ),
-      ...optimistic(configKey, (old, input: Record<string, unknown>) => ({ ...old, ...input })),
+      ...optimistic(configKey, (old, input: { kilocodeDefaultModel: string }) => ({
+        ...old,
+        ...input,
+      })),
     }),
     // Errors are categorized at the onboarding screen (locked/billing conflict,
     // quarantined, generic). The screen's callsite `onError` owns user-visible

@@ -91,7 +91,7 @@ export async function upsertAgentConfig(
       agent_type: data.agentType,
       platform: data.platform,
       config: data.config,
-      is_enabled: data.isEnabled ?? true,
+      is_enabled: data.isEnabled ?? false,
       created_by: data.createdBy,
     })
     .onConflictDoUpdate({
@@ -219,7 +219,7 @@ export async function upsertAgentConfigForOwner(
           agent_type: data.agentType,
           platform: data.platform,
           config: data.config,
-          is_enabled: data.isEnabled ?? true,
+          is_enabled: data.isEnabled ?? false,
           created_by: data.createdBy,
         }
       : {
@@ -228,7 +228,7 @@ export async function upsertAgentConfigForOwner(
           agent_type: data.agentType,
           platform: data.platform,
           config: data.config,
-          is_enabled: data.isEnabled ?? true,
+          is_enabled: data.isEnabled ?? false,
           created_by: data.createdBy,
         };
 

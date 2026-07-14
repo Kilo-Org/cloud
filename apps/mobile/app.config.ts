@@ -25,7 +25,7 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.2',
+  version: '1.0.3',
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
@@ -33,6 +33,8 @@ const config: ExpoConfig = {
   ios: {
     icon: './assets/images/logo.png',
     bundleIdentifier: 'com.kilocode.kiloapp',
+    requireFullScreen: true,
+    supportsTablet: true,
     usesAppleSignIn: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -64,6 +66,7 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
+    ['expo-dev-client', { toolsButton: false }],
     [
       'expo-build-properties',
       {

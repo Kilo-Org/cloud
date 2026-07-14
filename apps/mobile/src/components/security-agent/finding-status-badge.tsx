@@ -6,6 +6,7 @@ import {
   FINDING_TONE_TEXT_CLASS,
   findingToneColor,
 } from '@/components/security-agent/finding-tone';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,8 @@ type FindingStatusBadgeProps = {
   label: string;
   tone: FindingTone;
   size?: number;
+  /** Set from the presentation's `spinning` field for in-progress states (e.g. queued/analyzing). */
+  spinning?: boolean;
 };
 
 export function FindingStatusBadge({
@@ -22,13 +25,19 @@ export function FindingStatusBadge({
   label,
   tone,
   size = 14,
+  spinning = false,
 }: Readonly<FindingStatusBadgeProps>) {
   const colors = useThemeColors();
   const Icon = FINDING_ICONS[icon];
 
   return (
     <View className="flex-row items-center gap-1.5">
-      <Icon size={size} color={findingToneColor(colors, tone)} />
+      <SpinningIcon
+        icon={Icon}
+        size={size}
+        color={findingToneColor(colors, tone)}
+        spinning={spinning}
+      />
       <Text className={cn('text-sm font-medium', FINDING_TONE_TEXT_CLASS[tone])}>{label}</Text>
     </View>
   );

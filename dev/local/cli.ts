@@ -20,6 +20,7 @@ import {
   sessionExists,
   findOtherKiloDevSessions,
   createSession,
+  setSessionEnvironment,
   killSession,
   attachSession,
   sendKeys,
@@ -34,7 +35,9 @@ import {
   isTmuxAvailable,
   findServicePane,
   isPaneRunningCommand,
+  captureServicePane,
 } from './tmux';
+import { detectLanIp, prepareMobileEnvironment } from './mobile-env';
 import {
   findRepoRoot,
   startServiceInTmux,
@@ -127,9 +130,50 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     console.log(`${DIM}Port offset: ${portOffset} (KILO_PORT_OFFSET)${RESET}`);
   }
 
+  // --- Resolve targets ---
+  // Always start core (always-on) groups; additional targets are merged in
+  const coreServices = resolveGroups(getAlwaysOnGroupIds());
+  const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
+  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+
+  const mobileEnv: Record<string, string> = {};
+  if (serviceNames.includes('mobile')) {
+    const host = process.env.MOBILE_DEV_HOST || detectLanIp();
+    if (!host) {
+      throw new Error('Could not detect LAN IP. Set MOBILE_DEV_HOST explicitly.');
+    }
+    Object.assign(mobileEnv, prepareMobileEnvironment(repoRoot, host).sessionEnv);
+  }
+
+  const envResult = await syncEnvVars({ repoRoot, yes: true, targets: serviceNames });
+  if (!envResult.ok) {
+    throw new Error('Failed to prepare required local service environment');
+  }
+
   // --- Check for existing session ---
   const sessionName = getSessionName();
   if (sessionExists(sessionName)) {
+    for (const name of serviceNames) {
+      const service = getService(name);
+      if (service.type !== 'worker' || !findServicePane(sessionName, name)) continue;
+      const outcome = await restartServiceInTmux(sessionName, name);
+      if (outcome === 'gave-up') throw new Error(`${name} did not restart with refreshed secrets`);
+    }
+    if (Object.keys(mobileEnv).length > 0) {
+      setSessionEnvironment(sessionName, mobileEnv);
+      const nextjsPane = findServicePane(sessionName, 'nextjs');
+      if (nextjsPane) {
+        const outcome = await restartServiceInTmux(sessionName, 'nextjs');
+        if (outcome === 'gave-up')
+          throw new Error('nextjs did not restart with refreshed mobile URLs');
+      }
+      const mobilePane = findServicePane(sessionName, 'mobile');
+      if (mobilePane) {
+        const outcome = await restartServiceInTmux(sessionName, 'mobile', mobileEnv);
+        if (outcome === 'gave-up')
+          throw new Error('mobile did not restart with refreshed mobile URLs');
+      }
+    }
     console.log(
       noAttach
         ? `Session ${sessionName} already running.`
@@ -139,11 +183,24 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     return;
   }
 
-  // --- Resolve targets ---
-  // Always start core (always-on) groups; additional targets are merged in
-  const coreServices = resolveGroups(getAlwaysOnGroupIds());
-  const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
-  let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
+  const conflictingPorts: string[] = [];
+  const reusedHostServices = new Set<string>();
+  for (const name of serviceNames) {
+    const service = getService(name);
+    if (service.type !== 'infra' && service.port > 0 && (await probePort(service.port))) {
+      if (name === 'kiloclaw-docker-tcp') {
+        reusedHostServices.add(name);
+      } else {
+        conflictingPorts.push(`${name}:${service.port}`);
+      }
+    }
+  }
+  if (conflictingPorts.length > 0) {
+    throw new Error(
+      `Refusing to share occupied worktree service ports: ${conflictingPorts.join(', ')}. ` +
+        'Stop the owning worktree or set a distinct KILO_PORT_OFFSET.'
+    );
+  }
 
   // --- Check for socat when kiloclaw-docker-tcp is requested ---
   if (serviceNames.includes('kiloclaw-docker-tcp')) {
@@ -209,6 +266,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
       ? `${pnpmHome}${path.delimiter}${processPath}`
       : processPath;
   const sessionEnv: Record<string, string> = {
+    ...mobileEnv,
     KILO_PORT_OFFSET: String(portOffset),
     PATH: sessionPath,
     WRANGLER_REGISTRY_PATH: wranglerRegistryPath,
@@ -413,6 +471,11 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
 
   const skippedServices: string[] = [];
   for (const name of otherServices) {
+    if (reusedHostServices.has(name)) {
+      console.log(`Reusing host ${name} on ${getService(name).port}`);
+      startedServices.push(name);
+      continue;
+    }
     const dependsOnKiloclaw = getService(name).dependsOn.includes('kiloclaw');
     if (!kiloclawTunnelCaptured && (name === 'kiloclaw' || dependsOnKiloclaw)) {
       skippedServices.push(name);
@@ -623,7 +686,7 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
-async function cmdRestart(serviceName: string): Promise<void> {
+async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
     process.exit(1);
@@ -647,13 +710,30 @@ async function cmdRestart(serviceName: string): Promise<void> {
     process.exit(1);
   }
 
+  let restartEnv: Record<string, string> | undefined;
+  if (serviceName === 'mobile') {
+    const host = process.env.MOBILE_DEV_HOST || detectLanIp();
+    if (!host) throw new Error('Could not detect LAN IP. Set MOBILE_DEV_HOST explicitly.');
+    restartEnv = prepareMobileEnvironment(repoRoot, host).sessionEnv;
+    setSessionEnvironment(sessionName, restartEnv);
+  }
+
   console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);
-  const outcome = await restartServiceInTmux(sessionName, serviceName);
+  const outcome = await restartServiceInTmux(sessionName, serviceName, restartEnv);
   if (outcome === 'gave-up') {
     console.error(`${serviceName} did not shut down in time; not relaunched`);
     process.exit(1);
   }
   console.log(`Restarted ${serviceName}`);
+}
+
+function cmdCapture(serviceName: string, linesArg: string | undefined): void {
+  if (!services.has(serviceName)) throw new Error(`Unknown service: ${serviceName}`);
+  const lines = linesArg === undefined ? 200 : Number(linesArg);
+  if (!Number.isInteger(lines) || lines < 1 || lines > 10_000) {
+    throw new Error(`Invalid line count: ${linesArg}`);
+  }
+  process.stdout.write(captureServicePane(getSessionName(), serviceName, lines));
 }
 
 async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
@@ -717,6 +797,8 @@ Usage:
                           other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports
   dev:restart <service>   Restart a running service
+  dev:capture <service> [lines]
+                          Capture a service pane wherever the dashboard moved it
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
@@ -750,7 +832,13 @@ async function main() {
         console.error('Usage: dev:restart <service>');
         process.exit(1);
       }
-      await cmdRestart(serviceName);
+      await cmdRestart(serviceName, repoRoot);
+      break;
+    }
+    case 'capture': {
+      const serviceName = args[1];
+      if (!serviceName) throw new Error('Usage: dev:capture <service> [lines]');
+      cmdCapture(serviceName, args[2]);
       break;
     }
     case 'env':

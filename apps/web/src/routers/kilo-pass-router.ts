@@ -56,7 +56,12 @@ import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { computeKiloPassBonusCreditsUsd } from '@/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
+import {
+  isTerminalKiloPassScheduleStatus,
+  maybeMapStripeScheduleStatusToDb,
+  reconcileKiloPassScheduledChangeTerminalStatus,
+  releaseScheduledChangeForSubscription,
+} from '@/lib/kilo-pass/scheduled-change-release';
 import { KILO_PASS_BONUS_LIKE_ITEM_KINDS, appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
@@ -80,6 +85,7 @@ import { sentryLogger } from '@/lib/utils.server';
 
 const logHostingActivationInfo = sentryLogger('kilo-pass-hosting-activation', 'info');
 const logHostingActivationWarning = sentryLogger('kilo-pass-hosting-activation', 'warning');
+const logScheduledChangeWarning = sentryLogger('kilo-pass-scheduled-change', 'warning');
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -1837,13 +1843,14 @@ export const kiloPassRouter = createTRPCRouter({
       }
       assertStripeManagedSubscription(subscription);
 
-      const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+      let scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
         columns: {
           id: true,
           from_tier: true,
           from_cadence: true,
           to_tier: true,
           to_cadence: true,
+          stripe_schedule_id: true,
           effective_at: true,
           status: true,
         },
@@ -1855,6 +1862,69 @@ export const kiloPassRouter = createTRPCRouter({
 
       if (!scheduledChange) {
         return { scheduledChange: null };
+      }
+
+      const isPending =
+        scheduledChange.status === KiloPassScheduledChangeStatus.NotStarted ||
+        scheduledChange.status === KiloPassScheduledChangeStatus.Active;
+      if (isPending && !dayjs(scheduledChange.effective_at).isAfter(dayjs())) {
+        try {
+          const stripeSchedule = await stripe.subscriptionSchedules.retrieve(
+            scheduledChange.stripe_schedule_id
+          );
+          const providerStatus = maybeMapStripeScheduleStatusToDb(stripeSchedule.status);
+
+          if (providerStatus && isTerminalKiloPassScheduleStatus(providerStatus)) {
+            const reconciled = await reconcileKiloPassScheduledChangeTerminalStatus({
+              dbOrTx: db,
+              scheduledChangeId: scheduledChange.id,
+              status: providerStatus,
+            });
+            if (reconciled) return { scheduledChange: null };
+
+            const currentScheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+              columns: {
+                id: true,
+                from_tier: true,
+                from_cadence: true,
+                to_tier: true,
+                to_cadence: true,
+                stripe_schedule_id: true,
+                effective_at: true,
+                status: true,
+              },
+              where: and(
+                eq(
+                  kilo_pass_scheduled_changes.stripe_subscription_id,
+                  subscription.stripeSubscriptionId
+                ),
+                isNull(kilo_pass_scheduled_changes.deleted_at)
+              ),
+            });
+            if (!currentScheduledChange) return { scheduledChange: null };
+            scheduledChange = currentScheduledChange;
+          }
+
+          logScheduledChangeWarning('Overdue Kilo Pass provider schedule remains pending', {
+            scheduledChangeId: scheduledChange.id,
+            scheduleId: scheduledChange.stripe_schedule_id,
+            stripeSubscriptionId: subscription.stripeSubscriptionId,
+            effectiveAt: scheduledChange.effective_at,
+            localStatus: scheduledChange.status,
+            providerStatus: stripeSchedule.status,
+          });
+        } catch (error) {
+          captureException(error, {
+            tags: { source: 'kilo_pass_scheduled_change', stage: 'overdue_read_reconciliation' },
+            extra: {
+              scheduledChangeId: scheduledChange.id,
+              scheduleId: scheduledChange.stripe_schedule_id,
+              stripeSubscriptionId: subscription.stripeSubscriptionId,
+              effectiveAt: scheduledChange.effective_at,
+              localStatus: scheduledChange.status,
+            },
+          });
+        }
       }
 
       return {

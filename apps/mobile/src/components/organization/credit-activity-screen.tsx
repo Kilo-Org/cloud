@@ -1,18 +1,22 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { Receipt } from 'lucide-react-native';
+import { type ReactNode } from 'react';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   type CreditTransaction,
+  useOrgBoundary,
   useOrgCreditTransactions,
-  useOrgRole,
 } from '@/lib/hooks/use-organization-queries';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, formatDate, parseTimestamp } from '@/lib/utils';
 
 function humanizeCategory(category: string): string {
   const spaced = category.replaceAll('_', ' ');
@@ -44,16 +48,17 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
           {title}
         </Text>
         <Text className={cn('text-sm font-medium', isPositive ? 'text-good' : 'text-foreground')}>
-          {isPositive ? '+' : '-'}${Math.abs(amount).toFixed(2)}
+          {isPositive ? '+' : '-'}
+          {formatDollars(Math.abs(amount))}
         </Text>
       </View>
       <View className="flex-row items-center justify-between">
         <Text className="text-xs text-muted-foreground">
-          {parseTimestamp(transaction.created_at).toLocaleDateString()}
+          {formatDate(parseTimestamp(transaction.created_at))}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            Expires {parseTimestamp(transaction.expiry_date).toLocaleDateString()}
+            Expires {formatDate(parseTimestamp(transaction.expiry_date))}
           </Text>
         )}
       </View>
@@ -62,43 +67,58 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
 }
 
 export function OrganizationCreditActivityScreen() {
-  const { organizationId } = useOrgRole();
+  const { organizationId, org, isResolving } = useOrgBoundary();
   const query = useOrgCreditTransactions(organizationId);
+  const paddingBottom = useTabBarBottomPadding();
 
-  if (organizationId == null) {
-    return null;
+  if (isResolving || organizationId == null || org == null) {
+    return <OrganizationBoundary title="Credit activity" />;
   }
 
-  const isLoading = query.isLoading || !query.data;
+  const isLoading = query.isLoading;
+  const isError = query.isError && !query.data;
   const transactions = query.data ?? [];
+
+  let body: ReactNode = null;
+  if (isLoading) {
+    body = (
+      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
+        <CreditRowSkeleton />
+        <CreditRowSkeleton />
+        <CreditRowSkeleton />
+      </Animated.View>
+    );
+  } else if (isError) {
+    body = (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
+        <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />
+      </Animated.View>
+    );
+  } else {
+    body = (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <FlatList
+          data={transactions}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => <CreditRow transaction={item} />}
+          contentContainerClassName="grow gap-3 px-6 pt-4"
+          ListEmptyComponent={
+            <EmptyState
+              icon={Receipt}
+              title="No credit activity"
+              description="Purchases, usage, and credit adjustments for this organization will appear here as they happen."
+            />
+          }
+          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
+        />
+      </Animated.View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Credit activity" />
-      {isLoading ? (
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
-          <CreditRowSkeleton />
-          <CreditRowSkeleton />
-          <CreditRowSkeleton />
-        </Animated.View>
-      ) : (
-        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-          <FlatList
-            data={transactions}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => <CreditRow transaction={item} />}
-            contentContainerClassName="gap-3 px-6 pb-8 pt-4"
-            ListEmptyComponent={
-              <EmptyState
-                icon={Receipt}
-                className="pt-16"
-                title="No credit activity"
-                description="Credit transactions for this organization will show up here."
-              />
-            }
-          />
-        </Animated.View>
-      )}
+      {body}
     </View>
   );
 }

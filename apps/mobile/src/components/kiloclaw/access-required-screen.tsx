@@ -18,8 +18,8 @@ import {
   type AccessRequiredSubcase,
 } from '@/lib/analytics/onboarding-events';
 import { trackEvent } from '@/lib/appsflyer';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
 import { cn } from '@/lib/utils';
 
 export type { AccessRequiredSubcase };
@@ -86,12 +86,6 @@ const SUBCASE_CONTENT: Record<AccessRequiredSubcase, SubcaseContent> = {
   },
 };
 
-const SUBSCRIBE_SUBCASES: ReadonlySet<AccessRequiredSubcase> = new Set([
-  'trial_expired',
-  'subscription_canceled',
-  'subscription_past_due',
-]);
-
 type AccessRequiredScreenProps = {
   subcase: AccessRequiredSubcase;
 };
@@ -115,8 +109,7 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
   }, [subcase]);
 
   const onOpen = () => {
-    const target = SUBSCRIBE_SUBCASES.has(subcase) ? `${WEB_BASE_URL}/claw` : WEB_BASE_URL;
-    void Linking.openURL(target);
+    void Linking.openURL(resolveAccessIssueUrl(subcase));
   };
 
   if (Platform.OS === 'ios') {
@@ -138,6 +131,9 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
           <Text className="text-center text-2xl font-semibold">KiloClaw unavailable in iOS</Text>
           <Text variant="muted" className="text-center text-base">
             KiloClaw access is managed outside the iOS app for this account.
+          </Text>
+          <Text variant="muted" className="text-center text-base">
+            Questions? Contact hi@kilo.ai.
           </Text>
         </View>
       </View>

@@ -1306,7 +1306,21 @@ export const CodeReviewCouncilConfigSchema = z.object({
   // object (e.g. from a manual job) is treated as enabled.
   enabled: z.boolean().default(true),
   aggregation_strategy: CouncilAggregationStrategySchema.default('any_blocking_member'),
-  specialists: z.array(CouncilSpecialistSchema).max(8),
+  // Specialist ids must be unique: a specialist must not appear (and therefore vote)
+  // more than once, or vote aggregation could be skewed by a duplicate.
+  specialists: z
+    .array(CouncilSpecialistSchema)
+    .max(8)
+    .superRefine((specialists, ctx) => {
+      const seen = new Set<string>();
+      for (const specialist of specialists) {
+        if (seen.has(specialist.id)) {
+          ctx.addIssue({ code: 'custom', message: `Duplicate specialist id: ${specialist.id}` });
+          return;
+        }
+        seen.add(specialist.id);
+      }
+    }),
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 

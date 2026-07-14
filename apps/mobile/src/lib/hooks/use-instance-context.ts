@@ -1,10 +1,14 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
+import {
+  type ClawInstance,
+  deriveInstanceContext,
+  type InstanceContextResult,
+} from './instance-context-logic';
 import { useTRPC } from '@/lib/trpc';
 
-export type ClawInstance = inferRouterOutputs<RootRouter>['kiloclaw']['listAllInstances'][number];
+export type { ClawInstance, InstanceContextResult };
 
 type ListPollDecider = (instances: ClawInstance[] | undefined) => number;
 
@@ -22,30 +26,28 @@ export function useAllKiloClawInstances(refetchInterval: number | ListPollDecide
   );
 }
 
-/**
- * Resolves instance context (org vs personal) by looking up the cached
- * `listAllInstances` data.
- *
- * - `isResolved: false` — data not yet loaded / instance not found.
- *    All downstream queries and mutations should stay disabled.
- * - `isResolved: true, organizationId: null` — personal instance.
- * - `isResolved: true, organizationId: string` — org instance.
- */
-export function useInstanceContext(sandboxId: string) {
+/** The instance's org id once `useInstanceContext` resolves to `ready`, otherwise `undefined`. */
+export function instanceOrgId(context: InstanceContextResult): string | null | undefined {
+  return context.status === 'ready' ? context.organizationId : undefined;
+}
+
+export function useInstanceContext(sandboxId: string): InstanceContextResult {
   const trpc = useTRPC();
-  const { data: match } = useQuery({
-    ...trpc.kiloclaw.listAllInstances.queryOptions(undefined, {
+  const query = useQuery(
+    trpc.kiloclaw.listAllInstances.queryOptions(undefined, {
       staleTime: 30_000,
       refetchInterval: 30_000,
-    }),
-    select: instances => instances.find(i => i.sandboxId === sandboxId),
-  });
+    })
+  );
+  const queryRefetch = query.refetch;
+  const refetch = useCallback(() => {
+    void queryRefetch();
+  }, [queryRefetch]);
 
-  return useMemo(() => {
-    if (match === undefined) {
-      return { organizationId: undefined, isResolved: false, isOrg: false } as const;
-    }
-    const organizationId = match.organizationId ?? null;
-    return { organizationId, isResolved: true, isOrg: Boolean(organizationId) } as const;
-  }, [match]);
+  const data = query.data;
+  const isError = query.isError;
+  return useMemo(
+    () => deriveInstanceContext(sandboxId, { data, isError }, refetch),
+    [sandboxId, data, isError, refetch]
+  );
 }

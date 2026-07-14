@@ -299,12 +299,11 @@ historical Commit names, prices, invoices, and credit deductions.
     - Inline billing history showing credit transactions with amounts in USD
       (see Billing History rules)
 
-    Before update or disable, `/byok` MUST warn that routing changes do not
-    cancel or pause MiniMax token plan billing and cancellation is managed in
-    Subscription Center. `/byok` MUST block a direct delete of the Kilo-managed
-    installed key and direct the user to cancel the plan in Subscription Center,
-    which removes it at Effective Cancellation; customer surfaces MUST NOT
-    include saved raw-key view or copy controls.
+    `/byok` MUST identify the Kilo-managed installed key as read-only and MUST
+    NOT offer update, enable/disable, delete, saved raw-key view, or copy
+    controls. Non-mutating credential testing MAY remain available. `/byok` MUST
+    direct users to cancel the plan in Subscription Center to remove the key at
+    Effective Cancellation.
 
 31. Coding Plan cancellation, installed MiniMax configuration cleanup,
     and issued-credential revocation MUST follow `.specs/coding-plans.md`.
@@ -471,6 +470,11 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-07-14 -- Coding Plans installed keys made read-only
+
+- Made Kilo-managed installed MiniMax keys read-only in BYOK surfaces and APIs; users can still run a non-mutating credential test.
+- Kept cancellation as the user path for removing the managed configuration at Effective Cancellation.
 
 ### 2026-07-01 -- Coding Plans installed-key deletion blocked
 

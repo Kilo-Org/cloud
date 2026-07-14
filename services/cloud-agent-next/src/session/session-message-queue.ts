@@ -299,6 +299,7 @@ export async function flushNextPendingSessionMessage(params: {
   repairQueuedMessageEffects?: (intent: SessionMessageIntent) => Promise<void>;
   prepareQueuedMessageDelivery?: (intent: SessionMessageIntent) => Promise<void>;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
+  scheduleTerminalizationRepair?: () => Promise<void>;
 }): Promise<PendingFlushResult> {
   const context = await params.getDeliveryContext();
   const messages = await listPendingSessionMessages(
@@ -363,7 +364,11 @@ export async function flushNextPendingSessionMessage(params: {
       message,
       'Session metadata is not available',
       params.now,
-      { policy, code: 'NOT_FOUND' }
+      {
+        policy,
+        code: 'NOT_FOUND',
+        scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
+      }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -382,7 +387,11 @@ export async function flushNextPendingSessionMessage(params: {
       message,
       'Session is missing a valid model',
       params.now,
-      { policy, code: 'MODEL_MISSING' }
+      {
+        policy,
+        code: 'MODEL_MISSING',
+        scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
+      }
     );
     return toFailureResult(failure, totalCount);
   }
@@ -409,7 +418,11 @@ export async function flushNextPendingSessionMessage(params: {
         message,
         message.lastFlushError ?? 'Sandbox connection failed',
         params.now,
-        { policy, code: 'SANDBOX_CONNECT_FAILED' }
+        {
+          policy,
+          code: 'SANDBOX_CONNECT_FAILED',
+          scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
+        }
       );
       return toFailureResult(failure, totalCount);
     }
@@ -422,32 +435,15 @@ export async function flushNextPendingSessionMessage(params: {
 
   await params.prepareQueuedMessageDelivery?.(intent);
 
+  let startResult: MessageDeliveryResult;
   try {
     const plan = buildMessageDeliveryRequest(
       intent,
       context,
       params.validateModeAgainstRuntimeAgents
     );
-    const startResult = await params.deliver(plan);
-    if (!startResult.success && startResult.code === 'WRAPPER_FINALIZING') {
-      return { type: 'held', remainingCount: totalCount };
-    }
-    if (!startResult.success) {
-      const failure = await recordPendingFlushFailure(
-        params.storage,
-        message,
-        startResult.error,
-        Date.now(),
-        { policy, code: startResult.code }
-      );
-      throw new PendingFlushRecordedError(failure);
-    }
-    await deletePendingSessionMessageByMessageId(params.storage, message.messageId);
-    return { type: 'delivered', remainingCount: totalCount - 1 };
+    startResult = await params.deliver(plan);
   } catch (error) {
-    if (error instanceof PendingFlushRecordedError) {
-      return toFailureResult(error.failure, totalCount);
-    }
     if (error instanceof WrapperCleanupBlockedError) {
       if (isSandboxConnectionRetry(message)) {
         const failure = await recordPendingFlushFailure(
@@ -455,7 +451,11 @@ export async function flushNextPendingSessionMessage(params: {
           message,
           message.lastFlushError ?? 'Sandbox connection failed',
           Date.now(),
-          { policy, code: 'SANDBOX_CONNECT_FAILED' }
+          {
+            policy,
+            code: 'SANDBOX_CONNECT_FAILED',
+            scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
+          }
         );
         return toFailureResult(failure, totalCount);
       }
@@ -482,17 +482,31 @@ export async function flushNextPendingSessionMessage(params: {
         subtype: isExecutionError(error) ? error.workspaceFailureSubtype : undefined,
         safeFailureMessage: isExecutionError(error) ? error.safeFailureMessage : undefined,
         retryable: isExecutionError(error) ? error.retryable : undefined,
+        scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
       }
     );
     return toFailureResult(failure, totalCount);
   }
-}
 
-class PendingFlushRecordedError extends Error {
-  constructor(readonly failure: PendingFlushFailureResult) {
-    super(failure.message.lastFlushError ?? 'Pending flush failure recorded');
-    this.name = 'PendingFlushRecordedError';
+  if (!startResult.success && startResult.code === 'WRAPPER_FINALIZING') {
+    return { type: 'held', remainingCount: totalCount };
   }
+  if (!startResult.success) {
+    const failure = await recordPendingFlushFailure(
+      params.storage,
+      message,
+      startResult.error,
+      Date.now(),
+      {
+        policy,
+        code: startResult.code,
+        scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
+      }
+    );
+    return toFailureResult(failure, totalCount);
+  }
+  await deletePendingSessionMessageByMessageId(params.storage, message.messageId);
+  return { type: 'delivered', remainingCount: totalCount - 1 };
 }
 
 function buildAdmissionAck(
@@ -913,6 +927,7 @@ export function createSessionMessageQueue(
       repairQueuedMessageEffects: repairQueuedAdmissionEffects,
       prepareQueuedMessageDelivery,
       ensureAcceptedMessageEffects,
+      scheduleTerminalizationRepair: requestPendingDrain,
     });
 
     if (flushResult.type === 'skipped') {

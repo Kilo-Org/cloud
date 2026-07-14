@@ -57,7 +57,7 @@ export function ScreenHeader({
   let titleNode: React.ReactNode = null;
   if (title != null) {
     const titleText = (
-      <Text className={titleClass} numberOfLines={1}>
+      <Text className={titleClass} numberOfLines={2} accessibilityRole="header">
         {title}
       </Text>
     );
@@ -92,7 +92,7 @@ export function ScreenHeader({
               }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
               className="-ml-1 mr-1 active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (

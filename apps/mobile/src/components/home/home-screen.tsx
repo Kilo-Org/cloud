@@ -1,12 +1,17 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, RefreshControl, ScrollView, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { AppState, RefreshControl, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+
+import { TabScreenScrollView } from '@/components/tab-screen';
 
 import { badgeBucketForInstance } from '@kilocode/notifications';
 
-import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
+import {
+  AgentSessionsSection,
+  hasDisplayableAgentSessions,
+} from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { KiloClawPromoCard } from '@/components/home/kiloclaw-promo-card';
@@ -14,6 +19,7 @@ import { NewTaskButton } from '@/components/home/new-task-button';
 import { SectionHeader } from '@/components/home/section-header';
 import { KiloClawCard } from '@/components/kiloclaw/instance-card';
 import { isTransitionalStatus } from '@/components/kiloclaw/status-badge';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -79,20 +85,27 @@ export function HomeScreen() {
     data: instances,
     isPending: instancesPending,
     isError: instancesError,
+    refetch: refetchInstances,
   } = useAllKiloClawInstances(pickListPollInterval);
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
     isLoading: sessionsLoading,
+    storedIsError,
+    storedIsSuccess,
+    refetch: refetchSessions,
   } = useAgentSessions({
     organizationId,
   });
 
   const isLoading = instancesPending || sessionsLoading;
 
-  const hasAnySession = storedSessions.length > 0 || activeSessions.length > 0;
-  const headerTitle = buildTimedGreeting(null);
+  // Match what the Home Agent-sessions section actually renders (cloud-agent
+  // stored + any active), so a CLI-only account shows the first-use promo
+  // instead of an empty section + orphaned "New coding task" button.
+  const hasAnySession = hasDisplayableAgentSessions(storedSessions, activeSessions);
+  const headerTitle = buildTimedGreeting();
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -108,38 +121,54 @@ export function HomeScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={headerTitle} size="large" showBackButton={false} className="px-[22px]" />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="pb-24"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        {isLoading ? (
-          <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">
-            <Skeleton className="h-20 w-full rounded-2xl" />
-            <Skeleton className="h-20 w-full rounded-2xl" />
-          </Animated.View>
-        ) : (
-          <Animated.View entering={FadeIn.duration(200)} className="gap-2">
-            {renderKiloClawSlot({
-              instances: instances ?? [],
-              instancesError,
-              unreadByBadgeBucket,
-            })}
-
-            {renderSessionsOrPromo({
-              hasAnySession,
-              organizationId,
-            })}
-
-            {hasAnySession ? (
-              <View className="pt-4">
-                <NewTaskButton organizationId={organizationId} />
+        <Animated.View layout={LinearTransition}>
+          {isLoading ? (
+            <Animated.View exiting={FadeOut.duration(150)} className="gap-2">
+              <View className="px-4 pb-2 pt-5">
+                <Skeleton className="h-3 w-20 rounded" />
               </View>
-            ) : null}
-          </Animated.View>
-        )}
-      </ScrollView>
+              <View className="gap-3 px-4">
+                <Skeleton className="h-[72px] w-full rounded-2xl" />
+              </View>
+              <View className="px-4 pb-2 pt-5">
+                <Skeleton className="h-3 w-28 rounded" />
+              </View>
+              <View className="gap-2 px-4">
+                <Skeleton className="h-[72px] w-full rounded-2xl" />
+                <Skeleton className="h-[72px] w-full rounded-2xl" />
+              </View>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(200)} className="gap-2">
+              {renderKiloClawSlot({
+                instances: instances ?? [],
+                instancesError,
+                handleRetryInstances: () => void refetchInstances(),
+                unreadByBadgeBucket,
+              })}
+
+              {renderSessionsOrPromo({
+                hasAnySession,
+                organizationId,
+                sessionsError: storedIsError,
+                sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
+                handleRetrySessions: () => void refetchSessions(),
+              })}
+
+              {hasAnySession ? (
+                <View className="pt-4">
+                  <NewTaskButton organizationId={organizationId} />
+                </View>
+              ) : null}
+            </Animated.View>
+          )}
+        </Animated.View>
+      </TabScreenScrollView>
     </View>
   );
 }
@@ -147,8 +176,12 @@ export function HomeScreen() {
 function renderKiloClawSlot(params: {
   instances: ClawInstance[];
   instancesError: boolean;
+  handleRetryInstances: () => void;
   unreadByBadgeBucket: Map<string, number>;
 }) {
+  // Stale data (a previously successful fetch) always wins over a
+  // background-refetch failure — only an initial-load failure with no
+  // instances at all should replace the section with an error state.
   if (params.instances.length > 0) {
     return (
       <View>
@@ -168,14 +201,42 @@ function renderKiloClawSlot(params: {
     );
   }
   if (params.instancesError) {
-    return null;
+    return (
+      <QueryError
+        placement="top"
+        title="Couldn't load KiloClaw"
+        onRetry={params.handleRetryInstances}
+      />
+    );
   }
   return <KiloClawPromoCard />;
 }
 
-function renderSessionsOrPromo(params: { hasAnySession: boolean; organizationId: string | null }) {
+function renderSessionsOrPromo(params: {
+  hasAnySession: boolean;
+  organizationId: string | null;
+  sessionsError: boolean;
+  sessionsLoadedEmpty: boolean;
+  handleRetrySessions: () => void;
+}) {
+  // Stale stored history always wins over an error (e.g. a live-poll blip
+  // on the active-sessions query) — never blank out sessions we already
+  // have. The first-use promo only appears after a confirmed empty
+  // response, never merely because the fetch hasn't succeeded yet.
   if (params.hasAnySession) {
     return <AgentSessionsSection organizationId={params.organizationId} />;
   }
-  return <AgentsPromoCard organizationId={params.organizationId} />;
+  if (params.sessionsError) {
+    return (
+      <QueryError
+        placement="top"
+        title="Couldn't load sessions"
+        onRetry={params.handleRetrySessions}
+      />
+    );
+  }
+  if (params.sessionsLoadedEmpty) {
+    return <AgentsPromoCard organizationId={params.organizationId} />;
+  }
+  return null;
 }

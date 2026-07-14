@@ -1,9 +1,11 @@
 import { type ReactNode, useMemo } from 'react';
-import { Linking, Text, type TextStyle, useColorScheme, View, type ViewStyle } from 'react-native';
+import { Text, type TextStyle, useColorScheme, View, type ViewStyle } from 'react-native';
 import { Renderer, useMarkdown } from 'react-native-marked';
 
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { resolveLinkAccessibilityLabel } from './markdown-link';
 import {
   getMarkdownStyles,
   getPalette,
@@ -91,10 +93,12 @@ class MarkdownRenderer extends Renderer {
         selectable={this.selectable}
         accessibilityRole="link"
         accessibilityHint="Opens in a new window"
-        accessibilityLabel={title ?? 'Link'}
+        accessibilityLabel={resolveLinkAccessibilityLabel(children, href, title)}
         key={this.getKey()}
         onPress={() => {
-          void Linking.openURL(href);
+          void openExternalUrl(href, {
+            label: resolveLinkAccessibilityLabel(children, href, title),
+          });
         }}
         style={styles}
       >

@@ -27,6 +27,7 @@ import { RepoSelector } from '@/components/agents/repo-selector';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import {
@@ -46,6 +47,7 @@ import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
@@ -83,6 +85,7 @@ export default function NewSessionScreen() {
 
   // Prompt ref (uncontrolled TextInput on iOS)
   const promptRef = useRef('');
+  const [hasPrompt, setHasPrompt] = useState(false);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -94,7 +97,12 @@ export default function NewSessionScreen() {
   });
 
   // ── Models ───────────────────────────────────────────────────────
-  const { models } = useAvailableModels(organizationId);
+  const {
+    models,
+    isLoading: isLoadingModels,
+    isError: isModelsError,
+    refetch: refetchModels,
+  } = useAvailableModels(organizationId);
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { saveModel } = usePersistedAgentModel();
   const autoSelected = useAutoSelectModel(models, organizationId);
@@ -113,6 +121,7 @@ export default function NewSessionScreen() {
   const {
     data: repoData,
     isLoading: isLoadingRepos,
+    isError: isReposError,
     isRefetching: isRefetchingRepos,
     refetch: refetchRepos,
   } = useQuery(
@@ -164,23 +173,6 @@ export default function NewSessionScreen() {
 
   const handleCreate = useCallback(async () => {
     const prompt = promptRef.current.trim();
-    // The backend requires a non-empty prompt even when attachments are present.
-    if (!prompt) {
-      toast.error('Enter a prompt first.');
-      return;
-    }
-    if (!selectedRepo) {
-      toast.error('Select a repository first.');
-      return;
-    }
-    if (!model) {
-      toast.error('Select a model first.');
-      return;
-    }
-    if (attachments.isUploading) {
-      toast.error('Wait for attachments to finish uploading.');
-      return;
-    }
     if (prompt.startsWith('/') && attachments.attachments.length > 0) {
       toast.error('Attachments cannot be sent with slash commands.');
       return;
@@ -267,9 +259,18 @@ export default function NewSessionScreen() {
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
+  const canCreate =
+    hasPrompt &&
+    Boolean(selectedRepo) &&
+    Boolean(model) &&
+    !attachments.isUploading &&
+    !attachments.hasFailedAttachments;
+  const paperclipDisabled =
+    isCreating || attachments.attachments.length >= AGENT_ATTACHMENT_MAX_FILES;
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="New Session" />
+      <ScreenHeader title="New session" />
 
       <ScrollView
         className="flex-1"
@@ -283,17 +284,24 @@ export default function NewSessionScreen() {
             onRemove={id => {
               attachments.removeAttachment(id);
             }}
+            onRetry={id => {
+              attachments.retryAttachment(id);
+            }}
           />
           <View className="flex-row items-end px-2 pt-2">
             <Pressable
               onPress={() => {
                 void handleAddAttachment();
               }}
-              disabled={isCreating || attachments.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
+              disabled={paperclipDisabled}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
+              className={cn(
+                'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+                paperclipDisabled && 'opacity-50'
+              )}
               accessibilityRole="button"
               accessibilityLabel="Add attachment"
+              accessibilityState={{ disabled: paperclipDisabled }}
             >
               <Paperclip size={18} color={colors.mutedForeground} />
             </Pressable>
@@ -302,7 +310,10 @@ export default function NewSessionScreen() {
               placeholder="What would you like to work on?"
               placeholderTextColor={colors.mutedForeground}
               multiline
-              className="flex-1 px-2 py-2 text-base leading-6 text-foreground"
+              className={cn(
+                'flex-1 px-2 py-2 text-base leading-6 text-foreground',
+                isCreating && 'opacity-50'
+              )}
               style={[
                 promptInputStyle,
                 { height: promptMeasure.height },
@@ -313,77 +324,105 @@ export default function NewSessionScreen() {
               onChangeText={text => {
                 promptRef.current = text;
                 promptMeasure.setText(text);
+                const nextHasPrompt = text.trim().length > 0;
+                setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
               }}
               onLayout={handlePromptInputLayout}
               scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
               editable={!isCreating}
+              accessibilityState={{ disabled: isCreating }}
               autoFocus
             />
           </View>
-          <ChatToolbar
-            mode={mode}
-            onModeChange={setMode}
-            model={model}
-            variant={variant}
-            modelOptions={models}
-            onModelSelect={handleModelSelect}
-            disabled={isCreating}
-            className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-          />
+          {isModelsError && models.length === 0 ? (
+            <QueryError
+              placement="top"
+              variant="server"
+              title="Couldn't load models"
+              message="Check your connection and try again."
+              onRetry={() => void refetchModels()}
+              className="border-t border-border py-4"
+            />
+          ) : (
+            <ChatToolbar
+              mode={mode}
+              onModeChange={setMode}
+              model={model}
+              variant={variant}
+              modelOptions={models}
+              onModelSelect={handleModelSelect}
+              disabled={isCreating}
+              isLoadingModels={isLoadingModels}
+              className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+            />
+          )}
         </View>
 
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">Repository</Text>
-          <RepoSelector
-            value={selectedRepo}
-            repositories={repositories}
-            isLoading={isLoadingRepos}
-            onChange={setSelectedRepo}
-            disabled={isCreating}
-          />
-          {showGitHubIntegrationPrompt ? (
-            <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
-              <View className="gap-1">
-                <Text className="text-sm font-semibold text-foreground">Connect GitHub</Text>
-                <Text variant="muted">
-                  Connect GitHub in your browser, then return here to pick a repository.
-                </Text>
-              </View>
-              <View className="flex-row gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onPress={() => {
-                    void handleOpenGitHubIntegration();
-                  }}
-                >
-                  <ExternalLink size={16} color={colors.foreground} />
-                  <Text>Open</Text>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onPress={() => {
-                    void refetchRepos();
-                  }}
-                  disabled={isRefetchingRepos}
-                  accessibilityLabel="Refresh repositories"
-                >
-                  {isRefetchingRepos ? (
-                    <ActivityIndicator size="small" color={colors.foreground} />
-                  ) : (
-                    <RefreshCw size={16} color={colors.foreground} />
-                  )}
-                </Button>
-              </View>
-            </View>
-          ) : null}
+          {isReposError && repoData === undefined ? (
+            <QueryError
+              placement="top"
+              variant="server"
+              title="Couldn't load repositories"
+              message="Check your connection and try again."
+              onRetry={() => void refetchRepos()}
+              isRetrying={isRefetchingRepos}
+            />
+          ) : (
+            <>
+              <RepoSelector
+                value={selectedRepo}
+                repositories={repositories}
+                isLoading={isLoadingRepos}
+                onChange={setSelectedRepo}
+                disabled={isCreating}
+              />
+              {showGitHubIntegrationPrompt ? (
+                <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+                  <View className="gap-1">
+                    <Text className="text-sm font-semibold text-foreground">Connect GitHub</Text>
+                    <Text variant="muted">
+                      Connect GitHub in your browser, then return here to pick a repository.
+                    </Text>
+                  </View>
+                  <View className="flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onPress={() => {
+                        void handleOpenGitHubIntegration();
+                      }}
+                    >
+                      <ExternalLink size={16} color={colors.foreground} />
+                      <Text>Open GitHub</Text>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onPress={() => {
+                        void refetchRepos();
+                      }}
+                      disabled={isRefetchingRepos}
+                      accessibilityLabel="Refresh repositories"
+                    >
+                      {isRefetchingRepos ? (
+                        <ActivityIndicator size="small" color={colors.foreground} />
+                      ) : (
+                        <RefreshCw size={16} color={colors.foreground} />
+                      )}
+                    </Button>
+                  </View>
+                </View>
+              ) : null}
+            </>
+          )}
         </View>
 
         <Button
           size="lg"
           className="mt-6"
-          disabled={isCreating}
+          disabled={isCreating || !canCreate}
           onPress={() => {
             void handleCreate();
           }}
@@ -391,7 +430,7 @@ export default function NewSessionScreen() {
           {isCreating ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : (
-            <Text>Start Session</Text>
+            <Text>Start session</Text>
           )}
         </Button>
       </ScrollView>

@@ -81,6 +81,13 @@ export type OnboardingState = {
   first502AtMs: number | null;
   gateway502Expired: boolean;
 
+  // Terminal signal fed in from outside the 502-grace sub-machine: a hard
+  // query error (status/gateway-ready query failed). The overall wall-clock
+  // provisioning timeout is tracked locally in `ProvisioningStep` (see
+  // `./selectors.ts` `getProvisioningTerminalReason`) since it has no other
+  // producer or consumer.
+  queryErrored: boolean;
+
   // Analytics fire-once guards.
   onboardingEnteredFired: boolean;
   completionReachedFired: boolean;
@@ -106,6 +113,7 @@ export const INITIAL_STATE: OnboardingState = {
   execPresetSaved: false,
   first502AtMs: null,
   gateway502Expired: false,
+  queryErrored: false,
   onboardingEnteredFired: false,
   completionReachedFired: false,
 };
@@ -128,6 +136,7 @@ export type OnboardingEvent =
       nowMs: number;
     }
   | { type: 'gateway-grace-elapsed' }
+  | { type: 'provisioning-query-errored' }
   | { type: 'bot-identity-saved' }
   | { type: 'exec-preset-saved' }
 
@@ -245,6 +254,10 @@ export function reduce(state: OnboardingState, event: OnboardingEvent): Onboardi
       return { ...state, gateway502Expired: true };
     }
 
+    case 'provisioning-query-errored': {
+      return { ...state, queryErrored: true };
+    }
+
     case 'provisioning-complete-acknowledged': {
       return { ...state, step: 'done' };
     }
@@ -266,6 +279,7 @@ export function reduce(state: OnboardingState, event: OnboardingEvent): Onboardi
         completionReachedFired: false,
         first502AtMs: null,
         gateway502Expired: false,
+        queryErrored: false,
       };
     }
 

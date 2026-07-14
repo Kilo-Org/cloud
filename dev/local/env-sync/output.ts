@@ -267,7 +267,7 @@ function createSecretsStoreSecret(
   storeId: string,
   secretName: string,
   value: string
-): boolean {
+): void {
   const result = spawnSync(
     'pnpm',
     [
@@ -284,11 +284,16 @@ function createSecretsStoreSecret(
     {
       cwd: path.join(repoRoot, workerDir),
       encoding: 'utf-8',
-      input: value, // Pass value via stdin for security
+      input: `${value}\n`, // Complete Wrangler's prompt without exposing the value in argv.
       stdio: ['pipe', 'pipe', 'pipe'],
     }
   );
-  return result.status === 0;
+  if (result.status !== 0) {
+    const errorOutput = result.stderr.trim();
+    throw new Error(
+      `Failed to create Secrets Store secret ${secretName}${errorOutput ? `: ${errorOutput}` : ''}`
+    );
+  }
 }
 
 function applySecretsStoreAutoCreates(creates: SecretStoreAutoCreate[], repoRoot: string): void {
@@ -296,18 +301,14 @@ function applySecretsStoreAutoCreates(creates: SecretStoreAutoCreate[], repoRoot
 
   console.log('\nCreating secrets store secrets...');
   for (const create of creates) {
-    const success = createSecretsStoreSecret(
+    createSecretsStoreSecret(
       repoRoot,
       create.workerDir,
       create.binding.store_id,
       create.binding.secret_name,
       create.value
     );
-    if (success) {
-      console.log(`  ✓ ${create.binding.secret_name}`);
-    } else {
-      console.error(`  ✗ ${create.binding.secret_name} (failed)`);
-    }
+    console.log(`  ✓ ${create.binding.secret_name}`);
   }
 }
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type BotIdentity } from './index';
 import { INITIAL_STATE, type OnboardingEvent, reduce } from './machine';
 import {
+  getProvisioningTerminalReason,
   isProvisioningTerminal,
   shouldAdvanceFromProvisioning,
   shouldFireCompletion,
@@ -219,7 +220,7 @@ describe('isProvisioningTerminal', () => {
       },
       { type: 'gateway-grace-elapsed' },
     ]);
-    expect(isProvisioningTerminal(s)).toBe(true);
+    expect(isProvisioningTerminal(s, false)).toBe(true);
   });
 
   it('is false during the grace window', () => {
@@ -230,6 +231,42 @@ describe('isProvisioningTerminal', () => {
       status: 502,
       nowMs: 0,
     });
-    expect(isProvisioningTerminal(s)).toBe(false);
+    expect(isProvisioningTerminal(s, false)).toBe(false);
+  });
+
+  it('is true once a hard query error is fed in', () => {
+    const s = reduce(INITIAL_STATE, { type: 'provisioning-query-errored' });
+    expect(isProvisioningTerminal(s, false)).toBe(true);
+    expect(getProvisioningTerminalReason(s, false)).toBe('query_error');
+  });
+
+  it('is true once the instance status is a terminal lifecycle state (stopped)', () => {
+    const s = reduce(INITIAL_STATE, { type: 'instance-status-changed', status: 'stopped' });
+    expect(isProvisioningTerminal(s, false)).toBe(true);
+    expect(getProvisioningTerminalReason(s, false)).toBe('instance_stopped');
+  });
+
+  it('is false for a non-terminal instance status', () => {
+    const s = reduce(INITIAL_STATE, { type: 'instance-status-changed', status: 'starting' });
+    expect(isProvisioningTerminal(s, false)).toBe(false);
+    expect(getProvisioningTerminalReason(s, false)).toBeNull();
+  });
+
+  it('is true once the overall provisioning timeout elapses', () => {
+    expect(isProvisioningTerminal(INITIAL_STATE, true)).toBe(true);
+    expect(getProvisioningTerminalReason(INITIAL_STATE, true)).toBe('timeout');
+  });
+
+  it('prioritizes query_error over an instance_stopped status', () => {
+    const s = run([
+      { type: 'instance-status-changed', status: 'stopped' },
+      { type: 'provisioning-query-errored' },
+    ]);
+    expect(getProvisioningTerminalReason(s, false)).toBe('query_error');
+  });
+
+  it('clears after retry-requested so a fresh attempt is not terminal', () => {
+    const s = run([{ type: 'provisioning-query-errored' }, { type: 'retry-requested' }]);
+    expect(isProvisioningTerminal(s, false)).toBe(false);
   });
 });

@@ -11,9 +11,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 import { type BotIdentity, DEFAULT_BOT_IDENTITY } from './state';
@@ -29,8 +31,9 @@ export function CompleteStep({ botIdentity, onOpen }: Readonly<CompleteStepProps
   const name = botIdentity?.botName ?? DEFAULT_BOT_IDENTITY.botName;
   const emoji = botIdentity?.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji;
   const tint = agentColor(emoji);
+  const colors = useThemeColors();
 
-  // One-shot greeting: the emoji waves hello ~half a second after the tile
+  // One-shot greeting: the avatar waves hello ~half a second after the tile
   // lands. Subtle but celebratory — signals "your agent just showed up".
   const wave = useSharedValue(0);
   useEffect(() => {
@@ -62,7 +65,7 @@ export function CompleteStep({ botIdentity, onOpen }: Readonly<CompleteStepProps
         )}
       >
         <Animated.View style={waveStyle}>
-          <Text className="text-5xl">{emoji}</Text>
+          <BotAvatar emoji={emoji} size={48} color={colors.foreground} />
         </Animated.View>
       </Animated.View>
 

@@ -1,137 +1,249 @@
-# E2E Flow Testing (Maestro MCP)
+# Mobile E2E Runbook
 
-This folder documents how an agent tests Kilo App flows end-to-end: local backend + app on a simulator, driven via the Maestro MCP. There is no test suite here and none is planned — the point is interactive flow verification (e.g. "start a CLI session, confirm it shows up in the app, open it, send a message").
+Use this runbook for interactive verification against a local backend. Commands run from the repository root unless a step says otherwise. The repository dev runner keeps long-lived services in a worktree-specific tmux session; use it instead of loose background processes.
 
-All commands run from the **repo root** unless noted. Assumes a fresh checkout — complete the root [DEVELOPMENT.md](../../../DEVELOPMENT.md) setup first (Node via nvm, `pnpm install`, Docker Desktop, root `.env.local`, `pnpm dev:env`).
+## Fresh Worktree Quickstart
 
-## 1. Local backend
+If dependencies or local env files are missing, run this once. This also authorizes both worktree `.envrc` files and copies local env files from the primary checkout:
 
 ```bash
+node --version # must be v24; activate the root .nvmrc first if needed
+pnpm dev:worktree:prepare
+```
+
+Record pre-existing state so you clean up only resources you create:
+
+```bash
+pnpm dev:status --json
+tmux ls
+xcrun simctl list devices booted
+```
+
+Reuse a complete stack already running for this worktree. Do not start a competing stack or stop an unrelated `kilo-dev-*` session.
+
+`kiloclaw-docker-tcp` on port 23750 is the sole intentional host-wide exception: it is a stateless loopback proxy to the same Docker socket. The runner reuses an occupied proxy. Never kill a `socat` process owned by another worktree to free this port.
+
+When this worktree has no stack, start the complete mobile flow. Secondary worktrees automatically receive an isolated port offset, and mobile startup generates and explicitly injects this worktree's LAN URLs before Metro starts. Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale parent-shell values must not select the bundle endpoints:
+
+```bash
+pnpm dev:env -y cloudflare-session-ingest
 pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw event-service
+pnpm drizzle migrate
+pnpm dev:status --json
 ```
 
-- Starts everything in a tmux session named `kilo-dev-<checkout-dir>`: Expo dev server (:8081), Next.js (:3000), Postgres (:5432), session-ingest (:8800), cloud-agent-next, kiloclaw (+ its tunnel and notifications), event-service (:8809). Dependencies start automatically.
-- event-service tracks presence (which surfaces the user is actively on). The notifications worker queries it to suppress pushes when the user is in-context — e.g. the session-ready push is skipped while the app is foregrounded. Without it, presence lookups fail open: every push dispatches and the notifications logs fill with `Presence lookup failed` warnings, so presence-dependent flows can't be verified.
-- `--no-attach` skips the interactive tmux dashboard — required for agents.
-- Verify with `pnpm dev:status`. Stop with `pnpm dev:stop`.
-- Run DB migrations (`pnpm drizzle migrate` from the repo root) before testing. A local Postgres that's behind on migrations causes seemingly random 500s from the backend (e.g. every authenticated tRPC call failing with "column ... does not exist").
-- Read a service's logs from its tmux window:
+The session-ingest env step creates the JWT Secrets Store binding; without it the worker can appear healthy while rejecting every session request. `event-service` is required for presence and notification behavior.
+
+Secrets Store state is local to each Worker directory. `dev:start` runs env sync for its selected service graph and refreshes every source-backed secret before launching Workers; secret creation failures are fatal. Do not run bare `wrangler secrets-store` commands: use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source and Wrangler receives a complete non-interactive prompt.
+
+Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are `up`. Restarts are asynchronous; if `mobile` is still starting, inspect its log and rerun status instead of restarting the stack. Use reported ports; never assume defaults in a secondary worktree.
+
+## Logs and tmux
+
+Prefer the stable log files. When pane output is required, let the runner find the service wherever the dashboard moved it:
 
 ```bash
-tmux ls                                            # find the kilo-dev-* session
-tmux list-windows -t <session>
-tmux capture-pane -p -t <session>:<window> -S -200
+pnpm dev:status --json
+tail -n 200 dev/logs/<service>.log
+pnpm dev:capture mobile
 ```
 
-Before the first app launch, point the app at the local backend:
+Do not guess a tmux window from `tmux ls` or use `<session>:<service>` directly; a service pane can be joined into the dashboard and no longer have a same-named window. Use `pnpm dev:capture <service>` for inspection. Use raw tmux only for an interactive process after reading the exact `session` from `pnpm dev:status --json` and resolving the pane with `tmux list-panes -a`.
 
 ```bash
-pnpm dev:env:mobile   # writes apps/mobile/.env.local with LAN-IP URLs for all local services
+tmux ls
+tmux list-windows -t <dev-session>
 ```
 
-Restart the app (or reload from the Expo dev server) after this so Expo picks up the env file.
+Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.
 
-## 2. App on the device, signed in
+## iOS Simulator
 
-- **iOS**: the app is the dev-build `com.kilocode.kiloapp` on an iOS simulator. Check booted simulators for it with `xcrun simctl listapps booted | grep kilocode`. If no simulator has the build, install one with `npx expo run:ios` from `apps/mobile/` (the `ios/` project is checked in).
-- **Android**: see [§6 Android](#6-android-emulator) for the one-time toolchain setup and the emulator/dev-client workflow (`android/` is generated by prebuild and git-ignored — it is not checked in).
-- Sign in with **fake-login**: the local sign-in page (reached via the app's normal sign-in flow) has a "Test Account" form — enter any email (an account is created on first login, e.g. `e2e-mobile@example.com`); appending `?fakeUser=<email>` to the sign-in URL auto-submits.
-- Seed data with `pnpm dev:seed` (topics in `dev/seed/`): `app:user-id <email>` to look up a user id, `app:add-credits <userId> <usd>` if completions return 402. Local Postgres is `postgres://postgres:postgres@localhost:5432/postgres`.
-
-## 3. Kilo CLI against the local backend
-
-Needed for flows involving remote CLI sessions (the session list, session mirroring, sending messages from the app).
-
-**Install** in a scratch directory — never touch the global CLI:
+Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the command prefers an unclaimed shutdown device and boots it. Pass a UDID only when intentionally claiming that device:
 
 ```bash
-mkdir -p /tmp/kilo-cli && cd /tmp/kilo-cli && npm i @kilocode/cli
+pnpm dev:mobile:simulator claim [udid]
 ```
 
-**Mint a token** for the SAME user the app is signed in as (otherwise the app won't see the session). It's an HS256 JWT signed with `NEXTAUTH_SECRET` from the root `.env.local` — no deps needed:
+Uninstall Kilo, then build from this worktree in a dedicated tmux session. A fresh checkout generates the gitignored `ios/` directory and installs pods, so the first build takes a few minutes and is noisy:
 
 ```bash
-NEXTAUTH_SECRET=$(grep '^NEXTAUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"') \
-node -e '
+xcrun simctl uninstall <udid> com.kilocode.kiloapp 2>/dev/null || true
+IOS_BUILD_SESSION="kilo-e2e-ios-$(basename "$PWD")"
+tmux new-session -d -s "$IOS_BUILD_SESSION" -c "$PWD/apps/mobile"
+tmux set-option -t "$IOS_BUILD_SESSION" remain-on-exit on
+tmux respawn-pane -k -t "$IOS_BUILD_SESSION":0.0 \
+  "npx expo run:ios --device <udid> --no-bundler"
+tmux capture-pane -p -t "$IOS_BUILD_SESSION" -S -80
+tmux display-message -p -t "$IOS_BUILD_SESSION" '#{pane_dead} #{pane_dead_status}'
+```
+
+Poll the bounded pane tail until `pane_dead` is `1` and `pane_dead_status` is `0`; do not stream the full native build into agent context. Then connect to the Metro URL shown by this worktree's `mobile` pane. `expo run:ios --no-bundler` may still open port 8081 instead of the worktree-safe port:
+
+```bash
+xcrun simctl openurl <udid> \
+  "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
+```
+
+Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The login helper dismisses the clean-install tracking alert and Expo dev-menu introduction when present.
+
+## Sign In and Out
+
+Backend and Metro must be running. These idempotent wrappers first verify simulator ownership, this worktree's required services, generated API port, and Metro project provenance, then reconnect the dev client to that exact Metro URL before launch. Do not bypass their preflight or call the YAML login steps directly:
+
+```bash
+apps/mobile/e2e/login.sh <udid> [email]  # default: e2e-mobile@example.com
+apps/mobile/e2e/logout.sh <udid>
+```
+
+Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies it, accepts first-account consent, and asserts Home. It retries only the known dev-client launch/request boundary once. The wrappers use preflight to open the exact dev-client URL, then `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app. `flows/open-app.yaml` remains the standalone cold-launch flow.
+
+Native prompts are states in the flow, not errors to tap through blindly. The shared launch flow recognizes the iOS tracking prompt (`Allow “Kilo” to track your activity across other companies’ apps and websites?`) and chooses `Ask App Not to Track`; login handles notification permission after authentication. Feature-triggered prompts such as speech recognition and microphone access must be handled only when the acceptance flow reaches that feature: inspect the hierarchy, copy the exact button accessibility text (`Allow` or `Don’t Allow`), and choose the state required by the test. Never use a generic `tapOn: 'Allow'` before identifying which prompt is visible.
+
+Maestro can emit a large interactive transcript. For agent-driven runs, keep successful output out of context and show only a bounded failure tail:
+
+```bash
+LOGIN_LOG=$(mktemp /tmp/kilo-login.XXXXXX)
+apps/mobile/e2e/login.sh <udid> >"$LOGIN_LOG" 2>&1 || \
+  { tail -n 100 "$LOGIN_LOG"; false; }
+```
+
+When editing the flows, preserve these device-tested constraints:
+
+- Tap the Kilo home-screen icon; Maestro `launchApp` can bounce the Expo dev client to SpringBoard.
+- Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override them in the installed Maestro version.
+- Target the email field by `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
+- The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
+
+Seed only when needed:
+
+```bash
+pnpm dev:seed app:user-id <email>
+pnpm dev:seed app:add-credits <user-id> <usd>
+```
+
+## Maestro
+
+One-time machine setup:
+
+```bash
+brew install maestro
+```
+
+For MCP use stdio command `maestro mcp`, then restart the agent session so its tools appear. Inspect the screen before selecting elements and re-inspect after UI changes. Never guess a selector from the visible label or screenshot: copy the exact `txt` or `a11y` value from `maestro_inspect_screen`, mapping `a11y` to Maestro `text:`. Maestro text matching is full-string regex, not substring matching.
+
+Use Maestro as the primary iOS automation driver. Fall back to `xcrun simctl` only when Maestro cannot inspect or operate a native state, or when low-level simulator control is required. iOS setup still uses `simctl` for boot, install/uninstall, dev-client URL reconnection, screenshots, shutdown, and cleanup.
+
+Tab buttons are exposed through React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels are `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, and `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before using these examples because tab count or labels can change.
+
+CLI fallback:
+
+```bash
+maestro --device <udid|emulator-5554> test -e KEY=VALUE <flow.yaml>
+xcrun simctl io <udid> screenshot <path>      # iOS
+adb exec-out screencap -p > <path>            # Android
+```
+
+Attach a screenshot of the changed flow to the PR when it helps review. For transitions, prefer a short screenshot loop over `simctl io recordVideo`, which can produce one-frame recordings.
+
+## Remote CLI Session Flows
+
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. Install the CLI in a disposable directory, never globally:
+
+```bash
+CLI_SCRATCH=$(mktemp -d /tmp/kilo-cli.XXXXXX)
+npm install --prefix "$CLI_SCRATCH" @kilocode/cli
+E2E_EMAIL=${E2E_EMAIL:-e2e-mobile@example.com}
+USER_ID=$(pnpm -s dev:seed app:user-id "$E2E_EMAIL" --json | jq -r .userId)
+TOKEN=$(NEXTAUTH_SECRET=$(grep '^NEXTAUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"') \
+  USER_ID="$USER_ID" node -e '
 const crypto = require("crypto");
-const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
-const h = b64({ alg: "HS256", typ: "JWT" });
-const p = b64({ kiloUserId: process.argv[1], apiTokenPepper: null, version: 3 });
-const sig = crypto.createHmac("sha256", process.env.NEXTAUTH_SECRET).update(h + "." + p).digest("base64url");
-console.log(h + "." + p + "." + sig);
-' "<kiloUserId>"
+const b64 = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+const header = b64({ alg: "HS256", typ: "JWT" });
+const payload = b64({ kiloUserId: process.env.USER_ID, apiTokenPepper: null, version: 3 });
+const signature = crypto.createHmac("sha256", process.env.NEXTAUTH_SECRET)
+  .update(`${header}.${payload}`).digest("base64url");
+process.stdout.write(`${header}.${payload}.${signature}`);
+')
 ```
 
-**Run** the CLI pointed at local services:
+Do not print or log the token. Read the actual Next.js and session-ingest ports from `pnpm dev:status --json`, then run the CLI in its own tmux session:
 
 ```bash
-KILO_API_URL=http://localhost:3000 \
-KILO_SESSION_INGEST_URL=http://localhost:8800 \
-KILO_AUTH_CONTENT='{"kilo":{"type":"api","key":"<token>"}}' \
-KILO_REMOTE=1 \
-/tmp/kilo-cli/node_modules/.bin/kilo
+CLI_SESSION="kilo-e2e-$(basename "$PWD")"
+tmux new-session -d -s "$CLI_SESSION" -c "$PWD"
+tmux set-environment -t "$CLI_SESSION" KILO_API_URL http://localhost:<nextjs-port>
+tmux set-environment -t "$CLI_SESSION" KILO_SESSION_INGEST_URL http://localhost:<session-ingest-port>
+tmux set-environment -t "$CLI_SESSION" KILO_AUTH_CONTENT \
+  "$(printf '{"kilo":{"type":"api","key":"%s"}}' "$TOKEN")"
+tmux set-environment -t "$CLI_SESSION" KILO_REMOTE 1
+tmux set-environment -t "$CLI_SESSION" KILO_CLI_BIN "$CLI_SCRATCH/node_modules/.bin/kilo"
+tmux new-window -t "$CLI_SESSION" -n cli -c "$PWD" '"$KILO_CLI_BIN"'
+tmux capture-pane -p -t "$CLI_SESSION":cli -S -100
 ```
 
-- `KILO_REMOTE=1` enables remote at startup; mid-session, toggle via the TUI palette (ctrl+p → "Toggle remote").
-- A session appears in the app's active list only after WS connect + first heartbeat (~12s after enabling remote). Heartbeats are every ~10s.
-- Drive the TUI from tmux with `send-keys`; for slash commands the first Enter accepts autocomplete, the second submits.
-- Debugging: `KILO_DEBUG_SESSION_INGEST=1` logs ingest flushes. To observe what the app sees: WS to `ws://localhost:8800/api/user/web?token=<jwt>`, send `{"type":"subscribe","sessionId":...}`; full session snapshot at `GET http://localhost:8800/api/session/<id>/export`.
+The mobile list updates after the CLI WebSocket connects and its first heartbeat (usually about 12 seconds). Use `tmux send-keys` for automation; slash commands need one Enter for autocomplete and another to submit.
 
-## 4. Maestro MCP
+## Android Emulator
 
-The Maestro MCP drives the simulator (inspect screen, run YAML flows, screenshots).
-
-**Setup** (once per machine):
+Do not conclude that Android is unavailable from `command -v adb` or the agent's inherited `PATH`. The repository resolves the SDK and JDK 17 from `ANDROID_HOME`, `~/Library/Android/sdk`, and standard Homebrew locations. Run the doctor first; it prints resolved absolute paths and available AVDs:
 
 ```bash
-brew install maestro   # or: curl -fsSL "https://get.maestro.mobile.dev" | bash
+pnpm dev:mobile:android doctor
 ```
 
-Then register the MCP server with your harness: stdio transport, command `maestro mcp` (e.g. `claude mcp add maestro -- maestro mcp` in Claude Code, or the equivalent MCP config entry in your harness). Restart the session after registering so the maestro tools appear.
-
-**Usage**: `list_devices` → pick the booted simulator's device id → `inspect_screen` before targeting any element → `run` with inline YAML. Flows declare `appId: com.kilocode.kiloapp` and start with `launchApp`. Use `cheat_sheet` for unfamiliar Maestro commands.
-
-If the MCP driver can't connect (`Failed to connect to 127.0.0.1:22087`), fall back to the CLI: `maestro --device <udid|emulator-5554> test <flow.yaml>` (pass flow variables with `-e KEY=VAL`). Capture screenshots with `xcrun simctl io <udid> screenshot <path>` (iOS) or `adb exec-out screencap -p > <path>` (Android).
-
-Gotchas:
-
-- Cold relaunch (`simctl terminate` + `launch`, or `launchApp` with `clearState: false`) restores navigation state — the app reopens on the last screen. Navigate back explicitly before testing a flow that assumes a starting screen.
-- `simctl io recordVideo` is flaky (1-frame videos after first use). For capturing transitions, loop `simctl io screenshot` in the background (~7.5 fps) and assemble with ffmpeg.
-- Re-inspect the screen after every UI change; element ids/text from a stale inspect will miss.
-- Elements are matched by `accessibilityLabel` via the `text:` selector (the app has no testIDs); `id:` does not match a11y labels.
-- Attach screenshots from the e2e run to the PR description where applicable — e.g. the screen a UI change touches, or a key step of the flow being verified. They're the evidence the flow actually works and make review faster.
-
-## 6. Android emulator
-
-One-time toolchain setup (Homebrew):
+Use the wrappers for all Android tooling so the resolved SDK/JDK environment is applied, including the Expo/Gradle build:
 
 ```bash
-brew install --cask android-commandlinetools
-brew install --cask temurin@17   # RN/Gradle require JDK 17; newer JDKs fail with
-                                  # "JvmVendorSpec ... IBM_SEMERU" during the Gradle build
-export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-export ANDROID_SDK_ROOT=$ANDROID_HOME
-export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
-yes | sdkmanager --licenses
-sdkmanager "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;arm64-v8a"
-echo no | avdmanager create avd -n kilo_pixel7 -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_7
+ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
+tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
+  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect"
+pnpm dev:mobile:android adb wait-for-device
+pnpm dev:mobile:android claim <serial>
+pnpm dev:mobile:android adb reverse tcp:<nextjs-port> tcp:<nextjs-port>
+pnpm dev:mobile:android adb reverse tcp:<metro-port> tcp:<metro-port>
+cd apps/mobile
+pnpm -w dev:mobile:android build
 ```
 
-Boot + build + run (build with JDK 17 pinned):
+Use Maestro as the primary Android automation driver, matching iOS. Fall back to repository-wrapped ADB when Maestro cannot inspect or operate a native prompt, when direct intent/process control is required, or when diagnosing the emulator itself. Android setup still uses ADB for readiness and port reversal. Use the repository wrapper rather than bare `adb`:
 
 ```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-emulator -avd kilo_pixel7 -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect &
-adb wait-for-device
-cd apps/mobile && set -a; source .env.local; set +a
-npx expo run:android --no-install --no-bundler   # reuses the Metro already on :8081
+pnpm dev:mobile:android adb devices -l
+pnpm dev:mobile:android adb -s <serial> shell uiautomator dump /sdcard/window.xml
+pnpm dev:mobile:android adb -s <serial> shell cat /sdcard/window.xml
+pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > /tmp/kilo-android.png
+pnpm dev:mobile:android adb -s <serial> shell input tap <x> <y>
+pnpm dev:mobile:android adb -s <serial> shell input text '<text>'
+pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 ```
 
-- Android maps `localhost` to the emulator itself, so route host services through adb: `adb reverse tcp:3000 tcp:3000 && adb reverse tcp:8081 tcp:8081` (Next + Metro). Re-run after any full app-data clear.
-- The dev-client deep link (to re-point at localhost Metro) uses scheme `exp+kilo-app`, not the app's `kiloapp` scheme: `adb shell am start -a android.intent.action.VIEW -d "exp+kilo-app://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"`.
-- Reset auth/state to the login screen with `adb shell pm clear com.kilocode.kiloapp` — this also wipes the dev-client's saved packager URL, so re-deep-link (above) and re-add the `adb reverse` maps afterward. First launch after a clear shows the Expo dev menu; dismiss it (tap **Continue**).
-- The browser fallback ("More sign-in options") opens the system browser at `WEB_BASE_URL`. `.env.local` defaults it to a LAN IP; set it to a value the emulator can reach (or complete that leg on iOS) for full browser sign-in.
+Derive tap coordinates from the current `uiautomator` bounds, not screenshots or remembered positions. Re-dump after every navigation or prompt. Android's `localhost` is the emulator, so restore both `adb reverse` mappings after clearing app data. The dev-client scheme is `exp+kilo-app`. `adb shell pm clear com.kilocode.kiloapp` also forgets the Metro URL, so re-open the dev-client URL afterward with `adb shell am start`.
 
-## 5. Cleaning up
+The existing login/logout helpers accept either an iOS simulator UDID or an Android ADB serial. Their shared preflight applies platform-specific device ownership and reconnects the dev client to this worktree before Maestro runs.
 
-When the e2e test is done, clean up everything you started: kill any CLI sessions and tmux windows/sessions you created, stop background log streams or screenshot loops, and remove scratch installs (e.g. `/tmp/kilo-cli`). Leave the user's own dev services (`kilo-dev-*` session) running — only tear down what you started yourself.
+## Cleanup
+
+Clean up only resources you started:
+
+```bash
+tmux kill-session -t "$CLI_SESSION"       # if created
+tmux kill-session -t "$IOS_BUILD_SESSION" # if created
+tmux kill-session -t "$ANDROID_SESSION"   # if created
+rm -rf "$CLI_SCRATCH"                     # if created
+rm -f "$LOGIN_LOG"                        # if created
+pnpm dev:stop                              # only if you started this worktree's stack
+xcrun simctl shutdown <udid>               # only if you booted it
+pnpm dev:mobile:simulator release <udid>    # release every simulator you claimed
+pnpm dev:mobile:android release <serial>     # release every Android device you claimed
+```
+
+Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill unrelated `kilo-dev-*` sessions, stop a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.
+
+Verify cleanup:
+
+```bash
+pnpm dev:status --json
+tmux ls
+xcrun simctl list devices booted
+```

@@ -8,7 +8,7 @@ function timeOfDay(hour: number): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
-export function buildTimedGreeting(firstName: string | null): string {
+export function buildTimedGreeting(): string {
   const period = timeOfDay(new Date().getHours());
-  return firstName ? `Good ${period}, ${firstName}` : `Good ${period}`;
+  return `Good ${period}`;
 }

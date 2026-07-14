@@ -62,13 +62,11 @@ describe('isFreeModel', () => {
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
-      expect(getInferenceProvider(claude_opus_4_7_stealth_model)).toMatchObject({ slug: 'stealth' });
+      expect(getInferenceProvider(claude_opus_4_7_stealth_model)?.slug).toBe('stealth');
       expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
-      expect(getInferenceProvider(claude_sonnet_4_6_stealth_model)).toMatchObject({
-        slug: 'stealth',
-      });
+      expect(getInferenceProvider(claude_sonnet_4_6_stealth_model)?.slug).toBe('stealth');
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
-      expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toMatchObject({ slug: 'stealth' });
+      expect(getInferenceProvider(claude_opus_4_6_stealth_model)?.slug).toBe('stealth');
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 

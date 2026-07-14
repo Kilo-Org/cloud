@@ -93,6 +93,7 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { parseCodeReviewAnalyticsManifest } from '@/lib/code-reviews/analytics/contracts';
 import { finalizeCompletedCodeReviewWithAnalytics } from '@/lib/code-reviews/analytics/db';
+import { finalizeCouncilResultForReview } from '@/lib/code-reviews/council/finalize-council-result';
 import {
   getManualCodeReviewConfig,
   shouldPublishCodeReviewToProvider,
@@ -1348,6 +1349,15 @@ export async function POST(
       }
     } else {
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
+    }
+
+    // Council runs surface their outcome only in the cloud UI (never posted to a PR), so
+    // capture the manifest + code-owned decision and persist it on completion.
+    if (status === 'completed' && review.review_type === 'council') {
+      await finalizeCouncilResultForReview({
+        review,
+        lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+      });
     }
 
     let providerTerminalReason = terminalReason;

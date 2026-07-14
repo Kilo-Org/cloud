@@ -26,7 +26,7 @@ import type {
   Owner,
 } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
-import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import type { CodeReviewCouncilResult, CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
@@ -887,6 +887,20 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
  * Updates code review status
  * Can optionally update session_id, cli_session_id, error_message, started_at, completed_at
  */
+/**
+ * Persists the captured council outcome (decision + per-specialist votes/findings) on the
+ * review so the cloud UI job-runs screen can render it. Council runs only.
+ */
+export async function setCodeReviewCouncilResult(
+  reviewId: string,
+  councilResult: CodeReviewCouncilResult
+): Promise<void> {
+  await db
+    .update(cloud_agent_code_reviews)
+    .set({ council_result: councilResult, updated_at: new Date().toISOString() })
+    .where(eq(cloud_agent_code_reviews.id, reviewId));
+}
+
 export async function updateCodeReviewStatus(
   reviewId: string,
   status: CodeReviewStatus,

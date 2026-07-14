@@ -7,6 +7,8 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
+import { gpt_5_6_sol_stealth_model } from './providers/openai';
+import { muse_spark_1_1_model } from './providers/meta';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -68,6 +70,46 @@ describe('isFreeModel', () => {
       expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
       expect(getInferenceProvider(claude_opus_4_6_stealth_model)).toBe('stealth');
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
+    });
+
+    test('registers GPT-5.6 Sol as a Martian stealth model', () => {
+      expect(findKiloExclusiveModel('stealth/gpt-5.6-sol')).toBe(gpt_5_6_sol_stealth_model);
+      expect(gpt_5_6_sol_stealth_model.internal_id).toBe('openai/gpt-5.6-sol:optimized');
+      expect(gpt_5_6_sol_stealth_model.gateway).toBe('martian');
+      expect(getInferenceProvider(gpt_5_6_sol_stealth_model)).toBe('stealth');
+      expect(gpt_5_6_sol_stealth_model.pricing).toEqual([
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 4,
+            completion_per_million: 24,
+            input_cache_read_per_million: 0.4,
+            input_cache_write_per_million: 5,
+          },
+        },
+        {
+          start_context_length: 272_000,
+          pricing: {
+            prompt_per_million: 8,
+            completion_per_million: 36,
+            input_cache_read_per_million: 0.8,
+            input_cache_write_per_million: 10,
+          },
+        },
+      ]);
+    });
+
+    test('registers Muse Spark 1.1 through Vercel', () => {
+      expect(findKiloExclusiveModel('meta/muse-spark-1.1')).toBe(muse_spark_1_1_model);
+      expect(muse_spark_1_1_model.gateway).toBe('vercel');
+      expect(getInferenceProvider(muse_spark_1_1_model)).toBeUndefined();
+      expect(muse_spark_1_1_model.context_length).toBe(1_048_576);
+      expect(muse_spark_1_1_model.pricing?.[0].pricing).toEqual({
+        prompt_per_million: 1.25,
+        completion_per_million: 4.25,
+        input_cache_read_per_million: 0.15,
+        input_cache_write_per_million: null,
+      });
     });
 
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {

@@ -28,7 +28,12 @@ import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gatewa
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import {
+  GPT_CURRENT_MODEL_ID,
+  gpt_5_6_sol_stealth_model,
+  isOpenAiModel,
+} from '@/lib/ai-gateway/providers/openai';
+import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import {
   deepseek_v4_pro_discounted_model,
@@ -88,6 +93,8 @@ export const kiloExclusiveModels = [
   seed_20_code_free_model,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
+  gpt_5_6_sol_stealth_model,
+  muse_spark_1_1_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

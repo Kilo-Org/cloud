@@ -39,7 +39,10 @@ describe('voice input feedback side effects', () => {
     expect(alertMock.alert).toHaveBeenCalledWith(
       'Microphone access is off',
       'Microphone access is off. Enable it in Settings.',
-      [{ text: 'Cancel', style: 'cancel' }, { text: 'Open Settings', onPress: expect.any(Function) }]
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: expect.any(Function) },
+      ]
     );
     buttons?.find(button => button.text === 'Open Settings')?.onPress?.();
     expect(linkingMock.openSettings).toHaveBeenCalled();

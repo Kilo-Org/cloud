@@ -8,7 +8,10 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 import { cn } from '@/lib/utils';
-import { VoiceInputButton, VoiceInputStatus as VoiceInputStatusView } from '@/components/voice-input-control';
+import {
+  VoiceInputButton,
+  VoiceInputStatus as VoiceInputStatusView,
+} from '@/components/voice-input-control';
 import { MessageAttachmentPreviewStrip } from './message-attachment-preview-strip';
 import { messageInputKeyboardProps, messageInputTextStyle } from './message-input-layout';
 import { type ComposerAttachmentQueue } from './message-input-types';

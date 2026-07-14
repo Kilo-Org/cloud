@@ -268,5 +268,4 @@ describe('useVoiceInput integration', () => {
       ).toBe(false);
     });
   });
-
 });

@@ -25,6 +25,19 @@ import {
 } from './session-metrics';
 import migrations from '../../drizzle/migrations';
 import {
+  claimNextDispatchable,
+  getOutboxRow,
+  markDispatched,
+  markMissingSession,
+  markRetry,
+  markSuppressedByPresence,
+  recordRaiseIntent,
+  recordResolveIntent,
+  recoverStaleInFlightRows,
+} from '../attention-outbox-store';
+import { recordAttentionEventInputSchema } from './attention-event-input';
+import { computeNextAlarmTime } from './attention-alarm';
+import {
   readKiloSdkMessages,
   readKiloSdkSessionSnapshot,
   type KiloSdkSessionSnapshotRead,
@@ -37,8 +50,16 @@ type IngestMetaKey =
   | 'ingestVersion'
   | 'closeReason'
   | 'metricsEmitted'
+  | 'metricsAlarmAt'
   | 'deleted'
   | 'sessionReadyNotified';
+
+/**
+ * Bound the outbox dispatch work per alarm so a hot loop can't run the alarm
+ * out of wallclock. The alarm reschedules itself to the earliest remaining
+ * `next_attempt_at` when it stops short.
+ */
+const MAX_DISPATCH_PER_ALARM = 25;
 
 type ExtractableMetaKey =
   | 'title'
@@ -258,19 +279,19 @@ export class SessionIngestDO extends DurableObject<Env> {
             .delete(ingestMeta)
             .where(inArray(ingestMeta.key, ['metricsEmitted', 'closeReason']))
             .run();
-          await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+          await this.setSharedAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
         } else {
           writeIngestMetaIfChanged(this.db, {
             key: 'closeReason',
             incomingValue: event.reason,
           });
-          await this.ctx.storage.setAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
+          await this.setSharedAlarm(Date.now() + POST_CLOSE_DRAIN_MS);
         }
       }
       // Events without open/close (stragglers) don't touch the alarm.
     } else {
       // v0 (legacy): no open/close signals, rely on inactivity timeout.
-      await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
+      await this.setSharedAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
     }
 
     const changes: Changes = [];
@@ -341,6 +362,62 @@ export class SessionIngestDO extends DurableObject<Env> {
         });
       })
     );
+  }
+
+  /**
+   * Direct DO RPC: record a human-attention event for this session.
+   *
+   * Accepts only IDs and a classified raise/resolve intent — the DO never
+   * sees prompt text, permission arguments, or any other envelope payload.
+   * Raise intents are recorded into the per-session outbox; resolve intents
+   * cancel or stamp a terminal row. The alarm is rescheduled so the outbox
+   * dispatches on the next tick.
+   *
+   * Idempotency: a re-raise of the same request id is a no-op; resolving a
+   * request that was never raised is a no-op; re-raising a resolved row is
+   * a no-op (the user already saw the outcome). The dispatch path is the
+   * sole owner of network IO, so the RPC itself never calls the
+   * notifications service — failures there are contained to the alarm.
+   */
+  async recordAttentionEvent(
+    rawParams: unknown
+  ): Promise<{ accepted: true } | { accepted: false; reason: 'invalid_input' | 'deleted' }> {
+    const parsed = recordAttentionEventInputSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      return { accepted: false, reason: 'invalid_input' };
+    }
+    const params = parsed.data;
+
+    const deletedRow = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, 'deleted'))
+      .get();
+    if (deletedRow?.value === 'true') {
+      return { accepted: false, reason: 'deleted' };
+    }
+
+    writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: params.kiloUserId });
+    writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: params.sessionId });
+
+    const now = Date.now();
+    if (params.intent.kind === 'raise') {
+      recordRaiseIntent(this.db, {
+        requestId: params.requestId,
+        reason: params.intent.reason,
+        now,
+      });
+    } else {
+      recordResolveIntent(this.db, { requestId: params.requestId, now });
+    }
+
+    // Always reschedule: a raise wants to fire immediately; a resolve may
+    // free the alarm entirely (no remaining work) or shift the next attempt
+    // to an earlier pending row. `rescheduleAlarm` picks the correct
+    // outcome.
+    await this.rescheduleAlarm();
+
+    return { accepted: true };
   }
 
   async readKiloSdkSessionSnapshot(): Promise<KiloSdkSessionSnapshotRead> {
@@ -483,7 +560,13 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /**
    * Compute and emit session metrics to the o11y worker.
-   * Returns true if metrics were emitted, false if already emitted.
+   * Returns true if metrics were emitted, false if already emitted or no data.
+   *
+   * Emits a fresh alarm afterward via `rescheduleAlarm` so a metrics fire does
+   * not cancel any still-pending outbox work. The metrics alarm time is
+   * cleared once emission succeeds; the shared alarm scheduler reschedules
+   * itself to the earliest remaining outbox attempt (or deletes the alarm
+   * only when no work remains).
    */
   private async emitSessionMetrics(
     kiloUserId: string,
@@ -548,22 +631,134 @@ export class SessionIngestDO extends DurableObject<Env> {
       ...metrics,
     });
 
-    // Mark metrics as emitted to prevent duplicates
+    // Mark metrics as emitted to prevent duplicates and clear the metrics
+    // alarm time so the shared scheduler no longer considers it.
     this.db
       .insert(ingestMeta)
       .values({ key: 'metricsEmitted', value: 'true' })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: 'true' } })
       .run();
-
-    await this.ctx.storage.deleteAlarm();
+    this.db.delete(ingestMeta).where(eq(ingestMeta.key, 'metricsAlarmAt')).run();
 
     return true;
   }
 
   /**
-   * Alarm fires either after POST_CLOSE_DRAIN_MS (session closed) or
-   * INACTIVITY_TIMEOUT_MS (no activity). Reads the close reason from
-   * ingest_meta if present, otherwise falls back to 'abandoned'.
+   * Schedule (or reschedule) the single DO alarm to fire at the earliest
+   * pending work: the metrics alarm time when metrics have not yet emitted,
+   * or the earliest outbox `next_attempt_at`. When both are empty the alarm
+   * is deleted entirely.
+   */
+  private async rescheduleAlarm(): Promise<void> {
+    const next = computeNextAlarmTime(this.db);
+    if (next === null) {
+      await this.ctx.storage.deleteAlarm();
+    } else {
+      await this.ctx.storage.setAlarm(next);
+    }
+  }
+
+  /**
+   * Persist a new metrics alarm time and re-run the shared alarm scheduler.
+   * Every place ingest previously called `setAlarm` directly must use this
+   * helper so the outbox can still preempt the metrics timer.
+   */
+  private async setSharedAlarm(when: number): Promise<void> {
+    this.db
+      .insert(ingestMeta)
+      .values({ key: 'metricsAlarmAt', value: String(when) })
+      .onConflictDoUpdate({ target: ingestMeta.key, set: { value: String(when) } })
+      .run();
+    await this.rescheduleAlarm();
+  }
+
+  /**
+   * Process up to `MAX_DISPATCH_PER_ALARM` outbox rows for the alarm's
+   * session. Each row is claimed, dispatched via the notifications binding,
+   * and transitioned to a terminal status. Rows that were resolved
+   * mid-flight are not overwritten. The caller is responsible for the final
+   * reschedule.
+   */
+  private async dispatchOutboxBatch(params: {
+    kiloUserId: string;
+    sessionId: string;
+  }): Promise<void> {
+    for (let i = 0; i < MAX_DISPATCH_PER_ALARM; i++) {
+      const claimed = claimNextDispatchable(this.db, { now: Date.now() });
+      if (!claimed) return;
+
+      let result: {
+        dispatched: boolean;
+        reason?: 'missing_session' | 'dispatch_failed' | 'suppressed_presence';
+      };
+      try {
+        result = await this.env.NOTIFICATIONS.sendSessionAttentionNotification({
+          userId: params.kiloUserId,
+          cliSessionId: params.sessionId,
+          requestId: claimed.requestId,
+          reason: claimed.reason,
+        });
+      } catch (_error) {
+        // A thrown error is treated like `dispatch_failed`: bounded retry
+        // through `markRetry` (terminal `failed` once `MAX_ATTEMPTS` is hit).
+        // We never log the request id or reason, and we never store the raw
+        // thrown message in the outbox — only fixed safe codes.
+        console.error('SessionIngestDO attention dispatch threw', {
+          sessionId: params.sessionId,
+          kiloUserId: params.kiloUserId,
+          attemptCount: claimed.attemptCount,
+          code: 'rpc_error',
+        });
+        // If markRetry throws (unknown row), it is an invariant violation
+        // intentionally surfaced to the platform alarm retry; do not wrap
+        // or suppress it here.
+        markRetry(this.db, {
+          requestId: claimed.requestId,
+          now: Date.now(),
+          reason: 'rpc_error',
+        });
+        continue;
+      }
+
+      // A resolve that landed between the claim and the await must win.
+      const fresh = getOutboxRow(this.db, claimed.requestId);
+      if (fresh?.status === 'resolved') continue;
+
+      if (result.dispatched) {
+        markDispatched(this.db, { requestId: claimed.requestId, now: Date.now() });
+        continue;
+      }
+
+      switch (result.reason) {
+        case 'suppressed_presence':
+          markSuppressedByPresence(this.db, { requestId: claimed.requestId, now: Date.now() });
+          break;
+        case 'missing_session':
+          markMissingSession(this.db, { requestId: claimed.requestId, now: Date.now() });
+          break;
+        case 'dispatch_failed':
+        default:
+          markRetry(this.db, {
+            requestId: claimed.requestId,
+            now: Date.now(),
+            reason: 'dispatch_failed',
+          });
+          break;
+      }
+    }
+  }
+
+  /**
+   * Alarm fires either after POST_CLOSE_DRAIN_MS (session closed),
+   * INACTIVITY_TIMEOUT_MS (no activity), or immediately after a
+   * `recordAttentionEvent` raise. The same alarm is shared between the
+   * metrics lifecycle and the outbox dispatch loop — every scheduling
+   * decision goes through `rescheduleAlarm` so the two cannot clobber
+   * each other.
+   *
+   * The body is intentionally resilient: dispatch errors are caught,
+   * logged, and translated into a bounded retry; only `emitSessionMetrics`
+   * errors propagate so the platform can retry the alarm itself.
    */
   async alarm(): Promise<void> {
     const metaRows = this.db
@@ -576,18 +771,36 @@ export class SessionIngestDO extends DurableObject<Env> {
           'closeReason',
           'ingestVersion',
           'deleted',
+          'metricsEmitted',
+          'metricsAlarmAt',
         ])
       )
       .all();
 
     const meta = Object.fromEntries(metaRows.map(r => [r.key, r.value]));
 
-    if (meta['deleted'] === 'true') return;
+    if (meta['deleted'] === 'true') {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
 
     const kiloUserId = meta['kiloUserId'];
     const sessionId = meta['sessionId'];
 
-    if (!kiloUserId || !sessionId) return;
+    if (!kiloUserId || !sessionId) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+
+    // Recover any rows left in `in_flight` from a previous alarm that was
+    // lost (DO restart, crash between claim and ack). Each stale row is
+    // bumped back to `pending` with a fresh schedule, or parked at
+    // terminal `failed` if the cap is reached. Downstream dispatch is
+    // keyed on the stable request id, so a recovered row cannot double
+    // push.
+    recoverStaleInFlightRows(this.db, { now: Date.now() });
+
+    await this.dispatchOutboxBatch({ kiloUserId, sessionId });
 
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
     const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
@@ -608,6 +821,8 @@ export class SessionIngestDO extends DurableObject<Env> {
 
       throw error;
     }
+
+    await this.rescheduleAlarm();
   }
 
   /** Returns true when no ingest data has been stored for this session. */

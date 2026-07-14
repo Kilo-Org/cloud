@@ -9,6 +9,7 @@ import {
   kiloSdkSessionSnapshotOutcomeSchema,
   listCloudAgentRootSessionsSchema,
   persistedKiloSdkMessageHistorySchema,
+  recordCloudAgentSessionAttentionSchema,
   resolveCloudAgentRootSessionSchema,
   type CloudAgentRootSessionSnapshot,
   type CloudAgentRootSessionSummary,
@@ -19,6 +20,8 @@ import {
   type GetCloudAgentRootSessionSnapshotParams,
   type GetCloudAgentRootSessionSnapshotResult,
   type ListCloudAgentRootSessionsParams,
+  type RecordCloudAgentSessionAttentionParams,
+  type RecordCloudAgentSessionAttentionResult,
   type ResolveCloudAgentRootSessionForKiloSessionParams,
   type ResolveCloudAgentRootSessionForKiloSessionResult,
   type SessionIngestRpcMethods,
@@ -395,5 +398,47 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         errors: cacheErrors,
       });
     }
+  }
+
+  /**
+   * RPC method: record a Cloud Agent attention signal (question/permission
+   * raise or resolve) for the per-session SessionIngestDO. Used by the
+   * cloud-agent-next attention adapter to forward wrapper events after
+   * the wrapper's policy filter has already suppressed auto-approved and
+   * plan-followup/code-review events.
+   *
+   * Maps the Cloud Agent boundary (`kiloSessionId`) to the DO's
+   * `sessionId` field. The DO validates the rest of the payload against
+   * `recordAttentionEventInputSchema` and owns the durable outbox plus
+   * notification dispatch; the RPC is a thin shim that returns the
+   * accepted-or-not outcome the adapter forwards to its logs.
+   */
+  async recordCloudAgentSessionAttention(
+    params: RecordCloudAgentSessionAttentionParams
+  ): Promise<RecordCloudAgentSessionAttentionResult> {
+    const parsed = recordCloudAgentSessionAttentionSchema.safeParse(params);
+    if (!parsed.success) {
+      return { accepted: false, reason: 'invalid_input' };
+    }
+    return withDORetry(
+      () =>
+        getSessionIngestDO(this.env, {
+          kiloUserId: parsed.data.kiloUserId,
+          sessionId: parsed.data.kiloSessionId,
+        }),
+      async stub => {
+        const result = await stub.recordAttentionEvent({
+          kiloUserId: parsed.data.kiloUserId,
+          sessionId: parsed.data.kiloSessionId,
+          requestId: parsed.data.requestId,
+          intent:
+            parsed.data.intent.kind === 'raise'
+              ? { kind: 'raise', reason: parsed.data.intent.reason }
+              : { kind: 'resolve' },
+        });
+        return result.accepted ? { accepted: true } : { accepted: false, reason: result.reason };
+      },
+      'SessionIngestDO.recordAttentionEvent'
+    );
   }
 }

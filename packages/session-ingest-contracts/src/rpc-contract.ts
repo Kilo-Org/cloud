@@ -634,6 +634,32 @@ export type CloudAgentRootSessionMessages = {
 };
 export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessages | null;
 
+/**
+ * Attention intent for the Cloud Agent boundary RPC. The schema intentionally
+ * permits only `question` and `permission` reasons — `blocking_suggestion` is
+ * excluded because the wrapper's policy filter suppresses suggestions before
+ * they reach the worker, and the per-session outbox handles them separately.
+ */
+const cloudAgentAttentionReasonSchema = z.enum(['question', 'permission']);
+export const cloudAgentAttentionIntentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('raise'), reason: cloudAgentAttentionReasonSchema }),
+  z.object({ kind: z.literal('resolve') }),
+]);
+export type CloudAgentAttentionIntent = z.infer<typeof cloudAgentAttentionIntentSchema>;
+
+export const recordCloudAgentSessionAttentionSchema = z.object({
+  kiloUserId: z.string().min(1),
+  kiloSessionId: sessionIdSchema,
+  requestId: z.string().min(1),
+  intent: cloudAgentAttentionIntentSchema,
+});
+export type RecordCloudAgentSessionAttentionParams = z.input<
+  typeof recordCloudAgentSessionAttentionSchema
+>;
+export type RecordCloudAgentSessionAttentionResult =
+  | { accepted: true }
+  | { accepted: false; reason: 'invalid_input' | 'deleted' };
+
 export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (params: CreateSessionForCloudAgentParams) => Promise<void>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
@@ -649,4 +675,7 @@ export type SessionIngestRpcMethods = {
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;
+  recordCloudAgentSessionAttention: (
+    params: RecordCloudAgentSessionAttentionParams
+  ) => Promise<RecordCloudAgentSessionAttentionResult>;
 };

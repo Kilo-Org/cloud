@@ -266,6 +266,262 @@ describe('createIngestHandler', () => {
       );
     });
 
+    // --- kilocode events: attention event classification ---
+
+    function makeKilocodeData(
+      eventName: string,
+      properties: Record<string, unknown>,
+      options: { spreadId?: boolean } = {}
+    ): Record<string, unknown> {
+      // Real-time shape spreads properties at the top level of `data`;
+      // snapshot/replay shape nests them only under `properties`.
+      return options.spreadId
+        ? { ...properties, event: eventName, type: eventName, properties }
+        : { event: eventName, type: eventName, properties };
+    }
+
+    function makeKilocodeMessageFromData(data: Record<string, unknown>): string {
+      return JSON.stringify({
+        streamEventType: 'kilocode',
+        data,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    function createAttentionContext(): {
+      doContext: IngestDOContext;
+      onAttentionEvent: ReturnType<typeof vi.fn>;
+    } {
+      const doContext = createFakeDOContext();
+      const onAttentionEvent = vi.fn();
+      return { doContext: { ...doContext, onAttentionEvent }, onAttentionEvent };
+    }
+
+    async function runAttentionMessage(
+      doContext: IngestDOContext,
+      data: Record<string, unknown>
+    ): Promise<{ broadcastFn: ReturnType<typeof vi.fn>; eventQueries: EventQueries }> {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(ws, makeKilocodeMessageFromData(data));
+      return { broadcastFn, eventQueries };
+    }
+
+    it.each([
+      { eventName: 'question.asked', expected: { raise: 'question' } },
+      { eventName: 'permission.asked', expected: { raise: 'permission' } },
+    ])('raise $eventName with nested properties.id', async ({ eventName, expected }) => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const { broadcastFn, eventQueries } = await runAttentionMessage(
+        doContext,
+        makeKilocodeData(eventName, { id: 'req_nested' })
+      );
+      expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(onAttentionEvent).toHaveBeenCalledWith({
+        requestId: 'req_nested',
+        intent: expected,
+      });
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(eventQueries.upsert).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { eventName: 'question.asked', expected: { raise: 'question' } },
+      { eventName: 'permission.asked', expected: { raise: 'permission' } },
+    ])(
+      'raise $eventName with direct top-level data.id (real-time spread shape)',
+      async ({ eventName, expected }) => {
+        const { doContext, onAttentionEvent } = createAttentionContext();
+        await runAttentionMessage(
+          doContext,
+          makeKilocodeData(eventName, { id: 'req_direct' }, { spreadId: true })
+        );
+        expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+        expect(onAttentionEvent).toHaveBeenCalledWith({
+          requestId: 'req_direct',
+          intent: expected,
+        });
+      }
+    );
+
+    it.each(['question.replied', 'question.rejected', 'permission.replied'])(
+      'resolve %s with nested properties.id',
+      async eventName => {
+        const { doContext, onAttentionEvent } = createAttentionContext();
+        const { broadcastFn } = await runAttentionMessage(
+          doContext,
+          makeKilocodeData(eventName, { id: 'req_nested' })
+        );
+        expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+        expect(onAttentionEvent).toHaveBeenCalledWith({
+          requestId: 'req_nested',
+          intent: 'resolve',
+        });
+        expect(broadcastFn).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+        );
+      }
+    );
+
+    it.each(['question.replied', 'question.rejected', 'permission.replied'])(
+      'resolve %s with direct top-level data.id (real-time spread shape)',
+      async eventName => {
+        const { doContext, onAttentionEvent } = createAttentionContext();
+        await runAttentionMessage(
+          doContext,
+          makeKilocodeData(eventName, { id: 'req_direct' }, { spreadId: true })
+        );
+        expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+        expect(onAttentionEvent).toHaveBeenCalledWith({
+          requestId: 'req_direct',
+          intent: 'resolve',
+        });
+      }
+    );
+
+    it.each([
+      'session.status',
+      'session.idle',
+      'session.diff',
+      'session.completed',
+      'session.error',
+      'session.network.asked',
+      'message.part.delta',
+      'message.part.updated',
+      'message.updated',
+      'message.part.removed',
+      'session.created',
+      'session.updated',
+      'session.turn.close',
+    ])('does not invoke onAttentionEvent for ignored %s', async eventName => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      await runAttentionMessage(
+        doContext,
+        makeKilocodeData(eventName, { id: 'req_1' }, { spreadId: true })
+      );
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+    });
+
+    it('does not invoke onAttentionEvent when qualifying event has no id', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const { broadcastFn } = await runAttentionMessage(doContext, {
+        event: 'question.asked',
+        type: 'question.asked',
+        properties: {},
+      });
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it('does not invoke onAttentionEvent when qualifying event has empty string id', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      await runAttentionMessage(doContext, {
+        event: 'question.asked',
+        type: 'question.asked',
+        id: '',
+        properties: { id: '' },
+      });
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+    });
+
+    it('invokes callback while broadcast payload remains unchanged', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      const data = makeKilocodeData('question.asked', { id: 'req_nested' }, { spreadId: true });
+      await handler.handleIngestMessage(ws, makeKilocodeMessageFromData(data));
+      const baselinePayload = JSON.stringify(data);
+      expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(onAttentionEvent).toHaveBeenCalledWith({
+        requestId: 'req_nested',
+        intent: { raise: 'question' },
+      });
+      const broadcastCall = vi.mocked(broadcastFn).mock.calls[0]?.[0];
+      expect(broadcastCall).toBeDefined();
+      expect(broadcastCall?.id).toBe(0);
+      expect(broadcastCall?.stream_event_type).toBe('kilocode');
+      // Broadcast payload remains exactly what sanitization produced —
+      // adding the attention callback did not change what /stream clients receive.
+      expect(broadcastCall?.payload).toBe(baselinePayload);
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(eventQueries.upsert).not.toHaveBeenCalled();
+    });
+
+    it('invokes callback on duplicate same qualifying event (outbox owns dedup)', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      const message = makeKilocodeMessageFromData(
+        makeKilocodeData('question.asked', { id: 'req_dup' }, { spreadId: true })
+      );
+
+      await handler.handleIngestMessage(ws, message);
+      await handler.handleIngestMessage(ws, message);
+
+      expect(onAttentionEvent).toHaveBeenCalledTimes(2);
+      expect(onAttentionEvent).toHaveBeenNthCalledWith(1, {
+        requestId: 'req_dup',
+        intent: { raise: 'question' },
+      });
+      expect(onAttentionEvent).toHaveBeenNthCalledWith(2, {
+        requestId: 'req_dup',
+        intent: { raise: 'question' },
+      });
+    });
+
+    it('does not invoke callback when no onAttentionEvent is registered', async () => {
+      const doContext = createFakeDOContext(); // no onAttentionEvent
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessageFromData(
+          makeKilocodeData('question.asked', { id: 'req_1' }, { spreadId: true })
+        )
+      );
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+    });
+
     // --- non-kilocode: plain insert path (PERSISTED_STREAM_EVENT_TYPES) ---
 
     it.each(['complete', 'interrupted', 'error', 'autocommit_started', 'autocommit_completed'])(

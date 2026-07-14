@@ -51,6 +51,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, or } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import type { RecordAttentionEventInput } from './dos/attention-event-input';
 import { SessionIngestRPC } from './session-ingest-rpc';
 
 const sdkSessionInfoFixture = {
@@ -920,5 +921,149 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 101 })
     ).rejects.toThrow();
     expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionIngestRPC.recordCloudAgentSessionAttention', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('maps kiloSessionId to the DO sessionId and forwards only safe fields for a raise', async () => {
+    const { db } = makeDbFakes([]);
+    const recordAttentionEvent = vi.fn(async () => ({ accepted: true }) as const);
+    const ingestStub = { recordAttentionEvent };
+    vi.mocked(getSessionIngestDO).mockReturnValue(ingestStub as never);
+    const rpc = makeRpc(db);
+
+    const result = await rpc.recordCloudAgentSessionAttention({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_01',
+      intent: { kind: 'raise', reason: 'question' },
+    });
+
+    expect(result).toEqual({ accepted: true });
+    expect(getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: 'usr_owner',
+      sessionId: sdkSessionInfoFixture.id,
+    });
+    expect(recordAttentionEvent).toHaveBeenCalledTimes(1);
+    expect(recordAttentionEvent).toHaveBeenCalledWith({
+      kiloUserId: 'usr_owner',
+      sessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_01',
+      intent: { kind: 'raise', reason: 'question' },
+    });
+  });
+
+  it('forwards a resolve intent with no reason field', async () => {
+    const { db } = makeDbFakes([]);
+    const recordAttentionEvent = vi.fn(async () => ({ accepted: true }) as const);
+    vi.mocked(getSessionIngestDO).mockReturnValue({ recordAttentionEvent } as never);
+    const rpc = makeRpc(db);
+
+    const result = await rpc.recordCloudAgentSessionAttention({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_02',
+      intent: { kind: 'resolve' },
+    });
+
+    expect(result).toEqual({ accepted: true });
+    expect(recordAttentionEvent).toHaveBeenCalledWith({
+      kiloUserId: 'usr_owner',
+      sessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_02',
+      intent: { kind: 'resolve' },
+    });
+  });
+
+  it('returns accepted false without calling the DO when IDs are invalid', async () => {
+    const { db } = makeDbFakes([]);
+    const recordAttentionEvent = vi.fn();
+    vi.mocked(getSessionIngestDO).mockReturnValue({ recordAttentionEvent } as never);
+    const rpc = makeRpc(db);
+
+    const result = await rpc.recordCloudAgentSessionAttention({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: 'not-a-session',
+      requestId: 'req_attn_01',
+      intent: { kind: 'raise', reason: 'question' },
+    });
+
+    expect(result).toEqual({ accepted: false, reason: 'invalid_input' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+    expect(recordAttentionEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns accepted false without calling the DO when the reason is invalid', async () => {
+    const { db } = makeDbFakes([]);
+    const recordAttentionEvent = vi.fn();
+    vi.mocked(getSessionIngestDO).mockReturnValue({ recordAttentionEvent } as never);
+    const rpc = makeRpc(db);
+
+    const result = await rpc.recordCloudAgentSessionAttention({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_01',
+      // Cast through unknown so the test exercises the runtime validator, not
+      // the compile-time type.
+      intent: { kind: 'raise', reason: 'blocking_suggestion' },
+    } as never);
+
+    expect(result).toEqual({ accepted: false, reason: 'invalid_input' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+    expect(recordAttentionEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not forward extra body or envelope fields to the DO', async () => {
+    const { db } = makeDbFakes([]);
+    const recordAttentionEvent = vi.fn(
+      async (_input: RecordAttentionEventInput) => ({ accepted: true }) as const
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({ recordAttentionEvent } as never);
+    const rpc = makeRpc(db);
+
+    const result = await rpc.recordCloudAgentSessionAttention({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_01',
+      intent: { kind: 'raise', reason: 'question' },
+      // The contract schema strips these out — the DO must never see them.
+      body: 'raw prompt text that must be stripped',
+      permissionArgs: { command: 'rm -rf /' },
+    } as never);
+
+    expect(result).toEqual({ accepted: true });
+    expect(recordAttentionEvent).toHaveBeenCalledTimes(1);
+    const forwarded = recordAttentionEvent.mock.calls[0]?.[0];
+    expect(forwarded).toEqual({
+      kiloUserId: 'usr_owner',
+      sessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_01',
+      intent: { kind: 'raise', reason: 'question' },
+    });
+    expect(forwarded).not.toHaveProperty('body');
+    expect(forwarded).not.toHaveProperty('permissionArgs');
+  });
+
+  it('preserves a DO-returned accepted false reason through the normalized result', async () => {
+    const { db } = makeDbFakes([]);
+    const recordAttentionEvent = vi.fn(
+      async () => ({ accepted: false, reason: 'deleted' }) as const
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({ recordAttentionEvent } as never);
+    const rpc = makeRpc(db);
+
+    const result = await rpc.recordCloudAgentSessionAttention({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      requestId: 'req_attn_01',
+      intent: { kind: 'resolve' },
+    });
+
+    expect(result).toEqual({ accepted: false, reason: 'deleted' });
+    expect(recordAttentionEvent).toHaveBeenCalledTimes(1);
   });
 });

@@ -21,3 +21,24 @@ export const ingestMeta = sqliteTable('ingest_meta', {
 export const sessions = sqliteTable('sessions', {
   session_id: text('session_id').primaryKey(),
 });
+
+/**
+ * Per-session durable outbox for human-attention pushes. One row per stable
+ * request id (e.g. a question id from the CLI). Status is set to a terminal
+ * value once dispatch is no longer needed; `pending` rows drive the alarm
+ * retry loop.
+ */
+export const attentionOutbox = sqliteTable(
+  'attention_outbox',
+  {
+    request_id: text('request_id').primaryKey(),
+    reason: text('reason').notNull(),
+    status: text('status').notNull().default('pending'),
+    attempt_count: integer('attempt_count').notNull().default(0),
+    next_attempt_at: integer('next_attempt_at'),
+    last_error: text('last_error'),
+    raised_at: integer('raised_at').notNull(),
+    resolved_at: integer('resolved_at'),
+  },
+  table => [index('attention_outbox_pending_idx').on(table.status, table.next_attempt_at)]
+);

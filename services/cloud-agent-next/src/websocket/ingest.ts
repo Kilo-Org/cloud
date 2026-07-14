@@ -36,6 +36,10 @@ import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper
 import type { TerminalizeParams } from '../session/session-message-state.js';
 import { classifyAssistantFailureMessage } from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
+import {
+  classifyAttentionKilocodeEvent,
+  type AttentionEvent,
+} from './ingest-attention-classifier.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -253,6 +257,13 @@ export type IngestDOContext = {
   ) => Promise<void>;
   /** Persist the slash-command catalog so connecting clients can be hydrated. */
   setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
+  /**
+   * Optional callback invoked for qualifying question/permission kilocode
+   * events. Synchronous or returns void; CloudAgentSession later owns
+   * waitUntil for any external notification IO. Duplicate snapshots replay
+   * the callback each time; the outbox owns dedup.
+   */
+  onAttentionEvent?: (event: AttentionEvent) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -731,6 +742,10 @@ export function createIngestHandler(
               }
             );
             ws.serializeAttachment(attachment);
+            const attention = classifyAttentionKilocodeEvent(ingestEvent.data);
+            if (attention) {
+              doContext.onAttentionEvent?.(attention);
+            }
           } else {
             console.warn('Invalid kilocode event payload');
           }

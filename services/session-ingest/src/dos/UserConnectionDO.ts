@@ -1,7 +1,9 @@
 import { DurableObject } from 'cloudflare:workers';
+import { withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
+import { extractAttentionSignal, type AttentionIntent } from '../attention-outbox';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
@@ -324,7 +326,13 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion);
         break;
       case 'event':
-        this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
+        this.handleCliEvent(
+          msg.sessionId,
+          msg.parentSessionId,
+          msg.event,
+          msg.data,
+          attachment.kiloUserId
+        );
         break;
       case 'response':
         this.handleCliResponse(ws, msg.id, msg.result, msg.error);
@@ -435,8 +443,20 @@ export class UserConnectionDO extends DurableObject<Env> {
     sessionId: string,
     parentSessionId: string | undefined,
     event: string,
-    data: unknown
+    data: unknown,
+    kiloUserId: string | undefined
   ): void {
+    // Record human-attention signals durably BEFORE the no-subscriber
+    // early return so a session that briefly has no web subscribers
+    // (race on subscribe) still gets a push. Child events are skipped:
+    // mobile cannot safely answer requests originating from a subagent.
+    if (!parentSessionId) {
+      const signal = extractAttentionSignal(event, data);
+      if (signal !== null) {
+        this.recordAttentionEvent(kiloUserId, sessionId, signal.intent, signal.requestId);
+      }
+    }
+
     const childSubs = this.webSubscriptions.get(sessionId);
     const parentSubs = parentSessionId ? this.webSubscriptions.get(parentSessionId) : undefined;
     if (!childSubs && !parentSubs) return;
@@ -456,6 +476,47 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const ws of merged) {
       this.sendToWeb(ws, msg);
     }
+  }
+
+  /**
+   * Fire-and-forget outbox write for a human-attention signal. When
+   * `kiloUserId` is unavailable (legacy attachment) the relay continues
+   * unchanged but no push is recorded — the in-session UI is still
+   * forwarded to any web subscribers by the caller. The DO's `accepted:false`
+   * outcome is a terminal structural no-op (deleted/invalid session) and
+   * is intentionally not logged to avoid per-event noise; thrown availability
+   * failures retain fixed-code logging. The request id, prompt content, and
+   * arbitrary thrown message text are never written to logs.
+   */
+  private recordAttentionEvent(
+    kiloUserId: string | undefined,
+    sessionId: string,
+    intent: AttentionIntent,
+    requestId: string
+  ): void {
+    if (!kiloUserId) return;
+    this.ctx.waitUntil(
+      withDORetry(
+        () => getSessionIngestDO(this.env, { kiloUserId, sessionId }),
+        async stub => {
+          await stub.recordAttentionEvent({
+            kiloUserId,
+            sessionId,
+            requestId,
+            intent:
+              intent.kind === 'raise'
+                ? { kind: 'raise', reason: intent.reason }
+                : { kind: 'resolve' },
+          });
+        },
+        'SessionIngestDO.recordAttentionEvent'
+      ).catch(() => {
+        console.error('Failed to record attention event (non-fatal)', {
+          sessionId,
+          code: 'record_attention_failed',
+        });
+      })
+    );
   }
 
   private handleCliResponse(

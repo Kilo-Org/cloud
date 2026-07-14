@@ -34,6 +34,7 @@ export default defineConfig({
       'src/lib/kilo-pass/**/*.test.tsx',
       'src/lib/onboarding/**/*.test.ts',
       'src/components/**/*.test.ts',
+      'src/components/**/*.test.tsx',
     ],
   },
 });

@@ -14,6 +14,7 @@ import { MessageBubble } from '@/components/agents/message-bubble';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
+import { SuggestionCard } from '@/components/agents/suggestion-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
@@ -23,11 +24,16 @@ import {
 } from '@/components/agents/session-working-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { useAgentSessionPresence } from '@/components/kilo-chat/hooks/use-agent-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
+import {
+  hasActiveInteraction,
+  pickActiveInteractionSurface,
+} from '@/components/agents/interaction-surface';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -91,6 +97,7 @@ export function SessionDetailContent({
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
@@ -102,6 +109,12 @@ export function SessionDetailContent({
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
+
+  // Hold exact-session presence while the user is actively viewing this
+  // session. The hook gates on app-active + route-focused and releases the
+  // context as soon as we navigate away so notifications for this session
+  // (and others) resume correctly.
+  useAgentSessionPresence(sessionId);
 
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
@@ -271,6 +284,26 @@ export function SessionDetailContent({
     }
   }, [manager]);
 
+  // SuggestionCard owns safe error copy. We forward the manager call and
+  // let the error propagate to the card, which renders the friendly retry
+  // text; we deliberately avoid a second toast here.
+  const handleAcceptSuggestion = useCallback(
+    async (index: number) => {
+      if (!activeSuggestion) {
+        return;
+      }
+      await manager.acceptSuggestion(activeSuggestion.requestId, index);
+    },
+    [activeSuggestion, manager]
+  );
+
+  const handleDismissSuggestion = useCallback(async () => {
+    if (!activeSuggestion) {
+      return;
+    }
+    await manager.dismissSuggestion(activeSuggestion.requestId);
+  }, [activeSuggestion, manager]);
+
   const handleBackToSessions = useCallback(() => {
     router.replace('/(app)/(tabs)/(2_agents)' as Href);
   }, [router]);
@@ -331,14 +364,27 @@ export function SessionDetailContent({
   const title =
     fetchedData?.kiloSessionId === sessionId ? (fetchedData.title ?? 'Session') : 'Session';
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
+  // Exactly one interaction surface is ever visible: question wins, then
+  // permission, then suggestion. The composer is hidden while any of them
+  // is active so the user can only act on the surface they're being asked
+  // to respond to.
+  const hasInteraction = hasActiveInteraction({
+    activeQuestion,
+    activePermission,
+    activeSuggestion,
+  });
+  const activeInteractionSurface = pickActiveInteractionSurface({
+    activeQuestion,
+    activePermission,
+    activeSuggestion,
+  });
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
     shouldShowLoading ||
     Boolean(error) ||
-    Boolean(activeQuestion) ||
+    hasInteraction ||
     (requiresModel && !currentModel);
-  const showInteractionCards = activeQuestion ?? activePermission;
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
@@ -429,7 +475,7 @@ export function SessionDetailContent({
       <>
         <View className="flex-1">{renderContent()}</View>
 
-        {activeQuestion ? (
+        {activeInteractionSurface.kind === 'question' && activeQuestion ? (
           <QuestionCard
             questions={activeQuestion.questions}
             onAnswer={answers => {
@@ -442,7 +488,7 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {activePermission ? (
+        {activeInteractionSurface.kind === 'permission' && activePermission ? (
           <PermissionCard
             permission={activePermission.permission}
             patterns={activePermission.patterns}
@@ -454,7 +500,20 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {!showInteractionCards &&
+        {activeInteractionSurface.kind === 'suggestion' && activeSuggestion ? (
+          <SuggestionCard
+            text={activeSuggestion.text}
+            actions={activeSuggestion.actions}
+            onAccept={async index => {
+              await handleAcceptSuggestion(index);
+            }}
+            onDismiss={async () => {
+              await handleDismissSuggestion();
+            }}
+          />
+        ) : null}
+
+        {!hasInteraction &&
           (isReadOnly && messages.length > 0 ? (
             <View className="border-t border-border bg-secondary px-4 py-3">
               <Text className="text-center text-sm text-muted-foreground">

@@ -38,6 +38,12 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
+      all: vi.fn(() => [
+        { key: 'metricsAlarmAt', value: '9999999999999' },
+        { key: 'metricsEmitted', value: 'false' },
+      ]),
+      orderBy: vi.fn(() => selectQuery),
+      limit: vi.fn(() => selectQuery),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -105,6 +111,12 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => getResults.shift()),
+      all: vi.fn(() => [
+        { key: 'metricsAlarmAt', value: '9999999999999' },
+        { key: 'metricsEmitted', value: 'false' },
+      ]),
+      orderBy: vi.fn(() => selectQuery),
+      limit: vi.fn(() => selectQuery),
     };
     const db = {
       select: vi.fn(() => selectQuery),
@@ -174,6 +186,12 @@ describe('SessionIngestDO ingest ordering', () => {
       from: vi.fn(() => selectQuery),
       where: vi.fn(() => selectQuery),
       get: vi.fn(() => undefined),
+      all: vi.fn(() => [
+        { key: 'metricsAlarmAt', value: '9999999999999' },
+        { key: 'metricsEmitted', value: 'false' },
+      ]),
+      orderBy: vi.fn(() => selectQuery),
+      limit: vi.fn(() => selectQuery),
     };
     const db = {
       select: vi.fn(() => selectQuery),

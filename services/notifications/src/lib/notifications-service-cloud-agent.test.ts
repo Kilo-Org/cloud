@@ -4,6 +4,7 @@ import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/noti
 
 import {
   dispatchCloudAgentSessionPush,
+  dispatchSessionAttentionPush,
   dispatchSessionReadyPush,
   type DispatchCloudAgentSessionPushDeps,
 } from './cloud-agent-session-push';
@@ -275,5 +276,244 @@ describe('dispatchSessionReadyPush', () => {
     );
 
     expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
+  });
+});
+
+describe('dispatchSessionAttentionPush', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDispatchPush.mockResolvedValue({ kind: 'delivered', tokenCount: 1 });
+  });
+
+  it.each([
+    ['question', 'Kilo session needs your input', 'Your Kilo session is asking a question'],
+    [
+      'permission',
+      'Kilo session needs permission',
+      'Your Kilo session is waiting for permission to continue',
+    ],
+    [
+      'blocking_suggestion',
+      'Kilo session needs a decision',
+      'Your Kilo session has a suggestion that needs your review',
+    ],
+    [
+      'action_required',
+      'Kilo session needs you',
+      'Your Kilo session is waiting for you to take action',
+    ],
+  ] as const)(
+    'dispatches fixed safe copy for reason=%s with exact-session presence',
+    async (reason, title, body) => {
+      const deps = createDeps({ session: { title: 'Title', organizationId: null } });
+
+      const result = await dispatchSessionAttentionPush(
+        { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_1', reason },
+        deps
+      );
+
+      expect(result).toEqual({ dispatched: true });
+      expect(mockDispatchPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          presenceContext: '/presence/agent-session/ses_1',
+          idempotencyKey: `cloud-agent:ses_1:attention:${reason}:req_1`,
+          badge: null,
+          push: {
+            title,
+            body,
+            data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+            sound: 'default',
+            priority: 'high',
+          },
+        })
+      );
+    }
+  );
+
+  it('ignores any caller-provided body and only uses fixed copy', async () => {
+    const deps = createDeps({ session: { title: 'Title', organizationId: null } });
+
+    // The schema has no text/body field and strips unknown keys, so any
+    // caller-provided text is silently dropped and the fixed copy is used.
+    await expect(
+      dispatchSessionAttentionPush(
+        {
+          userId: 'user-1',
+          cliSessionId: 'ses_1',
+          requestId: 'req_1',
+          reason: 'question',
+          // @ts-expect-error -- callers must not be able to inject free-form copy
+          body: 'leak this',
+        },
+        deps
+      )
+    ).resolves.toEqual({ dispatched: true });
+
+    const call = mockDispatchPush.mock.calls[0]?.[0];
+    expect(call?.push.body).toBe('Your Kilo session is asking a question');
+    expect(call?.push.body).not.toContain('leak this');
+  });
+
+  it('uses distinct idempotency keys for distinct requests and reasons', async () => {
+    const deps = createDeps();
+
+    await dispatchSessionAttentionPush(
+      { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_1', reason: 'question' },
+      deps
+    );
+    await dispatchSessionAttentionPush(
+      { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_2', reason: 'question' },
+      deps
+    );
+    await dispatchSessionAttentionPush(
+      { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_1', reason: 'permission' },
+      deps
+    );
+
+    expect(mockDispatchPush).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ idempotencyKey: 'cloud-agent:ses_1:attention:question:req_1' })
+    );
+    expect(mockDispatchPush).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ idempotencyKey: 'cloud-agent:ses_1:attention:question:req_2' })
+    );
+    expect(mockDispatchPush).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ idempotencyKey: 'cloud-agent:ses_1:attention:permission:req_1' })
+    );
+  });
+
+  it('reuses the same idempotency key when the same request is retried', async () => {
+    const deps = createDeps();
+
+    const params = {
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+      requestId: 'req_dup',
+      reason: 'question',
+    } as const;
+    await dispatchSessionAttentionPush(params, deps);
+    await dispatchSessionAttentionPush(params, deps);
+
+    expect(mockDispatchPush).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ idempotencyKey: 'cloud-agent:ses_1:attention:question:req_dup' })
+    );
+    expect(mockDispatchPush).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ idempotencyKey: 'cloud-agent:ses_1:attention:question:req_dup' })
+    );
+  });
+
+  it('returns missing_session without dispatching when the session row is absent', async () => {
+    const deps = createDeps({ session: null });
+
+    const result = await dispatchSessionAttentionPush(
+      { userId: 'user-1', cliSessionId: 'ses_missing', requestId: 'req_1', reason: 'question' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'missing_session' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('returns missing_session when org membership has been revoked', async () => {
+    const deps = createDeps({
+      session: { title: 'Org session', organizationId: 'org-1' },
+      hasOrganizationAccess: false,
+    });
+
+    const result = await dispatchSessionAttentionPush(
+      {
+        userId: 'former-member',
+        cliSessionId: 'ses_org',
+        requestId: 'req_1',
+        reason: 'permission',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'missing_session' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+    expect(deps.hasOrganizationAccess).toHaveBeenCalledWith('former-member', 'org-1');
+  });
+
+  it('propagates presence-suppressed outcome from the recipient DO', async () => {
+    const deps = createDeps();
+    mockDispatchPush.mockResolvedValue({ kind: 'suppressed_presence' });
+
+    const result = await dispatchSessionAttentionPush(
+      { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_1', reason: 'question' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'suppressed_presence' });
+  });
+
+  it('propagates dispatch failures from the recipient notification channel', async () => {
+    const deps = createDeps();
+    mockDispatchPush.mockResolvedValue({ kind: 'failed', error: 'Expo unavailable' });
+
+    const result = await dispatchSessionAttentionPush(
+      { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_1', reason: 'question' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
+  });
+
+  it('treats delivered, duplicate, and no_tokens as dispatched', async () => {
+    const outcomes: DispatchPushOutcome[] = [
+      { kind: 'delivered', tokenCount: 2 },
+      { kind: 'duplicate' },
+      { kind: 'no_tokens' },
+    ];
+    for (const outcome of outcomes) {
+      const deps = createDeps();
+      mockDispatchPush.mockResolvedValueOnce(outcome);
+      const result = await dispatchSessionAttentionPush(
+        { userId: 'user-1', cliSessionId: 'ses_1', requestId: 'req_1', reason: 'question' },
+        deps
+      );
+      expect(result).toEqual({ dispatched: true });
+    }
+  });
+
+  it('rejects invalid params (empty IDs, unknown reason) before reading session data', async () => {
+    const deps = createDeps();
+
+    await expect(
+      dispatchSessionAttentionPush(
+        { userId: '', cliSessionId: 'ses_1', requestId: 'req_1', reason: 'question' },
+        deps
+      )
+    ).rejects.toThrow();
+    await expect(
+      dispatchSessionAttentionPush(
+        { userId: 'user-1', cliSessionId: '', requestId: 'req_1', reason: 'question' },
+        deps
+      )
+    ).rejects.toThrow();
+    await expect(
+      dispatchSessionAttentionPush(
+        { userId: 'user-1', cliSessionId: 'ses_1', requestId: '', reason: 'question' },
+        deps
+      )
+    ).rejects.toThrow();
+    await expect(
+      dispatchSessionAttentionPush(
+        {
+          userId: 'user-1',
+          cliSessionId: 'ses_1',
+          requestId: 'req_1',
+          // @ts-expect-error -- unknown reason must be rejected
+          reason: 'unknown',
+        },
+        deps
+      )
+    ).rejects.toThrow();
+    expect(deps.getSession).not.toHaveBeenCalled();
   });
 });

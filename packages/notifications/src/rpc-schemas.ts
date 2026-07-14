@@ -172,6 +172,44 @@ export type SendSessionReadyNotificationResult = z.infer<
   typeof sendSessionReadyNotificationOutputSchema
 >;
 
+// ── sendSessionAttentionNotification ────────────────────────────────
+
+/**
+ * Transport-neutral notification intent for actionable human waits on
+ * Cloud Agent / remote CLI sessions. The notifications service uses this
+ * to render fixed, lock-screen-safe copy and to look up exact-session
+ * presence before dispatching the push.
+ *
+ * The producer never supplies a body or title — copy is determined by
+ * `reason` and must not include prompt text, permission metadata, command
+ * args, paths, auth details, or arbitrary upstream messages.
+ */
+export const sessionAttentionReasonSchema = z.enum([
+  'question',
+  'permission',
+  'blocking_suggestion',
+  'action_required',
+]);
+export type SessionAttentionReason = z.infer<typeof sessionAttentionReasonSchema>;
+
+export const sendSessionAttentionNotificationInputSchema = z.object({
+  userId: z.string().min(1),
+  cliSessionId: z.string().min(1),
+  requestId: z.string().min(1),
+  reason: sessionAttentionReasonSchema,
+});
+export type SendSessionAttentionNotificationParams = z.infer<
+  typeof sendSessionAttentionNotificationInputSchema
+>;
+
+export const sendSessionAttentionNotificationOutputSchema = z.object({
+  dispatched: z.boolean(),
+  reason: z.enum(['missing_session', 'dispatch_failed', 'suppressed_presence']).optional(),
+});
+export type SendSessionAttentionNotificationResult = z.infer<
+  typeof sendSessionAttentionNotificationOutputSchema
+>;
+
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
 export const dispatchPushInputSchema = z.object({

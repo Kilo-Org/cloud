@@ -17,6 +17,8 @@ import {
   type DispatchPushOutcome,
   type SendCloudAgentSessionNotificationParams,
   type SendCloudAgentSessionNotificationResult,
+  type SendSessionAttentionNotificationParams,
+  type SendSessionAttentionNotificationResult,
   type SendSessionReadyNotificationParams,
   type SendSessionReadyNotificationResult,
   type SendInstanceLifecycleNotificationParams,
@@ -31,6 +33,7 @@ import {
 import { authMiddleware, type AuthContext } from './auth';
 import {
   dispatchCloudAgentSessionPush,
+  dispatchSessionAttentionPush,
   dispatchSessionReadyPush,
   type DispatchCloudAgentSessionPushDeps,
 } from './lib/cloud-agent-session-push';
@@ -235,6 +238,12 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     params: SendSessionReadyNotificationParams
   ): Promise<SendSessionReadyNotificationResult> {
     return dispatchSessionReadyPush(params, this.cloudAgentSessionPushDeps());
+  }
+
+  async sendSessionAttentionNotification(
+    params: SendSessionAttentionNotificationParams
+  ): Promise<SendSessionAttentionNotificationResult> {
+    return dispatchSessionAttentionPush(params, this.cloudAgentSessionPushDeps());
   }
 
   private cloudAgentSessionPushDeps(): DispatchCloudAgentSessionPushDeps {

@@ -7,6 +7,8 @@
  */
 
 import type {
+  SendSessionAttentionNotificationParams,
+  SendSessionAttentionNotificationResult,
   SendSessionReadyNotificationParams,
   SendSessionReadyNotificationResult,
 } from '@kilocode/notifications';
@@ -15,4 +17,7 @@ export type NotificationsBinding = Fetcher & {
   sendSessionReadyNotification(
     params: SendSessionReadyNotificationParams
   ): Promise<SendSessionReadyNotificationResult>;
+  sendSessionAttentionNotification(
+    params: SendSessionAttentionNotificationParams
+  ): Promise<SendSessionAttentionNotificationResult>;
 };

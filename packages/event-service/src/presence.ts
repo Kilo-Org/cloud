@@ -19,3 +19,13 @@ export const presenceContextForInstance = (sandboxId: string) =>
 
 export const presenceContextForConversation = (sandboxId: string, conversationId: string) =>
   `/presence${kiloclawConversationContext(sandboxId, conversationId)}` as const;
+
+/**
+ * Exact-session presence context for Cloud Agent / remote CLI sessions.
+ * Subscribed while the user is actively viewing the matching session, so
+ * notifications routed through this context are suppressed only when the
+ * user is on that specific session (not any other session). The
+ * notifications pipeline queries it via event-service.isUserInContext.
+ */
+export const presenceContextForAgentSession = (cliSessionId: string) =>
+  `/presence/agent-session/${cliSessionId}` as const;

@@ -21,6 +21,7 @@ import { logger } from '../logger.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
+import { scheduleCloudAgentAttention } from './cloud-agent-attention-scheduler.js';
 import {
   createExecutionQueries,
   createEventQueries,
@@ -824,6 +825,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             params.kind === 'failed'
               ? { ...params, failureStage: 'agent_activity', failureCode: 'assistant_error' }
               : params
+          );
+        },
+        // Synchronous waitUntil ownership: the ingest callback runs on the
+        // WS request path, so we hand any external IO to ctx.waitUntil and
+        // resolve immediately. Duplicates replay each time; the outbox
+        // downstream of recordCloudAgentSessionAttention owns dedup.
+        onAttentionEvent: event => {
+          scheduleCloudAgentAttention(
+            this.ctx,
+            {
+              sessionId: this.sessionId,
+              getMetadata: () => this.getMetadata(),
+              env: this.env,
+            },
+            event
           );
         },
       };

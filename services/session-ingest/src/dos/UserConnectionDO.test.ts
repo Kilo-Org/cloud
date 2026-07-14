@@ -12,6 +12,14 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
+// Mock withDORetry to a no-retry pass-through so attention recording tests do
+// not exercise backoff or internal worker-utils logging.
+vi.mock('@kilocode/worker-utils', () => ({
+  withDORetry: vi.fn(async <T, R>(getStub: () => T, operation: (stub: T) => Promise<R>) =>
+    operation(getStub())
+  ),
+}));
+
 import { MAX_CATALOG_RESULT_BYTES, UserConnectionDO } from './UserConnectionDO';
 
 // ---------------------------------------------------------------------------
@@ -153,7 +161,11 @@ function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): M
   return server;
 }
 
-function connectCliSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
+function connectCliSocket(
+  doInstance: UserConnectionDO,
+  connectionId: string,
+  kiloUserId?: string
+): MockWS {
   const client = createMockWs();
   const server = createMockWs();
   vi.stubGlobal(
@@ -170,8 +182,11 @@ function connectCliSocket(doInstance: UserConnectionDO, connectionId: string): M
     }
   );
 
+  const url = new URL(`http://local/cli?connectionId=${connectionId}`);
+  if (kiloUserId) url.searchParams.set('kiloUserId', kiloUserId);
+
   doInstance.fetch(
-    new Request(`http://local/cli?connectionId=${connectionId}`, {
+    new Request(url.toString(), {
       headers: { Upgrade: 'websocket' },
     })
   );
@@ -182,9 +197,11 @@ function connectCliSocket(doInstance: UserConnectionDO, connectionId: string): M
 function addCliSocket(
   mockCtx: ReturnType<typeof createMockCtx>,
   connectionId: string,
-  sessions: Array<{ id: string; status: string; title: string }> = []
+  sessions: Array<{ id: string; status: string; title: string }> = [],
+  kiloUserId?: string
 ): MockWS {
-  const attachment = { role: 'cli' as const, connectionId, sessions };
+  const attachment: Record<string, unknown> = { role: 'cli', connectionId, sessions };
+  if (kiloUserId) attachment.kiloUserId = kiloUserId;
   const ws = createMockWs(['cli'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -2239,6 +2256,247 @@ describe('UserConnectionDO', () => {
       );
 
       expect(server.deserializeAttachment()).toMatchObject({ role: 'cli', kiloUserId: 'usr_1' });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Attention outbox relay
+  // -------------------------------------------------------------------------
+
+  describe('attention outbox relay', () => {
+    function setupWithAttentionDO() {
+      const mockCtx = createMockCtx();
+      const ctx = mockCtx.build();
+      const recordAttentionEvent = vi.fn();
+      const env = {
+        SESSION_INGEST_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => ({ recordAttentionEvent })),
+        },
+      };
+      const doInstance = new UserConnectionDO(ctx as never, env as never);
+      return { doInstance, mockCtx, ctx, recordAttentionEvent };
+    }
+
+    function sendCliEvent(
+      doInstance: UserConnectionDO,
+      cliWs: MockWS,
+      opts: { sessionId: string; parentSessionId?: string; event: string; data: unknown }
+    ) {
+      doInstance.webSocketMessage(cliWs as never, JSON.stringify({ type: 'event', ...opts }));
+    }
+
+    it('records a root question raise even with no web subscribers', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: { id: 'q_1' },
+      });
+
+      expect(recordAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(recordAttentionEvent).toHaveBeenCalledWith({
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        requestId: 'q_1',
+        intent: { kind: 'raise', reason: 'question' },
+      });
+    });
+
+    it('records a root permission raise even with no web subscribers', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'permission.asked',
+        data: { requestId: 'p_1' },
+      });
+
+      expect(recordAttentionEvent).toHaveBeenCalledWith({
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        requestId: 'p_1',
+        intent: { kind: 'raise', reason: 'permission' },
+      });
+    });
+
+    it('records a root blocking suggestion raise even with no web subscribers', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'suggestion.shown',
+        data: { id: 's_1', blocking: true },
+      });
+
+      expect(recordAttentionEvent).toHaveBeenCalledWith({
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        requestId: 's_1',
+        intent: { kind: 'raise', reason: 'blocking_suggestion' },
+      });
+    });
+
+    it.each([
+      ['question.replied', 'q_1'],
+      ['question.rejected', 'q_1'],
+      ['permission.replied', 'p_1'],
+      ['suggestion.accepted', 's_1'],
+      ['suggestion.dismissed', 's_1'],
+    ] as const)('resolves a %s event', (event, requestId) => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event,
+        data: { id: requestId },
+      });
+
+      expect(recordAttentionEvent).toHaveBeenCalledWith({
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        requestId,
+        intent: { kind: 'resolve' },
+      });
+    });
+
+    it.each([
+      ['nonblocking suggestion', 'suggestion.shown', { id: 's_1', blocking: false }],
+      ['missing request id', 'question.asked', {}],
+      ['network event', 'session.network.asked', { id: 'nw_1' }],
+      ['retry event', 'session.retry', { id: 'r_1' }],
+      ['action_required event', 'action_required', { id: 'ar_1' }],
+    ] as const)('skips a %s', (_label, event, data) => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event,
+        data,
+      });
+
+      expect(recordAttentionEvent).not.toHaveBeenCalled();
+    });
+
+    it('skips child events and still relays them to subscribers', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1', ['child_1']);
+
+      const eventData = { id: 'q_1', properties: { question: 'what?' } };
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'child_1',
+        parentSessionId: 'parent_1',
+        event: 'question.asked',
+        data: eventData,
+      });
+
+      expect(recordAttentionEvent).not.toHaveBeenCalled();
+      expect(parseSent(webWs)).toEqual({
+        type: 'event',
+        sessionId: 'child_1',
+        parentSessionId: 'parent_1',
+        event: 'question.asked',
+        data: eventData,
+      });
+    });
+
+    it('skips recording when the CLI attachment has no kiloUserId', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1', ['ses_1']);
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: { id: 'q_1' },
+      });
+
+      expect(recordAttentionEvent).not.toHaveBeenCalled();
+      expect(parseSent(webWs)).toMatchObject({ event: 'question.asked' });
+    });
+
+    it('relays the exact event and data to web subscribers', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1', ['ses_1']);
+
+      const eventData = { id: 'q_1', nested: { value: 'keep-me' } };
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: eventData,
+      });
+
+      expect(recordAttentionEvent).toHaveBeenCalled();
+      expect(parseSent(webWs)).toEqual({
+        type: 'event',
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: eventData,
+      });
+    });
+
+    it('does not block relay when recording rejects', () => {
+      const { doInstance, mockCtx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1', ['ses_1']);
+      recordAttentionEvent.mockRejectedValue(new Error('outbox failure'));
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: { id: 'q_1' },
+      });
+
+      expect(parseSent(webWs)).toMatchObject({ event: 'question.asked' });
+    });
+
+    it('logs recording failures without request id, payload, or error', async () => {
+      const { doInstance, mockCtx, ctx, recordAttentionEvent } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1', ['ses_1']);
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      recordAttentionEvent.mockRejectedValue(new Error('secret-outbox-error'));
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: { id: 'q_1', body: 'secret-payload' },
+      });
+
+      const waitUntilPromise = ctx.waitUntil.mock.calls[0][0] as Promise<void>;
+      await waitUntilPromise;
+
+      const errorCall = errorSpy.mock.calls.find(
+        call => call[0] === 'Failed to record attention event (non-fatal)'
+      );
+      expect(errorCall).toBeDefined();
+      const loggedArgs = JSON.stringify(errorCall);
+      expect(loggedArgs).not.toContain('q_1');
+      expect(loggedArgs).not.toContain('secret-payload');
+      expect(loggedArgs).not.toContain('secret-outbox-error');
+      expect(parseSent(webWs)).toMatchObject({ event: 'question.asked' });
+    });
+
+    it('schedules attention recording via waitUntil', () => {
+      const { doInstance, mockCtx, ctx } = setupWithAttentionDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], 'usr_1');
+      ctx.waitUntil.mockClear();
+
+      sendCliEvent(doInstance, cliWs, {
+        sessionId: 'ses_1',
+        event: 'question.asked',
+        data: { id: 'q_1' },
+      });
+
+      expect(ctx.waitUntil).toHaveBeenCalledTimes(1);
     });
   });
 });

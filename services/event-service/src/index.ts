@@ -25,11 +25,14 @@ function allowedOrigin(origin: string, env: { WORKER_ENV?: string }): string | n
   return null;
 }
 
-app.use('/connect/*', cors({ origin: (origin, c) => allowedOrigin(origin, c.env) }));
+app.use(
+  '/connect/*',
+  cors({ origin: (origin, c) => allowedOrigin(origin, c.env as Pick<Env, 'WORKER_ENV'>) })
+);
 app.use(
   '/connect-ticket',
   cors({
-    origin: (origin, c) => allowedOrigin(origin, c.env),
+    origin: (origin, c) => allowedOrigin(origin, c.env as Pick<Env, 'WORKER_ENV'>),
     allowMethods: ['POST', 'OPTIONS'],
     allowHeaders: ['Authorization'],
   })

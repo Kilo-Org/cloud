@@ -4,6 +4,7 @@
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
+import { parseCreateSessionResponse } from './create-session';
 import {
   cliConnectionDataSchema,
   heartbeatDataSchema,
@@ -702,6 +703,35 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // `discoverCommands` itself deduplicates in-flight requests per
         // owner, so duplicate retry calls collapse safely.
         if (ownerConnectionId) discoverCommands(ownerConnectionId);
+      },
+      createSession: async () => {
+        // `create_session` is connection-scoped: it must use the owner we
+        // currently trust, snapshot it before the await (the owner can be
+        // cleared by a `cli.disconnected` race), and never auto-retry — a
+        // transient network failure is a hard reject so the caller can
+        // surface a retryable error.
+        const expectedOwnerConnectionId = ownerConnectionId;
+        if (!expectedOwnerConnectionId) {
+          throw new Error('Remote session has no connected owner');
+        }
+
+        try {
+          const result = await config.userWebConnection.sendCommandToConnection({
+            command: 'create_session',
+            data: { protocolVersion: 1 },
+            expectedConnectionId: expectedOwnerConnectionId,
+          });
+          const parsed = parseCreateSessionResponse(result);
+          if (!parsed.ok) {
+            throw new Error('Invalid create_session response');
+          }
+          return parsed.kiloSessionId;
+        } catch (error) {
+          if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
+            setOwnerConnectionId(null);
+          }
+          throw error;
+        }
       },
       send: async (input: TransportSendInput) => {
         if (input.payload.type === 'command') {

@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
+import type { KiloSessionId } from './types';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -463,6 +464,30 @@ export const cliConnectionDataSchema = z.object({
   connectionId: z.string(),
 });
 export type CliConnectionData = z.infer<typeof cliConnectionDataSchema>;
+
+export const kiloSessionIdSchema = z
+  .string()
+  .startsWith('ses_')
+  .length(30)
+  .transform(id => id as KiloSessionId);
+export type KiloSessionIdInput = z.input<typeof kiloSessionIdSchema>;
+
+/**
+ * Strict create-session response (protocol v1).
+ *
+ * `create_session` is a connection-scoped viewer command (no `sessionId` on
+ * the wire) whose only valid success body is exactly this shape. Anything
+ * else — extra fields, missing fields, the wrong protocol version, or an
+ * invalid `sessionID` — is rejected; the relay is the source of truth for
+ * this envelope and any drift should fail closed.
+ */
+export const createSessionResponseV1Schema = z
+  .object({
+    protocolVersion: z.literal(1),
+    sessionID: kiloSessionIdSchema,
+  })
+  .strict();
+export type CreateSessionResponseV1 = z.infer<typeof createSessionResponseV1Schema>;
 
 // ---------------------------------------------------------------------------
 // V2 session system events

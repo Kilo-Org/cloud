@@ -7,7 +7,7 @@
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
-import type { CloudAgentSessionId } from './types';
+import type { CloudAgentSessionId, KiloSessionId } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
 type CloudAgentStreamTicket = {
@@ -81,6 +81,15 @@ type Transport = {
   retryRemoteModels?: () => void;
   /** Re-discover the remote slash command catalog for the current owner. No-op when no owner is known or a request is already in flight. */
   retryRemoteCommands?: () => void;
+  /**
+   * Ask the currently connected CLI owner to create a new remote session and
+   * return its branded `KiloSessionId`. Connection-scoped: there is no
+   * sessionId to thread yet. The relay maps the request to the active CLI
+   * via the wire `connectionId`. Implementations must not auto-retry: a
+   * network failure is a hard reject so the caller can surface a retryable
+   * error. The caller does NOT switch the active session as a side effect.
+   */
+  createSession?: () => Promise<KiloSessionId>;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;

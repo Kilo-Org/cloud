@@ -7,7 +7,8 @@
 import { createTestSession, kiloId } from './test-helpers';
 import { createCloudAgentSession } from './session';
 import type { RemoteModelState } from './remote-model-catalog';
-import type { UserWebSystemEvent } from './user-web-connection';
+import type { KiloSessionId } from './types';
+import { UserWebCommandError, type UserWebSystemEvent } from './user-web-connection';
 import {
   createEventHelpers,
   sessionInfo,
@@ -382,6 +383,7 @@ describe('remote session transport state', () => {
           truncated: false,
         })
       ),
+      sendCommandToConnection: jest.fn(),
       onCliEvent: jest.fn(() => jest.fn()),
       onSystemEvent: jest.fn((listener: (event: UserWebSystemEvent) => void) => {
         systemListener = listener;
@@ -427,6 +429,148 @@ describe('remote session transport state', () => {
       catalog: { protocolVersion: 1, providers: [], truncated: false },
       refresh: 'idle',
     });
+    session.destroy();
+  });
+});
+
+describe('remote session create and retry commands', () => {
+  const REMOTE_CREATED_SESSION_ID = 'ses_12345678901234567890123456';
+
+  function createRemoteSessionFixture() {
+    let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
+    const userWebConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      destroy: jest.fn(),
+      subscribeToCliSession: jest.fn(() => jest.fn()),
+      sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?]>(() =>
+        Promise.resolve({
+          all: [],
+          default: {},
+          connected: [],
+          failed: [],
+          protocolVersion: 1,
+          truncated: false,
+        })
+      ),
+      sendCommandToConnection: jest.fn(),
+      onCliEvent: jest.fn(() => jest.fn()),
+      onSystemEvent: jest.fn((listener: (event: UserWebSystemEvent) => void) => {
+        systemListener = listener;
+        return jest.fn();
+      }),
+      onReconnect: jest.fn(() => jest.fn()),
+      onSessionEvent: jest.fn(() => jest.fn()),
+    };
+    const kiloSessionId = kiloId('ses-remote');
+    const session = createCloudAgentSession({
+      kiloSessionId,
+      resolveSession: () => Promise.resolve({ type: 'remote', kiloSessionId }),
+      transport: { userWebConnection },
+    });
+
+    return { userWebConnection, session, systemListener: () => systemListener };
+  }
+
+  function emitOwner(
+    systemListener: ((event: UserWebSystemEvent) => void) | undefined,
+    kiloSessionId: KiloSessionId
+  ): void {
+    systemListener?.({
+      event: 'sessions.list',
+      data: {
+        sessions: [{ id: kiloSessionId, status: 'active', title: 'Remote', connectionId: 'owner' }],
+      },
+    });
+  }
+
+  it('createRemoteSession returns the KiloSessionId from the remote transport', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+    jest
+      .mocked(userWebConnection.sendCommandToConnection)
+      .mockResolvedValue({ protocolVersion: 1, sessionID: REMOTE_CREATED_SESSION_ID });
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const result = await session.createRemoteSession();
+    expect(result).toBe(REMOTE_CREATED_SESSION_ID);
+    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'owner',
+    });
+    session.destroy();
+  });
+
+  it('createRemoteSession propagates an actionable UserWebCommandError', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+    jest.mocked(userWebConnection.sendCommandToConnection).mockRejectedValue(
+      new UserWebCommandError({
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
+      })
+    );
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(session.createRemoteSession()).rejects.toEqual(
+      expect.objectContaining({
+        name: 'UserWebCommandError',
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
+      })
+    );
+    session.destroy();
+  });
+
+  it('retryRemoteCommands delegates to the remote transport', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+    let commandRequest = 0;
+    jest.mocked(userWebConnection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') {
+        return Promise.resolve({
+          all: [],
+          default: {},
+          connected: [],
+          failed: [],
+          protocolVersion: 1,
+          truncated: false,
+        });
+      }
+      commandRequest += 1;
+      return commandRequest === 1
+        ? Promise.resolve({ protocolVersion: 1, commands: [] })
+        : Promise.resolve({ protocolVersion: 1, commands: [{ name: 'review', hints: [] }] });
+    });
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const initialListCommands = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'list_commands').length;
+
+    session.retryRemoteCommands();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_commands')
+    ).toHaveLength(initialListCommands + 1);
     session.destroy();
   });
 });

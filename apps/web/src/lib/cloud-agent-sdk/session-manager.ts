@@ -9,9 +9,10 @@ import type {
   RemoteModelOverride,
   RemoteModelState,
 } from './remote-model-catalog';
+import type { RemoteCommandState } from './remote-command-catalog';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
-import { createCloudAgentSession } from './session';
+import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
 import type { CloudAgentSession } from './session';
 import { createChatProcessor } from './chat-processor';
 import { createJotaiStorage } from './storage/jotai';
@@ -99,6 +100,12 @@ const EMPTY_REMOTE_MODEL_STATE = {
   refresh: 'idle',
 } satisfies RemoteModelState;
 
+const EMPTY_REMOTE_COMMAND_STATE = {
+  ownerConnectionId: null,
+  refresh: 'idle',
+  commands: [],
+} satisfies RemoteCommandState;
+
 type AssociatedPrData = {
   url: string;
   number: number;
@@ -183,6 +190,7 @@ type SessionManagerAtoms = {
   supportsAttachments: W<boolean>;
   activeSessionType: W<ActiveSessionType | null>;
   remoteModelState: W<RemoteModelState>;
+  remoteCommandState: W<RemoteCommandState>;
   observedModel: W<ModelSelection | null>;
   remoteModelOverride: W<RemoteModelOverride | null>;
   canSend: W<boolean>;
@@ -227,6 +235,8 @@ type SessionManager = {
   }): Promise<boolean>;
   setRemoteModelOverride(override: RemoteModelOverride | null): void;
   retryRemoteModels(): void;
+  retryRemoteCommands(): void;
+  createRemoteSession(): Promise<KiloSessionId>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -359,6 +369,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const supportsAttachmentsAtom = atom(false);
   const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
   const remoteModelStateAtom = atom<RemoteModelState>(EMPTY_REMOTE_MODEL_STATE);
+  const remoteCommandStateAtom = atom<RemoteCommandState>(EMPTY_REMOTE_COMMAND_STATE);
   const observedModelAtom = atom<ModelSelection | null>(null);
   const remoteModelOverrideAtom = atom<RemoteModelOverride | null>(null);
   const canSendAtom = atom(false);
@@ -478,6 +489,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(supportsAttachmentsAtom, false);
     store.set(activeSessionTypeAtom, null);
     store.set(remoteModelStateAtom, EMPTY_REMOTE_MODEL_STATE);
+    store.set(remoteCommandStateAtom, EMPTY_REMOTE_COMMAND_STATE);
     store.set(observedModelAtom, null);
     observedModelSource = null;
     remoteHistoryReplaying = true;
@@ -886,10 +898,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         updateCapabilityAtoms(session);
       },
       onRemoteModelStateChange: handleRemoteModelStateChange,
+      onRemoteCommandStateChange: state => {
+        if (expectedGeneration !== switchGeneration) return;
+        store.set(remoteCommandStateAtom, state);
+      },
       onTransportCapabilityChange: () => {
+        if (expectedGeneration !== switchGeneration) return;
         if (currentSession === session) updateCapabilityAtoms(session);
       },
       onReplayComplete: () => {
+        if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
       },
 
@@ -910,6 +928,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         setIndicator({ type: 'error', message, timestamp: Date.now() });
       },
       onEvent: event => {
+        if (expectedGeneration !== switchGeneration) return;
         if (event.type === 'commands.available') {
           // Replace the catalog wholesale. The DO sends the full list on
           // every connect, so we never need to merge incrementally.
@@ -1142,6 +1161,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.retryRemoteModels();
   }
 
+  function retryRemoteCommands(): void {
+    currentSession?.retryRemoteCommands();
+  }
+
+  async function createRemoteSession(): Promise<KiloSessionId> {
+    if (!currentSession || activeSessionType !== 'remote') {
+      throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
+    }
+    return currentSession.createRemoteSession();
+  }
+
   function destroy(): void {
     childSessionHydrationGeneration += 1;
     childSessionHydrationRequests.clear();
@@ -1165,6 +1195,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     send,
     setRemoteModelOverride,
     retryRemoteModels,
+    retryRemoteCommands,
+    createRemoteSession,
     interrupt,
     answerQuestion,
     rejectQuestion,
@@ -1184,6 +1216,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       supportsAttachments: supportsAttachmentsAtom,
       activeSessionType: activeSessionTypeAtom,
       remoteModelState: remoteModelStateAtom,
+      remoteCommandState: remoteCommandStateAtom,
       observedModel: observedModelAtom,
       remoteModelOverride: remoteModelOverrideAtom,
       canSend: canSendAtom,

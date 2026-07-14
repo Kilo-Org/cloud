@@ -11,6 +11,7 @@ import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
 import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
+import type { RemoteCommandState } from './remote-command-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
@@ -39,6 +40,9 @@ import type {
   SessionSnapshot,
 } from './types';
 
+const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
+  'Remote session creation is not supported for the current session';
+
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
@@ -66,6 +70,7 @@ type CloudAgentSessionConfig = {
   onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
@@ -145,6 +150,8 @@ type CloudAgentSession = {
     payload: CloudAgentSessionDismissSuggestionInput
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
+  retryRemoteCommands: () => void;
+  createRemoteSession: () => Promise<KiloSessionId>;
 
   // Capability checks
   canSend: boolean;
@@ -259,6 +266,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           fetchSnapshot: config.transport.fetchSnapshot,
           onError: config.onError,
           onRemoteModelStateChange: config.onRemoteModelStateChange,
+          onRemoteCommandStateChange: config.onRemoteCommandStateChange,
           onCapabilityChange: config.onTransportCapabilityChange,
         });
       }
@@ -421,6 +429,15 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     retryRemoteModels() {
       transport?.retryRemoteModels?.();
     },
+    retryRemoteCommands() {
+      transport?.retryRemoteCommands?.();
+    },
+    createRemoteSession: async () => {
+      if (!transport?.createSession) {
+        throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
+      }
+      return transport.createSession();
+    },
     get canSend() {
       return transport?.send !== undefined && (transport.canSend?.() ?? true);
     },
@@ -453,7 +470,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   };
 }
 
-export { createCloudAgentSession };
+export { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED };
 export type {
   CloudAgentSession,
   CloudAgentSessionAcceptSuggestionInput,

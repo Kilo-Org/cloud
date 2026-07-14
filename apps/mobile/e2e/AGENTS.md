@@ -133,6 +133,8 @@ brew install maestro
 
 For MCP use stdio command `maestro mcp`, then restart the agent session so its tools appear. Inspect the screen before selecting elements and re-inspect after UI changes. Never guess a selector from the visible label or screenshot: copy the exact `txt` or `a11y` value from `maestro_inspect_screen`, mapping `a11y` to Maestro `text:`. Maestro text matching is full-string regex, not substring matching.
 
+Use Maestro as the primary iOS automation driver. Fall back to `xcrun simctl` only when Maestro cannot inspect or operate a native state, or when low-level simulator control is required. iOS setup still uses `simctl` for boot, install/uninstall, dev-client URL reconnection, screenshots, shutdown, and cleanup.
+
 Tab buttons are exposed through React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels are `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, and `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before using these examples because tab count or labels can change.
 
 CLI fallback:

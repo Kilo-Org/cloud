@@ -101,6 +101,15 @@ test('Android workflow uses Maestro first and applies resolved tooling to Expo b
   assert.match(runbook, /Fall back to repository-wrapped ADB/);
 });
 
+test('iOS workflow uses Maestro first with simctl as the low-level fallback', () => {
+  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
+
+  assert.match(runbook, /Use Maestro as the primary iOS automation driver/);
+  assert.match(runbook, /Fall back to `xcrun simctl`/);
+  assert.match(verifier, /Fall back to `xcrun simctl` on iOS/);
+});
+
 test('Android tooling rejects a non-Java-17 JAVA_HOME', async () => {
   const { resolveAndroidEnvironment } = await import('./mobile-android');
   assert.throws(

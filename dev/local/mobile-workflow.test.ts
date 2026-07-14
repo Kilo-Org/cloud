@@ -28,7 +28,10 @@ test('shared launch flows close the Expo developer menu after its introduction',
   ]) {
     const flow = fs.readFileSync(flowPath, 'utf8');
     const continueIndex = flow.indexOf("tapOn: 'Continue'");
-    const closeGuardIndex = flow.indexOf("visible: 'Fast Refresh|Element Inspector'", continueIndex);
+    const closeGuardIndex = flow.indexOf(
+      "visible: 'Fast Refresh|Element Inspector'",
+      continueIndex
+    );
     const closeIndex = flow.indexOf("tapOn: 'Close'", closeGuardIndex);
 
     assert.ok(continueIndex >= 0, `${flowPath} should accept the developer-menu introduction`);

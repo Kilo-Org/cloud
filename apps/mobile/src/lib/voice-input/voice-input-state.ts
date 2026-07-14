@@ -22,7 +22,7 @@ type VoiceInputPermission = {
   restricted?: boolean;
 };
 
-type VoiceInputLifecycleInput = {
+export type VoiceInputLifecycleInput = {
   appState: 'active' | 'background' | 'inactive';
   disabled: boolean;
 };
@@ -50,9 +50,8 @@ export function applyVoiceRecognitionResult(
   const normalized = normalizeSegment(result.transcript);
 
   if (result.isFinal) {
-    const finalSegments = normalized.length === 0
-      ? state.finalSegments
-      : [...state.finalSegments, normalized];
+    const finalSegments =
+      normalized.length === 0 ? state.finalSegments : [...state.finalSegments, normalized];
     return {
       finalSegments,
       interim: '',

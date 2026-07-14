@@ -1,6 +1,4 @@
-import {
-  type ExpoSpeechRecognitionResultEvent,
-} from 'expo-speech-recognition';
+import { type ExpoSpeechRecognitionResultEvent } from 'expo-speech-recognition';
 
 import {
   classifyVoiceInputError,
@@ -92,8 +90,18 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
   let session: VoiceInputSession | null = null;
   const lifecycle: Lifecycle = { disposed: false };
 
+  let snapshot: VoiceInputControllerSnapshot = { availability, owner, status };
+
   const notify = (): void => {
-    const snapshot: VoiceInputControllerSnapshot = { availability, owner, status };
+    const next: VoiceInputControllerSnapshot = { availability, owner, status };
+    if (
+      next.availability === snapshot.availability &&
+      next.owner === snapshot.owner &&
+      next.status === snapshot.status
+    ) {
+      return;
+    }
+    snapshot = next;
     for (const subscriber of subscribers) {
       subscriber(snapshot);
     }
@@ -301,7 +309,7 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
   return {
     abort,
     dispose,
-    getSnapshot: () => ({ availability, owner, status }),
+    getSnapshot: () => snapshot,
     start,
     stop,
     subscribe,

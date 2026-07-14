@@ -32,11 +32,11 @@ import {
   canSubmitMessageInputContent,
   clearSubmittedMessageInputDraft,
   isMessageInputOverLimit,
-  settleVoiceInputBeforeSubmit,
   shouldShowMessageInputCounter,
   submitMessageInputDraft,
 } from './message-input-state';
 import { MessageInputView } from './message-input-view';
+import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 const MESSAGE_INPUT_FOCUS_RESTORE_DELAY_MS = 100;
 const EMPTY_READY_ATTACHMENT_BLOCKS: readonly AttachmentBlock[] = [];
@@ -99,8 +99,7 @@ export function MessageInputContent({
   const controlsDisabled = disabled === true || submitDisabled === true;
   const showAttachmentButton =
     attachmentQueue !== null && hasAttachmentsCapability && isEditing !== true && disabled !== true;
-  const voiceDisabled =
-    disabled === true || hasUploadingAttachment || isEditing === true;
+  const voiceDisabled = disabled === true || hasUploadingAttachment || isEditing === true;
   const inputMeasure = useTextHeight({
     minHeight: MESSAGE_INPUT_MIN_HEIGHT,
     maxHeight: MESSAGE_INPUT_MAX_HEIGHT,

@@ -85,29 +85,6 @@ export function clearSubmittedMessageInputDraft({
   return cleared;
 }
 
-/**
- * Awaits a voice-input settle callback (e.g. waiting for the final transcript of
- * an in-flight listening session) and only invokes `submit` when settle resolves
- * truthy. Returning `false` from settle aborts the submit so the caller can
- * surface controller-reported feedback. The helper intentionally does not
- * swallow rejections: a throw from settle is treated as a programmer or native
- * bridge bug and propagated to the caller, again without invoking submit.
- */
-export async function settleVoiceInputBeforeSubmit({
-  settleVoiceInput,
-  submit,
-}: {
-  settleVoiceInput: () => Promise<boolean>;
-  submit: () => void;
-}): Promise<boolean> {
-  const settled = await settleVoiceInput();
-  if (!settled) {
-    return false;
-  }
-  submit();
-  return true;
-}
-
 export function applyMessageInputTextChange({
   text,
   valueRef,

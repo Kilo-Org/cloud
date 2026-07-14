@@ -102,7 +102,7 @@ describe('isFreeModel', () => {
     test('registers Muse Spark 1.1 through Vercel', () => {
       expect(findKiloExclusiveModel('meta/muse-spark-1.1')).toBe(muse_spark_1_1_model);
       expect(muse_spark_1_1_model.gateway).toBe('vercel');
-      expect(getInferenceProvider(muse_spark_1_1_model)).toBeUndefined();
+      expect(getInferenceProvider(muse_spark_1_1_model)).toBeNull();
       expect(muse_spark_1_1_model.context_length).toBe(1_048_576);
       expect(muse_spark_1_1_model.pricing?.[0].pricing).toEqual({
         prompt_per_million: 1.25,

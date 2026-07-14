@@ -85,6 +85,14 @@ const config: ExpoConfig = {
         },
       },
     ],
+    [
+      'expo-speech-recognition',
+      {
+        microphonePermission: 'Allow Kilo to use your microphone to turn speech into text.',
+        speechRecognitionPermission:
+          'Allow Kilo to use speech recognition to turn your voice into text.',
+      },
+    ],
     'expo-router',
     'expo-image',
     'expo-font',

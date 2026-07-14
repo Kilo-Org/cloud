@@ -40,6 +40,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'liquid',
   'mancer',
   'mara',
+  'meta', // not yet on OpenRouter
   'minimax',
   'mistral',
   'modelrun',
@@ -180,6 +181,7 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'interfaze',
   'klingai',
   'meituan',
+  'meta',
   'morph',
   'nebius',
   'parasail',

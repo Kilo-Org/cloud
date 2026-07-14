@@ -34,6 +34,10 @@ Review against:
 - Correctness, regressions, error paths, security, and maintainability
 - Test quality and missing automated coverage
 - Cross-repository contract consistency
+- For every new user-facing feature: happy, retryable unhappy, non-retryable unhappy, and empty behavior
+- Meaningful state-specific messages; actionable CTAs for retryable and empty states; no CTA at all for non-retryable states
+- Explicit trigger/classification, message intent, CTA outcome or absence, and automated/E2E coverage for every state
+- Explicit orchestrator-accepted rationale showing that any `not applicable` state is structurally impossible, not merely inconvenient or difficult to test
 
 Inspect the actual diff and surrounding code. Run narrow read-only checks when useful, but do not dispatch subagents, commit, push, or create/update a pull request. Do not invent requirements beyond the accepted plan.
 

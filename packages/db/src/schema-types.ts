@@ -1327,13 +1327,16 @@ export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSche
 // Persisted OUTCOME of a council run, surfaced on the cloud UI job-runs screen (manual
 // council runs are not posted to a PR). This is the storage contract; the capture code
 // maps the parsed `kilo-code-review-council:v1` manifest + code-owned decision into it.
-export const CouncilResultFindingSchema = z.object({
+// Single source of truth for one council finding, shared by BOTH the parse contract
+// (the `kilo-code-review-council:v1` manifest in `@kilocode/worker-utils/code-review-council`)
+// and this storage contract, so their bounds cannot drift apart.
+export const CouncilFindingSchema = z.object({
   path: z.string().max(1024),
   line: z.number().int().nonnegative().nullable().optional(),
   severity: z.string().max(64),
   rationale: z.string().max(4000),
 });
-export type CouncilResultFinding = z.infer<typeof CouncilResultFindingSchema>;
+export type CouncilFinding = z.infer<typeof CouncilFindingSchema>;
 
 export const CouncilResultSpecialistSchema = z.object({
   id: z.string().max(64),
@@ -1344,7 +1347,7 @@ export const CouncilResultSpecialistSchema = z.object({
   thinkingEffort: z.string().max(50).nullable(),
   vote: CouncilVoteSchema,
   highestSeverity: z.string().max(64).nullable(),
-  findings: z.array(CouncilResultFindingSchema).max(200),
+  findings: z.array(CouncilFindingSchema).max(200),
 });
 export type CouncilResultSpecialist = z.infer<typeof CouncilResultSpecialistSchema>;
 

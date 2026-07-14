@@ -11,7 +11,15 @@
 # - See e2e/AGENTS.md ("Login / logout helper flows") for the full workflow.
 appId: com.kilocode.kiloapp
 ---
-- runFlow: open-app.yaml
+- runFlow:
+    when:
+      notVisible: 'Welcome to Kilo Code'
+    commands:
+      - runFlow:
+          when:
+            notVisible: 'HOME|Home, tab, 1 of 4'
+          commands:
+            - runFlow: settle-app.yaml
 # Booted into the consent gate (signed in, not consented) -> accept it to reach
 # Home, then sign out below.
 - runFlow:

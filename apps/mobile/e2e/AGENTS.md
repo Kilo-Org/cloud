@@ -97,7 +97,7 @@ apps/mobile/e2e/login.sh <udid> [email]  # default: e2e-mobile@example.com
 apps/mobile/e2e/logout.sh <udid>
 ```
 
-Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies it, accepts first-account consent, and asserts Home. It retries only the known dev-client launch/request boundary once. Login and logout share `flows/open-app.yaml`, which waits for late tracking and Expo developer-menu prompts before continuing.
+Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies it, accepts first-account consent, and asserts Home. It retries only the known dev-client launch/request boundary once. The wrappers use preflight to open the exact dev-client URL, then `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app. `flows/open-app.yaml` remains the standalone cold-launch flow.
 
 Native prompts are states in the flow, not errors to tap through blindly. The shared launch flow recognizes the iOS tracking prompt (`Allow “Kilo” to track your activity across other companies’ apps and websites?`) and chooses `Ask App Not to Track`; login handles notification permission after authentication. Feature-triggered prompts such as speech recognition and microphone access must be handled only when the acceptance flow reaches that feature: inspect the hierarchy, copy the exact button accessibility text (`Allow` or `Don’t Allow`), and choose the state required by the test. Never use a generic `tapOn: 'Allow'` before identifying which prompt is visible.
 

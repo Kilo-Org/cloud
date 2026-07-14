@@ -9,13 +9,14 @@ test('login waits for the delayed Expo developer menu after launching Kilo', () 
     "visible: 'This is the developer menu.*'",
     launchIndex
   );
+  const optionalWaitIndex = flow.lastIndexOf('- extendedWaitUntil:', developerMenuWaitIndex);
   const continueIndex = flow.indexOf("tapOn: 'Continue'", developerMenuWaitIndex);
 
   assert.ok(launchIndex >= 0);
   assert.ok(developerMenuWaitIndex > launchIndex);
   assert.ok(continueIndex > developerMenuWaitIndex);
-  assert.match(flow.slice(developerMenuWaitIndex - 80, continueIndex), /timeout: 15000/);
-  assert.match(flow.slice(developerMenuWaitIndex - 80, continueIndex), /optional: true/);
+  assert.match(flow.slice(optionalWaitIndex, continueIndex), /timeout: 2000/);
+  assert.match(flow.slice(optionalWaitIndex, continueIndex), /optional: true/);
 });
 
 test('login flows never use an unidentified generic Allow selector', () => {
@@ -26,9 +27,62 @@ test('login flows never use an unidentified generic Allow selector', () => {
   assert.match(openApp, /“Kilo” Would Like to Send You Notifications/);
 });
 
-test('login establishes a signed-out baseline before requesting a fresh OTP', () => {
+test('login verification does not pay a fixed optional notification wait', () => {
+  const verify = fs.readFileSync('apps/mobile/e2e/flows/login-verify-code.yaml', 'utf8');
+
+  assert.doesNotMatch(verify, /optional: true/);
+  assert.match(verify, /“Kilo” Would Like to Send You Notifications\|HOME/);
+});
+
+test('login request establishes a signed-out baseline before requesting a fresh OTP', () => {
+  const request = fs.readFileSync('apps/mobile/e2e/flows/login-request-code.yaml', 'utf8');
+  assert.ok(request.indexOf('logout.yaml') < request.indexOf("tapOn: 'Send sign-in code'"));
+});
+
+test('login reuses the app state established by logout instead of relaunching each step', () => {
+  const request = fs.readFileSync('apps/mobile/e2e/flows/login-request-code.yaml', 'utf8');
+  const verify = fs.readFileSync('apps/mobile/e2e/flows/login-verify-code.yaml', 'utf8');
   const login = fs.readFileSync('apps/mobile/e2e/login.sh', 'utf8');
-  assert.ok(login.indexOf('flows/logout.yaml') < login.indexOf('flows/login-request-code.yaml'));
+
+  assert.doesNotMatch(request, /open-app\.yaml/);
+  assert.doesNotMatch(verify, /open-app\.yaml/);
+  assert.doesNotMatch(login, /maestro .*logout\.yaml/);
+  assert.doesNotMatch(login, /login-assert-home\.yaml/);
+});
+
+test('login polls the local outbox without one-second latency', () => {
+  const login = fs.readFileSync('apps/mobile/e2e/login.sh', 'utf8');
+  assert.match(login, /sleep 0\.25/);
+});
+
+test('shared launch prompt grace periods total at most five seconds', () => {
+  const flow = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
+  const optionalWaits = [...flow.matchAll(/timeout: (\d+)\n\s+optional: true/g)].map(match =>
+    Number(match[1])
+  );
+
+  assert.equal(
+    optionalWaits.reduce((total, timeout) => total + timeout, 0),
+    5000
+  );
+});
+
+test('helper-driven logout settles the app already launched by preflight', () => {
+  const logout = fs.readFileSync('apps/mobile/e2e/flows/logout.yaml', 'utf8');
+  const settle = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
+
+  assert.match(logout, /settle-app\.yaml/);
+  assert.doesNotMatch(logout, /open-app\.yaml/);
+  assert.doesNotMatch(settle, /stopApp|text: 'Kilo'/);
+  assert.match(settle, /timeout: 3000/);
+});
+
+test('logout skips prompt settling for stable signed-in and signed-out states', () => {
+  const logout = fs.readFileSync('apps/mobile/e2e/flows/logout.yaml', 'utf8');
+  const settleIndex = logout.indexOf('settle-app.yaml');
+
+  assert.ok(logout.indexOf("notVisible: 'Welcome to Kilo Code'") < settleIndex);
+  assert.ok(logout.indexOf("notVisible: 'HOME|Home, tab, 1 of 4'") < settleIndex);
 });
 
 test('shared launch clears an already-visible tracking prompt before tapping the app icon', () => {

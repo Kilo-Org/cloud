@@ -1,8 +1,8 @@
 ---
-description: Verifies an approved mobile-app change end to end against local services, simulator, CLI, and related repositories
+description: Verifies an approved mobile change end to end
 mode: subagent
 model: kilo/kilo-auto/efficient
-steps: 60
+steps: 100
 permission:
   edit: deny
   external_directory: allow
@@ -21,12 +21,14 @@ Before testing:
 
 1. Read `apps/mobile/e2e/AGENTS.md` and all instructions it references.
 2. Translate the orchestrator's acceptance criteria into observable happy, retryable unhappy, non-retryable unhappy, and empty flows for every new user-facing feature.
-3. Record pre-existing services, simulators, and tmux sessions so cleanup only removes resources you create.
+3. Record pre-existing services, simulators, and tmux sessions so cleanup only removes resources you create. Claim a simulator with `pnpm dev:mobile:simulator claim`; never use one claimed by another worktree.
 
 During verification:
 
-- Verify the app is running the bundle and services from the intended worktree.
-- Inspect the current screen before selecting Maestro elements and re-inspect after UI changes.
+- Run the login/logout helper preflight rather than manually inferring bundle provenance, ports, or simulator ownership.
+- Run `pnpm dev:mobile:android doctor` before declaring Android tooling unavailable; do not rely on the inherited `PATH`.
+- Use Maestro as the primary driver on iOS and Android. Fall back to `xcrun simctl` on iOS or repository-wrapped ADB on Android only when Maestro cannot inspect or operate the state, or when low-level device control is required.
+- Inspect the current screen before selecting Maestro elements and re-inspect after UI changes. Copy exact hierarchy text; never infer selectors from screenshots or visible tab captions.
 - Exercise every applicable feature state that can be produced safely and deterministically. A skipped state requires an explicit rationale; do not silently omit it.
 - Confirm retryable and empty states show a meaningful message and actionable CTA, and that the CTA performs the expected recovery or next step.
 - Confirm non-retryable states show a meaningful message with no CTA at all.

@@ -19,6 +19,10 @@ const URL_KEY_TO_SERVICE = new Map<string, { service: string; protocol: 'http' |
 ]);
 
 type MobileEnvValues = ReadonlyMap<string, string>;
+type PreparedMobileEnvironment = {
+  appUrl: string;
+  sessionEnv: Record<string, string>;
+};
 
 function parseArgs(args: string[]): { host: string | undefined } {
   let host = process.env.MOBILE_DEV_HOST;
@@ -153,6 +157,54 @@ function writeRootEnv(repoRoot: string, host: string): void {
   fs.writeFileSync(envPath, upsertRootEnv(content, values), 'utf-8');
 }
 
+function getWorktreePaths(repoRoot: string): string[] {
+  const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  return output
+    .split('\n')
+    .filter(line => line.startsWith('worktree '))
+    .map(line => line.slice('worktree '.length));
+}
+
+function ensureRootEnv(repoRoot: string, worktreePaths?: string[]): void {
+  const envPath = path.join(repoRoot, ROOT_ENV_REL_PATH);
+  if (fs.existsSync(envPath)) return;
+
+  const primaryWorktree = (worktreePaths ?? getWorktreePaths(repoRoot))[0];
+  const sourcePath = primaryWorktree && path.join(primaryWorktree, ROOT_ENV_REL_PATH);
+  if (
+    sourcePath &&
+    path.resolve(primaryWorktree) !== path.resolve(repoRoot) &&
+    fs.existsSync(sourcePath)
+  ) {
+    fs.copyFileSync(sourcePath, envPath);
+    console.log(`Copied ${ROOT_ENV_REL_PATH} from primary worktree`);
+    return;
+  }
+
+  throw new Error(
+    `Missing ${ROOT_ENV_REL_PATH} in this worktree and the primary worktree. Run pnpm dev:worktree:prepare.`
+  );
+}
+
+function prepareMobileEnvironment(repoRoot: string, host: string): PreparedMobileEnvironment {
+  if (!isUsableIpv4(host)) {
+    throw new Error(`Invalid mobile development host: ${host}`);
+  }
+  ensureRootEnv(repoRoot);
+  writeMobileEnv(repoRoot, host);
+  writeRootEnv(repoRoot, host);
+
+  const mobileValues = buildMobileEnvValues(host);
+  const appUrl = serviceUrl(host, 'nextjs', 'http');
+  return {
+    appUrl,
+    sessionEnv: Object.fromEntries(mobileValues),
+  };
+}
+
 function findRepoRoot(): string {
   let dir = import.meta.dirname;
   for (let i = 0; i < 20; i++) {
@@ -182,10 +234,7 @@ function main(): void {
   }
 
   const repoRoot = findRepoRoot();
-  writeMobileEnv(repoRoot, host);
-  writeRootEnv(repoRoot, host);
-
-  const appUrl = serviceUrl(host, 'nextjs', 'http');
+  const { appUrl } = prepareMobileEnvironment(repoRoot, host);
   console.log(`Wrote ${MOBILE_ENV_REL_PATH}`);
   console.log(`Updated ${ROOT_ENV_REL_PATH} APP_URL_OVERRIDE and NEXTAUTH_URL`);
   console.log(`Mobile web/API base URL: ${appUrl}`);
@@ -206,4 +255,13 @@ if (isMain) {
   }
 }
 
-export { applyEnvValues, buildMobileEnvValues, detectLanIp, isUsableIpv4, upsertRootEnv };
+export {
+  applyEnvValues,
+  buildMobileEnvValues,
+  detectLanIp,
+  ensureRootEnv,
+  isUsableIpv4,
+  prepareMobileEnvironment,
+  upsertRootEnv,
+};
+export type { PreparedMobileEnvironment };

@@ -246,6 +246,22 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
     let backpressureSince: number | undefined;
     for await (const data of parseSseDataStream(response.body)) {
       if (closed || abortController.signal.aborted) break;
+
+      // Pre-parse size guard: skip JSON.parse + JSON.stringify on oversized
+      // SSE frames, which block the event loop for seconds on multi-MB
+      // payloads. data.length is a UTF-16 code-unit count (≤ UTF-8 byte
+      // length), so this is a safe lower-bound over-limit check.
+      if (data.length > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
+        logToFile(
+          JSON.stringify({
+            message: 'kilo_global_feed_event_dropped_oversized',
+            eventBytes: data.length,
+            limitBytes: MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES,
+          })
+        );
+        continue;
+      }
+
       let parsed: unknown;
       try {
         parsed = JSON.parse(data);

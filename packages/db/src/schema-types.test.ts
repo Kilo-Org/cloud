@@ -1,5 +1,30 @@
 import { describe, expect, it } from '@jest/globals';
-import { OrganizationSettingsSchema } from './schema-types';
+import { CodeReviewCouncilConfigSchema, OrganizationSettingsSchema } from './schema-types';
+
+describe('CodeReviewCouncilConfigSchema', () => {
+  const specialist = (id: string) => ({
+    id,
+    role: 'security' as const,
+    name: 'Security',
+    enabled: true,
+    required: false,
+    lens: 'security concerns',
+  });
+
+  it('accepts a council with unique specialist ids', () => {
+    const result = CodeReviewCouncilConfigSchema.safeParse({
+      specialists: [specialist('security'), specialist('performance')],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects duplicate specialist ids (a specialist must not vote twice)', () => {
+    const result = CodeReviewCouncilConfigSchema.safeParse({
+      specialists: [specialist('security'), specialist('security')],
+    });
+    expect(result.success).toBe(false);
+  });
+});
 
 describe('OrganizationSettingsSchema org_auto_model', () => {
   it('accepts bounded route maps and a fallback model', () => {

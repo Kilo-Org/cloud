@@ -6,7 +6,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Definitions
 
-**Coding Plan** - A recurring subscription product that grants a user access through Kilo to an upstream provider plan by installing its issued credential in the user's existing personal BYOK provider slot. A user's later BYOK changes do not alter Coding Plan billing.
+**Coding Plan** - A recurring subscription product that grants a user access through Kilo to an upstream provider plan by installing its issued credential in the user's existing personal BYOK provider slot.
 
 **Plan Catalog** - The set of Coding Plan offerings enabled by Kilo. The catalog is controlled by trusted application configuration and may contain one or more offerings.
 
@@ -16,7 +16,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 **Managed Plan Credential** - An upstream API key acquired or provisioned by Kilo for a Coding Plan. Kilo manages its assignment and revocation. It is paired with an Upstream Plan ID and is not exposed to the subscriber after it is installed in BYOK.
 
-**Installed BYOK Configuration** - A normal personal BYOK entry that Kilo initially populates with a Managed Plan Credential. While unchanged, it identifies the subscriber's MiniMax token plan as its origin and Kilo deletes it at Effective Cancellation. A subscriber may test, enable, disable, or update it using normal BYOK operations, but **MUST NOT** delete it directly while it remains Kilo-managed; it is removed by cancelling the plan in the Subscription Center. Replacing its credential transfers cleanup ownership to the subscriber and makes the resulting user-managed key deletable through normal BYOK operations.
+**Installed BYOK Configuration** - A read-only personal BYOK entry that Kilo populates with a Managed Plan Credential. It identifies the subscriber's MiniMax token plan as its origin, may be tested without changing its configuration, and is deleted by Kilo at Effective Cancellation. A subscriber **MUST NOT** update, enable, disable, or delete it through ordinary BYOK operations.
 
 **Availability Notification Intent** - A user's plan-scoped request to be notified when a sold-out Coding Plan has capacity again. It is not a reservation, purchase, subscription, or entitlement.
 
@@ -72,7 +72,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 3.4. On activation, Kilo **MUST** configure an Installed BYOK Configuration in the ordinary personal provider slot so eligible traffic can use the plan through the Kilo Gateway. Activation **MUST** fail without charge or assignment if that provider slot is occupied, including by a disabled key.
 
-3.5. While an Installed BYOK Configuration still contains Kilo's issued credential, user-facing BYOK surfaces **MUST** identify its Coding Plan origin. Ordinary BYOK test, enable/disable, and update operations **MUST** remain available. A direct delete of a Kilo-managed Installed BYOK Configuration **MUST** be rejected so a removed routing key cannot strand a still-billed subscription; the surface **MUST** direct the user to cancel the plan in the Subscription Center, which removes the configuration at Effective Cancellation. Before updating or disabling that configuration, Kilo **MUST** warn that the operation changes routing but does not cancel subscription billing and **MUST** direct cancellation to the Subscription Center. Updating the credential **MUST** mark the entry as user-managed, detach it from later Coding Plan cleanup, and restore ordinary delete for the resulting user-managed key. Testing or re-enabling the key does not require this warning.
+3.5. An Installed BYOK Configuration **MUST** remain read-only while it contains Kilo's issued credential. User-facing BYOK surfaces **MUST** identify its Coding Plan origin and **MUST NOT** offer update, enable/disable, or delete controls. The corresponding API operations **MUST** reject attempts to mutate it. Non-mutating credential testing **MAY** remain available. The surface **MUST** direct users who want the configuration removed to cancel the plan in the Subscription Center, which removes it at Effective Cancellation.
 
 ## 4. Credential provisioning and inventory
 
@@ -98,9 +98,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## 5. Subscription lifecycle
 
-5.1. A Coding Plan with successful activation enters `active` state and remains billable until its paid period ends or it is terminated immediately under this section. A subscriber's BYOK updates or disablement, or deletion of a user-managed replacement key, **MUST NOT** change that billing lifecycle.
+5.1. A Coding Plan with successful activation enters `active` state and remains billable until its paid period ends or it is terminated immediately under this section.
 
-5.2. When a user requests cancellation, the subscription **MUST** stop renewing and **MUST** remain paid through the end of its current period. On the first billing lifecycle sweep processing the subscription at or after Effective Cancellation, Kilo **MUST** delete its Installed BYOK Configuration only if that configuration is still linked and Kilo-installed, and **MUST** create a Manual Revocation Work Item for the originally issued credential. Kilo **MUST NOT** delete a replacement or later user-created provider key.
+5.2. When a user requests cancellation, the subscription **MUST** stop renewing and **MUST** remain paid through the end of its current period. On the first billing lifecycle sweep processing the subscription at or after Effective Cancellation, Kilo **MUST** delete its Installed BYOK Configuration only if that configuration is still linked and Kilo-installed, and **MUST** create a Manual Revocation Work Item for the originally issued credential. Kilo **MUST NOT** delete a separate user-created provider key.
 
 5.3. An uninterrupted successful renewal **MUST** extend paid access using the existing assigned credential. The system **MUST** debit the snapshotted renewal price atomically with recording the new charged term.
 
@@ -110,7 +110,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 5.6. During the `past_due` recovery period, arrival of sufficient credits before the stored grace deadline **MUST** allow one atomic renewal debit and restore `active` status. If renewal cannot be funded by that deadline, the next billing lifecycle sweep **MUST** terminate the subscription, delete only a still-linked Installed BYOK Configuration, and create a Manual Revocation Work Item for the issued credential.
 
-5.7. A user-requested cancellation **MUST NOT** trigger auto-top-up. Updating or disabling an Installed BYOK Configuration, or deleting a user-managed replacement key, **MUST NOT** trigger cancellation or affect renewal billing.
+5.7. A user-requested cancellation **MUST NOT** trigger auto-top-up.
 
 5.8. When a user account is deleted, Kilo **MUST** immediately terminate any Coding Plan subscription, delete the user's BYOK configurations and Availability Notification Intents under the general deletion policy, create a Manual Revocation Work Item for each issued credential, and anonymize subscriber linkage in retained credential disposition records. Account deletion **MUST NOT** wait until the end of a prepaid period. Subscription and charged-term history **MAY** remain associated with the platform's anonymized user record when required for financial or compliance retention.
 
@@ -122,9 +122,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 6.1. Initial MiniMax Coding Plan setup **MUST** route through the Kilo Gateway using the existing ordinary personal MiniMax BYOK provider identity. The initial release **MUST NOT** expose saved raw credential values through Kilo UI or API responses.
 
-6.2. The system **MUST NOT** add a MiniMax Coding Plan-specific provider or model-routing namespace. The Kilo-installed MiniMax key and any later subscriber replacement **MUST** use ordinary MiniMax BYOK routing and model availability.
+6.2. The system **MUST NOT** add a MiniMax Coding Plan-specific provider or model-routing namespace. The Kilo-installed MiniMax key **MUST** use ordinary MiniMax BYOK routing and model availability.
 
-6.3. Purchase **MUST** reject an occupied personal MiniMax BYOK slot before a charge or issued credential assignment commits. Once subscribed, a user's ordinary MiniMax BYOK actions affect routing configuration only; Coding Plan billing and revocation of Kilo's originally issued credential remain independent.
+6.3. Purchase **MUST** reject an occupied personal MiniMax BYOK slot before a charge or issued credential assignment commits. Once subscribed, the Installed BYOK Configuration **MUST** remain read-only until Kilo removes it at Effective Cancellation.
 
 ## 7. User-facing behavior
 
@@ -132,11 +132,11 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 7.2. Coding Plan surfaces **MUST** display recurring prices and charged-term amounts in USD regardless of payment source. Kilo Credits are valued one-to-one with USD for display. Surfaces **MUST** identify `Credits` as the payment source for credit-funded subscriptions and **MUST NOT** expose internal microdollars.
 
-7.3. While an Installed BYOK Configuration is unchanged, the BYOK surface **MUST** identify it as configured by the subscriber's MiniMax token plan. Before updating or disabling it, the surface **MUST** warn that routing changes do not cancel subscription billing and direct the user to Subscription Center to cancel. A delete attempt on the Kilo-managed configuration **MUST** be blocked with a message that directs the user to cancel the plan in the Subscription Center. Saved raw-key view or copy controls **MUST NOT** be added for customer BYOK surfaces.
+7.3. The BYOK surface **MUST** identify an Installed BYOK Configuration as managed by the subscriber's MiniMax token plan and read-only. It **MUST NOT** offer update, enable/disable, delete, saved raw-key view, or copy controls. Non-mutating credential testing **MAY** remain available. The surface **MUST** direct users to the Subscription Center to cancel the plan and remove the configuration at Effective Cancellation.
 
 7.4. Purchase messaging **MUST** state that Kilo configures MiniMax in BYOK and **MUST** tell users with an existing user-managed MiniMax key to delete it before subscribing. Cancellation messaging **MUST** state when billing ends, that Kilo deletes only its unchanged installed configuration, and that Kilo revokes its issued credential when plan access ends.
 
-7.5. A `past_due` subscription **MUST** communicate its grace deadline with date and local time, the consequence of unsuccessful payment recovery, and that a replacement or user-created MiniMax BYOK key is not deleted by Coding Plan termination.
+7.5. A `past_due` subscription **MUST** communicate its grace deadline with date and local time, the consequence of unsuccessful payment recovery, and that a separate user-created MiniMax BYOK key is not deleted by Coding Plan termination.
 
 7.6. A sold-out offering **MUST** display its unavailable state and **MUST** offer an authenticated user a way to record an Availability Notification Intent. Recording the same intent again **MUST** be idempotent, **MUST NOT** reserve capacity or initiate billing, and **MUST** show the saved intent state. A successful activation **MUST** clear the activated user's intent for that Plan ID.
 

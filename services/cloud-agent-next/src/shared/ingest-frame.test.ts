@@ -3,6 +3,7 @@ import {
   MAX_INGEST_BUFFERED_BYTES,
   MAX_INGEST_EVENT_BYTES,
   IngestEventBuffer,
+  estimateSerializedBytes,
   isLifecycleIngestEvent,
   prepareIngestFrame,
 } from './ingest-frame.js';
@@ -230,6 +231,125 @@ describe('prepareIngestFrame', () => {
     const sent = JSON.parse(frame.serialized);
     expect(sent.streamEventType).toBe('wrapper_event_truncated');
     expect(sent.data.kiloEventName).toBe('message.part.updated');
+  });
+
+  it('compacts a very large message.updated without serializing the full payload', () => {
+    // A 10 MB event would block the event loop for seconds if JSON.stringify
+    // were called on the full payload. The estimate must short-circuit and
+    // route directly to compaction.
+    const event: IngestEvent = {
+      streamEventType: 'kilocode',
+      timestamp: '2026-04-14T08:00:00.000Z',
+      data: {
+        event: 'message.updated',
+        type: 'message.updated',
+        properties: {
+          info: {
+            id: 'msg_big',
+            sessionID: 'sess_1',
+            role: 'assistant',
+            time: { started: 1, completed: 2 },
+            parts: [{ type: 'text', text: 'z'.repeat(10_000_000) }],
+          },
+        },
+      },
+    };
+    const frame = prepareIngestFrame(event);
+    expect(frame.kind).toBe('send');
+    if (frame.kind !== 'send') return;
+    expect(frame.compacted).toBe(true);
+    expect(frame.bytes).toBeLessThanOrEqual(MAX_INGEST_EVENT_BYTES);
+    // The huge text must not appear in the compacted output.
+    expect(frame.serialized).not.toContain('zzzzz');
+    const sent = JSON.parse(frame.serialized);
+    expect(sent.data.properties.info.id).toBe('msg_big');
+    expect(sent.data.properties.info.parts).toBeUndefined();
+    // originalBytes reflects the estimate (a lower bound), still over budget.
+    expect(frame.originalBytes).toBeGreaterThan(MAX_INGEST_EVENT_BYTES);
+  });
+
+  it('preserves the exact byte count when the estimate is under budget but serialization exceeds it', () => {
+    // Each emoji is 2 UTF-16 code units but 4 UTF-8 bytes. A string of 400K
+    // emoji has .length = 800K (under the 1 MiB estimate budget) but UTF-8
+    // byte length ≈ 1.6 MB (over the send budget). The estimate passes, so
+    // tryStringify runs and produces an over-budget result — originalBytes
+    // must reflect the exact measurement, not the lower estimate.
+    const event: IngestEvent = {
+      streamEventType: 'status',
+      timestamp: '2026-04-14T08:00:00.000Z',
+      data: { message: '😀'.repeat(400_000) },
+    };
+    const frame = prepareIngestFrame(event);
+    expect(frame.originalBytes).toBeGreaterThan(MAX_INGEST_EVENT_BYTES);
+    if (frame.kind === 'send') {
+      expect(frame.compacted).toBe(true);
+    }
+  });
+});
+
+describe('estimateSerializedBytes', () => {
+  it('returns a lower bound on the actual serialized size', () => {
+    const value = { a: 'hello', b: 42, c: true, d: null, e: [1, 2, 3] };
+    const actual = JSON.stringify(value).length;
+    const estimate = estimateSerializedBytes(value, 1_000_000);
+    expect(estimate).toBeLessThanOrEqual(actual);
+    expect(estimate).toBeGreaterThan(0);
+  });
+
+  it('short-circuits when the estimate exceeds the budget', () => {
+    const value = { big: 'x'.repeat(2_000_000) };
+    const estimate = estimateSerializedBytes(value, 1_000_000);
+    expect(estimate).toBeGreaterThan(1_000_000);
+    // Should not walk the entire object — just enough to exceed the budget.
+    expect(estimate).toBeLessThan(2_100_000);
+  });
+
+  it('handles circular references without infinite looping', () => {
+    const circular: Record<string, unknown> = { a: 'hello' };
+    circular.self = circular;
+    const estimate = estimateSerializedBytes(circular, 1_000_000);
+    expect(estimate).toBeLessThan(100);
+  });
+
+  it('counts shared (non-cyclic) references at each occurrence', () => {
+    // A shared sub-object referenced from two keys must be counted twice,
+    // matching JSON.stringify (which serializes it at each occurrence).
+    const shared = { text: 'x'.repeat(100_000) };
+    const value = { a: shared, b: shared };
+    const actual = JSON.stringify(value).length;
+    const estimate = estimateSerializedBytes(value, 1_000_000);
+    expect(estimate).toBeLessThanOrEqual(actual);
+    // Counting shared only once would underestimate by ~100K bytes.
+    expect(estimate).toBeGreaterThan(200_000);
+  });
+
+  it('short-circuits on wide arrays via structural overhead', () => {
+    // 2M-element sparse array: comma overhead (2M-1) alone exceeds the 1M
+    // budget, so the estimate returns without queuing or walking elements.
+    const value = { arr: new Array(2_000_000) };
+    const estimate = estimateSerializedBytes(value, 1_000_000);
+    expect(estimate).toBeGreaterThan(1_000_000);
+    expect(estimate).toBeLessThan(2_010_000);
+  });
+
+  it('returns 2 for an empty object', () => {
+    expect(estimateSerializedBytes({}, 1_000_000)).toBe(2);
+  });
+
+  it('returns 2 for an empty array', () => {
+    expect(estimateSerializedBytes([], 1_000_000)).toBe(2);
+  });
+
+  it('treats errors as oversized so compaction is used', () => {
+    const obj: Record<string, unknown> = {};
+    Object.defineProperty(obj, 'throwingGetter', {
+      get: () => {
+        throw new Error('boom');
+      },
+      enumerable: true,
+    });
+    const estimate = estimateSerializedBytes(obj, 1_000_000);
+    expect(estimate).toBeGreaterThan(1_000_000);
   });
 });
 

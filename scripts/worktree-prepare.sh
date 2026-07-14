@@ -12,6 +12,11 @@ WEB_ENV_FILE="apps/web/.env.development.local"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+if command -v direnv >/dev/null 2>&1 && [ -f .envrc ]; then
+  echo "==> Authorizing this worktree's root direnv config…"
+  direnv allow .
+fi
+
 upsert_env_line() {
   local file="$1"
   local line="$2"
@@ -90,6 +95,17 @@ if [ "$MAIN_WORKTREE_REALPATH" = "$CURRENT_WORKTREE_REALPATH" ]; then
 elif [ -f "$MAIN_WORKTREE/$WEB_ENV_FILE" ]; then
   echo "==> Copying $WEB_ENV_FILE from main worktree…"
   cp "$MAIN_WORKTREE/$WEB_ENV_FILE" "./$WEB_ENV_FILE"
+fi
+
+if [ "$MAIN_WORKTREE_REALPATH" != "$CURRENT_WORKTREE_REALPATH" ] &&
+  [ -f "$MAIN_WORKTREE/apps/mobile/.env.local" ]; then
+  echo "==> Copying apps/mobile/.env.local from main worktree…"
+  cp "$MAIN_WORKTREE/apps/mobile/.env.local" ./apps/mobile/.env.local
+fi
+
+if command -v direnv >/dev/null 2>&1 && [ -f apps/mobile/.envrc ]; then
+  echo "==> Authorizing this worktree's mobile direnv config…"
+  direnv allow ./apps/mobile
 fi
 
 echo "==> Syncing Next.js development env…"

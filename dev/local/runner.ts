@@ -17,6 +17,7 @@ import {
   paneHasRunningChild,
   selectPane,
   setPaneTitle,
+  setPaneServiceIdentity,
   setMainLeftLayout,
   pipePane,
 } from './tmux';
@@ -116,6 +117,7 @@ export function startServiceInTmux(
   const startupCommand =
     svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
   const winIndex = createWindow(sessionName, serviceName, env, startupCommand);
+  setPaneServiceIdentity(sessionName, winIndex, 0, serviceName);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
   pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
 }
@@ -298,7 +300,8 @@ const inFlightRestarts = new Map<string, () => void>();
 
 export function restartServiceInTmux(
   sessionName: string,
-  serviceName: string
+  serviceName: string,
+  env?: Record<string, string>
 ): Promise<RestartOutcome> {
   const svc = getService(serviceName);
   if (svc.type === 'infra') return Promise.resolve('not-running');
@@ -339,7 +342,7 @@ export function restartServiceInTmux(
         // window instead of leaving the service stopped after reporting
         // "Restarted"; the new window inherits the tmux session environment.
         try {
-          startServiceInTmux(sessionName, serviceName);
+          startServiceInTmux(sessionName, serviceName, env);
           settle('recreated');
         } catch {
           // Same policy as below: keep the TUI alive; the next explicit
@@ -366,7 +369,15 @@ export function restartServiceInTmux(
         return;
       }
       try {
-        sendKeys(sessionName, currentPane.windowIndex, cmd, currentPane.paneIndex);
+        const envPrefix = Object.entries(env ?? {})
+          .map(([key, value]) => `${key}=${shellQuote(value)}`)
+          .join(' ');
+        sendKeys(
+          sessionName,
+          currentPane.windowIndex,
+          envPrefix ? `${envPrefix} ${cmd}` : cmd,
+          currentPane.paneIndex
+        );
         settle('relaunched');
       } catch {
         // The dashboard may have moved or closed the pane after we resolved it.

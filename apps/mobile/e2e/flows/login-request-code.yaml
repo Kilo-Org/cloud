@@ -1,7 +1,7 @@
 # Login step 1/2 — request an email sign-in code.
 #
-# Fresh-launches the app and, if signed out, submits EMAIL to reach the
-# "Enter the code" screen. The 6-digit code is emailed to the local outbox
+# Establishes a signed-out baseline, then submits EMAIL to reach the "Enter the
+# code" screen. The 6-digit code is emailed to the local outbox
 # (dev/logs/emails/); read it there and pass it to login-verify-code.yaml.
 #
 #   maestro --device <udid> test -e EMAIL=e2e-mobile@example.com \
@@ -14,53 +14,13 @@
 # code for you. See e2e/AGENTS.md ("Login / logout helper flows").
 appId: com.kilocode.kiloapp
 ---
-# A clean iOS install can put system and Expo onboarding over the app. Clear
-# both before returning to SpringBoard; otherwise the Kilo icon is not tappable.
-- runFlow:
-    when:
-      visible: 'Ask App Not to Track'
-    commands:
-      - tapOn: 'Ask App Not to Track'
-- runFlow:
-    when:
-      visible: 'This is the developer menu.*'
-    commands:
-      - tapOn: 'Continue'
-- stopApp
-- tapOn:
-    text: 'Kilo'
-# Three possible launch states: Home (signed in), the consent gate (signed in,
-# not yet consented), or the login page (signed out).
+- runFlow: logout.yaml
+# Tap the input via its placeholder — the "Email address" label shares the
+# field's accessibility text and would match the (non-focusable) label.
+- tapOn: 'you@example.com'
+- inputText: ${EMAIL}
+- tapOn: 'Send sign-in code'
+# Wait for the code screen — sending is a network round-trip.
 - extendedWaitUntil:
-    visible:
-      text: 'HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
-    timeout: 30000
-# Grant the notification permission prompt if iOS shows one on first launch.
-- runFlow:
-    when:
-      visible: 'Allow'
-    commands:
-      - tapOn: 'Allow'
-# Booted into the consent gate (already signed in) -> accept it.
-- runFlow:
-    when:
-      visible: 'Accept and continue'
-    commands:
-      - tapOn: 'Accept and continue'
-      - extendedWaitUntil:
-          visible: 'HOME|Home, tab, 1 of 4'
-          timeout: 15000
-# Signed out -> submit the email to trigger the code.
-- runFlow:
-    when:
-      visible: 'Welcome to Kilo Code'
-    commands:
-      # Tap the input via its placeholder — the "Email address" label shares the
-      # field's accessibility text and would match the (non-focusable) label.
-      - tapOn: 'you@example.com'
-      - inputText: ${EMAIL}
-      - tapOn: 'Send sign-in code'
-      # Wait for the code screen — sending is a network round-trip.
-      - extendedWaitUntil:
-          visible: 'Verify code'
-          timeout: 15000
+    visible: 'Verify code'
+    timeout: 15000

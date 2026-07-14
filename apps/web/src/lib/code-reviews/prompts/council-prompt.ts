@@ -1,0 +1,112 @@
+import 'server-only';
+
+import type { CouncilAggregationStrategy, CouncilSpecialist } from '@kilocode/db/schema-types';
+import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import {
+  COUNCIL_RESULT_MARKER_TAG,
+  describeAggregationStrategy,
+} from '@kilocode/worker-utils/code-review-council';
+
+/**
+ * Council execution prompts (single-session, multi-model).
+ *
+ * The primary agent acts as the COORDINATOR: it delegates to one sub-agent per specialist
+ * (each pinned to its own model via `runtimeAgents`), collects their structured results,
+ * and emits ONE combined `kilo-code-review-council:v1` manifest. Our code — never the
+ * model — computes the governance decision from that manifest.
+ *
+ * NOTE: these prompts are a first cut and are expected to be tuned against real inference
+ * in local development. The machine-readable manifest contract below is the load-bearing
+ * part and must stay in sync with `CouncilResultManifestSchema` / `parseCouncilResultManifest`.
+ */
+
+/** Per-specialist sub-agent prompt: review only through this specialist's lens. */
+export function buildSpecialistAgentPrompt(specialist: CouncilSpecialist): string {
+  const extra = specialist.instructions?.trim();
+  return [
+    `You are the "${specialist.name}" code-review specialist.`,
+    `Review the pull request changes ONLY through this lens: ${specialist.lens}`,
+    extra ? `Additional instructions: ${extra}` : null,
+    '',
+    'Report back to the coordinator with a single JSON object (no prose) of the form:',
+    '{"vote":"pass|warn|block","highestSeverity":"<label or null>","findings":[{"path":"...","line":<number|null>,"severity":"<label>","rationale":"..."}]}',
+    '',
+    'Voting guidance: "block" for issues that should stop merge, "warn" for non-blocking',
+    'concerns, "pass" if nothing in your lens is wrong, "abstain" only if your lens does',
+    'not apply to these changes. Report findings only within your lens.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Coordinator instructions appended to the standard review context. The base prompt
+ * supplies repo/PR/diff context; this overrides the acting role to "coordinator" and
+ * defines the exact manifest to emit.
+ */
+export function buildCouncilOrchestratorPrompt(params: {
+  basePrompt: string;
+  specialists: CouncilSpecialist[];
+  aggregationStrategy: CouncilAggregationStrategy;
+}): string {
+  const { basePrompt, specialists, aggregationStrategy } = params;
+  const roster = specialists
+    .map(s => `- subagent_type "${s.id}" — ${s.name}: ${s.lens}`)
+    .join('\n');
+
+  const coordination = [
+    '# COUNCIL MODE',
+    '',
+    'You are the COORDINATOR of a review council. Do NOT review the code yourself.',
+    'Delegate to each specialist sub-agent below using the task tool, passing the same',
+    'pull request context. Run every specialist and collect its JSON result.',
+    '',
+    'Specialists:',
+    roster,
+    '',
+    `Governance (for context only — our system computes the final decision): ${describeAggregationStrategy(aggregationStrategy)}`,
+    '',
+    'When every specialist has reported, emit EXACTLY ONE machine-readable manifest as the',
+    'VERY LAST line of your final message, on its own line, with no text after it:',
+    '',
+    `<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"specialistId":"<id>","vote":"pass|warn|block|abstain","highestSeverity":"<label or null>","findings":[{"path":"<path>","line":<number|null>,"severity":"<label>","rationale":"<text>"}]}]} -->`,
+    '',
+    'Include one entry per specialist, using the subagent_type as its specialistId, and',
+    "pass through each specialist's findings verbatim. Do NOT compute an overall decision.",
+    '',
+    '---',
+    '',
+    'Shared pull request context for the specialists:',
+    '',
+  ].join('\n');
+
+  return `${coordination}${basePrompt}`;
+}
+
+/**
+ * Maps enabled council specialists to cloud-agent-next `runtimeAgents` — one subagent per
+ * specialist, each pinned to its own model/effort (falling back to the review default).
+ * `model` is always resolved so a per-specialist `variant` always has a model (required
+ * by cloud-agent-next's schema).
+ */
+export function buildCouncilRuntimeAgents(params: {
+  specialists: CouncilSpecialist[];
+  defaultModel: string;
+  defaultVariant?: string;
+}): RuntimeAgentInput[] {
+  const { specialists, defaultModel, defaultVariant } = params;
+  return specialists.map(specialist => {
+    const variant = specialist.thinking_effort ?? defaultVariant;
+    return {
+      slug: specialist.id,
+      name: specialist.name,
+      config: {
+        mode: 'subagent',
+        model: specialist.model_slug ?? defaultModel,
+        ...(variant ? { variant } : {}),
+        prompt: buildSpecialistAgentPrompt(specialist),
+        description: specialist.lens,
+      },
+    };
+  });
+}

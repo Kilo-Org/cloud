@@ -5,6 +5,7 @@ import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
+import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
@@ -25,7 +26,10 @@ async function isLoggingEnabledForUser(
   if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
   if (user?.id && users.includes(await kilologHash(user.id))) return true;
   if (organizationId && organizations.includes(await kilologHash(organizationId))) return true;
-  return false;
+  return isDynamicallyOptedIntoRequestLogging({
+    accountId: user?.id ?? null,
+    organizationId,
+  });
 }
 
 export async function handleRequestLogging(params: {

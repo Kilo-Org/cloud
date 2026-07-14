@@ -26,6 +26,11 @@ test('login flows never use an unidentified generic Allow selector', () => {
   assert.match(openApp, /“Kilo” Would Like to Send You Notifications/);
 });
 
+test('login establishes a signed-out baseline before requesting a fresh OTP', () => {
+  const login = fs.readFileSync('apps/mobile/e2e/login.sh', 'utf8');
+  assert.ok(login.indexOf('flows/logout.yaml') < login.indexOf('flows/login-request-code.yaml'));
+});
+
 test('shared launch clears an already-visible tracking prompt before tapping the app icon', () => {
   const flow = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
   assert.ok(flow.indexOf("visible: 'Ask App Not to Track'") < flow.indexOf("visible: 'Kilo'"));
@@ -38,6 +43,19 @@ test('mobile workflow documents hierarchy-derived tab selectors', () => {
   assert.match(runbook, /Never guess a selector from the visible label/);
   assert.match(runbook, /pnpm dev:capture mobile/);
   assert.match(runbook, /dev:mobile:simulator claim/);
+});
+
+test('tab layout exposes the exact documented accessibility labels', () => {
+  const layout = fs.readFileSync('apps/mobile/src/app/(app)/(tabs)/_layout.tsx', 'utf8');
+
+  for (const label of [
+    'Home, tab, 1 of 4',
+    'KiloClaw, tab, 2 of 4',
+    'Agents, tab, 3 of 4',
+    'Profile, tab, 4 of 4',
+  ]) {
+    assert.match(layout, new RegExp(`tabBarAccessibilityLabel: '${label}'`));
+  }
 });
 
 test('login preflight reconnects the claimed iOS device to this worktree Metro URL', () => {

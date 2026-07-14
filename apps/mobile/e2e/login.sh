@@ -40,6 +40,9 @@ latest_email() {
 
 before="$(latest_email)"
 
+echo "==> establishing signed-out baseline"
+maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/logout.yaml"
+
 echo "==> requesting sign-in code for $EMAIL"
 if ! maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"; then
   echo "==> retrying launch and sign-in request once after a dev-client startup failure"

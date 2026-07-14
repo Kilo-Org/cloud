@@ -1,5 +1,4 @@
 import {
-  type ExpoSpeechRecognitionErrorEvent,
   type ExpoSpeechRecognitionResultEvent,
 } from 'expo-speech-recognition';
 
@@ -27,7 +26,7 @@ export type VoiceInputNativeEvent = {
   start: null;
   result: ExpoSpeechRecognitionResultEvent;
   nomatch: null;
-  error: ExpoSpeechRecognitionErrorEvent;
+  error: { code?: number; error: string; message: string };
   end: null;
 };
 

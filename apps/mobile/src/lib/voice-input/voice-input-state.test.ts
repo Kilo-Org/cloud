@@ -246,6 +246,15 @@ describe('classifyVoiceInputError', () => {
       retryable: false,
     });
   });
+
+  it('maps an unknown error string to a generic retryable available feedback', () => {
+    expect(classifyVoiceInputError('future-native-error')).toEqual({
+      action: 'none',
+      availability: 'available',
+      message: 'Voice input stopped. Tap the microphone to try again.',
+      retryable: true,
+    });
+  });
 });
 
 describe('shouldAbortVoiceInput', () => {

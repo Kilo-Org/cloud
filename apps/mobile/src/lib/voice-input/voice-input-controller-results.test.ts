@@ -135,6 +135,27 @@ describe('createVoiceInputController - events and serialization', () => {
       ]);
     });
 
+    it('maps an unknown native error code to a generic retryable feedback without throwing', async () => {
+      const { harness, controller } = build();
+      const fb = recordFeedback();
+      await controller.start(makeStartOptions({ onFeedback: fb.onFeedback }));
+      harness.emit('start', null);
+
+      harness.emit('error', {
+        error: 'future-native-error',
+        message: 'future',
+      });
+
+      expect(fb.feedback).toEqual([
+        {
+          action: 'none',
+          availability: 'available',
+          message: 'Voice input stopped. Tap the microphone to try again.',
+          retryable: true,
+        },
+      ]);
+    });
+
     it('permanently flips availability to unavailable when a service-not-allowed feedback is reported', async () => {
       const { harness, controller } = build();
       const fb = recordFeedback();

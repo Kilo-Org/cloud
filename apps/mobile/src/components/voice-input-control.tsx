@@ -13,7 +13,7 @@ type VoiceInputButtonProps = {
 };
 
 const ICON_SIZE = 18;
-const HIT_SLOP = 2;
+const HIT_SLOP = { top: 2, bottom: 2, left: 2, right: 2 } as const;
 const LISTENING_BG = 'bg-red-600 dark:bg-red-500';
 const RESTING_BG = 'bg-secondary';
 

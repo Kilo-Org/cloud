@@ -1,5 +1,3 @@
-import { type ExpoSpeechRecognitionErrorCode } from 'expo-speech-recognition';
-
 export type VoiceInputStatus = 'idle' | 'starting' | 'listening' | 'stopping';
 export type VoiceInputAvailability = 'available' | 'unavailable';
 
@@ -111,7 +109,7 @@ export function classifyVoiceInputPermission(
   };
 }
 
-export function classifyVoiceInputError(code: ExpoSpeechRecognitionErrorCode): VoiceInputFeedback {
+export function classifyVoiceInputError(code: string): VoiceInputFeedback {
   switch (code) {
     case 'no-speech':
     case 'speech-timeout': {
@@ -176,8 +174,12 @@ export function classifyVoiceInputError(code: ExpoSpeechRecognitionErrorCode): V
       };
     }
     default: {
-      const unhandled: never = code;
-      throw new Error(`Unhandled ExpoSpeechRecognitionErrorCode: ${String(unhandled)}`);
+      return {
+        action: 'none',
+        availability: 'available',
+        message: 'Voice input stopped. Tap the microphone to try again.',
+        retryable: true,
+      };
     }
   }
 }

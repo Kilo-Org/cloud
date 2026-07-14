@@ -9,7 +9,7 @@ The main session is the orchestrator and should use a strong model. Role agents 
 Every new user-facing feature must define and behaviorally test these states before implementation begins:
 
 | State | Required experience |
-| --- | --- |
+|---|---|
 | Happy | The intended task completes and the resulting state is clear. |
 | Unhappy, retryable | A meaningful, specific message explains the failure and an actionable CTA lets the user retry or recover. |
 | Unhappy, non-retryable | A meaningful, specific message explains the terminal failure and no CTA is shown. |
@@ -20,7 +20,7 @@ Do not collapse retryable and non-retryable failures into one generic error stat
 ## Roles
 
 | Agent | Responsibility | Repository edits |
-| --- | --- | --- |
+|---|---|---|
 | `mobile-implementer` | Implements one bounded task from the accepted plan and runs narrow checks | Allowed where the task requires |
 | `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
 | `mobile-e2e-verifier` | Exercises accepted behavior on local services and a simulator/emulator | Denied |

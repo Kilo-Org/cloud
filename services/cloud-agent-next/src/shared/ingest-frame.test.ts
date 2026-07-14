@@ -267,6 +267,24 @@ describe('prepareIngestFrame', () => {
     // originalBytes reflects the estimate (a lower bound), still over budget.
     expect(frame.originalBytes).toBeGreaterThan(MAX_INGEST_EVENT_BYTES);
   });
+
+  it('preserves the exact byte count when the estimate is under budget but serialization exceeds it', () => {
+    // Each emoji is 2 UTF-16 code units but 4 UTF-8 bytes. A string of 400K
+    // emoji has .length = 800K (under the 1 MiB estimate budget) but UTF-8
+    // byte length ≈ 1.6 MB (over the send budget). The estimate passes, so
+    // tryStringify runs and produces an over-budget result — originalBytes
+    // must reflect the exact measurement, not the lower estimate.
+    const event: IngestEvent = {
+      streamEventType: 'status',
+      timestamp: '2026-04-14T08:00:00.000Z',
+      data: { message: '😀'.repeat(400_000) },
+    };
+    const frame = prepareIngestFrame(event);
+    expect(frame.originalBytes).toBeGreaterThan(MAX_INGEST_EVENT_BYTES);
+    if (frame.kind === 'send') {
+      expect(frame.compacted).toBe(true);
+    }
+  });
 });
 
 describe('estimateSerializedBytes', () => {
@@ -291,6 +309,27 @@ describe('estimateSerializedBytes', () => {
     circular.self = circular;
     const estimate = estimateSerializedBytes(circular, 1_000_000);
     expect(estimate).toBeLessThan(100);
+  });
+
+  it('counts shared (non-cyclic) references at each occurrence', () => {
+    // A shared sub-object referenced from two keys must be counted twice,
+    // matching JSON.stringify (which serializes it at each occurrence).
+    const shared = { text: 'x'.repeat(100_000) };
+    const value = { a: shared, b: shared };
+    const actual = JSON.stringify(value).length;
+    const estimate = estimateSerializedBytes(value, 1_000_000);
+    expect(estimate).toBeLessThanOrEqual(actual);
+    // Counting shared only once would underestimate by ~100K bytes.
+    expect(estimate).toBeGreaterThan(200_000);
+  });
+
+  it('short-circuits on wide arrays via structural overhead', () => {
+    // 2M-element sparse array: comma overhead (2M-1) alone exceeds the 1M
+    // budget, so the estimate returns without queuing or walking elements.
+    const value = { arr: new Array(2_000_000) };
+    const estimate = estimateSerializedBytes(value, 1_000_000);
+    expect(estimate).toBeGreaterThan(1_000_000);
+    expect(estimate).toBeLessThan(2_010_000);
   });
 
   it('returns 2 for an empty object', () => {

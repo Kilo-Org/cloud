@@ -329,15 +329,23 @@ function tryStringify(event: IngestEvent): string | undefined {
  * genuinely small events). If it says "over budget", compaction runs
  * directly without ever materializing the full serialized string.
  *
- * Circular references are detected via a `WeakSet` and skipped.
+ * Ancestor cycles (true circular references) are detected via a `WeakSet`
+ * tracking the current path and skipped. Shared (non-cyclic) references are
+ * counted at each occurrence, matching `JSON.stringify`.
  */
 export function estimateSerializedBytes(value: unknown, budget: number): number {
   try {
     let total = 0;
-    const stack: unknown[] = [value];
-    const visited = new WeakSet<object>();
+    const stack: Array<{ v: unknown } | { exit: object }> = [{ v: value }];
+    const path = new WeakSet<object>();
     while (stack.length > 0) {
-      const item = stack.pop();
+      const entry = stack.pop();
+      if (entry === undefined) break;
+      if ('exit' in entry) {
+        path.delete(entry.exit);
+        continue;
+      }
+      const item = entry.v;
       if (typeof item === 'string') {
         total += item.length + 2; // surrounding quotes
       } else if (typeof item === 'number') {
@@ -347,20 +355,26 @@ export function estimateSerializedBytes(value: unknown, budget: number): number 
       } else if (item === null) {
         total += 4; // "null"
       } else if (typeof item === 'object') {
-        if (visited.has(item)) continue; // circular reference — skip
-        visited.add(item);
+        if (path.has(item)) continue; // ancestor cycle — skip
+        path.add(item);
+        stack.push({ exit: item }); // remove from path after children
         if (Array.isArray(item)) {
           total += 2; // brackets
+          total += Math.max(0, item.length - 1); // commas
+          if (total > budget) return total;
           for (let i = item.length - 1; i >= 0; i--) {
-            stack.push(item[i]);
+            stack.push({ v: item[i] });
           }
         } else {
-          total += 2; // braces
           const keys = Object.keys(item);
-          for (let i = keys.length - 1; i >= 0; i--) {
-            const key = keys[i];
+          total += 2; // braces
+          for (const key of keys) {
             total += key.length + 3; // "key":
-            stack.push((item as Record<string, unknown>)[key]);
+          }
+          total += Math.max(0, keys.length - 1); // commas
+          if (total > budget) return total;
+          for (let i = keys.length - 1; i >= 0; i--) {
+            stack.push({ v: (item as Record<string, unknown>)[keys[i]] });
           }
         }
       }
@@ -390,6 +404,7 @@ export function prepareIngestFrame(event: IngestEvent): PreparedIngestFrame {
   const estimate = estimateSerializedBytes(trimmed, MAX_INGEST_EVENT_BYTES);
 
   let originalSerialized: string | undefined;
+  let exactBytes: number | undefined;
   if (estimate <= MAX_INGEST_EVENT_BYTES) {
     originalSerialized = tryStringify(trimmed);
     if (originalSerialized !== undefined) {
@@ -403,13 +418,14 @@ export function prepareIngestFrame(event: IngestEvent): PreparedIngestFrame {
           originalBytes,
         };
       }
+      exactBytes = originalBytes;
     }
   }
 
   // Oversized or unserializable — compact without full serialization.
-  // The estimate serves as originalBytes (a lower bound sufficient for
-  // observability; the exact size is not actionable post-compaction).
-  const originalBytes = estimate;
+  // Prefer the exact measurement when serialization succeeded; otherwise
+  // fall back to the estimate (a lower bound sufficient for observability).
+  const originalBytes = exactBytes ?? estimate;
 
   const compactedEvent = compactIngestEvent(trimmed, originalBytes);
   const compactedSerialized = tryStringify(compactedEvent);

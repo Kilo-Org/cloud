@@ -40,6 +40,7 @@ import {
   rewriteChatCompletionsOneOfAsAnyOf,
   isFriendliChatCompletionsRequest,
 } from '@/lib/ai-gateway/schema-rewrite';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -97,12 +98,16 @@ export function applyPreferredProvider(
   }
 }
 
-export function applyGatewayModelsFallback(
+export async function applyGatewayModelsFallback(
   providerId: ProviderId,
   requestedModel: string,
   requestToMutate: GatewayRequest
 ) {
-  if (isFableModel(requestedModel) && (providerId === 'openrouter' || providerId === 'vercel')) {
+  if (
+    !(await isFreeModel(requestedModel)) &&
+    isFableModel(requestedModel) &&
+    (providerId === 'openrouter' || providerId === 'vercel')
+  ) {
     requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
     return;
   }
@@ -122,7 +127,7 @@ export async function applyProviderSpecificLogic(
   sessionId: string | null,
   taskId: string | null
 ) {
-  applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);

@@ -90,15 +90,15 @@ test('Android tooling is resolved independently of the agent PATH', async () => 
   assert.match(env.path, /android-commandlinetools\/platform-tools/);
 });
 
-test('Android workflow uses adb first and applies resolved tooling to Expo builds', () => {
+test('Android workflow uses Maestro first and applies resolved tooling to Expo builds', () => {
   const android = fs.readFileSync('dev/local/mobile-android.ts', 'utf8');
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
   assert.match(android, /'build'/);
   assert.match(android, /'run:android'/);
   assert.match(android, /path\.join\(worktreeRoot, 'apps\/mobile'\)/);
-  assert.match(runbook, /choose repository-wrapped ADB or Maestro/);
-  assert.match(runbook, /iOS uses Maestro/);
+  assert.match(runbook, /Use Maestro as the primary Android automation driver/);
+  assert.match(runbook, /Fall back to repository-wrapped ADB/);
 });
 
 test('Android tooling rejects a non-Java-17 JAVA_HOME', async () => {

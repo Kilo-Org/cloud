@@ -205,7 +205,7 @@ cd apps/mobile
 pnpm -w dev:mobile:android build
 ```
 
-For Android, choose repository-wrapped ADB or Maestro based on which is more effective for the flow. ADB is useful for direct hierarchy inspection, prompt handling, intent launch, and deterministic shell input; Maestro is useful for reusable cross-screen flows such as OTP login. iOS uses Maestro. Use the repository wrapper rather than bare `adb`:
+Use Maestro as the primary Android automation driver, matching iOS. Fall back to repository-wrapped ADB when Maestro cannot inspect or operate a native prompt, when direct intent/process control is required, or when diagnosing the emulator itself. Android setup still uses ADB for readiness and port reversal. Use the repository wrapper rather than bare `adb`:
 
 ```bash
 pnpm dev:mobile:android adb devices -l

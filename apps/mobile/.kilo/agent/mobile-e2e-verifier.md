@@ -27,7 +27,7 @@ During verification:
 
 - Run the login/logout helper preflight rather than manually inferring bundle provenance, ports, or simulator ownership.
 - Run `pnpm dev:mobile:android doctor` before declaring Android tooling unavailable; do not rely on the inherited `PATH`.
-- Use repository-wrapped ADB or Maestro for Android, whichever is more effective for the flow. Use Maestro as the primary iOS driver.
+- Use Maestro as the primary driver on iOS and Android. Fall back to repository-wrapped ADB on Android only when Maestro cannot inspect or operate the state, or when low-level emulator control is required.
 - Inspect the current screen before selecting Maestro elements and re-inspect after UI changes. Copy exact hierarchy text; never infer selectors from screenshots or visible tab captions.
 - Exercise every applicable feature state that can be produced safely and deterministically. A skipped state requires an explicit rationale; do not silently omit it.
 - Confirm retryable and empty states show a meaningful message and actionable CTA, and that the CTA performs the expected recovery or next step.

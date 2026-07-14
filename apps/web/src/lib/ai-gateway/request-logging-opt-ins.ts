@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { createCachedFetch } from '@/lib/cached-fetch';
 import { redisClient } from '@/lib/redis';
 import { REQUEST_LOGGING_OPT_INS_REDIS_KEY } from '@/lib/redis-keys';
 
@@ -44,9 +45,17 @@ for _, entry in ipairs(entries) do
     table.insert(remaining, entry)
   end
 end
-if deleted == 1 then redis.call('SET', KEYS[1], cjson.encode(remaining)) end
+if deleted == 1 then
+  if #remaining == 0 then
+    redis.call('DEL', KEYS[1])
+  else
+    redis.call('SET', KEYS[1], cjson.encode(remaining))
+  end
+end
 return deleted
 `;
+
+const REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 10_000;
 
 export function hasMatchingRequestLoggingOptIn(
   optIns: RequestLoggingOptIn[],
@@ -63,6 +72,16 @@ export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> 
   const raw = await redisClient.get<string>(REQUEST_LOGGING_OPT_INS_REDIS_KEY);
   if (!raw) return [];
   return RequestLoggingOptInsSchema.parse(JSON.parse(raw));
+}
+
+const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
+  getRequestLoggingOptIns,
+  REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS,
+  []
+);
+
+export function invalidateRequestLoggingOptInsCache(): void {
+  getCachedRequestLoggingOptIns.invalidate();
 }
 
 export async function createRequestLoggingOptIn(
@@ -93,7 +112,7 @@ export async function isDynamicallyOptedIntoRequestLogging(params: {
   organizationId: string | null;
 }): Promise<boolean> {
   try {
-    const optIns = await getRequestLoggingOptIns();
+    const optIns = await getCachedRequestLoggingOptIns();
     return hasMatchingRequestLoggingOptIn(optIns, params);
   } catch {
     return false;

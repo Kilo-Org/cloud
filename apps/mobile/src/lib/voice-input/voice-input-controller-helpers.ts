@@ -6,6 +6,19 @@ type PermissionResult =
   | { kind: 'feedback'; feedback: VoiceInputFeedback }
   | { kind: 'client-error' };
 
+const noopBooleanResolver = (_ok: boolean): void => undefined;
+
+function createBooleanResolver(): {
+  promise: Promise<boolean>;
+  resolve: (value: boolean) => void;
+} {
+  let resolveBoolean = noopBooleanResolver;
+  const promise = new Promise<boolean>(resolve => {
+    resolveBoolean = resolve;
+  });
+  return { promise, resolve: resolveBoolean };
+}
+
 export type Lifecycle = { disposed: boolean };
 
 export type PendingVoiceInputStart = {
@@ -35,7 +48,7 @@ export function createVoiceInputStartQueue(): {
       }
       pending = request;
       const previousBarrier = barrier;
-      const completion = Promise.withResolvers<boolean>();
+      const completion = createBooleanResolver();
       barrier = completion.promise;
       try {
         if (previousBarrier) {
@@ -60,17 +73,11 @@ export function isDisposed(lifecycle: Lifecycle): boolean {
   return lifecycle.disposed;
 }
 
-const noopBooleanResolver = (_ok: boolean): void => undefined;
-
 export function createTerminal(): {
   promise: Promise<boolean>;
   resolve: (ok: boolean) => void;
 } {
-  let resolveTerminal: (ok: boolean) => void = noopBooleanResolver;
-  const promise = new Promise<boolean>(resolve => {
-    resolveTerminal = resolve;
-  });
-  return { promise, resolve: resolveTerminal };
+  return createBooleanResolver();
 }
 
 export async function waitForTerminal(current: {

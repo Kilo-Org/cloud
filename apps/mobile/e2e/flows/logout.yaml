@@ -4,20 +4,18 @@
 #
 #   maestro --device <udid> test e2e/flows/logout.yaml
 #
-# Notes:
-# - Launches the dev build by tapping its home-screen icon. `launchApp` cold-
-#   restarts the Expo dev client and bounces back to SpringBoard, so we stop the
-#   app and relaunch via the icon instead (reliable for dev builds).
-# - See e2e/AGENTS.md ("Login / logout helper flows") for the full workflow.
+# See e2e/AGENTS.md for the full workflow.
 appId: com.kilocode.kiloapp
 ---
-- stopApp
-- tapOn:
-    text: 'Kilo'
-- extendedWaitUntil:
-    visible:
-      text: 'Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
-    timeout: 30000
+- runFlow:
+    when:
+      notVisible: 'Welcome to Kilo Code'
+    commands:
+      - runFlow:
+          when:
+            notVisible: 'HOME|Home, tab, 1 of 4'
+          commands:
+            - runFlow: settle-app.yaml
 # Booted into the consent gate (signed in, not consented) -> accept it to reach
 # Home, then sign out below.
 - runFlow:

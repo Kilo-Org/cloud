@@ -45,7 +45,10 @@ import {
   KiloPassScheduledChangeStatus,
 } from '@/lib/kilo-pass/enums';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import { maybeMapStripeScheduleStatusToDb } from '@/lib/kilo-pass/scheduled-change-release';
+import {
+  KILO_PASS_TERMINAL_SCHEDULE_STATUSES,
+  maybeMapStripeScheduleStatusToDb,
+} from '@/lib/kilo-pass/scheduled-change-release';
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
@@ -1219,12 +1222,6 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
       await db.transaction(async tx => {
         const previousStatus = event.data.previous_attributes?.['status'];
-        const terminalStatuses = [
-          KiloPassScheduledChangeStatus.Released,
-          KiloPassScheduledChangeStatus.Canceled,
-          KiloPassScheduledChangeStatus.Completed,
-        ] as const;
-
         const softDeleteUpdate = shouldDeleteFromStatus ? auto_deleted_at : {};
         const updatedRows = await tx
           .update(kilo_pass_scheduled_changes)
@@ -1237,7 +1234,9 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               // Prevent status regressions once we hit a terminal status.
               // (Still allows idempotent replays of the same terminal status.)
               or(
-                not(inArray(kilo_pass_scheduled_changes.status, terminalStatuses)),
+                not(
+                  inArray(kilo_pass_scheduled_changes.status, KILO_PASS_TERMINAL_SCHEDULE_STATUSES)
+                ),
                 eq(kilo_pass_scheduled_changes.status, scheduleStatusForDb)
               )
             )
@@ -1246,6 +1245,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
             id: kilo_pass_scheduled_changes.id,
             kilo_user_id: kilo_pass_scheduled_changes.kilo_user_id,
             stripe_subscription_id: kilo_pass_scheduled_changes.stripe_subscription_id,
+            effective_at: kilo_pass_scheduled_changes.effective_at,
           });
 
         const row = updatedRows[0];
@@ -1280,6 +1280,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
             previousScheduleStatus: typeof previousStatus === 'string' ? previousStatus : null,
             scheduleStatusForDb,
             softDeleted: shouldDeleteFromStatus,
+            effectiveAt: new Date(row.effective_at).toISOString(),
+            unexpectedPreEffectiveRelease:
+              scheduleStatus === KiloPassScheduledChangeStatus.Released &&
+              new Date(row.effective_at).getTime() > Date.now(),
           },
         });
       });

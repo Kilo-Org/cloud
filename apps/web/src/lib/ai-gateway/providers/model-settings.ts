@@ -16,6 +16,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
@@ -35,6 +36,11 @@ export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
+export const REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  ...REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
 } as const;
 
 export const REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH = {
@@ -113,6 +119,9 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isDeepseekModel(model) || isGlmModel(model)) {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
+  if (model === muse_spark_1_1_model.public_id) {
+    return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH;
+  }
   return undefined;
 }
 
@@ -136,7 +145,7 @@ export function getAiSdkProvider(
   ) {
     return 'anthropic';
   }
-  if (isOpenAiModel(model) || isGrokModel(model)) {
+  if (isOpenAiModel(model) || isGrokModel(model) || model === muse_spark_1_1_model.public_id) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';

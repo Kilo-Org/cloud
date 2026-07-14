@@ -304,7 +304,9 @@ async function syncProviders(
     });
 
   for (const extraModel of mappedExtraModels) {
-    const providerData = providerModelData.find(data => data.provider.slug === extraModel.provider);
+    const providerData = providerModelData.find(
+      data => data.provider.slug === extraModel.provider.slug
+    );
     if (providerData) {
       console.log(
         `Found existing ${extraModel.provider} provider from OpenRouter, adding extra model ${extraModel.model.slug}`
@@ -347,25 +349,22 @@ async function syncProviders(
   const allProviders = [...normalizedProviders];
 
   // Auto-detect providers referenced by extra models that aren't already present
-  const missingProviderSlugs = new Set(
+  const missingProviders = new Map(
     mappedExtraModels
       .map(m => m.provider)
-      .filter(
-        (slug): slug is NonNullable<typeof slug> =>
-          slug !== null && !allProviders.some(p => p.slug === slug)
-      )
+      .filter(provider => !allProviders.some(p => p.slug === provider.slug))
+      .map(provider => [provider.slug, provider])
   );
 
-  for (const providerSlug of missingProviderSlugs) {
-    const displayName = providerSlug.toUpperCase();
-    const iconInitials = providerSlug.slice(0, 2).toUpperCase();
+  for (const provider of missingProviders.values()) {
+    const iconInitials = provider.slug.slice(0, 2).toUpperCase();
     allProviders.push({
-      name: displayName,
-      displayName,
-      slug: providerSlug,
+      name: provider.name,
+      displayName: provider.name,
+      slug: provider.slug,
       dataPolicy: {
-        training: true,
-        retainsPrompts: true,
+        training: provider.training,
+        retainsPrompts: provider.retainsPrompts,
         canPublish: false,
       },
       headquarters: 'Unknown',
@@ -374,7 +373,7 @@ async function syncProviders(
         url: `https://placehold.co/100?text=${iconInitials}&font=roboto`,
         className: 'rounded-sm',
       },
-      models: mappedExtraModels.filter(m => m.provider === providerSlug).map(m => m.model),
+      models: mappedExtraModels.filter(m => m.provider.slug === provider.slug).map(m => m.model),
     });
   }
 

@@ -2456,7 +2456,7 @@ describe('processStripePaymentEventHook', () => {
         to_tier: KiloPassTier.Tier49,
         to_cadence: KiloPassCadence.Yearly,
         stripe_schedule_id: scheduleId,
-        effective_at: '2026-02-01T00:00:00.000Z',
+        effective_at: '2099-02-01T00:00:00.000Z',
         status: KiloPassScheduledChangeStatus.NotStarted,
       });
 
@@ -2481,6 +2481,20 @@ describe('processStripePaymentEventHook', () => {
       expect(updatedRow).toBeTruthy();
       expect(updatedRow?.status).toBe(KiloPassScheduledChangeStatus.Released);
       expect(updatedRow?.deleted_at).not.toBeNull();
+
+      const auditLog = await db.query.kilo_pass_audit_log.findFirst({
+        where: eq(kilo_pass_audit_log.stripe_event_id, event.id),
+      });
+      expect(auditLog?.stripe_subscription_id).toBe(stripeSubscriptionId);
+      expect(auditLog?.payload_json).toEqual(
+        expect.objectContaining({
+          scheduleId,
+          scheduledChangeId,
+          scheduleStatus: KiloPassScheduledChangeStatus.Released,
+          effectiveAt: '2099-02-01T00:00:00.000Z',
+          unexpectedPreEffectiveRelease: true,
+        })
+      );
     });
 
     test('subscription_schedule.updated (status=canceled) soft-deletes the scheduled change row', async () => {
@@ -2620,6 +2634,168 @@ describe('processStripePaymentEventHook', () => {
 });
 
 describe('releaseScheduledChangeForSubscription', () => {
+  test('only the caller that claims the row releases Stripe under concurrent reads', async () => {
+    const scheduledChangeId = crypto.randomUUID();
+    const stripeSubId = `sub_release_helper_concurrent_${Math.random()}`;
+    const scheduleId = `sched_release_helper_concurrent_${Math.random()}`;
+    const user = await insertTestUser({
+      google_user_email: 'kilo-pass-release-helper-concurrent@example.com',
+    });
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
+      stripe_subscription_id: stripeSubId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+      cancel_at_period_end: false,
+      current_streak_months: 1,
+      started_at: '2026-01-01T00:00:00.000Z',
+    });
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Monthly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: scheduleId,
+      effective_at: '2026-02-01T00:00:00.000Z',
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const realFindFirst = db.query.kilo_pass_scheduled_changes.findFirst.bind(
+      db.query.kilo_pass_scheduled_changes
+    );
+    let readers = 0;
+    let releaseReaders: (() => void) | null = null;
+    const bothRead = new Promise<void>(resolve => {
+      releaseReaders = resolve;
+    });
+    const concurrentDb = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property !== 'query') return Reflect.get(target, property, receiver);
+        return {
+          ...target.query,
+          kilo_pass_scheduled_changes: {
+            ...target.query.kilo_pass_scheduled_changes,
+            findFirst: async (...args: Parameters<typeof realFindFirst>) => {
+              const row = await realFindFirst(...args);
+              readers += 1;
+              if (readers === 2) releaseReaders?.();
+              await bothRead;
+              return row;
+            },
+          },
+        };
+      },
+    });
+    const release = jest.fn(async (_scheduleId: string) => ({}));
+    const retrieve = jest.fn(async (_scheduleId: string) => ({ status: 'released' }));
+    const params = {
+      dbOrTx: concurrentDb,
+      stripe: { subscriptionSchedules: { release, retrieve } },
+      stripeSubscriptionId: stripeSubId,
+      reason: 'cancel_scheduled_change' as const,
+    };
+
+    await Promise.all([
+      releaseScheduledChangeForSubscription(params),
+      releaseScheduledChangeForSubscription(params),
+    ]);
+
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledWith(scheduleId);
+    const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+      where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+    });
+    expect(row?.status).toBe(KiloPassScheduledChangeStatus.Released);
+    expect(row?.deleted_at).not.toBeNull();
+  });
+
+  test('a concurrent caller does not report success while the claimed release fails', async () => {
+    const scheduledChangeId = crypto.randomUUID();
+    const stripeSubId = `sub_release_helper_concurrent_failure_${Math.random()}`;
+    const scheduleId = `sched_release_helper_concurrent_failure_${Math.random()}`;
+    const user = await insertTestUser({
+      google_user_email: 'kilo-pass-release-helper-concurrent-failure@example.com',
+    });
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      provider_subscription_id: stripeSubId,
+      stripe_subscription_id: stripeSubId,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: 'active',
+      cancel_at_period_end: false,
+      current_streak_months: 1,
+      started_at: '2026-01-01T00:00:00.000Z',
+    });
+    await db.insert(kilo_pass_scheduled_changes).values({
+      id: scheduledChangeId,
+      kilo_user_id: user.id,
+      stripe_subscription_id: stripeSubId,
+      from_tier: KiloPassTier.Tier19,
+      from_cadence: KiloPassCadence.Monthly,
+      to_tier: KiloPassTier.Tier49,
+      to_cadence: KiloPassCadence.Yearly,
+      stripe_schedule_id: scheduleId,
+      effective_at: '2026-02-01T00:00:00.000Z',
+      status: KiloPassScheduledChangeStatus.NotStarted,
+    });
+
+    const realFindFirst = db.query.kilo_pass_scheduled_changes.findFirst.bind(
+      db.query.kilo_pass_scheduled_changes
+    );
+    let readers = 0;
+    let releaseReaders: (() => void) | null = null;
+    const bothRead = new Promise<void>(resolve => {
+      releaseReaders = resolve;
+    });
+    const concurrentDb = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property !== 'query') return Reflect.get(target, property, receiver);
+        return {
+          ...target.query,
+          kilo_pass_scheduled_changes: {
+            ...target.query.kilo_pass_scheduled_changes,
+            findFirst: async (...args: Parameters<typeof realFindFirst>) => {
+              const row = await realFindFirst(...args);
+              readers += 1;
+              if (readers === 2) releaseReaders?.();
+              await bothRead;
+              return row;
+            },
+          },
+        };
+      },
+    });
+    const release = jest.fn(async (_scheduleId: string) => {
+      throw new Error('stripe release failed');
+    });
+    const retrieve = jest.fn(async (_scheduleId: string) => ({ status: 'active' }));
+    const params = {
+      dbOrTx: concurrentDb,
+      stripe: { subscriptionSchedules: { release, retrieve } },
+      stripeSubscriptionId: stripeSubId,
+      reason: 'cancel_scheduled_change' as const,
+    };
+
+    const results = await Promise.allSettled([
+      releaseScheduledChangeForSubscription(params),
+      releaseScheduledChangeForSubscription(params),
+    ]);
+
+    expect(results.every(result => result.status === 'rejected')).toBe(true);
+    expect(release).toHaveBeenCalledTimes(1);
+    const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+      where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+    });
+    expect(row?.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
+    expect(row?.deleted_at).toBeNull();
+  });
+
   test('soft-deletes first and reverts the delete if Stripe release fails', async () => {
     const scheduledChangeId = crypto.randomUUID();
     const stripeSubId = `sub_release_helper_${Math.random()}`;

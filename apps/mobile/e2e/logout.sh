@@ -11,4 +11,5 @@ set -euo pipefail
 DEVICE="${1:?usage: logout.sh <device-udid>}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+"$SCRIPT_DIR/preflight.sh" "$DEVICE"
 maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/logout.yaml"

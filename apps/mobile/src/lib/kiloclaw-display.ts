@@ -26,3 +26,11 @@ export function kiloclawInstanceSwitcherTitle(instance: KiloClawDisplayInstance 
     'KiloClaw instance'
   );
 }
+
+export function renameKiloClawInstance<
+  T extends { name?: string | null; organizationId?: string | null },
+>(instances: T[] | undefined, organizationId: string | null, name: string | null): T[] | undefined {
+  return instances?.map(instance =>
+    (instance.organizationId ?? null) === organizationId ? { ...instance, name } : instance
+  );
+}

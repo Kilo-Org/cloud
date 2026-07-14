@@ -1,18 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Building2, User } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useTRPC } from '@/lib/trpc';
 
 export function ScopeListScreen() {
   const router = useRouter();
   const trpc = useTRPC();
-  const { data: orgs, isLoading } = useQuery(trpc.organizations.list.queryOptions());
+  const {
+    data: orgs,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useQuery(trpc.organizations.list.queryOptions());
 
   const openScope = (scope: string) => {
     router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}` as Href);
@@ -21,7 +29,18 @@ export function ScopeListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+        {isError && (
+          <QueryError
+            variant="server"
+            title="Could not load organizations"
+            message="Personal repositories are still available below."
+            placement="top"
+            className="pb-6 pt-0"
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
+        )}
         <ConfigureRow
           icon={User}
           title="Personal"
@@ -47,7 +66,7 @@ export function ScopeListScreen() {
             />
           ))
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

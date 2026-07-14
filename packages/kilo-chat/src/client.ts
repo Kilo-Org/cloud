@@ -47,6 +47,7 @@ import type {
   MessageUpdatedEvent,
   MessageDeletedEvent,
   MessageDeliveryFailedEvent,
+  MessageRedeliveredEvent,
   ActionDeliveryFailedEvent,
   TypingEvent,
   ReactionAddedEvent,
@@ -234,6 +235,13 @@ export class KiloChatClient {
     });
   }
 
+  async redeliverMessage(conversationId: string, messageId: string): Promise<{ ok: true }> {
+    return this.httpRequest(`/v1/conversations/${conversationId}/messages/${messageId}/redeliver`, {
+      method: 'POST',
+      schema: okResponseSchema,
+    });
+  }
+
   async executeAction(
     conversationId: string,
     messageId: string,
@@ -364,6 +372,10 @@ export class KiloChatClient {
     handler: (ctx: string, e: MessageDeliveryFailedEvent) => void
   ): () => void {
     return this.on('message.delivery_failed', handler);
+  }
+
+  onMessageRedelivered(handler: (ctx: string, e: MessageRedeliveredEvent) => void): () => void {
+    return this.on('message.redelivered', handler);
   }
 
   onActionDeliveryFailed(handler: (ctx: string, e: ActionDeliveryFailedEvent) => void): () => void {

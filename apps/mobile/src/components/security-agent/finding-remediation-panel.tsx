@@ -4,10 +4,12 @@ import {
   getRemediationStatusPresentation,
   getRemediationUnavailableCopy,
 } from '@kilocode/app-shared/security-agent';
+import { Wrench } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
@@ -67,7 +69,14 @@ export function FindingRemediationPanel({
   }
 
   if (!analysis) {
-    return null;
+    return (
+      <EmptyState
+        icon={Wrench}
+        placement="top"
+        title="No analysis yet"
+        description="Run one from the Details tab"
+      />
+    );
   }
 
   const { remediationCapability, remediationSummary, remediationAttempts } = analysis;
@@ -93,6 +102,7 @@ export function FindingRemediationPanel({
           icon={presentation.icon}
           label={presentation.label}
           tone={presentation.tone}
+          spinning={presentation.spinning}
         />
         {remediationSummary?.outcomeSummary ? (
           <Text variant="muted" className="text-sm" selectable>
@@ -121,7 +131,7 @@ export function FindingRemediationPanel({
           {startRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text className="text-primary-foreground">Start fix</Text>
+          <Text className="text-primary-foreground">Start remediation</Text>
         </Button>
       ) : null}
 
@@ -136,7 +146,7 @@ export function FindingRemediationPanel({
           {retryRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.foreground} />
           ) : null}
-          <Text>Retry fix</Text>
+          <Text>Retry remediation</Text>
         </Button>
       ) : null}
 
@@ -168,7 +178,7 @@ export function FindingRemediationPanel({
           {cancelRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text>Cancel fix</Text>
+          <Text>Cancel remediation</Text>
         </Button>
       ) : null}
 
@@ -190,6 +200,10 @@ export function FindingRemediationPanel({
         <CollapsibleSection
           title={`Attempt history (${remediationAttempts.length})`}
           defaultExpanded={remediationAttempts.length <= 2}
+          // Attempt rows below are already their own card surface — a second
+          // bg-secondary card wrapping them read as a card nested in a card.
+          // Transparent wrapper: one visible surface per attempt, not two.
+          className="bg-transparent"
         >
           <View className="gap-3">
             {remediationAttempts.map(attempt => {
@@ -215,6 +229,7 @@ export function FindingRemediationPanel({
                     icon={attemptPresentation.icon}
                     label={attemptPresentation.label}
                     tone={attemptPresentation.tone}
+                    spinning={attemptPresentation.spinning}
                   />
                   <KvRow label="Started by" value={formatRemediationOrigin(attempt.origin)} />
                   <KvRow label="Model" value={attempt.remediationModelSlug} selectable />

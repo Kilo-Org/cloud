@@ -2,20 +2,23 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
-import { ScrollView, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
 
+import { AuditReportButton } from '@/components/security-agent/audit-report-button';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { capitalize } from '@/lib/utils';
 
 function SettingsOverviewSkeleton() {
   return (
@@ -30,14 +33,10 @@ function SettingsOverviewSkeleton() {
   );
 }
 
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const config = useSecurityAgentConfig(scope);
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 
@@ -58,14 +57,12 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Settings" />
-        <QueryError
-          className="flex-1"
-          message="Could not load Security Agent settings"
-          onRetry={() => void config.refetch()}
-        />
-      </View>
+      <PlatformErrorScreen
+        title="Settings"
+        variant="offline"
+        message="Could not load Security Agent settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {
@@ -96,10 +93,18 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
     });
   };
 
+  // Audit-report access shouldn't depend on the agent being enabled — see
+  // the matching header action in scope-entry-screen.tsx, which reaches
+  // audit reports from the connected-but-disconnected states. This is the
+  // connected-but-disabled counterpart: settings-overview-screen is where
+  // scope-entry redirects once the agent is disabled, so the same action
+  // needs to be reachable here too.
+  const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Settings" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
+      <ScreenHeader title="Settings" headerRight={auditAction} />
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">
             <Text className="text-sm font-medium">Security Agent</Text>
@@ -180,7 +185,7 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
             />
           </View>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

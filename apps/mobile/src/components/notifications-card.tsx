@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, MessageSquare } from 'lucide-react-native';
-import { useCallback, useEffect, useRef } from 'react';
-import { Alert, Linking, Switch, View } from 'react-native';
+import { Bell, MessageSquare, RefreshCw } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +22,22 @@ import { useTRPC } from '@/lib/trpc';
 const permissionQueryKey = ['notificationPermission'];
 const deviceTokenQueryKey = ['devicePushToken'];
 
+type InlineRetryProps = Readonly<{ label: string; color: string; onPress: () => void }>;
+
+function InlineRetry({ label, color, onPress }: InlineRetryProps) {
+  return (
+    <Pressable
+      className="flex-row items-center gap-1 active:opacity-70"
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <RefreshCw size={14} color={color} />
+      <Text className="text-xs font-medium text-destructive">Retry</Text>
+    </Pressable>
+  );
+}
+
 export function NotificationsCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -29,7 +45,14 @@ export function NotificationsCard() {
   const { token: authToken } = useAuth();
   const isAuthenticated = authToken != null;
 
-  const { data: permissionGranted = false, isLoading: permissionLoading } = useQuery({
+  const [isTogglingPermission, setIsTogglingPermission] = useState(false);
+
+  const {
+    data: permissionGranted = false,
+    isLoading: permissionLoading,
+    isError: permissionError,
+    refetch: refetchPermission,
+  } = useQuery({
     queryKey: permissionQueryKey,
     queryFn: async () => {
       const status = await getNotificationPermissionStatus();
@@ -37,16 +60,28 @@ export function NotificationsCard() {
     },
   });
 
-  const { data: deviceToken, isLoading: deviceTokenLoading } = useQuery({
+  const {
+    data: deviceToken,
+    isLoading: deviceTokenLoading,
+    isError: deviceTokenError,
+    refetch: refetchDeviceToken,
+  } = useQuery({
     queryKey: deviceTokenQueryKey,
     queryFn: getDevicePushToken,
     enabled: permissionGranted,
   });
 
-  const { data: pushTokens, isLoading: tokensLoading } = useQuery({
+  const {
+    data: pushTokens,
+    isLoading: tokensLoading,
+    isError: pushTokensError,
+    refetch: refetchPushTokens,
+  } = useQuery({
     ...trpc.user.getMyPushTokens.queryOptions(),
     enabled: isAuthenticated,
   });
+  const chatTokensError = deviceTokenError || pushTokensError;
+  const chatLoading = permissionLoading || tokensLoading || deviceTokenLoading;
 
   const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =
@@ -103,6 +138,8 @@ export function NotificationsCard() {
     })
   );
 
+  const chatTogglePending = registerToken.isPending || unregisterToken.isPending;
+
   // Re-check permission on foreground resume
   const { isActive } = useAppLifecycle();
   const wasActiveRef = useRef(isActive);
@@ -119,7 +156,7 @@ export function NotificationsCard() {
         const currentStatus = await getNotificationPermissionStatus();
         if (currentStatus === 'denied') {
           Alert.alert(
-            'Notifications Disabled',
+            'Notifications disabled',
             'To enable notifications, turn them on in your device settings.',
             [
               { text: 'Cancel', style: 'cancel' },
@@ -128,11 +165,20 @@ export function NotificationsCard() {
           );
           return;
         }
-        await Notifications.requestPermissionsAsync();
-        void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
+        setIsTogglingPermission(true);
+        try {
+          await Notifications.requestPermissionsAsync();
+          void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to request notification permission.'
+          );
+        } finally {
+          setIsTogglingPermission(false);
+        }
       } else {
         Alert.alert(
-          'Disable Notifications',
+          'Disable notifications',
           'To disable notifications, turn them off in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -147,10 +193,22 @@ export function NotificationsCard() {
   const handleToggleChatMessages = useCallback(
     async (value: boolean) => {
       if (value) {
-        const token = await registerForPushNotifications();
-        if (token) {
-          registerToken.mutate({ token, platform: getPlatform() });
+        let token: string | null = null;
+        try {
+          token = await registerForPushNotifications();
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'Registration failed. Check your notification permissions.'
+          );
+          return;
         }
+        if (!token) {
+          toast.error('Registration failed. Check your notification permissions.');
+          return;
+        }
+        registerToken.mutate({ token, platform: getPlatform() });
       } else if (deviceToken) {
         unregisterToken.mutate({ token: deviceToken });
       }
@@ -168,13 +226,26 @@ export function NotificationsCard() {
       <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
         <Bell size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium">Notifications</Text>
-        {permissionLoading ? (
-          <Skeleton className="h-8 w-12 rounded-full" />
-        ) : (
-          <Switch
-            value={permissionGranted}
-            onValueChange={value => void handleToggleNotifications(value)}
+        {permissionLoading && <Skeleton className="h-8 w-12 rounded-full" />}
+        {!permissionLoading && permissionError && (
+          <InlineRetry
+            label="Retry checking notification permission"
+            color={colors.destructive}
+            onPress={() => void refetchPermission()}
           />
+        )}
+        {!permissionLoading && !permissionError && (
+          <>
+            {isTogglingPermission && (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            )}
+            <Switch
+              value={permissionGranted}
+              disabled={isTogglingPermission}
+              accessibilityState={{ disabled: isTogglingPermission, busy: isTogglingPermission }}
+              onValueChange={value => void handleToggleNotifications(value)}
+            />
+          </>
         )}
       </View>
 
@@ -183,20 +254,36 @@ export function NotificationsCard() {
         className={`flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${!permissionGranted ? 'opacity-40' : ''}`}
       >
         <MessageSquare size={18} color={colors.secondaryForeground} />
-        <Text className="flex-1 text-sm font-medium">Chat Messages</Text>
-        {permissionLoading || tokensLoading || deviceTokenLoading ? (
-          <Skeleton className="h-8 w-12 rounded-full" />
-        ) : (
-          <Switch
-            value={serverRegistered}
-            disabled={!permissionGranted}
-            onValueChange={value => {
-              if (registerToken.isPending || unregisterToken.isPending) {
-                return;
-              }
-              void handleToggleChatMessages(value);
+        <Text className="flex-1 text-sm font-medium">Chat messages</Text>
+        {chatLoading && <Skeleton className="h-8 w-12 rounded-full" />}
+        {!chatLoading && chatTokensError && (
+          <InlineRetry
+            label="Retry loading chat message notification status"
+            color={colors.destructive}
+            onPress={() => {
+              void refetchDeviceToken();
+              void refetchPushTokens();
             }}
           />
+        )}
+        {!chatLoading && !chatTokensError && (
+          <>
+            {chatTogglePending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+            <Switch
+              value={serverRegistered}
+              disabled={!permissionGranted || chatTogglePending}
+              accessibilityState={{
+                disabled: !permissionGranted || chatTogglePending,
+                busy: chatTogglePending,
+              }}
+              onValueChange={value => {
+                if (chatTogglePending) {
+                  return;
+                }
+                void handleToggleChatMessages(value);
+              }}
+            />
+          </>
         )}
       </View>
     </View>

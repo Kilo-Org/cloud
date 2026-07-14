@@ -1,8 +1,7 @@
-import { canManageSecurityAgent } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Ban, ShieldOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -12,8 +11,9 @@ import { FindingDetailsPanel } from '@/components/security-agent/finding-details
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import {
-  useSecurityAgentOrgRole,
+  useSecurityAgentCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
@@ -48,11 +48,12 @@ type FindingDetailScreenProps = {
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
-  const role = useSecurityAgentOrgRole(scope);
+  const capability = useSecurityAgentCapability(scope);
 
   // Ref indirection keeps the tracking effects independent of the mutation
   // object's identity (a new object every render), so they only re-fire on
@@ -85,12 +86,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Finding" />
-        <EmptyState
-          icon={ShieldOff}
-          className="flex-1"
-          title="Finding not found"
-          description="This finding may have been removed, or you no longer have access to it."
-        />
+        <View className="flex-1" style={{ paddingBottom }}>
+          <EmptyState
+            icon={ShieldOff}
+            className="flex-1"
+            title="Finding not found"
+            description="This finding may have been removed, or you no longer have access to it."
+          />
+        </View>
       </View>
     );
   }
@@ -99,7 +102,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Finding" />
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center" style={{ paddingBottom }}>
           <QueryError
             message="Could not load this finding"
             onRetry={() => void findingQuery.refetch()}
@@ -124,7 +127,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }
 
   const finding = findingQuery.data;
-  const canDismiss = finding.status === 'open' && canManageSecurityAgent(scope, role);
+  const canDismiss = finding.status === 'open' && capability.canManage;
 
   return (
     <View className="flex-1 bg-background">
@@ -139,8 +142,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               }}
               accessibilityRole="button"
               accessibilityLabel="Dismiss finding"
-              hitSlop={8}
-              className="active:opacity-70"
+              className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />
             </Pressable>
@@ -154,7 +156,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             <Pressable
               key={key}
               className={cn(
-                'flex-1 items-center rounded-lg py-2 active:opacity-80',
+                'min-h-11 flex-1 items-center justify-center rounded-lg py-2 active:opacity-80',
                 selected ? 'bg-primary' : 'bg-secondary'
               )}
               onPress={() => {
@@ -175,7 +177,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           );
         })}
       </View>
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pb-24 pt-2">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-2">
         {tab === 'details' && <FindingDetailsPanel finding={finding} scope={scope} />}
         {tab === 'analysis' && (
           <FindingAnalysisPanel
@@ -197,7 +199,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             onRetry={() => void analysisQuery.refetch()}
           />
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

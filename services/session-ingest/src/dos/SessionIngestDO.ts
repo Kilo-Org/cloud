@@ -87,6 +87,10 @@ const INGEST_META_EXTRACTORS: Array<{
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
 
+export type IngestResult =
+  | { accepted: true; changes: Changes }
+  | { accepted: false; reason: 'deleted'; changes: never[] };
+
 type IngestLifecycleEvent =
   | { type: 'session_open' }
   | {
@@ -136,9 +140,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     ingestVersion = 0,
     ingestedAt?: number,
     r2References?: Record<string, string>
-  ): Promise<{
-    changes: Changes;
-  }> {
+  ): Promise<IngestResult> {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
       .from(ingestMeta)
@@ -152,7 +154,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           await this.env.SESSION_INGEST_R2.delete(keys);
         }
       }
-      return { changes: [] };
+      return { accepted: false, reason: 'deleted', changes: [] };
     }
 
     writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: kiloUserId });
@@ -301,6 +303,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     }
 
     return {
+      accepted: true,
       changes,
     };
   }

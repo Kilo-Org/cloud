@@ -1,0 +1,35 @@
+# Login step 2/2 — verify the emailed sign-in code.
+#
+# Enters OTP on the "Enter the code" screen and lands on Home. Assumes
+# login-request-code.yaml already reached that screen.
+#
+#   maestro --device <udid> test -e OTP=123456 e2e/flows/login-verify-code.yaml
+#
+# Prefer the one-shot wrapper e2e/login.sh. See e2e/AGENTS.md.
+appId: com.kilocode.kiloapp
+---
+- assertVisible: 'Verify code'
+- tapOn: 'Sign-in code'
+- eraseText: 6
+- inputText: ${OTP}
+# The number pad has no dismiss key; "Verify code" sits above it, so tap directly.
+- tapOn: 'Verify code'
+# A brand-new account's first sign-in shows a consent screen before Home.
+- extendedWaitUntil:
+    visible:
+      text: 'Accept and continue|HOME|Home, tab, 1 of 4'
+    timeout: 20000
+- runFlow:
+    when:
+      visible: 'Accept and continue'
+    commands:
+      - tapOn: 'Accept and continue'
+# Grant the notification permission prompt if iOS shows one.
+- runFlow:
+    when:
+      visible: 'Allow'
+    commands:
+      - tapOn: 'Allow'
+- extendedWaitUntil:
+    visible: 'HOME|Home, tab, 1 of 4'
+    timeout: 15000

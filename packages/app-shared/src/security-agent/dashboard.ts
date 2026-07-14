@@ -102,21 +102,22 @@ export function buildSecurityDashboardMetrics(
     ];
   }
 
-  const compliance =
-    data.sla.overall.total > 0
-      ? Math.round((data.sla.overall.withinSla / data.sla.overall.total) * 100)
-      : 100;
+  // With no SLA-tracked findings there's nothing to divide — showing "100%"
+  // reads as "fully compliant" when compliance was never actually measured.
+  const hasSlaData = data.sla.overall.total > 0;
+  const compliance = hasSlaData
+    ? Math.round((data.sla.overall.withinSla / data.sla.overall.total) * 100)
+    : null;
 
   return [
     {
       id: 'slaCompliance',
       label: 'SLA compliance',
-      value: `${compliance}%`,
-      detail:
-        data.sla.overall.total > 0
-          ? `${data.sla.overall.withinSla} of ${data.sla.overall.total} within deadline`
-          : 'No assigned deadlines',
-      tone: complianceTone(compliance),
+      value: compliance === null ? 'Not measured' : `${compliance}%`,
+      detail: hasSlaData
+        ? `${data.sla.overall.withinSla} of ${data.sla.overall.total} within deadline`
+        : 'No findings with an SLA deadline yet',
+      tone: compliance === null ? 'neutral' : complianceTone(compliance),
     },
     {
       id: 'deadlinePassed',

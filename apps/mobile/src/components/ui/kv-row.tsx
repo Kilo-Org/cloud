@@ -56,20 +56,24 @@ export function KvRow({
   return (
     <View
       className={cn(
-        'flex-row items-center justify-between py-3',
+        'flex-row items-center justify-between gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
         className
       )}
     >
-      <View className="flex-row items-center gap-2">
+      <View className="shrink-0 flex-row items-center gap-2">
         {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
         {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
-        <Text className="text-sm text-muted-foreground">{label}</Text>
+        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+          {label}
+        </Text>
       </View>
       <Text
         variant="mono"
         selectable={selectable}
-        className={cn('text-[13px]', VALUE_TONE[valueTone])}
+        numberOfLines={1}
+        ellipsizeMode="middle"
+        className={cn('min-w-0 shrink text-right text-[13px]', VALUE_TONE[valueTone])}
       >
         {value}
       </Text>

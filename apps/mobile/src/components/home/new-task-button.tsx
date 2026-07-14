@@ -28,7 +28,7 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
         }}
       >
         <Plus size={18} color={colors.primaryForeground} />
-        <Text className="font-semibold">New coding task</Text>
+        <Text className="shrink text-center font-semibold">New coding task</Text>
       </Button>
     </View>
   );

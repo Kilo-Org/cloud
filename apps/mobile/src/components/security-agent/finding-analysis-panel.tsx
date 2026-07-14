@@ -4,12 +4,13 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
-import { ExternalLink } from 'lucide-react-native';
+import { ExternalLink, ScanSearch } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
@@ -83,7 +84,14 @@ export function FindingAnalysisPanel({
   }
 
   if (!analysis) {
-    return null;
+    return (
+      <EmptyState
+        icon={ScanSearch}
+        placement="top"
+        title="No analysis yet"
+        description="Run one from the Details tab"
+      />
+    );
   }
 
   const presentation = getSecurityAnalysisDetailPresentation(
@@ -111,6 +119,10 @@ export function FindingAnalysisPanel({
     capacity.runningCount !== undefined &&
     capacity.concurrencyLimit !== undefined &&
     capacity.runningCount < capacity.concurrencyLimit;
+  // "Capacity full" is only ever true after a successful count — while
+  // loading or on error, `hasCapacity` is false too (so the button stays
+  // disabled), but neither of those states means it's actually full.
+  const capacityConfirmedFull = !capacity.isLoading && !capacity.isError && !hasCapacity;
 
   const handleStartAnalysis = () => {
     startAnalysis.mutate({
@@ -143,6 +155,7 @@ export function FindingAnalysisPanel({
           icon={presentation.icon}
           label={presentation.title}
           tone={presentation.tone}
+          spinning={presentation.spinning}
         />
         <Text variant="muted" className="text-sm" selectable>
           {presentation.description}
@@ -164,10 +177,24 @@ export function FindingAnalysisPanel({
               </Text>
             </Button>
           ) : null}
-          {canStartAnalysis && !hasCapacity ? (
+          {canStartAnalysis && capacityConfirmedFull ? (
             <Text variant="muted" className="text-xs">
               Analysis capacity is full. Wait for an active analysis to finish.
             </Text>
+          ) : null}
+          {canStartAnalysis && capacity.isError ? (
+            <View className="flex-row items-center gap-2">
+              <Text variant="muted" className="text-xs">
+                Could not check analysis capacity.
+              </Text>
+              <Pressable
+                onPress={() => void capacity.refetch()}
+                accessibilityRole="button"
+                accessibilityLabel="Retry"
+              >
+                <Text className="text-xs font-medium text-primary">Retry</Text>
+              </Pressable>
+            </View>
           ) : null}
           {canRestartAnalysis ? (
             <Button

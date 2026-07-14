@@ -1,86 +1,93 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { Pressable, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { AddCreditsRow } from '@/components/add-credits-row';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { OrgUsageStats } from '@/components/organization/org-usage-stats';
-import { RenameOrgModal } from '@/components/organization/rename-org-modal';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { KvRow } from '@/components/ui/kv-row';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
-import { isMoneyRole, useOrgRole, useOrgWithMembers } from '@/lib/hooks/use-organization-queries';
+import {
+  isMoneyRole,
+  useOrgBoundary,
+  useOrgWithMembers,
+} from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-function InfoCardSkeleton() {
-  return (
-    <View className="gap-2.5 rounded-lg bg-secondary px-3 py-3">
-      <Skeleton className="h-5 w-2/3 rounded-md" />
-      <Skeleton className="h-5 w-1/3 rounded-md" />
-    </View>
-  );
-}
 
 export function OrganizationHubScreen() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role, org, isLoading } = useOrgRole();
+  const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const mutations = useOrganizationMutations(organizationId ?? '');
   const [renameVisible, setRenameVisible] = useState(false);
 
-  if (organizationId == null) {
-    return null;
+  if (isResolving || organizationId == null || org == null) {
+    return <OrganizationBoundary title="Organization" />;
   }
 
   const showMoney = isMoneyRole(role);
   const minimumBalance = orgWithMembers.data?.settings.minimum_balance;
-  const lowBalanceSubtitle = minimumBalance != null ? `Below $${minimumBalance.toFixed(2)}` : 'Off';
+  const lowBalanceSubtitle =
+    minimumBalance != null ? `Below ${formatDollars(minimumBalance)}` : 'Off';
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={org?.organizationName ?? 'Organization'} />
-      <ScrollView
+      <ScreenHeader title={org.organizationName} />
+      <TabScreenScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-8"
+        contentContainerClassName="gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View layout={LinearTransition}>
-          {isLoading || !org ? (
-            <Animated.View exiting={FadeOut.duration(150)}>
-              <InfoCardSkeleton />
-            </Animated.View>
-          ) : (
-            <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-              <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-                <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
-                  {org.organizationName}
-                </Text>
-                {showMoney && (
-                  <Pressable
-                    onPress={() => {
-                      setRenameVisible(true);
-                    }}
-                    hitSlop={12}
-                    accessibilityRole="button"
-                    accessibilityLabel="Rename organization"
-                    className="active:opacity-70"
-                  >
-                    <Pencil size={16} color={colors.mutedForeground} />
-                  </Pressable>
-                )}
-              </View>
-              {showMoney && (
-                <KvRow label="Balance" value={`$${fromMicrodollars(org.balance).toFixed(2)}`} />
-              )}
-              <KvRow label="Seats" value={`${org.seatCount.used} / ${org.seatCount.total}`} last />
-            </Animated.View>
+        <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
+          <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
+            <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
+              {org.organizationName}
+            </Text>
+            {showMoney && (
+              <Pressable
+                onPress={() => {
+                  setRenameVisible(true);
+                }}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Rename organization"
+                className="active:opacity-70"
+              >
+                <Pencil size={16} color={colors.mutedForeground} />
+              </Pressable>
+            )}
+          </View>
+          {showMoney && (
+            <KvRow label="Balance" value={formatDollars(fromMicrodollars(org.balance))} />
           )}
+          {showMoney && org.balance === 0 && (
+            <AddCreditsRow
+              url={`${WEB_BASE_URL}/organizations/${organizationId}/payment-details`}
+              className="border-b-[0.5px] border-hair-soft py-3"
+            />
+          )}
+          <KvRow
+            label="Seats"
+            // `requireSeats` is the enforcement switch; total is the raw
+            // purchased capacity and can legitimately be zero.
+            value={
+              org.requireSeats
+                ? `${org.seatCount.used} / ${org.seatCount.total}`
+                : String(org.seatCount.used)
+            }
+            last
+          />
         </Animated.View>
 
         <OrgUsageStats organizationId={organizationId} />
@@ -122,20 +129,16 @@ export function OrganizationHubScreen() {
             </>
           )}
         </View>
-      </ScrollView>
+      </TabScreenScrollView>
 
-      {renameVisible && org && (
-        <RenameOrgModal
-          defaultName={org.organizationName}
-          onSubmit={name => {
-            mutations.rename.mutate(
-              { name },
-              {
-                onSuccess: () => {
-                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                },
-              }
-            );
+      {renameVisible && (
+        <RenameModal
+          title="Rename organization"
+          placeholder="Enter organization name"
+          initialValue={org.organizationName}
+          onSave={async name => {
+            await mutations.rename.mutateAsync({ name });
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
           onClose={() => {
             setRenameVisible(false);

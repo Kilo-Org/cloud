@@ -6,15 +6,17 @@ import {
   type SecurityFindingRouteParams,
   toSecurityFindingQuery,
 } from '@kilocode/app-shared/security-agent';
+import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
 import { FindingRow } from '@/components/security-agent/finding-row';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -24,7 +26,10 @@ import {
   useSecurityAnalysisCapacity,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
+import { getSecurityAgentPath } from '@/lib/security-agent';
+import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type FindingListScreenProps = {
   scope: string;
@@ -46,9 +51,10 @@ function FindingsListFooter({
 }
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
+  const router = useRouter();
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const [filters, setFilters] = useState(() => parseSecurityFindingFilters(routeParams));
-  const [showFilterModal, setShowFilterModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const config = useSecurityAgentConfig(scope);
@@ -65,13 +71,19 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   const items = findings.data?.pages.flatMap(page => page.findings) ?? [];
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
+  // Repos aren't known yet (still loading or the fetch failed) — the filter
+  // stays disabled instead of silently offering a shrunken repository list.
+  const filterUnavailable = repositories.isLoading || repositories.isError;
 
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
       try {
         // Refresh only — never triggers a new sync.
-        await findings.refetch();
+        const result = await findings.refetch();
+        if (result.isError) {
+          toast.error("Couldn't refresh. Pull down to try again.");
+        }
       } finally {
         setRefreshing(false);
       }
@@ -85,11 +97,24 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         headerRight={
           <Pressable
             onPress={() => {
-              setShowFilterModal(true);
+              if (filterUnavailable) {
+                return;
+              }
+              setSecurityFindingFilterBridge({
+                filters,
+                repositories: scopedRepositories,
+                onApply: setFilters,
+              });
+              router.push(getSecurityAgentPath(scope, 'filter'));
             }}
+            disabled={filterUnavailable}
             accessibilityRole="button"
             accessibilityLabel="Filter findings"
-            className="size-11 items-center justify-center active:opacity-70"
+            accessibilityState={{ disabled: filterUnavailable }}
+            className={cn(
+              'size-11 items-center justify-center active:opacity-70',
+              filterUnavailable && 'opacity-50'
+            )}
           >
             <SlidersHorizontal
               size={20}
@@ -125,7 +150,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               hasAnalysisCapacity={hasAnalysisCapacity}
             />
           )}
-          contentContainerClassName="gap-3 px-6 pb-24 pt-4"
+          contentContainerClassName="grow gap-3 px-6 pt-4"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {
@@ -134,20 +159,22 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            <FindingsListFooter
-              loading={findings.isFetchingNextPage}
-              error={findings.isFetchNextPageError}
-              onRetry={() => void findings.fetchNextPage()}
-            />
+            <>
+              <FindingsListFooter
+                loading={findings.isFetchingNextPage}
+                error={findings.isFetchNextPageError}
+                onRetry={() => void findings.fetchNextPage()}
+              />
+              <View style={{ height: paddingBottom }} pointerEvents="none" />
+            </>
           }
           ListEmptyComponent={
             <EmptyState
               icon={ShieldCheck}
-              className="pt-16"
-              title={filtersActive ? 'No matching findings' : 'No open findings'}
+              title={filtersActive ? 'No findings match filters' : 'No open findings'}
               description={
                 filtersActive
-                  ? 'No findings match the selected filters.'
+                  ? 'Try adjusting or clearing the selected filters.'
                   : 'No open findings need attention right now.'
               }
               action={
@@ -158,22 +185,12 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                       setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
                     }}
                   >
-                    <Text>Reset filters</Text>
+                    <Text>Clear filters</Text>
                   </Button>
                 ) : undefined
               }
             />
           }
-        />
-      )}
-      {showFilterModal && (
-        <FindingFilterModal
-          filters={filters}
-          repositories={scopedRepositories}
-          onClose={() => {
-            setShowFilterModal(false);
-          }}
-          onApply={setFilters}
         />
       )}
     </View>

@@ -6,7 +6,10 @@ import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createAppStoreKiloPassPurchaseActions,
+  resetInlinePurchaseErrorOwnership,
+  resetPurchaseErrorToastDedup,
   StoreKiloPassPurchaseProvider,
+  useInlinePurchaseErrorOwnership,
 } from './use-store-kilo-pass-purchase';
 import { type AppStoreKiloPassProduct } from './store-products';
 
@@ -106,6 +109,7 @@ type StoreKiloPassPurchaseContextValue = {
   restorePurchases: () => Promise<'restored' | 'empty' | 'failed'>;
   isPending: boolean;
   isRestoringPurchases: boolean;
+  errorMessage: string | null;
 };
 
 type ReactInternals = {
@@ -192,6 +196,36 @@ function renderStoreKiloPassPurchaseProvider() {
   return { render };
 }
 
+/** Mounts `useInlinePurchaseErrorOwnership`, returning an `unmount` that runs its cleanup. */
+function mountInlineErrorOwnership() {
+  const reactInternals = React as typeof React & ReactInternals;
+  let cleanup: (() => void) | undefined = undefined;
+  const dispatcher = {
+    useEffect: (effect: () => (() => void) | undefined) => {
+      cleanup = effect();
+    },
+  };
+
+  const previousDispatcher =
+    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H;
+  reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H = dispatcher;
+  try {
+    // Same alias trick as renderProviderElement above: run the hook against
+    // the fake dispatcher without tripping rules-of-hooks lexically.
+    const mountOwnershipHook = useInlinePurchaseErrorOwnership;
+    mountOwnershipHook();
+  } finally {
+    reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
+      previousDispatcher;
+  }
+
+  return {
+    unmount: () => {
+      cleanup?.();
+    },
+  };
+}
+
 function ignoreDeferredResolution(_value: unknown) {
   return undefined;
 }
@@ -271,6 +305,8 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetPurchaseErrorToastDedup();
+  resetInlinePurchaseErrorOwnership();
   mockedIap.availablePurchases = [];
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
@@ -814,6 +850,38 @@ describe('StoreKiloPassPurchaseProvider', () => {
     expect(releasedValue.isPending).toBe(false);
     await releasedValue.purchase(product);
     expect(mockedIap.requestPurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('toasts a purchase error when no screen owns inline feedback', async () => {
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product);
+
+    mockedIap.handlers?.onPurchaseError(new Error('Untoasted screen check failed'));
+    const releasedValue = provider.render();
+
+    expect(toast.error).toHaveBeenCalledWith('Untoasted screen check failed');
+    expect(releasedValue.errorMessage).toBe('Untoasted screen check failed');
+  });
+
+  it('suppresses the purchase-error toast while a screen owns inline feedback, and resumes once it unmounts', async () => {
+    const provider = renderStoreKiloPassPurchaseProvider();
+    const owner = mountInlineErrorOwnership();
+
+    const initialValue = provider.render();
+    await initialValue.purchase(product);
+    mockedIap.handlers?.onPurchaseError(new Error('Inline banner check failed'));
+    const ownedValue = provider.render();
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(ownedValue.errorMessage).toBe('Inline banner check failed');
+
+    owner.unmount();
+    await ownedValue.purchase(product);
+    mockedIap.handlers?.onPurchaseError(new Error('Untoasted screen check failed'));
+
+    expect(toast.error).toHaveBeenCalledWith('Untoasted screen check failed');
   });
 
   it('ignores live StoreKit success for an unknown product', async () => {

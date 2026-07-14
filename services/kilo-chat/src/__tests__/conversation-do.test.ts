@@ -1130,4 +1130,128 @@ describe('ConversationDO', () => {
     const result = await stub.destroyAndReturnMembers();
     expect(result).toBeNull();
   });
+
+  it('redeliverMessage - clears delivery_failed for a failed message', async () => {
+    const stub = getStub('conv-redeliver-1');
+    await stub.initialize({ ...BASE_PARAMS, id: 'conv-redeliver-1' });
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Retry me' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await expect(stub.notifyDeliveryFailed(created.messageId)).resolves.toEqual({
+      ok: true,
+      changed: true,
+    });
+
+    const result = await stub.redeliverMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+    });
+    expect(result).toEqual({
+      ok: true,
+      redelivered: true,
+    });
+
+    const { messages } = await stub.listMessages({ limit: 10 });
+    const msg = messages.find(m => m.id === created.messageId);
+    expect(msg!.deliveryFailed).toBe(false);
+  });
+
+  it('redeliverMessage - no-op for a message that has not failed', async () => {
+    const stub = getStub('conv-redeliver-2');
+    await stub.initialize({ ...BASE_PARAMS, id: 'conv-redeliver-2' });
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Delivered fine' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const result = await stub.redeliverMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.redelivered).toBe(false);
+  });
+
+  it('redeliverMessage - rejects a caller who is not the sender', async () => {
+    const stub = getStub('conv-redeliver-3');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-redeliver-3',
+      members: [...BASE_PARAMS.members, { id: 'user-bob', kind: 'user' as const }],
+    });
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Not yours' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    await stub.notifyDeliveryFailed(created.messageId);
+
+    const result = await stub.redeliverMessage({
+      messageId: created.messageId,
+      senderId: 'user-bob',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('forbidden');
+  });
+
+  it('redeliverMessage - conflict when no bot remains to redeliver to', async () => {
+    const stub = getStub('conv-redeliver-5');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-redeliver-5',
+      members: [{ id: 'user-alice', kind: 'user' as const }],
+    });
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Nobody home' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    await stub.notifyDeliveryFailed(created.messageId);
+
+    const result = await stub.redeliverMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('conflict');
+
+    // The flag must survive a rejected redelivery.
+    const { messages } = await stub.listMessages({ limit: 10 });
+    expect(messages.find(m => m.id === created.messageId)!.deliveryFailed).toBe(true);
+  });
+
+  it('redeliverMessage - not_found for missing or deleted messages', async () => {
+    const stub = getStub('conv-redeliver-4');
+    await stub.initialize({ ...BASE_PARAMS, id: 'conv-redeliver-4' });
+
+    const missing = await stub.redeliverMessage({
+      messageId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      senderId: 'user-alice',
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.code).toBe('not_found');
+
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Soon deleted' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    await stub.deleteMessage({ messageId: created.messageId, senderId: 'user-alice' });
+
+    const deleted = await stub.redeliverMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+    });
+    expect(deleted.ok).toBe(false);
+    if (!deleted.ok) expect(deleted.code).toBe('not_found');
+  });
 });

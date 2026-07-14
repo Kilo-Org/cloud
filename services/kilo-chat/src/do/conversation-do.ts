@@ -10,6 +10,7 @@ import {
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { logger } from '../util/logger';
+import { contentBlocksToText } from '../util/content';
 import { headObject } from '../util/presigner';
 import {
   deliverToBot,
@@ -52,6 +53,7 @@ import {
   botMessageNotificationTextLength,
   sendConversationMessagePush,
 } from '../services/push-notifications';
+import { pushEventToHumanMembers } from '../services/event-push';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
@@ -255,6 +257,15 @@ export type NotifyDeliveryFailedResult =
   | { ok: true; changed: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
+export type RedeliverMessageParams = {
+  messageId: string;
+  senderId: string;
+};
+
+export type RedeliverMessageResult =
+  | { ok: true; redelivered: boolean }
+  | { ok: false; code: 'not_found' | 'forbidden' | 'conflict'; error: string };
+
 export type InitAttachmentParams = {
   uploaderId: string;
   mimeType: string;
@@ -442,6 +453,129 @@ export class ConversationDO extends DurableObject<Env> {
 
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
     return { ok: true, changed: true };
+  }
+
+  /**
+   * Re-attempts bot delivery of an existing delivery-failed message. Clears
+   * the `delivery_failed` flag, publishes `message.redelivered` to human
+   * members, then re-enqueues the webhook for the stored content — no new
+   * message row, no attachment re-linking. If the retry fails permanently
+   * again, the normal deliverToBot failure path flips the flag back and
+   * pushes `message.delivery_failed`.
+   */
+  async redeliverMessage(params: RedeliverMessageParams): Promise<RedeliverMessageResult> {
+    const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
+    if (!row || row.deleted === 1) {
+      return { ok: false, code: 'not_found', error: 'Message not found' };
+    }
+
+    if (params.senderId !== row.sender_id) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not the owner of message ${params.messageId}`,
+      };
+    }
+
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === params.senderId)) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
+      };
+    }
+    const memberContext = this.getMemberContextFromRows(activeMembers);
+
+    // Already delivered (or a concurrent redeliver won) — idempotent no-op so
+    // a double-tap cannot double-deliver to the bot.
+    if (row.delivery_failed !== 1) {
+      return { ok: true, redelivered: false };
+    }
+
+    // delivery_failed is one message-level bit — it doesn't record which
+    // recipient failed. Redelivery is only well-defined with exactly one
+    // eligible bot (the shape every kilo-chat conversation has; see
+    // getMemberContextFromRows). Zero bots must not clear the flag and
+    // report success; multiple would double-deliver to bots that already
+    // accepted the original.
+    const bots = activeMembers.filter(member => member.kind === 'bot');
+    if (bots.length !== 1) {
+      return {
+        ok: false,
+        code: 'conflict',
+        error:
+          bots.length === 0
+            ? 'No active bot to redeliver to'
+            : 'Redelivery is ambiguous with multiple bots',
+      };
+    }
+    const bot = bots[0];
+
+    // Clear synchronously so a double-tap (flag now 0) short-circuits at the
+    // check above instead of double-delivering. If the retry fails again,
+    // deliverToBot -> notifyDeliveryFailed re-sets the flag.
+    this.db.update(messages).set({ delivery_failed: 0 }).where(eq(messages.id, row.id)).run();
+
+    const conversationId = this.getConversationId();
+    const content = parseStoredContent(row.content, row.id);
+
+    // Mirror the reply context the original delivery carried (see
+    // postCommitFanOut in services/messages.ts).
+    let inReplyToBody: string | undefined;
+    let inReplyToSender: string | undefined;
+    if (row.in_reply_to_message_id) {
+      const parent = this.db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, row.in_reply_to_message_id))
+        .get();
+      if (parent && parent.deleted !== 1) {
+        inReplyToBody = contentBlocksToText(parseStoredContent(parent.content, parent.id));
+        inReplyToSender = parent.sender_id;
+      }
+    }
+
+    const sentAt = new Date().toISOString();
+    const webhookMessage: WebhookMessage = {
+      targetBotId: bot.id,
+      conversationId,
+      messageId: row.id,
+      from: row.sender_id,
+      content,
+      sentAt,
+      ...(row.in_reply_to_message_id !== null && {
+        inReplyToMessageId: row.in_reply_to_message_id,
+      }),
+      ...(inReplyToBody !== undefined && { inReplyToBody }),
+      ...(inReplyToSender !== undefined && { inReplyToSender }),
+    };
+
+    // Reserve the webhook-chain slot synchronously — no external await runs
+    // between the check above and this assignment — so a concurrent DO request
+    // can't slot a later message ahead of this redelivery (or run deliverToBot
+    // out of order). The redelivered event is pushed INSIDE the task, strictly
+    // before deliverToBot, so a failure re-flag (deliverToBot ->
+    // notifyDeliveryFailed) always lands after it and is never clobbered by a
+    // delayed clear.
+    this.webhookChain = this.webhookChain
+      .catch(() => {})
+      .then(async () => {
+        if (memberContext.sandboxId) {
+          await pushEventToHumanMembers(
+            this.env,
+            conversationId,
+            memberContext.sandboxId,
+            memberContext.humanMemberIds,
+            'message.redelivered',
+            { messageId: row.id }
+          );
+        }
+        await deliverToBot(this.env, webhookMessage, memberContext);
+      });
+    this.ctx.waitUntil(this.webhookChain);
+
+    return { ok: true, redelivered: true };
   }
 
   revertActionResolution(params: {

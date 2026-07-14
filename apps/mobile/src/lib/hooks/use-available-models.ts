@@ -120,7 +120,7 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
 }
 
 export function useAvailableModels(organizationId: string | undefined) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['available-models', organizationId] as const,
     queryFn: fetchModels.bind(null, organizationId),
     staleTime: 60_000,
@@ -168,5 +168,5 @@ export function useAvailableModels(organizationId: string | undefined) {
     }));
   }, [data]);
 
-  return { models, isLoading };
+  return { models, isLoading, isError, error, refetch };
 }

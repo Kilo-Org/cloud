@@ -554,38 +554,53 @@ describe('BYOK Router', () => {
       return { key, subscription };
     }
 
-    test('identifies installed origin and allows disable without affecting ownership', async () => {
+    test('identifies installed origin and blocks changing enabled state', async () => {
       const { key } = await createInstalledMiniMaxKey();
       const caller = await createCallerForUser(ownerUser.id);
       const listed = await caller.byok.list({});
 
       expect(listed[0].provider_id).toBe('minimax');
       expect(listed[0].management_source).toBe('coding_plan');
-      const disabled = await caller.byok.setEnabled({ id: key.id, is_enabled: false });
-      expect(disabled.is_enabled).toBe(false);
-      expect(disabled.management_source).toBe('coding_plan');
+      await expect(caller.byok.setEnabled({ id: key.id, is_enabled: false })).rejects.toThrow(
+        /read-only/i
+      );
+
+      const [unchangedKey] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, key.id));
+      expect(unchangedKey.is_enabled).toBe(true);
+      expect(unchangedKey.management_source).toBe('coding_plan');
     });
 
-    test('transfers cleanup ownership when installed MiniMax credential is updated', async () => {
+    test('blocks replacing an installed MiniMax credential', async () => {
       const { key, subscription } = await createInstalledMiniMaxKey();
       const caller = await createCallerForUser(ownerUser.id);
 
-      const updated = await caller.byok.update({ id: key.id, api_key: 'replacement-key' });
+      await expect(caller.byok.update({ id: key.id, api_key: 'replacement-key' })).rejects.toThrow(
+        /read-only/i
+      );
+
+      const [unchangedKey] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, key.id));
       const [updatedSubscription] = await db
         .select()
         .from(coding_plan_subscriptions)
         .where(eq(coding_plan_subscriptions.id, subscription.id));
 
-      expect(updated.management_source).toBe('user');
+      expect(unchangedKey.encrypted_api_key).toStrictEqual(key.encrypted_api_key);
+      expect(unchangedKey.management_source).toBe('coding_plan');
       expect(updatedSubscription.status).toBe('active');
-      expect(updatedSubscription.installed_byok_key_id).toBeNull();
+      expect(updatedSubscription.installed_byok_key_id).toBe(key.id);
     });
 
     test('blocks deleting an installed coding-plan MiniMax key', async () => {
       const { key, subscription } = await createInstalledMiniMaxKey();
       const caller = await createCallerForUser(ownerUser.id);
 
-      await expect(caller.byok.delete({ id: key.id })).rejects.toThrow(/coding plan/i);
+      await expect(caller.byok.delete({ id: key.id })).rejects.toThrow(/read-only/i);
 
       const remainingKeys = await db
         .select()

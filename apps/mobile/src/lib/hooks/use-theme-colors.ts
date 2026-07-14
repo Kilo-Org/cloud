@@ -11,8 +11,8 @@ const lightColors = {
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
   muted: '#F0EEE6',
-  mutedForeground: '#7A756B',
-  destructive: '#C25647',
+  mutedForeground: '#6F6A61',
+  destructive: '#BE4E3F',
   border: 'rgba(20, 15, 10, 0.09)',
   card: '#FFFFFF',
 
@@ -22,8 +22,9 @@ const lightColors = {
   hairSoft: 'rgba(20, 15, 10, 0.05)',
   accentSoft: '#E8F27A',
   accentSoftForeground: '#1A1A10',
-  good: '#2F9A5F',
-  warn: '#B27214',
+  good: '#278150',
+  warn: '#9F6612',
+  info: '#2563EB',
 
   // Per-agent hues (full-opacity only — tile bg/border live in CSS tokens)
   agentYuki: '#6B4FD6',
@@ -55,6 +56,7 @@ const darkColors = {
   accentSoftForeground: '#1A1A10',
   good: '#5FCB8E',
   warn: '#F2B05F',
+  info: '#60A5FA',
 
   // Per-agent hues
   agentYuki: '#A78BFA',

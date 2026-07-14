@@ -44,6 +44,8 @@ export type CommonProps = {
   replyingTo?: Message | null;
   onCancelReply?: () => void;
   disabledReason?: string | null;
+  showInstanceCta?: boolean;
+  onOpenInstance?: () => void;
   clearOnSubmit?: boolean;
   botName?: string | null;
   typingMembers?: Map<string, number>;

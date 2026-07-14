@@ -1,4 +1,5 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { formatDollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Alert, Pressable, View } from 'react-native';
@@ -137,7 +138,7 @@ export function MemberRow({
         </View>
         {member.dailyUsageLimitUsd != null && (
           <Text className="text-xs text-muted-foreground">
-            ${member.dailyUsageLimitUsd.toFixed(2)}/day
+            {formatDollars(member.dailyUsageLimitUsd)}/day
           </Text>
         )}
       </View>

@@ -1,16 +1,18 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { AuditReportButton } from '@/components/security-agent/audit-report-button';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import {
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentPermissionStatus,
   useSecurityAgentRepositories,
@@ -36,33 +38,15 @@ function ScopeEntrySkeleton() {
   );
 }
 
-function ScopeEntryError({ onRetry }: Readonly<{ onRetry: () => void }>) {
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title="Security Agent" />
-      <View className="flex-1 items-center justify-center px-6">
-        <Pressable
-          className="rounded-lg bg-secondary p-3 active:opacity-70"
-          onPress={onRetry}
-          accessibilityRole="button"
-        >
-          <Text className="text-sm text-destructive">
-            Could not load Security Agent. Tap to retry.
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
+  const capability = useSecurityAgentCapability(scope);
 
-  const isLoading = permission.isLoading || config.isLoading;
-  const isError = permission.isError || config.isError;
+  const isLoading = permission.isLoading || config.isLoading || capability.isLoading;
+  const isError = permission.isError || config.isError || capability.isError;
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;
@@ -76,7 +60,12 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   }, [isDisabled, router, scope]);
 
   const refetchAll = async () => {
-    await Promise.all([permission.refetch(), config.refetch(), repositories.refetch()]);
+    await Promise.all([
+      permission.refetch(),
+      config.refetch(),
+      repositories.refetch(),
+      capability.refetch(),
+    ]);
   };
 
   if (isLoading) {
@@ -85,19 +74,29 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   if (isError) {
     return (
-      <ScopeEntryError
+      <PlatformErrorScreen
+        title="Security Agent"
+        errorTitle="Could not load Security Agent"
         onRetry={() => {
           void permission.refetch();
           void config.refetch();
+          void capability.refetch();
         }}
+        isRetrying={permission.isFetching || config.isFetching || capability.isFetching}
       />
     );
   }
 
+  // Audit-report access shouldn't depend on the agent being connected or
+  // enabled — it's a link to historical reports, not agent-managed UI — so
+  // it's offered here in the shared shell, ahead of the setup/disabled
+  // gates below, whenever the caller can manage the agent.
+  const auditAction = capability.canManage ? <AuditReportButton scope={scope} /> : null;
+
   if (!hasIntegration) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Security Agent" />
+        <ScreenHeader title="Security Agent" headerRight={auditAction} />
         <SecurityAgentSetup
           title="Connect GitHub to get started"
           description="Install the Kilo GitHub App to automatically sync Dependabot alerts and manage security findings across your repositories."
@@ -115,7 +114,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (!hasPermissions) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Security Agent" />
+        <ScreenHeader title="Security Agent" headerRight={auditAction} />
         <SecurityAgentSetup
           title="Additional permissions required"
           description="Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission."

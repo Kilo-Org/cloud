@@ -101,7 +101,7 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
     case 'subscription_past_due': {
       return {
         icon: AlertTriangle,
-        message: 'Payment past due — please update your payment method',
+        message: 'Payment past due. Please update your payment method.',
         severity: 'danger',
       };
     }

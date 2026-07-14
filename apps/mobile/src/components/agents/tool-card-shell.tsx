@@ -51,6 +51,11 @@ export function ToolCardShell({
     }
   }
 
+  let accessibilityHint: string | undefined = undefined;
+  if (hasContent) {
+    accessibilityHint = isExpanded ? 'Collapse details' : 'Expand details';
+  }
+
   return (
     <Animated.View
       layout={LinearTransition.duration(200)}
@@ -62,7 +67,8 @@ export function ToolCardShell({
         disabled={!hasContent}
         accessibilityRole="button"
         accessibilityLabel={`${subtitle ?? title} tool, ${status}`}
-        accessibilityHint={isExpanded ? 'Collapse details' : 'Expand details'}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={{ disabled: !hasContent }}
       >
         {status === 'pending' || status === 'running' ? (
           <ActivityIndicator size="small" color={colors.mutedForeground} />

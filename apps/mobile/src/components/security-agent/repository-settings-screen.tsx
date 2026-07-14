@@ -1,25 +1,35 @@
-import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
-import * as Haptics from 'expo-haptics';
-import { Check, Lock } from 'lucide-react-native';
+import {
+  getSettingsDirtyState,
+  isPersonalSecurityScope,
+} from '@kilocode/app-shared/security-agent';
+import { FolderGit2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
+import { EmptyState } from '@/components/empty-state';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
+import { Button } from '@/components/ui/button';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
+import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
@@ -39,8 +49,7 @@ function RepositorySettingsSkeleton() {
 }
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const colors = useThemeColors();
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -66,30 +75,26 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
 
   const valid = mode === 'all' || selectedIds.length > 0;
+  const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
   const dirty =
     hydratedRef.current &&
-    getSettingsDirtyState(
-      initialConfigRef.current,
-      { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds },
-      valid
-    ) !== 'clean';
+    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
 
   const handleSave = async () => {
-    await save.mutateAsync({ repositorySelectionMode: mode, selectedRepositoryIds: selectedIds });
+    await save.mutateAsync(patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Repositories" />
-        <QueryError
-          className="flex-1"
-          message="Could not load repository settings"
-          onRetry={() => void config.refetch()}
-        />
-      </View>
+      <PlatformErrorScreen
+        title="Repositories"
+        variant="offline"
+        message="Could not load repository settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {
@@ -100,12 +105,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }
 
   const setModeOption = (option: RepositorySelectionMode) => {
-    void Haptics.selectionAsync();
     setMode(option);
   };
 
   const toggleRepo = (id: number) => {
-    void Haptics.selectionAsync();
     setSelectedIds(current =>
       current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]
     );
@@ -123,27 +126,28 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-24">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+        {!canManage && (
+          <Text className="pb-4 text-center text-xs text-muted-foreground">
+            Only organization owners and billing managers can change these settings.
+          </Text>
+        )}
         {(['all', 'selected'] as const).map(option => (
-          <Pressable
+          <ChoiceRow
             key={option}
+            label={option === 'all' ? 'All repositories' : 'Selected repositories'}
+            selected={mode === option}
             disabled={!canManage}
-            className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+            className="border-b-[0.5px] border-hair-soft"
             onPress={() => {
               setModeOption(option);
             }}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: mode === option }}
-          >
-            <Text className="text-sm font-medium">
-              {option === 'all' ? 'All repositories' : 'Selected repositories'}
-            </Text>
-            <Check size={18} color={mode === option ? colors.foreground : 'transparent'} />
-          </Pressable>
+          />
         ))}
 
         {mode === 'selected' && (
@@ -157,41 +161,64 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 <Skeleton className="h-12 w-full rounded-lg" />
               </View>
             )}
-            {(repositories.data ?? []).map(repo => (
-              <Pressable
-                key={repo.id}
-                disabled={!canManage}
-                className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
-                onPress={() => {
-                  toggleRepo(repo.id);
-                }}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selectedIds.includes(repo.id) }}
-              >
-                <View className="flex-1 flex-row items-center gap-2 pr-3">
-                  {repo.private ? <Lock size={12} color={colors.mutedForeground} /> : null}
-                  <Text className="text-sm" numberOfLines={1}>
-                    {repo.fullName}
-                  </Text>
-                </View>
-                <Check
-                  size={18}
-                  color={selectedIds.includes(repo.id) ? colors.foreground : 'transparent'}
-                />
-              </Pressable>
-            ))}
-            {selectedIds.length === 0 && (
-              <Text className="pt-2 text-xs text-destructive">Select at least one repository.</Text>
+            {repositories.isError && (
+              <QueryError
+                variant="server"
+                placement="top"
+                title="Could not load repositories"
+                onRetry={() => void repositories.refetch()}
+                isRetrying={repositories.isFetching}
+              />
             )}
+            {!repositories.isLoading && !repositories.isError && repositories.data?.length === 0 ? (
+              <EmptyState
+                placement="top"
+                icon={FolderGit2}
+                title="No repositories"
+                description="Grant the Kilo GitHub App access to repositories"
+                action={
+                  <Button
+                    variant="outline"
+                    onPress={() => {
+                      void openExternalUrl(
+                        getGitHubIntegrationUrl(
+                          WEB_BASE_URL,
+                          isPersonalSecurityScope(scope) ? undefined : scope
+                        ),
+                        { label: 'GitHub App settings' }
+                      );
+                    }}
+                  >
+                    <Text>Manage GitHub App access</Text>
+                  </Button>
+                }
+              />
+            ) : null}
+            {!repositories.isLoading &&
+              !repositories.isError &&
+              (repositories.data ?? []).map(repo => (
+                <RepoToggleRow
+                  key={repo.id}
+                  repo={repo}
+                  selected={selectedIds.includes(repo.id)}
+                  disabled={!canManage}
+                  className="border-b-[0.5px] border-hair-soft"
+                  onPress={() => {
+                    toggleRepo(repo.id);
+                  }}
+                />
+              ))}
+            {!repositories.isLoading &&
+              !repositories.isError &&
+              (repositories.data?.length ?? 0) > 0 &&
+              selectedIds.length === 0 && (
+                <Text className="pt-2 text-xs text-destructive">
+                  Select at least one repository.
+                </Text>
+              )}
           </View>
         )}
-
-        {!canManage && (
-          <Text className="pt-6 text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
-          </Text>
-        )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

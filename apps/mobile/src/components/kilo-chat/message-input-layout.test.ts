@@ -29,7 +29,7 @@ describe('message input layout', () => {
     });
   });
 
-  it('keeps composer bottom padding constant across safe-area insets', () => {
+  it('defaults composer bottom padding to the minimum clearance when no safe-area inset is given', () => {
     expect(resolveMessageInputBottomPadding()).toBe(8);
   });
 
@@ -42,10 +42,19 @@ describe('message input layout', () => {
     ).toBe(32);
   });
 
-  it('keeps iOS composer bottom padding controlled by the existing keyboard wrapper', () => {
+  it('respects the iOS bottom safe-area inset so the composer clears the home indicator', () => {
     expect(
       resolveMessageInputBottomPadding({
         bottomSafeAreaInset: 24,
+        platform: 'ios',
+      })
+    ).toBe(24);
+  });
+
+  it('floors iOS composer bottom padding at the minimum clearance when the safe-area inset is small', () => {
+    expect(
+      resolveMessageInputBottomPadding({
+        bottomSafeAreaInset: 4,
         platform: 'ios',
       })
     ).toBe(8);

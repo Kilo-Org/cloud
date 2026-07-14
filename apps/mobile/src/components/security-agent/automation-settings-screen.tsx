@@ -1,23 +1,24 @@
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
-import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
+  useSecurityAgentCapability,
   useSecurityAgentConfig,
-  useSecurityAgentEditCapability,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { type SecurityAgentConfig } from '@/lib/security-agent';
@@ -54,7 +55,7 @@ function AutomationSettingsSkeleton() {
 }
 
 export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const canManage = useSecurityAgentEditCapability(scope);
+  const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
@@ -125,6 +126,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const handleSave = async () => {
     const result = await save.mutateAsync(patch);
+    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
     if (result.existingFindingsQueuedCount) {
       toast.success(
         `${result.existingFindingsQueuedCount} existing finding${result.existingFindingsQueuedCount === 1 ? '' : 's'} queued for analysis.`
@@ -132,18 +134,16 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     }
   };
 
-  const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
   if (config.isError && !config.data) {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="Automation" />
-        <QueryError
-          className="flex-1"
-          message="Could not load automation settings"
-          onRetry={() => void config.refetch()}
-        />
-      </View>
+      <PlatformErrorScreen
+        title="Automation"
+        variant="offline"
+        message="Could not load automation settings"
+        onRetry={() => void config.refetch()}
+      />
     );
   }
   if (config.isLoading || !config.data) {
@@ -165,14 +165,15 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
               valid={valid}
               pending={save.isPending}
               onSave={handleSave}
+              skipNextGuardRef={skipNextGuardRef}
             />
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
+      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto Analysis
+            Auto analysis
           </Text>
           <ToggleRow
             title="Enable auto-analysis"
@@ -203,7 +204,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto Remediation
+            Auto remediation
           </Text>
           <ToggleRow
             title="Enable auto-remediation"
@@ -234,7 +235,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto Dismiss
+            Auto dismiss
           </Text>
           <ToggleRow
             title="Enable auto-dismiss"
@@ -259,7 +260,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
             Only organization owners and billing managers can change these settings.
           </Text>
         )}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

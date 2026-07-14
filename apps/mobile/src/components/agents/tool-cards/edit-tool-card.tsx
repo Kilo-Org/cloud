@@ -49,7 +49,7 @@ export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
         </View>
       ) : null}
       {error ? (
-        <Text selectable className="text-xs text-red-500">
+        <Text selectable className="text-xs text-destructive">
           {error}
         </Text>
       ) : null}

@@ -124,6 +124,7 @@ describe('getDashboardStats', () => {
         exploitable: 1,
         needsAction: 2,
         slaCompliancePercent: 50,
+        slaComplianceMeasured: true,
       },
       {
         repoFullName: 'Kilo-Org/kilocode',
@@ -135,7 +136,9 @@ describe('getDashboardStats', () => {
         overdue: 0,
         exploitable: 0,
         needsAction: 1,
+        // Preserve the numeric field for installed clients while exposing honest measurement state.
         slaCompliancePercent: 100,
+        slaComplianceMeasured: false,
       },
     ]);
   });

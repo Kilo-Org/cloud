@@ -19,15 +19,15 @@
   --secondary: #f0eee6;
   --secondary-foreground: #14130f;
   --muted: #f0eee6;
-  --muted-foreground: #7a756b;
+  --muted-foreground: #6f6a61;
   --accent: #4f5a10;
   --accent-foreground: #ffffff;
   --primary: #4f5a10;
   --primary-foreground: #ffffff;
-  --destructive: #c25647;
+  --destructive: #be4e3f;
   --destructive-foreground: #ffffff;
   --border: rgba(20, 15, 10, 0.09);
-  --input: rgba(20, 15, 10, 0.09);
+  --input: rgba(20, 15, 10, 0.45);
   --ring: #4f5a10;
   --radius: 0.625rem;
 
@@ -37,16 +37,20 @@
   --hair-soft: rgba(20, 15, 10, 0.05);
   --accent-soft: #e8f27a;
   --accent-soft-foreground: #1a1a10;
-  --good: #2f9a5f;
+  --good: #278150;
   --good-foreground: #ffffff;
-  --good-tile-bg: #2f9a5f1a;
-  --good-tile-border: #2f9a5f33;
-  --warn: #b27214;
+  --good-tile-bg: #2781501a;
+  --good-tile-border: #27815033;
+  --warn: #9f6612;
   --warn-foreground: #ffffff;
-  --warn-tile-bg: #b272141a;
-  --warn-tile-border: #b2721433;
-  --danger-tile-bg: #c256471a;
-  --danger-tile-border: #c2564733;
+  --warn-tile-bg: #9f66121a;
+  --warn-tile-border: #9f661233;
+  --danger-tile-bg: #be4e3f1a;
+  --danger-tile-border: #be4e3f33;
+  --info: #2563eb;
+  --info-foreground: #ffffff;
+  --info-tile-bg: #2563eb1a;
+  --info-tile-border: #2563eb33;
 
   /* Per-agent hues + pre-tinted tile pairs.
    * The *-tile-bg (10% alpha) and *-tile-border (20% alpha) tokens exist
@@ -94,7 +98,7 @@
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     --border: rgba(255, 255, 255, 0.07);
-    --input: rgba(255, 255, 255, 0.07);
+    --input: rgba(255, 255, 255, 0.35);
     --ring: #e8f27a;
     --radius: 0.625rem;
 
@@ -114,6 +118,10 @@
     --warn-tile-border: #f2b05f33;
     --danger-tile-bg: #f28b7a1a;
     --danger-tile-border: #f28b7a33;
+    --info: #60a5fa;
+    --info-foreground: #0e0e10;
+    --info-tile-bg: #60a5fa1a;
+    --info-tile-border: #60a5fa33;
 
     /* Per-agent hues + pre-tinted tile pairs (dark values) */
     --agent-yuki: #a78bfa;
@@ -175,6 +183,10 @@
   --color-warn-tile-border: var(--warn-tile-border);
   --color-danger-tile-bg: var(--danger-tile-bg);
   --color-danger-tile-border: var(--danger-tile-border);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-tile-bg: var(--info-tile-bg);
+  --color-info-tile-border: var(--info-tile-border);
 
   /* Per-agent colors (Tailwind classes: bg-agent-yuki, bg-agent-yuki-tile-bg, ...) */
   --color-agent-yuki: var(--agent-yuki);

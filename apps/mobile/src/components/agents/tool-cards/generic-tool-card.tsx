@@ -5,6 +5,7 @@ import { type ToolPart } from 'cloud-agent-sdk';
 import { Text } from '@/components/ui/text';
 
 import { ToolCardShell } from '../tool-card-shell';
+import { getGenericToolTitle } from '../tool-card-utils';
 
 function formatInput(input: Record<string, unknown>): string {
   try {
@@ -16,10 +17,11 @@ function formatInput(input: Record<string, unknown>): string {
 
 export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
-  const title = part.state.status === 'running' ? part.state.title : undefined;
-  const completedTitle = part.state.status === 'completed' ? part.state.title : undefined;
-
-  const subtitle = completedTitle ?? title ?? part.tool;
+  const stateTitle =
+    part.state.status === 'running' || part.state.status === 'completed'
+      ? part.state.title
+      : undefined;
+  const subtitle = getGenericToolTitle(part.tool, stateTitle, input);
 
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
@@ -46,7 +48,7 @@ export function GenericToolCard({ part }: Readonly<{ part: ToolPart }>) {
             </ScrollView>
           ) : null}
           {error ? (
-            <Text selectable className="text-xs text-red-500">
+            <Text selectable className="text-xs text-destructive">
               {error}
             </Text>
           ) : null}

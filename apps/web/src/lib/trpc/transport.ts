@@ -10,6 +10,21 @@ export class UpstreamApiError extends Error {
   }
 }
 
+/**
+ * Marker for the context-level UNAUTHORIZED (no authenticated user / invalid
+ * token). The error-formatter surfaces it as `data.authRequired`, letting the
+ * mobile client sign the user out ONLY on a genuine session failure — and not
+ * on a procedure-level UNAUTHORIZED (e.g. org-access denial via
+ * ensureOrganizationAccess), which must be handled in-screen as a permission
+ * error rather than logging the whole app out.
+ */
+export class AuthContextError extends Error {
+  constructor() {
+    super('auth_context');
+    this.name = 'AuthContextError';
+  }
+}
+
 export const TrpcZodFlattenedErrorSchema = z.object({
   formErrors: z.array(z.string()),
   fieldErrors: z.record(z.string(), z.array(z.string())),
@@ -23,6 +38,7 @@ export const TrpcErrorDataSchema = z
     path: z.string().optional(),
     zodError: TrpcZodFlattenedErrorSchema.nullable(),
     upstreamCode: z.string().optional(),
+    authRequired: z.boolean().optional(),
   })
   .passthrough();
 
@@ -79,5 +95,6 @@ export const trpcErrorFormatter = (({ shape, error }) => ({
         ? z.flattenError(error.cause)
         : null,
     upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
+    authRequired: error.cause instanceof AuthContextError ? true : undefined,
   },
 })) satisfies TRPCErrorFormatter<unknown, KiloTrpcErrorShape>;

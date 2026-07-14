@@ -3,7 +3,7 @@ import 'server-only';
 import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
 import { auto_deleted_at } from '@/lib/drizzle';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, not } from 'drizzle-orm';
 
 import {
   KiloPassAuditLogAction,
@@ -18,8 +18,43 @@ type DbOrTx = Db | DrizzleTransaction;
 export type StripeSubscriptionSchedulesClient = {
   subscriptionSchedules: {
     release: (scheduleId: string) => Promise<unknown>;
+    retrieve?: (scheduleId: string) => Promise<{ status: string }>;
   };
 };
+
+export const KILO_PASS_TERMINAL_SCHEDULE_STATUSES = [
+  KiloPassScheduledChangeStatus.Released,
+  KiloPassScheduledChangeStatus.Canceled,
+  KiloPassScheduledChangeStatus.Completed,
+] as const;
+
+export function isTerminalKiloPassScheduleStatus(status: KiloPassScheduledChangeStatus): boolean {
+  return KILO_PASS_TERMINAL_SCHEDULE_STATUSES.includes(
+    status as (typeof KILO_PASS_TERMINAL_SCHEDULE_STATUSES)[number]
+  );
+}
+
+export async function reconcileKiloPassScheduledChangeTerminalStatus(params: {
+  dbOrTx: DbOrTx;
+  scheduledChangeId: string;
+  status: KiloPassScheduledChangeStatus;
+}): Promise<boolean> {
+  if (!isTerminalKiloPassScheduleStatus(params.status)) return false;
+
+  const updatedRows = await params.dbOrTx
+    .update(kilo_pass_scheduled_changes)
+    .set({ status: params.status, ...auto_deleted_at })
+    .where(
+      and(
+        eq(kilo_pass_scheduled_changes.id, params.scheduledChangeId),
+        isNull(kilo_pass_scheduled_changes.deleted_at),
+        not(inArray(kilo_pass_scheduled_changes.status, KILO_PASS_TERMINAL_SCHEDULE_STATUSES))
+      )
+    )
+    .returning({ id: kilo_pass_scheduled_changes.id });
+
+  return updatedRows.length > 0;
+}
 
 export function maybeMapStripeScheduleStatusToDb(
   status: string
@@ -136,40 +171,85 @@ export async function releaseScheduledChangeForSubscription(params: {
   // Soft-delete first so that if Stripe release fails, callers can safely retry.
   // Also update status to `released` to reflect intent (even if Stripe later fails,
   // we revert this along with the soft-delete).
-  await dbOrTx
+  const claimedRows = await dbOrTx
     .update(kilo_pass_scheduled_changes)
     .set({ ...auto_deleted_at, status: KiloPassScheduledChangeStatus.Released })
     .where(
       and(
         eq(kilo_pass_scheduled_changes.id, row.id),
-        isNull(kilo_pass_scheduled_changes.deleted_at)
+        isNull(kilo_pass_scheduled_changes.deleted_at),
+        not(inArray(kilo_pass_scheduled_changes.status, KILO_PASS_TERMINAL_SCHEDULE_STATUSES))
       )
-    );
+    )
+    .returning({ id: kilo_pass_scheduled_changes.id });
+
+  // Another caller or webhook won the state transition after our initial read.
+  // Confirm a durable provider outcome before reporting idempotent success.
+  if (claimedRows.length === 0) {
+    const retrieve = stripe.subscriptionSchedules.retrieve;
+    if (retrieve) {
+      const schedule = await retrieve(row.stripe_schedule_id);
+      const providerStatus = maybeMapStripeScheduleStatusToDb(schedule.status);
+      if (providerStatus && isTerminalKiloPassScheduleStatus(providerStatus)) return;
+    }
+    throw new Error(`Kilo Pass scheduled change release already in progress: ${row.id}`);
+  }
 
   try {
     await stripe.subscriptionSchedules.release(row.stripe_schedule_id);
-
-    await appendKiloPassAuditLog(dbOrTx, {
-      action: KiloPassAuditLogAction.StripeWebhookReceived,
-      result: KiloPassAuditLogResult.Success,
-      kiloUserId: row.kilo_user_id,
-      stripeEventId: stripeEventId ?? null,
-      stripeSubscriptionId: row.stripe_subscription_id,
-      payload: {
-        scope: 'kilo_pass_scheduled_change',
-        type: 'subscription_schedule.release',
-        scheduledChangeId: row.id,
-        scheduleId: row.stripe_schedule_id,
-        scheduleStatus: row.status,
-        reason,
-      },
-    });
   } catch (error) {
+    let providerStatus: KiloPassScheduledChangeStatus | null = null;
+    let providerStateError: unknown = null;
+    try {
+      const retrieve = stripe.subscriptionSchedules.retrieve;
+      if (retrieve) {
+        const schedule = await retrieve(row.stripe_schedule_id);
+        providerStatus = maybeMapStripeScheduleStatusToDb(schedule.status);
+      }
+    } catch (retrieveError) {
+      providerStateError = retrieveError;
+    }
+
+    if (providerStatus && isTerminalKiloPassScheduleStatus(providerStatus)) {
+      await dbOrTx
+        .update(kilo_pass_scheduled_changes)
+        .set({ status: providerStatus })
+        .where(
+          and(
+            eq(kilo_pass_scheduled_changes.id, row.id),
+            eq(kilo_pass_scheduled_changes.status, KiloPassScheduledChangeStatus.Released)
+          )
+        );
+
+      await appendKiloPassAuditLog(dbOrTx, {
+        action: KiloPassAuditLogAction.StripeWebhookReceived,
+        result: KiloPassAuditLogResult.Success,
+        kiloUserId: row.kilo_user_id,
+        stripeEventId: stripeEventId ?? null,
+        stripeSubscriptionId: row.stripe_subscription_id,
+        payload: {
+          scope: 'kilo_pass_scheduled_change',
+          type: 'subscription_schedule.release',
+          scheduledChangeId: row.id,
+          scheduleId: row.stripe_schedule_id,
+          scheduleStatus: providerStatus,
+          reason,
+          note: 'release_failed_but_provider_terminal',
+        },
+      });
+      return;
+    }
+
     // Revert the soft delete so the row remains visible and can be retried.
     await dbOrTx
       .update(kilo_pass_scheduled_changes)
       .set({ deleted_at: null, status: row.status })
-      .where(eq(kilo_pass_scheduled_changes.id, row.id));
+      .where(
+        and(
+          eq(kilo_pass_scheduled_changes.id, row.id),
+          eq(kilo_pass_scheduled_changes.status, KiloPassScheduledChangeStatus.Released)
+        )
+      );
 
     await appendKiloPassAuditLog(dbOrTx, {
       action: KiloPassAuditLogAction.StripeWebhookReceived,
@@ -185,9 +265,32 @@ export async function releaseScheduledChangeForSubscription(params: {
         scheduleStatus: row.status,
         reason,
         error: error instanceof Error ? error.message : String(error),
+        providerStatus,
+        providerStateError:
+          providerStateError instanceof Error
+            ? providerStateError.message
+            : providerStateError
+              ? String(providerStateError)
+              : null,
       },
     });
 
     throw error;
   }
+
+  await appendKiloPassAuditLog(dbOrTx, {
+    action: KiloPassAuditLogAction.StripeWebhookReceived,
+    result: KiloPassAuditLogResult.Success,
+    kiloUserId: row.kilo_user_id,
+    stripeEventId: stripeEventId ?? null,
+    stripeSubscriptionId: row.stripe_subscription_id,
+    payload: {
+      scope: 'kilo_pass_scheduled_change',
+      type: 'subscription_schedule.release',
+      scheduledChangeId: row.id,
+      scheduleId: row.stripe_schedule_id,
+      scheduleStatus: row.status,
+      reason,
+    },
+  });
 }

@@ -125,6 +125,7 @@ function createQueueHarness(options?: {
   storage?: SessionMessageQueueStorage;
   failQueuedEventOnce?: boolean;
   failAlarmOnce?: boolean;
+  failTerminalizationRepairAlarmOnce?: boolean;
   failTerminalizationOnce?: boolean;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
   getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
@@ -136,6 +137,7 @@ function createQueueHarness(options?: {
   const finalizedTerminalCallbacks: Array<{ allowWithoutObservedIdle?: boolean } | undefined> = [];
   let failQueuedEvent = options?.failQueuedEventOnce ?? false;
   let failAlarm = options?.failAlarmOnce ?? false;
+  let failTerminalizationRepairAlarm = options?.failTerminalizationRepairAlarmOnce ?? false;
   let failTerminalization = options?.failTerminalizationOnce ?? false;
   const terminalizations: Terminalization[] = [];
   const metadata = options?.metadata === undefined ? createMetadata() : options.metadata;
@@ -193,6 +195,10 @@ function createQueueHarness(options?: {
         if (failAlarm) {
           failAlarm = false;
           throw new Error('failed to schedule prompt drain');
+        }
+        if (failTerminalizationRepairAlarm && deliver.mock.calls.length > 0) {
+          failTerminalizationRepairAlarm = false;
+          throw new Error('failed to schedule terminalization repair');
         }
         alarmDeadlines.push(deadline);
       },
@@ -1386,6 +1392,75 @@ describe('SessionMessageQueue', () => {
     expect(deliver).not.toHaveBeenCalled();
     expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
     expect(drain.remainingPendingCount).toBe(0);
+  });
+
+  it('does not retry a terminal delivery failure when repair scheduling fails', async () => {
+    const harness = createQueueHarness({
+      failTerminalizationRepairAlarmOnce: true,
+      deliver: async () => ({ success: false, code: 'BAD_REQUEST', error: 'invalid queued turn' }),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'do not retry invalid delivery' },
+    });
+
+    await expect(harness.queue.drainNextPendingMessage()).rejects.toThrow(
+      'failed to schedule terminalization repair'
+    );
+
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending).toMatchObject({
+      messageId: FIRST_MESSAGE_ID,
+      flushAttempts: 1,
+      nextFlushAttemptAt: undefined,
+      deliveryDisposition: 'terminalization-pending',
+    });
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(harness.terminalizations).toHaveLength(0);
+
+    const settled = await harness.queue.drainNextPendingMessage();
+
+    expect(settled).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      reason: 'exhausted',
+      completionSource: 'delivery_failure',
+    });
+  });
+
+  it('repairs interrupted exhausted terminalization without redispatch', async () => {
+    const harness = createQueueHarness({
+      failTerminalizationOnce: true,
+      deliver: async () => ({ success: false, code: 'BAD_REQUEST', error: 'invalid queued turn' }),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'repair terminalization' },
+    });
+    const alarmCountBeforeDrain = harness.alarmDeadlines.length;
+
+    await expect(harness.queue.drainNextPendingMessage()).rejects.toThrow(
+      'terminal transition failed'
+    );
+    const [interruptedPending] = await listPendingSessionMessages(harness.storage);
+
+    expect(interruptedPending).toMatchObject({
+      messageId: FIRST_MESSAGE_ID,
+      deliveryDisposition: 'terminalization-pending',
+      nextFlushAttemptAt: undefined,
+    });
+    expect(harness.alarmDeadlines.length).toBeGreaterThan(alarmCountBeforeDrain);
+    expect(harness.deliver).toHaveBeenCalledOnce();
+
+    const repaired = await harness.queue.drainNextPendingMessage();
+
+    expect(repaired).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
   });
 
   it('hands exhausted queued delivery to settlement terminalization', async () => {

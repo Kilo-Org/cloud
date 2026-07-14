@@ -130,10 +130,11 @@ export function SessionFilterChips({
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
+            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
+            accessibilityRole="button"
             accessibilityLabel={`Remove ${label} project filter`}
           >
             <Text
@@ -149,10 +150,11 @@ export function SessionFilterChips({
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
+          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
           onPress={() => {
             onRemovePlatform(platform);
           }}
+          accessibilityRole="button"
           accessibilityLabel={`Remove ${platformFilterLabel(platform)} platform filter`}
         >
           <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
@@ -189,15 +191,26 @@ export function SessionFilterModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-start px-6 pt-[20%]" onPress={onClose}>
+      <Pressable
+        // Backdrop tap-to-dismiss. accessible={false} so it doesn't collapse the
+        // whole sheet subtree into a single VoiceOver node (Pressable defaults to
+        // accessible=true) — the inner controls stay individually navigable.
+        accessible={false}
+        className="flex-1 justify-start px-6 pt-[20%]"
+        onPress={onClose}
+      >
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable
+          // Catches taps to stop backdrop dismissal; accessible={false} so the
+          // checkboxes/buttons inside stay individually navigable by VoiceOver
+          // (a pressable defaults to accessible=true and would collapse them).
+          accessible={false}
           className="gap-4 rounded-2xl bg-popover p-5"
           onPress={e => {
             e.stopPropagation();
           }}
         >
-          <Text className="text-base font-semibold">Filter Sessions</Text>
+          <Text className="text-base font-semibold">Filter sessions</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">

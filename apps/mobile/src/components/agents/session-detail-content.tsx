@@ -1,8 +1,10 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { MessageSquare } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -19,12 +21,18 @@ import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
 } from '@/components/agents/session-working-state';
+import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
+import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
+import { PartRenderer } from '@/components/agents/part-renderer';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import {
@@ -64,6 +72,11 @@ export function SessionDetailContent({
   openedVia = 'app',
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
+  const router = useRouter();
+  const [childSession, setChildSession] = useState<{
+    sessionId: KiloSessionId;
+    title: string;
+  }>();
 
   const messages = useAtomValue(manager.atoms.messagesList);
   const isLoading = useAtomValue(manager.atoms.isLoading);
@@ -80,6 +93,7 @@ export function SessionDetailContent({
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
@@ -221,6 +235,14 @@ export function SessionDetailContent({
     return -1;
   }, [messages]);
 
+  const handleOpenChildSession = useCallback(
+    (childSessionId: KiloSessionId, childTitle: string) => {
+      setChildSession({ sessionId: childSessionId, title: childTitle });
+      void manager.hydrateChildSession(childSessionId);
+    },
+    [manager]
+  );
+
   const renderItem = useCallback(
     ({ item, index }: { item: StoredMessage; index: number }) => (
       <MessageBubble
@@ -229,9 +251,16 @@ export function SessionDetailContent({
         isSessionStreaming={isStreaming}
         getChildMessages={getChildMessages}
         defaultReasoningExpanded={reasoningDefaultExpanded}
+        onOpenChildSession={handleOpenChildSession}
       />
     ),
-    [lastAssistantIndex, isStreaming, getChildMessages, reasoningDefaultExpanded]
+    [
+      lastAssistantIndex,
+      isStreaming,
+      getChildMessages,
+      reasoningDefaultExpanded,
+      handleOpenChildSession,
+    ]
   );
 
   const handleStop = useCallback(async () => {
@@ -241,6 +270,10 @@ export function SessionDetailContent({
       toast.error('Failed to stop execution');
     }
   }, [manager]);
+
+  const handleBackToSessions = useCallback(() => {
+    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+  }, [router]);
 
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
@@ -293,7 +326,7 @@ export function SessionDetailContent({
       statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready'),
   });
 
-  const emptyStateText = error ?? (statusIndicator ? null : 'No messages yet');
+  const emptyStateText = statusIndicator ? null : 'No messages yet';
 
   const title =
     fetchedData?.kiloSessionId === sessionId ? (fetchedData.title ?? 'Session') : 'Session';
@@ -316,21 +349,25 @@ export function SessionDetailContent({
         toast.error('Select a model before sending');
         return;
       }
-      try {
-        await manager.send({
-          payload: {
-            type: 'prompt',
-            prompt: text,
-            mode: currentMode,
-            model: currentModel,
-            variant: currentVariant || undefined,
-          },
-          ...(supportsAttachments && attachments ? { attachments } : {}),
-        });
-        captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
-      } catch {
-        toast.error('Failed to send message. Please try again.');
+      // manager.send() reports failures via its own return value (and toasts
+      // through the manager's onSendFailed hook) rather than rejecting — it
+      // is the single toast owner for send failures. Throw here, without a
+      // second toast, purely so the composer's `await onSend(...)` sees the
+      // rejection and preserves the draft.
+      const sent = await manager.send({
+        payload: {
+          type: 'prompt',
+          prompt: text,
+          mode: currentMode,
+          model: currentModel,
+          variant: currentVariant || undefined,
+        },
+        ...(supportsAttachments && attachments ? { attachments } : {}),
+      });
+      if (!sent) {
+        throw new Error('Failed to send message');
       }
+      captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
     },
     [
       manager,
@@ -367,6 +404,23 @@ export function SessionDetailContent({
       )}
 
       <View style={{ height: bottom }} className="bg-background" />
+
+      {childSession ? (
+        <ChildSessionSheet
+          sessionId={childSession.sessionId}
+          title={childSession.title}
+          getChildMessages={getChildMessages}
+          hydrationState={getChildSessionHydrationState(childSession.sessionId)}
+          renderPart={props => <PartRenderer {...props} />}
+          onOpenChildSession={handleOpenChildSession}
+          onRetry={() => {
+            void manager.hydrateChildSession(childSession.sessionId);
+          }}
+          onClose={() => {
+            setChildSession(undefined);
+          }}
+        />
+      ) : null}
     </View>
   );
 
@@ -437,10 +491,24 @@ export function SessionDetailContent({
 
   function renderContent() {
     if (shouldBlockMessages) {
+      return <SessionSkeletonMessages />;
+    }
+    if (error && messages.length === 0) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" />
-          <Text className="mt-3 text-sm text-muted-foreground">Loading session…</Text>
+        <View className="flex-1 items-center justify-center gap-3 px-6">
+          <QueryError
+            variant="server"
+            placement="top"
+            className="px-0 pt-0"
+            title="Couldn't load this session"
+            message={error}
+            onRetry={() => {
+              void manager.switchSession(sessionId);
+            }}
+          />
+          <Button variant="ghost" onPress={handleBackToSessions}>
+            <Text>Back to sessions</Text>
+          </Button>
         </View>
       );
     }
@@ -449,11 +517,11 @@ export function SessionDetailContent({
         <View className="flex-1 items-center justify-center px-6">
           {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           {emptyStateText ? (
-            <Text
-              className={`text-center ${error ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}
-            >
-              {emptyStateText}
-            </Text>
+            <EmptyState
+              icon={MessageSquare}
+              title={emptyStateText}
+              description="Send a message below to get started."
+            />
           ) : null}
         </View>
       );
@@ -484,4 +552,23 @@ export function SessionDetailContent({
       />
     );
   }
+}
+
+// Mirrors MessageBubble's bubble geometry (px-4 py-1/py-2 wrapper,
+// rounded-2xl with an asymmetric "tail" corner, self-start/self-end
+// alignment) so the loading state reads as a message list, not a spinner.
+export function SessionSkeletonMessages() {
+  return (
+    <View className="flex-1 pt-2">
+      <View className="items-start px-4 py-2">
+        <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
+      </View>
+      <View className="items-end px-4 py-1">
+        <Skeleton className="h-10 w-1/2 rounded-2xl rounded-tr-sm" />
+      </View>
+      <View className="items-start px-4 py-2">
+        <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tl-sm" />
+      </View>
+    </View>
+  );
 }

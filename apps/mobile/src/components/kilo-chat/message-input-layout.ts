@@ -53,5 +53,5 @@ export function resolveMessageInputBottomPadding({
     return MESSAGE_INPUT_BOTTOM_CLEARANCE + Math.max(bottomSafeAreaInset, 0);
   }
 
-  return MESSAGE_INPUT_BOTTOM_CLEARANCE;
+  return Math.max(bottomSafeAreaInset, MESSAGE_INPUT_BOTTOM_CLEARANCE);
 }

@@ -49,8 +49,8 @@ export function ConsentDetails() {
           why="Measure app performance and understand which channels bring new users."
           who="The analytics provider named in our privacy policy."
           footer={
-            <View className="mt-3 rounded-md bg-amber-50 p-3 dark:bg-amber-950">
-              <Text className="text-xs text-amber-900 dark:text-amber-100">
+            <View className="mt-3 rounded-md bg-warn-tile-bg p-3">
+              <Text className="text-xs text-warn">
                 No prompt or conversation content is sent to analytics.
               </Text>
             </View>

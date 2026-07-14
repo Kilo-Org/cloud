@@ -1,9 +1,10 @@
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
-import { ArrowRight, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, FolderGit2, ShieldCheck } from 'lucide-react-native';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { EmptyState } from '@/components/empty-state';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
@@ -24,6 +25,16 @@ type SectionProps = Readonly<{
   slaEnabled: boolean;
   repoFullName: string | undefined;
 }>;
+
+function repoTrailingLabel(
+  repo: { slaCompliancePercent: number; slaComplianceMeasured: boolean; needsAction: number },
+  slaEnabled: boolean
+): string {
+  if (!slaEnabled) {
+    return `${repo.needsAction} findings`;
+  }
+  return repo.slaComplianceMeasured ? `${repo.slaCompliancePercent}%` : 'Not measured';
+}
 
 function findingsHref(
   scope: string,
@@ -238,9 +249,13 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
   if (data.repoHealth.length === 0) {
     return (
       <SectionCard title="Repository action plan">
-        <Text variant="muted" className="pb-3 text-sm">
-          Repository priorities will appear after findings are synced.
-        </Text>
+        <EmptyState
+          icon={FolderGit2}
+          placement="top"
+          className="py-3"
+          title="No repository data yet"
+          description="Repository priorities will appear after findings are synced."
+        />
       </SectionCard>
     );
   }
@@ -267,7 +282,7 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
           </View>
           <Text variant="mono" className="text-xs text-muted-foreground">
-            {slaEnabled ? `${repo.slaCompliancePercent}%` : `${repo.needsAction} findings`}
+            {repoTrailingLabel(repo, slaEnabled)}
           </Text>
           <ArrowRight size={14} color={colors.mutedForeground} />
         </Pressable>

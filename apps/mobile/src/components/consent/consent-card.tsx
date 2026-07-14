@@ -1,9 +1,9 @@
 import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
 import { ChevronRight, MessageSquare, Shield, Smartphone, User } from 'lucide-react-native';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
@@ -33,6 +33,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     paddingTop: 24,
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
+  const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePrimaryAction = async () => {
     if (mode === 'review') {
@@ -41,12 +43,51 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     }
 
     if (!userId) {
-      toast.error('Could not load your account. Please try again.');
+      setError('Could not load your account. Please try again.');
       return;
     }
 
-    await acceptConsent(userId);
-    router.replace('/(app)/(tabs)' as Href);
+    setError(null);
+    setPendingAction('primary');
+    try {
+      await acceptConsent(userId);
+      router.replace('/(app)/(tabs)' as Href);
+    } catch {
+      setError('Could not save your consent. Please try again.');
+      setPendingAction(null);
+    }
+  };
+
+  const runSecondaryAction = async () => {
+    setError(null);
+    setPendingAction('secondary');
+
+    if (mode === 'review') {
+      if (!userId) {
+        setError('Could not load your account. Please try again.');
+        setPendingAction(null);
+        return;
+      }
+
+      try {
+        await revokeConsent(userId);
+      } catch {
+        setError('Could not revoke consent. Please try again.');
+        setPendingAction(null);
+        return;
+      }
+    }
+
+    try {
+      await signOut();
+    } catch {
+      setError(
+        mode === 'review'
+          ? 'Consent was revoked, but sign-out failed. Please try again.'
+          : 'Could not sign out. Please try again.'
+      );
+      setPendingAction(null);
+    }
   };
 
   const handleSecondaryAction = () => {
@@ -61,18 +102,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         text: actions.destructiveLabel,
         style: 'destructive',
         onPress: () => {
-          void (async () => {
-            if (mode === 'review') {
-              if (!userId) {
-                toast.error('Could not load your account. Please try again.');
-                return;
-              }
-
-              await revokeConsent(userId);
-            }
-
-            await signOut();
-          })();
+          void runSecondaryAction();
         },
       },
     ]);
@@ -144,6 +174,12 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           .
         </Text>
 
+        {error ? (
+          <Text accessibilityLiveRegion="polite" className="mt-6 text-sm text-destructive">
+            {error}
+          </Text>
+        ) : null}
+
         <View className="mt-8 gap-3">
           <Button
             onPress={() => {
@@ -151,6 +187,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             }}
             size="lg"
             accessibilityLabel={actions.primaryLabel}
+            disabled={pendingAction === 'secondary'}
+            loading={pendingAction === 'primary'}
           >
             <Text>{actions.primaryLabel}</Text>
           </Button>
@@ -159,6 +197,8 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             size="lg"
             onPress={handleSecondaryAction}
             accessibilityLabel={actions.secondaryLabel}
+            disabled={pendingAction === 'primary'}
+            loading={pendingAction === 'secondary'}
           >
             <Text>{actions.secondaryLabel}</Text>
           </Button>

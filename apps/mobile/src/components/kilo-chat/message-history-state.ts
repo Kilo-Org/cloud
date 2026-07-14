@@ -1,4 +1,4 @@
-type MessageHistoryContentState = 'loading' | 'error' | 'ready';
+type MessageHistoryContentState = 'loading' | 'error' | 'ready' | 'stale-error';
 
 export function getMessageHistoryContentState({
   isPending,
@@ -12,13 +12,15 @@ export function getMessageHistoryContentState({
   if (isPending) {
     return 'loading';
   }
+  // Cached data wins: a refetch failure with existing messages is a stale-error
+  // (small inline indicator), never a full-screen error that hides history.
+  if (hasData) {
+    return isError ? 'stale-error' : 'ready';
+  }
   if (isError) {
     return 'error';
   }
-  if (!hasData) {
-    return 'loading';
-  }
-  return 'ready';
+  return 'loading';
 }
 
 export function shouldMarkLatestMessageRead({

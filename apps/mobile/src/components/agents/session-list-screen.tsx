@@ -1,10 +1,10 @@
-import { Plus, SlidersHorizontal } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
+import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import {
   type ProjectFilterOption,
   SessionFilterChips,
@@ -25,14 +25,12 @@ import {
   useRecentAgentRepositories,
 } from '@/lib/hooks/use-agent-sessions';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 
 export function AgentSessionListScreen() {
   const router = useRouter();
-  const colors = useThemeColors();
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -55,6 +53,13 @@ export function AgentSessionListScreen() {
     searchTimerRef.current = setTimeout(() => {
       setSearchQuery(text.trim());
     }, 300);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    setSearchQuery('');
   }, []);
 
   useEffect(
@@ -106,6 +111,31 @@ export function AgentSessionListScreen() {
     enabled: ready,
   });
 
+  // While searching, only the search query's own error/pending state matters —
+  // it's the one actually driving what's on screen. Retrying should hit
+  // whichever query is really in error instead of always refetching the base
+  // list underneath a failed search.
+  const contentIsError = isSearching ? search.isError : isError;
+  const isSearchPending = isSearching && search.isPending;
+  const searchRefetch = search.refetch;
+  const handleRetry = useCallback(() => {
+    if (isSearching) {
+      void searchRefetch();
+    } else {
+      void refetch();
+    }
+  }, [isSearching, searchRefetch, refetch]);
+
+  // Pull-to-refresh must also retry the search query while one is active —
+  // it's the query actually driving what's on screen.
+  const handleRefetch = useCallback(async () => {
+    if (!isSearching) {
+      await refetch();
+      return;
+    }
+    await Promise.all([searchRefetch(), refetch()]);
+  }, [isSearching, refetch, searchRefetch]);
+
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
@@ -140,6 +170,12 @@ export function AgentSessionListScreen() {
     return [...byGitUrl.values()];
   }, [projectFilter, recentRepositories?.repositories]);
 
+  // While the first fetch for this search text is still in flight (no
+  // keepPreviousData to fall back on yet), render as if no search were
+  // applied instead of blanking to an empty/mismatched list —
+  // `isSearchPending` drives a lightweight inline indicator instead.
+  const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
+
   const sections = useMemo<SessionSection[]>(() => {
     const result: SessionSection[] = [];
     const storedSessionIds = new Set(storedSessions.map(session => session.session_id));
@@ -157,7 +193,9 @@ export function AgentSessionListScreen() {
         return false;
       }
 
-      return searchQuery ? matchesSearch(searchQuery, session.title, session.gitUrl ?? null) : true;
+      return effectiveSearchQuery
+        ? matchesSearch(effectiveSearchQuery, session.title, session.gitUrl ?? null)
+        : true;
     });
 
     if (filteredActive.length > 0) {
@@ -175,7 +213,7 @@ export function AgentSessionListScreen() {
     // Stored sessions are cursor-paginated, so a client-side filter would only
     // see the loaded pages. When a query is active, use the server search
     // results (which cover the full history) instead.
-    const storedGroups = searchQuery ? search.dateGroups : dateGroups;
+    const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
     for (const group of storedGroups) {
       if (group.sessions.length > 0) {
         result.push({
@@ -196,9 +234,9 @@ export function AgentSessionListScreen() {
     activeSessionIds,
     activeSessions,
     dateGroups,
+    effectiveSearchQuery,
     projectFilter,
     search.dateGroups,
-    searchQuery,
     storedSessions,
   ]);
 
@@ -219,6 +257,12 @@ export function AgentSessionListScreen() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
 
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
+  const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
+
+  const handleClearQuery = useCallback(() => {
+    handleClearSearch();
+    setFilters({ platformFilter: [], projectFilter: [] });
+  }, [handleClearSearch, setFilters]);
 
   return (
     <View className="flex-1 bg-background">
@@ -228,34 +272,16 @@ export function AgentSessionListScreen() {
         showBackButton={false}
         className="px-[22px]"
         headerRight={
-          <View className="flex-row items-center gap-4">
-            <Pressable
-              onPress={() => {
-                router.push(getNewAgentSessionPath(organizationId) as Href);
-              }}
-              // right slop capped so the expanded targets don't overlap inside the 16px gap
-              hitSlop={{ top: 11, bottom: 11, left: 11, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="New session"
-              className="active:opacity-70"
-            >
-              <Plus size={22} color={colors.foreground} />
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setShowFilterModal(true);
-              }}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
-              accessibilityRole="button"
-              accessibilityLabel="Filter sessions"
-              className="active:opacity-70"
-            >
-              <SlidersHorizontal
-                size={20}
-                color={hasActiveFilter ? colors.foreground : colors.mutedForeground}
-              />
-            </Pressable>
-          </View>
+          <SessionListHeaderActions
+            hasActiveFilter={hasActiveFilter}
+            showNewSession={hasAnySessions}
+            onNewSession={() => {
+              router.push(getNewAgentSessionPath(organizationId) as Href);
+            }}
+            onOpenFilters={() => {
+              setShowFilterModal(true);
+            }}
+          />
         }
       />
       <Animated.View layout={LinearTransition}>
@@ -275,14 +301,19 @@ export function AgentSessionListScreen() {
         <AgentSessionListContent
           sections={sections}
           storedSessions={storedSessions}
-          hasAnySessions={storedSessions.length > 0 || activeSessions.length > 0}
-          isLoading={isLoading || !ready || (isSearching && search.isPending)}
-          isError={isError || (isSearching && search.isError)}
+          hasAnySessions={hasAnySessions}
+          isLoading={isLoading || !ready}
+          isSearchPending={isSearchPending}
+          isError={contentIsError}
           isFetchingNextPage={isFetchingNextPage}
-          refetch={refetch}
+          refetch={handleRefetch}
+          onRetry={handleRetry}
           onEndReached={handleEndReached}
           onSessionPress={navigateToSession}
           onSearchChange={handleSearchChange}
+          hasActiveQuery={isSearching || hasActiveFilter}
+          isSearching={isSearching}
+          onClearQuery={handleClearQuery}
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}

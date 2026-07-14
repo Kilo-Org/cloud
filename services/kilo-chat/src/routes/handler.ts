@@ -251,6 +251,29 @@ export async function handleExecuteAction(c: HonoCtx) {
   return c.json(result satisfies ExecuteActionResponse);
 }
 
+// ─── redeliverMessage ───────────────────────────────────────────────────────
+
+export async function handleRedeliverMessage(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
+
+  const callerId = c.get('callerId');
+  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
+  const result = await convStub.redeliverMessage({ messageId: msgId.data, senderId: callerId });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'conflict') return c.json({ error: result.error }, 409);
+    return c.json({ error: result.error }, 404);
+  }
+
+  // The DO publishes message.redelivered itself, ordered before the delivery
+  // attempt is enqueued, so a fresh delivery failure can never be clobbered
+  // by a delayed clear event.
+  return c.json({ ok: true } satisfies OkResponse);
+}
+
 // ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
 
 export async function handleMessageDeliveryFailed(c: HonoCtx) {

@@ -1,6 +1,9 @@
 import { Portal } from '@rn-primitives/portal';
 import { X } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { useEffect } from 'react';
+import { BackHandler, Pressable, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -33,6 +36,21 @@ export function MessageReactionPickerSheet({
   onSelect,
 }: Readonly<MessageReactionPickerSheetProps>) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (!visible) {
+      return undefined;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [visible, onClose]);
+
   if (!visible) {
     return null;
   }
@@ -41,9 +59,19 @@ export function MessageReactionPickerSheet({
 
   return (
     <Portal name="message-reactions">
-      <View className="absolute inset-0 justify-end bg-black/40">
+      <Animated.View
+        entering={FadeIn.duration(150)}
+        exiting={FadeOut.duration(150)}
+        className="absolute inset-0 justify-end bg-black/40"
+      >
         <Pressable className="flex-1" accessibilityLabel="Close reactions" onPress={onClose} />
-        <View className="gap-4 rounded-t-3xl bg-card px-5 pb-8 pt-4">
+        <Animated.View
+          entering={SlideInDown.duration(220)}
+          exiting={SlideOutDown.duration(180)}
+          accessibilityViewIsModal
+          className="gap-4 rounded-t-3xl bg-card px-5 pt-4"
+          style={{ paddingBottom: insets.bottom + 24 }}
+        >
           <View className="flex-row items-center justify-between">
             <Text className="text-base font-semibold text-foreground">Reactions</Text>
             <Pressable
@@ -59,8 +87,8 @@ export function MessageReactionPickerSheet({
             <ReactionGrid title="Recent" reactions={recent} onSelect={onSelect} />
           ) : null}
           <ReactionGrid title="Common" reactions={COMMON_REACTIONS} onSelect={onSelect} />
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Portal>
   );
 }

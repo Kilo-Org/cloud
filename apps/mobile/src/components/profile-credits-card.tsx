@@ -1,21 +1,25 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
+import { formatDate, parseTimestamp } from '@/lib/utils';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
-  orgs: { organizationId: string; organizationName: string }[] | undefined;
+  orgs: OrgListEntry[] | undefined;
 };
 
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
@@ -54,7 +58,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const balanceDollars = balance?.balance ?? 0;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
-  const expiringTotal = expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0) / 1_000_000;
+  const expiringTotal = fromMicrodollars(
+    expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
+  );
   const earliestExpiry = expiringBlocks
     .map(b => b.expiry_date)
     .filter((d): d is string => d !== null)
@@ -66,6 +72,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     : 'Personal';
 
   const hasOrgs = orgs && orgs.length > 0;
+
+  // Personal (non-org) credits are a consumable purchased directly by the end
+  // user, so Apple requires IAP for them — iOS can't show purchase language
+  // pointing at the web billing page. Org billing is exempt (business/seat
+  // billing), but only members who can manage billing should see the CTA —
+  // matching the money-role gate on the organization hub screen.
+  const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
+  const canShowZeroBalanceCta =
+    selectedOrgId != null ? isMoneyRole(selectedOrgRole) : Platform.OS !== 'ios';
+  const zeroBalanceUrl = selectedOrgId
+    ? `${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`
+    : `${WEB_BASE_URL}/credits`;
 
   const openPicker = () => {
     if (!orgs || orgs.length === 0) {
@@ -114,19 +132,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         )}
       </View>
 
-      {balanceLoading && <Skeleton className="h-16 w-full rounded-lg" />}
+      {balanceLoading && <Skeleton className="min-h-16 w-full rounded-lg" />}
       {balanceError && (
         <Pressable
-          className="h-16 justify-center rounded-lg bg-secondary px-3 active:opacity-70"
+          className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
           onPress={() => void refetchBalance()}
         >
           <Text className="text-sm text-destructive">Failed to load balance. Tap to retry.</Text>
         </Pressable>
       )}
       {!balanceLoading && !balanceError && (
-        <View className="h-16 flex-row items-center rounded-lg bg-secondary px-3">
+        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
-            <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
+            <Text className="text-2xl font-bold">{formatDollars(balanceDollars)}</Text>
             {creditsLoading ? (
               <Animated.View exiting={FadeOut.duration(150)}>
                 <Skeleton className="mt-1 h-3 w-48 rounded" />
@@ -136,11 +154,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
               earliestExpiry != null && (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
                   <Text className="text-xs text-muted-foreground">
-                    ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
-                    {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+                    {formatDollars(expiringTotal)} in bonus credits expiring{' '}
+                    {formatDate(parseTimestamp(earliestExpiry))}
                   </Text>
                 </Animated.View>
               )
@@ -149,6 +164,24 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
+      {!balanceLoading && !balanceError && balanceDollars === 0 && canShowZeroBalanceCta && (
+        <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
+      )}
+      {/* Personal-context IAP disclosure only — never show this personal "managed
+          outside the iOS app" copy under an org context (org billing isn't personal
+          IAP, and a non-money-role member just lacks access). */}
+      {!balanceLoading &&
+        !balanceError &&
+        balanceDollars === 0 &&
+        !canShowZeroBalanceCta &&
+        selectedOrgId == null && (
+          <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
+            <Text className="flex-1 pr-3 text-xs text-muted-foreground">
+              Your credit balance is empty. Credits are managed outside the iOS app for this
+              account.
+            </Text>
+          </View>
+        )}
       {enabled && !selectedOrgId ? <KiloPassSubscriptionCard /> : null}
     </View>
   );

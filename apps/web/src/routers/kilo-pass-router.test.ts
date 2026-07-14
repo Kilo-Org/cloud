@@ -73,6 +73,7 @@ type StripeMock = {
     create: ReturnType<typeof jest.fn>;
     update: ReturnType<typeof jest.fn>;
     release: ReturnType<typeof jest.fn>;
+    retrieve: ReturnType<typeof jest.fn>;
   };
   checkout: {
     sessions: {
@@ -201,6 +202,12 @@ type KiloPassCaller = {
     targetTier: KiloPassTier;
     targetCadence: KiloPassCadence;
   }) => Promise<{ scheduledChangeId: string; effectiveAt: string }>;
+  getScheduledChange: () => Promise<{
+    scheduledChange: {
+      id: string;
+      status: KiloPassScheduledChangeStatus;
+    } | null;
+  }>;
   cancelScheduledChange: () => Promise<{ success: boolean }>;
   createCheckoutSession: (input: {
     tier: KiloPassTier;
@@ -285,6 +292,7 @@ jest.mock('@/lib/stripe-client', () => {
       create: jest.fn(),
       update: jest.fn(),
       release: jest.fn(),
+      retrieve: jest.fn(),
     },
     checkout: {
       sessions: {
@@ -554,6 +562,7 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.create.mockReset();
     stripeMock.subscriptionSchedules.update.mockReset();
     stripeMock.subscriptionSchedules.release.mockReset();
+    stripeMock.subscriptionSchedules.retrieve.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
     stripeMock.checkout.sessions.retrieve.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
@@ -3078,6 +3087,95 @@ describe('kiloPassRouter', () => {
     });
   });
 
+  describe('getScheduledChange', () => {
+    async function insertPendingScheduledChange(params: {
+      email: string;
+      effectiveAt: string;
+      status?: KiloPassScheduledChangeStatus;
+    }) {
+      const user = await insertTestUser({ google_user_email: params.email });
+      const stripeSubscriptionId = `sub_read_${crypto.randomUUID()}`;
+      const scheduleId = `sched_read_${crypto.randomUUID()}`;
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const scheduledChangeId = crypto.randomUUID();
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubscriptionId,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Monthly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Monthly,
+        stripe_schedule_id: scheduleId,
+        effective_at: params.effectiveAt,
+        status: params.status ?? KiloPassScheduledChangeStatus.Active,
+      });
+      return { user, scheduleId, scheduledChangeId };
+    }
+
+    it('does not retrieve Stripe state for a non-overdue pending change', async () => {
+      freezeKiloPassClock('2026-07-14T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      const { user, scheduledChangeId } = await insertPendingScheduledChange({
+        email: 'kilo-pass-scheduled-read-future@example.com',
+        effectiveAt: '2026-07-15T12:00:00.000Z',
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getScheduledChange();
+
+      expect(result.scheduledChange?.id).toBe(scheduledChangeId);
+      expect(stripeMock.subscriptionSchedules.retrieve).not.toHaveBeenCalled();
+    });
+
+    it('keeps an overdue change pending while the Stripe schedule remains active', async () => {
+      freezeKiloPassClock('2026-07-14T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'active' });
+      const { user, scheduleId, scheduledChangeId } = await insertPendingScheduledChange({
+        email: 'kilo-pass-scheduled-read-active@example.com',
+        effectiveAt: '2026-07-14T11:00:00.000Z',
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getScheduledChange();
+
+      expect(result.scheduledChange?.id).toBe(scheduledChangeId);
+      expect(stripeMock.subscriptionSchedules.retrieve).toHaveBeenCalledWith(scheduleId);
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.deleted_at).toBeNull();
+      expect(row?.status).toBe(KiloPassScheduledChangeStatus.Active);
+    });
+
+    it.each([
+      KiloPassScheduledChangeStatus.Released,
+      KiloPassScheduledChangeStatus.Canceled,
+      KiloPassScheduledChangeStatus.Completed,
+    ])('reconciles an overdue change when Stripe reports %s', async providerStatus => {
+      freezeKiloPassClock('2026-07-14T12:00:00.000Z');
+      getStripeMock().subscriptionSchedules.retrieve.mockResolvedValue({ status: providerStatus });
+      const { user, scheduledChangeId } = await insertPendingScheduledChange({
+        email: `kilo-pass-scheduled-read-${providerStatus}@example.com`,
+        effectiveAt: '2026-07-14T11:00:00.000Z',
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getScheduledChange();
+
+      expect(result).toEqual({ scheduledChange: null });
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.status).toBe(providerStatus);
+      expect(row?.deleted_at).not.toBeNull();
+    });
+  });
+
   describe('scheduleChange', () => {
     it('monthly cadence: creates a Stripe subscription schedule and inserts a pending scheduled change row', async () => {
       const stripeMock = getStripeMock();
@@ -3560,6 +3658,88 @@ describe('kiloPassRouter', () => {
       // The API releases the schedule; the DB row is deleted asynchronously by the Stripe
       // `subscription_schedule.updated` webhook when it transitions to released/canceled/completed.
       expect(updated).toBeTruthy();
+    });
+
+    it('reconciles and succeeds when Stripe reports the schedule was already released', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptionSchedules.release.mockRejectedValue(
+        new Error('The subscription schedule is already released')
+      );
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'released' });
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-already-released@example.com',
+      });
+      const stripeSubId = `sub_cancel_released_${crypto.randomUUID()}`;
+      const scheduleId = `sched_cancel_released_${crypto.randomUUID()}`;
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const scheduledChangeId = crypto.randomUUID();
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Monthly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Monthly,
+        stripe_schedule_id: scheduleId,
+        effective_at: '2026-08-01T00:00:00.000Z',
+        status: KiloPassScheduledChangeStatus.Active,
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.cancelScheduledChange();
+
+      expect(result).toEqual({ success: true });
+      expect(stripeMock.subscriptionSchedules.retrieve).toHaveBeenCalledWith(scheduleId);
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.status).toBe(KiloPassScheduledChangeStatus.Released);
+      expect(row?.deleted_at).not.toBeNull();
+    });
+
+    it('restores the pending row when release fails and Stripe remains active', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe unavailable'));
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'active' });
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-still-active@example.com',
+      });
+      const stripeSubId = `sub_cancel_active_${crypto.randomUUID()}`;
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const scheduledChangeId = crypto.randomUUID();
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Monthly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Monthly,
+        stripe_schedule_id: `sched_cancel_active_${crypto.randomUUID()}`,
+        effective_at: '2026-08-01T00:00:00.000Z',
+        status: KiloPassScheduledChangeStatus.Active,
+      });
+
+      await expect(
+        (await createCallerForUser(user.id)).kiloPass.cancelScheduledChange()
+      ).rejects.toThrow('Stripe unavailable');
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.status).toBe(KiloPassScheduledChangeStatus.Active);
+      expect(row?.deleted_at).toBeNull();
     });
 
     it('rejects active Google Play subscriptions without releasing a Stripe schedule', async () => {

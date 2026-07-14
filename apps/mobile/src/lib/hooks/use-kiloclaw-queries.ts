@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { deriveMobileOnboardingStateFromBilling } from '@/lib/derive-mobile-onboarding-state';
@@ -47,15 +48,29 @@ export function useKiloClawStatusQueryKey(organizationId: string | null) {
     : trpc.kiloclaw.getStatus.queryKey();
 }
 
-export function useKiloClawBillingStatus(enabled = true) {
+type BillingData = inferRouterOutputs<RootRouter>['kiloclaw']['getBillingStatus'];
+type BillingPollDecider = (data: BillingData | undefined) => number;
+
+export function useKiloClawBillingStatus(
+  enabled = true,
+  refetchInterval: BillingPollDecider = () => 60_000
+) {
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getBillingStatus.queryOptions(undefined, {
       enabled,
-      refetchInterval: enabled ? 60_000 : false,
+      refetchInterval: enabled
+        ? (query: { state: { data?: BillingData } }) => refetchInterval(query.state.data)
+        : false,
     })
   );
 }
+
+// While the subscription is still settling server-side, poll much faster so
+// the "finishing setup" wait is as short as possible instead of sitting on
+// static copy for up to a minute.
+const PENDING_SETTLEMENT_POLL_MS = 5000;
+const DEFAULT_BILLING_POLL_MS = 60_000;
 
 /**
  * Mobile KiloClaw onboarding state, derived client-side from
@@ -63,7 +78,12 @@ export function useKiloClawBillingStatus(enabled = true) {
  * and limitations.
  */
 export function useKiloClawMobileOnboardingState(enabled = true) {
-  const billing = useKiloClawBillingStatus(enabled);
+  const billing = useKiloClawBillingStatus(enabled, data => {
+    if (data && deriveMobileOnboardingStateFromBilling(data).state === 'pending_settlement') {
+      return PENDING_SETTLEMENT_POLL_MS;
+    }
+    return DEFAULT_BILLING_POLL_MS;
+  });
   const data = useMemo(() => {
     if (!billing.data) {
       return undefined;
@@ -184,16 +204,19 @@ export function useKiloClawAvailableVersions(
 ) {
   const trpc = useTRPC();
   const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId);
+  // keepPreviousData: `limit` grows as the caller loads more pages — without
+  // this, bumping it would blank the already-rendered list while the bigger
+  // page refetches.
   const personal = useQuery(
     trpc.kiloclaw.listAvailableVersions.queryOptions(
       { offset, limit },
-      { enabled: personalEnabled, staleTime: 5 * 60_000 }
+      { enabled: personalEnabled, staleTime: 5 * 60_000, placeholderData: keepPreviousData }
     )
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.listAvailableVersions.queryOptions(
       { ...orgInput, offset, limit },
-      { enabled: orgEnabled, staleTime: 5 * 60_000 }
+      { enabled: orgEnabled, staleTime: 5 * 60_000, placeholderData: keepPreviousData }
     )
   );
   return isOrg ? org : personal;

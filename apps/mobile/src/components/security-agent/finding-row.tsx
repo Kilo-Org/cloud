@@ -12,11 +12,12 @@ import {
   findingToneColor,
 } from '@/components/security-agent/finding-tone';
 import { Button } from '@/components/ui/button';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import { cn } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 
 const SEVERITY_TEXT_CLASS: Record<string, string> = {
   critical: 'text-destructive',
@@ -24,10 +25,6 @@ const SEVERITY_TEXT_CLASS: Record<string, string> = {
   medium: 'text-muted-foreground',
   low: 'text-muted-foreground',
 };
-
-function severityLabel(severity: string): string {
-  return severity.length > 0 ? `${severity.charAt(0).toUpperCase()}${severity.slice(1)}` : severity;
-}
 
 // Clearest next action for this finding, mirroring the priority order in
 // apps/web/src/components/security-agent/SecurityFindingRow.tsx — but as a
@@ -44,10 +41,10 @@ function getNextActionLabel(finding: SecurityFinding): string | null {
     return 'Remediation in progress';
   }
   if (capability.canRetry) {
-    return 'Retry fix available';
+    return 'Retry remediation available';
   }
   if (capability.canStart) {
-    return 'Fix available';
+    return 'Remediation available';
   }
   const needsAnalysis =
     finding.status === 'open' && (!finding.analysis_status || finding.analysis_status === 'failed');
@@ -67,17 +64,23 @@ type FindingRowQuickActionProps = {
   finding: SecurityFinding;
   scope: string;
   prUrl: string | null;
-  canQuickAnalyze: boolean;
+  isAnalyzable: boolean;
+  hasAnalysisCapacity: boolean;
   nextAction: string | null;
 };
 
-// Extracted to avoid a nested ternary (prUrl / canQuickAnalyze / nextAction
-// fallback) while keeping FindingRow's render body flat.
+// Extracted to avoid a nested ternary (prUrl / isAnalyzable / nextAction
+// fallback) while keeping FindingRow's render body flat. `isAnalyzable`
+// (eligibility) and `hasAnalysisCapacity` (loaded-and-not-full) are kept
+// separate so the Analyze button's presence never depends on capacity still
+// loading — only its disabled state does, avoiding a button/text layout
+// shift once capacity resolves.
 function FindingRowQuickAction({
   finding,
   scope,
   prUrl,
-  canQuickAnalyze,
+  isAnalyzable,
+  hasAnalysisCapacity,
   nextAction,
 }: Readonly<FindingRowQuickActionProps>) {
   const colors = useThemeColors();
@@ -89,7 +92,7 @@ function FindingRowQuickAction({
       <Button
         variant="secondary"
         size="sm"
-        className="mt-1 h-8 self-start px-3"
+        className="mt-1 self-start px-3"
         onPress={() => {
           void Linking.openURL(prUrl);
         }}
@@ -100,13 +103,13 @@ function FindingRowQuickAction({
     );
   }
 
-  if (canQuickAnalyze) {
+  if (isAnalyzable) {
     return (
       <Button
         variant="secondary"
         size="sm"
-        className="mt-1 h-8 self-start px-3"
-        disabled={startAnalysis.isPending}
+        className="mt-1 self-start px-3"
+        disabled={startAnalysis.isPending || !hasAnalysisCapacity}
         onPress={() => {
           startAnalysis.mutate({
             findingId: finding.id,
@@ -137,7 +140,7 @@ type FindingRowProps = {
   finding: SecurityFinding;
   scope: string;
   slaEnabled: boolean;
-  /** From useSecurityAnalysisCapacity(scope) — gates the row's quick Analyze action. */
+  /** From useSecurityAnalysisCapacity(scope) — disables (not hides) the row's quick Analyze action. */
   hasAnalysisCapacity: boolean;
 };
 
@@ -159,18 +162,20 @@ export function FindingRow({
 
   const prUrl =
     finding.remediationSummary?.status === 'pr_opened' ? finding.remediationSummary.prUrl : null;
-  const canQuickAnalyze =
+  // Eligibility is independent of capacity — the button stays visible
+  // (disabled via hasAnalysisCapacity) instead of swapping for the
+  // nextAction text once capacity resolves.
+  const isAnalyzable =
     !prUrl &&
     finding.status === 'open' &&
-    (!finding.analysis_status || finding.analysis_status === 'failed') &&
-    hasAnalysisCapacity;
+    (!finding.analysis_status || finding.analysis_status === 'failed');
 
   return (
     <View className="gap-1.5 rounded-lg bg-secondary p-3">
       <Pressable
         className="gap-1.5 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={`${severityLabel(finding.severity)} finding: ${finding.title}. ${finding.repo_full_name}. ${analysis.label}${deadline ? `. ${deadline.label}` : ''}`}
+        accessibilityLabel={`${capitalize(finding.severity)} finding: ${finding.title}. ${finding.repo_full_name}. ${analysis.label}${deadline ? `. ${deadline.label}` : ''}`}
         onPress={() => {
           router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
@@ -181,7 +186,7 @@ export function FindingRow({
             SEVERITY_TEXT_CLASS[finding.severity] ?? 'text-muted-foreground'
           )}
         >
-          {severityLabel(finding.severity)}
+          {capitalize(finding.severity)}
         </Text>
         <Text className="text-sm font-medium" numberOfLines={2}>
           {finding.title}
@@ -191,14 +196,24 @@ export function FindingRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
           <View className="flex-row items-center gap-1">
-            <AnalysisIcon size={13} color={findingToneColor(colors, analysis.tone)} />
+            <SpinningIcon
+              icon={AnalysisIcon}
+              size={13}
+              color={findingToneColor(colors, analysis.tone)}
+              spinning={Boolean(analysis.spinning)}
+            />
             <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
               {analysis.label}
             </Text>
           </View>
           {deadline && DeadlineIcon && (
             <View className="flex-row items-center gap-1">
-              <DeadlineIcon size={13} color={findingToneColor(colors, deadline.tone)} />
+              <SpinningIcon
+                icon={DeadlineIcon}
+                size={13}
+                color={findingToneColor(colors, deadline.tone)}
+                spinning={Boolean(deadline.spinning)}
+              />
               <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
                 {deadline.label}
               </Text>
@@ -210,7 +225,8 @@ export function FindingRow({
         finding={finding}
         scope={scope}
         prUrl={prUrl}
-        canQuickAnalyze={canQuickAnalyze}
+        isAnalyzable={isAnalyzable}
+        hasAnalysisCapacity={hasAnalysisCapacity}
         nextAction={nextAction}
       />
     </View>

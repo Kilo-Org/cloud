@@ -44,3 +44,15 @@ export function formatCents(amount: number, currency: string = 'USD') {
     currency: currency.toUpperCase(),
   }).format(amount / 100);
 }
+
+/**
+ * Canonical app-wide date format (e.g. "7/11/2026" for en-US).
+ *
+ * Follows the runtime's default locale (device locale on mobile, browser
+ * locale on web) rather than a pinned locale, so it reads naturally for
+ * every user. Pass a `Date`, not a raw backend string — parse backend
+ * timestamps with `parseTimestamp()` first.
+ */
+export function formatDate(date: Date): string {
+  return date.toLocaleDateString();
+}

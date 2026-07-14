@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useEditMessage } from '@kilocode/kilo-chat-hooks';
+import { useEditMessage, useRedeliverMessage } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageEditContent,
   contentBlocksToText,
@@ -60,6 +60,7 @@ export function useConversationMessageController({
 
   const sendMutation = useSendMessage(client, conversationId, currentUserId);
   const editMessage = useEditMessage(client, conversationId);
+  const redeliverMessage = useRedeliverMessage(client, conversationId);
   const editingTextValue = useMemo(
     () => (editingMessage ? editableText(editingMessage) : ''),
     [editingMessage]
@@ -93,12 +94,33 @@ export function useConversationMessageController({
     setRemovedEditAttachmentIds([]);
   }, []);
 
+  const handleRetrySend = useCallback(
+    (message: Message) => {
+      // Redelivers the existing failed message row server-side — no new
+      // message, no attachment re-linking. The server clears delivery_failed
+      // and pushes message.redelivered to other clients.
+      redeliverMessage.mutate(
+        { messageId: message.id },
+        {
+          onSuccess: () => {
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+          onError: err => {
+            toast.error(formatKiloChatError(err, 'Failed to retry send'));
+          },
+        }
+      );
+    },
+    [redeliverMessage]
+  );
+
   const messageActions = useConversationMessageActions({
     client,
     conversationId,
     currentUserId,
     onEditMessage: startEditingMessage,
     onReplyToMessage: startReplyToMessage,
+    onRetrySend: handleRetrySend,
   });
 
   const handleSend = useCallback(

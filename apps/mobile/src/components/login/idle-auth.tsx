@@ -5,19 +5,19 @@ import {
   isAvailableAsync as isAppleAuthAvailableAsync,
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, TextInput, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Platform, useColorScheme, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function IdleAuth({
   start,
 }: Readonly<{ start: (mode: 'signin' | 'signup') => Promise<void> }>) {
-  const colors = useThemeColors();
   const colorScheme = useColorScheme();
   const {
     busy,
@@ -90,7 +90,12 @@ export function IdleAuth({
           void verifyEmailCode(emailRef.current, code);
         }}
         onResend={() => {
-          void requestEmailCode(emailRef.current);
+          void (async () => {
+            const ok = await requestEmailCode(emailRef.current);
+            if (ok) {
+              toast.success('Code sent');
+            }
+          })();
         }}
         onBack={() => {
           setView('main');
@@ -102,23 +107,28 @@ export function IdleAuth({
   return (
     <View className="gap-3">
       {showApple && (
-        <AppleAuthenticationButton
-          buttonType={AppleAuthenticationButtonType.SIGN_IN}
-          buttonStyle={
-            colorScheme === 'dark'
-              ? AppleAuthenticationButtonStyle.WHITE
-              : AppleAuthenticationButtonStyle.BLACK
-          }
-          cornerRadius={8}
-          // eslint-disable-next-line react-native/no-inline-styles -- AppleAuthenticationButton isn't NativeWind-aware; height/width must be set via style, not className
-          style={{ height: 44, width: '100%' }}
-          onPress={() => {
-            if (!authBusy) {
-              void signInWithApple();
+        <View
+          className={authBusy ? 'opacity-50' : undefined}
+          pointerEvents={authBusy ? 'none' : 'auto'}
+        >
+          <AppleAuthenticationButton
+            buttonType={AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={
+              colorScheme === 'dark'
+                ? AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthenticationButtonStyle.BLACK
             }
-          }}
-          accessibilityLabel="Sign in with Apple"
-        />
+            cornerRadius={8}
+            // eslint-disable-next-line react-native/no-inline-styles -- AppleAuthenticationButton isn't NativeWind-aware; height/width must be set via style, not className
+            style={{ height: 44, width: '100%' }}
+            onPress={() => {
+              if (!authBusy) {
+                void signInWithApple();
+              }
+            }}
+            accessibilityLabel="Sign in with Apple"
+          />
+        </View>
       )}
 
       {googleConfigured && (
@@ -145,17 +155,17 @@ export function IdleAuth({
         </View>
       )}
 
-      <TextInput
-        className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-5 text-foreground"
-        placeholder="Email address"
-        placeholderTextColor={colors.mutedForeground}
+      <FormField
+        label="Email address"
+        placeholder="you@example.com"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
         onChangeText={value => {
           emailRef.current = value;
         }}
-        accessibilityLabel="Email address"
       />
       <Button
         size="lg"

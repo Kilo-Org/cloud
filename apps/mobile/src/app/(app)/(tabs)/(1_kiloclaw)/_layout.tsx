@@ -9,15 +9,6 @@ export default function KiloClawLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen
-        name="rename-conversation"
-        options={{
-          presentation: 'formSheet',
-          sheetAllowedDetents: [0.5],
-          sheetGrabberVisible: true,
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
         name="chat/instance-picker"
         options={{
           presentation: 'formSheet',

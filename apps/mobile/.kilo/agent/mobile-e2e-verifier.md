@@ -2,7 +2,7 @@
 description: Verifies an approved mobile-app change end to end against local services, simulator, CLI, and related repositories
 mode: subagent
 model: kilo/kilo-auto/efficient
-steps: 60
+steps: 100
 permission:
   edit: deny
   external_directory: allow

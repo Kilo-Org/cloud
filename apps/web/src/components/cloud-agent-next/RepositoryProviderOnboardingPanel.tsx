@@ -2,9 +2,8 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 const providerLogoPaths = {
   github:
@@ -102,30 +101,20 @@ export function RepositoryProviderOnboardingPanel({
         ))}
       </div>
 
-      <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="type-label text-pretty text-muted-foreground">
-          <span className="block">Already connected?</span>
-          <span className="block">Check again to load your repositories.</span>
-        </p>
+      <p className="type-body mt-5 text-muted-foreground">
+        Already connected?{' '}
         <Button
-          variant="secondary"
-          className="border-transparent duration-150 ease-out-strong active:bg-surface-selected [@media(any-pointer:coarse)]:min-h-control-touch"
+          variant="link"
+          className="type-body relative h-auto rounded-sm p-0 text-muted-foreground underline decoration-muted-foreground/50 underline-offset-4 after:absolute after:-inset-y-3 after:inset-x-0 hover:text-foreground hover:decoration-foreground"
           onClick={onCheckConnection}
           disabled={isCheckingConnection}
           aria-busy={isCheckingConnection}
         >
-          <RefreshCw
-            className={cn(
-              'size-4',
-              isCheckingConnection && 'animate-spin motion-reduce:animate-none'
-            )}
-            aria-hidden="true"
-          />
           <span aria-live="polite">
             {isCheckingConnection ? 'Checking connection…' : 'Check connection'}
           </span>
         </Button>
-      </div>
+      </p>
     </section>
   );
 }

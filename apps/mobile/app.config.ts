@@ -66,6 +66,7 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
+    ['expo-dev-client', { toolsButton: false }],
     [
       'expo-build-properties',
       {

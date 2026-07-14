@@ -14,6 +14,18 @@
 # code for you. See e2e/AGENTS.md ("Login / logout helper flows").
 appId: com.kilocode.kiloapp
 ---
+# A clean iOS install can put system and Expo onboarding over the app. Clear
+# both before returning to SpringBoard; otherwise the Kilo icon is not tappable.
+- runFlow:
+    when:
+      visible: 'Ask App Not to Track'
+    commands:
+      - tapOn: 'Ask App Not to Track'
+- runFlow:
+    when:
+      visible: 'This is the developer menu.*'
+    commands:
+      - tapOn: 'Continue'
 - stopApp
 - tapOn:
     text: 'Kilo'

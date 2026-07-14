@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
+import { CouncilGovernancePanel } from '@/components/code-reviews/CouncilGovernancePanel';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
 import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
@@ -286,6 +287,14 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           )}
         </CardContent>
       </Card>
+
+      {/* Council results (council runs only) */}
+      {review.review_type === 'council' && (
+        <CouncilGovernancePanel
+          councilResult={review.council_result}
+          awaitingResults={isInFlightReviewStatus(status)}
+        />
+      )}
 
       {/* Session log / live stream */}
       {showStreamView && (

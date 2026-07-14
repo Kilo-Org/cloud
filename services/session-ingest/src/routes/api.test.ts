@@ -587,9 +587,7 @@ describe('api routes', () => {
       }));
       const { app } = prepareIngestRoute(ingest);
       const { db, fns } = makeDbFakes();
-      fns.selectResult.mockResolvedValueOnce([
-        { parentSessionId: null, createdOnPlatform: 'vscode' },
-      ]);
+      fns.selectResult.mockResolvedValueOnce([{ parentSessionId: null }]);
       vi.mocked(getWorkerDb).mockReturnValue(db);
       const env = directIngestEnv();
       const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
@@ -617,9 +615,7 @@ describe('api routes', () => {
       }));
       const { app } = prepareIngestRoute(ingest);
       const { db, fns } = makeDbFakes();
-      fns.selectResult.mockResolvedValueOnce([
-        { parentSessionId: null, createdOnPlatform: 'vscode' },
-      ]);
+      fns.selectResult.mockResolvedValueOnce([{ parentSessionId: null }]);
       vi.mocked(getWorkerDb).mockReturnValue(db);
       const env = directIngestEnv();
       env.NOTIFICATIONS.sendCloudAgentSessionNotification.mockRejectedValueOnce(

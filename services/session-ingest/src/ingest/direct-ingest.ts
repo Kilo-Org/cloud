@@ -376,7 +376,6 @@ async function runDirectPostCommitTasks(
     const [session] = await db
       .select({
         parentSessionId: cli_sessions_v2.parent_session_id,
-        createdOnPlatform: cli_sessions_v2.created_on_platform,
       })
       .from(cli_sessions_v2)
       .where(

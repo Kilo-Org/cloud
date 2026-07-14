@@ -69,18 +69,24 @@ async function processMessage(
     await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
     // Same reasoning for attention signals: a committed status transition won't
     // re-emit on retry, so dispatch what was collected before the failure.
-    scheduleAttentionSignalDispatch(env, msg, sessionRow, mergedAttentionSignals, ctx);
+    scheduleAttentionSignalDispatch(
+      env,
+      msg,
+      sessionRow,
+      mergedChanges,
+      mergedAttentionSignals,
+      ctx
+    );
     throw err;
   }
 
-  scheduleAttentionSignalDispatch(env, msg, sessionRow, mergedAttentionSignals, ctx);
+  scheduleAttentionSignalDispatch(env, msg, sessionRow, mergedChanges, mergedAttentionSignals, ctx);
   await env.SESSION_INGEST_R2.delete(msg.r2Key);
 }
 
 type IngestSessionRow = {
   session_id: string;
   parent_session_id: string | null;
-  created_on_platform: string | null;
 };
 
 /**
@@ -99,7 +105,6 @@ async function loadSessionOrCleanupStaging(
     .select({
       session_id: cli_sessions_v2.session_id,
       parent_session_id: cli_sessions_v2.parent_session_id,
-      created_on_platform: cli_sessions_v2.created_on_platform,
     })
     .from(cli_sessions_v2)
     .where(
@@ -305,21 +310,23 @@ function scheduleAttentionSignalDispatch(
   env: Env,
   msg: IngestQueueMessage,
   sessionRow: IngestSessionRow,
+  mergedChanges: Map<string, string | null>,
   signals: AttentionSignal[],
   ctx: ExecutionContext
 ): void {
   if (signals.length === 0) return;
+  const parentSessionId = mergedChanges.has('parentId')
+    ? (mergedChanges.get('parentId') ?? null)
+    : sessionRow.parent_session_id;
   if (
     !isEligibleForRemoteSessionAttention({
-      parentSessionId: sessionRow.parent_session_id,
-      createdOnPlatform: sessionRow.created_on_platform,
+      parentSessionId,
     })
   ) {
     console.log('Skipping attention signal dispatch (ineligible session)', {
       sessionId: msg.sessionId,
       kiloUserId: msg.kiloUserId,
-      parentSessionId: sessionRow.parent_session_id,
-      createdOnPlatform: sessionRow.created_on_platform,
+      parentSessionId,
       signalCount: signals.length,
     });
     return;

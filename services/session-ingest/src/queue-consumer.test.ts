@@ -1024,7 +1024,7 @@ describe('remote session attention notifications', () => {
   const attentionSignal = { signalId: 'msg_1', kind: 'completed', messageExcerpt: 'All done' };
 
   function setUpAttentionTest(params: {
-    sessionRow: { parent_session_id: string | null; created_on_platform?: string | null };
+    sessionRow: { parent_session_id: string | null };
     activeCliSession?: boolean;
     ingest?: ReturnType<typeof vi.fn>;
     stagedItems?: unknown[];
@@ -1034,9 +1034,7 @@ describe('remote session attention notifications', () => {
     vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
 
     // A single session lookup serves both the deleted-session guard and push eligibility.
-    const limit = vi.fn(async () => [
-      { session_id: 'ses_remote', created_on_platform: 'vscode', ...params.sessionRow },
-    ]);
+    const limit = vi.fn(async () => [{ session_id: 'ses_remote', ...params.sessionRow }]);
     const where = vi.fn(() => ({ limit }));
     const from = vi.fn(() => ({ where }));
     const select = vi.fn(() => ({ from }));
@@ -1143,9 +1141,14 @@ describe('remote session attention notifications', () => {
     expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
   });
 
-  it('suppresses the push for a local CLI session', async () => {
+  it('suppresses the push when the current payload identifies a child session', async () => {
+    const ingest = vi.fn(async () => ({
+      changes: [{ name: 'parentId', value: 'ses_parent' }],
+      attentionSignals: [attentionSignal],
+    }));
     const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
-      sessionRow: { parent_session_id: null, created_on_platform: 'cli' },
+      sessionRow: { parent_session_id: null },
+      ingest,
     });
 
     await runAttentionQueue(env);

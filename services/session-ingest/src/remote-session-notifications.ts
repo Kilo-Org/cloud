@@ -6,18 +6,11 @@ import type { AttentionSignal } from './dos/session-ingest-attention';
 
 export type RemoteSessionInfo = {
   parentSessionId: string | null;
-  createdOnPlatform: string | null;
 };
 
-const REMOTE_SESSION_PLATFORMS = new Set(['vscode', 'agent-manager']);
-
-/** Only remotely controlled root sessions can be eligible for attention pushes. */
+/** Only root sessions can be eligible for attention pushes. */
 export function isEligibleForRemoteSessionAttention(session: RemoteSessionInfo): boolean {
-  return (
-    session.parentSessionId === null &&
-    session.createdOnPlatform !== null &&
-    REMOTE_SESSION_PLATFORMS.has(session.createdOnPlatform)
-  );
+  return session.parentSessionId === null;
 }
 
 const NEEDS_INPUT_BODY = 'Kilo needs your input.';
@@ -41,8 +34,8 @@ export type DispatchRemoteSessionAttentionOutcome = 'sent' | 'suppressed';
 
 /**
  * Sends a best-effort mobile push for a remote session attention signal. Viewing suppression
- * is handled by the notifications service presence check. A connected CLI must currently
- * report the session in its heartbeat. Callers are expected to have already confirmed
+ * is handled by the notifications service presence check. An active remote connection must
+ * currently report the session in its heartbeat. Callers are expected to have already confirmed
  * `isEligibleForRemoteSessionAttention` for the owning session.
  */
 export async function dispatchRemoteSessionAttentionSignal(

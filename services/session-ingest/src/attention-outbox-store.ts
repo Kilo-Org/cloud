@@ -37,11 +37,17 @@
  *     that already pushed cannot double-fire a notification.
  */
 
-import { and, asc, eq, isNotNull, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
 import { attentionOutbox } from './db/sqlite-schema';
-import { computeNextAttemptAt, MAX_ATTEMPTS, type AttentionReason } from './attention-outbox';
+import {
+  ATTENTION_MAX_DISPATCH_AGE_MS,
+  computeNextAttemptAt,
+  dispatchDeadline,
+  MAX_ATTEMPTS,
+  type AttentionReason,
+} from './attention-outbox';
 
 export type OutboxStatus =
   | 'pending'
@@ -131,6 +137,7 @@ export function recordRaiseIntent(
 
 export type RecordResolveParams = {
   requestId: string;
+  reason: AttentionReason;
   now: number;
 };
 
@@ -155,18 +162,71 @@ export function applyResolveIntent(existing: OutboxRow, now: number): OutboxRow 
 }
 
 /**
- * Mark a request resolved. Returns the resulting row, or null when the
- * request id was never raised. Resolve-before-dispatch and
- * resolve-before-retry cancel the pending push; resolve-after-dispatch is
- * a no-op for terminal rows (we still record the timestamp for audit).
+ * Pure: build a terminal resolved tombstone for a request id that was
+ * never raised. The unknown-resolve path is the safe out-of-order case
+ * where the resolve arrives before the matching raise. The tombstone
+ * stamps `raisedAt` and `resolvedAt` to the same `now` so a subsequent
+ * raise cannot pick the row up as a real push — the outbox dispatch
+ * loop will see `status === 'resolved'` and skip it.
+ *
+ * `raisedAt === resolvedAt` and `attemptCount === 0` are the contract
+ * that distinguishes a tombstone from a real raise-then-resolve row.
+ */
+export function applyResolveIntentForUnknownRequest(params: {
+  requestId: string;
+  reason: AttentionReason;
+  now: number;
+}): OutboxRow {
+  return {
+    requestId: params.requestId,
+    reason: params.reason,
+    status: 'resolved',
+    attemptCount: 0,
+    nextAttemptAt: null,
+    lastError: null,
+    raisedAt: params.now,
+    resolvedAt: params.now,
+  };
+}
+
+/**
+ * Mark a request resolved. When the request id was never raised this
+ * inserts a terminal resolved tombstone (see
+ * `applyResolveIntentForUnknownRequest`) so a late raise cannot enqueue
+ * a notification. When a row already exists, the original `reason` is
+ * preserved and the row is collapsed to terminal `resolved` — a repeat
+ * resolve with a different reason is a no-op for the stored reason and
+ * never re-flaps status.
  */
 export function recordResolveIntent(
   db: DrizzleSqliteDODatabase,
   params: RecordResolveParams
-): OutboxRow | null {
+): OutboxRow {
   const existing = selectByRequestId(db, params.requestId);
-  if (!existing) return null;
+  if (!existing) {
+    const row = applyResolveIntentForUnknownRequest({
+      requestId: params.requestId,
+      reason: params.reason,
+      now: params.now,
+    });
+    db.insert(attentionOutbox)
+      .values({
+        request_id: row.requestId,
+        reason: row.reason,
+        status: row.status,
+        attempt_count: row.attemptCount,
+        next_attempt_at: row.nextAttemptAt,
+        last_error: row.lastError,
+        raised_at: row.raisedAt,
+        resolved_at: row.resolvedAt,
+      })
+      .run();
+    return row;
+  }
 
+  // Existing row: the original reason is preserved. A repeat resolve
+  // with a different reason must not overwrite the stored reason, and
+  // must not change status away from any terminal state.
   const next = applyResolveIntent(existing, params.now);
   if (next === existing) return existing;
 
@@ -180,7 +240,7 @@ export function recordResolveIntent(
     .where(eq(attentionOutbox.request_id, params.requestId))
     .run();
 
-  return selectByRequestId(db, params.requestId);
+  return selectByRequestId(db, params.requestId) as OutboxRow;
 }
 
 export type ClaimDispatchParams = {
@@ -188,15 +248,85 @@ export type ClaimDispatchParams = {
 };
 
 /**
+ * Park every pending row whose `next_attempt_at` is at/over the
+ * absolute dispatch window (raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS)
+ * as terminal failed with `last_error: 'retry_window_expired'`. The
+ * window is the receiver's idempotency TTL bound
+ * (NotificationChannelDO = 60min; we cap dispatch at 55min) so any
+ * attempt at/after 60min could be silently dropped or duplicated. By
+ * parking first, the rest of the dispatch loop and the
+ * `earliestScheduledAttemptAt` scheduler see only rows that are still
+ * safely within the window.
+ *
+ * Defense in depth: `claimNextDispatchable` calls this on every lease
+ * attempt and the DO alarm also calls it at start-up, so a delayed
+ * alarm that fires long after the row crossed the window can never
+ * claim a stale row.
+ */
+export function parkExpiredPendingRows(
+  db: DrizzleSqliteDODatabase,
+  _params: ClaimDispatchParams
+): OutboxRow[] {
+  const candidates = db
+    .select()
+    .from(attentionOutbox)
+    .where(
+      and(
+        eq(attentionOutbox.status, 'pending'),
+        isNotNull(attentionOutbox.next_attempt_at),
+        gte(
+          attentionOutbox.next_attempt_at,
+          sql`${attentionOutbox.raised_at} + ${ATTENTION_MAX_DISPATCH_AGE_MS}`
+        )
+      )
+    )
+    .all();
+
+  const parked: OutboxRow[] = [];
+  for (const row of candidates) {
+    const existing = rowToOutbox(row);
+    db.update(attentionOutbox)
+      .set({
+        status: 'failed',
+        next_attempt_at: null,
+        last_error: 'retry_window_expired',
+      })
+      .where(eq(attentionOutbox.request_id, existing.requestId))
+      .run();
+    parked.push({
+      ...existing,
+      status: 'failed',
+      nextAttemptAt: null,
+      lastError: 'retry_window_expired',
+    });
+  }
+  return parked;
+}
+
+/**
  * Claim the next due pending row for dispatch, transitioning it to
- * `in_flight`. Returns the row or null when nothing is due. Atomic within
- * the DO input gate — the SQLite update + select is the dispatch lease.
+ * `in_flight`. Returns the row or null when nothing is due.
+ *
+ * Two hard guards ensure the row is still within the receiver's
+ * idempotency window before any lease is granted:
+ *   1. `parkExpiredPendingRows` flips any pending row whose
+ *      `next_attempt_at` is at/over the absolute deadline to terminal
+ *      `failed` (defense in depth — also called at alarm start).
+ *   2. The remaining `pending` candidate must additionally satisfy
+ *      `now < raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS` so a row whose
+ *      deadline has just elapsed between the parking step and the
+ *      claim is never picked.
+ *
+ * Atomic within the DO input gate — the SQLite update + select is the
+ * dispatch lease.
  */
 export function claimNextDispatchable(
   db: DrizzleSqliteDODatabase,
   params: ClaimDispatchParams
 ): OutboxRow | null {
-  const candidate = db
+  parkExpiredPendingRows(db, params);
+
+  const candidates = db
     .select()
     .from(attentionOutbox)
     .where(
@@ -207,16 +337,36 @@ export function claimNextDispatchable(
       )
     )
     .orderBy(asc(attentionOutbox.next_attempt_at))
-    .limit(1)
-    .get();
-  if (!candidate) return null;
+    .all();
 
-  db.update(attentionOutbox)
-    .set({ status: 'in_flight' })
-    .where(eq(attentionOutbox.request_id, candidate.request_id))
-    .run();
+  for (const candidate of candidates) {
+    const existing = rowToOutbox(candidate);
+    if (params.now >= dispatchDeadline(existing.raisedAt)) {
+      // The candidate is "due" by next_attempt_at but the absolute
+      // window has elapsed. Park it and continue scanning — the
+      // earlier `next_attempt_at` does not imply earlier dispatch
+      // safety. Parking here covers the rare case where
+      // `next_attempt_at < raisedAt + maxAge` (so the parking step
+      // didn't catch it) but the wall clock is now past the deadline.
+      db.update(attentionOutbox)
+        .set({
+          status: 'failed',
+          next_attempt_at: null,
+          last_error: 'retry_window_expired',
+        })
+        .where(eq(attentionOutbox.request_id, existing.requestId))
+        .run();
+      continue;
+    }
 
-  return rowToOutbox(candidate);
+    db.update(attentionOutbox)
+      .set({ status: 'in_flight' })
+      .where(eq(attentionOutbox.request_id, existing.requestId))
+      .run();
+
+    return { ...existing, status: 'in_flight' };
+  }
+  return null;
 }
 
 export type MarkDispatchedParams = {
@@ -283,22 +433,34 @@ export type MarkRetryParams = {
 /**
  * Pure: compute the next row for a retry outcome. Bumps `attemptCount`
  * and either schedules the next attempt or parks the row at terminal
- * `failed` once the cap is reached. Terminal rows (resolved, dispatched,
+ * `failed`. Two independent terminal triggers:
+ *   1. the attempt cap (`MAX_ATTEMPTS`) is reached, or
+ *   2. the absolute dispatch window has elapsed — `now` is at/after
+ *      `raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS`, or the candidate
+ *      next attempt timestamp would itself land at/after that deadline.
+ * Trigger (2) is the receiver's idempotency TTL bound
+ * (NotificationChannelDO is 60min; we cap dispatch at 55min) and trips
+ * regardless of the cap. Terminal rows (resolved, dispatched,
  * suppressed_presence, missing_session, or failed) win and are returned
- * unchanged so retries never resurrect finished work. The terminal `failed`
- * row keeps `resolvedAt` null to match the markRetry park convention.
+ * unchanged so retries never resurrect finished work. The terminal
+ * `failed` row keeps `resolvedAt` null to match the markRetry park
+ * convention.
  */
 export function applyRetry(existing: OutboxRow, now: number, reason: string): OutboxRow {
   if (isTerminalStatus(existing.status)) {
     return existing;
   }
   const nextAttemptCount = existing.attemptCount + 1;
-  const isTerminal = nextAttemptCount >= MAX_ATTEMPTS;
+  const capReached = nextAttemptCount >= MAX_ATTEMPTS;
+  const deadline = dispatchDeadline(existing.raisedAt);
+  const candidateNext = computeNextAttemptAt(nextAttemptCount, now);
+  const windowExpired = now >= deadline || candidateNext >= deadline;
+  const isTerminal = capReached || windowExpired;
   return {
     ...existing,
     status: isTerminal ? 'failed' : 'pending',
     attemptCount: nextAttemptCount,
-    nextAttemptAt: isTerminal ? null : computeNextAttemptAt(nextAttemptCount, now),
+    nextAttemptAt: isTerminal ? null : candidateNext,
     lastError: reason.slice(0, 512),
   };
 }
@@ -337,14 +499,18 @@ export function markRetry(db: DrizzleSqliteDODatabase, params: MarkRetryParams):
 /**
  * Pure: compute the next row for a stale `in_flight` recovery (alarm
  * restart or crash between lease and ack). The row is bumped to
- * `pending` with a fresh `nextAttemptAt`; if the bump would hit
- * `MAX_ATTEMPTS`, the row is parked at terminal `failed` instead.
- * Downstream dispatch is keyed on the stable request id, so a
+ * `pending` with a fresh `nextAttemptAt`; the same two terminal
+ * triggers as `applyRetry` apply — the cap or the absolute dispatch
+ * window. Downstream dispatch is keyed on the stable request id, so a
  * recovered row cannot double-push.
  */
 export function applyStaleInFlightRecovery(existing: OutboxRow, now: number): OutboxRow {
   const nextAttemptCount = existing.attemptCount + 1;
-  const isTerminal = nextAttemptCount >= MAX_ATTEMPTS;
+  const capReached = nextAttemptCount >= MAX_ATTEMPTS;
+  const deadline = dispatchDeadline(existing.raisedAt);
+  const candidateNext = computeNextAttemptAt(nextAttemptCount, now);
+  const windowExpired = now >= deadline || candidateNext >= deadline;
+  const isTerminal = capReached || windowExpired;
   if (isTerminal) {
     return {
       ...existing,
@@ -358,7 +524,7 @@ export function applyStaleInFlightRecovery(existing: OutboxRow, now: number): Ou
     ...existing,
     status: 'pending',
     attemptCount: nextAttemptCount,
-    nextAttemptAt: computeNextAttemptAt(nextAttemptCount, now),
+    nextAttemptAt: candidateNext,
     lastError: 'stale_in_flight_recovered',
   };
 }

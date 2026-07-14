@@ -434,7 +434,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           intent:
             parsed.data.intent.kind === 'raise'
               ? { kind: 'raise', reason: parsed.data.intent.reason }
-              : { kind: 'resolve' },
+              : { kind: 'resolve', reason: parsed.data.intent.reason },
         });
         return result.accepted ? { accepted: true } : { accepted: false, reason: result.reason };
       },

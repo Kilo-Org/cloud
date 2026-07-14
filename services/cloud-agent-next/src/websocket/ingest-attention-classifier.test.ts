@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { classifyAttentionKilocodeEvent } from './ingest-attention-classifier.js';
 
+const SOURCE_SESSION_ID = 'kilo_session_source';
+
 describe('classifyAttentionKilocodeEvent', () => {
   describe('raise mappings', () => {
     it.each([
@@ -9,9 +11,13 @@ describe('classifyAttentionKilocodeEvent', () => {
     ] as const)('%s with nested properties.id raises %s', (eventName, kind) => {
       const result = classifyAttentionKilocodeEvent({
         event: eventName,
-        properties: { id: 'req_nested' },
+        properties: { id: 'req_nested', sessionID: SOURCE_SESSION_ID },
       });
-      expect(result).toEqual({ requestId: 'req_nested', intent: { raise: kind } });
+      expect(result).toEqual({
+        requestId: 'req_nested',
+        intent: { raise: kind },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
     });
 
     it.each([
@@ -21,40 +27,137 @@ describe('classifyAttentionKilocodeEvent', () => {
       const result = classifyAttentionKilocodeEvent({
         event: eventName,
         id: 'req_direct',
+        sessionID: SOURCE_SESSION_ID,
       });
-      expect(result).toEqual({ requestId: 'req_direct', intent: { raise: kind } });
+      expect(result).toEqual({
+        requestId: 'req_direct',
+        intent: { raise: kind },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
     });
 
     it('prefers properties.id over data.id for raise', () => {
       const result = classifyAttentionKilocodeEvent({
         event: 'question.asked',
         id: 'req_direct',
-        properties: { id: 'req_nested' },
+        sessionID: 'top_session',
+        properties: { id: 'req_nested', sessionID: SOURCE_SESSION_ID },
       });
-      expect(result).toEqual({ requestId: 'req_nested', intent: { raise: 'question' } });
+      expect(result).toEqual({
+        requestId: 'req_nested',
+        intent: { raise: 'question' },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
     });
   });
 
   describe('resolve mappings', () => {
-    it.each(['question.replied', 'question.rejected', 'permission.replied'])(
-      '%s with nested properties.id resolves',
-      eventName => {
+    it.each([
+      ['question.replied', 'question'],
+      ['question.rejected', 'question'],
+      ['permission.replied', 'permission'],
+    ] as const)('%s with nested properties.requestID resolves as %s', (eventName, reason) => {
+      const result = classifyAttentionKilocodeEvent({
+        event: eventName,
+        properties: { requestID: 'req_nested', sessionID: SOURCE_SESSION_ID },
+      });
+      expect(result).toEqual({
+        requestId: 'req_nested',
+        intent: { resolve: reason },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
+    });
+
+    it.each([
+      ['question.replied', 'question'],
+      ['question.rejected', 'question'],
+      ['permission.replied', 'permission'],
+    ] as const)(
+      '%s with direct top-level data.requestID fallback resolves as %s',
+      (eventName, reason) => {
         const result = classifyAttentionKilocodeEvent({
           event: eventName,
-          properties: { id: 'req_nested' },
+          requestID: 'req_direct',
+          sessionID: SOURCE_SESSION_ID,
         });
-        expect(result).toEqual({ requestId: 'req_nested', intent: 'resolve' });
+        expect(result).toEqual({
+          requestId: 'req_direct',
+          intent: { resolve: reason },
+          sourceKiloSessionId: SOURCE_SESSION_ID,
+        });
+      }
+    );
+
+    it.each([
+      ['question.replied', 'question'],
+      ['question.rejected', 'question'],
+      ['permission.replied', 'permission'],
+    ] as const)(
+      '%s prefers nested properties.requestID over top-level requestID',
+      (eventName, reason) => {
+        const result = classifyAttentionKilocodeEvent({
+          event: eventName,
+          requestID: 'req_top_requestID',
+          sessionID: 'top_session',
+          id: 'req_top_id',
+          properties: {
+            id: 'req_nested_id',
+            requestID: 'req_nested_requestID',
+            sessionID: SOURCE_SESSION_ID,
+          },
+        });
+        expect(result).toEqual({
+          requestId: 'req_nested_requestID',
+          intent: { resolve: reason },
+          sourceKiloSessionId: SOURCE_SESSION_ID,
+        });
+      }
+    );
+
+    it.each([
+      ['question.replied', 'question'],
+      ['question.rejected', 'question'],
+      ['permission.replied', 'permission'],
+    ] as const)(
+      '%s prefers requestID over id when nested properties carries both',
+      (eventName, reason) => {
+        const result = classifyAttentionKilocodeEvent({
+          event: eventName,
+          properties: {
+            id: 'req_nested_id',
+            requestID: 'req_nested_requestID',
+            sessionID: SOURCE_SESSION_ID,
+          },
+        });
+        expect(result).toEqual({
+          requestId: 'req_nested_requestID',
+          intent: { resolve: reason },
+          sourceKiloSessionId: SOURCE_SESSION_ID,
+        });
       }
     );
 
     it.each(['question.replied', 'question.rejected', 'permission.replied'])(
-      '%s with direct data.id fallback resolves',
+      '%s returns null when no resolve id is present anywhere',
       eventName => {
-        const result = classifyAttentionKilocodeEvent({
-          event: eventName,
-          id: 'req_direct',
-        });
-        expect(result).toEqual({ requestId: 'req_direct', intent: 'resolve' });
+        expect(
+          classifyAttentionKilocodeEvent({
+            event: eventName,
+            properties: { sessionID: SOURCE_SESSION_ID },
+          })
+        ).toBeNull();
+      }
+    );
+
+    it.each(['question.replied', 'question.rejected', 'permission.replied'])(
+      '%s returns null when source sessionID is missing even with requestID',
+      eventName => {
+        expect(
+          classifyAttentionKilocodeEvent({
+            event: eventName,
+            properties: { requestID: 'req_missing_session' },
+          })
+        ).toBeNull();
       }
     );
   });
@@ -97,7 +200,7 @@ describe('classifyAttentionKilocodeEvent', () => {
     it('ignores qualifying event with no id anywhere', () => {
       const result = classifyAttentionKilocodeEvent({
         event: 'question.asked',
-        properties: {},
+        properties: { sessionID: SOURCE_SESSION_ID },
       });
       expect(result).toBeNull();
     });
@@ -106,7 +209,32 @@ describe('classifyAttentionKilocodeEvent', () => {
       const result = classifyAttentionKilocodeEvent({
         event: 'question.asked',
         id: '',
+        sessionID: SOURCE_SESSION_ID,
         properties: { id: '' },
+      });
+      expect(result).toBeNull();
+    });
+
+    it('ignores a resolve event with no requestID anywhere', () => {
+      const result = classifyAttentionKilocodeEvent({
+        event: 'question.replied',
+        properties: { sessionID: SOURCE_SESSION_ID },
+      });
+      expect(result).toBeNull();
+    });
+
+    it('ignores qualifying event when source sessionID is missing', () => {
+      const result = classifyAttentionKilocodeEvent({
+        event: 'question.asked',
+        properties: { id: 'req_present' },
+      });
+      expect(result).toBeNull();
+    });
+
+    it('ignores qualifying event when source sessionID is empty', () => {
+      const result = classifyAttentionKilocodeEvent({
+        event: 'question.asked',
+        properties: { id: 'req_present', sessionID: '' },
       });
       expect(result).toBeNull();
     });
@@ -115,7 +243,8 @@ describe('classifyAttentionKilocodeEvent', () => {
       const result = classifyAttentionKilocodeEvent({
         event: 'question.asked',
         id: 123,
-        properties: { id: { foo: 'bar' } },
+        sessionID: SOURCE_SESSION_ID,
+        properties: { id: { foo: 'bar' }, sessionID: SOURCE_SESSION_ID },
       });
       expect(result).toBeNull();
     });
@@ -125,8 +254,13 @@ describe('classifyAttentionKilocodeEvent', () => {
         event: 'question.asked',
         properties: 'not-an-object',
         id: 'req_direct',
+        sessionID: SOURCE_SESSION_ID,
       });
-      expect(result).toEqual({ requestId: 'req_direct', intent: { raise: 'question' } });
+      expect(result).toEqual({
+        requestId: 'req_direct',
+        intent: { raise: 'question' },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
     });
 
     it('returns null when properties is null and no top-level id', () => {

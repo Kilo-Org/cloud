@@ -957,7 +957,7 @@ describe('SessionIngestRPC.recordCloudAgentSessionAttention', () => {
     });
   });
 
-  it('forwards a resolve intent with no reason field', async () => {
+  it('forwards a resolve intent with the reason field', async () => {
     const { db } = makeDbFakes([]);
     const recordAttentionEvent = vi.fn(async () => ({ accepted: true }) as const);
     vi.mocked(getSessionIngestDO).mockReturnValue({ recordAttentionEvent } as never);
@@ -967,7 +967,7 @@ describe('SessionIngestRPC.recordCloudAgentSessionAttention', () => {
       kiloUserId: 'usr_owner',
       kiloSessionId: sdkSessionInfoFixture.id,
       requestId: 'req_attn_02',
-      intent: { kind: 'resolve' },
+      intent: { kind: 'resolve', reason: 'question' },
     });
 
     expect(result).toEqual({ accepted: true });
@@ -975,7 +975,7 @@ describe('SessionIngestRPC.recordCloudAgentSessionAttention', () => {
       kiloUserId: 'usr_owner',
       sessionId: sdkSessionInfoFixture.id,
       requestId: 'req_attn_02',
-      intent: { kind: 'resolve' },
+      intent: { kind: 'resolve', reason: 'question' },
     });
   });
 
@@ -1060,7 +1060,7 @@ describe('SessionIngestRPC.recordCloudAgentSessionAttention', () => {
       kiloUserId: 'usr_owner',
       kiloSessionId: sdkSessionInfoFixture.id,
       requestId: 'req_attn_01',
-      intent: { kind: 'resolve' },
+      intent: { kind: 'resolve', reason: 'permission' },
     });
 
     expect(result).toEqual({ accepted: false, reason: 'deleted' });

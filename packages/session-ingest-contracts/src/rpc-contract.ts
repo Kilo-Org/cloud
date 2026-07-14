@@ -639,11 +639,16 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * permits only `question` and `permission` reasons — `blocking_suggestion` is
  * excluded because the wrapper's policy filter suppresses suggestions before
  * they reach the worker, and the per-session outbox handles them separately.
+ *
+ * The resolve intent must carry the same reason the matching raise would
+ * have. Without a reason, an out-of-order resolve arriving before a raise
+ * cannot insert a tombstone with the correct `reason`, and the outbox-level
+ * "preserve original reason" rule has nothing to compare against.
  */
 const cloudAgentAttentionReasonSchema = z.enum(['question', 'permission']);
 export const cloudAgentAttentionIntentSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('raise'), reason: cloudAgentAttentionReasonSchema }),
-  z.object({ kind: z.literal('resolve') }),
+  z.object({ kind: z.literal('resolve'), reason: cloudAgentAttentionReasonSchema }),
 ]);
 export type CloudAgentAttentionIntent = z.infer<typeof cloudAgentAttentionIntentSchema>;
 

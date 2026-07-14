@@ -26,18 +26,45 @@ describe('recordAttentionEventInputSchema', () => {
     }
   });
 
-  it('accepts a valid resolve intent', () => {
+  it.each(['question', 'permission', 'blocking_suggestion'] as const)(
+    'accepts a valid resolve intent with reason %s',
+    reason => {
+      const result = recordAttentionEventInputSchema.safeParse({
+        ...validBase(),
+        intent: { kind: 'resolve', reason },
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual({
+          ...validBase(),
+          intent: { kind: 'resolve', reason },
+        });
+      }
+    }
+  );
+
+  it('rejects a resolve intent without a reason', () => {
     const result = recordAttentionEventInputSchema.safeParse({
       ...validBase(),
       intent: { kind: 'resolve' },
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data).toEqual({
-        ...validBase(),
-        intent: { kind: 'resolve' },
-      });
-    }
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a resolve intent with an unknown reason', () => {
+    const result = recordAttentionEventInputSchema.safeParse({
+      ...validBase(),
+      intent: { kind: 'resolve', reason: 'action_required' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a resolve intent with a non-string reason', () => {
+    const result = recordAttentionEventInputSchema.safeParse({
+      ...validBase(),
+      intent: { kind: 'resolve', reason: 123 },
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects an unknown reason', () => {

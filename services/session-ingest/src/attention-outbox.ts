@@ -35,9 +35,30 @@ export type AttentionReason = z.infer<typeof attentionReasonSchema>;
 
 export type AttentionIntent =
   | { kind: 'raise'; reason: AttentionReason }
-  | { kind: 'resolve'; reason: null };
+  | { kind: 'resolve'; reason: AttentionReason };
 
 export const MAX_ATTEMPTS = 7;
+
+/**
+ * Maximum age (in ms) between a row's `raisedAt` and the moment a
+ * dispatch attempt is allowed to fire. The downstream receiver
+ * (NotificationChannelDO) deduplicates push requests with a 60-minute
+ * idempotency TTL, so any attempt at/after 60 minutes from `raisedAt`
+ * can be silently dropped or duplicated by a retry that crosses the
+ * window. We hold a 5-minute safety margin and refuse to attempt
+ * dispatch at/after 55 minutes from `raisedAt`.
+ *
+ * `dispatchDeadline(raisedAt)` returns the absolute wall-clock
+ * deadline; the outbox and alarm code must never schedule a row at or
+ * past that timestamp, and must never claim one whose deadline has
+ * arrived. The constant is exported so tests in the same package can
+ * reference it directly without coupling across the package boundary.
+ */
+export const ATTENTION_MAX_DISPATCH_AGE_MS = 55 * 60_000;
+
+export function dispatchDeadline(raisedAt: number): number {
+  return raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+}
 
 /**
  * Map a raw event name + envelope data to a raise/resolve intent. Returns
@@ -57,12 +78,12 @@ export function classifyAttentionEvent(eventName: string, data: unknown): Attent
       return { kind: 'raise', reason: 'question' };
     case 'question.replied':
     case 'question.rejected':
-      return { kind: 'resolve', reason: null };
+      return { kind: 'resolve', reason: 'question' };
 
     case 'permission.asked':
       return { kind: 'raise', reason: 'permission' };
     case 'permission.replied':
-      return { kind: 'resolve', reason: null };
+      return { kind: 'resolve', reason: 'permission' };
 
     case 'suggestion.shown':
       // Only blocking suggestions are user-actionable. Non-blocking
@@ -70,7 +91,12 @@ export function classifyAttentionEvent(eventName: string, data: unknown): Attent
       return props?.blocking === true ? { kind: 'raise', reason: 'blocking_suggestion' } : null;
     case 'suggestion.accepted':
     case 'suggestion.dismissed':
-      return { kind: 'resolve', reason: null };
+      // A suggestion explicitly marked `blocking: false` is advisory; the
+      // producer never raised it, so we must not synthesize a resolve for
+      // it either. For every other shape (no blocking field, blocking:true,
+      // or any non-false value) we synthesize a blocking_suggestion resolve
+      // so a late raise cannot enqueue a notification.
+      return props?.blocking === false ? null : { kind: 'resolve', reason: 'blocking_suggestion' };
 
     default:
       return null;

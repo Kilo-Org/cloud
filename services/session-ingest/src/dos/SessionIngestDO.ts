@@ -31,12 +31,13 @@ import {
   markMissingSession,
   markRetry,
   markSuppressedByPresence,
+  parkExpiredPendingRows,
   recordRaiseIntent,
   recordResolveIntent,
   recoverStaleInFlightRows,
 } from '../attention-outbox-store';
 import { recordAttentionEventInputSchema } from './attention-event-input';
-import { computeNextAlarmTime } from './attention-alarm';
+import { computeNextAlarmTime, shouldEmitMetricsFromAttentionAlarm } from './attention-alarm';
 import {
   readKiloSdkMessages,
   readKiloSdkSessionSnapshot,
@@ -408,7 +409,11 @@ export class SessionIngestDO extends DurableObject<Env> {
         now,
       });
     } else {
-      recordResolveIntent(this.db, { requestId: params.requestId, now });
+      recordResolveIntent(this.db, {
+        requestId: params.requestId,
+        reason: params.intent.reason,
+        now,
+      });
     }
 
     // Always reschedule: a raise wants to fire immediately; a resolve may
@@ -792,6 +797,14 @@ export class SessionIngestDO extends DurableObject<Env> {
       return;
     }
 
+    // Park any pending rows whose `next_attempt_at` has crossed the
+    // absolute dispatch window (raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS).
+    // Doing this at alarm start (and again inside `claimNextDispatchable`
+    // for defense in depth) keeps `earliestScheduledAttemptAt` from
+    // pointing the next alarm at a row that can no longer be safely
+    // dispatched under the receiver's 60min idempotency TTL.
+    parkExpiredPendingRows(this.db, { now: Date.now() });
+
     // Recover any rows left in `in_flight` from a previous alarm that was
     // lost (DO restart, crash between claim and ack). Each stale row is
     // bumped back to `pending` with a fresh schedule, or parked at
@@ -802,24 +815,42 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     await this.dispatchOutboxBatch({ kiloUserId, sessionId });
 
+    // Re-read the metrics state AFTER `dispatchOutboxBatch` returns. The
+    // batch awaits external IO (the notifications RPC), during which a
+    // concurrent ingest can update `metricsAlarmAt` (e.g. a new
+    // session_open resetting the inactivity timer) or another alarm path
+    // can mark `metricsEmitted`. Emitting metrics on stale state read at
+    // the top of `alarm()` would publish prematurely when the immediate
+    // outbox alarm preempted a far-future metrics deadline, or would
+    // double-publish when emission was already done elsewhere.
+    const freshMeta = this.db
+      .select({ key: ingestMeta.key, value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(inArray(ingestMeta.key, ['metricsEmitted', 'metricsAlarmAt']))
+      .all();
+    const freshMetricsEmitted = freshMeta.find(row => row.key === 'metricsEmitted')?.value ?? null;
+    const freshMetricsAlarmAt = freshMeta.find(row => row.key === 'metricsAlarmAt')?.value ?? null;
+
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
     const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
 
-    // DO alarm exceptions don't populate the Exceptions array in logpush traces,
-    // so without this catch we get outcome=exception with zero diagnostics.
-    try {
-      await this.emitSessionMetrics(kiloUserId, sessionId, closeReason, ingestVersion);
-    } catch (error) {
-      console.error('SessionIngestDO alarm failed', {
-        sessionId,
-        kiloUserId,
-        closeReason,
-        ingestVersion,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+    if (shouldEmitMetricsFromAttentionAlarm(freshMetricsEmitted, freshMetricsAlarmAt, Date.now())) {
+      // DO alarm exceptions don't populate the Exceptions array in logpush traces,
+      // so without this catch we get outcome=exception with zero diagnostics.
+      try {
+        await this.emitSessionMetrics(kiloUserId, sessionId, closeReason, ingestVersion);
+      } catch (error) {
+        console.error('SessionIngestDO alarm failed', {
+          sessionId,
+          kiloUserId,
+          closeReason,
+          ingestVersion,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
 
-      throw error;
+        throw error;
+      }
     }
 
     await this.rescheduleAlarm();

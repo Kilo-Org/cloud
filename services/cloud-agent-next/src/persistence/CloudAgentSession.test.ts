@@ -49,8 +49,14 @@ type RecordAttentionFn = (
 
 type AttentionEnv = CloudAgentAttentionDeps['env'];
 
-function makeAttentionEvent(intent: AttentionEvent['intent'], requestId = 'req_1'): AttentionEvent {
-  return { requestId, intent };
+const ROOT_KILO_SESSION_ID = 'kilo_root_session';
+
+function makeAttentionEvent(
+  intent: AttentionEvent['intent'],
+  requestId = 'req_1',
+  sourceKiloSessionId: string = ROOT_KILO_SESSION_ID
+): AttentionEvent {
+  return { requestId, intent, sourceKiloSessionId };
 }
 
 function makeMetadata(overrides?: { userId?: string; kiloSessionId?: string }): {
@@ -62,7 +68,8 @@ function makeMetadata(overrides?: { userId?: string; kiloSessionId?: string }): 
       userId: overrides && 'userId' in overrides ? overrides.userId : 'user_1',
     },
     auth: {
-      kiloSessionId: overrides && 'kiloSessionId' in overrides ? overrides.kiloSessionId : 'kilo_1',
+      kiloSessionId:
+        overrides && 'kiloSessionId' in overrides ? overrides.kiloSessionId : ROOT_KILO_SESSION_ID,
     },
   };
 }
@@ -129,7 +136,7 @@ describe('scheduleCloudAgentAttention', () => {
     expect(recordCloudAgentSessionAttention).toHaveBeenCalledTimes(1);
     expect(recordCloudAgentSessionAttention).toHaveBeenCalledWith({
       kiloUserId: 'user_1',
-      kiloSessionId: 'kilo_1',
+      kiloSessionId: ROOT_KILO_SESSION_ID,
       requestId: 'req_q',
       intent: { kind: 'raise', reason: 'question' },
     });
@@ -151,20 +158,30 @@ describe('scheduleCloudAgentAttention', () => {
     );
   });
 
-  it('maps a resolve intent to { kind: "resolve" } without a reason', async () => {
-    const { deps, recordCloudAgentSessionAttention } = makeDeps();
-    const waitUntil = vi.fn((p: Promise<unknown>) => p);
+  it.each([
+    { intent: { resolve: 'question' } as const, reason: 'question' as const },
+    { intent: { resolve: 'permission' } as const, reason: 'permission' as const },
+  ])(
+    'maps a resolve intent for $reason to { kind: "resolve", reason: "$reason" }',
+    async ({ intent, reason }) => {
+      const { deps, recordCloudAgentSessionAttention } = makeDeps();
+      const waitUntil = vi.fn((p: Promise<unknown>) => p);
 
-    scheduleCloudAgentAttention({ waitUntil }, deps, makeAttentionEvent('resolve', 'req_r'));
-    await flushWaitUntil(waitUntil.mock.calls[0]?.[0] as Promise<unknown>);
+      scheduleCloudAgentAttention(
+        { waitUntil },
+        deps,
+        makeAttentionEvent(intent, `req_r_${reason}`)
+      );
+      await flushWaitUntil(waitUntil.mock.calls[0]?.[0] as Promise<unknown>);
 
-    expect(recordCloudAgentSessionAttention).toHaveBeenCalledWith({
-      kiloUserId: 'user_1',
-      kiloSessionId: 'kilo_1',
-      requestId: 'req_r',
-      intent: { kind: 'resolve' },
-    });
-  });
+      expect(recordCloudAgentSessionAttention).toHaveBeenCalledWith({
+        kiloUserId: 'user_1',
+        kiloSessionId: ROOT_KILO_SESSION_ID,
+        requestId: `req_r_${reason}`,
+        intent: { kind: 'resolve', reason },
+      });
+    }
+  );
 
   it('forwards the payload exactly once per call and does not coalesce duplicates', async () => {
     const { deps, recordCloudAgentSessionAttention } = makeDeps();
@@ -229,6 +246,25 @@ describe('scheduleCloudAgentAttention', () => {
 
     expect(recordCloudAgentSessionAttention).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it('is a no-op when event sourceKiloSessionId does not match metadata and never calls the binding', async () => {
+    const { deps, recordCloudAgentSessionAttention } = makeDeps();
+    const waitUntil = vi.fn((p: Promise<unknown>) => p);
+
+    scheduleCloudAgentAttention(
+      { waitUntil },
+      deps,
+      makeAttentionEvent({ raise: 'question' }, 'req_child', 'kilo_child_session')
+    );
+    await flushWaitUntil(waitUntil.mock.calls[0]?.[0] as Promise<unknown>);
+
+    expect(recordCloudAgentSessionAttention).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalled();
+    const joined = getWarnCalls();
+    expect(joined).not.toContain('req_child');
+    expect(joined).not.toContain('kilo_child_session');
+    expect(joined).not.toContain(ROOT_KILO_SESSION_ID);
   });
 
   it('emits a privacy-safe warn log when the binding throws — no requestId, no reason, no error message', async () => {

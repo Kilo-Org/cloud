@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ATTENTION_MAX_DISPATCH_AGE_MS,
   classifyAttentionEvent,
   computeNextAttemptAt,
+  dispatchDeadline,
   extractAttentionSignal,
   extractStableRequestId,
   isActionable,
@@ -13,6 +15,7 @@ import {
 import {
   applyRaiseIntent,
   applyResolveIntent,
+  applyResolveIntentForUnknownRequest,
   applyRetry,
   applyStaleInFlightRecovery,
   type OutboxRow,
@@ -22,10 +25,10 @@ import {
 describe('classifyAttentionEvent', () => {
   it.each([
     ['question.asked', 'raise', 'question'],
-    ['question.replied', 'resolve', null],
-    ['question.rejected', 'resolve', null],
+    ['question.replied', 'resolve', 'question'],
+    ['question.rejected', 'resolve', 'question'],
     ['permission.asked', 'raise', 'permission'],
-    ['permission.replied', 'resolve', null],
+    ['permission.replied', 'resolve', 'permission'],
   ] as const)('maps %s to %s', (event, kind, reason) => {
     const result = classifyAttentionEvent(event, {});
     expect(result?.kind).toBe(kind);
@@ -54,18 +57,26 @@ describe('classifyAttentionEvent', () => {
       expect(classifyAttentionEvent('suggestion.shown', { blocking: false })).toBeNull();
     });
 
-    it('resolves a suggestion.accepted regardless of blocking flag', () => {
+    it('resolves a suggestion.accepted as blocking_suggestion', () => {
       expect(classifyAttentionEvent('suggestion.accepted', { id: 's_1' })).toEqual({
         kind: 'resolve',
-        reason: null,
+        reason: 'blocking_suggestion',
       });
     });
 
-    it('resolves a suggestion.dismissed regardless of blocking flag', () => {
+    it('resolves a suggestion.dismissed as blocking_suggestion', () => {
       expect(classifyAttentionEvent('suggestion.dismissed', { id: 's_1' })).toEqual({
         kind: 'resolve',
-        reason: null,
+        reason: 'blocking_suggestion',
       });
+    });
+
+    it('ignores a suggestion.accepted when blocking is false (advisory, not user-actionable)', () => {
+      // Advisory (non-blocking) suggestions are noise; the producer
+      // never raised them, so we should not synthesize a resolve either.
+      expect(
+        classifyAttentionEvent('suggestion.accepted', { id: 's_1', blocking: false })
+      ).toBeNull();
     });
   });
 
@@ -108,13 +119,13 @@ describe('isActionable', () => {
   });
 
   it('returns false for resolve events', () => {
-    expect(isActionable({ kind: 'resolve', reason: null })).toBe(false);
+    expect(isActionable({ kind: 'resolve', reason: 'question' })).toBe(false);
   });
 });
 
 describe('isResolvedEvent', () => {
   it('returns true for resolve intents only', () => {
-    expect(isResolvedEvent({ kind: 'resolve', reason: null })).toBe(true);
+    expect(isResolvedEvent({ kind: 'resolve', reason: 'question' })).toBe(true);
     expect(isResolvedEvent({ kind: 'raise', reason: 'question' })).toBe(false);
   });
 });
@@ -240,6 +251,46 @@ describe('outbox store pure transitions', () => {
     });
   });
 
+  describe('applyResolveIntentForUnknownRequest', () => {
+    // The unknown-resolve path handles out-of-order events where the
+    // resolve arrives before the matching raise. The row must be a
+    // terminal tombstone: no scheduled dispatch, no attempt count, and
+    // `raisedAt === resolvedAt` so a subsequent raise cannot pick the row
+    // up as a real push.
+    it('produces a terminal resolved tombstone with the supplied reason and now as both timestamps', () => {
+      const next = applyResolveIntentForUnknownRequest({
+        requestId: 'req_unknown',
+        reason: 'question',
+        now: NOW,
+      });
+      expect(next).toEqual({
+        requestId: 'req_unknown',
+        reason: 'question',
+        status: 'resolved',
+        attemptCount: 0,
+        nextAttemptAt: null,
+        lastError: null,
+        raisedAt: NOW,
+        resolvedAt: NOW,
+      });
+    });
+
+    it.each(['question', 'permission', 'blocking_suggestion'] as const)(
+      'preserves the supplied resolve reason %s on the tombstone',
+      reason => {
+        const next = applyResolveIntentForUnknownRequest({
+          requestId: `req_${reason}`,
+          reason,
+          now: NOW,
+        });
+        expect(next.reason).toBe(reason);
+        expect(next.status).toBe('resolved');
+        expect(next.raisedAt).toBe(NOW);
+        expect(next.resolvedAt).toBe(NOW);
+      }
+    );
+  });
+
   describe('applyRetry', () => {
     it('bumps attemptCount, schedules the next attempt, and keeps status pending', () => {
       const next = applyRetry(baseRow({ attemptCount: 1 }), NOW + 100, 'transient');
@@ -294,6 +345,56 @@ describe('outbox store pure transitions', () => {
       const next = applyRetry(baseRow({ attemptCount: 0 }), NOW, huge);
       expect(next.lastError?.length).toBe(512);
     });
+
+    // Kilobot finding 5: never schedule a dispatch at/after the absolute
+    // deadline derived from `raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS`.
+    // The cap is enforced even when the cap-by-attempt-count wouldn't
+    // trip, because the receiver's TTL is the actual hard limit.
+    it('parks at terminal failed when `now` reaches the absolute deadline', () => {
+      const raisedAt = NOW;
+      const deadline = raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+      const next = applyRetry(baseRow({ attemptCount: 2, raisedAt }), deadline, 'transient');
+      expect(next.status).toBe('failed');
+      expect(next.nextAttemptAt).toBeNull();
+      expect(next.attemptCount).toBe(3);
+      expect(next.lastError).toBe('transient');
+    });
+
+    it('parks at terminal failed when `now` is strictly past the absolute deadline', () => {
+      const raisedAt = NOW;
+      const deadline = raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+      const next = applyRetry(baseRow({ attemptCount: 1, raisedAt }), deadline + 1, 'transient');
+      expect(next.status).toBe('failed');
+      expect(next.nextAttemptAt).toBeNull();
+    });
+
+    it('still schedules normally when the next backoff fits inside the window', () => {
+      const raisedAt = NOW;
+      const deadline = raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+      // attempt 0 → next attempt 1 (5s backoff) lands well before the
+      // deadline, so we must still schedule normally.
+      const fitsBefore = deadline - 10_000;
+      const next = applyRetry(baseRow({ attemptCount: 0, raisedAt }), fitsBefore, 'transient');
+      expect(next.status).toBe('pending');
+      expect(next.nextAttemptAt).toBe(computeNextAttemptAt(1, fitsBefore));
+      expect(next.nextAttemptAt).toBeLessThan(deadline);
+    });
+
+    it('parks at terminal failed when the next attempt would cross the deadline', () => {
+      // The cap-by-attempt-count would still allow attempt 6, but its
+      // backoff is 60min, which is past the 55min absolute deadline, so
+      // we park at failed without scheduling.
+      const raisedAt = NOW;
+      const deadline = raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+      const justInside = deadline - 1;
+      // attempt 5 → next attempt 6 → computeNextAttemptAt(6, justInside)
+      // = justInside + 60*60_000, which is > deadline.
+      const next = applyRetry(baseRow({ attemptCount: 5, raisedAt }), justInside, 'transient');
+      expect(next.status).toBe('failed');
+      expect(next.nextAttemptAt).toBeNull();
+      expect(next.attemptCount).toBe(6);
+      expect(next.lastError).toBe('transient');
+    });
   });
 
   describe('applyStaleInFlightRecovery', () => {
@@ -322,6 +423,33 @@ describe('outbox store pure transitions', () => {
       expect(next.nextAttemptAt).toBeNull();
       expect(next.lastError).toBe('stale_in_flight_recovered');
       expect(next.resolvedAt).toBeNull();
+    });
+
+    // Kilobot finding 5: stale-recovery must respect the absolute
+    // deadline. A row past its window must not be rescheduled.
+    it('parks at terminal failed when `now` is at the absolute deadline', () => {
+      const raisedAt = NOW;
+      const deadline = raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+      const next = applyStaleInFlightRecovery(
+        baseRow({ status: 'in_flight', attemptCount: 1, raisedAt }),
+        deadline
+      );
+      expect(next.status).toBe('failed');
+      expect(next.nextAttemptAt).toBeNull();
+      expect(next.attemptCount).toBe(2);
+    });
+
+    it('parks at terminal failed when the recovered schedule would cross the deadline', () => {
+      const raisedAt = NOW;
+      const deadline = raisedAt + ATTENTION_MAX_DISPATCH_AGE_MS;
+      // attempt 5 → next attempt 6 → schedule crosses deadline.
+      const justInside = deadline - 1;
+      const next = applyStaleInFlightRecovery(
+        baseRow({ status: 'in_flight', attemptCount: 5, raisedAt }),
+        justInside
+      );
+      expect(next.status).toBe('failed');
+      expect(next.nextAttemptAt).toBeNull();
     });
   });
 
@@ -396,29 +524,29 @@ describe('extractAttentionSignal', () => {
 
   it('resolves question.replied and question.rejected', () => {
     expect(extractAttentionSignal('question.replied', { id: 'q_1' })).toEqual({
-      intent: { kind: 'resolve', reason: null },
+      intent: { kind: 'resolve', reason: 'question' },
       requestId: 'q_1',
     });
     expect(extractAttentionSignal('question.rejected', { id: 'q_1' })).toEqual({
-      intent: { kind: 'resolve', reason: null },
+      intent: { kind: 'resolve', reason: 'question' },
       requestId: 'q_1',
     });
   });
 
   it('resolves permission.replied', () => {
     expect(extractAttentionSignal('permission.replied', { id: 'p_1' })).toEqual({
-      intent: { kind: 'resolve', reason: null },
+      intent: { kind: 'resolve', reason: 'permission' },
       requestId: 'p_1',
     });
   });
 
-  it('resolves suggestion.accepted and suggestion.dismissed', () => {
+  it('resolves suggestion.accepted and suggestion.dismissed as blocking_suggestion', () => {
     expect(extractAttentionSignal('suggestion.accepted', { id: 's_1' })).toEqual({
-      intent: { kind: 'resolve', reason: null },
+      intent: { kind: 'resolve', reason: 'blocking_suggestion' },
       requestId: 's_1',
     });
     expect(extractAttentionSignal('suggestion.dismissed', { id: 's_1' })).toEqual({
-      intent: { kind: 'resolve', reason: null },
+      intent: { kind: 'resolve', reason: 'blocking_suggestion' },
       requestId: 's_1',
     });
   });
@@ -438,5 +566,31 @@ describe('extractAttentionSignal', () => {
 
   it('ignores action_required events', () => {
     expect(extractAttentionSignal('action_required', { id: 'ar_1' })).toBeNull();
+  });
+});
+
+const NOW_FOR_DEADLINE_TESTS = 1_700_000_000_000;
+
+/**
+ * Kilobot finding 5: notification downstream idempotency is bounded at
+ * 60min. Producers must not attempt dispatch at/after 55min from the
+ * raise timestamp so the row can never cross the receiver's TTL
+ * (NotificationChannelDO). The constant is a service-internal knob and
+ * is not re-exported across the package boundary; tests below import it
+ * from the same module so we exercise the actual value without coupling
+ * sibling packages.
+ */
+describe('ATTENTION_MAX_DISPATCH_AGE_MS', () => {
+  it('keeps the absolute dispatch deadline strictly under 60 minutes', () => {
+    // NotificationChannelDO TTL is 60min; we must never schedule dispatch
+    // at/after 55min from raisedAt, with a 5min safety margin.
+    expect(ATTENTION_MAX_DISPATCH_AGE_MS).toBeLessThan(60 * 60_000);
+    expect(60 * 60_000 - ATTENTION_MAX_DISPATCH_AGE_MS).toBe(5 * 60_000);
+  });
+
+  it('exposes a helper that adds the cap to a raise timestamp', () => {
+    expect(dispatchDeadline(NOW_FOR_DEADLINE_TESTS)).toBe(
+      NOW_FOR_DEADLINE_TESTS + ATTENTION_MAX_DISPATCH_AGE_MS
+    );
   });
 });

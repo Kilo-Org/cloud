@@ -28,7 +28,7 @@ function validResolve() {
     kiloUserId: 'usr_owner',
     kiloSessionId: VALID_KILO_SESSION_ID,
     requestId: 'req_attn_01',
-    intent: { kind: 'resolve' },
+    intent: { kind: 'resolve', reason: 'question' },
   };
 }
 
@@ -49,12 +49,49 @@ describe('recordCloudAgentSessionAttentionSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts a valid resolve intent', () => {
+  it('accepts a valid resolve intent with reason "question"', () => {
     const result = recordCloudAgentSessionAttentionSchema.safeParse(validResolve());
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toEqual(validResolve());
     }
+  });
+
+  it('accepts a valid resolve intent with reason "permission"', () => {
+    const result = recordCloudAgentSessionAttentionSchema.safeParse({
+      ...validResolve(),
+      intent: { kind: 'resolve', reason: 'permission' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a resolve intent without a reason', () => {
+    const result = recordCloudAgentSessionAttentionSchema.safeParse({
+      ...validResolve(),
+      intent: { kind: 'resolve' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a resolve intent with reason "blocking_suggestion" (wrapper never raises suggestions)', () => {
+    // The Cloud Agent boundary is intentionally narrower than the
+    // session-ingest input schema: the wrapper's policy filter suppresses
+    // suggestions before they reach the worker, so the boundary must not
+    // accept them — the suggestion resolve must be produced only by the
+    // remote CLI / direct session-ingest path.
+    const result = recordCloudAgentSessionAttentionSchema.safeParse({
+      ...validResolve(),
+      intent: { kind: 'resolve', reason: 'blocking_suggestion' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a resolve intent with an unknown reason string', () => {
+    const result = recordCloudAgentSessionAttentionSchema.safeParse({
+      ...validResolve(),
+      intent: { kind: 'resolve', reason: 'action_required' },
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects a raise intent with the blocking_suggestion reason', () => {

@@ -66,10 +66,16 @@ async function runCloudAgentAttentionEvent(
         .warn('Cloud Agent attention event dropped: session identity missing');
       return;
     }
+    if (event.sourceKiloSessionId !== kiloSessionId) {
+      logger
+        .withFields({ sessionId: deps.sessionId })
+        .warn('Cloud Agent attention event dropped: source session mismatch');
+      return;
+    }
     const intent =
-      event.intent === 'resolve'
-        ? { kind: 'resolve' as const }
-        : { kind: 'raise' as const, reason: event.intent.raise };
+      'raise' in event.intent
+        ? { kind: 'raise' as const, reason: event.intent.raise }
+        : { kind: 'resolve' as const, reason: event.intent.resolve };
     const result = await deps.env.SESSION_INGEST.recordCloudAgentSessionAttention({
       kiloUserId,
       kiloSessionId,

@@ -59,3 +59,41 @@ export function computeNextAlarmTime(db: DrizzleSqliteDODatabase): number | null
     outboxAt
   );
 }
+
+/**
+ * Decide whether the immediate-attention outbox alarm should additionally
+ * drive a session-metrics emission on the current tick.
+ *
+ * The attention outbox and the session-metrics lifecycle share one DO alarm
+ * so the outbox can preempt the metrics timer. When the alarm fires
+ * because a raise was recorded, the metrics deadline is almost always still
+ * in the future; emitting at that tick would publish metrics prematurely.
+ *
+ * The DO re-reads `metricsEmitted` and `metricsAlarmAt` from SQLite after
+ * `dispatchOutboxBatch` returns so a concurrent update that arrives during
+ * the awaited notification RPC is respected. This helper encapsulates the
+ * decision so the alarm body stays small and the rule is unit-testable.
+ *
+ * Rules:
+ *  - `metricsEmitted === 'true'` → skip (already published).
+ *  - `metricsAlarmAt` missing or non-numeric → skip (legacy platform alarm
+ *    that reached the DO without a persisted deadline; emitting now would
+ *    be premature).
+ *  - `metricsAlarmAt <= 0` → skip (non-positive deadline is invalid).
+ *  - `metricsAlarmAt > now` → skip (deadline still in the future; preserve).
+ *  - otherwise → emit.
+ */
+export function shouldEmitMetricsFromAttentionAlarm(
+  metricsEmitted: string | null | boolean,
+  metricsAlarmAt: string | null,
+  now: number
+): boolean {
+  // Defense in depth: the DO reads `metricsEmitted` as a string column,
+  // but accept the boolean `true` as well so a future refactor that
+  // passes the parsed value through stays safe.
+  if (metricsEmitted === 'true' || metricsEmitted === true) return false;
+  if (metricsAlarmAt === null || metricsAlarmAt === undefined) return false;
+  const parsed = Number(metricsAlarmAt);
+  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+  return parsed <= now;
+}

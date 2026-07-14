@@ -502,6 +502,7 @@ export function SessionDetailContent({
 
         {activeInteractionSurface.kind === 'suggestion' && activeSuggestion ? (
           <SuggestionCard
+            key={activeSuggestion.requestId}
             text={activeSuggestion.text}
             actions={activeSuggestion.actions}
             onAccept={async index => {

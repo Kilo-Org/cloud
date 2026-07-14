@@ -6,6 +6,7 @@ import type { SessionId } from '../types/ids.js';
 
 const SESSION_ID = 'sess_test' as SessionId;
 const WRAPPER_RUN_ID = 'wr_test_basic';
+const SOURCE_SESSION_ID = 'kilo_session_test';
 const itWithWebSocketPair = typeof WebSocketPair === 'undefined' ? it.skip : it;
 
 function createFakeState() {
@@ -275,9 +276,10 @@ describe('createIngestHandler', () => {
     ): Record<string, unknown> {
       // Real-time shape spreads properties at the top level of `data`;
       // snapshot/replay shape nests them only under `properties`.
+      const props = { sessionID: SOURCE_SESSION_ID, ...properties };
       return options.spreadId
-        ? { ...properties, event: eventName, type: eventName, properties }
-        : { event: eventName, type: eventName, properties };
+        ? { ...props, event: eventName, type: eventName, properties: props }
+        : { event: eventName, type: eventName, properties: props };
     }
 
     function makeKilocodeMessageFromData(data: Record<string, unknown>): string {
@@ -328,6 +330,7 @@ describe('createIngestHandler', () => {
       expect(onAttentionEvent).toHaveBeenCalledWith({
         requestId: 'req_nested',
         intent: expected,
+        sourceKiloSessionId: SOURCE_SESSION_ID,
       });
       expect(broadcastFn).toHaveBeenCalledWith(
         expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
@@ -351,41 +354,49 @@ describe('createIngestHandler', () => {
         expect(onAttentionEvent).toHaveBeenCalledWith({
           requestId: 'req_direct',
           intent: expected,
+          sourceKiloSessionId: SOURCE_SESSION_ID,
         });
       }
     );
 
-    it.each(['question.replied', 'question.rejected', 'permission.replied'])(
-      'resolve %s with nested properties.id',
-      async eventName => {
-        const { doContext, onAttentionEvent } = createAttentionContext();
-        const { broadcastFn } = await runAttentionMessage(
-          doContext,
-          makeKilocodeData(eventName, { id: 'req_nested' })
-        );
-        expect(onAttentionEvent).toHaveBeenCalledTimes(1);
-        expect(onAttentionEvent).toHaveBeenCalledWith({
-          requestId: 'req_nested',
-          intent: 'resolve',
-        });
-        expect(broadcastFn).toHaveBeenCalledWith(
-          expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
-        );
-      }
-    );
+    it.each([
+      ['question.replied', 'question'],
+      ['question.rejected', 'question'],
+      ['permission.replied', 'permission'],
+    ] as const)('resolve %s with nested properties.requestID', async (eventName, reason) => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const { broadcastFn } = await runAttentionMessage(
+        doContext,
+        makeKilocodeData(eventName, { requestID: 'req_nested' })
+      );
+      expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(onAttentionEvent).toHaveBeenCalledWith({
+        requestId: 'req_nested',
+        intent: { resolve: reason },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
 
-    it.each(['question.replied', 'question.rejected', 'permission.replied'])(
-      'resolve %s with direct top-level data.id (real-time spread shape)',
-      async eventName => {
+    it.each([
+      ['question.replied', 'question'],
+      ['question.rejected', 'question'],
+      ['permission.replied', 'permission'],
+    ] as const)(
+      'resolve %s with direct top-level data.requestID (real-time spread shape)',
+      async (eventName, reason) => {
         const { doContext, onAttentionEvent } = createAttentionContext();
         await runAttentionMessage(
           doContext,
-          makeKilocodeData(eventName, { id: 'req_direct' }, { spreadId: true })
+          makeKilocodeData(eventName, { requestID: 'req_direct' }, { spreadId: true })
         );
         expect(onAttentionEvent).toHaveBeenCalledTimes(1);
         expect(onAttentionEvent).toHaveBeenCalledWith({
           requestId: 'req_direct',
-          intent: 'resolve',
+          intent: { resolve: reason },
+          sourceKiloSessionId: SOURCE_SESSION_ID,
         });
       }
     );
@@ -456,6 +467,7 @@ describe('createIngestHandler', () => {
       expect(onAttentionEvent).toHaveBeenCalledWith({
         requestId: 'req_nested',
         intent: { raise: 'question' },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
       });
       const broadcastCall = vi.mocked(broadcastFn).mock.calls[0]?.[0];
       expect(broadcastCall).toBeDefined();
@@ -491,10 +503,12 @@ describe('createIngestHandler', () => {
       expect(onAttentionEvent).toHaveBeenNthCalledWith(1, {
         requestId: 'req_dup',
         intent: { raise: 'question' },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
       });
       expect(onAttentionEvent).toHaveBeenNthCalledWith(2, {
         requestId: 'req_dup',
         intent: { raise: 'question' },
+        sourceKiloSessionId: SOURCE_SESSION_ID,
       });
     });
 
@@ -520,6 +534,52 @@ describe('createIngestHandler', () => {
         expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
       );
       expect(eventQueries.insert).not.toHaveBeenCalled();
+    });
+
+    it('does not invoke onAttentionEvent when source sessionID is missing', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const { broadcastFn } = await runAttentionMessage(doContext, {
+        event: 'question.asked',
+        type: 'question.asked',
+        properties: { id: 'req_no_session' },
+      });
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it('invokes callback with child source sessionID while broadcast remains unchanged', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      const childSessionId = 'kilo_child_session';
+      const data = makeKilocodeData(
+        'question.asked',
+        { id: 'req_child', sessionID: childSessionId },
+        { spreadId: true }
+      );
+      await handler.handleIngestMessage(ws, makeKilocodeMessageFromData(data));
+      const baselinePayload = JSON.stringify(data);
+      expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(onAttentionEvent).toHaveBeenCalledWith({
+        requestId: 'req_child',
+        intent: { raise: 'question' },
+        sourceKiloSessionId: childSessionId,
+      });
+      const broadcastCall = vi.mocked(broadcastFn).mock.calls[0]?.[0];
+      expect(broadcastCall).toBeDefined();
+      expect(broadcastCall?.payload).toBe(baselinePayload);
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(eventQueries.upsert).not.toHaveBeenCalled();
     });
 
     // --- non-kilocode: plain insert path (PERSISTED_STREAM_EVENT_TYPES) ---

@@ -6,7 +6,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { ingestMeta, attentionOutbox } from '../db/sqlite-schema';
-import { computeNextAlarmTime, minPendingAlarmTime } from './attention-alarm';
+import {
+  computeNextAlarmTime,
+  minPendingAlarmTime,
+  shouldEmitMetricsFromAttentionAlarm,
+} from './attention-alarm';
 
 describe('minPendingAlarmTime', () => {
   it('returns only metrics when outbox is null', () => {
@@ -78,5 +82,47 @@ describe('computeNextAlarmTime', () => {
     };
 
     expect(computeNextAlarmTime(db as never)).toBe(2000);
+  });
+});
+
+describe('shouldEmitMetricsFromAttentionAlarm', () => {
+  // Pure helper used by the alarm() body to decide whether the immediate
+  // attention alarm should also drive a metrics emission. It must ignore
+  // calls when the persisted metrics deadline is still in the future or
+  // missing entirely (legacy platform alarms without a persisted deadline).
+  const NOW = 1_700_000_000_000;
+
+  it('emits when metricsAlarmAt is finite positive and <= now', () => {
+    expect(shouldEmitMetricsFromAttentionAlarm('false', String(NOW - 1), NOW)).toBe(true);
+    expect(shouldEmitMetricsFromAttentionAlarm('false', String(NOW), NOW)).toBe(true);
+  });
+
+  it('skips when metricsAlarmAt is strictly in the future', () => {
+    expect(shouldEmitMetricsFromAttentionAlarm('false', String(NOW + 1), NOW)).toBe(false);
+    expect(shouldEmitMetricsFromAttentionAlarm(null, String(NOW + 60_000), NOW)).toBe(false);
+  });
+
+  it('skips when metricsEmitted is already true', () => {
+    expect(shouldEmitMetricsFromAttentionAlarm('true', String(NOW - 100), NOW)).toBe(false);
+  });
+
+  it('skips when metricsAlarmAt is missing (legacy platform alarm)', () => {
+    expect(shouldEmitMetricsFromAttentionAlarm('false', null, NOW)).toBe(false);
+    expect(shouldEmitMetricsFromAttentionAlarm(null, null, NOW)).toBe(false);
+  });
+
+  it('skips when metricsAlarmAt is non-numeric or non-positive', () => {
+    expect(shouldEmitMetricsFromAttentionAlarm('false', 'not-a-number', NOW)).toBe(false);
+    expect(shouldEmitMetricsFromAttentionAlarm('false', '', NOW)).toBe(false);
+    expect(shouldEmitMetricsFromAttentionAlarm('false', '0', NOW)).toBe(false);
+    expect(shouldEmitMetricsFromAttentionAlarm('false', '-1', NOW)).toBe(false);
+  });
+
+  it('treats the boolean-true metricsEmitted as already emitted (defense in depth)', () => {
+    // The DO reads metricsEmitted as a string column; this guard makes the
+    // helper safe if a future refactor passes the raw row value through.
+    expect(
+      shouldEmitMetricsFromAttentionAlarm(true as unknown as string, String(NOW - 1), NOW)
+    ).toBe(false);
   });
 });

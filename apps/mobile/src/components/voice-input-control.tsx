@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 import { resolveVoiceInputControlState } from '@/lib/voice-input/voice-input-view-state';
 
-export type VoiceInputButtonProps = {
+type VoiceInputButtonProps = {
   disabled: boolean;
   onPress(): void;
   status: VoiceInputStatus;
@@ -64,7 +64,7 @@ export function VoiceInputButton({
   );
 }
 
-export type VoiceInputStatusProps = {
+type VoiceInputStatusProps = {
   status: VoiceInputStatus;
 };
 

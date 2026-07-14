@@ -8,7 +8,6 @@ import {
   isOpenRouterProviderConfig,
   type GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 
 export type KiloExclusiveModelFlag =
   | 'reasoning'
@@ -191,7 +190,7 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   if (model.flags.includes('stealth')) {
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
   }
-  if (isMuseModel(model.public_id)) {
+  if (model.public_id.includes('muse-')) {
     return { slug: 'meta', name: 'Meta', training: false, retainsPrompts: true };
   }
   if (model.gateway === 'openrouter' || model.gateway === 'vercel') {

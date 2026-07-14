@@ -189,20 +189,35 @@ Do not conclude that Android is unavailable from `command -v adb` or the agent's
 pnpm dev:mobile:android doctor
 ```
 
-Use the wrappers for all Android tooling so the resolved SDK/JDK environment is applied:
+Use the wrappers for all Android tooling so the resolved SDK/JDK environment is applied, including the Expo/Gradle build:
 
 ```bash
 ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
 tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
   "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect"
 pnpm dev:mobile:android adb wait-for-device
+pnpm dev:mobile:android claim <serial>
 pnpm dev:mobile:android adb reverse tcp:<nextjs-port> tcp:<nextjs-port>
 pnpm dev:mobile:android adb reverse tcp:<metro-port> tcp:<metro-port>
 cd apps/mobile
-npx expo run:android --no-install --no-bundler
+pnpm -w dev:mobile:android build
 ```
 
-Android's `localhost` is the emulator, so restore both `adb reverse` mappings after clearing app data. The dev-client scheme is `exp+kilo-app`. `adb shell pm clear com.kilocode.kiloapp` also forgets the Metro URL, so re-open the dev-client URL afterward.
+For Android, choose repository-wrapped ADB or Maestro based on which is more effective for the flow. ADB is useful for direct hierarchy inspection, prompt handling, intent launch, and deterministic shell input; Maestro is useful for reusable cross-screen flows such as OTP login. iOS uses Maestro. Use the repository wrapper rather than bare `adb`:
+
+```bash
+pnpm dev:mobile:android adb devices -l
+pnpm dev:mobile:android adb -s <serial> shell uiautomator dump /sdcard/window.xml
+pnpm dev:mobile:android adb -s <serial> shell cat /sdcard/window.xml
+pnpm dev:mobile:android adb -s <serial> exec-out screencap -p > /tmp/kilo-android.png
+pnpm dev:mobile:android adb -s <serial> shell input tap <x> <y>
+pnpm dev:mobile:android adb -s <serial> shell input text '<text>'
+pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
+```
+
+Derive tap coordinates from the current `uiautomator` bounds, not screenshots or remembered positions. Re-dump after every navigation or prompt. Android's `localhost` is the emulator, so restore both `adb reverse` mappings after clearing app data. The dev-client scheme is `exp+kilo-app`. `adb shell pm clear com.kilocode.kiloapp` also forgets the Metro URL, so re-open the dev-client URL afterward with `adb shell am start`.
+
+The existing login/logout helpers accept either an iOS simulator UDID or an Android ADB serial. Their shared preflight applies platform-specific device ownership and reconnects the dev client to this worktree before Maestro runs.
 
 ## Cleanup
 
@@ -217,6 +232,7 @@ rm -f "$LOGIN_LOG"                        # if created
 pnpm dev:stop                              # only if you started this worktree's stack
 xcrun simctl shutdown <udid>               # only if you booted it
 pnpm dev:mobile:simulator release <udid>    # release every simulator you claimed
+pnpm dev:mobile:android release <serial>     # release every Android device you claimed
 ```
 
 Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill unrelated `kilo-dev-*` sessions, stop a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.

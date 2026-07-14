@@ -31,12 +31,18 @@ if [ "$SESSION_STATUS" != "401" ] || ! grep -Fq 'Invalid or expired token' "$SES
   exit 1
 fi
 
-CLAIM="$(cd "$REPO_ROOT" && pnpm -s dev:mobile:simulator claim "$DEVICE")"
+PLATFORM="ios"
+if (cd "$REPO_ROOT" && pnpm -s dev:mobile:android adb devices | awk -v device="$DEVICE" '$1 == device && $2 == "device" { found=1 } END { exit !found }'); then
+  PLATFORM="android"
+  CLAIM="$(cd "$REPO_ROOT" && pnpm -s dev:mobile:android claim "$DEVICE")"
+else
+  CLAIM="$(cd "$REPO_ROOT" && pnpm -s dev:mobile:simulator claim "$DEVICE")"
+fi
 node - "$CLAIM" "$REPO_ROOT" <<'NODE'
 const [claimOutput, expectedRoot] = process.argv.slice(2);
 const claim = JSON.parse(claimOutput.trim().split('\n').at(-1));
 if (claim.worktreeRoot !== expectedRoot) {
-  throw new Error(`Simulator belongs to ${claim.worktreeRoot}, expected ${expectedRoot}`);
+  throw new Error(`Device belongs to ${claim.worktreeRoot}, expected ${expectedRoot}`);
 }
 NODE
 
@@ -72,9 +78,15 @@ NODE
 )"
 METRO_URL="http://${MOBILE_HOST}:${METRO_PORT}"
 ENCODED_METRO_URL="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$METRO_URL")"
-if xcrun simctl list devices available | grep -Fq "$DEVICE"; then
+if [ "$PLATFORM" = "ios" ]; then
   xcrun simctl openurl "$DEVICE" \
     "exp+kilo-app://expo-development-client/?url=${ENCODED_METRO_URL}"
+else
+  cd "$REPO_ROOT"
+  pnpm -s dev:mobile:android adb -s "$DEVICE" reverse "tcp:${EXPECTED_API_PORT}" "tcp:${EXPECTED_API_PORT}"
+  pnpm -s dev:mobile:android adb -s "$DEVICE" reverse "tcp:${METRO_PORT}" "tcp:${METRO_PORT}"
+  pnpm -s dev:mobile:android adb -s "$DEVICE" shell am start -a android.intent.action.VIEW \
+    -d "exp+kilo-app://expo-development-client/?url=${ENCODED_METRO_URL}" >/dev/null
 fi
 
-echo "Mobile E2E preflight passed for $DEVICE in $REPO_ROOT ($METRO_URL)"
+echo "Mobile E2E preflight passed for $PLATFORM device $DEVICE in $REPO_ROOT ($METRO_URL)"

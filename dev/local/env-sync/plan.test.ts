@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 import { computePlan } from './plan';
+import { getService } from '../services';
 
 const workerDir = 'services/cloud-agent-next';
 
@@ -147,7 +148,7 @@ test('generates the auto routing worker URL for local Next.js', () => {
       {
         key: 'AUTO_ROUTING_WORKER_URL',
         oldValue: undefined,
-        newValue: 'http://localhost:8810',
+        newValue: `http://localhost:${getService('auto-routing').port}`,
       }
     );
   } finally {
@@ -580,6 +581,28 @@ test('refreshes an existing source-backed local Secrets Store secret', () => {
   }
 });
 
+test('check mode accepts an existing source-backed local Secrets Store secret', () => {
+  const repo = createRepo({
+    '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',
+    'services/event-service/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/event-service/wrangler.jsonc': `{
+      "secrets_store_secrets": [{
+        "binding": "NEXTAUTH_SECRET",
+        "store_id": "store-id",
+        "secret_name": "NEXTAUTH_SECRET_PROD"
+      }]
+    }`,
+  });
+  try {
+    withFakePnpm('NEXTAUTH_SECRET_PROD\n', () => {
+      const plan = computePlan(repo.root, new Set(['event-service']), false);
+      assert.deepEqual(plan.secretStoreAutoCreates, []);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('auto-creates event-service NEXTAUTH Secrets Store binding from .env.local', () => {
   const repo = createRepo({
     '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',
@@ -802,16 +825,20 @@ test('preserves host.docker.internal in @url defaults for useLanIp services', ()
   });
   try {
     const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    const nextjsPort = getService('nextjs').port;
+    const cloudAgentPort = getService('cloud-agent-next').port;
     assert.equal(plan.missingEnvLocal, false);
     assert.equal(plan.devVarsChanges.length, 1);
     const [change] = plan.devVarsChanges;
     assert.ok(change);
     assert.equal(change.isNew, true);
     const content = change.newFileContent ?? '';
-    assert.ok(content.includes('KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:3000'));
-    assert.ok(content.includes('WORKER_URL=http://host.docker.internal:8794'));
+    assert.ok(
+      content.includes(`KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:${nextjsPort}`)
+    );
+    assert.ok(content.includes(`WORKER_URL=http://host.docker.internal:${cloudAgentPort}`));
     // ORIGINS keys still use localhost even when example default has host.docker.internal
-    assert.ok(content.includes('ALLOWED_ORIGINS=http://localhost:3000'));
+    assert.ok(content.includes(`ALLOWED_ORIGINS=http://localhost:${nextjsPort}`));
   } finally {
     repo.cleanup();
   }
@@ -838,15 +865,17 @@ test('preserves localhost in worker-side @url defaults for useLanIp services', (
   });
   try {
     const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    const nextjsPort = getService('nextjs').port;
+    const cloudAgentPort = getService('cloud-agent-next').port;
     assert.equal(plan.missingEnvLocal, false);
     assert.equal(plan.devVarsChanges.length, 1);
     const [change] = plan.devVarsChanges;
     assert.ok(change);
     assert.equal(change.isNew, true);
     const content = change.newFileContent ?? '';
-    assert.ok(content.includes('KILOCODE_BACKEND_BASE_URL=http://localhost:3000'));
-    assert.ok(content.includes('KILO_OPENROUTER_BASE=http://localhost:3000/api'));
-    assert.ok(content.includes('WORKER_URL=http://host.docker.internal:8794'));
+    assert.ok(content.includes(`KILOCODE_BACKEND_BASE_URL=http://localhost:${nextjsPort}`));
+    assert.ok(content.includes(`KILO_OPENROUTER_BASE=http://localhost:${nextjsPort}/api`));
+    assert.ok(content.includes(`WORKER_URL=http://host.docker.internal:${cloudAgentPort}`));
   } finally {
     repo.cleanup();
   }

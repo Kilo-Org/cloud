@@ -477,7 +477,11 @@ function collectLocalSecretSources(
 // Plan computation
 // ---------------------------------------------------------------------------
 
-function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan {
+function computePlan(
+  repoRoot: string,
+  serviceFilter?: Set<string>,
+  refreshSourceBackedSecrets = true
+): EnvSyncPlan {
   const envLocalPath = path.join(repoRoot, '.env.local');
   if (!fs.existsSync(envLocalPath)) {
     return {
@@ -747,6 +751,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
       const source = resolveSecretStoreSource(b.secret_name, envLocal, localSecretSources);
       if (source) {
+        if (!refreshSourceBackedSecrets && output.includes(b.secret_name)) continue;
         // Recreate source-backed secrets so metadata-only entries and stale values self-heal.
         secretStoreAutoCreates.push({
           workerDir: svc.dir,

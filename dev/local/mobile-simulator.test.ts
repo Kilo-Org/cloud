@@ -39,3 +39,8 @@ test('refuses to release a simulator claimed by another worktree', () => {
   fs.rmSync(one, { recursive: true, force: true });
   fs.rmSync(two, { recursive: true, force: true });
 });
+
+test('uses exclusive claim creation to prevent concurrent simulator sharing', () => {
+  const source = fs.readFileSync(new URL('./mobile-simulator.ts', import.meta.url), 'utf8');
+  assert.match(source, /flag: 'wx'/);
+});

@@ -44,7 +44,7 @@ async function syncEnvVars(options: {
 }): Promise<SyncResult> {
   const { repoRoot, check = false, yes = false, targets } = options;
   const serviceFilter = resolveServiceFilter(targets);
-  const plan = computePlan(repoRoot, serviceFilter);
+  const plan = computePlan(repoRoot, serviceFilter, !check);
 
   if (plan.missingEnvLocal) {
     displayPlan(plan);
@@ -74,7 +74,7 @@ async function syncEnvVars(options: {
     if (shouldApply) {
       applyEnvLocalAutoCreates(plan.envLocalAutoCreates, repoRoot);
       const applyReadyPlan =
-        plan.envLocalAutoCreates.length > 0 ? computePlan(repoRoot, serviceFilter) : plan;
+        plan.envLocalAutoCreates.length > 0 ? computePlan(repoRoot, serviceFilter, true) : plan;
       applyPlan(applyReadyPlan, repoRoot);
       console.log(`\n${GREEN}✓ Applied${RESET}`);
     } else {
@@ -99,7 +99,7 @@ async function checkEnvVars(repoRoot: string, targets?: string[]): Promise<Check
   }
 
   const serviceFilter = resolveServiceFilter(targets);
-  const plan = computePlan(repoRoot, serviceFilter);
+  const plan = computePlan(repoRoot, serviceFilter, false);
   const totalMissing =
     plan.devVarsChanges.reduce((sum, c) => sum + c.missingValues.length, 0) +
     plan.secretStoreWarnings.reduce((sum, c) => sum + c.bindings.length, 0);

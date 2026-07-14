@@ -126,7 +126,7 @@ test('prepares mobile URLs before returning values for the Metro tmux environmen
   assert.equal(result.appUrl, appUrl);
   assert.equal(result.sessionEnv.API_BASE_URL, appUrl);
   assert.equal(result.sessionEnv.WEB_BASE_URL, appUrl);
-  assert.equal(result.sessionEnv.NEXTAUTH_URL, appUrl);
-  assert.equal(result.sessionEnv.APP_URL_OVERRIDE, appUrl);
+  assert.equal(result.sessionEnv.NEXTAUTH_URL, undefined);
+  assert.equal(result.sessionEnv.APP_URL_OVERRIDE, undefined);
   fs.rmSync(root, { recursive: true, force: true });
 });

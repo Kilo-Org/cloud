@@ -23,6 +23,7 @@ function readOwner(lockRoot: string, deviceId: string): string | undefined {
     if (claim.worktreeRoot && fs.existsSync(claim.worktreeRoot)) return claim.worktreeRoot;
     fs.rmSync(lockPath(lockRoot, deviceId), { force: true });
   } catch {
+    fs.rmSync(lockPath(lockRoot, deviceId), { force: true });
     // Missing or invalid claims are unowned.
   }
   return undefined;
@@ -44,11 +45,20 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
       if (requestedId) throw new Error(`Simulator ${device.id} is claimed by ${owner}`);
       continue;
     }
-    fs.writeFileSync(
-      lockPath(lockRoot, device.id),
-      JSON.stringify({ deviceId: device.id, worktreeRoot, claimedAt: new Date().toISOString() })
-    );
-    return { device, alreadyOwned: false };
+    try {
+      fs.writeFileSync(
+        lockPath(lockRoot, device.id),
+        JSON.stringify({ deviceId: device.id, worktreeRoot, claimedAt: new Date().toISOString() }),
+        { flag: 'wx' }
+      );
+      return { device, alreadyOwned: false };
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+        if (requestedId) throw new Error(`Simulator ${device.id} was claimed concurrently`);
+        continue;
+      }
+      throw error;
+    }
   }
   throw new Error('No unclaimed iOS simulator is available');
 }

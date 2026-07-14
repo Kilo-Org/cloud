@@ -205,8 +205,6 @@ function prepareMobileEnvironment(repoRoot: string, host: string): PreparedMobil
     host,
     sessionEnv: {
       ...Object.fromEntries(mobileValues),
-      APP_URL_OVERRIDE: appUrl,
-      NEXTAUTH_URL: appUrl,
     },
   };
 }

@@ -42,6 +42,8 @@ test('login preflight reconnects the claimed iOS device to this worktree Metro U
   assert.match(preflight, /pnpm -s dev:capture mobile/);
   assert.match(preflight, /exp\+kilo-app:\/\/expo-development-client\/\?url=/);
   assert.match(preflight, /session-ingest secret readiness probe failed/);
+  assert.match(preflight, /dev:mobile:android claim/);
+  assert.match(preflight, /adb -s "\$DEVICE" reverse/);
 });
 
 test('Android tooling is resolved independently of the agent PATH', async () => {
@@ -55,12 +57,49 @@ test('Android tooling is resolved independently of the agent PATH', async () => 
       '/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager',
       '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java',
     ]),
+    javaMajor: () => 17,
   });
 
   assert.equal(env.adb, '/opt/homebrew/share/android-commandlinetools/platform-tools/adb');
   assert.equal(env.emulator, '/opt/homebrew/share/android-commandlinetools/emulator/emulator');
   assert.equal(env.javaHome, '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home');
   assert.match(env.path, /android-commandlinetools\/platform-tools/);
+});
+
+test('Android workflow uses adb first and applies resolved tooling to Expo builds', () => {
+  const android = fs.readFileSync('dev/local/mobile-android.ts', 'utf8');
+  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+
+  assert.match(android, /'build'/);
+  assert.match(android, /'run:android'/);
+  assert.match(android, /path\.join\(worktreeRoot, 'apps\/mobile'\)/);
+  assert.match(runbook, /choose repository-wrapped ADB or Maestro/);
+  assert.match(runbook, /iOS uses Maestro/);
+});
+
+test('Android tooling rejects a non-Java-17 JAVA_HOME', async () => {
+  const { resolveAndroidEnvironment } = await import('./mobile-android');
+  assert.throws(
+    () =>
+      resolveAndroidEnvironment({
+        home: '/Users/test',
+        path: '/usr/bin:/bin',
+        existingPaths: new Set([
+          '/opt/homebrew/share/android-commandlinetools/platform-tools/adb',
+          '/opt/homebrew/share/android-commandlinetools/emulator/emulator',
+          '/java/bin/java',
+        ]),
+        javaMajor: () => 21,
+      }),
+    /missing JDK 17/
+  );
+});
+
+test('Android device ownership uses exclusive worktree claims', () => {
+  const android = fs.readFileSync('dev/local/mobile-android.ts', 'utf8');
+  assert.match(android, /flag: 'wx'/);
+  assert.match(android, /claimAndroidDevice/);
+  assert.match(android, /releaseAndroidDevice/);
 });
 
 test('env sync refreshes source-backed Wrangler secrets through completed stdin prompts', () => {

@@ -95,11 +95,6 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
 
   const settleBeforeSubmit = async (): Promise<boolean> => {
     const owner = getOwner();
-    const snapshot = controller.getSnapshot();
-    const view = resolveOwnerVoiceInputView(snapshot, owner);
-    if (!view.isActive) {
-      return true;
-    }
     const result = await controller.stop(owner);
     return result;
   };

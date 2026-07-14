@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/text';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { shouldShowRepositoryError } from './new-session-repository-state';
 
 type RepositoryItem = { fullName: string; isPrivate: boolean };
 
@@ -40,11 +41,15 @@ export function NewSessionRepositorySection({
   value,
 }: Readonly<NewSessionRepositorySectionProps>) {
   const colors = useThemeColors();
+  const showError = shouldShowRepositoryError({
+    isError,
+    repositoryCount: repositories.length,
+  });
 
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">Repository</Text>
-      {isError ? (
+      {showError ? (
         <QueryError
           placement="top"
           variant="server"

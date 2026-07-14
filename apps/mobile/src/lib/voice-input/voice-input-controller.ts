@@ -15,8 +15,11 @@ import {
 import {
   acquirePermission,
   createTerminal,
+  createVoiceInputStartQueue,
   isDisposed,
+  isPendingStartCancelled,
   type Lifecycle,
+  type PendingVoiceInputStart,
   waitForTerminal,
 } from './voice-input-controller-helpers';
 
@@ -69,18 +72,7 @@ export type VoiceInputStartOptions = {
   owner: string;
 };
 
-type VoiceInputController = {
-  abort(owner?: string): Promise<boolean>;
-  dispose(): void;
-  getSnapshot(): VoiceInputControllerSnapshot;
-  start(options: VoiceInputStartOptions): Promise<boolean>;
-  stop(owner: string): Promise<boolean>;
-  subscribe(listener: (snapshot: VoiceInputControllerSnapshot) => void): () => void;
-};
-
-type Subscription = { remove(): void };
-
-export function createVoiceInputController(native: VoiceInputNative): VoiceInputController {
+export function createVoiceInputController(native: VoiceInputNative) {
   let availability: VoiceInputAvailability = native.isRecognitionAvailable()
     ? 'available'
     : 'unavailable';
@@ -88,6 +80,7 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
   let status: VoiceInputStatus = 'idle';
   const subscribers = new Set<(snapshot: VoiceInputControllerSnapshot) => void>();
   let session: VoiceInputSession | null = null;
+  const startQueue = createVoiceInputStartQueue();
   const lifecycle: Lifecycle = { disposed: false };
 
   let snapshot: VoiceInputControllerSnapshot = { availability, owner, status };
@@ -148,7 +141,7 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
     terminalize,
   };
 
-  const subscriptions: Subscription[] = installVoiceInputListeners(native, sessionController);
+  const subscriptions: { remove(): void }[] = installVoiceInputListeners(native, sessionController);
 
   const abortActive = (current: VoiceInputSession): void => {
     current.expectedAbort = true;
@@ -171,7 +164,10 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
     return !isDisposed(lifecycle);
   };
 
-  const start = async (options: VoiceInputStartOptions): Promise<boolean> => {
+  const runStart = async (
+    options: VoiceInputStartOptions,
+    request: PendingVoiceInputStart
+  ): Promise<boolean> => {
     if (isDisposed(lifecycle)) {
       return false;
     }
@@ -179,11 +175,11 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
       reportFeedback(classifyVoiceInputError('service-not-allowed'), options.onFeedback);
       return false;
     }
-    if (!(await serializeOwnership())) {
+    if (!(await serializeOwnership()) || isPendingStartCancelled(request)) {
       return false;
     }
     const permission = await acquirePermission(native);
-    if (isDisposed(lifecycle)) {
+    if (isDisposed(lifecycle) || isPendingStartCancelled(request)) {
       return false;
     }
     if (permission.kind === 'client-error') {
@@ -194,7 +190,7 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
       reportFeedback(permission.feedback, options.onFeedback);
       return false;
     }
-    if (isDisposed(lifecycle)) {
+    if (isDisposed(lifecycle) || isPendingStartCancelled(request)) {
       return false;
     }
     const terminal = createTerminal();
@@ -230,7 +226,20 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
     return true;
   };
 
+  const start = async ({
+    owner: startOwner,
+    ...options
+  }: VoiceInputStartOptions): Promise<boolean> => {
+    const request: PendingVoiceInputStart = { cancelled: false, owner: startOwner };
+    const result = await startQueue.run(request, async current => {
+      const started = await runStart({ ...options, owner: startOwner }, current);
+      return started;
+    });
+    return result;
+  };
+
   const stop = async (ownerArg: string): Promise<boolean> => {
+    startQueue.cancel(ownerArg);
     const current = session;
     if (!current || current.owner !== ownerArg) {
       return true;
@@ -256,6 +265,7 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
   };
 
   const abort = async (ownerArg?: string): Promise<boolean> => {
+    startQueue.cancel(ownerArg);
     const current = session;
     if (!current) {
       return true;
@@ -281,6 +291,7 @@ export function createVoiceInputController(native: VoiceInputNative): VoiceInput
       return;
     }
     lifecycle.disposed = true;
+    startQueue.cancel();
     const current = session;
     if (current) {
       current.expectedAbort = true;

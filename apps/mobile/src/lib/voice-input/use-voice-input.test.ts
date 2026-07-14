@@ -143,14 +143,15 @@ describe('useVoiceInput integration', () => {
 
   describe('createVoiceInputActions', () => {
     describe('settleBeforeSubmit', () => {
-      it('returns true without calling stop when this owner is not active', async () => {
+      it('delegates stop(owner) when the public snapshot is idle so a pending start is cancelled', async () => {
         const { actions } = buildActions();
         mockController.setSnapshot(idleSnapshot());
+        mockController.stop.mockResolvedValueOnce(true);
 
         const result = await actions.settleBeforeSubmit();
 
         expect(result).toBe(true);
-        expect(mockController.stop).not.toHaveBeenCalled();
+        expect(mockController.stop).toHaveBeenCalledWith(expect.any(String));
       });
 
       it('delegates stop(owner) and returns the controllers result when this owner is active', async () => {

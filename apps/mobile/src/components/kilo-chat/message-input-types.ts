@@ -12,13 +12,13 @@ export type MessageInputTextOnSend = (
   text: string,
   inReplyToMessageId?: string,
   controls?: MessageInputSubmitControls
-) => void;
+) => void | Promise<void>;
 
 export type MessageInputContentBlocksOnSend = (
   content: InputContentBlock[],
   inReplyToMessageId?: string,
   controls?: MessageInputSubmitControls
-) => void;
+) => void | Promise<void>;
 
 export type AttachmentEnabledProps = {
   client: KiloChatClient;

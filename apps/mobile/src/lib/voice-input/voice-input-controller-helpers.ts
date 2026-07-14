@@ -8,6 +8,54 @@ type PermissionResult =
 
 export type Lifecycle = { disposed: boolean };
 
+export type PendingVoiceInputStart = {
+  cancelled: boolean;
+  owner: string;
+};
+
+export function createVoiceInputStartQueue(): {
+  cancel: (owner?: string) => void;
+  run: (
+    request: PendingVoiceInputStart,
+    task: (request: PendingVoiceInputStart) => Promise<boolean>
+  ) => Promise<boolean>;
+} {
+  let pending: PendingVoiceInputStart | null = null;
+  let barrier: Promise<boolean> | null = null;
+
+  return {
+    cancel: owner => {
+      if (pending && (owner === undefined || pending.owner === owner)) {
+        pending.cancelled = true;
+      }
+    },
+    run: async (request, task) => {
+      if (pending) {
+        pending.cancelled = true;
+      }
+      pending = request;
+      const previousBarrier = barrier;
+      const completion = Promise.withResolvers<boolean>();
+      barrier = completion.promise;
+      try {
+        if (previousBarrier) {
+          await previousBarrier;
+        }
+        return await task(request);
+      } finally {
+        if (pending === request) {
+          pending = null;
+        }
+        completion.resolve(true);
+      }
+    },
+  };
+}
+
+export function isPendingStartCancelled(request: PendingVoiceInputStart): boolean {
+  return request.cancelled;
+}
+
 export function isDisposed(lifecycle: Lifecycle): boolean {
   return lifecycle.disposed;
 }

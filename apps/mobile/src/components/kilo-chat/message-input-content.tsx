@@ -75,7 +75,9 @@ export function MessageInputContent({
   );
   const [draftLength, setDraftLength] = useState(initialText.length);
   const [inputWidth, setInputWidth] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const submissionLockRef = useRef(false);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,11 +97,14 @@ export function MessageInputContent({
   const overLimit = isMessageInputOverLimit(valueRef.current);
   const showCounter = shouldShowMessageInputCounter(valueRef.current);
   const sendDisabled =
-    submitDisabled === true || resolveMessageInputSendDisabled({ canSend, disabled, overLimit });
-  const controlsDisabled = disabled === true || submitDisabled === true;
+    isSubmitting ||
+    submitDisabled === true ||
+    resolveMessageInputSendDisabled({ canSend, disabled, overLimit });
+  const controlsDisabled = disabled === true || submitDisabled === true || isSubmitting;
   const showAttachmentButton =
     attachmentQueue !== null && hasAttachmentsCapability && isEditing !== true && disabled !== true;
-  const voiceDisabled = disabled === true || hasUploadingAttachment || isEditing === true;
+  const voiceDisabled =
+    disabled === true || hasUploadingAttachment || isEditing === true || isSubmitting;
   const inputMeasure = useTextHeight({
     minHeight: MESSAGE_INPUT_MIN_HEIGHT,
     maxHeight: MESSAGE_INPUT_MAX_HEIGHT,
@@ -184,23 +189,23 @@ export function MessageInputContent({
     );
   }, [hasFailedAttachment, hasUploadingAttachment, readyAttachmentBlocks]);
 
-  function submitDraft() {
+  async function submitDraft() {
     if (disabled || submitDisabled) {
       return;
     }
     const submittedAttachmentTempIds =
       attachmentQueue?.rows.filter(row => row.status === 'ready').map(row => row.tempId) ?? [];
-    submitMessageInputDraft({
+    const submission = submitMessageInputDraft({
       valueRef,
       replyingToMessageId: replyingTo?.id,
-      onSend: (text, inReplyToMessageId, controls) => {
-        onSendText?.(text, inReplyToMessageId, controls);
+      onSend: async (text, inReplyToMessageId, controls) => {
+        await onSendText?.(text, inReplyToMessageId, controls);
       },
       onSendContentBlocks:
         attachmentQueue === null
           ? undefined
-          : (content, inReplyToMessageId, controls) => {
-              onSendContentBlocks?.(content, inReplyToMessageId, {
+          : async (content, inReplyToMessageId, controls) => {
+              await onSendContentBlocks?.(content, inReplyToMessageId, {
                 clearDraft: () =>
                   clearSubmittedMessageInputDraft({
                     controls,
@@ -221,10 +226,13 @@ export function MessageInputContent({
       hasUploadingAttachment,
       hasFailedAttachment,
     });
+    await submission?.completion;
   }
 
   async function submit() {
     await settleVoiceInputBeforeSubmit({
+      lock: submissionLockRef,
+      onPendingChange: setIsSubmitting,
       settleVoiceInput: voiceInput.settleBeforeSubmit,
       submit: submitDraft,
     });
@@ -265,7 +273,6 @@ export function MessageInputContent({
         attachmentQueue={attachmentQueue}
         botName={botName}
         controlsDisabled={controlsDisabled}
-        disabled={disabled}
         disabledReason={disabledReason}
         showInstanceCta={showInstanceCta}
         onOpenInstance={onOpenInstance}

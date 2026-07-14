@@ -7,23 +7,35 @@
  * or native bridge bug and propagated to the caller, again without invoking
  * submit.
  *
- * This is a domain-agnostic submit race guarantee. Both the Kilo Chat message
- * input and the Cloud Agent chat composer call into `useVoiceInput`'s
- * `settleBeforeSubmit` before their respective submit paths so an in-flight
- * recognition session can deliver its final transcript before the message is
- * flushed.
+ * The caller-owned lock rejects repeated submissions until both voice input
+ * and an asynchronous submit have settled. This keeps the lock synchronous
+ * across React renders while `onPendingChange` drives disabled UI state.
  */
 export async function settleVoiceInputBeforeSubmit({
+  lock,
+  onPendingChange,
   settleVoiceInput,
   submit,
 }: {
+  lock: { current: boolean };
+  onPendingChange?: (pending: boolean) => void;
   settleVoiceInput: () => Promise<boolean>;
-  submit: () => void;
+  submit: () => void | Promise<void>;
 }): Promise<boolean> {
-  const settled = await settleVoiceInput();
-  if (!settled) {
+  if (lock.current) {
     return false;
   }
-  submit();
-  return true;
+  lock.current = true;
+  onPendingChange?.(true);
+  try {
+    const settled = await settleVoiceInput();
+    if (!settled) {
+      return false;
+    }
+    await submit();
+    return true;
+  } finally {
+    lock.current = false;
+    onPendingChange?.(false);
+  }
 }

@@ -22,7 +22,6 @@ type Props = {
   attachmentQueue: ComposerAttachmentQueue | null;
   botName?: string | null;
   controlsDisabled: boolean;
-  disabled?: boolean;
   disabledReason?: string | null;
   showInstanceCta?: boolean;
   onOpenInstance?: () => void;
@@ -61,7 +60,6 @@ export function MessageInputView({
   attachmentQueue,
   botName,
   controlsDisabled,
-  disabled,
   disabledReason,
   showInstanceCta,
   onOpenInstance,
@@ -96,7 +94,7 @@ export function MessageInputView({
   voiceInputStatus,
 }: Props) {
   const colors = useThemeColors();
-  const inputDisabled = disabled === true || voiceInputActive;
+  const inputDisabled = controlsDisabled || voiceInputActive;
 
   return (
     <>

@@ -40,7 +40,9 @@ export default function NewSessionScreen() {
   const [variant, setVariant] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasPrompt, setHasPrompt] = useState(false);
+  const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
 
   // ── Models ───────────────────────────────────────────────────────
@@ -137,6 +139,8 @@ export default function NewSessionScreen() {
 
   const submitCreate = useCallback(async () => {
     await settleVoiceInputBeforeSubmit({
+      lock: submissionLockRef,
+      onPendingChange: setIsSubmitting,
       settleVoiceInput: async () => {
         const settleVoiceInput = voiceInputSettlerRef.current;
         if (settleVoiceInput === null) {
@@ -145,9 +149,7 @@ export default function NewSessionScreen() {
         const settled = await settleVoiceInput();
         return settled;
       },
-      submit: () => {
-        void createSessionFromDraft();
-      },
+      submit: createSessionFromDraft,
     });
   }, [createSessionFromDraft]);
 
@@ -225,7 +227,7 @@ export default function NewSessionScreen() {
         <Button
           size="lg"
           className="mt-6"
-          disabled={isCreating || !canCreate}
+          disabled={isCreating || isSubmitting || !canCreate}
           onPress={handleStartSession}
         >
           {isCreating ? (

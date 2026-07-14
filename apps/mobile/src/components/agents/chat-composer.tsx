@@ -81,6 +81,7 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const submissionLockRef = useRef(false);
   const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({
@@ -146,7 +147,6 @@ export function ChatComposer({
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const payload = upload.toWirePayload();
-    setIsSending(true);
     try {
       // Only clear the draft once the send actually succeeds — a failed
       // send must leave the text and attachments exactly as the user left
@@ -160,17 +160,15 @@ export function ChatComposer({
       Keyboard.dismiss();
     } catch {
       // Draft preserved; error already surfaced by the caller.
-    } finally {
-      setIsSending(false);
     }
   }
 
   async function submit() {
     await settleVoiceInputBeforeSubmit({
+      lock: submissionLockRef,
+      onPendingChange: setIsSending,
       settleVoiceInput: voiceInput.settleBeforeSubmit,
-      submit: () => {
-        void handleSend();
-      },
+      submit: handleSend,
     });
   }
 

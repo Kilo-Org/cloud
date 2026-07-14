@@ -349,13 +349,14 @@ async function syncProviders(
   const allProviders = [...normalizedProviders];
 
   // Auto-detect providers referenced by extra models that aren't already present
-  const missingProviders = new Set(
+  const missingProviders = new Map(
     mappedExtraModels
       .map(m => m.provider)
       .filter(provider => !allProviders.some(p => p.slug === provider.slug))
+      .map(provider => [provider.slug, provider])
   );
 
-  for (const provider of missingProviders) {
+  for (const provider of missingProviders.values()) {
     const iconInitials = provider.slug.slice(0, 2).toUpperCase();
     allProviders.push({
       name: provider.name,

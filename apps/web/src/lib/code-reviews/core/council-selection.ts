@@ -21,6 +21,12 @@ export type CouncilSpecialistSelection = {
   thinkingEffort: string | null;
 };
 
+/**
+ * PostHog flag that gates council UI visibility for entitled enterprise orgs (staged
+ * rollout). Local development always shows the UI regardless of this flag.
+ */
+export const CODE_REVIEW_COUNCIL_FLAG = 'code-review-council';
+
 /** All presets enabled on the review's default model/effort — the initial picker state. */
 export function defaultCouncilSelections(): Record<string, CouncilSpecialistSelection> {
   return Object.fromEntries(

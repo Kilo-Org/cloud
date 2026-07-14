@@ -59,6 +59,11 @@ export function ReviewAgentPageClient({
   const router = useRouter();
   const selectedPlatform = initialPlatform;
 
+  const { data: councilEntitlement } = useQuery(
+    trpc.organizations.reviewAgent.getCouncilEntitlement.queryOptions({ organizationId })
+  );
+  const councilEntitled = councilEntitlement?.entitled ?? false;
+
   const handlePlatformChange = (platform: Platform) => {
     const params = new URLSearchParams();
     if (platform !== 'github') {
@@ -292,6 +297,7 @@ export function ReviewAgentPageClient({
                   localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
                   defaultModelSlug={selectedConfigData?.modelSlug}
                   defaultThinkingEffort={selectedConfigData?.thinkingEffort}
+                  councilEntitled={councilEntitled}
                 />
               ) : (
                 <Alert>
@@ -405,6 +411,7 @@ export function ReviewAgentPageClient({
                   localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
                   defaultModelSlug={selectedConfigData?.modelSlug}
                   defaultThinkingEffort={selectedConfigData?.thinkingEffort}
+                  councilEntitled={councilEntitled}
                 />
               ) : (
                 <Alert>

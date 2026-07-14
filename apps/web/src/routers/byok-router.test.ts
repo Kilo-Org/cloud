@@ -590,7 +590,7 @@ describe('BYOK Router', () => {
         .from(coding_plan_subscriptions)
         .where(eq(coding_plan_subscriptions.id, subscription.id));
 
-      expect(unchangedKey.encrypted_api_key).toBe(key.encrypted_api_key);
+      expect(unchangedKey.encrypted_api_key).toStrictEqual(key.encrypted_api_key);
       expect(unchangedKey.management_source).toBe('coding_plan');
       expect(updatedSubscription.status).toBe('active');
       expect(updatedSubscription.installed_byok_key_id).toBe(key.id);

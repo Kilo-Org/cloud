@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import styles from './RepositoryProviderOnboardingPanel.module.css';
 
 const providerLogoPaths = {
   github:
@@ -101,16 +102,19 @@ export function RepositoryProviderOnboardingPanel({
         ))}
       </div>
 
-      <p className="type-label mt-5 text-muted-foreground">
+      <p className="type-body mt-5 text-muted-foreground">
         Already connected?{' '}
         <Button
           variant="link"
-          className="relative h-auto rounded-sm p-0 text-muted-foreground underline decoration-muted-foreground/50 underline-offset-4 after:absolute after:-inset-y-3 after:inset-x-0 hover:text-foreground hover:decoration-foreground"
+          className="relative h-auto rounded-sm p-0 text-muted-foreground underline decoration-muted-foreground/50 underline-offset-4 after:absolute after:-inset-y-3 after:inset-x-0 hover:text-foreground hover:decoration-foreground disabled:no-underline"
           onClick={onCheckConnection}
           disabled={isCheckingConnection}
           aria-busy={isCheckingConnection}
         >
-          <span className="type-label" aria-live="polite">
+          <span
+            className={`type-body ${isCheckingConnection ? styles.shimmer : ''}`}
+            aria-live="polite"
+          >
             {isCheckingConnection ? 'Checking…' : 'Check connection'}
           </span>
         </Button>

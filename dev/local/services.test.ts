@@ -3,11 +3,31 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 import {
+  computePortOffset,
   getAlwaysOnGroupIds,
   getService,
   resolveGroups,
   resolveSessionNextAuthUrl,
 } from './services';
+
+test('uses an automatic port offset for secondary worktrees by default', () => {
+  assert.equal(
+    computePortOffset({ explicit: undefined, isPrimary: false, slug: 'mobile-context-info' }),
+    1100
+  );
+});
+
+test('never assigns default ports to a secondary worktree', () => {
+  assert.equal(computePortOffset({ explicit: 'auto', isPrimary: false, slug: 'd' }), 5000);
+});
+
+test('keeps the primary worktree on the default ports', () => {
+  assert.equal(computePortOffset({ explicit: undefined, isPrimary: true, slug: 'cloud' }), 0);
+});
+
+test('honors an explicit port offset', () => {
+  assert.equal(computePortOffset({ explicit: '1200', isPrimary: false, slug: 'anything' }), 1200);
+});
 
 test('points NEXTAUTH_URL at the offset port when the web app runs without a tunnel', () => {
   const url = resolveSessionNextAuthUrl({
@@ -51,14 +71,22 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.equal(service.group, 'auto-routing');
   assert.equal(service.type, 'worker');
   assert.equal(service.dir, 'services/auto-routing');
-  assert.equal(service.port, 8810);
+  assert.equal(
+    service.port,
+    8810 +
+      computePortOffset({
+        explicit: process.env.KILO_PORT_OFFSET,
+        isPrimary: false,
+        slug: 'harden-mobile-agent-workflow',
+      })
+  );
   assert.match(service.command.join(' '), /pnpm run dev/);
 
   const benchmark = getService('auto-routing-benchmark');
   assert.equal(benchmark.group, 'auto-routing');
   assert.equal(benchmark.type, 'worker');
   assert.equal(benchmark.dir, 'services/auto-routing-benchmark');
-  assert.equal(benchmark.port, 8814);
+  assert.equal(benchmark.port - service.port, 4);
 
   const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
   assert.ok(!alwaysOn.includes('auto-routing'));
@@ -82,7 +110,7 @@ test('keeps auto routing package dev script compatible with local launcher flags
 test('starts Storybook with Storybook v10 port flags', () => {
   const service = getService('storybook');
 
-  assert.deepEqual(service.command, ['pnpm', 'run', 'storybook', '-p', '6006']);
+  assert.deepEqual(service.command, ['pnpm', 'run', 'storybook', '-p', String(service.port)]);
 });
 
 test('preserves auto routing backend auth secret name', () => {

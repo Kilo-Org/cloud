@@ -544,13 +544,36 @@ test('rejects reserved generated-secret metadata in source Wrangler config', () 
   }
 });
 
-test('preserves an existing annotated local Secrets Store secret', () => {
+test('preserves an existing generated local Secrets Store secret', () => {
   const repo = createGitTokenServiceRepo({});
   try {
     withFakePnpm('SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV\n', () => {
       const plan = computePlan(repo.root, new Set(['cloudflare-git-token-service']));
       assert.deepEqual(plan.secretStoreAutoCreates, []);
       assert.deepEqual(plan.secretStoreWarnings, []);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('refreshes an existing source-backed local Secrets Store secret', () => {
+  const repo = createRepo({
+    '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',
+    'services/event-service/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/event-service/wrangler.jsonc': `{
+      "secrets_store_secrets": [{
+        "binding": "NEXTAUTH_SECRET",
+        "store_id": "store-id",
+        "secret_name": "NEXTAUTH_SECRET_PROD"
+      }]
+    }`,
+  });
+  try {
+    withFakePnpm('NEXTAUTH_SECRET_PROD\n', () => {
+      const plan = computePlan(repo.root, new Set(['event-service']));
+      assert.equal(plan.secretStoreAutoCreates.length, 1);
+      assert.equal(plan.secretStoreAutoCreates[0]?.value, 'local-nextauth-secret');
     });
   } finally {
     repo.cleanup();
@@ -618,7 +641,11 @@ test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev var
       const plan = computePlan(repo.root, new Set(['kilo-chat']));
       assert.equal(plan.missingEnvLocal, false);
       assert.deepEqual(plan.secretStoreWarnings, []);
-      assert.deepEqual(plan.secretStoreAutoCreates, [
+      assert.equal(plan.secretStoreAutoCreates.length, 2);
+      assert.deepEqual(
+        plan.secretStoreAutoCreates.find(
+          create => create.binding.secret_name === 'GATEWAY_TOKEN_SECRET'
+        ),
         {
           workerDir: 'services/kilo-chat',
           binding: {
@@ -628,8 +655,8 @@ test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev var
           },
           sourceKey: 'services/kiloclaw/.dev.vars.example:GATEWAY_TOKEN_SECRET',
           value: 'dev-gateway-secret-kiloclaw',
-        },
-      ]);
+        }
+      );
     });
   } finally {
     repo.cleanup();

@@ -21,6 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 OUTBOX="${OUTBOX:-$REPO_ROOT/dev/logs/emails}"
 
+"$SCRIPT_DIR/preflight.sh" "$DEVICE"
+
 # Newest sign-in-code email for EMAIL, or empty.
 latest_email() {
   [ -d "$OUTBOX" ] || return 0
@@ -39,11 +41,14 @@ latest_email() {
 before="$(latest_email)"
 
 echo "==> requesting sign-in code for $EMAIL"
-maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+if ! maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"; then
+  echo "==> retrying launch and sign-in request once after a dev-client startup failure"
+  maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+fi
 
 # Wait for a newer outbox email than we had before (the send is async).
 code=""
-for _ in $(seq 1 10); do
+for _ in $(seq 1 30); do
   after="$(latest_email)"
   if [ -n "$after" ] && [ "$after" != "$before" ]; then
     code="$(perl -0777 -ne 'print $1 if /letter-spacing:\s*8px.*?>\s*(\d{6})\s*</s' "$after")"
@@ -61,4 +66,5 @@ fi
 
 echo "==> verifying sign-in code"
 maestro --device "$DEVICE" test -e "OTP=$code" "$SCRIPT_DIR/flows/login-verify-code.yaml"
+maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/login-assert-home.yaml"
 echo "==> signed in"

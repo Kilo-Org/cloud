@@ -108,6 +108,12 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
   });
 }
 
+function setSessionEnvironment(sessionName: string, env: Record<string, string>): void {
+  for (const [key, value] of Object.entries(env)) {
+    execFileSync('tmux', ['set-environment', '-t', sessionName, key, value], { stdio: 'ignore' });
+  }
+}
+
 function killSession(sessionName: string): void {
   try {
     execSync(`tmux kill-session -t ${sessionName}`, { stdio: 'ignore' });
@@ -391,6 +397,26 @@ function findServicePane(sessionName: string, serviceName: string): PaneInfo | u
   }
 }
 
+function captureServicePane(sessionName: string, serviceName: string, historyLines = 200): string {
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) {
+    throw new Error(`Service ${serviceName} is not running in ${sessionName}`);
+  }
+  return execFileSync(
+    'tmux',
+    [
+      'capture-pane',
+      '-p',
+      '-J',
+      '-t',
+      `${sessionName}:${pane.windowIndex}.${pane.paneIndex}`,
+      '-S',
+      `-${historyLines}`,
+    ],
+    { encoding: 'utf8' }
+  );
+}
+
 function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
   try {
     const command = execSync(
@@ -503,6 +529,7 @@ export {
   sessionExists,
   findOtherKiloDevSessions,
   createSession,
+  setSessionEnvironment,
   killSession,
   attachSession,
   createWindow,
@@ -523,6 +550,7 @@ export {
   breakPane,
   countPanes,
   findServicePane,
+  captureServicePane,
   isPaneRunningCommand,
   paneHasRunningChild,
   selectPane,

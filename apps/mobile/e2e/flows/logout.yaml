@@ -11,13 +11,7 @@
 # - See e2e/AGENTS.md ("Login / logout helper flows") for the full workflow.
 appId: com.kilocode.kiloapp
 ---
-- stopApp
-- tapOn:
-    text: 'Kilo'
-- extendedWaitUntil:
-    visible:
-      text: 'Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
-    timeout: 30000
+- runFlow: open-app.yaml
 # Booted into the consent gate (signed in, not consented) -> accept it to reach
 # Home, then sign out below.
 - runFlow:

@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 
-import { breakPane, buildInteractiveShellCommand, listWindows } from './tmux';
+import { breakPane, buildInteractiveShellCommand, captureServicePane, listWindows } from './tmux';
 import { buildStartCommand, restartServiceInTmux } from './runner';
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
@@ -32,6 +32,50 @@ const hasTmux = (() => {
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+test(
+  'captureServicePane follows a service after the dashboard moves its pane',
+  { skip: !hasTmux },
+  () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'mobile';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      tmux(
+        'new-window',
+        '-d',
+        '-t',
+        sessionName,
+        '-n',
+        serviceName,
+        '/bin/sh',
+        '-c',
+        'printf "worktree-mobile-pane\\n"; sleep 120'
+      );
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+      tmux(
+        'join-pane',
+        '-h',
+        '-s',
+        `${sessionName}:${serviceWindow.index}.0`,
+        '-t',
+        `${sessionName}:0.0`
+      );
+      tmux('select-pane', '-t', `${sessionName}:0.1`, '-T', serviceName);
+
+      assert.match(captureServicePane(sessionName, serviceName, 20), /worktree-mobile-pane/);
+    } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
 
 test(
   'breakPane keeps the requested service window name after tmux automatic rename',

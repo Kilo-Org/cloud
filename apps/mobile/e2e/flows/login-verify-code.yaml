@@ -24,12 +24,7 @@ appId: com.kilocode.kiloapp
       visible: 'Accept and continue'
     commands:
       - tapOn: 'Accept and continue'
-# Grant the notification permission prompt if iOS shows one.
-- runFlow:
-    when:
-      visible: 'Allow'
-    commands:
-      - tapOn: 'Allow'
+- runFlow: open-app.yaml
 - extendedWaitUntil:
     visible: 'HOME|Home, tab, 1 of 4'
     timeout: 15000

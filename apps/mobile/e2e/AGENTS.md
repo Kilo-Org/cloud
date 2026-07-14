@@ -21,6 +21,8 @@ xcrun simctl list devices booted
 
 Reuse a complete stack already running for this worktree. Do not start a competing stack or stop an unrelated `kilo-dev-*` session.
 
+`kiloclaw-docker-tcp` on port 23750 is the sole intentional host-wide exception: it is a stateless loopback proxy to the same Docker socket. The runner reuses an occupied proxy. Never kill a `socat` process owned by another worktree to free this port.
+
 When this worktree has no stack, start the complete mobile flow. Secondary worktrees automatically receive an isolated port offset, and mobile startup generates and explicitly injects this worktree's LAN URLs before Metro starts. Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale parent-shell values must not select the bundle endpoints:
 
 ```bash
@@ -84,7 +86,7 @@ xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
 
-Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login helper dismisses the clean-install tracking alert and Expo dev-menu introduction when present.
+Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The login helper dismisses the clean-install tracking alert and Expo dev-menu introduction when present.
 
 ## Sign In and Out
 

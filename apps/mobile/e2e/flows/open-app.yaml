@@ -1,8 +1,22 @@
 appId: com.kilocode.kiloapp
 ---
+- runFlow:
+    when:
+      visible: 'Ask App Not to Track'
+    commands:
+      - tapOn: 'Ask App Not to Track'
+- runFlow:
+    when:
+      visible: 'This is the developer menu.*'
+    commands:
+      - tapOn: 'Continue'
 - stopApp
-- tapOn:
-    text: 'Kilo'
+- runFlow:
+    when:
+      visible: 'Kilo'
+    commands:
+      - tapOn:
+          text: 'Kilo'
 - extendedWaitUntil:
     visible: 'Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
     timeout: 30000

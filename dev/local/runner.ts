@@ -17,6 +17,7 @@ import {
   paneHasRunningChild,
   selectPane,
   setPaneTitle,
+  setPaneServiceIdentity,
   setMainLeftLayout,
   pipePane,
 } from './tmux';
@@ -116,6 +117,7 @@ export function startServiceInTmux(
   const startupCommand =
     svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
   const winIndex = createWindow(sessionName, serviceName, env, startupCommand);
+  setPaneServiceIdentity(sessionName, winIndex, 0, serviceName);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
   pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
 }

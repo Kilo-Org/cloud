@@ -26,6 +26,11 @@ test('login flows never use an unidentified generic Allow selector', () => {
   assert.match(openApp, /“Kilo” Would Like to Send You Notifications/);
 });
 
+test('shared launch clears an already-visible tracking prompt before tapping the app icon', () => {
+  const flow = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
+  assert.ok(flow.indexOf("visible: 'Ask App Not to Track'") < flow.indexOf("visible: 'Kilo'"));
+});
+
 test('mobile workflow documents hierarchy-derived tab selectors', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
@@ -42,6 +47,7 @@ test('login preflight reconnects the claimed iOS device to this worktree Metro U
   assert.match(preflight, /pnpm -s dev:capture mobile/);
   assert.match(preflight, /exp\+kilo-app:\/\/expo-development-client\/\?url=/);
   assert.match(preflight, /session-ingest secret readiness probe failed/);
+  assert.match(preflight, /Metro manifest API URL is/);
   assert.match(preflight, /dev:mobile:android claim/);
   assert.match(preflight, /adb -s "\$DEVICE" reverse/);
 });
@@ -109,4 +115,14 @@ test('env sync refreshes source-backed Wrangler secrets through completed stdin 
   assert.match(plan, /Recreate source-backed secrets/);
   assert.match(envOutput, /input: `\$\{value\}\\n`/);
   assert.match(envOutput, /Failed to create Secrets Store secret/);
+});
+
+test('workflow documents the shared Docker proxy exception without weakening backend isolation', () => {
+  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+  const cli = fs.readFileSync('dev/local/cli.ts', 'utf8');
+
+  assert.match(runbook, /sole intentional host-wide exception/);
+  assert.match(runbook, /Never kill a `socat` process owned by another worktree/);
+  assert.match(cli, /name === 'kiloclaw-docker-tcp'/);
+  assert.match(cli, /Refusing to share occupied worktree service ports/);
 });

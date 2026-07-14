@@ -77,6 +77,22 @@ process.stdout.write(String(port));
 NODE
 )"
 METRO_URL="http://${MOBILE_HOST}:${METRO_PORT}"
+MANIFEST="$(mktemp)"
+trap 'rm -f "$SESSION_PROBE" "$MANIFEST"' EXIT
+curl -sS -H 'expo-platform: ios' -H 'expo-protocol-version: 1' \
+  -H 'accept: application/expo+json,application/json' "$METRO_URL" >"$MANIFEST"
+node - "$MANIFEST" "http://${MOBILE_HOST}:${EXPECTED_API_PORT}" "$REPO_ROOT" <<'NODE'
+const fs = require('node:fs');
+const [manifestPath, expectedApiUrl, expectedRoot] = process.argv.slice(2);
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const expoClient = manifest.extra?.expoClient;
+if (expoClient?.extra?.apiBaseUrl !== expectedApiUrl) {
+  throw new Error(`Metro manifest API URL is ${expoClient?.extra?.apiBaseUrl}, expected ${expectedApiUrl}`);
+}
+if (expoClient?._internal?.projectRoot !== `${expectedRoot}/apps/mobile`) {
+  throw new Error(`Metro manifest belongs to ${expoClient?._internal?.projectRoot}, expected ${expectedRoot}/apps/mobile`);
+}
+NODE
 ENCODED_METRO_URL="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$METRO_URL")"
 if [ "$PLATFORM" = "ios" ]; then
   xcrun simctl openurl "$DEVICE" \

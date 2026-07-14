@@ -158,6 +158,26 @@ function createWindow(
   return parseInt(output, 10);
 }
 
+function setPaneServiceIdentity(
+  sessionName: string,
+  windowTarget: string | number,
+  pane: number,
+  serviceName: string
+): void {
+  execFileSync(
+    'tmux',
+    [
+      'set-option',
+      '-p',
+      '-t',
+      `${sessionName}:${windowTarget}.${pane}`,
+      '@kilo_service',
+      serviceName,
+    ],
+    { stdio: 'ignore' }
+  );
+}
+
 function buildInteractiveShellCommand(
   startupCommand: string,
   shell = process.env.SHELL || '/bin/sh'
@@ -376,6 +396,24 @@ type PaneInfo = { windowIndex: number; paneIndex: number };
  */
 function findServicePane(sessionName: string, serviceName: string): PaneInfo | undefined {
   try {
+    const panes = execFileSync(
+      'tmux',
+      [
+        'list-panes',
+        '-s',
+        '-t',
+        sessionName,
+        '-F',
+        '#{window_index}:#{pane_index}:#{@kilo_service}',
+      ],
+      { encoding: 'utf8' }
+    ).trim();
+    for (const line of panes.split('\n')) {
+      const [windowIndex, paneIndex, identity] = line.split(':');
+      if (identity === serviceName) {
+        return { windowIndex: Number(windowIndex), paneIndex: Number(paneIndex) };
+      }
+    }
     // Check named windows first (service in its own window)
     const windows = listWindows(sessionName);
     const win = windows.find(w => w.name === serviceName);
@@ -533,6 +571,7 @@ export {
   killSession,
   attachSession,
   createWindow,
+  setPaneServiceIdentity,
   buildInteractiveShellCommand,
   sendKeys,
   sendInterrupt,

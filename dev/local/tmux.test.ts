@@ -5,7 +5,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 
-import { breakPane, buildInteractiveShellCommand, captureServicePane, listWindows } from './tmux';
+import {
+  breakPane,
+  buildInteractiveShellCommand,
+  captureServicePane,
+  listWindows,
+  setPaneServiceIdentity,
+} from './tmux';
 import { buildStartCommand, restartServiceInTmux } from './runner';
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
@@ -56,6 +62,7 @@ test(
       );
       const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
       assert.ok(serviceWindow);
+      setPaneServiceIdentity(sessionName, serviceWindow.index, 0, serviceName);
       tmux(
         'join-pane',
         '-h',
@@ -64,8 +71,6 @@ test(
         '-t',
         `${sessionName}:0.0`
       );
-      tmux('select-pane', '-t', `${sessionName}:0.1`, '-T', serviceName);
-
       assert.match(captureServicePane(sessionName, serviceName, 20), /worktree-mobile-pane/);
     } finally {
       try {

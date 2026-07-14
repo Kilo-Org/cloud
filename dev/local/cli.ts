@@ -184,10 +184,15 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   }
 
   const conflictingPorts: string[] = [];
+  const reusedHostServices = new Set<string>();
   for (const name of serviceNames) {
     const service = getService(name);
     if (service.type !== 'infra' && service.port > 0 && (await probePort(service.port))) {
-      conflictingPorts.push(`${name}:${service.port}`);
+      if (name === 'kiloclaw-docker-tcp') {
+        reusedHostServices.add(name);
+      } else {
+        conflictingPorts.push(`${name}:${service.port}`);
+      }
     }
   }
   if (conflictingPorts.length > 0) {
@@ -466,6 +471,11 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
 
   const skippedServices: string[] = [];
   for (const name of otherServices) {
+    if (reusedHostServices.has(name)) {
+      console.log(`Reusing host ${name} on ${getService(name).port}`);
+      startedServices.push(name);
+      continue;
+    }
     const dependsOnKiloclaw = getService(name).dependsOn.includes('kiloclaw');
     if (!kiloclawTunnelCaptured && (name === 'kiloclaw' || dependsOnKiloclaw)) {
       skippedServices.push(name);

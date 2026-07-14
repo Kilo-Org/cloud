@@ -791,6 +791,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
     if (modelRestrictionError) return modelRestrictionError;
 
+    // Experiment traffic captures prompts to R2 for partner evaluation, which
+    // is a form of data collection that the gateway-pinned `data_collection`
+    // setting cannot enforce on a direct partner upstream. If the org has
+    // explicitly disabled data collection, refuse the experimented public id
+    // here rather than routing through and silently capturing prompts.
+    if (effectiveProviderContext.experiment && settings?.data_collection === 'deny') {
+      return dataCollectionRequiredResponse();
+    }
+
     // Enterprise `provider_allow_list` is enforced via OpenRouter's
     // `body.provider.only` field, which doesn't reach a direct partner
     // upstream. Refuse the experimented public id rather than routing

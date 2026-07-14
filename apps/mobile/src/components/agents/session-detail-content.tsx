@@ -93,6 +93,7 @@ export function SessionDetailContent({
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
@@ -409,8 +410,12 @@ export function SessionDetailContent({
           sessionId={childSession.sessionId}
           title={childSession.title}
           getChildMessages={getChildMessages}
+          hydrationState={getChildSessionHydrationState(childSession.sessionId)}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={handleOpenChildSession}
+          onRetry={() => {
+            void manager.hydrateChildSession(childSession.sessionId);
+          }}
           onClose={() => {
             setChildSession(undefined);
           }}

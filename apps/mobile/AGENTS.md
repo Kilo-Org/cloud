@@ -6,6 +6,8 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go, and do 
 
 For a fresh-worktree backend, simulator, login, Maestro, remote CLI, logs, and cleanup workflow, follow [e2e/AGENTS.md](e2e/AGENTS.md). Agents may start what they need there; do not ask the user to start Metro or backend services.
 
+For substantial mobile work, follow the orchestrated implement-review-E2E loop in [.kilo/MOBILE_WORKFLOW.md](.kilo/MOBILE_WORKFLOW.md). Its mobile role agents may change backend, shared-package, infrastructure, or sibling CLI code when the accepted plan requires it; mobile describes the product workflow, not a directory boundary.
+
 ## Stack
 
 - Expo SDK 55, React Native 0.83, React 19, strict TypeScript (`tsgo`)

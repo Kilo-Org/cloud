@@ -3,12 +3,17 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
+import {
+  CodeReviewCouncilConfigSchema,
+  type CodeReviewType,
+  type ManualCodeReviewConfig,
+} from '@kilocode/db/schema-types';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
 } from '@/lib/agent-config/core/types';
+import { assertCouncilCreationAllowed } from './core/council-entitlement';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -36,6 +41,10 @@ export const ManualCodeReviewJobInputSchema = z.object({
     .nullable()
     .optional(),
   instructions: z.string().max(4_000).optional(),
+  // When present, this is a multi-specialist council run. The specialists (with their
+  // per-specialist model/effort) and aggregation strategy are carried here and merged
+  // into the run's agent config. Absent = a standard single-reviewer run.
+  council: CodeReviewCouncilConfigSchema.optional(),
 });
 
 export type ManualCodeReviewJobInput = z.infer<typeof ManualCodeReviewJobInputSchema>;
@@ -152,12 +161,19 @@ export async function createManualCodeReviewJob(params: {
   const localMode = isLocalCodeReviewDevelopmentEnabled();
   const outputMode: ManualCodeReviewConfig['outputMode'] = localMode ? 'kilo' : 'provider';
   const instructions = normalizeManualInstructions(input.instructions);
+  const reviewType: CodeReviewType = input.council ? 'council' : 'standard';
+
+  // Fail fast on entitlement before doing any provider/network work. The creation
+  // boundary (`createCodeReview`) enforces this too, but checking here avoids resolving
+  // the PR for a request that can never run.
+  await assertCouncilCreationAllowed({ owner: params.owner, reviewType });
 
   const agentConfig = await buildManualAgentConfig({
     owner: params.owner,
     platform,
     modelSlug: input.modelSlug,
     thinkingEffort: input.thinkingEffort ?? null,
+    council: input.council ?? null,
   });
 
   const source = localMode
@@ -207,6 +223,7 @@ export async function createManualCodeReviewJob(params: {
       platform: source.platform,
       platformProjectId: source.platformProjectId,
       manualConfig,
+      reviewType,
       triggerSource: 'manual',
     });
 
@@ -250,6 +267,7 @@ async function buildManualAgentConfig(params: {
   platform: CodeReviewPlatform;
   modelSlug: string;
   thinkingEffort: string | null;
+  council: CodeReviewAgentConfig['council'] | null;
 }): Promise<CodeReviewAgentConfig> {
   const savedConfig = await getAgentConfigForOwner(params.owner, 'code_review', params.platform);
   const parsedSavedConfig = savedConfig
@@ -263,6 +281,9 @@ async function buildManualAgentConfig(params: {
     ...baseConfig,
     model_slug: params.modelSlug,
     thinking_effort: params.thinkingEffort,
+    // Manual runs carry their council selection in the run's agent config; a standard
+    // run clears any inherited council so it can't accidentally run as a council.
+    council: params.council ?? undefined,
   };
 }
 

@@ -1324,6 +1324,38 @@ export const CodeReviewCouncilConfigSchema = z.object({
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 
+// Persisted OUTCOME of a council run, surfaced on the cloud UI job-runs screen (manual
+// council runs are not posted to a PR). This is the storage contract; the capture code
+// maps the parsed `kilo-code-review-council:v1` manifest + code-owned decision into it.
+export const CouncilResultFindingSchema = z.object({
+  path: z.string().max(1024),
+  line: z.number().int().nonnegative().nullable().optional(),
+  severity: z.string().max(64),
+  rationale: z.string().max(4000),
+});
+export type CouncilResultFinding = z.infer<typeof CouncilResultFindingSchema>;
+
+export const CouncilResultSpecialistSchema = z.object({
+  id: z.string().max(64),
+  role: z.enum(COUNCIL_SPECIALIST_ROLES),
+  name: z.string().max(80),
+  // The model/effort that actually ran this specialist (we assign these), for display.
+  model: z.string().max(512).nullable(),
+  thinkingEffort: z.string().max(50).nullable(),
+  vote: CouncilVoteSchema,
+  highestSeverity: z.string().max(64).nullable(),
+  findings: z.array(CouncilResultFindingSchema).max(200),
+});
+export type CouncilResultSpecialist = z.infer<typeof CouncilResultSpecialistSchema>;
+
+export const CodeReviewCouncilResultSchema = z.object({
+  // The code-owned governance decision (never model-authored).
+  decision: CouncilVoteSchema,
+  aggregationStrategy: CouncilAggregationStrategySchema,
+  specialists: z.array(CouncilResultSpecialistSchema).max(8),
+});
+export type CodeReviewCouncilResult = z.infer<typeof CodeReviewCouncilResultSchema>;
+
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
   focus_areas: z.array(z.string()),

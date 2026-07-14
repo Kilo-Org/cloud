@@ -79,6 +79,8 @@ type Transport = {
   send?: (payload: TransportSendInput) => Promise<unknown>;
   canSend?: () => boolean;
   retryRemoteModels?: () => void;
+  /** Re-discover the remote slash command catalog for the current owner. No-op when no owner is known or a request is already in flight. */
+  retryRemoteCommands?: () => void;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;

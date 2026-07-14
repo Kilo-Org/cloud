@@ -3,12 +3,14 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
+import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import {
   cliConnectionDataSchema,
   heartbeatDataSchema,
   remoteModelCatalogV1Schema,
   sessionsListDataSchema,
 } from './schemas';
+import type { SlashCommandInfo } from './schemas';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { TransportFactory, TransportSendInput, TransportSink } from './transport';
 import type { KiloSessionId, SessionSnapshot } from './types';
@@ -24,6 +26,7 @@ type CliLiveTransportConfig = {
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onError?: (message: string) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
 };
 
@@ -31,6 +34,22 @@ type CliLiveTransportConfig = {
 // the session store's persistence lag behind the live stream; bump if holes
 // still appear after long backgrounding.
 const RECONNECT_RESYNC_DELAY_MS = 5000;
+
+/**
+ * Deep-copy a list of validated remote slash commands.
+ *
+ * Creates a new outer array, new command objects, and new hints arrays
+ * so each emitted snapshot (event, internal cache, state callback) is
+ * independent. Optional string/boolean fields are spread verbatim; the
+ * schema has already validated them. Avoids `JSON.parse(JSON.stringify(...))`
+ * because the shape is known and bounded.
+ */
+export function deepCopyCommands(commands: SlashCommandInfo[]): SlashCommandInfo[] {
+  return commands.map(command => ({
+    ...command,
+    hints: command.hints.slice(),
+  }));
+}
 
 function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactory {
   return (sink: TransportSink) => {
@@ -41,31 +60,81 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     let lastForwardedHeartbeatStatus: string | null = null;
     let catalogRequestGeneration = 0;
     let catalogRequestInFlight: { ownerConnectionId: string; generation: number } | null = null;
+    // Command catalog discovery runs on its own generation so it stays
+    // independent of model discovery: a model refresh that completes or
+    // fails must not drop an in-flight command catalog request.
+    let commandCatalogRequestGeneration = 0;
+    let commandCatalogRequestInFlight: {
+      ownerConnectionId: string;
+      generation: number;
+    } | null = null;
     let remoteModelState: RemoteModelState = {
       ownerConnectionId: null,
       protocol: 'unknown',
       refresh: 'idle',
     };
-
+    // Last successfully parsed remote command catalog, deep-copied on
+    // every publish so later mutation of consumer-held arrays, command
+    // objects, or nested hints cannot corrupt prior state history.
+    let lastValidCommands: SlashCommandInfo[] = [];
     function publishRemoteModelState(next: RemoteModelState): void {
       remoteModelState = next;
       config.onRemoteModelStateChange?.(next);
     }
 
+    function publishRemoteCommandState(next: RemoteCommandState): void {
+      config.onRemoteCommandStateChange?.(next);
+    }
+
+    function publishCommands(commands: SlashCommandInfo[]): void {
+      // Deep copy the array, every command object, and every hints array
+      // so the event payload, the internal cache, and every subsequent
+      // state callback each hold an independent snapshot.
+      const snapshotted = deepCopyCommands(commands);
+      lastValidCommands = snapshotted;
+      sink.onServiceEvent({ type: 'commands.available', commands: deepCopyCommands(snapshotted) });
+    }
+
+    function snapshotCommands(): SlashCommandInfo[] {
+      return deepCopyCommands(lastValidCommands);
+    }
+
     function setOwnerConnectionId(nextOwnerConnectionId: string | null): void {
       if (ownerConnectionId === nextOwnerConnectionId) return;
 
+      const previousOwnerConnectionId = ownerConnectionId;
       ownerConnectionId = nextOwnerConnectionId;
       catalogRequestGeneration += 1;
       catalogRequestInFlight = null;
+      commandCatalogRequestGeneration += 1;
+      commandCatalogRequestInFlight = null;
       publishRemoteModelState({
         ownerConnectionId: nextOwnerConnectionId,
         protocol: 'unknown',
         refresh: nextOwnerConnectionId ? 'loading' : 'idle',
       });
+      // Owner replacement clears the command cache; emit an empty catalog
+      // event and the matching idle state so consumers can re-render.
+      if (previousOwnerConnectionId) {
+        publishCommands([]);
+        publishRemoteCommandState({
+          ownerConnectionId: nextOwnerConnectionId,
+          refresh: 'idle',
+          commands: snapshotCommands(),
+        });
+      } else {
+        publishRemoteCommandState({
+          ownerConnectionId: nextOwnerConnectionId,
+          refresh: 'idle',
+          commands: snapshotCommands(),
+        });
+      }
       config.onCapabilityChange?.();
 
-      if (nextOwnerConnectionId) discoverModels(nextOwnerConnectionId);
+      if (nextOwnerConnectionId) {
+        discoverModels(nextOwnerConnectionId);
+        discoverCommands(nextOwnerConnectionId);
+      }
     }
 
     function handleCatalogFailure(
@@ -168,6 +237,146 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .finally(() => {
           if (catalogRequestInFlight?.generation === expectedRequestGeneration) {
             catalogRequestInFlight = null;
+          }
+        });
+    }
+
+    function handleCommandCatalogFailure(
+      error: unknown,
+      expectedOwnerConnectionId: string,
+      expectedGeneration: number,
+      expectedRequestGeneration: number,
+      clearCatalog: boolean
+    ): void {
+      if (
+        expectedGeneration !== generation ||
+        expectedRequestGeneration !== commandCatalogRequestGeneration ||
+        ownerConnectionId !== expectedOwnerConnectionId
+      ) {
+        return;
+      }
+
+      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
+        setOwnerConnectionId(null);
+        return;
+      }
+
+      // Exact relay `CLI_UPGRADE_REQUIRED` is non-fatal: clear the catalog
+      // and surface actionable copy through the command state so the chat
+      // composer can prompt the user to upgrade. Never populate the global
+      // session error atom for this.
+      if (error instanceof UserWebCommandError && error.code === 'CLI_UPGRADE_REQUIRED') {
+        publishCommands([]);
+        publishRemoteCommandState({
+          ownerConnectionId: expectedOwnerConnectionId,
+          refresh: 'upgrade-required',
+          commands: snapshotCommands(),
+          message: error.message,
+        });
+        return;
+      }
+
+      // Legacy CLI without `list_commands` support: treat as "no commands
+      // available" rather than a failure so the composer can hide suggestions.
+      if (error instanceof Error && error.message.includes('unknown command')) {
+        publishCommands([]);
+        publishRemoteCommandState({
+          ownerConnectionId: expectedOwnerConnectionId,
+          refresh: 'idle',
+          commands: snapshotCommands(),
+        });
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : 'Failed to discover remote commands';
+      if (clearCatalog) {
+        publishCommands([]);
+        publishRemoteCommandState({
+          ownerConnectionId: expectedOwnerConnectionId,
+          refresh: 'error',
+          commands: snapshotCommands(),
+          message,
+        });
+        return;
+      }
+      // Transient failure on a same-owner refresh: keep the previously
+      // published catalog and report the error through state without
+      // populating the fatal session error atom.
+      publishRemoteCommandState({
+        ownerConnectionId: expectedOwnerConnectionId,
+        refresh: 'error',
+        commands: snapshotCommands(),
+        message,
+      });
+    }
+
+    function discoverCommands(expectedOwnerConnectionId: string): void {
+      if (commandCatalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
+
+      commandCatalogRequestGeneration += 1;
+      const expectedRequestGeneration = commandCatalogRequestGeneration;
+      const expectedGeneration = generation;
+      commandCatalogRequestInFlight = {
+        ownerConnectionId: expectedOwnerConnectionId,
+        generation: expectedRequestGeneration,
+      };
+      publishRemoteCommandState({
+        ownerConnectionId: expectedOwnerConnectionId,
+        refresh: 'loading',
+        commands: snapshotCommands(),
+      });
+
+      void config.userWebConnection
+        .sendCommand(
+          config.kiloSessionId,
+          'list_commands',
+          { protocolVersion: 1 },
+          expectedOwnerConnectionId
+        )
+        .then(
+          result => {
+            if (
+              expectedGeneration !== generation ||
+              expectedRequestGeneration !== commandCatalogRequestGeneration ||
+              ownerConnectionId !== expectedOwnerConnectionId
+            ) {
+              return;
+            }
+
+            const parsed = parseRemoteCommandCatalog(result);
+            if (!parsed.ok) {
+              handleCommandCatalogFailure(
+                new Error('Invalid remote command catalog'),
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration,
+                true
+              );
+              return;
+            }
+
+            publishCommands(parsed.commands);
+            publishRemoteCommandState({
+              ownerConnectionId: expectedOwnerConnectionId,
+              refresh: 'idle',
+              commands: snapshotCommands(),
+            });
+          },
+          error =>
+            handleCommandCatalogFailure(
+              error,
+              expectedOwnerConnectionId,
+              expectedGeneration,
+              expectedRequestGeneration,
+              // A relay `CATALOG_TOO_LARGE` reports the response is over
+              // the 512 KiB size cap; clear the prior catalog so the
+              // composer can present a clean state.
+              error instanceof UserWebCommandError && error.code === 'CATALOG_TOO_LARGE'
+            )
+        )
+        .finally(() => {
+          if (commandCatalogRequestInFlight?.generation === expectedRequestGeneration) {
+            commandCatalogRequestInFlight = null;
           }
         });
     }
@@ -357,10 +566,17 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         lastForwardedHeartbeatStatus = null;
         catalogRequestGeneration += 1;
         catalogRequestInFlight = null;
+        commandCatalogRequestGeneration += 1;
+        commandCatalogRequestInFlight = null;
         publishRemoteModelState({
           ownerConnectionId: null,
           protocol: 'unknown',
           refresh: 'idle',
+        });
+        publishRemoteCommandState({
+          ownerConnectionId: null,
+          refresh: 'idle',
+          commands: snapshotCommands(),
         });
         config.onCapabilityChange?.();
         let resyncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -457,7 +673,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             resyncTimer = null;
             replayCurrentSnapshot(false);
           }, RECONNECT_RESYNC_DELAY_MS);
-          if (ownerConnectionId) discoverModels(ownerConnectionId);
+          if (ownerConnectionId) {
+            discoverModels(ownerConnectionId);
+            discoverCommands(ownerConnectionId);
+          }
         });
         const releaseSubscription = config.userWebConnection.subscribeToCliSession(
           config.kiloSessionId
@@ -478,11 +697,39 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       retryRemoteModels: () => {
         if (ownerConnectionId) discoverModels(ownerConnectionId);
       },
+      retryRemoteCommands: () => {
+        // Mirrors `retryRemoteModels`: only acts when an owner is known.
+        // `discoverCommands` itself deduplicates in-flight requests per
+        // owner, so duplicate retry calls collapse safely.
+        if (ownerConnectionId) discoverCommands(ownerConnectionId);
+      },
       send: async (input: TransportSendInput) => {
         if (input.payload.type === 'command') {
-          return Promise.reject(
-            new Error('Slash commands are not supported on the CLI live transport yet')
-          );
+          const remoteModel = getRemoteModelFields(input);
+          return sendCommand('send_command', {
+            protocolVersion: 1,
+            command: input.payload.command,
+            arguments: input.payload.arguments,
+            ...(input.messageId ? { messageID: input.messageId } : {}),
+            ...(remoteModel.kind === 'none'
+              ? {}
+              : {
+                  // `send_command` requires a structured model: never emit a
+                  // bare string. Legacy CLI overrides arrive as a bare
+                  // model string; map them to the kilo provider and strip
+                  // any `kilo/` prefix so the wire modelID matches what
+                  // `dispatchedKilocodeModelId` would emit for the
+                  // equivalent prompt wire.
+                  model:
+                    remoteModel.kind === 'structured'
+                      ? remoteModel.model
+                      : {
+                          providerID: 'kilo',
+                          modelID: remoteModel.model.replace(/^kilo\//, ''),
+                        },
+                  ...(remoteModel.variant ? { variant: remoteModel.variant } : {}),
+                }),
+          });
         }
         const payload = input.payload;
         const remoteModel = getRemoteModelFields(input);

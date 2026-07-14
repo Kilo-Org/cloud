@@ -333,6 +333,68 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
 });
 export type RemoteModelCatalogV1 = z.output<typeof remoteModelCatalogV1Schema>;
 
+// ---------------------------------------------------------------------------
+// Remote CLI command catalog
+// ---------------------------------------------------------------------------
+
+export const REMOTE_COMMAND_MAX_COMMANDS = 256;
+export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
+export const REMOTE_COMMAND_MAX_HINTS = 32;
+export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
+
+const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
+const remoteSlashCommandInfoSchema = z
+  .object({
+    name: remoteCommandStringSchema.min(1),
+    description: remoteCommandStringSchema.optional(),
+    agent: remoteCommandStringSchema.optional(),
+    model: remoteCommandStringSchema.optional(),
+    source: z.enum(['command', 'mcp', 'skill']).optional(),
+    hints: z.array(remoteCommandStringSchema).max(REMOTE_COMMAND_MAX_HINTS),
+    subtask: z.boolean().optional(),
+  })
+  .strict();
+
+export const remoteCommandCatalogV1Schema = z
+  .object({
+    protocolVersion: z.literal(1),
+    commands: z.array(remoteSlashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const seenNames = new Set<string>();
+    for (const [commandIndex, command] of catalog.commands.entries()) {
+      if (seenNames.has(command.name)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Command name must be unique',
+          path: ['commands', commandIndex, 'name'],
+        });
+        continue;
+      }
+      seenNames.add(command.name);
+    }
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(catalog)).byteLength;
+    if (serializedBytes > REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES) {
+      context.addIssue({
+        code: 'custom',
+        message: `Catalog cannot exceed ${REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES} serialized bytes`,
+      });
+    }
+  })
+  .transform(catalog => ({
+    protocolVersion: 1 as const,
+    commands: catalog.commands
+      .filter(command => command.source !== 'skill')
+      // SlashCommandInfo requires a `hints` array; remote commands with no
+      // hints still have an empty array after the strict shape parse above.
+      .map(command => ({
+        ...command,
+        hints: command.hints,
+      })),
+  }));
+export type RemoteCommandCatalogV1 = z.output<typeof remoteCommandCatalogV1Schema>;
+
 export const userWebCommandErrorDataSchema = z
   .object({
     source: z.literal('relay'),

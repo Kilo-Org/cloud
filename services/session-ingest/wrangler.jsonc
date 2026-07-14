@@ -22,7 +22,7 @@
   },
   "vars": {
     "DIRECT_INGEST_PERCENT": "0",
-    "DIRECT_INGEST_USER_IDS": "",
+    "DIRECT_INGEST_USER_IDS": "f1a848ca-bade-48d8-a5ad-1042d08651e6",
     "DIRECT_INGEST_MAX_BYTES": "4194304",
   },
   "observability": {

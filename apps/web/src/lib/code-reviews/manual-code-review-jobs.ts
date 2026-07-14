@@ -13,6 +13,11 @@ import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
 } from '@/lib/agent-config/core/types';
+import {
+  COUNCIL_MIN_SPECIALISTS,
+  enabledSpecialists,
+  isCouncilActive,
+} from '@kilocode/worker-utils/code-review-council';
 import { assertCouncilCreationAllowed } from './core/council-entitlement';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
@@ -161,7 +166,25 @@ export async function createManualCodeReviewJob(params: {
   const localMode = isLocalCodeReviewDevelopmentEnabled();
   const outputMode: ManualCodeReviewConfig['outputMode'] = localMode ? 'kilo' : 'provider';
   const instructions = normalizeManualInstructions(input.instructions);
-  const reviewType: CodeReviewType = input.council ? 'council' : 'standard';
+
+  // Reject an enabled council that is under the specialist minimum, so a request can't be
+  // stamped/charged as a council yet be unable to behave as one. (`council: {}` parses to
+  // an enabled council with zero specialists.)
+  if (
+    input.council?.enabled &&
+    enabledSpecialists(input.council).length < COUNCIL_MIN_SPECIALISTS
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `A council review requires at least ${COUNCIL_MIN_SPECIALISTS} specialists.`,
+    });
+  }
+
+  // Derive the run type from the canonical predicate, not mere presence — a disabled or
+  // empty council is a standard run. This keeps review_type, the entitlement charge, and
+  // actual council behavior (isCouncilActive) in agreement.
+  const councilActive = isCouncilActive(input.council);
+  const reviewType: CodeReviewType = councilActive ? 'council' : 'standard';
 
   // Fail fast on entitlement before doing any provider/network work. The creation
   // boundary (`createCodeReview`) enforces this too, but checking here avoids resolving
@@ -173,7 +196,8 @@ export async function createManualCodeReviewJob(params: {
     platform,
     modelSlug: input.modelSlug,
     thinkingEffort: input.thinkingEffort ?? null,
-    council: input.council ?? null,
+    // Only persist the council config for an actual council run; a standard run clears it.
+    council: councilActive ? (input.council ?? null) : null,
   });
 
   const source = localMode

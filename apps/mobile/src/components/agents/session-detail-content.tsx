@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ChatComposer } from '@/components/agents/chat-composer';
-import { createRemoteSessionWithFeedback } from '@/components/agents/create-remote-session-with-feedback';
+import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -402,19 +402,26 @@ export function SessionDetailContent({
   );
 
   const handleCreateSession = useCallback(async () => {
-    // createRemoteSession is a hard-reject operation: no auto-retry. The helper
-    // surfaces exactly one actionable toast on failure and returns a boolean
-    // so the composer can preserve the draft without emitting a second toast.
-    // No navigation is performed here — the new session is surfaced through the
-    // same session detail flow in a follow-up slice.
-    const result = await createRemoteSessionWithFeedback(
-      manager.createRemoteSession.bind(manager),
-      message => {
+    // The orchestrator surfaces exactly one actionable toast on failure and
+    // calls `router.replace` to the new session route on success — the
+    // route-keyed `AgentSessionProvider` creates a fresh manager for the new
+    // id, so we deliberately do not `manager.switchSession()` here. The
+    // resolve order (replace → resolve) is what makes the composer's
+    // "accepted" signal fire only after navigation has been initiated, so
+    // the draft is cleared exactly when the new route is being pushed.
+    // No cache mutation: the destination route fetches its own session
+    // via trpc, the active-sessions poll picks up the new id on its next
+    // tick, and the agents tab refetches on focus.
+    const result = await createAndNavigateAgentSession({
+      create: manager.createRemoteSession.bind(manager),
+      router,
+      organizationId,
+      onError: message => {
         toast.error(message);
-      }
-    );
+      },
+    });
     return result.success;
-  }, [manager]);
+  }, [manager, router, organizationId]);
 
   return (
     <View className="flex-1 bg-background">

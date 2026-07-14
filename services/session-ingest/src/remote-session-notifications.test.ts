@@ -15,13 +15,29 @@ function needsInputSignal(): AttentionSignal {
 }
 
 describe('isEligibleForRemoteSessionAttention', () => {
-  it('is eligible for a root session', () => {
-    expect(isEligibleForRemoteSessionAttention({ parentSessionId: null })).toBe(true);
+  it.each(['vscode', 'agent-manager'])('is eligible for a root %s session', createdOnPlatform => {
+    expect(isEligibleForRemoteSessionAttention({ parentSessionId: null, createdOnPlatform })).toBe(
+      true
+    );
   });
 
   it('is not eligible for a child session', () => {
-    expect(isEligibleForRemoteSessionAttention({ parentSessionId: 'parent-1' })).toBe(false);
+    expect(
+      isEligibleForRemoteSessionAttention({
+        parentSessionId: 'parent-1',
+        createdOnPlatform: 'vscode',
+      })
+    ).toBe(false);
   });
+
+  it.each([null, 'cli', 'cloud-agent-web'])(
+    'is not eligible for a root session created on %s',
+    createdOnPlatform => {
+      expect(
+        isEligibleForRemoteSessionAttention({ parentSessionId: null, createdOnPlatform })
+      ).toBe(false);
+    }
+  );
 });
 
 describe('buildRemoteSessionAttentionPushBody', () => {

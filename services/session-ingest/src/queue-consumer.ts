@@ -80,6 +80,7 @@ async function processMessage(
 type IngestSessionRow = {
   session_id: string;
   parent_session_id: string | null;
+  created_on_platform: string | null;
 };
 
 /**
@@ -98,6 +99,7 @@ async function loadSessionOrCleanupStaging(
     .select({
       session_id: cli_sessions_v2.session_id,
       parent_session_id: cli_sessions_v2.parent_session_id,
+      created_on_platform: cli_sessions_v2.created_on_platform,
     })
     .from(cli_sessions_v2)
     .where(
@@ -310,12 +312,14 @@ function scheduleAttentionSignalDispatch(
   if (
     !isEligibleForRemoteSessionAttention({
       parentSessionId: sessionRow.parent_session_id,
+      createdOnPlatform: sessionRow.created_on_platform,
     })
   ) {
     console.log('Skipping attention signal dispatch (ineligible session)', {
       sessionId: msg.sessionId,
       kiloUserId: msg.kiloUserId,
       parentSessionId: sessionRow.parent_session_id,
+      createdOnPlatform: sessionRow.created_on_platform,
       signalCount: signals.length,
     });
     return;

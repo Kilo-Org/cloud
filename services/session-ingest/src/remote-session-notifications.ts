@@ -6,11 +6,18 @@ import type { AttentionSignal } from './dos/session-ingest-attention';
 
 export type RemoteSessionInfo = {
   parentSessionId: string | null;
+  createdOnPlatform: string | null;
 };
 
-/** Only root sessions (no parent) can be eligible for attention pushes. */
+const REMOTE_SESSION_PLATFORMS = new Set(['vscode', 'agent-manager']);
+
+/** Only remotely controlled root sessions can be eligible for attention pushes. */
 export function isEligibleForRemoteSessionAttention(session: RemoteSessionInfo): boolean {
-  return session.parentSessionId === null;
+  return (
+    session.parentSessionId === null &&
+    session.createdOnPlatform !== null &&
+    REMOTE_SESSION_PLATFORMS.has(session.createdOnPlatform)
+  );
 }
 
 const NEEDS_INPUT_BODY = 'Kilo needs your input.';

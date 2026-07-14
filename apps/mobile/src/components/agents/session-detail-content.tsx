@@ -15,7 +15,10 @@ import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-sel
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
-import { getContextSheetMountState } from '@/components/agents/context-usage-display';
+import {
+  type ContextSheetIdentity,
+  getContextSheetMountState,
+} from '@/components/agents/context-usage-display';
 import {
   SessionContextCostFallback,
   SessionContextMetrics,
@@ -107,7 +110,8 @@ export function SessionDetailContent({
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
-  const [isContextSheetOpen, setContextSheetOpen] = useState(false);
+  const [openContextSheetIdentity, setOpenContextSheetIdentity] =
+    useState<ContextSheetIdentity | null>(null);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -156,13 +160,17 @@ export function SessionDetailContent({
     }
     const match = sessionModels.options.find(
       option =>
-        option.modelRef !== undefined &&
-        option.modelRef.providerID === contextInfo.providerID &&
-        option.modelRef.modelID === contextInfo.modelID
+        (option.modelRef?.providerID === contextInfo.providerID &&
+          option.modelRef.modelID === contextInfo.modelID) ||
+        (contextInfo.providerID === 'kilo' &&
+          option.showGatewayMetadata &&
+          option.id === contextInfo.modelID)
     );
     return {
       model: match?.name ?? match?.displayId ?? contextInfo.modelID,
-      provider: match?.provider?.name ?? contextInfo.providerID,
+      provider:
+        match?.provider?.name ??
+        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
     };
   }, [contextInfo, sessionModels.options]);
   const headerRight = contextInfo ? (
@@ -170,13 +178,21 @@ export function SessionDetailContent({
       info={contextInfo}
       totalCost={totalCost}
       onPress={() => {
-        setContextSheetOpen(true);
+        setOpenContextSheetIdentity({
+          sessionId,
+          providerID: contextInfo.providerID,
+          modelID: contextInfo.modelID,
+        });
       }}
     />
   ) : (
     <SessionContextCostFallback totalCost={totalCost} />
   );
-  const sheetMountState = getContextSheetMountState(contextInfo, isContextSheetOpen);
+  const sheetMountState = getContextSheetMountState(
+    contextInfo,
+    openContextSheetIdentity,
+    sessionId
+  );
   const catalogGenerationIdentity =
     remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
   const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
@@ -240,6 +256,21 @@ export function SessionDetailContent({
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  useEffect(() => {
+    setOpenContextSheetIdentity(openIdentity => {
+      if (
+        !openIdentity ||
+        (contextInfo &&
+          openIdentity.sessionId === sessionId &&
+          openIdentity.providerID === contextInfo.providerID &&
+          openIdentity.modelID === contextInfo.modelID)
+      ) {
+        return openIdentity;
+      }
+      return null;
+    });
+  }, [contextInfo, sessionId]);
 
   useEffect(() => {
     if (
@@ -446,7 +477,7 @@ export function SessionDetailContent({
           providerDisplay={contextModelAndProvider.provider}
           totalCost={totalCost}
           onClose={() => {
-            setContextSheetOpen(false);
+            setOpenContextSheetIdentity(null);
           }}
         />
       ) : null}

@@ -45,7 +45,6 @@ function createContextLengthIndex(): ContextLengthIndex {
 }
 
 function isRecordable(option: SessionModelOption): option is SessionModelOption & {
-  modelRef: NonNullable<SessionModelOption['modelRef']>;
   contextWindow: number;
 } {
   if (option.unavailable) {
@@ -55,9 +54,6 @@ function isRecordable(option: SessionModelOption): option is SessionModelOption 
     return false;
   }
   if (!isFinitePositive(option.contextWindow)) {
-    return false;
-  }
-  if (!option.modelRef) {
     return false;
   }
   return true;
@@ -71,16 +67,17 @@ function resolveContextWindow(
   const remoteIndices = new Map<string, ContextLengthIndex>();
 
   for (const option of options.filter(candidate => isRecordable(candidate))) {
-    const providerID = option.modelRef.providerID;
-    if (providerID === 'kilo') {
-      recordContextLength(kiloIndex, option.modelRef.modelID, option.contextWindow);
-    } else {
+    const providerID = option.modelRef?.providerID ?? (option.showGatewayMetadata ? 'kilo' : null);
+    const modelID = option.modelRef?.modelID ?? (option.showGatewayMetadata ? option.id : null);
+    if (providerID && modelID && providerID === 'kilo') {
+      recordContextLength(kiloIndex, modelID, option.contextWindow);
+    } else if (providerID && modelID) {
       let index = remoteIndices.get(providerID);
       if (!index) {
         index = createContextLengthIndex();
         remoteIndices.set(providerID, index);
       }
-      recordContextLength(index, option.modelRef.modelID, option.contextWindow);
+      recordContextLength(index, modelID, option.contextWindow);
     }
   }
 

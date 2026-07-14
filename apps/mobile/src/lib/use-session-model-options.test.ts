@@ -7,6 +7,7 @@ import {
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
 } from './hooks/use-session-model-options';
+import { buildModelPickerRows, modelPickerFavoriteId } from './model-picker-rows';
 import { resolveSessionContextInfo } from './session-context-info';
 
 const gatewayModels = [
@@ -449,6 +450,50 @@ describe('buildSessionModelOptions', () => {
 });
 
 describe('buildSessionModelOptions capacity projection', () => {
+  it('preserves Gateway picker grouping and favorite identity while projecting context capacity', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: {
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels: [
+        {
+          id: 'gateway/recommended',
+          name: 'Recommended',
+          variants: [],
+          isPreferred: true,
+          context_length: 200_000,
+        },
+        {
+          id: 'gateway/other',
+          name: 'Other',
+          variants: [],
+          isPreferred: false,
+          context_length: 32_000,
+        },
+      ],
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    const [gatewayOption] = result.options;
+    if (!gatewayOption) {
+      throw new Error('Expected a Gateway option');
+    }
+    expect(gatewayOption.provider).toBeUndefined();
+    expect(gatewayOption.modelRef).toBeUndefined();
+    expect(modelPickerFavoriteId(gatewayOption)).toBe('gateway/recommended');
+    expect(
+      buildModelPickerRows({ models: result.options, search: '', favoriteIds: new Set() })
+        .filter(row => row.type === 'header')
+        .map(row => row.title)
+    ).toEqual(['RECOMMENDED', 'ALL MODELS']);
+  });
+
   it('projects Cloud Agent Gateway context_length onto every option', () => {
     const result = buildSessionModelOptions({
       activeSessionType: 'cloud-agent',

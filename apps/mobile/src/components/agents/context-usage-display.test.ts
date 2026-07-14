@@ -10,7 +10,6 @@ import {
   formatRemainingTokens,
   getArcFraction,
   getContextSheetContent,
-  getContextSheetMountState,
   getContextTone,
   getHeaderSummary,
   getIndeterminateArcFraction,
@@ -313,22 +312,5 @@ describe('pure integration fallback', () => {
     // (no context control, no sheet) rather than an empty header.
     const summary = getHeaderSummary(undefined, 0.08);
     expect(summary).toBeNull();
-  });
-});
-
-describe('getContextSheetMountState', () => {
-  it('unmounts when there is no context info regardless of open state', () => {
-    expect(getContextSheetMountState(undefined, false)).toEqual({ mounted: false });
-    expect(getContextSheetMountState(undefined, true)).toEqual({ mounted: false });
-  });
-
-  it('mounts visible when context info exists and the sheet is open', () => {
-    const result = getContextSheetMountState(info({}), true);
-    expect(result).toEqual({ mounted: true, visible: true, info: info({}) });
-  });
-
-  it('mounts hidden when context info exists but the sheet is closed', () => {
-    const result = getContextSheetMountState(info({}), false);
-    expect(result).toEqual({ mounted: true, visible: false, info: info({}) });
   });
 });

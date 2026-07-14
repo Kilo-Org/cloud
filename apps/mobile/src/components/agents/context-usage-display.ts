@@ -172,6 +172,12 @@ type SheetMountState =
   | { mounted: false }
   | { mounted: true; visible: boolean; info: SessionContextInfo };
 
+export type ContextSheetIdentity = {
+  sessionId: string;
+  providerID: string;
+  modelID: string;
+};
+
 /**
  * Controls when the native Modal is mounted and when it is visible. Keeping
  * the sheet mounted while contextInfo exists lets `visible` transition from
@@ -179,10 +185,15 @@ type SheetMountState =
  */
 export function getContextSheetMountState(
   info: SessionContextInfo | undefined,
-  isOpen: boolean
+  openIdentity: ContextSheetIdentity | null,
+  sessionId: string
 ): SheetMountState {
   if (!info) {
     return { mounted: false };
   }
-  return { mounted: true, visible: isOpen, info };
+  const visible =
+    openIdentity?.sessionId === sessionId &&
+    openIdentity.providerID === info.providerID &&
+    openIdentity.modelID === info.modelID;
+  return { mounted: true, visible, info };
 }

@@ -269,8 +269,6 @@ function createGatewayOption(model: ModelOption): SessionModelOption {
     ...rest,
     displayId: model.id,
     contextWindow: model.context_length ?? undefined,
-    provider: { id: 'kilo', name: 'Kilo' },
-    modelRef: { providerID: 'kilo', modelID: model.id },
     showGatewayMetadata: true,
   };
 }

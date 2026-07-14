@@ -16,7 +16,6 @@ function gatewayOption(partial: {
     variants: [],
     isPreferred: false,
     showGatewayMetadata: !partial.unavailable,
-    modelRef: { providerID: 'kilo', modelID: partial.id },
     ...(partial.unavailable ? { unavailable: true } : {}),
     ...(partial.contextWindow !== undefined ? { contextWindow: partial.contextWindow } : {}),
   };

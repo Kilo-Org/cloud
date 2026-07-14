@@ -64,11 +64,7 @@ export function SessionContextSheet({
             them behind a single ScrollView accessibilityLabel would shadow the
             natural read order. */}
         <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-          <View
-            className="items-center gap-3 pt-2"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          >
+          <View className="items-center gap-3 pt-2">
             <ContextUsageRing
               size={SHEET_RING_SIZE}
               strokeWidth={SHEET_RING_STROKE}

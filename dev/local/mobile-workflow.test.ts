@@ -19,6 +19,30 @@ test('login waits for the delayed Expo developer menu after launching Kilo', () 
   assert.match(flow.slice(optionalWaitIndex, continueIndex), /optional: true/);
 });
 
+test('shared launch flows close the Expo developer menu after its introduction', () => {
+  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+
+  for (const flowPath of [
+    'apps/mobile/e2e/flows/open-app.yaml',
+    'apps/mobile/e2e/flows/settle-app.yaml',
+  ]) {
+    const flow = fs.readFileSync(flowPath, 'utf8');
+    const continueIndex = flow.indexOf("tapOn: 'Continue'");
+    const closeGuardIndex = flow.indexOf("visible: 'Fast Refresh|Element Inspector'", continueIndex);
+    const closeIndex = flow.indexOf("tapOn: 'Close'", closeGuardIndex);
+
+    assert.ok(continueIndex >= 0, `${flowPath} should accept the developer-menu introduction`);
+    assert.ok(closeGuardIndex > continueIndex, `${flowPath} should detect the opened menu`);
+    assert.ok(closeIndex > closeGuardIndex, `${flowPath} should close the opened menu`);
+    assert.doesNotMatch(flow, /when:\n\s+visible: 'Close'/);
+  }
+
+  assert.match(
+    runbook,
+    /developer menu containing Fast Refresh and Element Inspector with its `Close` accessibility action/
+  );
+});
+
 test('login flows never use an unidentified generic Allow selector', () => {
   const request = fs.readFileSync('apps/mobile/e2e/flows/login-request-code.yaml', 'utf8');
   const openApp = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
@@ -37,6 +61,21 @@ test('login verification does not pay a fixed optional notification wait', () =>
 test('login request establishes a signed-out baseline before requesting a fresh OTP', () => {
   const request = fs.readFileSync('apps/mobile/e2e/flows/login-request-code.yaml', 'utf8');
   assert.ok(request.indexOf('logout.yaml') < request.indexOf("tapOn: 'Send sign-in code'"));
+});
+
+test('login retry resets an already-open verification screen to the email form', () => {
+  const logout = fs.readFileSync('apps/mobile/e2e/flows/logout.yaml', 'utf8');
+  const verificationIndex = logout.indexOf("visible: 'Verify code'");
+  const backIndex = logout.indexOf("tapOn: 'Back'", verificationIndex);
+  const signedOutGuardIndex = logout.indexOf(
+    "notVisible: 'Welcome to Kilo Code'",
+    verificationIndex
+  );
+
+  assert.ok(verificationIndex >= 0);
+  assert.ok(backIndex > verificationIndex);
+  assert.ok(signedOutGuardIndex > backIndex);
+  assert.match(logout, /assertVisible: 'you@example\.com'/);
 });
 
 test('login reuses the app state established by logout instead of relaunching each step', () => {
@@ -206,4 +245,30 @@ test('workflow documents the shared Docker proxy exception without weakening bac
   assert.match(runbook, /Never kill a `socat` process owned by another worktree/);
   assert.match(cli, /name === 'kiloclaw-docker-tcp'/);
   assert.match(cli, /Refusing to share occupied worktree service ports/);
+});
+
+test('mobile workflow owns PR assignment and the post-PR Kilobot repair loop', () => {
+  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
+
+  assert.match(workflow, /assign(?:s|ed)? the PR to the requesting human/i);
+  assert.match(workflow, /Kilobot has reviewed the latest head/i);
+  assert.match(workflow, /no unresolved actionable Kilobot comments/i);
+  assert.match(workflow, /plan the smallest coherent repair/i);
+  assert.match(workflow, /mobile-implementer/);
+  assert.match(workflow, /fresh `mobile-reviewer`/);
+  assert.match(workflow, /smallest coherent commit/i);
+  assert.match(workflow, /reply in the original review thread/i);
+  assert.match(workflow, /resolve the thread/i);
+  assert.match(workflow, /local mobile E2E/i);
+});
+
+test('mobile workflow keeps secret-bearing environment files out of subagent context', () => {
+  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
+  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+
+  assert.match(workflow, /must not read .*\.env/i);
+  assert.match(workflow, /\.dev\.vars/);
+  assert.match(workflow, /sanitized explicit values/i);
+  assert.doesNotMatch(runbook, /grep .*\.env/);
+  assert.match(runbook, /KILO_E2E_AUTH_TOKEN/);
 });

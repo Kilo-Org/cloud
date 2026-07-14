@@ -1,10 +1,10 @@
 appId: com.kilocode.kiloapp
 ---
 - extendedWaitUntil:
-    visible: 'Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    visible: 'Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
     timeout: 15000
 - extendedWaitUntil:
-    visible: 'Ask App Not to Track|This is the developer menu.*|“Kilo” Would Like to Send You Notifications'
+    visible: 'Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications'
     timeout: 3000
     optional: true
 - runFlow:
@@ -17,6 +17,11 @@ appId: com.kilocode.kiloapp
       visible: 'This is the developer menu.*'
     commands:
       - tapOn: 'Continue'
+- runFlow:
+    when:
+      visible: 'Fast Refresh|Element Inspector'
+    commands:
+      - tapOn: 'Close'
 - runFlow:
     when:
       visible: '“Kilo” Would Like to Send You Notifications'

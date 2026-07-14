@@ -85,7 +85,7 @@ xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
 
-Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The login helper dismisses the clean-install tracking alert and Expo dev-menu introduction when present.
+Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The shared launch flows dismiss the clean-install tracking alert, accept the Expo dev-menu introduction with `Continue`, and then close the full Expo/React Native developer menu containing Fast Refresh and Element Inspector with its `Close` accessibility action.
 
 ## Sign In and Out
 
@@ -148,23 +148,14 @@ Attach a screenshot of the changed flow to the PR when it helps review. For tran
 
 ## Remote CLI Session Flows
 
-Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. Install the CLI in a disposable directory, never globally:
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator must mint the user's local auth token and pass it as `KILO_E2E_AUTH_TOKEN`; role agents must not read environment files or receive `NEXTAUTH_SECRET`. Install the CLI in a disposable directory, never globally:
 
 ```bash
 CLI_SCRATCH=$(mktemp -d /tmp/kilo-cli.XXXXXX)
 npm install --prefix "$CLI_SCRATCH" @kilocode/cli
 E2E_EMAIL=${E2E_EMAIL:-e2e-mobile@example.com}
 USER_ID=$(pnpm -s dev:seed app:user-id "$E2E_EMAIL" --json | jq -r .userId)
-TOKEN=$(NEXTAUTH_SECRET=$(grep '^NEXTAUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"') \
-  USER_ID="$USER_ID" node -e '
-const crypto = require("crypto");
-const b64 = value => Buffer.from(JSON.stringify(value)).toString("base64url");
-const header = b64({ alg: "HS256", typ: "JWT" });
-const payload = b64({ kiloUserId: process.env.USER_ID, apiTokenPepper: null, version: 3 });
-const signature = crypto.createHmac("sha256", process.env.NEXTAUTH_SECRET)
-  .update(`${header}.${payload}`).digest("base64url");
-process.stdout.write(`${header}.${payload}.${signature}`);
-')
+TOKEN="${KILO_E2E_AUTH_TOKEN:?orchestrator must provide KILO_E2E_AUTH_TOKEN}"
 ```
 
 Do not print or log the token. Read the actual Next.js and session-ingest ports from `pnpm dev:status --json`, then run the CLI in its own tmux session:

@@ -76,7 +76,7 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('stealth/gpt-5.6-sol')).toBe(gpt_5_6_sol_stealth_model);
       expect(gpt_5_6_sol_stealth_model.internal_id).toBe('openai/gpt-5.6-sol:optimized');
       expect(gpt_5_6_sol_stealth_model.gateway).toBe('martian');
-      expect(getInferenceProvider(gpt_5_6_sol_stealth_model)).toBe('stealth');
+      expect(getInferenceProvider(gpt_5_6_sol_stealth_model)?.slug).toBe('stealth');
       expect(gpt_5_6_sol_stealth_model.pricing).toEqual([
         {
           start_context_length: 0,
@@ -102,7 +102,7 @@ describe('isFreeModel', () => {
     test('registers Muse Spark 1.1 through Vercel', () => {
       expect(findKiloExclusiveModel('meta/muse-spark-1.1')).toBe(muse_spark_1_1_model);
       expect(muse_spark_1_1_model.gateway).toBe('vercel');
-      expect(getInferenceProvider(muse_spark_1_1_model)).toBeNull();
+      expect(getInferenceProvider(muse_spark_1_1_model)?.slug).toBe('meta');
       expect(muse_spark_1_1_model.context_length).toBe(1_048_576);
       expect(muse_spark_1_1_model.pricing?.[0].pricing).toEqual({
         prompt_per_million: 1.25,

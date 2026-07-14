@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { withProcessLock } from './process-lock';
+
 type AndroidEnvironment = {
   adb: string;
   emulator: string;
@@ -20,6 +22,11 @@ type ResolveArgs = {
 };
 
 type DeviceClaim = { serial: string; worktreeRoot: string; claimedAt: string };
+type ClaimOptions = {
+  fileOperations?: {
+    readFileSync?: (filePath: string, encoding: 'utf8') => string;
+  };
+};
 
 function firstExisting(
   candidates: string[],
@@ -29,8 +36,9 @@ function firstExisting(
 }
 
 function resolveAndroidEnvironment(args: ResolveArgs): AndroidEnvironment {
-  const exists = args.existingPaths
-    ? (candidate: string) => args.existingPaths!.has(candidate)
+  const existingPaths = args.existingPaths;
+  const exists = existingPaths
+    ? (candidate: string) => existingPaths.has(candidate)
     : fs.existsSync;
   const sdkRoots = [
     process.env.ANDROID_HOME,
@@ -39,11 +47,9 @@ function resolveAndroidEnvironment(args: ResolveArgs): AndroidEnvironment {
     '/opt/homebrew/share/android-commandlinetools',
     '/usr/local/share/android-commandlinetools',
   ].filter((value): value is string => Boolean(value));
-  const sdkRoot = sdkRoots.find(root =>
-    firstExisting(
-      [path.join(root, 'platform-tools/adb'), path.join(root, 'emulator/emulator')],
-      exists
-    )
+  const sdkRoot = sdkRoots.find(
+    root =>
+      exists(path.join(root, 'platform-tools/adb')) && exists(path.join(root, 'emulator/emulator'))
   );
   if (!sdkRoot) {
     throw new Error(
@@ -51,8 +57,8 @@ function resolveAndroidEnvironment(args: ResolveArgs): AndroidEnvironment {
     );
   }
 
-  const adb = firstExisting([path.join(sdkRoot, 'platform-tools/adb')], exists);
-  const emulator = firstExisting([path.join(sdkRoot, 'emulator/emulator')], exists);
+  const adb = path.join(sdkRoot, 'platform-tools/adb');
+  const emulator = path.join(sdkRoot, 'emulator/emulator');
   const sdkmanager = firstExisting(
     [
       path.join(sdkRoot, 'cmdline-tools/latest/bin/sdkmanager'),
@@ -79,10 +85,7 @@ function resolveAndroidEnvironment(args: ResolveArgs): AndroidEnvironment {
     candidate => exists(path.join(candidate, 'bin/java')) && javaMajor(candidate) === 17
   );
 
-  const missing = [!adb && 'adb', !emulator && 'emulator', !javaHome && 'JDK 17'].filter(Boolean);
-  if (missing.length > 0) {
-    throw new Error(`Android tooling incomplete: missing ${missing.join(', ')}`);
-  }
+  if (!javaHome) throw new Error('Android tooling incomplete: missing JDK 17');
 
   const toolPaths = [
     path.join(sdkRoot, 'platform-tools'),
@@ -139,35 +142,49 @@ function claimPath(serial: string): string {
   );
 }
 
-function claimAndroidDevice(serial: string, worktreeRoot: string): DeviceClaim {
+function withClaimMutationLock<T>(filePath: string, mutate: () => T): T {
+  const lockFilePath = `${filePath}.lock`;
+  return withProcessLock(lockFilePath, `${path.basename(filePath, '.json')} claim`, mutate);
+}
+
+function claimAndroidDevice(
+  serial: string,
+  worktreeRoot: string,
+  options?: ClaimOptions
+): DeviceClaim {
   const filePath = claimPath(serial);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  try {
-    const claim = JSON.parse(fs.readFileSync(filePath, 'utf8')) as DeviceClaim;
-    if (claim.worktreeRoot === worktreeRoot) return claim;
-    if (fs.existsSync(claim.worktreeRoot))
-      throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
-    fs.rmSync(filePath, { force: true });
-  } catch (error) {
-    if (error instanceof SyntaxError) {
+  return withClaimMutationLock(filePath, () => {
+    try {
+      const readFileSync = options?.fileOperations?.readFileSync ?? fs.readFileSync;
+      const claim = JSON.parse(readFileSync(filePath, 'utf8')) as DeviceClaim;
+      if (claim.worktreeRoot === worktreeRoot) return claim;
+      if (fs.existsSync(claim.worktreeRoot))
+        throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
       fs.rmSync(filePath, { force: true });
-    } else if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      // Missing claims can be created atomically below.
-    } else if (error instanceof Error && error.message.includes(' is claimed by ')) {
-      throw error;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        fs.rmSync(filePath, { force: true });
+      } else if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        // Missing claims can be created atomically below.
+      } else if (error instanceof Error && error.message.includes(' is claimed by ')) {
+        throw error;
+      }
     }
-  }
-  const claim = { serial, worktreeRoot, claimedAt: new Date().toISOString() };
-  fs.writeFileSync(filePath, JSON.stringify(claim), { flag: 'wx' });
-  return claim;
+    const claim = { serial, worktreeRoot, claimedAt: new Date().toISOString() };
+    fs.writeFileSync(filePath, JSON.stringify(claim), { flag: 'wx' });
+    return claim;
+  });
 }
 
 function releaseAndroidDevice(serial: string, worktreeRoot: string): void {
   const filePath = claimPath(serial);
-  const claim = JSON.parse(fs.readFileSync(filePath, 'utf8')) as DeviceClaim;
-  if (claim.worktreeRoot !== worktreeRoot)
-    throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
-  fs.rmSync(filePath);
+  withClaimMutationLock(filePath, () => {
+    const claim = JSON.parse(fs.readFileSync(filePath, 'utf8')) as DeviceClaim;
+    if (claim.worktreeRoot !== worktreeRoot)
+      throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
+    fs.rmSync(filePath);
+  });
 }
 
 function main(): void {

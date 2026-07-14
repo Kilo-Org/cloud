@@ -3,30 +3,46 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { withProcessLock } from './process-lock';
+
 type SimulatorDevice = { id: string; name: string; state: string };
 type ClaimArgs = {
   devices: SimulatorDevice[];
   lockRoot: string;
   worktreeRoot: string;
   requestedId?: string;
+  prepare?: (device: SimulatorDevice) => void;
+  fileOperations?: {
+    readFileSync?: (filePath: string, encoding: 'utf8') => string;
+  };
 };
 
 function lockPath(lockRoot: string, deviceId: string): string {
   return path.join(lockRoot, `${deviceId}.json`);
 }
 
-function readOwner(lockRoot: string, deviceId: string): string | undefined {
+function readOwner(
+  lockRoot: string,
+  deviceId: string,
+  readFileSync: (filePath: string, encoding: 'utf8') => string = fs.readFileSync
+): string | undefined {
   try {
-    const claim = JSON.parse(fs.readFileSync(lockPath(lockRoot, deviceId), 'utf8')) as {
+    const claim = JSON.parse(readFileSync(lockPath(lockRoot, deviceId), 'utf8')) as {
       worktreeRoot?: string;
     };
     if (claim.worktreeRoot && fs.existsSync(claim.worktreeRoot)) return claim.worktreeRoot;
     fs.rmSync(lockPath(lockRoot, deviceId), { force: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined;
     fs.rmSync(lockPath(lockRoot, deviceId), { force: true });
-    // Missing or invalid claims are unowned.
+    // Invalid claims are unowned.
   }
   return undefined;
+}
+
+function withClaimMutationLock<T>(lockRoot: string, deviceId: string, mutate: () => T): T {
+  const mutationLockPath = `${lockPath(lockRoot, deviceId)}.lock`;
+  return withProcessLock(mutationLockPath, `Simulator ${deviceId} claim`, mutate);
 }
 
 function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwned: boolean } {
@@ -39,22 +55,51 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
     throw new Error(`Simulator ${requestedId ?? ''} is not available`.trim());
 
   for (const device of candidates) {
-    const owner = readOwner(lockRoot, device.id);
-    if (owner === worktreeRoot) return { device, alreadyOwned: true };
-    if (owner) {
-      if (requestedId) throw new Error(`Simulator ${device.id} is claimed by ${owner}`);
-      continue;
-    }
     try {
-      fs.writeFileSync(
-        lockPath(lockRoot, device.id),
-        JSON.stringify({ deviceId: device.id, worktreeRoot, claimedAt: new Date().toISOString() }),
-        { flag: 'wx' }
-      );
-      return { device, alreadyOwned: false };
+      const claim = withClaimMutationLock(lockRoot, device.id, () => {
+        const owner = readOwner(
+          lockRoot,
+          device.id,
+          args.fileOperations?.readFileSync ?? fs.readFileSync
+        );
+        if (owner === worktreeRoot) return { device, alreadyOwned: true };
+        if (owner) throw new Error(`Simulator ${device.id} is claimed by ${owner}`);
+        fs.writeFileSync(
+          lockPath(lockRoot, device.id),
+          JSON.stringify({
+            deviceId: device.id,
+            worktreeRoot,
+            claimedAt: new Date().toISOString(),
+          }),
+          { flag: 'wx' }
+        );
+        return { device, alreadyOwned: false };
+      });
+      try {
+        args.prepare?.(device);
+        return claim;
+      } catch (error) {
+        if (!claim.alreadyOwned) {
+          releaseSimulator({ deviceId: device.id, lockRoot, worktreeRoot });
+        }
+        throw error;
+      }
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
-        if (requestedId) throw new Error(`Simulator ${device.id} was claimed concurrently`);
+        if (requestedId) {
+          throw new Error(`Simulator ${device.id} was claimed concurrently`, { cause: error });
+        }
+        continue;
+      }
+      if (
+        error instanceof Error &&
+        error.message.includes(' claim is being updated concurrently')
+      ) {
+        if (requestedId) throw error;
+        continue;
+      }
+      if (error instanceof Error && error.message.includes(' is claimed by ')) {
+        if (requestedId) throw error;
         continue;
       }
       throw error;
@@ -68,11 +113,13 @@ function releaseSimulator(args: {
   lockRoot: string;
   worktreeRoot: string;
 }): void {
-  const owner = readOwner(args.lockRoot, args.deviceId);
-  if (owner && owner !== args.worktreeRoot) {
-    throw new Error(`Simulator ${args.deviceId} is claimed by ${owner}`);
-  }
-  fs.rmSync(lockPath(args.lockRoot, args.deviceId), { force: true });
+  withClaimMutationLock(args.lockRoot, args.deviceId, () => {
+    const owner = readOwner(args.lockRoot, args.deviceId);
+    if (owner && owner !== args.worktreeRoot) {
+      throw new Error(`Simulator ${args.deviceId} is claimed by ${owner}`);
+    }
+    fs.rmSync(lockPath(args.lockRoot, args.deviceId), { force: true });
+  });
 }
 
 function listIosDevices(): SimulatorDevice[] {
@@ -99,11 +146,12 @@ function main(): void {
       lockRoot,
       worktreeRoot,
       requestedId,
+      prepare: device => {
+        if (device.state === 'Booted') return;
+        execFileSync('xcrun', ['simctl', 'boot', device.id], { stdio: 'ignore' });
+        execFileSync('xcrun', ['simctl', 'bootstatus', device.id, '-b'], { stdio: 'inherit' });
+      },
     });
-    if (claim.device.state !== 'Booted') {
-      execFileSync('xcrun', ['simctl', 'boot', claim.device.id], { stdio: 'ignore' });
-      execFileSync('xcrun', ['simctl', 'bootstatus', claim.device.id, '-b'], { stdio: 'inherit' });
-    }
     console.log(JSON.stringify({ ...claim, worktreeRoot }));
     return;
   }

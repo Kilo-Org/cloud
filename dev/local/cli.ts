@@ -38,6 +38,7 @@ import {
   captureServicePane,
 } from './tmux';
 import { detectLanIp, prepareMobileEnvironment } from './mobile-env';
+import { probeDockerApi } from './docker-api-probe';
 import {
   findRepoRoot,
   startServiceInTmux,
@@ -189,7 +190,8 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     const service = getService(name);
     if (service.type !== 'infra' && service.port > 0 && (await probePort(service.port))) {
       if (name === 'kiloclaw-docker-tcp') {
-        reusedHostServices.add(name);
+        if (await probeDockerApi(service.port)) reusedHostServices.add(name);
+        else conflictingPorts.push(`${name}:${service.port}`);
       } else {
         conflictingPorts.push(`${name}:${service.port}`);
       }

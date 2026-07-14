@@ -6,6 +6,7 @@ import {
   computePortOffset,
   getAlwaysOnGroupIds,
   getService,
+  portOffset,
   resolveGroups,
   resolveSessionNextAuthUrl,
 } from './services';
@@ -71,15 +72,7 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.equal(service.group, 'auto-routing');
   assert.equal(service.type, 'worker');
   assert.equal(service.dir, 'services/auto-routing');
-  assert.equal(
-    service.port,
-    8810 +
-      computePortOffset({
-        explicit: process.env.KILO_PORT_OFFSET,
-        isPrimary: false,
-        slug: 'harden-mobile-agent-workflow',
-      })
-  );
+  assert.equal(service.port, 8810 + portOffset);
   assert.match(service.command.join(' '), /pnpm run dev/);
 
   const benchmark = getService('auto-routing-benchmark');

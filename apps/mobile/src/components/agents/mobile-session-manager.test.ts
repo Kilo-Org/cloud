@@ -23,6 +23,7 @@ const userWebConnection: UserWebConnection = {
   destroy: vi.fn(() => undefined),
   subscribeToCliSession: vi.fn(() => noCleanup),
   sendCommand: vi.fn(),
+  sendCommandToConnection: vi.fn(),
   onCliEvent: vi.fn(() => noCleanup),
   onSystemEvent: vi.fn(() => noCleanup),
   onReconnect: vi.fn(() => noCleanup),

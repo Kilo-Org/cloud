@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ChatComposer } from '@/components/agents/chat-composer';
+import { createRemoteSessionWithFeedback } from '@/components/agents/create-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -99,6 +100,8 @@ export function SessionDetailContent({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -380,6 +383,39 @@ export function SessionDetailContent({
     ]
   );
 
+  const handleSendCommand = useCallback(
+    async (command: string, argumentsText: string) => {
+      // Slash commands ride the same manager.send() pipeline. The manager
+      // resolves the active remoteModelOverride from its own store and is
+      // the sole transport-toast owner; we throw a stable error on a
+      // false return purely so the composer preserves the draft, and never
+      // emit a duplicate toast of our own.
+      const sent = await manager.send({
+        payload: { type: 'command', command, arguments: argumentsText },
+      });
+      if (!sent) {
+        throw new Error('Failed to send slash command');
+      }
+      return true;
+    },
+    [manager]
+  );
+
+  const handleCreateSession = useCallback(async () => {
+    // createRemoteSession is a hard-reject operation: no auto-retry. The helper
+    // surfaces exactly one actionable toast on failure and returns a boolean
+    // so the composer can preserve the draft without emitting a second toast.
+    // No navigation is performed here — the new session is surfaced through the
+    // same session detail flow in a follow-up slice.
+    const result = await createRemoteSessionWithFeedback(
+      manager.createRemoteSession.bind(manager),
+      message => {
+        toast.error(message);
+      }
+    );
+    return result.success;
+  }, [manager]);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -469,6 +505,8 @@ export function SessionDetailContent({
               >
                 <ChatComposer
                   onSend={handleSend}
+                  onSendCommand={handleSendCommand}
+                  onCreateSession={handleCreateSession}
                   onStop={handleStop}
                   disabled={isComposerDisabled}
                   isStreaming={isStreaming}
@@ -481,6 +519,9 @@ export function SessionDetailContent({
                   onModelSelect={handleModelSelect}
                   organizationId={organizationId}
                   attachmentsEnabled={supportsAttachments}
+                  activeSessionType={activeSessionType}
+                  commands={availableCommands}
+                  commandState={remoteCommandState}
                 />
               </ModelPickerSelectionScopeProvider>
             </>

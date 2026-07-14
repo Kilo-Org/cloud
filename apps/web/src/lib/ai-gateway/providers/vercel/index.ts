@@ -40,26 +40,6 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
-function hasOpenRouterExclusiveProviderOptions(request: GatewayRequest) {
-  // Vercel has options for disallowPromptTraining and zeroDataRetention
-  // but they are not enforced for BYOK requests, which is most requests,
-  // so we don't use them for now.
-  // https://vercel.com/docs/ai-gateway/security-and-compliance/disallow-prompt-training
-  if (request.body.provider?.data_collection === 'deny') {
-    console.debug('[hasOpenRouterExclusiveProviderOptions] has data_collection==deny');
-    return true;
-  }
-  if (request.body.provider?.zdr) {
-    console.debug('[hasOpenRouterExclusiveProviderOptions] has zdr');
-    return true;
-  }
-  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
-    console.debug('[hasOpenRouterExclusiveProviderOptions] has ignore');
-    return true;
-  }
-  return false;
-}
-
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
   vercelInferenceProviders: string[] | null
@@ -87,7 +67,7 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  if (hasOpenRouterExclusiveProviderOptions(request)) {
+  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       '[shouldRouteToVercel] not routing to Vercel because of unsupported provider options'
     );
@@ -140,7 +120,7 @@ function convertProviderOptions(requestToMutate: GatewayRequest): VercelProvider
       only: provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
-      disallowPromptTraining: provider?.data_collection === 'deny',
+      disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
     },
   };

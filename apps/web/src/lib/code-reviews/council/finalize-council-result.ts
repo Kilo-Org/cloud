@@ -27,11 +27,12 @@ export async function finalizeCouncilResultForReview(params: {
   const { review, lastAssistantMessageText } = params;
   try {
     if (review.review_type !== 'council') return;
-    const council = getManualCodeReviewConfig(review)?.agentConfig.council;
+    const agentConfig = getManualCodeReviewConfig(review)?.agentConfig;
+    const council = agentConfig?.council;
     if (!council) return;
 
     const members = enabledSpecialists(council);
-    const baseModel = getManualCodeReviewConfig(review)?.agentConfig.model_slug ?? null;
+    const baseModel = agentConfig.model_slug ?? null;
     const strategy = council.aggregation_strategy;
     const configuredIds = members.map(member => member.id);
     const capture = parseCouncilResultManifest(lastAssistantMessageText);

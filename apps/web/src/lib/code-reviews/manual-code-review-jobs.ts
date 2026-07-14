@@ -187,8 +187,10 @@ export async function createManualCodeReviewJob(params: {
   const reviewType: CodeReviewType = councilActive ? 'council' : 'standard';
 
   // Fail fast on entitlement before doing any provider/network work. The creation
-  // boundary (`createCodeReview`) enforces this too, but checking here avoids resolving
-  // the PR for a request that can never run.
+  // boundary (`createCodeReview`) re-checks this as the authoritative gate, so this repeats
+  // the entitlement lookup on the (rare, interactive, enterprise-only) council path. That
+  // redundancy is intentional: we prefer it over threading a "already authorized" bypass
+  // flag into `createCodeReview`, which would weaken the single security boundary.
   await assertCouncilCreationAllowed({ owner: params.owner, reviewType });
 
   const agentConfig = await buildManualAgentConfig({

@@ -7,7 +7,7 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import { gpt_5_6_sol_stealth_model } from './providers/openai';
+import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
 import { muse_spark_1_1_model } from './providers/meta';
 
 describe('isFreeModel', () => {

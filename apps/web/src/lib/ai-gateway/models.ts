@@ -28,11 +28,8 @@ import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gatewa
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import {
-  GPT_CURRENT_MODEL_ID,
-  gpt_5_6_sol_stealth_model,
-  isOpenAiModel,
-} from '@/lib/ai-gateway/providers/openai';
+import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import {

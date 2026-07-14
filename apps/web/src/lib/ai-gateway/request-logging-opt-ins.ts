@@ -69,7 +69,7 @@ export async function createRequestLoggingOptIn(
   entry: RequestLoggingOptIn
 ): Promise<'created' | 'duplicate' | 'full'> {
   const validated = RequestLoggingOptInSchema.parse(entry);
-  const result = await redisClient.eval<number>(
+  const result = await redisClient.eval<[string], number>(
     CREATE_OPT_IN_SCRIPT,
     [REQUEST_LOGGING_OPT_INS_REDIS_KEY],
     [JSON.stringify(validated)]
@@ -80,7 +80,7 @@ export async function createRequestLoggingOptIn(
 }
 
 export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
-  const result = await redisClient.eval<number>(
+  const result = await redisClient.eval<[string], number>(
     DELETE_OPT_IN_SCRIPT,
     [REQUEST_LOGGING_OPT_INS_REDIS_KEY],
     [id]

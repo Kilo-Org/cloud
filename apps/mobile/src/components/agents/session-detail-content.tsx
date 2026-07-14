@@ -15,6 +15,12 @@ import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-sel
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
+import { getContextSheetMountState } from '@/components/agents/context-usage-display';
+import {
+  SessionContextCostFallback,
+  SessionContextMetrics,
+} from '@/components/agents/session-context-metrics';
+import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import {
@@ -51,6 +57,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
   type ModelPickerSelection,
@@ -99,6 +106,8 @@ export function SessionDetailContent({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const contextUsage = useAtomValue(manager.atoms.contextUsage);
+  const [isContextSheetOpen, setContextSheetOpen] = useState(false);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -137,6 +146,37 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
+  const contextInfo = useMemo(
+    () => resolveSessionContextInfo(contextUsage, sessionModels.options),
+    [contextUsage, sessionModels.options]
+  );
+  const contextModelAndProvider = useMemo(() => {
+    if (!contextInfo) {
+      return { model: '', provider: '' };
+    }
+    const match = sessionModels.options.find(
+      option =>
+        option.modelRef !== undefined &&
+        option.modelRef.providerID === contextInfo.providerID &&
+        option.modelRef.modelID === contextInfo.modelID
+    );
+    return {
+      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
+      provider: match?.provider?.name ?? contextInfo.providerID,
+    };
+  }, [contextInfo, sessionModels.options]);
+  const headerRight = contextInfo ? (
+    <SessionContextMetrics
+      info={contextInfo}
+      totalCost={totalCost}
+      onPress={() => {
+        setContextSheetOpen(true);
+      }}
+    />
+  ) : (
+    <SessionContextCostFallback totalCost={totalCost} />
+  );
+  const sheetMountState = getContextSheetMountState(contextInfo, isContextSheetOpen);
   const catalogGenerationIdentity =
     remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
   const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
@@ -382,14 +422,7 @@ export function SessionDetailContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={title}
-        headerRight={
-          totalCost > 0 ? (
-            <Text className="text-sm text-muted-foreground">${totalCost.toFixed(4)}</Text>
-          ) : undefined
-        }
-      />
+      <ScreenHeader title={title} headerRight={headerRight} />
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -404,6 +437,19 @@ export function SessionDetailContent({
       )}
 
       <View style={{ height: bottom }} className="bg-background" />
+
+      {sheetMountState.mounted ? (
+        <SessionContextSheet
+          visible={sheetMountState.visible}
+          info={sheetMountState.info}
+          modelDisplay={contextModelAndProvider.model}
+          providerDisplay={contextModelAndProvider.provider}
+          totalCost={totalCost}
+          onClose={() => {
+            setContextSheetOpen(false);
+          }}
+        />
+      ) : null}
 
       {childSession ? (
         <ChildSessionSheet

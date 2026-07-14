@@ -634,11 +634,73 @@ export type ErrorData = z.infer<typeof errorDataSchema>;
 export const wrapperDisconnectedDataSchema = z.unknown();
 export type WrapperDisconnectedData = z.infer<typeof wrapperDisconnectedDataSchema>;
 
-export const preparingDataSchema = z.object({
-  step: z.string(),
-  message: z.string(),
-  branch: z.string().optional(),
+const preparationStepSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  kind: z.enum(['phase', 'setup_command']),
+  label: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  completedAt: z.number().optional(),
+  revision: z.number(),
+  latestDetail: z.string().optional(),
+  safeError: z.string().optional(),
+  command: z.string().optional(),
+  commandIndex: z.number().optional(),
+  commandCount: z.number().optional(),
+  outputTail: z.string().optional(),
+  outputTruncated: z.boolean().optional(),
+  exitCode: z.number().optional(),
 });
+
+const preparationAttemptSchema = z.object({
+  id: z.string(),
+  triggerMessageId: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  completedAt: z.number().optional(),
+  safeError: z.string().optional(),
+  revision: z.number(),
+});
+
+export const preparingDataSchema = z
+  .object({
+    step: z.string(),
+    message: z.string(),
+    branch: z.string().optional(),
+    version: z.literal(2).optional(),
+    attemptId: z.string().optional(),
+    triggerMessageId: z.string().optional(),
+    revision: z.number().optional(),
+    timestamp: z.number().optional(),
+    action: z
+      .enum([
+        'attempt_started',
+        'step_started',
+        'step_progress',
+        'step_output',
+        'step_completed',
+        'step_failed',
+        'attempt_completed',
+        'attempt_failed',
+        'attempt_snapshot',
+        'step_snapshot',
+      ])
+      .optional(),
+    stepId: z.string().optional(),
+    kind: z.enum(['phase', 'setup_command']).optional(),
+    label: z.string().optional(),
+    command: z.string().optional(),
+    commandIndex: z.number().optional(),
+    commandCount: z.number().optional(),
+    detail: z.string().optional(),
+    output: z.string().optional(),
+    safeError: z.string().optional(),
+    exitCode: z.number().optional(),
+    attempt: preparationAttemptSchema.optional(),
+    stepSnapshot: preparationStepSchema.optional(),
+  })
+  .passthrough();
 export type PreparingData = z.infer<typeof preparingDataSchema>;
 
 export const autocommitStartedDataSchema = z.object({

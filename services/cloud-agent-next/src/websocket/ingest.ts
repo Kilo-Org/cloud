@@ -36,6 +36,10 @@ import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper
 import type { TerminalizeParams } from '../session/session-message-state.js';
 import { classifyAssistantFailureMessage } from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
+import {
+  cloudStatusForPreparingEvent,
+  materializePreparationEvent,
+} from '../session/preparation-history.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -679,21 +683,29 @@ export function createIngestHandler(
         broadcastFn(storedEvent);
 
         if (eventType === 'preparing') {
-          const preparingData = ingestEvent.data as { step?: string; message?: string } | undefined;
-          broadcastFn({
-            id: 0 as EventId,
-            execution_id: eventSourceId,
-            session_id: sessionId,
-            stream_event_type: 'cloud.status',
-            payload: JSON.stringify({
-              cloudStatus: {
-                type: 'preparing',
-                step: preparingData?.step,
-                message: preparingData?.message,
-              },
-            } satisfies CloudStatusData),
-            timestamp,
-          });
+          let applied = false;
+          try {
+            applied = materializePreparationEvent(eventQueries, storedEvent, ingestEvent.data);
+          } catch (error) {
+            logger
+              .withFields({
+                sessionId,
+                wrapperRunId: attachment.wrapperRunId,
+                error: error instanceof Error ? error.message : String(error),
+              })
+              .warn('Failed to materialize preparation history');
+          }
+          const cloudStatus = cloudStatusForPreparingEvent(ingestEvent.data, applied);
+          if (cloudStatus) {
+            broadcastFn({
+              id: 0 as EventId,
+              execution_id: eventSourceId,
+              session_id: sessionId,
+              stream_event_type: 'cloud.status',
+              payload: JSON.stringify({ cloudStatus } satisfies CloudStatusData),
+              timestamp,
+            });
+          }
         }
 
         if (now - attachment.lastHeartbeatUpdate >= HEARTBEAT_DEBOUNCE_MS) {

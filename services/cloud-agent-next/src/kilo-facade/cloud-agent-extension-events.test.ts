@@ -98,6 +98,20 @@ describe('projectPublicCloudAgentExtensionEvent', () => {
     expect(
       projectPublicCloudAgentExtensionEvent(
         source('cloud.status', {
+          cloudStatus: { type: 'preparing', step: 'sandbox_provision' },
+        }),
+        kiloSessionId
+      )
+    ).toEqual({
+      type: 'cloud.status',
+      properties: {
+        sessionID: kiloSessionId,
+        cloudStatus: { type: 'preparing', step: 'sandbox_provision' },
+      },
+    });
+    expect(
+      projectPublicCloudAgentExtensionEvent(
+        source('cloud.status', {
           cloudStatus: { type: 'preparing', step: 'private_step', message: 'secret' },
         }),
         kiloSessionId

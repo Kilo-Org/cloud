@@ -120,6 +120,14 @@ export class WrapperState {
     this._sendToIngestFn = fn;
   }
 
+  /**
+   * Clear the send fn only if `fn` is still the active one, so a channel
+   * closing late cannot clobber a newer connection's send fn.
+   */
+  clearSendToIngestFn(fn: (event: IngestEvent) => void): void {
+    if (this._sendToIngestFn === fn) this._sendToIngestFn = null;
+  }
+
   sendToIngest(event: IngestEvent): void {
     this._sendToIngestFn?.(event);
   }

@@ -383,7 +383,7 @@ export async function openIngestProgressChannel(
 
     const close = () => {
       active = false;
-      state.setSendToIngestFn(null);
+      state.clearSendToIngestFn(sendProgressEvent);
       try {
         ws.close();
       } catch {
@@ -424,7 +424,7 @@ export async function openIngestProgressChannel(
       }
       if (active) {
         active = false;
-        state.setSendToIngestFn(null);
+        state.clearSendToIngestFn(sendProgressEvent);
       }
     };
 

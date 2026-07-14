@@ -101,6 +101,7 @@ export type StreamHandlerOptions = {
    */
   getAvailableCommands?: () => Promise<SlashCommandInfo[]>;
   deriveQueuedMessages?: () => Promise<QueuedMessageSnapshot[]>;
+  getPreparationSnapshots?: () => Promise<StoredEvent[]>;
 };
 
 /**
@@ -201,6 +202,19 @@ export function createStreamHandler(
             data: connectedData,
           })
         );
+      }
+
+      if (options?.getPreparationSnapshots) {
+        const snapshots = await options.getPreparationSnapshots();
+        for (const snapshot of snapshots) {
+          if (!matchesFilters({ ...snapshot, id: 0 as EventId }, filters)) continue;
+          server.send(
+            JSON.stringify({
+              ...formatStreamEvent({ ...snapshot, id: 0 as EventId }, sessionId),
+              eventId: 0,
+            })
+          );
+        }
       }
 
       // Send the cached slash-command catalog on connect only when the client

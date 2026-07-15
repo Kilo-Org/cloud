@@ -60,6 +60,15 @@ export default {
     supportedChatApis: [],
     async transformRequest() {},
   },
+  STREAMLAKE: {
+    id: 'streamlake',
+    apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
+    apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
+    supportedChatApis: ['chat_completions'],
+    async transformRequest(context) {
+      delete context.request.body.provider;
+    },
+  },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',

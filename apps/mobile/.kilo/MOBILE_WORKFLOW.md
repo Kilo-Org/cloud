@@ -2,6 +2,8 @@
 
 Use this workflow when the main session is planning or implementing work whose product surface is the mobile app. Start Kilo from `apps/mobile/` so the role agents in `.kilo/agent/` are discovered. The implementation itself is not restricted to `apps/mobile`: an accepted plan may require cloud services, tRPC routers, shared packages, infrastructure, or a sibling checkout such as `~/Projects/kilocode`.
 
+Work must always be done in a dedicated worktree, regardless of the repository. This applies to the cloud repository and all sibling repositories touched by the plan. The orchestrator and role agents must not edit the primary checkout or the main checkout of any repository.
+
 The main session is the orchestrator and should use a strong model. Role agents use `kilo/kilo-auto/efficient`. The orchestrator retains product judgment, architecture decisions, loop control, final verification, Git integration, and pull-request ownership. Prefer small, logically scoped commits throughout the flow instead of one final catch-all commit.
 
 ## Feature State Matrix
@@ -37,7 +39,11 @@ Reviewer and verifier invocations must be fresh sessions so earlier conclusions 
 6. Stop after three repair rounds if findings remain. The main session takes over or asks the user to resolve the underlying ambiguity; never loop indefinitely.
 7. Once review has no valid findings, dispatch `mobile-e2e-verifier` with observable acceptance criteria and the intended worktree/service context.
 8. Route product failures through implementer and reviewer again. Let the verifier attempt one recovery for environment failures. The main session classifies inconclusive results before deciding whether code should change.
-9. The main session performs the final full-diff review and repository-appropriate verification, commits any final narrowly scoped repair, then pushes and creates or updates the PR. Do not squash the work into a catch-all commit unless the user explicitly requests it.
+9. The main session performs the final full-diff review and repository-appropriate verification, commits any final narrowly scoped repair, then pushes and creates or updates the PR. Assign the PR to the requesting human. Do not squash the work into a catch-all commit unless the user explicitly requests it.
+10. Wait until Kilobot has reviewed the latest head. Fetch every Kilobot review thread, including comments that arrive after earlier repairs, and triage each finding in the main session using the repository-root `AGENTS.md` review-remark workflow.
+11. For each valid finding, plan the smallest coherent repair and send that bounded task to `mobile-implementer`. Run the required narrow checks, dispatch a fresh `mobile-reviewer`, and create the smallest coherent commit before pushing. Reply in the original review thread with the concrete fix, then resolve the thread. Reject invalid findings with technical evidence in the same thread instead of changing correct code.
+12. Repeat the Kilobot triage, implementer, fresh reviewer, commit, push, reply, and resolution cycle until Kilobot has reviewed the latest head and there are no unresolved actionable Kilobot comments. Preserve the three-repair-round limit for any one finding; the main session takes over or asks the user if that limit is reached.
+13. Run local mobile E2E again after Kilobot repairs that affect behavior, build/runtime configuration, or the E2E workflow. Documentation-only or test-only repairs may skip repeated device E2E when the orchestrator records why the previously verified behavior is unaffected.
 
 ## Handoff Requirements
 
@@ -47,12 +53,15 @@ Every dispatch should include:
 - Observable acceptance criteria
 - The four-state feature matrix, with each state's trigger/classification, message intent, CTA label and outcome or required absence, and automated/E2E coverage
 - Repositories and worktrees in scope
+- The dedicated worktree path for every repository in scope, including sibling repositories
 - Existing uncommitted changes that must be preserved
 - Exact checks or user flows expected for that stage
 - Prior findings being addressed, including rejected findings that must not be reopened without new evidence
 - The intended commit boundary for the assigned slice
+- A prohibition on reading secret-bearing environment files: role agents must not read `.env`, `.env.*`, `.dev.vars`, or equivalent files. Use documented setup commands, sanitized status or manifest output, and sanitized explicit values supplied by the orchestrator instead.
+- A prohibition on committing generated E2E fixtures: E2E fixtures must never be committed. Role agents may create them only in a temporary directory for the current run and must clean them up before returning control.
 
-Do not ask a role agent to infer context from the conversation it cannot see. Keep cross-repository changes on coordinated branches or working trees, and give the reviewer and verifier the location of every related diff.
+Do not ask a role agent to infer context from the conversation it cannot see. Keep cross-repository changes on coordinated branches or working trees, and give the reviewer and verifier the location of every related diff. Never place secrets or raw environment-file contents in a handoff; provide only the minimum sanitized explicit values required for the task.
 
 ## Completion Gate
 
@@ -66,3 +75,6 @@ The orchestrator may call the work complete only when:
 - E2E acceptance criteria pass, or a documented environment blocker is explicitly accepted by the user
 - Final automated checks pass in every changed repository
 - The main session has reviewed the complete diff and owns the Git/PR actions
+- The PR is assigned to the requesting human
+- Kilobot has reviewed the latest head and there are no unresolved actionable Kilobot comments
+- Generated E2E fixtures have been cleaned up, and final `git status` confirms none are tracked or untracked in the repository

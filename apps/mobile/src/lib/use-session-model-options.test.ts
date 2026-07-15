@@ -1,11 +1,14 @@
 /* eslint-disable max-lines -- Model option tests mirror the SDK/web suite. */
 import { describe, expect, it } from 'vitest';
+import { type ContextUsage } from 'cloud-agent-sdk/context-usage';
 
 import {
   buildSessionModelOptions,
   createRemoteModelOverride,
   revalidateLegacyGatewayOverride,
 } from './hooks/use-session-model-options';
+import { buildModelPickerRows, modelPickerFavoriteId } from './model-picker-rows';
+import { resolveSessionContextInfo } from './session-context-info';
 
 const gatewayModels = [
   {
@@ -14,6 +17,7 @@ const gatewayModels = [
     variants: ['high'],
     isPreferred: true,
     isFree: true,
+    context_length: 200_000,
   },
 ];
 
@@ -442,5 +446,221 @@ describe('buildSessionModelOptions', () => {
     });
     expect(result.selectedValue).toBe(cliOption?.id);
     expect(result.selectedVariant).toBe('high');
+  });
+});
+
+describe('buildSessionModelOptions capacity projection', () => {
+  it('preserves Gateway picker grouping and favorite identity while projecting context capacity', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: {
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels: [
+        {
+          id: 'gateway/recommended',
+          name: 'Recommended',
+          variants: [],
+          isPreferred: true,
+          context_length: 200_000,
+        },
+        {
+          id: 'gateway/other',
+          name: 'Other',
+          variants: [],
+          isPreferred: false,
+          context_length: 32_000,
+        },
+      ],
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    const [gatewayOption] = result.options;
+    if (!gatewayOption) {
+      throw new Error('Expected a Gateway option');
+    }
+    expect(gatewayOption.provider).toBeUndefined();
+    expect(gatewayOption.modelRef).toBeUndefined();
+    expect(modelPickerFavoriteId(gatewayOption)).toBe('gateway/recommended');
+    expect(
+      buildModelPickerRows({ models: result.options, search: '', favoriteIds: new Set() })
+        .filter(row => row.type === 'header')
+        .map(row => row.title)
+    ).toEqual(['RECOMMENDED', 'ALL MODELS']);
+  });
+
+  it('projects Cloud Agent Gateway context_length onto every option', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: {
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels: [
+        { id: 'gateway/a', name: 'A', variants: [], isPreferred: true, context_length: 200_000 },
+        { id: 'gateway/b', name: 'B', variants: [], isPreferred: false, context_length: 32_000 },
+        {
+          id: 'gateway/missing',
+          name: 'M',
+          variants: [],
+          isPreferred: false,
+          context_length: null,
+        },
+        { id: 'gateway/undefined', name: 'U', variants: [], isPreferred: false },
+      ],
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    expect(result.source).toBe('cloud-agent-gateway');
+    expect(result.options.find(option => option.id === 'gateway/a')?.contextWindow).toBe(200_000);
+    expect(result.options.find(option => option.id === 'gateway/b')?.contextWindow).toBe(32_000);
+    expect(
+      result.options.find(option => option.id === 'gateway/missing')?.contextWindow
+    ).toBeUndefined();
+    expect(
+      result.options.find(option => option.id === 'gateway/undefined')?.contextWindow
+    ).toBeUndefined();
+  });
+
+  it('projects legacy Gateway context_length and omits contextWindow on the unavailable option', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: {
+        ownerConnectionId: 'legacy-owner',
+        protocol: 'legacy',
+        refresh: 'idle',
+      },
+      observedModel: {
+        model: { providerID: 'local-provider', modelID: 'private-model' },
+        variant: 'old-variant',
+      },
+      remoteModelOverride: null,
+      gatewayModels: [
+        {
+          id: 'gateway/model',
+          name: 'Gateway Model',
+          variants: ['high'],
+          isPreferred: true,
+          context_length: 200_000,
+        },
+      ],
+      gatewayModelsLoading: false,
+      organizationId: 'org-legacy',
+    });
+
+    const legacyOption = result.options.find(option => option.overrideSource === 'legacy-gateway');
+    const unavailableOption = result.options.find(option => option.unavailable);
+
+    expect(result.source).toBe('remote-legacy-gateway');
+    expect(legacyOption?.contextWindow).toBe(200_000);
+    expect(legacyOption?.modelRef).toEqual({ providerID: 'kilo', modelID: 'gateway/model' });
+    expect(unavailableOption?.contextWindow).toBeUndefined();
+  });
+
+  it('projects v1 CLI limits.context onto each provider-aware row, distinct per provider', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: {
+        ownerConnectionId: 'cli-owner',
+        protocol: 'v1',
+        refresh: 'idle',
+        catalog: {
+          protocolVersion: 1,
+          truncated: false,
+          providers: [
+            {
+              id: 'anthropic-local',
+              name: 'Anthropic Local',
+              models: [
+                {
+                  id: 'shared/model.id',
+                  name: 'Claude Workspace',
+                  variants: ['low', 'high'],
+                  capabilities: { attachment: true, reasoning: true },
+                  limits: { context: 200_000, output: 8192 },
+                },
+              ],
+            },
+            {
+              id: 'custom-openai',
+              name: 'Custom OpenAI',
+              models: [
+                {
+                  id: 'shared/model.id',
+                  name: 'Internal Deployment',
+                  variants: [],
+                  capabilities: { attachment: false, reasoning: false },
+                  limits: { context: 32_000, output: 4096 },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels: [],
+      gatewayModelsLoading: false,
+      organizationId: 'org-cli',
+    });
+
+    const anthropicRow = result.options.find(
+      option => option.modelRef?.providerID === 'anthropic-local'
+    );
+    const customRow = result.options.find(
+      option => option.modelRef?.providerID === 'custom-openai'
+    );
+
+    expect(anthropicRow?.contextWindow).toBe(200_000);
+    expect(customRow?.contextWindow).toBe(32_000);
+  });
+
+  it('resolves Cloud Agent Gateway context capacity through buildSessionModelOptions', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'cloud-agent',
+      remoteModelState: {
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels: [
+        {
+          id: 'gateway/model',
+          name: 'Gateway Model',
+          variants: [],
+          isPreferred: true,
+          context_length: 200_000,
+        },
+      ],
+      gatewayModelsLoading: false,
+      organizationId: 'org-1',
+    });
+
+    const contextUsage: ContextUsage = {
+      contextTokens: 84_000,
+      providerID: 'kilo',
+      modelID: 'gateway/model',
+    };
+
+    const resolved = resolveSessionContextInfo(contextUsage, result.options);
+
+    expect(resolved).toEqual({
+      contextTokens: 84_000,
+      providerID: 'kilo',
+      modelID: 'gateway/model',
+      contextWindow: 200_000,
+      percentage: 42,
+    });
   });
 });

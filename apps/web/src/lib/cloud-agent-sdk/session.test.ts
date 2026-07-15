@@ -486,9 +486,6 @@ describe('remote session create and retry commands', () => {
 
   it('createRemoteSession returns the KiloSessionId from the remote transport', async () => {
     const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
-    jest
-      .mocked(userWebConnection.sendCommandToConnection)
-      .mockResolvedValue({ protocolVersion: 1, sessionID: REMOTE_CREATED_SESSION_ID });
 
     session.connect();
     await Promise.resolve();
@@ -496,30 +493,39 @@ describe('remote session create and retry commands', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockResolvedValue({ protocolVersion: 1, sessionID: REMOTE_CREATED_SESSION_ID });
+
     const result = await session.createRemoteSession();
     expect(result).toBe(REMOTE_CREATED_SESSION_ID);
-    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledWith({
-      command: 'create_session',
-      data: { protocolVersion: 1 },
-      expectedConnectionId: 'owner',
-    });
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      kiloId('ses-remote'),
+      'create_session',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     session.destroy();
   });
 
   it('createRemoteSession propagates an actionable UserWebCommandError', async () => {
     const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
-    jest.mocked(userWebConnection.sendCommandToConnection).mockRejectedValue(
-      new UserWebCommandError({
-        code: 'CLI_UPGRADE_REQUIRED',
-        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
-      })
-    );
 
     session.connect();
     await Promise.resolve();
     emitOwner(systemListener(), kiloId('ses-remote'));
     await Promise.resolve();
     await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest.mocked(userWebConnection.sendCommand).mockRejectedValue(
+      new UserWebCommandError({
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
+      })
+    );
 
     await expect(session.createRemoteSession()).rejects.toEqual(
       expect.objectContaining({
@@ -528,6 +534,7 @@ describe('remote session create and retry commands', () => {
         message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
       })
     );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     session.destroy();
   });
 

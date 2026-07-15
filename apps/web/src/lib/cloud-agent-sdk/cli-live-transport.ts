@@ -705,33 +705,18 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (ownerConnectionId) discoverCommands(ownerConnectionId);
       },
       createSession: async () => {
-        // `create_session` is connection-scoped: it must use the owner we
-        // currently trust, snapshot it before the await (the owner can be
-        // cleared by a `cli.disconnected` race), and never auto-retry — a
-        // transient network failure is a hard reject so the caller can
-        // surface a retryable error.
-        const expectedOwnerConnectionId = ownerConnectionId;
-        if (!expectedOwnerConnectionId) {
-          throw new Error('Remote session has no connected owner');
+        // `create_session` is session-scoped: it must include the current Kilo
+        // sessionId so the CLI can select the workspace, and it must be fenced
+        // to the owner we currently trust. Reuse `sendCommand` so the owner is
+        // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
+        // Never auto-retry — a transient network failure is a hard reject so
+        // the caller can surface a retryable error.
+        const result = await sendCommand('create_session', { protocolVersion: 1 });
+        const parsed = parseCreateSessionResponse(result);
+        if (!parsed.ok) {
+          throw new Error('Invalid create_session response');
         }
-
-        try {
-          const result = await config.userWebConnection.sendCommandToConnection({
-            command: 'create_session',
-            data: { protocolVersion: 1 },
-            expectedConnectionId: expectedOwnerConnectionId,
-          });
-          const parsed = parseCreateSessionResponse(result);
-          if (!parsed.ok) {
-            throw new Error('Invalid create_session response');
-          }
-          return parsed.kiloSessionId;
-        } catch (error) {
-          if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
-            setOwnerConnectionId(null);
-          }
-          throw error;
-        }
+        return parsed.kiloSessionId;
       },
       send: async (input: TransportSendInput) => {
         if (input.payload.type === 'command') {

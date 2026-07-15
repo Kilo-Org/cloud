@@ -475,11 +475,13 @@ export type KiloSessionIdInput = z.input<typeof kiloSessionIdSchema>;
 /**
  * Strict create-session response (protocol v1).
  *
- * `create_session` is a connection-scoped viewer command (no `sessionId` on
- * the wire) whose only valid success body is exactly this shape. Anything
- * else — extra fields, missing fields, the wrong protocol version, or an
- * invalid `sessionID` — is rejected; the relay is the source of truth for
- * this envelope and any drift should fail closed.
+ * `create_session` is a session-scoped viewer command (the current Kilo
+ * sessionId is sent on the wire so the CLI can select the workspace; an
+ * optional owner connectionId fences the request to the active CLI). Its only
+ * valid success body is exactly this shape. Anything else — extra fields,
+ * missing fields, the wrong protocol version, or an invalid `sessionID` — is
+ * rejected; the relay is the source of truth for this envelope and any drift
+ * should fail closed.
  */
 export const createSessionResponseV1Schema = z
   .object({

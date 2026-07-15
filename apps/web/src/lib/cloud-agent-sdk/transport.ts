@@ -83,11 +83,12 @@ type Transport = {
   retryRemoteCommands?: () => void;
   /**
    * Ask the currently connected CLI owner to create a new remote session and
-   * return its branded `KiloSessionId`. Connection-scoped: there is no
-   * sessionId to thread yet. The relay maps the request to the active CLI
-   * via the wire `connectionId`. Implementations must not auto-retry: a
-   * network failure is a hard reject so the caller can surface a retryable
-   * error. The caller does NOT switch the active session as a side effect.
+   * return its branded `KiloSessionId`. Session-scoped: the current Kilo
+   * sessionId is sent so the CLI can select the workspace, and an expected owner
+   * connectionId fences the request to the active CLI. Implementations must not
+   * auto-retry: a network failure is a hard reject so the caller can surface a
+   * retryable error. The caller does NOT switch the active session as a side
+   * effect.
    */
   createSession?: () => Promise<KiloSessionId>;
   interrupt?: () => Promise<unknown>;

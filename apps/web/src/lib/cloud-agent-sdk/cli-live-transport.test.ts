@@ -2306,10 +2306,10 @@ describe('CliLiveTransport createSession', () => {
     transport.destroy();
   });
 
-  it('sends create_session via sendCommandToConnection against the current owner and returns the branded id', async () => {
+  it('sends create_session via sendCommand against the current session and owner and returns the branded id', async () => {
     const connection = createConnection();
     jest
-      .mocked(connection.sendCommandToConnection)
+      .mocked(connection.sendCommand)
       .mockResolvedValue({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
     const { transport, userWebConnection } = createTransportWithSinks({ connection });
 
@@ -2319,19 +2319,23 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    // Clear discovery calls so we can assert exactly the create_session call.
+    jest.mocked(userWebConnection.sendCommand).mockClear();
     const result = await transport.createSession?.();
     expect(result).toBe(NEW_KILO_SESSION_ID);
-    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledWith({
-      command: 'create_session',
-      data: { protocolVersion: 1 },
-      expectedConnectionId: 'owner',
-    });
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'create_session',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
   });
 
   it('rejects a malformed response without retrying or changing owner', async () => {
     const connection = createConnection();
-    jest.mocked(connection.sendCommandToConnection).mockResolvedValue({ invalid: true });
+    jest.mocked(connection.sendCommand).mockResolvedValue({ invalid: true });
     const { transport, userWebConnection } = createTransportWithSinks({ connection });
 
     transport.connect();
@@ -2340,15 +2344,22 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    jest.mocked(userWebConnection.sendCommand).mockClear();
     await expect(transport.createSession?.()).rejects.toThrow('Invalid create_session response');
-    // No second call — never auto-retry.
-    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    // No second create_session call — never auto-retry.
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(1);
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    expect(transport.canSend?.()).toBe(true);
     transport.destroy();
   });
 
   it('propagates a CLI_UPGRADE_REQUIRED error with the actionable message', async () => {
     const connection = createConnection();
-    jest.mocked(connection.sendCommandToConnection).mockRejectedValue(
+    jest.mocked(connection.sendCommand).mockRejectedValue(
       new UserWebCommandError({
         code: 'CLI_UPGRADE_REQUIRED',
         message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
@@ -2362,22 +2373,23 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    jest.mocked(userWebConnection.sendCommand).mockClear();
     await expect(transport.createSession?.()).rejects.toThrow(
       'Creating remote sessions from mobile requires a newer Kilo CLI.'
     );
-    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(1);
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
   });
 
   it('clears the owner on a SESSION_OWNER_CHANGED error and re-throws', async () => {
     const connection = createConnection();
-    jest
-      .mocked(connection.sendCommandToConnection)
-      .mockRejectedValue(
-        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
-      );
     const commandStates: RemoteCommandState[] = [];
-    const { transport } = createTransportWithSinks({
+    const { transport, userWebConnection } = createTransportWithSinks({
       connection,
       onRemoteCommandStateChange: state => commandStates.push(state),
     });
@@ -2388,21 +2400,24 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValue(
+        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
+      );
+
     await expect(transport.createSession?.()).rejects.toMatchObject({
       code: 'SESSION_OWNER_CHANGED',
     });
     expect(commandStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
   });
 
   it('uses the owner snapshot at call time when the owner changes mid-flight', async () => {
     const connection = createConnection();
     let resolveCreate: ((value: { protocolVersion: 1; sessionID: string }) => void) | undefined;
-    jest.mocked(connection.sendCommandToConnection).mockImplementation(() => {
-      return new Promise(resolve => {
-        resolveCreate = resolve;
-      });
-    });
     const { transport, userWebConnection } = createTransportWithSinks({ connection });
 
     transport.connect();
@@ -2411,6 +2426,13 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest.mocked(userWebConnection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command !== 'create_session') return Promise.resolve({ ok: true });
+      return new Promise(resolve => {
+        resolveCreate = resolve;
+      });
+    });
     const createPromise = transport.createSession?.();
     await Promise.resolve();
     // Owner rotates mid-flight.
@@ -2428,18 +2450,20 @@ describe('CliLiveTransport createSession', () => {
     resolveCreate?.({ protocolVersion: 1, sessionID: ROTATED_KILO_SESSION_ID });
     await expect(createPromise).resolves.toBe(ROTATED_KILO_SESSION_ID);
     // The snapshot we used was 'owner-a' even though the current owner is now 'owner-b'.
-    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledWith({
-      command: 'create_session',
-      data: { protocolVersion: 1 },
-      expectedConnectionId: 'owner-a',
-    });
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'create_session',
+      { protocolVersion: 1 },
+      'owner-a'
+    );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
   });
 
   it('does not retry a network failure', async () => {
     const connection = createConnection();
     jest
-      .mocked(connection.sendCommandToConnection)
+      .mocked(connection.sendCommand)
       .mockRejectedValue(new Error('Connection lost during reconnect'));
     const { transport, userWebConnection } = createTransportWithSinks({ connection });
 
@@ -2449,8 +2473,14 @@ describe('CliLiveTransport createSession', () => {
     await Promise.resolve();
     await Promise.resolve();
 
+    jest.mocked(userWebConnection.sendCommand).mockClear();
     await expect(transport.createSession?.()).rejects.toThrow('Connection lost during reconnect');
-    expect(userWebConnection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(1);
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     transport.destroy();
   });
 });

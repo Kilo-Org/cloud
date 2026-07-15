@@ -1469,7 +1469,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     open();
 
     const promise = client.sendCommandToConnection({
-      command: 'create_session',
+      command: 'runtime_status',
       data: { protocolVersion: 1 },
       expectedConnectionId: 'cli-owner-1',
     });
@@ -1479,7 +1479,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
       JSON.stringify({
         type: 'command',
         id: 'uuid-2',
-        command: 'create_session',
+        command: 'runtime_status',
         connectionId: 'cli-owner-1',
         data: { protocolVersion: 1 },
       })
@@ -1491,9 +1491,9 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     inbound({
       type: 'response',
       id: 'uuid-2',
-      result: { protocolVersion: 1, sessionID: 'ses-new' },
+      result: { ok: true },
     });
-    await expect(promise).resolves.toEqual({ protocolVersion: 1, sessionID: 'ses-new' });
+    await expect(promise).resolves.toEqual({ ok: true });
     client.destroy();
   });
 
@@ -1503,7 +1503,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     open();
 
     const promise = client.sendCommandToConnection({
-      command: 'create_session',
+      command: 'runtime_status',
       data: { protocolVersion: 1 },
       expectedConnectionId: 'cli-owner-1',
     });
@@ -1523,9 +1523,9 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     inbound({
       type: 'response',
       id: 'uuid-2',
-      result: { protocolVersion: 1, sessionID: 'ses-new' },
+      result: { ok: true },
     });
-    await expect(promise).resolves.toEqual({ protocolVersion: 1, sessionID: 'ses-new' });
+    await expect(promise).resolves.toEqual({ ok: true });
     client.destroy();
   });
 
@@ -1537,7 +1537,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
       open();
 
       const promise = client.sendCommandToConnection({
-        command: 'create_session',
+        command: 'runtime_status',
         data: { protocolVersion: 1 },
         expectedConnectionId: 'cli-owner-1',
       });
@@ -1560,7 +1560,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
 
     const promise = client.sendCommandToConnection({
-      command: 'create_session',
+      command: 'runtime_status',
       data: { protocolVersion: 1 },
       expectedConnectionId: 'cli-owner-1',
     });
@@ -1580,7 +1580,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     open();
 
     const promise = client.sendCommandToConnection({
-      command: 'create_session',
+      command: 'runtime_status',
       data: { protocolVersion: 1 },
       expectedConnectionId: 'cli-owner-1',
     });
@@ -1613,7 +1613,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     open();
 
     const promise = client.sendCommandToConnection({
-      command: 'create_session',
+      command: 'runtime_status',
       data: { protocolVersion: 1 },
       expectedConnectionId: 'cli-owner-1',
     });
@@ -1625,7 +1625,7 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     inbound({
       type: 'response',
       id: 'uuid-2',
-      result: { protocolVersion: 1, sessionID: 'ses-new' },
+      result: { ok: true },
     });
     await promise;
     client.destroy();

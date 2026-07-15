@@ -67,10 +67,10 @@ type UserWebConnection = {
   ) => Promise<unknown>;
   /**
    * Send a viewer command that is scoped to a specific CLI connection and has
-   * no associated session (e.g. `create_session`). The wire frame includes
-   * `connectionId` and omits `sessionId`. Shares the existing correlated
-   * command lifecycle: timeout, open/disconnect handling, and structured
-   * `UserWebCommandError` errors.
+   * no associated session (e.g. a connection-scoped runtime probe). The wire
+   * frame includes `connectionId` and omits `sessionId`. Shares the existing
+   * correlated command lifecycle: timeout, open/disconnect handling, and
+   * structured `UserWebCommandError` errors.
    */
   sendCommandToConnection: (input: SendCommandToConnectionInput) => Promise<unknown>;
   onCliEvent: (sessionId: string, listener: (event: CliEvent) => void) => () => void;

@@ -8,7 +8,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 const migrationTag = '0185_smiling_stranger';
 
 describe('admin permissions migration', () => {
-  it('backfills real 0184 admins while preserving false defaults for future admins', async () => {
+  it('backfills only admins that matched the previous grant-authority predicate', async () => {
     const baseUrl = new URL(process.env.POSTGRES_URL ?? '');
     if (!['localhost', '127.0.0.1'].includes(baseUrl.hostname)) {
       throw new Error('Migration test requires the local Docker PostgreSQL instance');
@@ -41,11 +41,14 @@ describe('admin permissions migration', () => {
       await migrate(drizzle(testPool), { migrationsFolder: previousMigrations });
       await testPool.query(
         `INSERT INTO kilocode_users
-          (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, is_admin, blocked_reason)
+          (id, google_user_email, google_user_name, google_user_image_url, stripe_customer_id, hosted_domain, is_admin, blocked_reason)
          VALUES
-          ('admin-active', 'admin-active@example.com', 'Active Admin', '', 'cus_active', true, NULL),
-          ('admin-blocked', 'admin-blocked@example.com', 'Blocked Admin', '', 'cus_blocked', true, 'blocked'),
-          ('ordinary-user', 'ordinary@example.com', 'Ordinary User', '', 'cus_ordinary', false, NULL)`
+          ('eligible-admin', 'eligible@kilocode.ai', 'Eligible Admin', '', 'cus_eligible', 'kilocode.ai', true, NULL),
+          ('eligible-blocked-admin', 'blocked@kilocode.ai', 'Blocked Eligible Admin', '', 'cus_blocked', 'kilocode.ai', true, 'blocked'),
+          ('external-admin', 'external@example.com', 'External Admin', '', 'cus_external', NULL, true, NULL),
+          ('wrong-domain-admin', 'domain@kilocode.ai', 'Wrong Domain Admin', '', 'cus_domain', 'example.com', true, NULL),
+          ('wrong-email-admin', 'email@example.com', 'Wrong Email Admin', '', 'cus_email', 'kilocode.ai', true, NULL),
+          ('ordinary-user', 'ordinary@kilocode.ai', 'Ordinary User', '', 'cus_ordinary', 'kilocode.ai', false, NULL)`
       );
 
       const migrationSql = await readFile(
@@ -61,13 +64,23 @@ describe('admin permissions migration', () => {
       }>(
         `SELECT id, is_super_admin, can_view_sessions
          FROM kilocode_users
-         WHERE id IN ('admin-active', 'admin-blocked', 'ordinary-user')
+         WHERE id IN (
+           'eligible-admin',
+           'eligible-blocked-admin',
+           'external-admin',
+           'wrong-domain-admin',
+           'wrong-email-admin',
+           'ordinary-user'
+         )
          ORDER BY id`
       );
       expect(migrated.rows).toEqual([
-        { id: 'admin-active', is_super_admin: true, can_view_sessions: false },
-        { id: 'admin-blocked', is_super_admin: true, can_view_sessions: false },
+        { id: 'eligible-admin', is_super_admin: true, can_view_sessions: false },
+        { id: 'eligible-blocked-admin', is_super_admin: true, can_view_sessions: false },
+        { id: 'external-admin', is_super_admin: false, can_view_sessions: false },
         { id: 'ordinary-user', is_super_admin: false, can_view_sessions: false },
+        { id: 'wrong-domain-admin', is_super_admin: false, can_view_sessions: false },
+        { id: 'wrong-email-admin', is_super_admin: false, can_view_sessions: false },
       ]);
 
       const inserted = await testPool.query<{

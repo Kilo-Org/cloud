@@ -853,13 +853,20 @@ describe('kiloPassRouter', () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-monthly@example.com',
       });
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 0,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        stripeInvoiceId: 'in_test_monthly_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1452,7 +1459,7 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-next@example.com',
       });
 
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_next',
         tier: KiloPassTier.Tier19,
@@ -1460,6 +1467,14 @@ describe('kiloPassRouter', () => {
         status: 'active',
         currentStreakMonths: 1,
         startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_monthly_grandfathered_month2_next_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
       });
 
       const caller = await createCallerForUser(user.id);

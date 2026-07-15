@@ -1,8 +1,14 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull, or, isNotNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import {
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  getSessionMessagesSchema,
+  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  persistedKiloSdkMessageHistorySchema,
+} from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
 import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
@@ -294,6 +300,116 @@ api.get('/session/:sessionId/export', async c => {
   return c.body(stream, 200, {
     'content-type': 'application/json; charset=utf-8',
   });
+});
+
+/**
+ * Paginated session-message history for any Kilo session the user owns.
+ * Reuses the same `(owner, current organization membership)` check shape as
+ * `SessionIngestRPC.findOwnedAccessibleSession` and delegates the bounded
+ * read to `SessionIngestDO.readKiloSdkMessages`. Mobile uses the default
+ * page size of 50; the existing max of 100 is honored for callers that
+ * request more.
+ */
+api.get('/session/:sessionId/messages', async c => {
+  const rawSessionId = c.req.param('sessionId');
+  const parsed = sessionIdSchema.safeParse(rawSessionId);
+  if (!parsed.success) {
+    return c.json({ success: false, error: 'Invalid sessionId', issues: parsed.error.issues }, 400);
+  }
+
+  const limitParam = c.req.query('limit');
+  const beforeParam = c.req.query('before');
+  // Apply the shared default at the HTTP layer too so the value passed to
+  // the contract schema (and onward to the DO) is always defined. The
+  // contract schema's `.default(...)` is the source of truth; this is a
+  // symmetry shortcut that also keeps the JSON response and any logging
+  // explicit about the page size.
+  const limitParsed =
+    limitParam === undefined
+      ? { success: true as const, data: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE }
+      : z.coerce
+          .number()
+          .int()
+          .positive()
+          .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+          .safeParse(limitParam);
+  if (!limitParsed.success) {
+    return c.json({ success: false, error: 'Invalid limit' }, 400);
+  }
+  const beforeParsed =
+    beforeParam === undefined
+      ? { success: true as const, data: undefined }
+      : z.string().min(1).max(1024).safeParse(beforeParam);
+  if (!beforeParsed.success) {
+    return c.json({ success: false, error: 'Invalid before' }, 400);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const inputParse = getSessionMessagesSchema.safeParse({
+    kiloUserId,
+    kiloSessionId: parsed.data,
+    limit: limitParsed.data,
+    before: beforeParsed.data,
+  });
+  if (!inputParse.success) {
+    return c.json(
+      { success: false, error: 'Invalid paging input', issues: inputParse.error.issues },
+      400
+    );
+  }
+
+  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  // Mirrors `SessionIngestRPC.findOwnedAccessibleSession`. The join is
+  // duplicated here (instead of going through the RPC) because importing
+  // `SessionIngestRPC` from `routes/api.ts` would create a cycle
+  // `api.ts -> session-ingest-rpc.ts -> app.ts -> api.ts` and break the
+  // node-env vitest suite that loads this module. Keep the two queries
+  // in sync if the access shape ever changes.
+  const authorized = await db
+    .select({ sessionId: cli_sessions_v2.session_id })
+    .from(cli_sessions_v2)
+    .leftJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
+        eq(organization_memberships.kilo_user_id, kiloUserId)
+      )
+    )
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, inputParse.data.kiloSessionId),
+        eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+        or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id))
+      )
+    )
+    .limit(1);
+  if (authorized.length === 0) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
+
+  const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+    () =>
+      getSessionIngestDO(c.env, {
+        kiloUserId,
+        sessionId: inputParse.data.kiloSessionId,
+      }),
+    stub =>
+      stub.readKiloSdkMessages({
+        limit: inputParse.data.limit,
+        before: inputParse.data.before,
+      }),
+    'SessionIngestDO.readKiloSdkMessages'
+  );
+  const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+
+  return c.json(
+    {
+      success: true,
+      kiloSessionId: inputParse.data.kiloSessionId,
+      history: history.success ? history.data : { kind: 'invalid_data' },
+    },
+    200
+  );
 });
 
 api.post('/session/:sessionId/share', async c => {

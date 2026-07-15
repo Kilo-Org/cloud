@@ -6,6 +6,7 @@ import {
   createSessionForCloudAgentSchema,
   deleteSessionForCloudAgentSchema,
   getCloudAgentRootSessionMessagesSchema,
+  getSessionMessagesSchema,
   kiloSdkSessionSnapshotOutcomeSchema,
   listCloudAgentRootSessionsSchema,
   persistedKiloSdkMessageHistorySchema,
@@ -18,6 +19,8 @@ import {
   type GetCloudAgentRootSessionMessagesResult,
   type GetCloudAgentRootSessionSnapshotParams,
   type GetCloudAgentRootSessionSnapshotResult,
+  type GetSessionMessagesParams,
+  type GetSessionMessagesResult,
   type ListCloudAgentRootSessionsParams,
   type ResolveCloudAgentRootSessionForKiloSessionParams,
   type ResolveCloudAgentRootSessionForKiloSessionResult,
@@ -192,6 +195,42 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     };
   }
 
+  /**
+   * Generic authorized paginated session history usable by `cliSessionsV2` for
+   * any Kilo session the user owns (root cloud-agent, child, or remote CLI).
+   * Mirrors `getCloudAgentRootSessionMessages` but enforces the same
+   * `(owner, current organization membership)` boundary as the web router's
+   * `getSessionWithAccessCheck` so the DO reader is only reached for sessions
+   * the caller is allowed to read.
+   *
+   * Returns `null` for any access failure (missing owner row, lost org
+   * membership) so the caller can surface `NOT_FOUND` without leaking which
+   * side of the check failed.
+   */
+  async getSessionMessages(params: GetSessionMessagesParams): Promise<GetSessionMessagesResult> {
+    const parsed = getSessionMessagesSchema.parse(params);
+    const authorized = await this.findOwnedAccessibleSession(parsed);
+    if (!authorized) {
+      return null;
+    }
+
+    const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+      () =>
+        getSessionIngestDO(this.env, {
+          kiloUserId: parsed.kiloUserId,
+          sessionId: parsed.kiloSessionId,
+        }),
+      stub => stub.readKiloSdkMessages({ limit: parsed.limit, before: parsed.before }),
+      'SessionIngestDO.readKiloSdkMessages'
+    );
+    const parsedHistory = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+
+    return {
+      kiloSessionId: parsed.kiloSessionId,
+      history: parsedHistory.success ? parsedHistory.data : { kind: 'invalid_data' },
+    };
+  }
+
   async listCloudAgentRootSessions(
     params: ListCloudAgentRootSessionsParams
   ): Promise<CloudAgentRootSessionSummary[]> {
@@ -282,6 +321,32 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
 
     const cloudAgentSessionId = rows[0]?.cloudAgentSessionId;
     return cloudAgentSessionId ? { cloudAgentSessionId } : null;
+  }
+
+  /**
+   * Confirms the user owns the session and still has access to its
+   * organization. Unlike `findOwnedRootCloudAgentMapping`, this does not
+   * require a Cloud Agent mapping — it accepts any Kilo session kind so
+   * remote CLI sessions and child sessions are also readable.
+   */
+  private async findOwnedAccessibleSession(params: {
+    kiloUserId: string;
+    kiloSessionId: string;
+  }): Promise<{ kiloSessionId: string } | null> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const rows = await db
+      .select({ sessionId: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, params.kiloSessionId),
+          eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
+          personalOrAccessibleOrganizationCondition()
+        )
+      )
+      .limit(1);
+    return rows[0] ? { kiloSessionId: rows[0].sessionId } : null;
   }
 
   /**

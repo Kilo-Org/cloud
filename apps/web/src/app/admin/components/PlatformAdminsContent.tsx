@@ -325,9 +325,9 @@ export function PlatformAdminsContent() {
         <CardHeader>
           <CardTitle>Grant admin access</CardTitle>
           <CardDescription>
-            {isRosterLoading
+            {isRosterLoading || (!permissions.isPermissionResolved && !permissions.isError)
               ? 'Checking your permissions…'
-              : rosterError
+              : rosterError || permissions.isError
                 ? 'Could not determine your permissions. Reload to try again.'
                 : canManageAdmins
                   ? 'Search registered kilocode.ai users who are not already admins. New admins receive no subordinate permissions.'

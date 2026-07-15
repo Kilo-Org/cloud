@@ -36,6 +36,10 @@ import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganiz
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
+import {
+  RepositoryModelOverrides,
+  type RepositoryModelOverrideValue,
+} from './RepositoryModelOverrides';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
@@ -226,6 +230,12 @@ export function ReviewConfigForm({
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
+  // Per-repository model overrides keyed by repository id.
+  const [repositoryModelOverrides, setRepositoryModelOverrides] = useState<
+    Map<number, RepositoryModelOverrideValue>
+  >(new Map());
+  // Opt-in toggle for the per-repository model section.
+  const [overridesEnabled, setOverridesEnabled] = useState(false);
   const [useReviewMd, setUseReviewMd] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
@@ -344,9 +354,36 @@ export function ReviewConfigForm({
           (repositoryId): repositoryId is number => typeof repositoryId === 'number'
         )
       );
+      const overridesMap = new Map<number, RepositoryModelOverrideValue>();
+      for (const override of configData.repositoryModelOverrides ?? []) {
+        if (typeof override.repositoryId === 'number') {
+          overridesMap.set(override.repositoryId, {
+            repoFullName: override.repoFullName,
+            modelSlug: override.modelSlug,
+            thinkingEffort: override.thinkingEffort ?? null,
+          });
+        }
+      }
+      setRepositoryModelOverrides(overridesMap);
+      setOverridesEnabled(overridesMap.size > 0);
       setUseReviewMd(!(configData.disableReviewMd ?? false));
     }
   }, [configData, isGitLab]);
+
+  const handleRepositoryModelOverrideSet = useCallback(
+    (repositoryId: number, value: RepositoryModelOverrideValue) => {
+      setRepositoryModelOverrides(prev => new Map(prev).set(repositoryId, value));
+    },
+    []
+  );
+
+  const handleRepositoryModelOverrideRemove = useCallback((repositoryId: number) => {
+    setRepositoryModelOverrides(prev => {
+      const next = new Map(prev);
+      next.delete(repositoryId);
+      return next;
+    });
+  }, []);
 
   // Organization mutations
   const orgToggleMutation = useMutation(
@@ -467,6 +504,18 @@ export function ReviewConfigForm({
       selectedRepositoryIdSet.has(repo.id)
     );
 
+    // Overrides are independent of the trigger selection mode — they apply whether
+    // reviews run on all or selected repositories. Sent only when the per-repository
+    // section is toggled on; toggling it off clears the overrides on save.
+    const repositoryModelOverridesPayload = overridesEnabled
+      ? Array.from(repositoryModelOverrides.entries()).map(([repositoryId, value]) => ({
+          repositoryId,
+          repoFullName: value.repoFullName,
+          modelSlug: value.modelSlug,
+          thinkingEffort: value.thinkingEffort,
+        }))
+      : [];
+
     if (organizationId) {
       orgSaveMutation.mutate({
         organizationId,
@@ -480,6 +529,7 @@ export function ReviewConfigForm({
         repositorySelectionMode,
         selectedRepositoryIds,
         manuallyAddedRepositories,
+        repositoryModelOverrides: repositoryModelOverridesPayload,
         disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
@@ -496,6 +546,7 @@ export function ReviewConfigForm({
         repositorySelectionMode,
         selectedRepositoryIds,
         manuallyAddedRepositories,
+        repositoryModelOverrides: repositoryModelOverridesPayload,
         disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
@@ -570,14 +621,14 @@ export function ReviewConfigForm({
 
           {/* Configuration Fields */}
           <div className={cn('space-y-8', !isEnabled && 'pointer-events-none opacity-50')}>
-            {/* AI Model Selection */}
+            {/* Default AI Model Selection */}
             <ModelCombobox
-              label="AI Model"
+              label="Default AI Model"
               models={modelOptions}
               value={selectedModel}
               onValueChange={setSelectedModel}
               isLoading={isLoadingModels}
-              helperText="Choose the AI model to use for code reviews"
+              helperText="Applies to all repositories unless overridden below"
             />
 
             {/* Thinking Effort — only shown when the model supports variants */}
@@ -768,6 +819,41 @@ export function ReviewConfigForm({
                 </>
               )}
             </div>
+
+            {/* Per-repository model overrides — independent of the trigger selection
+                mode above; applies whether reviews run on all or selected repos. */}
+            {repositoriesData?.integrationInstalled && selectableRepositories.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="per-repo-models" className="text-base font-semibold">
+                      Per-repository models
+                    </Label>
+                    <p className="text-muted-foreground text-sm">
+                      Run specific repositories&apos; reviews on a different model than the default.
+                    </p>
+                  </div>
+                  <Switch
+                    id="per-repo-models"
+                    checked={overridesEnabled}
+                    onCheckedChange={setOverridesEnabled}
+                    disabled={!isEnabled}
+                  />
+                </div>
+                {overridesEnabled && (
+                  <RepositoryModelOverrides
+                    availableRepositories={selectableRepositories}
+                    models={modelOptions}
+                    isLoadingModels={isLoadingModels}
+                    overrides={repositoryModelOverrides}
+                    defaultModelSlug={selectedModel}
+                    onSet={handleRepositoryModelOverrideSet}
+                    onRemove={handleRepositoryModelOverrideRemove}
+                    disabled={!isEnabled}
+                  />
+                )}
+              </div>
+            )}
 
             {/* GitLab Webhook Configuration */}
             {isGitLab &&

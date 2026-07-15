@@ -6,7 +6,9 @@ import test from 'node:test';
 
 import {
   bootSimulator,
+  buildSimulatorLabel,
   claimSimulator,
+  parseClaimArgs,
   releaseSimulator,
   type SimulatorDevice,
 } from './mobile-simulator';
@@ -927,6 +929,44 @@ test('treats a legacy claim (no status/claimId) as ready for the same worktree',
   }
 });
 
+test('upgrades and relabels a same-worktree legacy claim without desynchronizing its name', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renames: string[] = [];
+
+  try {
+    fs.writeFileSync(path.join(lockRoot, 'B.json'), JSON.stringify({ worktreeRoot }));
+
+    const claim = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'verify',
+      rename: (_deviceId, name) => renames.push(name),
+    });
+
+    assert.equal(claim.alreadyOwned, true);
+    assert.equal(claim.device.name, buildSimulatorLabel(worktreeRoot, 'verify'));
+    assert.deepEqual(renames, [buildSimulatorLabel(worktreeRoot, 'verify')]);
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      status: string;
+      claimId: string;
+      originalDeviceName: string;
+      currentDeviceName: string;
+      phase: string;
+    };
+    assert.equal(persisted.status, 'ready');
+    assert.ok(persisted.claimId);
+    assert.equal(persisted.originalDeviceName, devices.find(device => device.id === 'B')?.name);
+    assert.equal(persisted.currentDeviceName, buildSimulatorLabel(worktreeRoot, 'verify'));
+    assert.equal(persisted.phase, 'verify');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
 test('rejects a different worktree against a legacy claim (no status/claimId)', () => {
   const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
   const firstWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-one-'));
@@ -1738,6 +1778,975 @@ test('attaches a rollback cleanup failure to the original prepare error', () => 
     );
     const cleanupError = caught.cleanupError as Error;
     assert.match(String(cleanupError), /injected cleanup deletion failure/);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+// --- Task 1: ownership-aware simulator labels ---
+
+test('buildSimulatorLabel: deterministic sanitization and 64-char bound', () => {
+  const base = '/Users/igor/Projects/cloud/.worktrees/speed-mobile-agent-workflow';
+  const label = buildSimulatorLabel(base, 'prewarm');
+  assert.equal(label.startsWith('Kilo E2E - '), true);
+  assert.equal(label.endsWith(' - prewarm'), true);
+  // Worktree basename is "speed-mobile-agent-workflow" — no special chars.
+  assert.equal(label, 'Kilo E2E - speed-mobile-agent-workflow - prewarm');
+});
+
+test('buildSimulatorLabel: trims leading/trailing separators and falls back to "worktree"', () => {
+  const base = '/tmp/---name---/';
+  const label = buildSimulatorLabel(base, 'prewarm');
+  assert.equal(label, 'Kilo E2E - name - prewarm');
+});
+
+test('buildSimulatorLabel: falls back to "worktree" when the basename has no allowed characters', () => {
+  const base = '/tmp/!!!/';
+  const label = buildSimulatorLabel(base, 'prewarm');
+  assert.equal(label, 'Kilo E2E - worktree - prewarm');
+});
+
+test('buildSimulatorLabel: bounds the visible label to 64 characters', () => {
+  const base = `/tmp/${'a'.repeat(120)}_some-more-name-padding/`;
+  const label = buildSimulatorLabel(base, 'verify');
+  assert.ok(label.length <= 64, `label length ${label.length} exceeds 64`);
+  assert.equal(label.startsWith('Kilo E2E - '), true);
+  assert.equal(label.endsWith(' - verify'), true);
+});
+
+test('parseClaimArgs: bare claim', () => {
+  assert.deepEqual(parseClaimArgs(['claim']), {
+    command: 'claim',
+    udid: undefined,
+    phase: undefined,
+  });
+});
+
+test('parseClaimArgs: claim with udid', () => {
+  assert.deepEqual(parseClaimArgs(['claim', 'UDID-X']), {
+    command: 'claim',
+    udid: 'UDID-X',
+    phase: undefined,
+  });
+});
+
+test('parseClaimArgs: claim with --phase flag', () => {
+  assert.deepEqual(parseClaimArgs(['claim', '--phase', 'prewarm']), {
+    command: 'claim',
+    udid: undefined,
+    phase: 'prewarm',
+  });
+});
+
+test('parseClaimArgs: claim with udid and --phase flag', () => {
+  assert.deepEqual(parseClaimArgs(['claim', 'UDID-Y', '--phase', 'verify']), {
+    command: 'claim',
+    udid: 'UDID-Y',
+    phase: 'verify',
+  });
+});
+
+test('parseClaimArgs: claim with --phase before udid', () => {
+  assert.deepEqual(parseClaimArgs(['claim', '--phase', 'verify', 'UDID-Z']), {
+    command: 'claim',
+    udid: 'UDID-Z',
+    phase: 'verify',
+  });
+});
+
+test('parseClaimArgs: release with udid', () => {
+  assert.deepEqual(parseClaimArgs(['release', 'UDID-R']), { command: 'release', udid: 'UDID-R' });
+});
+
+test('parseClaimArgs: rejects missing udid for release', () => {
+  assert.throws(() => parseClaimArgs(['release']), /usage/i);
+});
+
+test('parseClaimArgs: rejects missing/invalid phase values', () => {
+  assert.throws(() => parseClaimArgs(['claim', '--phase']), /usage/i);
+  assert.throws(() => parseClaimArgs(['claim', '--phase', 'other']), /usage/i);
+  assert.throws(
+    () => parseClaimArgs(['claim', '--phase', 'prewarm', '--phase', 'verify']),
+    /usage/i
+  );
+});
+
+test('parseClaimArgs: rejects unknown command', () => {
+  assert.throws(() => parseClaimArgs(['bogus']), /usage/i);
+});
+
+test('parseClaimArgs: rejects --phase with release', () => {
+  assert.throws(() => parseClaimArgs(['release', 'UDID-R', '--phase', 'prewarm']), /usage/i);
+});
+
+test('new phase claim: renames the device, persists original/current name and phase, returns label', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: Array<{ id: string; name: string }> = [];
+  const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+
+  try {
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+
+    assert.equal(result.alreadyOwned, false);
+    assert.equal(result.device.id, 'B');
+    assert.deepEqual(renameCalls, [{ id: 'B', name: expectedLabel }]);
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      phase?: string;
+      originalDeviceName?: string;
+      currentDeviceName?: string;
+      status: string;
+    };
+    assert.equal(persisted.status, 'ready');
+    assert.equal(persisted.phase, 'prewarm');
+    assert.equal(persisted.originalDeviceName, 'Kilo E2E-B');
+    assert.equal(persisted.currentDeviceName, expectedLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('phase-less claim: does not rename and does not persist name fields', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  let renameCalls = 0;
+
+  try {
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      rename: () => {
+        renameCalls += 1;
+      },
+    });
+
+    assert.equal(result.alreadyOwned, false);
+    assert.equal(renameCalls, 0);
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      phase?: string;
+      originalDeviceName?: string;
+      currentDeviceName?: string;
+    };
+    assert.equal(persisted.phase, undefined);
+    assert.equal(persisted.originalDeviceName, undefined);
+    assert.equal(persisted.currentDeviceName, undefined);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('same-worktree relabel: prewarm -> verify renames and updates stored phase/name', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: Array<{ id: string; name: string }> = [];
+
+  try {
+    const first = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+    assert.equal(first.alreadyOwned, false);
+    const firstLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+    const secondLabel = buildSimulatorLabel(worktreeRoot, 'verify');
+
+    const second = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'verify',
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+
+    assert.equal(second.alreadyOwned, true);
+    // The original rename (during the first claim) plus the relabel rename.
+    assert.deepEqual(renameCalls, [
+      { id: 'B', name: firstLabel },
+      { id: 'B', name: secondLabel },
+    ]);
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      phase: string;
+      originalDeviceName: string;
+      currentDeviceName: string;
+    };
+    assert.equal(persisted.phase, 'verify');
+    assert.equal(persisted.originalDeviceName, 'Kilo E2E-B');
+    assert.equal(persisted.currentDeviceName, secondLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('cross-worktree relabel is rejected (does not rename, claim still belongs to original worktree)', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const firstWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-one-'));
+  const secondWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-two-'));
+  const renameCalls: Array<{ id: string; name: string }> = [];
+
+  try {
+    claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot: firstWorktree,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+
+    assert.throws(
+      () =>
+        claimSimulator({
+          devices,
+          lockRoot,
+          worktreeRoot: secondWorktree,
+          requestedId: 'B',
+          phase: 'verify',
+          rename: (id, name) => {
+            renameCalls.push({ id, name });
+          },
+        }),
+      new RegExp(`claimed by ${firstWorktree}`)
+    );
+    // Only the original-worktree rename should have happened.
+    assert.equal(renameCalls.length, 1);
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      worktreeRoot: string;
+      phase: string;
+    };
+    assert.equal(persisted.worktreeRoot, firstWorktree);
+    assert.equal(persisted.phase, 'prewarm');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(firstWorktree, { recursive: true, force: true });
+    fs.rmSync(secondWorktree, { recursive: true, force: true });
+  }
+});
+
+test('same-owner phase-less reclaim preserves the existing labeled claim', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: Array<{ id: string; name: string }> = [];
+
+  try {
+    claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+    const before = fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8');
+
+    const second = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      // No phase — must preserve the existing label.
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+
+    assert.equal(second.alreadyOwned, true);
+    assert.equal(renameCalls.length, 1);
+    const after = fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8');
+    assert.equal(after, before);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('initial phase rename rollback success: restores original name and removes the preparing claim', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: string[] = [];
+  let caught: Error | undefined;
+
+  try {
+    try {
+      claimSimulator({
+        devices,
+        lockRoot,
+        worktreeRoot,
+        requestedId: 'B',
+        phase: 'prewarm',
+        rename: (id, name) => {
+          renameCalls.push(`${id}:${name}`);
+          if (name !== 'Kilo E2E-B') {
+            // The first rename (to the visible label) fails; the
+            // restoration (back to the original name) succeeds.
+            throw new Error('rename failed');
+          }
+        },
+      });
+    } catch (error) {
+      caught = error as Error;
+    }
+
+    assert.ok(caught, 'claimSimulator must throw when initial rename fails');
+    assert.match(String(caught), /rename failed/);
+    // The exact-own rollback must have removed the preparing claim.
+    assert.equal(fs.existsSync(path.join(lockRoot, 'B.json')), false);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('initial phase rename + restoration failure: preserves the preparing claim and exposes both failures', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  let caught: Error | undefined;
+
+  try {
+    try {
+      claimSimulator({
+        devices,
+        lockRoot,
+        worktreeRoot,
+        requestedId: 'B',
+        phase: 'prewarm',
+        rename: () => {
+          // Both the initial label rename and the restoration rename fail.
+          throw new Error('rename failed');
+        },
+      });
+    } catch (error) {
+      caught = error as Error;
+    }
+
+    assert.ok(caught, 'claimSimulator must throw when rename + restoration both fail');
+    // The preparing claim must be preserved so a peer cannot adopt
+    // unknown state.
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      status: string;
+      phase: string;
+    };
+    assert.equal(persisted.status, 'preparing');
+    assert.equal(persisted.phase, 'prewarm');
+    // The error message must surface both failures.
+    assert.match(String(caught), /rename failed/);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('releaseSimulator restores the original device name before deleting an owned ready claim', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: Array<{ id: string; name: string }> = [];
+
+  try {
+    claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+    const labelRename = renameCalls[0];
+
+    releaseSimulator({
+      deviceId: 'B',
+      lockRoot,
+      worktreeRoot,
+      rename: (id, name) => {
+        renameCalls.push({ id, name });
+      },
+    });
+
+    // The first rename was the initial claim; the second must be the
+    // restoration back to the original name (which is the device name
+    // at the time of claim, not the list-time name).
+    assert.equal(renameCalls.length, 2);
+    assert.equal(renameCalls[1].id, 'B');
+    assert.equal(renameCalls[1].name, 'Kilo E2E-B');
+    assert.notEqual(renameCalls[1].name, labelRename.name);
+    assert.equal(fs.existsSync(path.join(lockRoot, 'B.json')), false);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('releaseSimulator: restoration failure preserves the claim and throws', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  let caught: Error | undefined;
+
+  try {
+    claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      // Initial rename succeeds; release-time restoration will be
+      // forced to fail.
+      rename: () => undefined,
+    });
+
+    try {
+      releaseSimulator({
+        deviceId: 'B',
+        lockRoot,
+        worktreeRoot,
+        rename: () => {
+          throw new Error('restoration failed');
+        },
+      });
+    } catch (error) {
+      caught = error as Error;
+    }
+
+    assert.ok(caught, 'releaseSimulator must throw when restoration fails');
+    assert.match(String(caught), /restoration failed/);
+    // The claim must be preserved so a peer can investigate.
+    assert.equal(fs.existsSync(path.join(lockRoot, 'B.json')), true);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('releaseSimulator: old claim without original/current name retains existing behavior (no rename)', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  let renameCalled = false;
+
+  try {
+    // A current-format claim written by an older release of this code
+    // (status, claimId, but no phase/originalDeviceName/currentDeviceName).
+    fs.writeFileSync(
+      path.join(lockRoot, 'B.json'),
+      JSON.stringify({
+        deviceId: 'B',
+        worktreeRoot,
+        claimId: 'legacy-claim-id',
+        preparerPid: process.pid,
+        preparerIdentity: 'legacy-identity',
+        status: 'ready',
+        claimedAt: new Date().toISOString(),
+      })
+    );
+
+    releaseSimulator({
+      deviceId: 'B',
+      lockRoot,
+      worktreeRoot,
+      rename: () => {
+        renameCalled = true;
+      },
+    });
+
+    assert.equal(renameCalled, false);
+    assert.equal(fs.existsSync(path.join(lockRoot, 'B.json')), false);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('production rename command: xcrun simctl rename <device> <name>', () => {
+  // The production CLI is `xcrun simctl rename <device> <name>`. The
+  // ts file must use that exact command shape; we pin it via a source
+  // assertion so an accidental rewrite is caught by tests.
+  const source = fs.readFileSync(new URL('./mobile-simulator.ts', import.meta.url), 'utf8');
+  assert.match(source, /xcrun['"]?\s*,\s*\[['"]simctl['"]\s*,\s*['"]rename['"]/);
+});
+
+// --- Spec-review follow-up: disallowed runs in the basename ---
+
+test('buildSimulatorLabel: collapses disallowed runs in the basename to a single dash', () => {
+  // The reviewer's example: `/tmp/foo bar!!!baz` has a space and three
+  // exclamation marks. After sanitization the basename must read
+  // `foo-bar-baz` and the full label must be deterministic.
+  assert.equal(
+    buildSimulatorLabel('/tmp/foo bar!!!baz', 'verify'),
+    'Kilo E2E - foo-bar-baz - verify'
+  );
+});
+
+// --- Spec-review follow-up: phase-less -> phase upgrade records originalDeviceName ---
+
+test('phase-less -> phase upgrade: records originalDeviceName from list-time device.name and restores it on release', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: string[] = [];
+
+  try {
+    // Pre-existing phase-less ready claim owned by the same worktree.
+    // This is what a pre-protocol or earlier-release claim looks like:
+    // current-format (status, claimId, preparerPid) but no phase /
+    // originalDeviceName / currentDeviceName.
+    fs.writeFileSync(
+      path.join(lockRoot, 'B.json'),
+      JSON.stringify({
+        deviceId: 'B',
+        worktreeRoot,
+        claimId: 'pre-existing-claim-id',
+        preparerPid: process.pid,
+        preparerIdentity: 'pre-existing-identity',
+        status: 'ready',
+        claimedAt: new Date().toISOString(),
+      })
+    );
+
+    // Reclaim with a phase. The list-time device name is the source of
+    // truth for the new originalDeviceName.
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push(`${id}:${name}`);
+      },
+    });
+
+    const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+    assert.equal(result.alreadyOwned, true);
+    // The returned device must report the new visible label.
+    assert.equal(result.device.name, expectedLabel);
+
+    // First rename is the upgrade to the visible label.
+    assert.deepEqual(renameCalls, [`B:${expectedLabel}`]);
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      phase: string;
+      originalDeviceName: string;
+      currentDeviceName: string;
+      claimId: string;
+    };
+    assert.equal(persisted.phase, 'prewarm');
+    assert.equal(persisted.originalDeviceName, 'Kilo E2E-B');
+    assert.equal(persisted.currentDeviceName, expectedLabel);
+    // The claim identity must be preserved (we're upgrading an
+    // existing claim, not replacing it).
+    assert.equal(persisted.claimId, 'pre-existing-claim-id');
+
+    // Release must restore the original name before deletion.
+    releaseSimulator({
+      deviceId: 'B',
+      lockRoot,
+      worktreeRoot,
+      rename: (id, name) => {
+        renameCalls.push(`${id}:${name}`);
+      },
+    });
+
+    assert.deepEqual(renameCalls, [`B:${expectedLabel}`, `B:Kilo E2E-B`]);
+    assert.equal(fs.existsSync(path.join(lockRoot, 'B.json')), false);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+// --- Spec-review follow-up: returned device.name reflects the visible label ---
+
+test('new phase claim: returned device.name is the new visible label', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+
+  try {
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: () => undefined,
+    });
+
+    assert.equal(result.alreadyOwned, false);
+    assert.equal(result.device.id, 'B');
+    assert.equal(result.device.name, expectedLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('relabel: returned device.name is the new visible label', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const expectedLabel = buildSimulatorLabel(worktreeRoot, 'verify');
+
+  try {
+    claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: () => undefined,
+    });
+
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'verify',
+      rename: () => undefined,
+    });
+
+    assert.equal(result.alreadyOwned, true);
+    assert.equal(result.device.name, expectedLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('phase-less claim: returned device.name is the list-time device name (unchanged)', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+
+  try {
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+    });
+
+    assert.equal(result.alreadyOwned, false);
+    assert.equal(result.device.name, 'Kilo E2E-B');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('same-owner phase-less reclaim: returned device.name is the existing currentDeviceName (preserved)', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+
+  try {
+    claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: () => undefined,
+    });
+
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+    });
+
+    assert.equal(result.alreadyOwned, true);
+    // The existing label must be preserved (not the list-time name).
+    assert.equal(result.device.name, expectedLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+// --- Code-quality follow-up: corrupt optional label fields are sanitized ---
+
+test('readClaim sanitizes non-string originalDeviceName/currentDeviceName/phase so they cannot poison relabel', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+
+  try {
+    // On-disk claim with corrupted label fields: non-string
+    // originalDeviceName, non-string currentDeviceName, and an invalid
+    // phase. The reader must drop the corrupt fields (matching
+    // readClaimRaw) so a reclaim cannot persist a bogus original
+    // name — the list-time device.name must be the fallback.
+    fs.writeFileSync(
+      path.join(lockRoot, 'B.json'),
+      JSON.stringify({
+        deviceId: 'B',
+        worktreeRoot,
+        claimId: 'corrupt-fields-claim-id',
+        preparerPid: process.pid,
+        preparerIdentity: 'corrupt-fields-identity',
+        status: 'ready',
+        claimedAt: new Date().toISOString(),
+        phase: 12345,
+        originalDeviceName: { not: 'a string' },
+        currentDeviceName: ['not', 'a', 'string'],
+      })
+    );
+
+    const renameCalls: string[] = [];
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push(`${id}:${name}`);
+      },
+    });
+
+    const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+    assert.equal(result.alreadyOwned, true);
+    // The relabel must have actually renamed (not just returned the
+    // stored corrupt name).
+    assert.deepEqual(renameCalls, [`B:${expectedLabel}`]);
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      phase: string;
+      originalDeviceName: string;
+      currentDeviceName: string;
+    };
+    assert.equal(persisted.phase, 'prewarm');
+    // The corrupt originalDeviceName must be replaced by the list-time
+    // device name (sanitized readClaim treated it as undefined).
+    assert.equal(persisted.originalDeviceName, 'Kilo E2E-B');
+    assert.equal(persisted.currentDeviceName, expectedLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+// --- Code-quality follow-up: same phase but different stored label must rename ---
+
+test('relabel: same phase but different stored currentDeviceName renames and persists the target label', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: string[] = [];
+
+  try {
+    // Pre-existing claim with phase='prewarm' but a stored
+    // currentDeviceName that does not match the canonical label (e.g.,
+    // written by a buggy or older build). The relabel must notice the
+    // mismatch and actually rename, not just return the stored name.
+    const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+    const staleLabel = 'Kilo E2E - stale-basename - prewarm';
+    fs.writeFileSync(
+      path.join(lockRoot, 'B.json'),
+      JSON.stringify({
+        deviceId: 'B',
+        worktreeRoot,
+        claimId: 'stale-label-claim-id',
+        preparerPid: process.pid,
+        preparerIdentity: 'stale-label-identity',
+        status: 'ready',
+        claimedAt: new Date().toISOString(),
+        phase: 'prewarm',
+        originalDeviceName: 'Kilo E2E-B',
+        currentDeviceName: staleLabel,
+      })
+    );
+
+    const result = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push(`${id}:${name}`);
+      },
+    });
+
+    assert.equal(result.alreadyOwned, true);
+    // The rename must have fired (stale label != canonical label).
+    assert.deepEqual(renameCalls, [`B:${expectedLabel}`]);
+    assert.equal(result.device.name, expectedLabel);
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      currentDeviceName: string;
+      phase: string;
+    };
+    assert.equal(persisted.phase, 'prewarm');
+    assert.equal(persisted.currentDeviceName, expectedLabel);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+// --- Code-quality follow-up: initial rename error is the primary cause, restorationError is separate ---
+
+test('initial phase rename + restoration failure: cause is the initial rename error and restorationError exposes the restoration failure', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  let caught: (Error & { cause?: unknown; restorationError?: unknown }) | undefined;
+
+  try {
+    try {
+      claimSimulator({
+        devices,
+        lockRoot,
+        worktreeRoot,
+        requestedId: 'B',
+        phase: 'prewarm',
+        rename: () => {
+          // Both the initial label rename and the restoration rename
+          // fail with distinct messages so the test can distinguish
+          // them.
+          throw new Error('initial-rename-failed');
+        },
+      });
+    } catch (error) {
+      caught = error as Error & { cause?: unknown; restorationError?: unknown };
+    }
+
+    assert.ok(caught, 'claimSimulator must throw when rename + restoration both fail');
+    // The preparing claim must be preserved so a peer cannot adopt
+    // unknown state.
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      status: string;
+      phase: string;
+    };
+    assert.equal(persisted.status, 'preparing');
+    assert.equal(persisted.phase, 'prewarm');
+
+    // The primary cause must be the initial rename error, not the
+    // restoration error. The restoration failure is exposed
+    // separately as `restorationError`.
+    assert.ok(caught.cause instanceof Error, 'cause must be the initial rename error');
+    assert.match((caught.cause as Error).message, /initial-rename-failed/);
+    assert.ok(caught.restorationError instanceof Error, 'restorationError must be set');
+    assert.match((caught.restorationError as Error).message, /initial-rename-failed/);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('initial phase rename rollback success: cause is the initial rename error and restorationError is undefined', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  let caught: (Error & { cause?: unknown; restorationError?: unknown }) | undefined;
+
+  try {
+    try {
+      claimSimulator({
+        devices,
+        lockRoot,
+        worktreeRoot,
+        requestedId: 'B',
+        phase: 'prewarm',
+        rename: (id, name) => {
+          if (name !== 'Kilo E2E-B') {
+            // The first rename (to the visible label) fails; the
+            // restoration (back to the original name) succeeds.
+            throw new Error('initial-rename-failed');
+          }
+        },
+      });
+    } catch (error) {
+      caught = error as Error & { cause?: unknown; restorationError?: unknown };
+    }
+
+    assert.ok(caught, 'claimSimulator must throw when initial rename fails');
+    // The primary cause must be the initial rename error.
+    assert.ok(caught.cause instanceof Error, 'cause must be the initial rename error');
+    assert.match((caught.cause as Error).message, /initial-rename-failed/);
+    // Restoration succeeded, so restorationError must be undefined.
+    assert.equal(caught.restorationError, undefined);
+    // The exact-own rollback must have removed the preparing claim.
+    assert.equal(fs.existsSync(path.join(lockRoot, 'B.json')), false);
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+// --- Code-quality follow-up: same-worktree, same-phase, same-label reclaim is idempotent ---
+
+test('same-worktree, same-phase, same-label reclaim is idempotent (no rename, record unchanged)', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renameCalls: string[] = [];
+
+  try {
+    // First claim establishes the label.
+    const first = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push(`${id}:${name}`);
+      },
+    });
+    const expectedLabel = buildSimulatorLabel(worktreeRoot, 'prewarm');
+    assert.equal(first.alreadyOwned, false);
+    assert.deepEqual(renameCalls, [`B:${expectedLabel}`]);
+
+    // Snapshot the on-disk claim before the second (idempotent) claim.
+    const before = fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8');
+
+    // Second claim with the same phase and the same label must be a
+    // no-op: rename must NOT fire again and the record must be
+    // byte-for-byte unchanged. The returned device.name must still
+    // report the current label.
+    const second = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'prewarm',
+      rename: (id, name) => {
+        renameCalls.push(`${id}:${name}`);
+      },
+    });
+
+    assert.equal(second.alreadyOwned, true);
+    // No additional rename was issued.
+    assert.deepEqual(renameCalls, [`B:${expectedLabel}`]);
+    // The returned device name is the current label.
+    assert.equal(second.device.name, expectedLabel);
+    // The on-disk claim is byte-for-byte unchanged.
+    const after = fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8');
+    assert.equal(after, before);
   } finally {
     fs.rmSync(lockRoot, { recursive: true, force: true });
     fs.rmSync(worktreeRoot, { recursive: true, force: true });

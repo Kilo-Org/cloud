@@ -213,7 +213,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/kiloclaw-billing',
   },
   'event-service': {
-    group: 'kiloclaw',
+    group: 'cloud-agent',
     dependsOn: [],
     dir: 'services/event-service',
   },

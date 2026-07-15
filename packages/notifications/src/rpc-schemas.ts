@@ -143,6 +143,7 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   executionId: z.string().min(1),
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
+  suppressIfViewingSession: z.boolean().optional(),
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
   typeof sendCloudAgentSessionNotificationInputSchema

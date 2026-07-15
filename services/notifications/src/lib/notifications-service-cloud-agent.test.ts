@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import {
+  sendCloudAgentSessionNotificationInputSchema,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+} from '@kilocode/notifications';
 
 import {
   dispatchCloudAgentSessionPush,
@@ -73,6 +77,48 @@ describe('dispatchCloudAgentSessionPush', () => {
       })
     );
     expect(deps.hasOrganizationAccess).not.toHaveBeenCalled();
+  });
+
+  it('passes the CLI session presence context when requested', async () => {
+    const deps = createDeps();
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_1',
+        status: 'completed',
+        body: 'Finished',
+        suppressIfViewingSession: true,
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({ presenceContext: '/presence/cli-session/ses_1' })
+    );
+  });
+
+  it('does not pass a presence context when suppression is explicitly disabled', async () => {
+    const deps = createDeps();
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_1',
+        status: 'completed',
+        body: 'Finished',
+        suppressIfViewingSession: false,
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({ presenceContext: null })
+    );
   });
 
   it('keeps follow-up executions in one session idempotent independently', async () => {
@@ -275,5 +321,28 @@ describe('dispatchSessionReadyPush', () => {
     );
 
     expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
+  });
+});
+
+describe('sendCloudAgentSessionNotificationInputSchema', () => {
+  it('accepts suppressIfViewingSession and strips unrelated fields', () => {
+    const parsed = sendCloudAgentSessionNotificationInputSchema.parse({
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+      executionId: 'exec_1',
+      status: 'completed',
+      body: 'Finished',
+      suppressIfViewingSession: true,
+      extra: 'stripped',
+    });
+
+    expect(parsed).toEqual({
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+      executionId: 'exec_1',
+      status: 'completed',
+      body: 'Finished',
+      suppressIfViewingSession: true,
+    });
   });
 });

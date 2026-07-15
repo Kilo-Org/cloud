@@ -1,4 +1,7 @@
-import { type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
+import {
+  type CodeReviewPlatform,
+  type RepositoryModelOverrideInput,
+} from '@kilocode/app-shared/code-review';
 
 import { parseParam } from '@/lib/route-params';
 
@@ -93,6 +96,7 @@ export type ReviewConfigData = {
   gateThreshold: 'off' | 'all' | 'warning' | 'critical';
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: (number | string)[];
+  repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
 };
 
@@ -105,5 +109,6 @@ export type ConfigPatch = Partial<{
   gateThreshold: ReviewConfigData['gateThreshold'];
   repositorySelectionMode: ReviewConfigData['repositorySelectionMode'];
   selectedRepositoryIds: (number | string)[];
+  repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
 }>;

@@ -1324,6 +1324,33 @@ export const CodeReviewCouncilConfigSchema = z.object({
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 
+// Per-repository model override. Ties a repository to a specific model so a repo
+// can run its standard review on a different model than the global default. A repo
+// without an entry here uses the config's global `model_slug`.
+//
+// Two identifiers are stored intentionally, each serving a lookup the other can't:
+//   - `repository_id` matches `selected_repository_ids` (GitHub/GitLab numeric,
+//     Bitbucket UUID). Used at save time for selection/pruning parity.
+//   - `repo_full_name` is the platform's canonical full name and the ONLY repo
+//     identifier persisted on the review row, so it is what the dispatch-time model
+//     lookup matches against (numeric IDs are not on the row for GitHub/Bitbucket).
+export const RepositoryModelOverrideSchema = z.object({
+  // Matched by exact value and type against the platform repository ID — never coerced.
+  repository_id: z.union([z.number(), z.string()]),
+  // "owner/repo" (GitHub), path_with_namespace (GitLab), "workspace/slug" (Bitbucket).
+  repo_full_name: z.string().max(511),
+  model_slug: z.string().max(512),
+  // Thinking effort variant name (e.g. "high", "max") — null means model default,
+  // matching the global `thinking_effort` field below.
+  thinking_effort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+});
+export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
+
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
   focus_areas: z.array(z.string()),
@@ -1343,6 +1370,8 @@ export const CodeReviewAgentConfigSchema = z.object({
   selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
+  // Per-repository model overrides. Absent/empty = every repo uses the global model_slug.
+  repository_model_overrides: z.array(RepositoryModelOverrideSchema).optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.

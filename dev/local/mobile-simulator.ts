@@ -19,6 +19,15 @@ type CommandResult = {
 };
 type ExecWithOutputFn = (command: string, args: readonly string[]) => CommandResult;
 type ClaimStatus = 'preparing' | 'ready';
+// Phase is recorded alongside the visible simulator name so an operator
+// inspecting the device list can tell at a glance which agent role
+// (prewarm or verify) currently owns the simulator. Phase-less claims
+// keep the legacy pre-protocol behavior and do not rename the device.
+export type SimulatorPhase = 'prewarm' | 'verify';
+// Rename hook used to set and restore the visible simulator name.
+// Production wires this to `xcrun simctl rename <device> <name>`.
+// Injectable for deterministic tests.
+export type RenameFn = (deviceId: string, name: string) => void;
 // All fields are optional in the exported type. Current-format claims
 // require deviceId, worktreeRoot, claimId, status, and claimedAt;
 // legacy claims (no `status`) require only worktreeRoot. The
@@ -37,12 +46,29 @@ type ClaimRecord = {
   preparerIdentity?: string;
   status?: ClaimStatus;
   claimedAt?: string;
+  // Ownership-aware label fields. Populated only when a phase is
+  // supplied at claim time. `originalDeviceName` is the simulator's
+  // name at the moment of claim and is restored on release;
+  // `currentDeviceName` is the visible label. Both are absent on
+  // phase-less and pre-protocol claims for backward compatibility.
+  phase?: SimulatorPhase;
+  originalDeviceName?: string;
+  currentDeviceName?: string;
 };
 type ClaimArgs = {
   devices: SimulatorDevice[];
   lockRoot: string;
   worktreeRoot: string;
   requestedId?: string;
+  // Optional phase for ownership-aware labeling. When set, the device
+  // is renamed to a deterministic label and the original/current names
+  // are persisted on the claim record. When undefined, the claim
+  // behaves like a pre-protocol claim (no rename, no label fields).
+  phase?: SimulatorPhase;
+  // Rename hook. Required for phase claims. Defaults to
+  // `xcrun simctl rename <device> <name>` in production via `main`.
+  // Tests inject a recording stub.
+  rename?: RenameFn;
   prepare?: (device: SimulatorDevice) => void;
   // Recovery reset contract: REQUIRED for abandoned-preparation
   // recovery. The callback receives a deviceId and must return a
@@ -69,6 +95,81 @@ type ClaimArgs = {
     rmSync?: (filePath: string, options: { force?: boolean }) => void;
   };
 };
+
+// Build the deterministic visible label for a phase-claimed simulator:
+// `Kilo E2E - <sanitized-worktree-basename> - <phase>`, bounded to 64
+// characters. The worktree basename is sanitized by collapsing runs of
+// characters outside `[A-Za-z0-9._-]` to a single dash, trimming
+// leading/trailing separators, and falling back to `worktree` when the
+// result is empty. If the sanitized label still exceeds 64 characters,
+// the worktree segment is truncated to fit. Pure helper exported for
+// tests.
+function buildSimulatorLabel(worktreeRoot: string, phase: SimulatorPhase): string {
+  const suffix = ` - ${phase}`;
+  const prefix = 'Kilo E2E - ';
+  const maxWorktreeSegment = 64 - prefix.length - suffix.length;
+  const basename = path.basename(worktreeRoot);
+  const sanitized =
+    basename
+      .replace(/[^A-Za-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, Math.max(0, maxWorktreeSegment))
+      .replace(/^-+|-+$/g, '') || 'worktree';
+  const label = `${prefix}${sanitized}${suffix}`;
+  return label.length <= 64 ? label : label.slice(0, 64).replace(/-+$/, '');
+}
+
+// Parse the CLI arguments for the `claim` and `release` commands.
+// Supports:
+//   - `claim`
+//   - `claim <udid>`
+//   - `claim --phase <prewarm|verify>`
+//   - `claim <udid> --phase <prewarm|verify>`
+//   - `claim --phase <prewarm|verify> <udid>`
+//   - `release <udid>`
+// Throws a clear usage error on missing, duplicate, or invalid
+// `--phase` values, missing `release` udid, or unknown commands. Pure
+// helper exported for tests.
+function parseClaimArgs(
+  argv: readonly string[]
+):
+  | { command: 'claim'; udid: string | undefined; phase: SimulatorPhase | undefined }
+  | { command: 'release'; udid: string } {
+  const [command, ...rest] = argv;
+  if (command === 'release') {
+    if (rest.length !== 1) {
+      throw new Error('Usage: release <udid>');
+    }
+    return { command: 'release', udid: rest[0] };
+  }
+  if (command !== 'claim') {
+    throw new Error('Usage: claim [--phase <prewarm|verify>] [<udid>] | release <udid>');
+  }
+  let phase: SimulatorPhase | undefined;
+  let phaseSeen = false;
+  const positional: string[] = [];
+  for (let i = 0; i < rest.length; i += 1) {
+    const arg = rest[i];
+    if (arg === '--phase') {
+      if (phaseSeen) {
+        throw new Error('Usage: --phase may only be specified once');
+      }
+      phaseSeen = true;
+      const value = rest[i + 1];
+      if (value !== 'prewarm' && value !== 'verify') {
+        throw new Error('Usage: --phase must be one of: prewarm, verify');
+      }
+      phase = value;
+      i += 1;
+      continue;
+    }
+    positional.push(arg);
+  }
+  if (positional.length > 1) {
+    throw new Error('Usage: claim [--phase <prewarm|verify>] [<udid>]');
+  }
+  return { command: 'claim', udid: positional[0], phase };
+}
 
 // Typed error thrown by `bootSimulator` so the caller can distinguish a
 // prepare failure (safe to roll back the claim) from a prepare failure whose
@@ -231,6 +332,17 @@ function readClaim(
     return undefined;
   }
   const claim = obj as unknown as ClaimRecord;
+  // Sanitize optional label fields to the same shape as readClaimRaw:
+  // phase must be exactly 'prewarm' or 'verify'; the two name fields
+  // must be strings. Corrupt values (wrong type, invalid phase string)
+  // are dropped to undefined so a subsequent relabel cannot persist a
+  // bogus original name or label. The claim stays valid; only the
+  // optional fields are coerced.
+  claim.phase = obj.phase === 'prewarm' || obj.phase === 'verify' ? obj.phase : undefined;
+  claim.originalDeviceName =
+    typeof obj.originalDeviceName === 'string' ? obj.originalDeviceName : undefined;
+  claim.currentDeviceName =
+    typeof obj.currentDeviceName === 'string' ? obj.currentDeviceName : undefined;
   if (claim.status === 'preparing') return claim;
   // Ready: check worktreeRoot liveness.
   if (claim.worktreeRoot && fs.existsSync(claim.worktreeRoot)) return claim;
@@ -290,6 +402,11 @@ function readClaimRaw(
       preparerIdentity: typeof obj.preparerIdentity === 'string' ? obj.preparerIdentity : undefined,
       status: obj.status as ClaimStatus,
       claimedAt: obj.claimedAt as string,
+      phase: obj.phase === 'prewarm' || obj.phase === 'verify' ? obj.phase : undefined,
+      originalDeviceName:
+        typeof obj.originalDeviceName === 'string' ? obj.originalDeviceName : undefined,
+      currentDeviceName:
+        typeof obj.currentDeviceName === 'string' ? obj.currentDeviceName : undefined,
     },
   };
 }
@@ -415,7 +532,8 @@ function buildPreparingClaim(
   deviceId: string,
   worktreeRoot: string,
   claimId: string,
-  processIdentity: (pid: number) => string | undefined
+  processIdentity: (pid: number) => string | undefined,
+  phase?: SimulatorPhase
 ): Record<string, unknown> {
   const record: Record<string, unknown> = {
     deviceId,
@@ -428,6 +546,9 @@ function buildPreparingClaim(
   const identity = processIdentity(process.pid);
   if (identity !== undefined) {
     record.preparerIdentity = identity;
+  }
+  if (phase !== undefined) {
+    record.phase = phase;
   }
   return record;
 }
@@ -475,14 +596,82 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
             fs.writeFileSync(
               lockPath(lockRoot, device.id),
               JSON.stringify(
-                buildPreparingClaim(device.id, worktreeRoot, claimId, processIdentity)
+                buildPreparingClaim(device.id, worktreeRoot, claimId, processIdentity, args.phase)
               ),
               { flag: 'w' }
             );
             return { device, alreadyOwned: false, claimId, recovering: true };
           }
           if (existing.worktreeRoot === worktreeRoot) {
-            return { device, alreadyOwned: true };
+            // Same-worktree ready reclaim. A phase set on the call may
+            // relabel an existing labeled claim to a new phase
+            // (`Kilo E2E - <basename> - <phase>`). A phase-less reclaim
+            // must preserve the existing label — the original
+            // originalDeviceName and currentDeviceName (when present)
+            // are left intact.
+            if (args.phase === undefined) {
+              return {
+                device: existing.currentDeviceName
+                  ? { ...device, name: existing.currentDeviceName }
+                  : device,
+                alreadyOwned: true,
+              };
+            }
+            const targetLabel = buildSimulatorLabel(worktreeRoot, args.phase);
+            if (existing.currentDeviceName === targetLabel && existing.phase === args.phase) {
+              return { device: { ...device, name: targetLabel }, alreadyOwned: true };
+            }
+            // Relabel fires when EITHER the stored phase differs from
+            // the requested phase OR the stored currentDeviceName does
+            // not match the canonical target label. The phase-only
+            // check would miss a claim whose stored label is stale
+            // (e.g., written by an older build, or by a peer with a
+            // different worktree basename that later relinked).
+            if (existing.phase !== args.phase || existing.currentDeviceName !== targetLabel) {
+              if (!args.rename) {
+                throw new Error(
+                  `Simulator ${device.id} relabel to ${args.phase} requires a rename hook`
+                );
+              }
+              if (existing.claimId === undefined) {
+                const upgraded: ClaimRecord = {
+                  deviceId: device.id,
+                  worktreeRoot,
+                  claimId: randomUUID(),
+                  status: 'ready',
+                  claimedAt: new Date().toISOString(),
+                  originalDeviceName: device.name,
+                  currentDeviceName: device.name,
+                };
+                fs.writeFileSync(lockPath(lockRoot, device.id), JSON.stringify(upgraded), {
+                  flag: 'w',
+                });
+                existing.claimId = upgraded.claimId;
+                existing.originalDeviceName = upgraded.originalDeviceName;
+                existing.currentDeviceName = upgraded.currentDeviceName;
+              }
+              args.rename(device.id, targetLabel);
+              // Persist the new label/phase under the mutation lock. We
+              // only touch the record when the exact claimId is still
+              // current (which it is — we hold the lock). When no
+              // originalDeviceName is stored (legacy or phase-less
+              // claim being upgraded), the list-time device name is the
+              // source of truth — it must be persisted so release can
+              // restore it.
+              const fresh = readClaimRaw(lockRoot, device.id);
+              if (fresh.kind !== 'current' || fresh.record.claimId !== existing.claimId) {
+                throw new Error(`Simulator ${device.id} relabel failed: claim record changed`);
+              }
+              const next: Record<string, unknown> = {
+                ...fresh.record,
+                phase: args.phase,
+                currentDeviceName: targetLabel,
+                originalDeviceName:
+                  existing.originalDeviceName ?? fresh.record.originalDeviceName ?? device.name,
+              };
+              fs.writeFileSync(lockPath(lockRoot, device.id), JSON.stringify(next), { flag: 'w' });
+            }
+            return { device: { ...device, name: targetLabel }, alreadyOwned: true };
           }
           throw new Error(`Simulator ${device.id} is claimed by ${existing.worktreeRoot}`);
         }
@@ -493,7 +682,9 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
         const claimId = randomUUID();
         fs.writeFileSync(
           lockPath(lockRoot, device.id),
-          JSON.stringify(buildPreparingClaim(device.id, worktreeRoot, claimId, processIdentity)),
+          JSON.stringify(
+            buildPreparingClaim(device.id, worktreeRoot, claimId, processIdentity, args.phase)
+          ),
           { flag: 'wx' }
         );
         return { device, alreadyOwned: false, claimId, recovering: false };
@@ -561,6 +752,57 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
               });
       }
 
+      // Phase rename happens after prepare and before finalization. We
+      // capture the original device name (the list-time `device.name`)
+      // so it can be restored on release. If the rename fails we try to
+      // restore the original name; if the restore also fails the
+      // preparing claim is preserved (a peer must not be able to adopt
+      // a device whose visible name is unknown).
+      let labelInfo: { label: string; originalName: string } | undefined;
+      let renameError: unknown;
+      if (!prepareError && args.phase !== undefined) {
+        if (!args.rename) {
+          prepareError = new PrepareError(
+            `Simulator ${device.id} phase claim requires a rename hook`,
+            { shutdownFailed: false }
+          );
+        } else {
+          const label = buildSimulatorLabel(worktreeRoot, args.phase);
+          const originalName = device.name;
+          try {
+            args.rename(device.id, label);
+            labelInfo = { label, originalName };
+          } catch (initialRenameError) {
+            renameError = initialRenameError;
+            let restorationError: unknown;
+            try {
+              args.rename(device.id, originalName);
+            } catch (restoreError) {
+              restorationError = restoreError;
+            }
+            const restoreSucceeded = restorationError === undefined;
+            const message = `Simulator ${device.id} rename to ${label} failed${
+              restoreSucceeded ? ' (restored original name)' : ' (restoration also failed)'
+            }: ${initialRenameError instanceof Error ? initialRenameError.message : String(initialRenameError)}`;
+            // The initial rename error is the primary cause; the
+            // restoration failure (if any) is exposed separately as
+            // `restorationError` so operators can see both without the
+            // restoration error masking the original failure.
+            prepareError = new PrepareError(message, {
+              shutdownFailed: !restoreSucceeded,
+              cause: initialRenameError,
+            });
+            (prepareError as PrepareError & { renameError?: unknown }).renameError =
+              initialRenameError;
+            (prepareError as PrepareError & { restorationError?: unknown }).restorationError =
+              restorationError;
+            (
+              prepareError as PrepareError & { restorationSucceeded?: boolean }
+            ).restorationSucceeded = restoreSucceeded;
+          }
+        }
+      }
+
       // Reacquire the mutation lock to finalize (mark ready) or roll back
       // (remove the preparing claim). The on-disk record is the source of
       // truth; we only touch it when our exact claimId is still current.
@@ -576,19 +818,16 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
         const result = readClaimRaw(lockRoot, device.id);
         const rmSync = args.fileOperations?.rmSync ?? fs.rmSync;
         if (prepareError) {
+          // When a rename failure's restoration also failed, the device
+          // is in an unknown visible-name state — preserve the
+          // preparing claim so a peer cannot adopt it.
           if (prepareError.shutdownFailed) {
-            // Preserve the preparing claim so a peer cannot adopt a
-            // device that may still be running. The original prepare
-            // error still surfaces to the caller via the throw below.
             return;
           }
           if (result.kind === 'current' && result.record.claimId === claimId) {
             try {
               rmSync(lockPath(lockRoot, device.id), { force: true });
             } catch (cleanupError) {
-              // Attach the cleanup failure to the original prepare error
-              // so the operator sees both; the original prepare failure
-              // remains the primary reason the claim did not succeed.
               prepareError = new PrepareError(prepareError.message, {
                 shutdownFailed: false,
                 cause: prepareError.cause ?? prepareError,
@@ -597,8 +836,6 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
                 cleanupError;
             }
           }
-          // For missing/corrupt/replaced records during rollback, do
-          // nothing — the original prepare error will be thrown.
           return;
         }
         if (result.kind === 'missing') {
@@ -612,27 +849,33 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
           );
         }
         if (result.kind === 'legacy') {
-          // A legacy claim appeared mid-prepare (e.g., a peer on an
-          // older worktree wrote it). We do not own it; fail closed.
           throw new Error(
             `Simulator ${device.id} finalization failed: claim record was replaced by a legacy entry`
           );
         }
-        // result.kind === 'current'
         if (result.record.claimId !== claimId) {
           throw new Error(
             `Simulator ${device.id} finalization failed: claim record was replaced by another owner`
           );
         }
-        fs.writeFileSync(
-          lockPath(lockRoot, device.id),
-          JSON.stringify({ ...result.record, status: 'ready' }),
-          { flag: 'w' }
-        );
+        const nextRecord: Record<string, unknown> = { ...result.record, status: 'ready' };
+        if (labelInfo) {
+          nextRecord.phase = args.phase;
+          nextRecord.originalDeviceName = labelInfo.originalName;
+          nextRecord.currentDeviceName = labelInfo.label;
+        }
+        fs.writeFileSync(lockPath(lockRoot, device.id), JSON.stringify(nextRecord), { flag: 'w' });
       });
 
       if (prepareError) throw prepareError;
-      return { device: outcome.device, alreadyOwned: false };
+      // For phase claims the visible simulator name is the label we
+      // just applied; for phase-less claims the list-time device name
+      // is unchanged. Returning the correct name lets callers and the
+      // CLI print the visible label.
+      return {
+        device: labelInfo ? { ...outcome.device, name: labelInfo.label } : outcome.device,
+        alreadyOwned: false,
+      };
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
         if (requestedId) {
@@ -665,6 +908,12 @@ function releaseSimulator(args: {
   deviceId: string;
   lockRoot: string;
   worktreeRoot: string;
+  // Optional rename hook used to restore the original simulator name
+  // before deleting an owned ready claim. When a current-format claim
+  // carries `originalDeviceName`, the hook is invoked to restore it
+  // before removal. Old/legacy claims without `originalDeviceName`
+  // skip the restore (no name was set by this protocol).
+  rename?: RenameFn;
 }): void {
   withClaimMutationLock(args.lockRoot, args.deviceId, () => {
     const result = readClaimRaw(args.lockRoot, args.deviceId);
@@ -688,6 +937,16 @@ function releaseSimulator(args: {
       if (result.record.worktreeRoot !== args.worktreeRoot) {
         throw new Error(`Simulator ${args.deviceId} is claimed by ${result.record.worktreeRoot}`);
       }
+      // Restore the original simulator name before deleting the claim.
+      // A restoration failure preserves the claim and surfaces the
+      // error so a peer (or operator) can investigate.
+      if (
+        args.rename !== undefined &&
+        typeof result.record.originalDeviceName === 'string' &&
+        result.record.originalDeviceName.length > 0
+      ) {
+        args.rename(args.deviceId, result.record.originalDeviceName);
+      }
     } else if (result.worktreeRoot !== args.worktreeRoot) {
       // Legacy claim — treat as ready, but enforce worktree ownership.
       throw new Error(`Simulator ${args.deviceId} is claimed by ${result.worktreeRoot}`);
@@ -708,18 +967,27 @@ function listIosDevices(): SimulatorDevice[] {
     .map(device => ({ id: device.udid, name: device.name, state: device.state }));
 }
 
+// Production rename: `xcrun simctl rename <device> <name>`. Throws on
+// non-zero exit so callers can handle failures (e.g., restore the
+// original name on a relabel or claim rollback).
+function defaultRename(deviceId: string, name: string): void {
+  execFileSync('xcrun', ['simctl', 'rename', deviceId, name], { stdio: 'ignore' });
+}
+
 function main(): void {
-  const [command, requestedId] = process.argv.slice(2);
+  const parsed = parseClaimArgs(process.argv.slice(2));
   const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
     encoding: 'utf8',
   }).trim();
   const lockRoot = path.join(os.tmpdir(), 'kilo-mobile-simulator-claims');
-  if (command === 'claim') {
+  if (parsed.command === 'claim') {
     const claim = claimSimulator({
       devices: listIosDevices(),
       lockRoot,
       worktreeRoot,
-      requestedId,
+      requestedId: parsed.udid,
+      phase: parsed.phase,
+      rename: defaultRename,
       prepare: device => bootSimulator(device),
       // Production recovery reset: re-read the actual simulator state
       // at decision time (not the list-time snapshot). If the device
@@ -749,15 +1017,19 @@ function main(): void {
         return { id: deviceId, name: deviceId, state: 'Shutdown' as const };
       },
     });
-    console.log(JSON.stringify({ ...claim, worktreeRoot }));
+    const label =
+      parsed.phase !== undefined ? buildSimulatorLabel(worktreeRoot, parsed.phase) : undefined;
+    console.log(JSON.stringify({ ...claim, worktreeRoot, ...(label ? { label } : {}) }));
     return;
   }
-  if (command === 'release' && requestedId) {
-    releaseSimulator({ deviceId: requestedId, lockRoot, worktreeRoot });
-    console.log(`Released ${requestedId}`);
-    return;
-  }
-  throw new Error('Usage: pnpm dev:mobile:simulator <claim [udid]|release <udid>>');
+  // parsed.command === 'release'
+  releaseSimulator({
+    deviceId: parsed.udid,
+    lockRoot,
+    worktreeRoot,
+    rename: defaultRename,
+  });
+  console.log(`Released ${parsed.udid}`);
 }
 
 const isMain =
@@ -771,5 +1043,5 @@ if (isMain) {
   }
 }
 
-export { bootSimulator, claimSimulator, releaseSimulator };
-export type { SimulatorDevice, ClaimRecord, ClaimStatus };
+export { bootSimulator, buildSimulatorLabel, claimSimulator, parseClaimArgs, releaseSimulator };
+export type { ClaimRecord, ClaimStatus, RenameFn, SimulatorDevice, SimulatorPhase };

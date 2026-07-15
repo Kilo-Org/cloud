@@ -88,16 +88,4 @@ describe('createCachedFetch', () => {
     expect(await get()).toBe(10); // stale fallback
     expect(await get()).toBe(20); // recovered
   });
-
-  test('re-fetches after explicit invalidation', async () => {
-    const fetcher = jest
-      .fn<() => Promise<number>>()
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(2);
-    const get = createCachedFetch(fetcher, 10_000, 0);
-
-    expect(await get()).toBe(1);
-    get.invalidate();
-    expect(await get()).toBe(2);
-  });
 });

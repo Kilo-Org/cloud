@@ -9,7 +9,7 @@
 export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number, defaultValue: T) {
   let cached: { value: T; at: number } | null = null;
 
-  async function get(): Promise<T> {
+  return async function get(): Promise<T> {
     if (cached && Date.now() - cached.at < ttlMs) {
       return cached.value;
     }
@@ -20,11 +20,5 @@ export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number, d
     } catch {
       return cached?.value ?? defaultValue;
     }
-  }
-
-  get.invalidate = () => {
-    cached = null;
   };
-
-  return get;
 }

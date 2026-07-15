@@ -123,6 +123,9 @@ export type { SessionStorage, StorageMutation } from './storage/types';
 export { stripPartContentIfFile } from './part-utils';
 export { splitByContiguousPrefix } from './array-utils';
 
+export { calculateContextUsagePercentage } from './context-usage';
+export type { ContextUsage } from './context-usage';
+
 export type {
   MessageInfo,
   ProcessedMessage,

@@ -1,7 +1,16 @@
 import { withDORetry } from '@kilocode/worker-utils';
+import { and, eq } from 'drizzle-orm';
+import { getWorkerDb } from '@kilocode/db/client';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 
 import { getSessionIngestDO, type IngestResult } from '../dos/SessionIngestDO';
+import { getUserConnectionDO } from '../dos/UserConnectionDO';
+import type { AttentionSignal } from '../dos/session-ingest-attention';
 import type { Env } from '../env';
+import {
+  dispatchRemoteSessionAttentionSignal,
+  isEligibleForRemoteSessionAttention,
+} from '../remote-session-notifications';
 import {
   INGEST_CHUNK_MAX_BYTES,
   INGEST_CHUNK_MAX_ITEMS,
@@ -61,7 +70,9 @@ type LegacyOptions = {
   startedAt: number;
 };
 
-type DirectIngestResult = IngestResult | { accepted?: undefined; changes: IngestResult['changes'] };
+type DirectIngestResult =
+  | IngestResult
+  | { accepted?: undefined; changes: IngestResult['changes']; attentionSignals?: undefined };
 
 type CommonEvent = {
   ingestRequestId: string;
@@ -265,7 +276,16 @@ export async function handleDirectIngestRequest(
     return { status: 404, body: { success: false, error: 'session_not_found' } };
   }
 
-  await runMetadataProjection(request, ingestResult.changes);
+  const postCommitPromise = runDirectPostCommitTasks(
+    request,
+    ingestResult.changes,
+    ingestResult.attentionSignals ?? []
+  );
+  if (request.executionContext) {
+    request.executionContext.waitUntil(postCommitPromise);
+  } else {
+    await postCommitPromise;
+  }
   logEvent('info', {
     event: 'direct_ingest_ok',
     ...eventBase(request, startedAt, {
@@ -327,7 +347,7 @@ async function runMetadataProjection(
   changes: Array<{ name: string; value: string | null }>
 ): Promise<void> {
   if (changes.length === 0) return;
-  const metadataPromise = applyMetadataChanges(
+  await applyMetadataChanges(
     request.env,
     request.kiloUserId,
     request.sessionId,
@@ -341,11 +361,60 @@ async function runMetadataProjection(
       error: errorMessage(error),
     });
   });
+}
 
-  if (request.executionContext) {
-    request.executionContext.waitUntil(metadataPromise);
-  } else {
-    await metadataPromise;
+async function runDirectPostCommitTasks(
+  request: DirectIngestRequest,
+  changes: Array<{ name: string; value: string | null }>,
+  attentionSignals: AttentionSignal[]
+): Promise<void> {
+  await runMetadataProjection(request, changes);
+  if (attentionSignals.length === 0) return;
+
+  try {
+    const db = getWorkerDb(request.env.HYPERDRIVE.connectionString);
+    const [session] = await db
+      .select({
+        parentSessionId: cli_sessions_v2.parent_session_id,
+      })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, request.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, request.kiloUserId)
+        )
+      )
+      .limit(1);
+    if (!session || !isEligibleForRemoteSessionAttention(session)) return;
+
+    const userConnection = getUserConnectionDO(request.env, { kiloUserId: request.kiloUserId });
+    for (const signal of attentionSignals) {
+      try {
+        await dispatchRemoteSessionAttentionSignal(
+          { kiloUserId: request.kiloUserId, sessionId: request.sessionId, signal },
+          {
+            hasActiveCliSession: () => userConnection.hasActiveCliSession(request.sessionId),
+            sendPush: pushParams =>
+              request.env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),
+          }
+        );
+      } catch (error) {
+        console.error({
+          event: 'direct_ingest_attention_error',
+          ingestRequestId: request.ingestRequestId,
+          sessionId: request.sessionId,
+          signalId: signal.signalId,
+          error: errorMessage(error),
+        });
+      }
+    }
+  } catch (error) {
+    console.error({
+      event: 'direct_ingest_attention_error',
+      ingestRequestId: request.ingestRequestId,
+      sessionId: request.sessionId,
+      error: errorMessage(error),
+    });
   }
 }
 

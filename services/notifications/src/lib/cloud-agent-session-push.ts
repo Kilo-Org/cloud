@@ -1,4 +1,4 @@
-import { presenceContextForPlatform } from '@kilocode/event-service';
+import { presenceContextForCliSession, presenceContextForPlatform } from '@kilocode/event-service';
 import {
   sendCloudAgentSessionNotificationInputSchema,
   sendSessionReadyNotificationInputSchema,
@@ -81,7 +81,9 @@ export async function dispatchCloudAgentSessionPush(
     parsed.userId,
     parsed.cliSessionId,
     session => ({
-      presenceContext: null,
+      presenceContext: parsed.suppressIfViewingSession
+        ? presenceContextForCliSession(parsed.cliSessionId)
+        : null,
       idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
       title: session.title ?? 'Agent session',
       body: parsed.body,

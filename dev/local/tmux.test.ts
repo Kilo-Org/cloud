@@ -5,7 +5,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 
-import { breakPane, buildInteractiveShellCommand, listWindows } from './tmux';
+import {
+  breakPane,
+  buildInteractiveShellCommand,
+  captureServicePane,
+  listWindows,
+  setPaneServiceIdentity,
+} from './tmux';
 import { buildStartCommand, restartServiceInTmux } from './runner';
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
@@ -32,6 +38,49 @@ const hasTmux = (() => {
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+test(
+  'captureServicePane follows a service after the dashboard moves its pane',
+  { skip: !hasTmux },
+  () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'mobile';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      tmux(
+        'new-window',
+        '-d',
+        '-t',
+        sessionName,
+        '-n',
+        serviceName,
+        '/bin/sh',
+        '-c',
+        'printf "worktree-mobile-pane\\n"; sleep 120'
+      );
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+      setPaneServiceIdentity(sessionName, serviceWindow.index, 0, serviceName);
+      tmux(
+        'join-pane',
+        '-h',
+        '-s',
+        `${sessionName}:${serviceWindow.index}.0`,
+        '-t',
+        `${sessionName}:0.0`
+      );
+      assert.match(captureServicePane(sessionName, serviceName, 20), /worktree-mobile-pane/);
+    } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
 
 test(
   'breakPane keeps the requested service window name after tmux automatic rename',
@@ -122,6 +171,77 @@ test(
       await sleep(1200);
       assert.ok(listWindows(sessionName).some(window => window.name === serviceName));
     } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
+
+test(
+  'restartServiceInTmux injects escaped env values into a non-POSIX shell',
+  { skip: !hasTmux || !fs.existsSync('/bin/tcsh') },
+  async () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'stripe';
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-tmux-test-env-'));
+    const marker = path.join(tempDir, 'env-value');
+    const envValue = "space ' quote $dollar; semicolon";
+    const fakeTsx = path.join(tempDir, 'tsx');
+    const foregroundProcess = path.join(tempDir, 'foreground-process');
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    fs.writeFileSync(fakeTsx, `#!/bin/sh\nprintf '%s' "$KILO_TEST_VALUE" > "$KILO_TEST_MARKER"\n`);
+    fs.writeFileSync(
+      foregroundProcess,
+      "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile :; do sleep 1; done\n"
+    );
+    fs.chmodSync(fakeTsx, 0o755);
+    fs.chmodSync(foregroundProcess, 0o755);
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      tmux('new-window', '-d', '-t', sessionName, '-n', serviceName, '/bin/tcsh');
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+
+      tmux(
+        'send-keys',
+        '-t',
+        `${sessionName}:${serviceWindow.index}.0`,
+        foregroundProcess,
+        'Enter'
+      );
+      let fixtureUp = false;
+      for (let i = 0; i < 20 && !fixtureUp; i++) {
+        const panePid = execFileSync(
+          'tmux',
+          ['display-message', '-p', '-t', `${sessionName}:${serviceWindow.index}.0`, '#{pane_pid}'],
+          { encoding: 'utf-8' }
+        ).trim();
+        try {
+          execFileSync('pgrep', ['-P', panePid], { stdio: 'ignore' });
+          fixtureUp = true;
+        } catch {
+          await sleep(50);
+        }
+      }
+      assert.ok(fixtureUp, 'foreground process should start under tcsh');
+
+      const outcome = await restartServiceInTmux(sessionName, serviceName, {
+        KILO_TEST_MARKER: marker,
+        KILO_TEST_VALUE: envValue,
+        PATH: `${tempDir}:${process.env.PATH ?? ''}`,
+      });
+
+      assert.equal(outcome, 'relaunched');
+      for (let i = 0; i < 20 && !fs.existsSync(marker); i++) await sleep(50);
+      assert.equal(fs.readFileSync(marker, 'utf-8'), envValue);
+    } finally {
+      fs.rmSync(tempDir, { force: true, recursive: true });
       try {
         tmux('kill-session', '-t', sessionName);
       } catch {

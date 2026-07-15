@@ -17,17 +17,19 @@ appId: com.kilocode.kiloapp
 # A brand-new account's first sign-in shows a consent screen before Home.
 - extendedWaitUntil:
     visible:
-      text: 'Accept and continue|HOME|Home, tab, 1 of 4'
+      text: 'Accept and continue|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4'
     timeout: 20000
 - runFlow:
     when:
       visible: 'Accept and continue'
     commands:
       - tapOn: 'Accept and continue'
-# Grant the notification permission prompt if iOS shows one.
+- extendedWaitUntil:
+    visible: '“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4'
+    timeout: 15000
 - runFlow:
     when:
-      visible: 'Allow'
+      visible: '“Kilo” Would Like to Send You Notifications'
     commands:
       - tapOn: 'Allow'
 - extendedWaitUntil:

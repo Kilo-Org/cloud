@@ -56,6 +56,7 @@ import {
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
+  checkExclusiveModelProviderAllowed,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -591,21 +592,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Request-level data-collection opt-out: a caller can set
-  // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
-  // request to opt that single request out of training/data-retention.
-  // Direct experiment upstreams ignore those OpenRouter/Vercel flags
-  // (we never reach OpenRouter), but we still capture the prompt to R2
-  // for partner evaluation — which violates the caller's stated
-  // intent. Refuse here regardless of org settings, anon/BYOK status,
-  // or the org-level check below.
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
-    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
-  ) {
-    return dataCollectionRequiredResponse();
-  }
-
   if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
@@ -829,6 +815,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed.body.provider = providerConfig;
     }
   }
+
+  if (
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
+    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
+  ) {
+    return dataCollectionRequiredResponse();
+  }
+
+  const providerNotAllowedError = checkExclusiveModelProviderAllowed(
+    effectiveModelIdLowerCased,
+    requestBodyParsed.body.provider
+  );
+  if (providerNotAllowedError) return providerNotAllowedError;
 
   if (effectiveProviderContext.experiment) {
     usageContext.modelExperimentVariantVersionId =

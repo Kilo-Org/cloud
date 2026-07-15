@@ -53,7 +53,7 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 );
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 
-export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);
+export const REQUEST_LOGGING_OPT_INS_REDIS_KEY = redisKey('ai-gateway:request-logging-opt-ins');
 
 export const abuseRulesClassificationRedisKey = (identityKey: string) =>
   redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);

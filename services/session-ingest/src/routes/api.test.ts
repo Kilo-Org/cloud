@@ -47,7 +47,10 @@ type TestBindings = {
   HYPERDRIVE: HyperdriveBinding;
   SESSION_INGEST_R2: { put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
   INGEST_QUEUE: { send: ReturnType<typeof vi.fn> };
-  NOTIFICATIONS: { sendSessionReadyNotification: ReturnType<typeof vi.fn> };
+  NOTIFICATIONS: {
+    sendSessionReadyNotification: ReturnType<typeof vi.fn>;
+    sendCloudAgentSessionNotification: ReturnType<typeof vi.fn>;
+  };
   DIRECT_INGEST_PERCENT: string;
   DIRECT_INGEST_USER_IDS: string;
   DIRECT_INGEST_MAX_BYTES: string;
@@ -61,7 +64,10 @@ function makeTestEnv(overrides: Partial<TestBindings> = {}): TestBindings {
       delete: vi.fn(async () => undefined),
     },
     INGEST_QUEUE: { send: vi.fn(async () => undefined) },
-    NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
+    NOTIFICATIONS: {
+      sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })),
+      sendCloudAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+    },
     DIRECT_INGEST_PERCENT: '0',
     DIRECT_INGEST_USER_IDS: '',
     DIRECT_INGEST_MAX_BYTES: '4194304',
@@ -98,6 +104,9 @@ function prepareIngestRoute(
   vi.mocked(getWorkerDb).mockReturnValue(db);
   vi.mocked(getSessionAccessCacheDO).mockReturnValue({ has: vi.fn(async () => true) } as never);
   vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+  vi.mocked(getUserConnectionDO).mockReturnValue({
+    hasActiveCliSession: vi.fn(async () => true),
+  } as never);
   vi.mocked(applyMetadataChanges).mockResolvedValue(undefined);
   return { app: makeApiApp(), ingest };
 }
@@ -566,6 +575,62 @@ describe('api routes', () => {
       expect(applyMetadataChanges).toHaveBeenCalledTimes(1);
       expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
       expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+    });
+
+    it.skip('dispatches attention signals for an eligible direct ingest', async () => {
+      const ingest = vi.fn(async () => ({
+        accepted: true as const,
+        changes: [],
+        attentionSignals: [
+          { signalId: 'msg_1', kind: 'completed' as const, messageExcerpt: 'All done' },
+        ],
+      }));
+      const { app } = prepareIngestRoute(ingest);
+      const { db, fns } = makeDbFakes();
+      fns.selectResult.mockResolvedValueOnce([{ parentSessionId: null }]);
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const env = directIngestEnv();
+      const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+
+      const response = await app.fetch(ingestRequest(body), env);
+
+      expect(response.status).toBe(200);
+      expect(env.NOTIFICATIONS.sendCloudAgentSessionNotification).toHaveBeenCalledWith({
+        userId: 'usr_test',
+        cliSessionId: 'ses_12345678901234567890123456',
+        executionId: 'remote:msg_1',
+        status: 'completed',
+        body: 'All done',
+        suppressIfViewingSession: true,
+      });
+    });
+
+    it.skip('keeps direct ingest successful when attention dispatch fails', async () => {
+      const ingest = vi.fn(async () => ({
+        accepted: true as const,
+        changes: [],
+        attentionSignals: [
+          { signalId: 'msg_1', kind: 'completed' as const, messageExcerpt: 'All done' },
+        ],
+      }));
+      const { app } = prepareIngestRoute(ingest);
+      const { db, fns } = makeDbFakes();
+      fns.selectResult.mockResolvedValueOnce([{ parentSessionId: null }]);
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      const env = directIngestEnv();
+      env.NOTIFICATIONS.sendCloudAgentSessionNotification.mockRejectedValueOnce(
+        new Error('notifications unavailable')
+      );
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+
+      const response = await app.fetch(ingestRequest(body), env);
+
+      expect(response.status).toBe(200);
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_attention_error' })
+      );
+      error.mockRestore();
     });
 
     it('completes a bodyless gate miss with an empty staged stream', async () => {

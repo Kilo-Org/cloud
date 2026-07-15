@@ -60,7 +60,6 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Button as UIButton } from '@/components/ui/button';
-import { LinkButton } from '@/components/Button';
 import { cn } from '@/lib/utils';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
@@ -104,6 +103,7 @@ import {
   shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
+import { RepositoryProviderOnboardingPanel } from './RepositoryProviderOnboardingPanel';
 
 type Repository = {
   id: string | number;
@@ -426,6 +426,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     data: githubRepoData,
     isLoading: isLoadingGitHubRepos,
     error: githubRepoError,
+    refetch: refetchGitHubRepositories,
   } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
@@ -441,6 +442,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     data: gitlabRepoData,
     isLoading: isLoadingGitLabRepos,
     error: gitlabRepoError,
+    refetch: refetchGitLabRepositories,
   } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
@@ -464,7 +466,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     }),
     enabled: Boolean(organizationId),
   });
-  const { data: bitbucketStatusData } = useQuery({
+  const { data: bitbucketStatusData, refetch: refetchBitbucketStatus } = useQuery({
     ...trpc.organizations.bitbucket.getStatus.queryOptions({
       organizationId: organizationId ?? '',
     }),
@@ -703,59 +705,63 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     })
   );
 
-  const refreshBitbucketRepositories = useCallback(async () => {
-    if (!organizationId) return;
+  const refreshBitbucketRepositories = useCallback(
+    async (statusOverride?: typeof bitbucketStatusData) => {
+      if (!organizationId) return;
 
-    const bitbucketStatus =
-      bitbucketStatusData ??
-      (await queryClient.fetchQuery(
-        trpc.organizations.bitbucket.getStatus.queryOptions({
+      const bitbucketStatus =
+        statusOverride ??
+        bitbucketStatusData ??
+        (await queryClient.fetchQuery(
+          trpc.organizations.bitbucket.getStatus.queryOptions({
+            organizationId,
+          })
+        ));
+
+      if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
+        const result = await refreshBitbucketRepositoriesFromProvider({
           organizationId,
-        })
-      ));
+          integrationId: bitbucketStatus.integrationId,
+        });
+        if (result.status !== 'available') {
+          throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.status));
+        }
+        return;
+      }
 
-    if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
-      const result = await refreshBitbucketRepositoriesFromProvider({
-        organizationId,
-        integrationId: bitbucketStatus.integrationId,
+      const result = await queryClient.fetchQuery({
+        ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+          organizationId,
+          forceRefresh: true,
+        }),
+        staleTime: 0,
+      });
+      if (shouldCacheBitbucketRepositoryRefreshResult(result.status)) {
+        queryClient.setQueryData(
+          trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
+            organizationId,
+            forceRefresh: false,
+          }),
+          result
+        );
+      }
+      void queryClient.invalidateQueries({
+        queryKey: trpc.organizations.bitbucket.getStatus.queryKey({ organizationId }),
       });
       if (result.status !== 'available') {
         throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.status));
       }
-      return;
-    }
-
-    const result = await queryClient.fetchQuery({
-      ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
-        organizationId,
-        forceRefresh: true,
-      }),
-      staleTime: 0,
-    });
-    if (shouldCacheBitbucketRepositoryRefreshResult(result.status)) {
-      queryClient.setQueryData(
-        trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
-          organizationId,
-          forceRefresh: false,
-        }),
-        result
-      );
-    }
-    void queryClient.invalidateQueries({
-      queryKey: trpc.organizations.bitbucket.getStatus.queryKey({ organizationId }),
-    });
-    if (result.status !== 'available') {
-      throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.status));
-    }
-  }, [
-    bitbucketStatusData?.canManage,
-    bitbucketStatusData?.integrationId,
-    organizationId,
-    queryClient,
-    refreshBitbucketRepositoriesFromProvider,
-    trpc.organizations.bitbucket.getStatus,
-    trpc.organizations.cloudAgentNext.listBitbucketRepositories,
-  ]);
+    },
+    [
+      bitbucketStatusData?.canManage,
+      bitbucketStatusData?.integrationId,
+      organizationId,
+      queryClient,
+      refreshBitbucketRepositoriesFromProvider,
+      trpc.organizations.bitbucket.getStatus,
+      trpc.organizations.cloudAgentNext.listBitbucketRepositories,
+    ]
+  );
 
   const shouldRefreshBitbucketRepositories =
     organizationId && shouldIncludeBitbucketRepositoryRefresh(bitbucketRepoData?.status);
@@ -787,6 +793,51 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     isRefreshingGitLabRepos ||
     isRefreshingBitbucketRepos ||
     isRefetchingBitbucketRepos;
+
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+  const checkSourceControlConnection = useCallback(async () => {
+    setIsCheckingConnection(true);
+
+    try {
+      const [githubResult, gitlabResult, bitbucketStatusResult] = await Promise.allSettled([
+        refetchGitHubRepositories(),
+        refetchGitLabRepositories(),
+        organizationId ? refetchBitbucketStatus() : Promise.resolve(null),
+      ]);
+      const connectionAvailable =
+        (githubResult.status === 'fulfilled' && githubResult.value.data?.integrationInstalled) ||
+        (gitlabResult.status === 'fulfilled' && gitlabResult.value.data?.integrationInstalled);
+
+      if (connectionAvailable) return;
+
+      if (
+        bitbucketStatusResult.status === 'fulfilled' &&
+        bitbucketStatusResult.value?.data?.status === 'connected'
+      ) {
+        await refreshBitbucketRepositories(bitbucketStatusResult.value.data);
+        return;
+      }
+
+      const connectionError = [githubResult, gitlabResult, bitbucketStatusResult]
+        .map(result => (result.status === 'rejected' ? result.reason : result.value?.error))
+        .find(Boolean);
+      if (connectionError) throw connectionError;
+
+      toast.info('No repository provider connected yet');
+    } catch (error) {
+      toast.error('Could not check source control connections', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsCheckingConnection(false);
+    }
+  }, [
+    organizationId,
+    refetchBitbucketStatus,
+    refetchGitHubRepositories,
+    refetchGitLabRepositories,
+    refreshBitbucketRepositories,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Integration missing check
@@ -1139,34 +1190,18 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   // Integration missing view
   // ---------------------------------------------------------------------------
   if (isIntegrationMissing) {
-    const integrationsPath = organizationId
-      ? `/organizations/${organizationId}/integrations`
-      : '/integrations';
-    const integrationMessage =
-      githubRepoData?.errorMessage ||
-      gitlabRepoData?.errorMessage ||
-      'Connect a source control integration to select a repository for Cloud Agent.';
-
     return (
-      <div className="relative flex h-full flex-col items-center justify-end p-4 pb-8">
+      <div className="relative flex h-full flex-col items-center justify-start overflow-y-auto px-4 py-8">
         <SetPageTitle title="Cloud Agent">
           <Badge variant="new">new</Badge>
         </SetPageTitle>
         <MobileSidebarToggle />
-        <div className="w-full max-w-2xl rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-6">
-          <div className="mb-3 flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-400" />
-            <h2 className="text-lg font-semibold">Connect source control to start a session</h2>
-          </div>
-          <p className="text-muted-foreground mb-4 text-sm">{integrationMessage}</p>
-          <div className="flex flex-wrap gap-3">
-            <LinkButton href={integrationsPath} variant="primary" size="md">
-              Open integrations
-            </LinkButton>
-            <UIButton variant="outline" onClick={() => router.refresh()}>
-              Refresh
-            </UIButton>
-          </div>
+        <div className="my-auto w-full max-w-2xl">
+          <RepositoryProviderOnboardingPanel
+            organizationId={organizationId}
+            isCheckingConnection={isCheckingConnection}
+            onCheckConnection={() => void checkSourceControlConnection()}
+          />
         </div>
       </div>
     );

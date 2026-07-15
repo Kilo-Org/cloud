@@ -2095,6 +2095,236 @@ describe('SessionIngestDO integration', () => {
     });
   });
 
+  describe('attention signals', () => {
+    /** A completed signal requires a previously stored status, so tests start sessions as busy. */
+    async function ingestBusyStatus(stub: ReturnType<typeof getStub>, sessionId: string) {
+      await stub.ingest(
+        [{ type: 'session_status', data: { status: 'busy' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+    }
+
+    it('emits a completed signal with a text excerpt when the status transitions to idle', async () => {
+      const sessionId = 'ses_attention_completed_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const result = await stub.ingest(
+        [
+          {
+            type: 'part',
+            data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'Hello ' },
+          },
+          { type: 'part', data: { id: 'part_2', messageID: 'msg_1', type: 'text', text: 'world' } },
+          {
+            type: 'message',
+            data: { id: 'msg_1', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([
+        { signalId: 'msg_1', kind: 'completed', messageExcerpt: 'Hello world' },
+      ]);
+    });
+
+    it('finds an excerpt from parts ingested in an earlier call', async () => {
+      const sessionId = 'ses_attention_completed_0002';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'Done!' } },
+          { type: 'session_status', data: { status: 'busy' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      const result = await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: { id: 'msg_1', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([
+        { signalId: 'msg_1', kind: 'completed', messageExcerpt: 'Done!' },
+      ]);
+    });
+
+    it('truncates a long excerpt to a push-sized snippet', async () => {
+      const sessionId = 'ses_attention_truncated_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const longText = `First line.\n\n${'x'.repeat(200)}`;
+      const result = await stub.ingest(
+        [
+          {
+            type: 'part',
+            data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: longText },
+          },
+          {
+            type: 'message',
+            data: { id: 'msg_1', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const excerpt = result.attentionSignals[0]?.messageExcerpt;
+      expect(excerpt).toHaveLength(100);
+      expect(excerpt).toMatch(/^First line\. x+\.\.\.$/);
+    });
+
+    it('does not emit a completed signal when the assistant message has not finished', async () => {
+      const sessionId = 'ses_attention_incomplete_001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const result = await stub.ingest(
+        [
+          { type: 'message', data: { id: 'msg_1', role: 'assistant', time: { created: 1 } } },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([]);
+    });
+
+    it('does not emit a completed signal when only a user message has completed', async () => {
+      const sessionId = 'ses_attention_user_msg_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const result = await stub.ingest(
+        [
+          {
+            type: 'message',
+            data: { id: 'msg_1', role: 'user', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([]);
+    });
+
+    it("does not emit a completed signal on the session's first reported status", async () => {
+      const sessionId = 'ses_attention_first_status_1';
+      const stub = getStub(kiloUserId, sessionId);
+
+      // A full-history backfill of an already-idle session must not push about an old turn.
+      const result = await stub.ingest(
+        [
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'Old' } },
+          {
+            type: 'message',
+            data: { id: 'msg_1', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([]);
+    });
+
+    it('emits a needs-input signal when status becomes question', async () => {
+      const sessionId = 'ses_attention_question_0001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      const result = await stub.ingest(
+        [{ type: 'session_status', data: { status: 'question' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toHaveLength(1);
+      expect(result.attentionSignals[0]).toMatchObject({ kind: 'needs_input' });
+    });
+
+    it('emits a needs-input signal when status becomes permission', async () => {
+      const sessionId = 'ses_attention_permission_001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      const result = await stub.ingest(
+        [{ type: 'session_status', data: { status: 'permission' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toHaveLength(1);
+      expect(result.attentionSignals[0]).toMatchObject({ kind: 'needs_input' });
+    });
+
+    it('does not emit a completed signal when the session has no messages at all', async () => {
+      const sessionId = 'ses_attention_idle_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [{ type: 'session_status', data: { status: 'busy' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      const result = await stub.ingest(
+        [{ type: 'session_status', data: { status: 'idle' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([]);
+    });
+
+    it('does not re-emit a needs-input signal when the status is unchanged', async () => {
+      const sessionId = 'ses_attention_repeat_000001';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [{ type: 'session_status', data: { status: 'question' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      const result = await stub.ingest(
+        [{ type: 'session_status', data: { status: 'question' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([]);
+    });
+  });
+
   describe('export produces valid JSON', () => {
     it('returns valid JSON from getAllStream even with no items', async () => {
       const sessionId = 'ses_export_empty_0000000007';

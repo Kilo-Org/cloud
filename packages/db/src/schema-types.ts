@@ -1324,12 +1324,9 @@ export const CodeReviewCouncilConfigSchema = z.object({
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 
-// Persisted OUTCOME of a council run, surfaced on the cloud UI job-runs screen (manual
-// council runs are not posted to a PR). This is the storage contract; the capture code
-// maps the parsed `kilo-code-review-council:v1` manifest + code-owned decision into it.
 // Single source of truth for one council finding, shared by BOTH the parse contract
 // (the `kilo-code-review-council:v1` manifest in `@kilocode/worker-utils/code-review-council`)
-// and this storage contract, so their bounds cannot drift apart.
+// and the persisted council result below, so their bounds cannot drift apart.
 export const CouncilFindingSchema = z.object({
   path: z.string().max(1024),
   line: z.number().int().nonnegative().nullable().optional(),
@@ -1351,6 +1348,9 @@ export const CouncilResultSpecialistSchema = z.object({
 });
 export type CouncilResultSpecialist = z.infer<typeof CouncilResultSpecialistSchema>;
 
+// Persisted OUTCOME of a council run, surfaced on the cloud UI job-runs screen (manual
+// council runs are not posted to a PR). The capture code maps the parsed
+// `kilo-code-review-council:v1` manifest + the code-owned decision into this storage contract.
 export const CodeReviewCouncilResultSchema = z.object({
   // The code-owned governance decision (never model-authored).
   decision: CouncilVoteSchema,
@@ -1358,6 +1358,33 @@ export const CodeReviewCouncilResultSchema = z.object({
   specialists: z.array(CouncilResultSpecialistSchema).max(8),
 });
 export type CodeReviewCouncilResult = z.infer<typeof CodeReviewCouncilResultSchema>;
+
+// Per-repository model override. Ties a repository to a specific model so a repo
+// can run its standard review on a different model than the global default. A repo
+// without an entry here uses the config's global `model_slug`.
+//
+// Two identifiers are stored intentionally, each serving a lookup the other can't:
+//   - `repository_id` matches `selected_repository_ids` (GitHub/GitLab numeric,
+//     Bitbucket UUID). Used at save time for selection/pruning parity.
+//   - `repo_full_name` is the platform's canonical full name and the ONLY repo
+//     identifier persisted on the review row, so it is what the dispatch-time model
+//     lookup matches against (numeric IDs are not on the row for GitHub/Bitbucket).
+export const RepositoryModelOverrideSchema = z.object({
+  // Matched by exact value and type against the platform repository ID — never coerced.
+  repository_id: z.union([z.number(), z.string()]),
+  // "owner/repo" (GitHub), path_with_namespace (GitLab), "workspace/slug" (Bitbucket).
+  repo_full_name: z.string().max(511),
+  model_slug: z.string().max(512),
+  // Thinking effort variant name (e.g. "high", "max") — null means model default,
+  // matching the global `thinking_effort` field below.
+  thinking_effort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+});
+export type RepositoryModelOverride = z.infer<typeof RepositoryModelOverrideSchema>;
 
 export const CodeReviewAgentConfigSchema = z.object({
   review_style: z.enum(REVIEW_STYLES),
@@ -1378,6 +1405,8 @@ export const CodeReviewAgentConfigSchema = z.object({
   selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
+  // Per-repository model overrides. Absent/empty = every repo uses the global model_slug.
+  repository_model_overrides: z.array(RepositoryModelOverrideSchema).optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.

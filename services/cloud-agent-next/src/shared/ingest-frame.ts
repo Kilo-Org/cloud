@@ -318,6 +318,75 @@ function tryStringify(event: IngestEvent): string | undefined {
 }
 
 /**
+ * Cheap lower-bound estimate of the JSON-serialized UTF-8 byte length of a
+ * value. Walks the object tree summing string lengths and structural
+ * overhead, short-circuiting as soon as the running total exceeds `budget`.
+ *
+ * This avoids calling `JSON.stringify` on oversized events (which blocks the
+ * event loop for seconds on multi-MB payloads) just to discover they need
+ * compaction. The estimate is a conservative lower bound — if it says
+ * "under budget", the full serialization is attempted (which is fast for
+ * genuinely small events). If it says "over budget", compaction runs
+ * directly without ever materializing the full serialized string.
+ *
+ * Ancestor cycles (true circular references) are detected via a `WeakSet`
+ * tracking the current path and skipped. Shared (non-cyclic) references are
+ * counted at each occurrence, matching `JSON.stringify`.
+ */
+export function estimateSerializedBytes(value: unknown, budget: number): number {
+  try {
+    let total = 0;
+    const stack: Array<{ v: unknown } | { exit: object }> = [{ v: value }];
+    const path = new WeakSet<object>();
+    while (stack.length > 0) {
+      const entry = stack.pop();
+      if (entry === undefined) break;
+      if ('exit' in entry) {
+        path.delete(entry.exit);
+        continue;
+      }
+      const item = entry.v;
+      if (typeof item === 'string') {
+        total += item.length + 2; // surrounding quotes
+      } else if (typeof item === 'number') {
+        total += 1; // lower bound (actual: 1–21 chars)
+      } else if (typeof item === 'boolean') {
+        total += 4; // "true" (4) or "false" (5)
+      } else if (item === null) {
+        total += 4; // "null"
+      } else if (typeof item === 'object') {
+        if (path.has(item)) continue; // ancestor cycle — skip
+        path.add(item);
+        stack.push({ exit: item }); // remove from path after children
+        if (Array.isArray(item)) {
+          total += 2; // brackets
+          total += Math.max(0, item.length - 1); // commas
+          if (total > budget) return total;
+          for (let i = item.length - 1; i >= 0; i--) {
+            stack.push({ v: item[i] });
+          }
+        } else {
+          const keys = Object.keys(item);
+          total += 2; // braces
+          for (const key of keys) {
+            total += key.length + 3; // "key":
+          }
+          total += Math.max(0, keys.length - 1); // commas
+          if (total > budget) return total;
+          for (let i = keys.length - 1; i >= 0; i--) {
+            stack.push({ v: (item as Record<string, unknown>)[keys[i]] });
+          }
+        }
+      }
+      if (total > budget) return total;
+    }
+    return total;
+  } catch {
+    return budget + 1; // treat as oversized on error
+  }
+}
+
+/**
  * Trim, serialize, measure, and (if needed) compact an ingest event so its
  * serialized UTF-8 byte length stays under `MAX_INGEST_EVENT_BYTES`.
  */
@@ -326,17 +395,37 @@ export function prepareIngestFrame(event: IngestEvent): PreparedIngestFrame {
     ...event,
     data: trimPayload(event.streamEventType, event.data),
   };
-  const originalSerialized = tryStringify(trimmed);
-  const originalBytes = originalSerialized === undefined ? 0 : byteLength(originalSerialized);
-  if (originalSerialized !== undefined && originalBytes <= MAX_INGEST_EVENT_BYTES) {
-    return {
-      kind: 'send',
-      serialized: originalSerialized,
-      bytes: originalBytes,
-      compacted: false,
-      originalBytes,
-    };
+
+  // Pre-serialization estimate: if the event is clearly over budget, skip
+  // the full JSON.stringify (which blocks the event loop for seconds on
+  // multi-MB payloads) and go straight to compaction. The estimate is a
+  // conservative lower bound, so events that pass are still measured
+  // exactly via tryStringify below.
+  const estimate = estimateSerializedBytes(trimmed, MAX_INGEST_EVENT_BYTES);
+
+  let originalSerialized: string | undefined;
+  let exactBytes: number | undefined;
+  if (estimate <= MAX_INGEST_EVENT_BYTES) {
+    originalSerialized = tryStringify(trimmed);
+    if (originalSerialized !== undefined) {
+      const originalBytes = byteLength(originalSerialized);
+      if (originalBytes <= MAX_INGEST_EVENT_BYTES) {
+        return {
+          kind: 'send',
+          serialized: originalSerialized,
+          bytes: originalBytes,
+          compacted: false,
+          originalBytes,
+        };
+      }
+      exactBytes = originalBytes;
+    }
   }
+
+  // Oversized or unserializable — compact without full serialization.
+  // Prefer the exact measurement when serialization succeeded; otherwise
+  // fall back to the estimate (a lower bound sufficient for observability).
+  const originalBytes = exactBytes ?? estimate;
 
   const compactedEvent = compactIngestEvent(trimmed, originalBytes);
   const compactedSerialized = tryStringify(compactedEvent);
@@ -372,7 +461,9 @@ export function prepareIngestFrame(event: IngestEvent): PreparedIngestFrame {
     kind: 'dropped',
     originalBytes,
     reason:
-      originalSerialized === undefined ? 'unserializable_ingest_event' : 'oversized_ingest_event',
+      originalSerialized === undefined && estimate <= MAX_INGEST_EVENT_BYTES
+        ? 'unserializable_ingest_event'
+        : 'oversized_ingest_event',
   };
 }
 

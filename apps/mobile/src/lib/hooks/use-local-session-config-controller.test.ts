@@ -34,6 +34,7 @@ const CATALOG: LocalRuntimeCatalog = {
 };
 
 let capturedFence: LocalRuntimeFence | null = null;
+let capturedRefetch: (() => unknown) | null = null;
 let selectionState = {
   selectedFence: null as LocalRuntimeFence | null,
   agentOverride: null,
@@ -70,13 +71,17 @@ vi.mock('./use-local-runtime-catalog', () => ({
     return {
       data: undefined,
       error: null,
-      refetch: () => undefined,
+      refetch: (...args: unknown[]) => {
+        capturedRefetch = () => args[0];
+        return undefined;
+      },
     };
   },
 }));
 
 beforeEach(() => {
   capturedFence = null;
+  capturedRefetch = null;
   selectionState = { selectedFence: null, agentOverride: null, modelOverride: null };
   dispatch.mockReset();
 });
@@ -188,11 +193,19 @@ describe('useLocalSessionConfigController composition', () => {
       'onSelectAgent',
       'onSelectModel',
       'onResetOverrides',
+      'refetchCatalog',
     ]);
     expect(controller).not.toHaveProperty('onSubmit');
     expect(controller).not.toHaveProperty('onSendPrompt');
     expect(controller).not.toHaveProperty('onAddAttachment');
     expect(controller).not.toHaveProperty('onCreateSession');
+  });
+
+  it('refetchCatalog invokes the underlying catalog query refetch', () => {
+    selectionState = { selectedFence: FENCE_A, agentOverride: null, modelOverride: null };
+    const controller = useLocalSessionConfigController();
+    controller.refetchCatalog();
+    expect(capturedRefetch).not.toBeNull();
   });
 });
 

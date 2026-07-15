@@ -8,16 +8,7 @@ export const SCREEN_TITLE = 'Local session';
 const RUNTIME_ROW_TITLE = 'Runtime';
 const AGENT_ROW_TITLE = 'Agent';
 const MODEL_ROW_TITLE = 'Model';
-const FOOTER_MESSAGE = 'Session creation will be available in the next step.';
 export const SKELETON_ROW_CLASS = 'h-[54px] w-full rounded-lg';
-
-export function FooterMessage() {
-  return (
-    <View className="border-t border-hair-soft bg-background px-6 py-4">
-      <Text className="text-center text-xs text-muted-foreground">{FOOTER_MESSAGE}</Text>
-    </View>
-  );
-}
 
 type ConfiguredRowsProps = {
   runtimeTitle: string;

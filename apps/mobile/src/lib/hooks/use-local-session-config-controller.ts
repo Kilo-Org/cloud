@@ -31,6 +31,7 @@ export type LocalSessionConfigController = {
   onSelectAgent: (slug: string) => void;
   onSelectModel: (selection: LocalSessionConfigModelSelection) => void;
   onResetOverrides: () => void;
+  refetchCatalog: () => void;
 };
 
 /**
@@ -171,6 +172,10 @@ export function useLocalSessionConfigController(): LocalSessionConfigController 
     dispatch({ type: 'resetOverrides' });
   }, []);
 
+  const refetchCatalog = useCallback(() => {
+    void catalogRefetch();
+  }, [catalogRefetch]);
+
   return {
     selection,
     runtimesState,
@@ -180,6 +185,7 @@ export function useLocalSessionConfigController(): LocalSessionConfigController 
     onSelectAgent,
     onSelectModel,
     onResetOverrides,
+    refetchCatalog,
   };
 }
 

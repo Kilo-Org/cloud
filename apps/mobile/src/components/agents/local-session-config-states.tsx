@@ -12,12 +12,7 @@ import {
 } from '@/lib/hooks/local-runtime-catalog-types';
 import { type LocalRuntime } from '@/lib/hooks/runtime-discovery-logic';
 
-import {
-  ConfiguredRows,
-  FooterMessage,
-  SCREEN_TITLE,
-  SKELETON_ROW_CLASS,
-} from './local-session-config-rows';
+import { ConfiguredRows, SCREEN_TITLE, SKELETON_ROW_CLASS } from './local-session-config-rows';
 
 type LocalSessionConfigStateRendererProps = {
   viewModel: LocalSessionConfigViewModel;
@@ -54,7 +49,6 @@ export function LocalSessionConfigStateRenderer({
         <View className="flex-1 px-4 pt-4">
           <QueryError title={viewModel.title} message={viewModel.message} onRetry={handleRetry} />
         </View>
-        <FooterMessage />
       </View>
     );
   }
@@ -66,7 +60,6 @@ export function LocalSessionConfigStateRenderer({
         <View className="flex-1 px-4 pt-4">
           <QueryError title="Update Kilo CLI" message="Update Kilo CLI and reconnect." />
         </View>
-        <FooterMessage />
       </View>
     );
   }
@@ -103,7 +96,6 @@ export function LocalSessionConfigStateRenderer({
             })}
           </View>
         </ScrollView>
-        <FooterMessage />
       </View>
     );
   }
@@ -131,7 +123,6 @@ export function LocalSessionConfigStateRenderer({
             modelDisabled
           />
         </ScrollView>
-        <FooterMessage />
       </View>
     );
   }
@@ -163,7 +154,6 @@ export function LocalSessionConfigStateRenderer({
             <QueryError title={viewModel.title} message={viewModel.message} onRetry={handleRetry} />
           </View>
         </ScrollView>
-        <FooterMessage />
       </View>
     );
   }
@@ -194,7 +184,6 @@ export function LocalSessionConfigStateRenderer({
             <QueryError title={viewModel.title} message={viewModel.message} />
           </View>
         </ScrollView>
-        <FooterMessage />
       </View>
     );
   }

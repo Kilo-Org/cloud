@@ -2,62 +2,23 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import {
+  type AgentSessionFilters,
+  createDefaultAgentSessionFilters,
+  parseStoredAgentSessionFilters,
+} from '@/lib/agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
 
-type AgentSessionFilters = {
-  platformFilter: string[];
-  projectFilter: string[];
-};
-
-type FiltersUpdater = AgentSessionFilters | ((prev: AgentSessionFilters) => AgentSessionFilters);
+type FiltersUpdater = Partial<AgentSessionFilters> | ((prev: AgentSessionFilters) => AgentSessionFilters);
 type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
-
-function createDefaultFilters(): AgentSessionFilters {
-  return {
-    platformFilter: [],
-    projectFilter: [],
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(item => typeof item === 'string');
-}
-
-function parseStoredFilters(raw: string | null): AgentSessionFilters | null {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) {
-      return null;
-    }
-
-    return {
-      platformFilter: readStringArray(parsed.platformFilter),
-      projectFilter: readStringArray(parsed.projectFilter),
-    };
-  } catch {
-    return null;
-  }
-}
 
 async function loadStoredFilters(): Promise<AgentSessionFilters> {
   const raw = await SecureStore.getItemAsync(SESSION_FILTERS_KEY);
-  return parseStoredFilters(raw) ?? createDefaultFilters();
+  return parseStoredAgentSessionFilters(raw) ?? createDefaultAgentSessionFilters();
 }
 
 export function usePersistedAgentSessionFilters() {
-  const [filters, setFiltersState] = useState<AgentSessionFilters>(() => createDefaultFilters());
+  const [filters, setFiltersState] = useState<AgentSessionFilters>(() => createDefaultAgentSessionFilters());
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
@@ -71,7 +32,7 @@ export function usePersistedAgentSessionFilters() {
         }
       } catch {
         if (isActive) {
-          setFiltersState(createDefaultFilters());
+          setFiltersState(createDefaultAgentSessionFilters());
         }
       } finally {
         if (isActive) {
@@ -107,8 +68,17 @@ export function usePersistedAgentSessionFilters() {
   }, [filters, hasLoaded]);
 
   const setFilters = useCallback((updater: FiltersUpdater) => {
-    setFiltersState(prev => (typeof updater === 'function' ? updater(prev) : updater));
+    setFiltersState(prev =>
+      typeof updater === 'function' ? updater(prev) : { ...prev, ...updater }
+    );
   }, []);
+
+  const setActiveNow = useCallback(
+    (activeNow: boolean) => {
+      setFilters(prev => ({ ...prev, activeNow }));
+    },
+    [setFilters]
+  );
 
   const setPlatformFilter = useCallback(
     (updater: StringArrayUpdater) => {
@@ -131,10 +101,12 @@ export function usePersistedAgentSessionFilters() {
   );
 
   return {
+    activeNow: filters.activeNow,
     platformFilter: filters.platformFilter,
     projectFilter: filters.projectFilter,
     hasLoaded,
     setFilters,
+    setActiveNow,
     setPlatformFilter,
     setProjectFilter,
   };

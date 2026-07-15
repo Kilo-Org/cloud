@@ -2227,4 +2227,33 @@ describe('review agent config repository model overrides', () => {
       },
     ]);
   });
+
+  it('rejects duplicate repository overrides for the same repo', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await expect(
+      caller.personalReviewAgent.saveReviewConfig({
+        platform: 'github',
+        reviewStyle: 'balanced',
+        focusAreas: [],
+        modelSlug: 'test-model',
+        repositorySelectionMode: 'all',
+        selectedRepositoryIds: [],
+        repositoryModelOverrides: [
+          {
+            repositoryId: 101,
+            repoFullName: 'acme/api',
+            modelSlug: 'openai/gpt-5',
+            thinkingEffort: null,
+          },
+          {
+            repositoryId: 101,
+            repoFullName: 'acme/api',
+            modelSlug: 'anthropic/claude-sonnet-5',
+            thinkingEffort: null,
+          },
+        ],
+        autoConfigureWebhooks: false,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
 });

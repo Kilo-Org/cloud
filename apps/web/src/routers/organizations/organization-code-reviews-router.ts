@@ -84,6 +84,31 @@ const RepositoryModelOverrideInputSchema = z.object({
     .optional(),
 });
 
+// Bound the overrides array so a caller cannot grow the JSONB config unbounded, and
+// reject duplicate entries for the same repo (by id or full name) — dispatch resolves
+// via first-match, so duplicates would silently pick one. Mirrors the duplicate
+// rejection already applied to Bitbucket selectedRepositoryIds.
+const MAX_REPOSITORY_MODEL_OVERRIDES = 1000;
+
+function rejectDuplicateRepositoryModelOverrides(
+  overrides: Array<{ repositoryId: number | string; repoFullName: string }>,
+  ctx: z.RefinementCtx
+) {
+  const seenIds = new Set<number | string>();
+  const seenNames = new Set<string>();
+  for (const override of overrides) {
+    if (seenIds.has(override.repositoryId) || seenNames.has(override.repoFullName)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Duplicate repository model override for the same repository',
+      });
+      return;
+    }
+    seenIds.add(override.repositoryId);
+    seenNames.add(override.repoFullName);
+  }
+}
+
 const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   platform: PlatformSchema,
   reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']),
@@ -99,7 +124,11 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
-  repositoryModelOverrides: z.array(RepositoryModelOverrideInputSchema).optional(),
+  repositoryModelOverrides: z
+    .array(RepositoryModelOverrideInputSchema)
+    .max(MAX_REPOSITORY_MODEL_OVERRIDES)
+    .superRefine(rejectDuplicateRepositoryModelOverrides)
+    .optional(),
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks

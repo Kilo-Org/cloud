@@ -395,14 +395,14 @@ export class SessionIngestDO extends DurableObject<Env> {
     const rows = this.db
       .select({
         item_data: ingestItems.item_data,
-        item_data_r2_key: ingestItems.item_data_r2_key,
       })
       .from(ingestItems)
       .where(
         and(
           eq(ingestItems.item_type, 'part'),
           gte(ingestItems.item_id, range.start),
-          lt(ingestItems.item_id, range.end)
+          lt(ingestItems.item_id, range.end),
+          isNull(ingestItems.item_data_r2_key)
         )
       )
       .orderBy(ingestItems.ingested_at, ingestItems.id)
@@ -410,9 +410,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
     // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
-    return buildAssistantExcerpt(
-      rows.filter(row => !row.item_data_r2_key).map(row => row.item_data)
-    );
+    return buildAssistantExcerpt(rows.map(row => row.item_data));
   }
 
   /**
@@ -427,15 +425,13 @@ export class SessionIngestDO extends DurableObject<Env> {
     const rows = this.db
       .select({
         item_data: ingestItems.item_data,
-        item_data_r2_key: ingestItems.item_data_r2_key,
       })
       .from(ingestItems)
-      .where(eq(ingestItems.item_type, 'message'))
+      .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
       .orderBy(desc(ingestItems.ingested_at), desc(ingestItems.id))
       .limit(COMPLETED_MESSAGE_SCAN_LIMIT)
       .all();
     for (const row of rows) {
-      if (row.item_data_r2_key) continue;
       const messageId = completedAssistantMessageIdFromItemData(row.item_data);
       if (messageId) return messageId;
     }

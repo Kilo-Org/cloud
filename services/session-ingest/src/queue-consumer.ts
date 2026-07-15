@@ -323,21 +323,9 @@ function scheduleAttentionSignalDispatch(
       parentSessionId,
     })
   ) {
-    console.log('Skipping attention signal dispatch (ineligible session)', {
-      sessionId: msg.sessionId,
-      kiloUserId: msg.kiloUserId,
-      parentSessionId,
-      signalCount: signals.length,
-    });
     return;
   }
 
-  console.log('Scheduling attention signal dispatch', {
-    sessionId: msg.sessionId,
-    kiloUserId: msg.kiloUserId,
-    signalCount: signals.length,
-    kinds: signals.map(s => s.kind),
-  });
   ctx.waitUntil(
     dispatchRemoteSessionAttentionSignals(env, msg.kiloUserId, msg.sessionId, signals).catch(
       error => {
@@ -359,7 +347,7 @@ async function dispatchRemoteSessionAttentionSignals(
 ): Promise<void> {
   for (const signal of signals) {
     try {
-      const outcome = await dispatchRemoteSessionAttentionSignal(
+      await dispatchRemoteSessionAttentionSignal(
         { kiloUserId, sessionId, signal },
         {
           hasActiveCliSession: async () => {
@@ -369,13 +357,6 @@ async function dispatchRemoteSessionAttentionSignals(
           sendPush: pushParams => env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),
         }
       );
-      console.log('Remote session attention signal dispatch outcome', {
-        sessionId,
-        kiloUserId,
-        signalId: signal.signalId,
-        kind: signal.kind,
-        outcome,
-      });
     } catch (error) {
       console.error('Failed to dispatch remote session attention notification (non-fatal)', {
         sessionId,

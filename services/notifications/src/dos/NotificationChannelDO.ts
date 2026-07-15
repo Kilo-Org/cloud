@@ -35,10 +35,6 @@ const ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS = 30_000;
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
-    return this.dispatchPushCore(input);
-  }
-
-  private async dispatchPushCore(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     // 1. Idempotency. DO is single-threaded — requests for a given
     //    user serialize on this instance. Retryable send failures leave the
     //    record at `pending` so upstream can retry the send without

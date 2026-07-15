@@ -28,7 +28,11 @@ import { computeMonthlyKiloPassBonusDecision } from '@/lib/kilo-pass/bonus-decis
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
-import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
+import {
+  getInitialWelcomePromoContextForSubscription,
+  getKiloPassWelcomePromoPolicy,
+  type KiloPassWelcomePromoPolicy,
+} from '@/lib/kilo-pass/welcome-promo-context';
 import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 
 type Db = typeof defaultDb;
@@ -46,7 +50,7 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   startedAtIso: string | null;
   currentStreakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  requiresSettledPaymentDecision?: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   issueMonth: string;
 }): UsageTriggeredMonthlyBonusDecision {
@@ -55,7 +59,7 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
     startedAtIso: params.startedAtIso,
     streakMonths: params.currentStreakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    requiresSettledPaymentDecision: params.requiresSettledPaymentDecision,
+    welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
     issueMonth: params.issueMonth,
   });
@@ -253,21 +257,23 @@ async function maybeIssueBonusFromUsageThreshold(
       .limit(1);
 
     const isFirstTimeSubscriberEver = otherSubscription.length === 0;
-    const welcomePromoEligibilityReason =
+    const initialWelcomePromoContext =
       subscription.paymentProvider === KiloPassPaymentProvider.Stripe
-        ? await getInitialWelcomePromoEligibilityReasonForSubscription(tx, {
+        ? await getInitialWelcomePromoContextForSubscription(tx, {
             subscriptionId: subscription.subscriptionId,
           })
         : null;
+    const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
+      paymentProvider: subscription.paymentProvider,
+      initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
+    });
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
       tier: subscription.tier,
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
       isFirstTimeSubscriberEver,
-      requiresSettledPaymentDecision:
-        subscription.paymentProvider === KiloPassPaymentProvider.Stripe &&
-        welcomePromoEligibilityReason != null,
-      welcomePromoEligibilityReason,
+      welcomePromoPolicy,
+      welcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
       issueMonth: issuance.issueMonth,
     });
 

@@ -9,6 +9,12 @@ export {
 
 export const KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT = 0.5;
 
+// Fixed historical boundary when the settled-payment fingerprint policy reached production.
+// Changing this would retroactively change welcome-promo eligibility for existing issuances.
+export const KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT = dayjs(
+  '2026-05-28T12:06:20.000Z'
+).utc();
+
 // First-time subscribers receive a 50% bonus for month 2 only if they started
 // strictly before this grandfather cutoff. Month 1 remains 50% for new subscribers.
 export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-05-07T00:00:00Z').utc();

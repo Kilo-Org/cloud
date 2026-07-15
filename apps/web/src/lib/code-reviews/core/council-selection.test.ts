@@ -2,7 +2,6 @@ import { describe, expect, it } from '@jest/globals';
 import { COUNCIL_SPECIALIST_PRESETS } from '@kilocode/worker-utils/code-review-council';
 import {
   buildCouncilSpecialists,
-  councilSelectionsFromConfig,
   countEnabledSelections,
   defaultCouncilSelections,
 } from './council-selection';
@@ -42,30 +41,5 @@ describe('council-selection', () => {
     // Default model/effort are omitted, not persisted as null-model.
     expect(specialists[1].model_slug).toBeUndefined();
     expect(specialists[1].thinking_effort).toBeUndefined();
-  });
-
-  it('round-trips a persisted config back into selections', () => {
-    const selections = defaultCouncilSelections();
-    for (const id of Object.keys(selections)) selections[id].enabled = false;
-    selections.security = { enabled: true, modelSlug: 'anthropic/x', thinkingEffort: 'high' };
-    selections.testing = { enabled: true, modelSlug: null, thinkingEffort: null };
-
-    const round = councilSelectionsFromConfig({
-      enabled: true,
-      aggregation_strategy: 'any_blocking_member',
-      specialists: buildCouncilSpecialists(selections),
-    });
-    expect(round.security).toEqual({
-      enabled: true,
-      modelSlug: 'anthropic/x',
-      thinkingEffort: 'high',
-    });
-    expect(round.testing).toEqual({ enabled: true, modelSlug: null, thinkingEffort: null });
-    // Presets absent from the config are shown disabled.
-    expect(round.performance.enabled).toBe(false);
-  });
-
-  it('returns all-enabled defaults when there is no config', () => {
-    expect(councilSelectionsFromConfig(null)).toEqual(defaultCouncilSelections());
   });
 });

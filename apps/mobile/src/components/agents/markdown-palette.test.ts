@@ -13,6 +13,7 @@ const colors = {
   muted: '#F0EEE6',
   mutedForeground: '#7A756B',
   destructive: '#C25647',
+  destructiveForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
   card: '#FFFFFF',
   ink2: '#3C382F',

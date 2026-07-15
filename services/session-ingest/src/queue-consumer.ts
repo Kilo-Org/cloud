@@ -15,6 +15,12 @@ import { withDORetry } from '@kilocode/worker-utils';
 import { applyMetadataChanges, flushPartialMetadataChanges } from './ingest/metadata';
 export { createItemExtractor } from './ingest/item-extractor';
 import { createItemExtractor } from './ingest/item-extractor';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
+import type { AttentionSignal } from './dos/session-ingest-attention';
+import {
+  dispatchRemoteSessionAttentionSignal,
+  isEligibleForRemoteSessionAttention,
+} from './remote-session-notifications';
 
 export interface IngestQueueMessage {
   r2Key: string;
@@ -36,13 +42,21 @@ async function processMessage(
   msg: IngestQueueMessage,
   ctx: ExecutionContext
 ): Promise<void> {
-  if (await deleteStagingObjectIfSessionMissing(env, msg)) return;
+  const sessionRow = await loadSessionOrCleanupStaging(env, msg);
+  if (!sessionRow) return;
 
   const body = await getStagingObjectBody(env, msg.r2Key);
   const mergedChanges = new Map<string, string | null>();
+  const mergedAttentionSignals: AttentionSignal[] = [];
 
   try {
-    const accepted = await ingestStagedSessionItems(env, msg, body, mergedChanges);
+    const accepted = await ingestStagedSessionItems(
+      env,
+      msg,
+      body,
+      mergedChanges,
+      mergedAttentionSignals
+    );
     if (accepted) {
       await applyMetadataChanges(env, msg.kiloUserId, msg.sessionId, mergedChanges, ctx);
     }
@@ -53,33 +67,56 @@ async function processMessage(
     // re-emitted — Postgres would never catch up. Flush what we have now so the
     // two stores stay in sync. Best-effort: never mask the original error.
     await flushPartialMetadataChanges(env, msg, mergedChanges, ctx);
+    // Same reasoning for attention signals: a committed status transition won't
+    // re-emit on retry, so dispatch what was collected before the failure.
+    scheduleAttentionSignalDispatch(
+      env,
+      msg,
+      sessionRow,
+      mergedChanges,
+      mergedAttentionSignals,
+      ctx
+    );
     throw err;
   }
 
+  scheduleAttentionSignalDispatch(env, msg, sessionRow, mergedChanges, mergedAttentionSignals, ctx);
   await env.SESSION_INGEST_R2.delete(msg.r2Key);
 }
 
-async function deleteStagingObjectIfSessionMissing(
+type IngestSessionRow = {
+  session_id: string;
+  parent_session_id: string | null;
+};
+
+/**
+ * Loads the session row for the queued message, or cleans up the staging object and returns
+ * null if the session has been deleted since the message was queued. The parent column feeds
+ * the attention-push eligibility check later in processing.
+ */
+async function loadSessionOrCleanupStaging(
   env: Env,
   msg: IngestQueueMessage
-): Promise<boolean> {
+): Promise<IngestSessionRow | null> {
   const { r2Key, kiloUserId, sessionId } = msg;
 
-  // Guard: skip processing if the session has been deleted since this message was queued
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const sessionRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
+    .select({
+      session_id: cli_sessions_v2.session_id,
+      parent_session_id: cli_sessions_v2.parent_session_id,
+    })
     .from(cli_sessions_v2)
     .where(
       and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
     )
     .limit(1);
 
-  if (sessionRows[0]) return false;
+  if (sessionRows[0]) return sessionRows[0];
 
   console.warn('Session no longer exists, cleaning up staging object', { r2Key, sessionId });
   await env.SESSION_INGEST_R2.delete(r2Key);
-  return true;
+  return null;
 }
 
 async function getStagingObjectBody(env: Env, r2Key: string): Promise<ReadableStream<Uint8Array>> {
@@ -95,9 +132,10 @@ async function ingestStagedSessionItems(
   env: Env,
   msg: IngestQueueMessage,
   body: ReadableStream<Uint8Array>,
-  mergedChanges: Map<string, string | null>
+  mergedChanges: Map<string, string | null>,
+  mergedAttentionSignals: AttentionSignal[]
 ): Promise<boolean> {
-  const chunker = createIngestChunker(env, msg, mergedChanges);
+  const chunker = createIngestChunker(env, msg, mergedChanges, mergedAttentionSignals);
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
   if (parseError) {
@@ -178,7 +216,8 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
 function createIngestChunker(
   env: Env,
   msg: IngestQueueMessage,
-  mergedChanges: Map<string, string | null>
+  mergedChanges: Map<string, string | null>,
+  mergedAttentionSignals: AttentionSignal[]
 ) {
   const { r2Key, kiloUserId, sessionId, ingestVersion, ingestedAt } = msg;
   const encoder = new TextEncoder();
@@ -209,6 +248,7 @@ function createIngestChunker(
     for (const change of ingestResult.changes) {
       mergedChanges.set(change.name, change.value);
     }
+    mergedAttentionSignals.push(...(ingestResult.attentionSignals ?? []));
   };
 
   const stage = async (rawItem: Record<string, unknown>): Promise<boolean> => {
@@ -258,6 +298,75 @@ function createIngestChunker(
   };
 
   return { stage, flushChunkToSessionDO, wasAccepted: () => accepted };
+}
+
+/**
+ * Best-effort mobile push dispatch for remote-session attention signals detected during
+ * ingest (completed assistant turn, or waiting for input). Suppressed for sessions without
+ * a live CLI owner and for child sessions. Viewing suppression is delegated to notifications.
+ * Never throws — a dispatch failure must not block ack'ing (or retrying) the message.
+ */
+function scheduleAttentionSignalDispatch(
+  env: Env,
+  msg: IngestQueueMessage,
+  sessionRow: IngestSessionRow,
+  mergedChanges: Map<string, string | null>,
+  signals: AttentionSignal[],
+  ctx: ExecutionContext
+): void {
+  if (signals.length === 0) return;
+  const parentSessionId = mergedChanges.has('parentId')
+    ? (mergedChanges.get('parentId') ?? null)
+    : sessionRow.parent_session_id;
+  if (
+    !isEligibleForRemoteSessionAttention({
+      parentSessionId,
+    })
+  ) {
+    return;
+  }
+
+  ctx.waitUntil(
+    dispatchRemoteSessionAttentionSignals(env, msg.kiloUserId, msg.sessionId, signals).catch(
+      error => {
+        console.error('Failed to dispatch remote session attention signals (non-fatal)', {
+          sessionId: msg.sessionId,
+          kiloUserId: msg.kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    )
+  );
+}
+
+async function dispatchRemoteSessionAttentionSignals(
+  env: Env,
+  kiloUserId: string,
+  sessionId: string,
+  signals: AttentionSignal[]
+): Promise<void> {
+  for (const signal of signals) {
+    try {
+      await dispatchRemoteSessionAttentionSignal(
+        { kiloUserId, sessionId, signal },
+        {
+          hasActiveCliSession: async () => {
+            const stub = getUserConnectionDO(env, { kiloUserId });
+            return stub.hasActiveCliSession(sessionId);
+          },
+          sendPush: pushParams => env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),
+        }
+      );
+    } catch (error) {
+      console.error('Failed to dispatch remote session attention notification (non-fatal)', {
+        sessionId,
+        kiloUserId,
+        signalId: signal.signalId,
+        kind: signal.kind,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 export async function queue(

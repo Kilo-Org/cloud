@@ -34,6 +34,9 @@ import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
+import { DEFAULT_CODE_REVIEW_MODEL } from '../core/constants';
+import { resolveEffectiveModel } from '../core/model-selection';
+import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
@@ -497,7 +500,34 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       );
     }
 
-    agentConfig = persistedAgentConfig;
+    // Resolve the per-repository model override (if any) against the live config.
+    // Manual reviews are intentionally excluded — they keep the model the user
+    // picked in the manual dialog (handled by the `manualConfig` branch above).
+    // Only rewrite the config when an override actually applies, so the no-override
+    // path passes the live config through untouched.
+    const persistedConfig = persistedAgentConfig.config as CodeReviewAgentConfig;
+    const effectiveModel = resolveEffectiveModel(
+      persistedConfig,
+      review.repo_full_name,
+      DEFAULT_CODE_REVIEW_MODEL
+    );
+    if (effectiveModel.source === 'repository_override') {
+      logExceptInTest('[dispatchReview] Applying per-repository model override', {
+        reviewId: review.id,
+        repo: review.repo_full_name,
+        model: effectiveModel.modelSlug,
+      });
+      agentConfig = {
+        ...persistedAgentConfig,
+        config: {
+          ...persistedConfig,
+          model_slug: effectiveModel.modelSlug,
+          thinking_effort: effectiveModel.thinkingEffort,
+        },
+      };
+    } else {
+      agentConfig = persistedAgentConfig;
+    }
   }
 
   const payload = await prepareReviewPayload({

@@ -42,6 +42,11 @@ function ticketEndpointFor(wsBase: string): string {
 
 function connectUrlFor(wsBase: string, ticket: string): string {
   const url = baseUrlWithPath(wsBase, 'connect');
+  if (url.protocol === 'http:') {
+    url.protocol = 'ws:';
+  } else if (url.protocol === 'https:') {
+    url.protocol = 'wss:';
+  }
   const query = { ticket } satisfies ConnectTicketQuery;
   url.searchParams.set('ticket', query.ticket);
   return url.toString();

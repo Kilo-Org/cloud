@@ -182,7 +182,11 @@ function connectCliSocket(doInstance: UserConnectionDO, connectionId: string): M
 function addCliSocket(
   mockCtx: ReturnType<typeof createMockCtx>,
   connectionId: string,
-  sessions: Array<{ id: string; status: string; title: string }> = []
+  sessions: Array<{
+    id: string;
+    status: string;
+    title: string;
+  }> = []
 ): MockWS {
   const attachment = { role: 'cli' as const, connectionId, sessions };
   const ws = createMockWs(['cli'], attachment);
@@ -206,7 +210,11 @@ function addWebSocket(
 function sendHeartbeat(
   doInstance: UserConnectionDO,
   cliWs: MockWS,
-  sessions: Array<{ id: string; status: string; title: string }>,
+  sessions: Array<{
+    id: string;
+    status: string;
+    title: string;
+  }>,
   protocolVersion?: string
 ) {
   const msg = JSON.stringify({
@@ -343,6 +351,31 @@ describe('UserConnectionDO', () => {
         doInstance.notifySessionEvent({ type: 'session.created', data: { source: 'v1' } } as never)
       ).rejects.toThrow();
       expect(webWs.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('hasActiveCliSession', () => {
+    it('tracks whether a connected CLI heartbeat currently owns the session', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      expect(doInstance.hasActiveCliSession('ses_1')).toBe(false);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_1')]);
+
+      expect(doInstance.hasActiveCliSession('ses_1')).toBe(true);
+
+      mockCtx.removeSocket(cliWs);
+      disconnectCli(doInstance, cliWs);
+
+      expect(doInstance.hasActiveCliSession('ses_1')).toBe(false);
+    });
+
+    it('reconstructs live session ownership from a hibernated CLI attachment', () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-1', [makeSession('ses_1')]);
+
+      expect(doInstance.hasActiveCliSession('ses_1')).toBe(true);
     });
   });
 

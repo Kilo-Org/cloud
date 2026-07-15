@@ -7,11 +7,16 @@
  */
 
 import type {
+  SendCloudAgentSessionNotificationParams,
+  SendCloudAgentSessionNotificationResult,
   SendSessionReadyNotificationParams,
   SendSessionReadyNotificationResult,
 } from '@kilocode/notifications';
 
 export type NotificationsBinding = Fetcher & {
+  sendCloudAgentSessionNotification(
+    params: SendCloudAgentSessionNotificationParams
+  ): Promise<SendCloudAgentSessionNotificationResult>;
   sendSessionReadyNotification(
     params: SendSessionReadyNotificationParams
   ): Promise<SendSessionReadyNotificationResult>;

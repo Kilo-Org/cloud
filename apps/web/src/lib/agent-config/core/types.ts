@@ -4,7 +4,11 @@ export {
   ManuallyAddedRepositorySchema,
   CodeReviewAgentConfigSchema,
 } from '@kilocode/db/schema-types';
-export type { ManuallyAddedRepository, CodeReviewAgentConfig } from '@kilocode/db/schema-types';
+export type {
+  ManuallyAddedRepository,
+  CodeReviewAgentConfig,
+  RepositoryModelOverride,
+} from '@kilocode/db/schema-types';
 
 /**
  * Zod schema for ReviewConfig validation

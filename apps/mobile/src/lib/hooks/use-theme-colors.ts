@@ -1,3 +1,4 @@
+import { DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { useColorScheme } from 'react-native';
 
 // These values must stay in sync with src/global.css design tokens.
@@ -13,6 +14,7 @@ const lightColors = {
   muted: '#F0EEE6',
   mutedForeground: '#6F6A61',
   destructive: '#BE4E3F',
+  destructiveForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
   card: '#FFFFFF',
 
@@ -45,6 +47,7 @@ const darkColors = {
   muted: '#1F1F24',
   mutedForeground: '#8A8680',
   destructive: '#F28B7A',
+  destructiveForeground: '#1A1A10',
   border: 'rgba(255, 255, 255, 0.07)',
   card: '#17171A',
 
@@ -72,4 +75,23 @@ export type ThemeColors = { readonly [K in keyof typeof lightColors]: string };
 export function useThemeColors(): ThemeColors {
   const colorScheme = useColorScheme();
   return colorScheme === 'dark' ? darkColors : lightColors;
+}
+
+export function useNavigationTheme() {
+  const colorScheme = useColorScheme();
+  const colors = colorScheme === 'dark' ? darkColors : lightColors;
+  const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+
+  return {
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.card,
+      text: colors.foreground,
+      border: colors.border,
+      notification: colors.destructive,
+    },
+  };
 }

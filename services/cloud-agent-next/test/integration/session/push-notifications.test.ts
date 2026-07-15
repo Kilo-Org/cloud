@@ -152,6 +152,7 @@ describe('CloudAgentSession push notification producer', () => {
           executionId: COMPLETED_MESSAGE_ID,
           status: 'completed',
           body: 'Assistant finished the task.',
+          suppressIfViewingSession: true,
         },
       ]);
   });
@@ -180,6 +181,7 @@ describe('CloudAgentSession push notification producer', () => {
           executionId: FAILED_MESSAGE_ID,
           status: 'failed',
           body: 'Failed: The message failed',
+          suppressIfViewingSession: true,
         },
       ]);
   });
@@ -210,6 +212,7 @@ describe('CloudAgentSession push notification producer', () => {
           executionId: INTERRUPTED_MESSAGE_ID,
           status: 'interrupted',
           body: 'Interrupted: Task interrupted',
+          suppressIfViewingSession: true,
         },
       ]);
   });
@@ -247,6 +250,7 @@ describe('CloudAgentSession push notification producer', () => {
           executionId: RETRY_MESSAGE_ID,
           status: 'failed',
           body: 'Failed: The message failed',
+          suppressIfViewingSession: true,
         },
         {
           userId,
@@ -254,6 +258,7 @@ describe('CloudAgentSession push notification producer', () => {
           executionId: RETRY_MESSAGE_ID,
           status: 'failed',
           body: 'Failed: The message failed',
+          suppressIfViewingSession: true,
         },
       ]);
   });

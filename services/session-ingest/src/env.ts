@@ -1,5 +1,5 @@
-import type { NotificationsBinding } from './notifications-binding.js';
 import type { O11YBinding } from './o11y-binding.js';
+import type { NotificationsBinding } from './notifications-binding.js';
 
 export type Env = Omit<
   Cloudflare.Env,

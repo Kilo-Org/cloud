@@ -242,6 +242,11 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
               selectedRepositoryIds: input.selectedRepositoryIds.filter(
                 (id): id is number => typeof id === 'number'
               ),
+              // Same numeric-only narrowing as selectedRepositoryIds above.
+              repositoryModelOverrides: input.repositoryModelOverrides.filter(
+                (override): override is typeof override & { repositoryId: number } =>
+                  typeof override.repositoryId === 'number'
+              ),
             })
           : await trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
               ...input,

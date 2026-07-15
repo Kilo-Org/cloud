@@ -1,13 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Keyboard,
   type LayoutChangeEvent,
-  Pressable,
-  TextInput,
+  type TextInput,
   type TextStyle,
   View,
 } from 'react-native';
@@ -19,7 +16,10 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { useTextHeight } from '@/components/agents/use-text-height';
+import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
+import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
+import { VoiceInputStatus } from '@/components/voice-input-control';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
   type AgentAttachmentWire,
@@ -28,6 +28,9 @@ import {
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
+import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
+import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 const TEXT_INPUT_MAX_LINES = 5;
 const TEXT_INPUT_LINE_HEIGHT = 20;
@@ -36,8 +39,7 @@ const TEXT_INPUT_HORIZONTAL_PADDING = 32;
 const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDING;
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
-
-const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+const TEXT_INPUT_FONT_SIZE = 16;
 
 type ChatComposerProps = {
   onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
@@ -79,6 +81,7 @@ export function ChatComposer({
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const submissionLockRef = useRef(false);
   const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({
@@ -86,18 +89,37 @@ export function ChatComposer({
     maxHeight: TEXT_INPUT_MAX_HEIGHT,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
     textContentWidth: inputWidth - TEXT_INPUT_HORIZONTAL_PADDING,
-    fontSize: 16,
+    fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
 
-  // The backend requires a non-empty prompt even when attachments are present.
-  const canSend = hasText && !disabled && !isStreaming && !isSending;
-  const showToolbar = isFocused || hasText || upload.attachments.length > 0;
-  // isSending locks the input and attachment controls too — otherwise text or
-  // attachments added while the send is in flight get wiped by the success path.
+  // Compute base composer disabled before the voice hook so voice can react to it.
   const toolbarDisabled = disabled || isStreaming || isSending;
-  const paperclipDisabled =
-    toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES;
+  const voiceDisabled = toolbarDisabled;
+
+  const voiceInput = useVoiceInput({
+    disabled: voiceDisabled,
+    getDraft: () => textRef.current,
+    onDraftChange: draft => {
+      applyVoiceDraftToInput({
+        input: inputRef.current,
+        draft,
+        maxLength: 4000,
+        onChangeText: handleChangeText,
+      });
+    },
+  });
+
+  const control = resolveChatComposerControlState({
+    attachmentsCount: upload.attachments.length,
+    attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
+    disabled,
+    hasText,
+    isFocused,
+    isSending,
+    isStreaming,
+    voiceInputActive: voiceInput.isActive,
+  });
 
   function handleChangeText(value: string) {
     textRef.current = value;
@@ -107,7 +129,7 @@ export function ChatComposer({
 
   async function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!trimmed || !canSend) {
+    if (!trimmed || !control.canSend) {
       return;
     }
     if (upload.isUploading) {
@@ -125,7 +147,6 @@ export function ChatComposer({
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const payload = upload.toWirePayload();
-    setIsSending(true);
     try {
       // Only clear the draft once the send actually succeeds — a failed
       // send must leave the text and attachments exactly as the user left
@@ -139,9 +160,16 @@ export function ChatComposer({
       Keyboard.dismiss();
     } catch {
       // Draft preserved; error already surfaced by the caller.
-    } finally {
-      setIsSending(false);
     }
+  }
+
+  async function submit() {
+    await settleVoiceInputBeforeSubmit({
+      lock: submissionLockRef,
+      onPendingChange: setIsSending,
+      settleVoiceInput: voiceInput.settleBeforeSubmit,
+      submit: handleSend,
+    });
   }
 
   function handleStop() {
@@ -162,7 +190,7 @@ export function ChatComposer({
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,
-    fontSize: 16,
+    fontSize: TEXT_INPUT_FONT_SIZE,
     height: measure.height,
     includeFontPadding: false,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
@@ -176,7 +204,7 @@ export function ChatComposer({
     <BlurBar>
       {measure.measureElement}
 
-      {showToolbar ? (
+      {control.showToolbar ? (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
           <ChatToolbar
             mode={mode}
@@ -185,7 +213,7 @@ export function ChatComposer({
             variant={variant}
             modelOptions={modelOptions}
             onModelSelect={onModelSelect}
-            disabled={toolbarDisabled}
+            disabled={control.toolbarDisabled}
           />
         </Animated.View>
       ) : null}
@@ -198,98 +226,46 @@ export function ChatComposer({
         />
       ) : null}
 
-      <View className="flex-row items-center p-2.5 px-3">
-        {attachmentsEnabled ? (
-          <Pressable
-            onPress={() => {
-              void handleAddAttachment();
-            }}
-            disabled={paperclipDisabled}
-            hitSlop={PAPERCLIP_HIT_SLOP}
-            className={cn(
-              'h-8 w-8 items-center justify-center rounded-full active:opacity-70',
-              paperclipDisabled && 'opacity-50'
-            )}
-            accessibilityRole="button"
-            accessibilityLabel="Add attachment"
-            accessibilityState={{ disabled: paperclipDisabled }}
-          >
-            <Paperclip size={18} color={colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-
-        <View
-          className={cn(
-            'mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
-            toolbarDisabled && 'opacity-50'
-          )}
-          onLayout={handleInputLayout}
-        >
-          <TextInput
-            ref={inputRef}
-            placeholder={placeholder}
-            placeholderTextColor={colors.mutedForeground}
-            multiline
-            maxLength={4000}
-            onChangeText={handleChangeText}
-            onFocus={() => {
-              setIsFocused(true);
-            }}
-            onBlur={() => {
-              setIsFocused(false);
-            }}
-            style={textInputStyle}
-            scrollEnabled={measure.height >= TEXT_INPUT_MAX_HEIGHT}
-            editable={!toolbarDisabled}
-            accessibilityState={{ disabled: toolbarDisabled }}
-            returnKeyType="default"
-            submitBehavior="newline"
-            autoCapitalize="sentences"
-            autoCorrect
-          />
-        </View>
-
-        {isStreaming ? (
-          <Pressable
-            onPress={handleStop}
-            disabled={disabled}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Stop generating"
-            accessibilityState={{ disabled }}
-            className={cn(
-              'h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
-              disabled && 'opacity-50'
-            )}
-          >
-            <Square size={14} color="white" fill="white" />
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={() => {
-              void handleSend();
-            }}
-            disabled={!canSend}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            accessibilityState={{ disabled: !canSend, busy: isSending }}
-            className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
-              canSend ? 'bg-accent-soft' : 'bg-muted'
-            }`}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-            ) : (
-              <ArrowUp
-                size={18}
-                color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
-                strokeWidth={2.5}
-              />
-            )}
-          </Pressable>
-        )}
+      <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
+        <VoiceInputStatus status={voiceInput.status} />
       </View>
+
+      <ChatComposerInputRow
+        attachmentsEnabled={attachmentsEnabled}
+        canSend={control.canSend}
+        disabled={disabled}
+        inputAccessibilityDisabled={control.inputAccessibilityDisabled}
+        inputEditable={control.inputEditable}
+        inputRef={inputRef}
+        isSending={isSending}
+        isStreaming={isStreaming}
+        maxInputHeight={TEXT_INPUT_MAX_HEIGHT}
+        measureHeight={measure.height}
+        onAddAttachment={() => {
+          void handleAddAttachment();
+        }}
+        onChangeText={handleChangeText}
+        onInputBlur={() => {
+          setIsFocused(false);
+        }}
+        onInputFocus={() => {
+          setIsFocused(true);
+        }}
+        onInputLayout={handleInputLayout}
+        onStop={handleStop}
+        onSubmit={() => {
+          void submit();
+        }}
+        onToggleVoice={() => {
+          void voiceInput.toggle();
+        }}
+        paperclipDisabled={control.paperclipDisabled}
+        placeholder={placeholder}
+        textInputStyle={textInputStyle}
+        voiceDisabled={control.voiceDisabled}
+        voiceInputAvailable={voiceInput.available}
+        voiceInputStatus={voiceInput.status}
+      />
     </BlurBar>
   );
 }

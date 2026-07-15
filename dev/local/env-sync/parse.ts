@@ -228,7 +228,10 @@ function resolveAnnotatedValue(
     case 'url': {
       const isOrigins = key.includes('ORIGINS');
       const isHostname = key.includes('HOSTNAME') && !key.includes('URL');
-      const isWs = key.includes('_WS_');
+      const isWs =
+        key.includes('_WS_') ||
+        entry.defaultValue.startsWith('ws://') ||
+        entry.defaultValue.startsWith('wss://');
       const defaultUsesDockerHost = entry.defaultValue.includes('host.docker.internal');
       const defaultUsesWorkerLocalhost =
         WORKER_LOCALHOST_URL_KEYS.has(key) &&

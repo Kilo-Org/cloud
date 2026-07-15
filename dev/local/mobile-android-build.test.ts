@@ -132,6 +132,7 @@ test('Android cache hit installs without entering the native build slot', async 
   );
   let slots = 0;
   let builds = 0;
+  let packageReads = 0;
   const installed: string[] = [];
   d.withNativeBuildSlot = async run => {
     slots += 1;
@@ -141,12 +142,17 @@ test('Android cache hit installs without entering the native build slot', async 
     builds += 1;
     return path.join(staging, 'app-debug.apk');
   };
+  d.readPackageId = () => {
+    packageReads += 1;
+    return PACKAGE_ID;
+  };
   d.install = (_serial, value) => installed.push(value);
 
   await runAndroidBuild(serial, d);
 
   assert.equal(slots, 0);
   assert.equal(builds, 0);
+  assert.equal(packageReads, 1);
   assert.deepEqual(installed, [apk]);
 });
 

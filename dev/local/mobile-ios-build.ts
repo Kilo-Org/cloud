@@ -758,11 +758,14 @@ export async function pruneCache(args: PruneCacheArgs): Promise<PruneResult> {
     for (const name of fs.readdirSync(locksRoot)) {
       const full = path.join(locksRoot, name);
       const stat = fs.statSync(full);
-      if (!stat.isDirectory()) continue;
-      // Only remove directories that look like our lock or quarantine artifacts.
+      // Locks are directories; tryAdoptLock quarantines lock.json as a file.
       if (!/\.(lock|quarantine\..*)$/.test(name)) continue;
       const key = name.replace(/\.(lock|quarantine\..*)$/, '');
       if (fs.existsSync(path.join(entriesRoot, key))) continue;
+      if (!stat.isDirectory()) {
+        removeLockArtifacts(full);
+        continue;
+      }
       const lockFile = path.join(full, 'lock.json');
       const lockRecord = readLockRecord(lockFile);
       if (lockRecord && isActive(lockRecord)) continue;

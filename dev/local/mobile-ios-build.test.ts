@@ -1683,10 +1683,9 @@ test('pruneCache removes stale lock artifacts and orphan quarantines', async () 
     })
   );
 
-  // Orphan quarantine directory with no entry
+  // tryAdoptLock quarantines lock.json as a file, not a directory.
   const orphanQuarantine = path.join(locksRoot, 'orphan.quarantine.123-456-abc');
-  fs.mkdirSync(orphanQuarantine, { recursive: true });
-  fs.writeFileSync(path.join(orphanQuarantine, 'stale.json'), '{}');
+  fs.writeFileSync(orphanQuarantine, '{}');
 
   const result = await pruneCache({
     env: fixedEnv({ cacheRoot }),
@@ -1936,7 +1935,12 @@ test('computeArtifactChecksum streams large files in chunks without loading full
 });
 
 test('defaultIsLockActive rejects when only pidAlive or only processIdentity matches', () => {
-  const record: LockRecord = { key: 'k', pid: 42, identity: 'expected', startedAt: '' };
+  const record: LockRecord = {
+    key: 'k',
+    pid: 0,
+    identity: 'expected',
+    startedAt: '',
+  };
 
   // Only pidAlive provided: identity must still match via default probe
   let active = defaultIsLockActive({
@@ -1950,7 +1954,7 @@ test('defaultIsLockActive rejects when only pidAlive or only processIdentity mat
     env: fixedEnv(),
     processIdentity: () => 'expected',
   });
-  // PID 42 is unlikely to exist in this test process, so it should be inactive
+  // PID 0 is rejected before the default probe reaches the host process table.
   assert.equal(active(record), false, 'identity matches but pid dead');
 
   // Both provided and match

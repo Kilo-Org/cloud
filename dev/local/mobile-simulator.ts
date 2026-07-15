@@ -633,6 +633,23 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
                   `Simulator ${device.id} relabel to ${args.phase} requires a rename hook`
                 );
               }
+              if (existing.claimId === undefined) {
+                const upgraded: ClaimRecord = {
+                  deviceId: device.id,
+                  worktreeRoot,
+                  claimId: randomUUID(),
+                  status: 'ready',
+                  claimedAt: new Date().toISOString(),
+                  originalDeviceName: device.name,
+                  currentDeviceName: device.name,
+                };
+                fs.writeFileSync(lockPath(lockRoot, device.id), JSON.stringify(upgraded), {
+                  flag: 'w',
+                });
+                existing.claimId = upgraded.claimId;
+                existing.originalDeviceName = upgraded.originalDeviceName;
+                existing.currentDeviceName = upgraded.currentDeviceName;
+              }
               args.rename(device.id, targetLabel);
               // Persist the new label/phase under the mutation lock. We
               // only touch the record when the exact claimId is still

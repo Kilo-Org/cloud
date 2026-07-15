@@ -929,6 +929,44 @@ test('treats a legacy claim (no status/claimId) as ready for the same worktree',
   }
 });
 
+test('upgrades and relabels a same-worktree legacy claim without desynchronizing its name', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const renames: string[] = [];
+
+  try {
+    fs.writeFileSync(path.join(lockRoot, 'B.json'), JSON.stringify({ worktreeRoot }));
+
+    const claim = claimSimulator({
+      devices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'B',
+      phase: 'verify',
+      rename: (_deviceId, name) => renames.push(name),
+    });
+
+    assert.equal(claim.alreadyOwned, true);
+    assert.equal(claim.device.name, buildSimulatorLabel(worktreeRoot, 'verify'));
+    assert.deepEqual(renames, [buildSimulatorLabel(worktreeRoot, 'verify')]);
+    const persisted = JSON.parse(fs.readFileSync(path.join(lockRoot, 'B.json'), 'utf8')) as {
+      status: string;
+      claimId: string;
+      originalDeviceName: string;
+      currentDeviceName: string;
+      phase: string;
+    };
+    assert.equal(persisted.status, 'ready');
+    assert.ok(persisted.claimId);
+    assert.equal(persisted.originalDeviceName, devices.find(device => device.id === 'B')?.name);
+    assert.equal(persisted.currentDeviceName, buildSimulatorLabel(worktreeRoot, 'verify'));
+    assert.equal(persisted.phase, 'verify');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
 test('rejects a different worktree against a legacy claim (no status/claimId)', () => {
   const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
   const firstWorktree = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-one-'));

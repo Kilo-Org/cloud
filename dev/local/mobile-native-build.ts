@@ -23,45 +23,46 @@ const DEFAULT_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
 
 export async function withNativeBuildSemaphore<T>(args: NativeBuildSemaphoreArgs<T>): Promise<T> {
   fs.mkdirSync(args.root, { recursive: true });
-  const lockDir = path.join(args.root, 'native-build.lock');
-  const ownerPath = path.join(lockDir, 'owner.json');
+  const lockPath = path.join(args.root, 'native-build.lock');
   const pidAlive = args.pidAlive ?? defaultPidAlive;
   const processIdentity = args.processIdentity ?? defaultProcessIdentity;
   const deadline = Date.now() + (args.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS);
 
   while (true) {
-    const owner = acquire(lockDir, ownerPath, processIdentity);
+    const owner = acquire(lockPath, processIdentity);
     if (owner) {
       try {
         return await args.run();
       } finally {
-        releaseOwned(lockDir, ownerPath, owner.token);
+        releaseOwned(lockPath, owner.token);
       }
     }
 
-    const current = readOwner(ownerPath);
-    if (!current || !pidAlive(current.pid) || processIdentity(current.pid) !== current.identity) {
-      reclaim(lockDir, ownerPath, current);
+    if (Date.now() >= deadline) {
+      throw new Error('Timed out waiting for native build producer');
+    }
+
+    const current = readOwner(lockPath);
+    if (!current) {
+      await sleep(args.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
       continue;
     }
-    if (Date.now() >= deadline) {
-      throw new Error(`Timed out waiting for native build producer ${current.pid}`);
+    if (!pidAlive(current.pid) || processIdentity(current.pid) !== current.identity) {
+      reclaim(lockPath, current);
+      await sleep(args.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
+      continue;
     }
     await sleep(args.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS);
   }
 }
 
 function acquire(
-  lockDir: string,
-  ownerPath: string,
+  lockPath: string,
   processIdentity: (pid: number) => string | undefined
 ): NativeBuildOwner | undefined {
-  try {
-    fs.mkdirSync(lockDir);
-  } catch (error) {
-    if (hasCode(error, 'EEXIST')) return undefined;
-    throw error;
-  }
+  const stagingPath = `${lockPath}.acquire-${process.pid}-${Date.now()}-${Math.random()
+    .toString(16)
+    .slice(2)}`;
   const owner: NativeBuildOwner = {
     pid: process.pid,
     identity: processIdentity(process.pid) ?? `pid-${process.pid}`,
@@ -69,33 +70,48 @@ function acquire(
     startedAt: new Date().toISOString(),
   };
   try {
-    fs.writeFileSync(ownerPath, JSON.stringify(owner), { flag: 'wx' });
+    fs.writeFileSync(stagingPath, JSON.stringify(owner), { flag: 'wx' });
+    fs.linkSync(stagingPath, lockPath);
     return owner;
   } catch (error) {
-    fs.rmSync(lockDir, { recursive: true, force: true });
+    if (hasCode(error, 'EEXIST')) return undefined;
     throw error;
+  } finally {
+    try {
+      fs.rmSync(stagingPath, { force: true });
+    } catch {
+      // Unique staging files are inert; cleanup must not mask lock acquisition.
+    }
   }
 }
 
-function reclaim(lockDir: string, ownerPath: string, expected: NativeBuildOwner | undefined): void {
-  const current = readOwner(ownerPath);
+function reclaim(lockPath: string, expected: NativeBuildOwner): void {
+  const current = readOwner(lockPath);
   if (!sameOwner(current, expected)) return;
-  const quarantine = `${lockDir}.stale-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const quarantine = `${lockPath}.stale-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   try {
-    fs.renameSync(lockDir, quarantine);
-    fs.rmSync(quarantine, { recursive: true, force: true });
+    fs.renameSync(lockPath, quarantine);
   } catch (error) {
     if (!hasCode(error, 'ENOENT')) throw error;
+    return;
+  }
+  try {
+    fs.rmSync(quarantine, { recursive: true, force: true });
+  } catch {
+    // A uniquely named quarantine is inert and must not block the next producer.
   }
 }
 
-function releaseOwned(lockDir: string, ownerPath: string, token: string): void {
-  if (readOwner(ownerPath)?.token !== token) return;
-  fs.rmSync(lockDir, { recursive: true, force: true });
+function releaseOwned(lockPath: string, token: string): void {
+  if (readOwner(lockPath)?.token !== token) return;
+  fs.rmSync(lockPath, { force: true });
 }
 
-function readOwner(ownerPath: string): NativeBuildOwner | undefined {
+function readOwner(lockPath: string): NativeBuildOwner | undefined {
   try {
+    const ownerPath = fs.statSync(lockPath).isDirectory()
+      ? path.join(lockPath, 'owner.json')
+      : lockPath;
     const value: unknown = JSON.parse(fs.readFileSync(ownerPath, 'utf8'));
     if (typeof value !== 'object' || value === null) return undefined;
     const owner = value as Record<string, unknown>;
@@ -118,15 +134,13 @@ function readOwner(ownerPath: string): NativeBuildOwner | undefined {
   }
 }
 
-function sameOwner(
-  left: NativeBuildOwner | undefined,
-  right: NativeBuildOwner | undefined
-): boolean {
-  if (!left || !right) return left === right;
+function sameOwner(left: NativeBuildOwner | undefined, right: NativeBuildOwner): boolean {
+  if (!left) return false;
   return left.pid === right.pid && left.identity === right.identity && left.token === right.token;
 }
 
 function defaultPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;

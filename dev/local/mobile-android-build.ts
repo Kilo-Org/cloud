@@ -121,11 +121,7 @@ export async function runAndroidBuild(serial: string, deps: AndroidBuildDeps): P
       return publish(serial, key, compatibility, deps);
     });
   }
-  const verified = await lookup(deps.cacheRoot, key, compatibility, deps.readPackageId);
-  if (!verified || verified.apkPath !== entry.apkPath) {
-    throw new Error(`Android cache entry failed validation for key ${key}`);
-  }
-  deps.install(serial, verified.apkPath);
+  deps.install(serial, entry.apkPath);
 }
 
 async function lookup(

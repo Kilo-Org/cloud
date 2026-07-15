@@ -49,10 +49,9 @@ test('serializes native producers across different platform builds', async () =>
 
 test('recovers an abandoned native producer lock', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
-  const lockDir = path.join(root, 'native-build.lock');
-  fs.mkdirSync(lockDir, { recursive: true });
+  const lockPath = path.join(root, 'native-build.lock');
   fs.writeFileSync(
-    path.join(lockDir, 'owner.json'),
+    lockPath,
     JSON.stringify({
       pid: 99_999,
       identity: 'dead',
@@ -73,21 +72,49 @@ test('recovers an abandoned native producer lock', async () => {
   });
 
   assert.equal(ran, true);
-  assert.equal(fs.existsSync(lockDir), false);
+  assert.equal(fs.existsSync(lockPath), false);
+});
+
+test('recovers an abandoned legacy directory-shaped native producer lock', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
+  const lockPath = path.join(root, 'native-build.lock');
+  fs.mkdirSync(lockPath);
+  fs.writeFileSync(
+    path.join(lockPath, 'owner.json'),
+    JSON.stringify({
+      pid: 99_999,
+      identity: 'dead',
+      token: 'legacy-stale',
+      startedAt: new Date().toISOString(),
+    })
+  );
+
+  let ran = false;
+  await withNativeBuildSemaphore({
+    root,
+    pidAlive: () => false,
+    processIdentity: () => undefined,
+    pollIntervalMs: 1,
+    run: async () => {
+      ran = true;
+    },
+  });
+
+  assert.equal(ran, true);
+  assert.equal(fs.existsSync(lockPath), false);
 });
 
 test('does not release a native lock replaced by another owner', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
-  const lockDir = path.join(root, 'native-build.lock');
+  const lockPath = path.join(root, 'native-build.lock');
 
   await assert.rejects(
     withNativeBuildSemaphore({
       root,
       run: async () => {
-        fs.rmSync(lockDir, { recursive: true, force: true });
-        fs.mkdirSync(lockDir, { recursive: true });
+        fs.rmSync(lockPath, { force: true });
         fs.writeFileSync(
-          path.join(lockDir, 'owner.json'),
+          lockPath,
           JSON.stringify({
             pid: process.pid,
             identity: 'replacement',
@@ -101,8 +128,69 @@ test('does not release a native lock replaced by another owner', async () => {
     /producer failed/
   );
 
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(lockDir, 'owner.json'), 'utf8')).token,
-    'replacement'
+  assert.equal(JSON.parse(fs.readFileSync(lockPath, 'utf8')).token, 'replacement');
+});
+
+test('publishes owner metadata before exposing the canonical native lock', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
+  const originalLinkSync = fs.linkSync;
+  let second: Promise<void> | undefined;
+  let active = 0;
+  let maxActive = 0;
+  let intercepted = false;
+
+  fs.linkSync = ((existingPath, newPath) => {
+    if (!intercepted && path.basename(String(newPath)) === 'native-build.lock') {
+      intercepted = true;
+      second = withNativeBuildSemaphore({
+        root,
+        pollIntervalMs: 1,
+        run: async () => {
+          active += 1;
+          maxActive = Math.max(maxActive, active);
+          await new Promise(resolve => setTimeout(resolve, 10));
+          active -= 1;
+        },
+      });
+    }
+    return originalLinkSync(existingPath, newPath);
+  }) as typeof fs.linkSync;
+
+  try {
+    await withNativeBuildSemaphore({
+      root,
+      pollIntervalMs: 1,
+      run: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        active -= 1;
+      },
+    });
+    await second;
+    assert.equal(maxActive, 1);
+  } finally {
+    fs.linkSync = originalLinkSync;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('enforces the wait timeout before reclaiming an incomplete lock', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-native-build-'));
+  fs.writeFileSync(path.join(root, 'native-build.lock'), '{');
+  let ran = false;
+
+  await assert.rejects(
+    withNativeBuildSemaphore({
+      root,
+      waitTimeoutMs: 0,
+      run: async () => {
+        ran = true;
+      },
+    }),
+    /Timed out waiting for native build producer/
   );
+  assert.equal(ran, false);
+  assert.equal(fs.existsSync(path.join(root, 'native-build.lock')), true);
+  fs.rmSync(root, { recursive: true, force: true });
 });

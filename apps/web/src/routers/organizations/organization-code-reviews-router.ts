@@ -65,6 +65,21 @@ const ManuallyAddedRepositoryInputSchema = z.object({
   private: z.boolean(),
 });
 
+// Repository IDs are numeric for GitHub/GitLab and UUID strings for Bitbucket, so
+// the override ID is a union here; per-platform validation happens against the
+// validated `selectedRepositoryIds` at save time.
+const RepositoryModelOverrideInputSchema = z.object({
+  repositoryId: z.union([z.number(), z.string()]),
+  repoFullName: z.string().max(511),
+  modelSlug: z.string(),
+  thinkingEffort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+});
+
 const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   platform: PlatformSchema,
   reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']),
@@ -80,6 +95,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
+  repositoryModelOverrides: z.array(RepositoryModelOverrideInputSchema).optional(),
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
@@ -426,6 +442,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             platform === 'bitbucket' ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
+          repositoryModelOverrides: [],
           disableReviewMd: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -454,6 +471,18 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           : cfg.repository_selection_mode || 'all',
         selectedRepositoryIds,
         manuallyAddedRepositories: isBitbucket ? [] : cfg.manually_added_repositories || [],
+        repositoryModelOverrides: (cfg.repository_model_overrides ?? [])
+          .filter(override =>
+            isBitbucket
+              ? typeof override.repository_id === 'string'
+              : typeof override.repository_id === 'number'
+          )
+          .map(override => ({
+            repositoryId: override.repository_id,
+            repoFullName: override.repo_full_name,
+            modelSlug: override.model_slug,
+            thinkingEffort: override.thinking_effort ?? null,
+          })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
         reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
@@ -493,6 +522,23 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           }
         }
 
+        // Per-repository model overrides are independent of the trigger selection —
+        // they apply in both 'all' and 'selected' modes. Keep only overrides whose id
+        // type matches the platform (numeric for GitHub/GitLab, UUID string for
+        // Bitbucket), mirroring how selected repository ids are validated.
+        const repositoryModelOverrides = (input.repositoryModelOverrides ?? [])
+          .filter(override =>
+            isBitbucket
+              ? typeof override.repositoryId === 'string'
+              : typeof override.repositoryId === 'number'
+          )
+          .map(override => ({
+            repository_id: override.repositoryId,
+            repo_full_name: override.repoFullName,
+            model_slug: override.modelSlug,
+            thinking_effort: override.thinkingEffort ?? null,
+          }));
+
         await upsertAgentConfig({
           organizationId: input.organizationId,
           agentType: 'code_review',
@@ -509,6 +555,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
               : input.repositorySelectionMode || 'all',
             selected_repository_ids: selectedRepositoryIds,
             manually_added_repositories: isBitbucket ? [] : input.manuallyAddedRepositories || [],
+            repository_model_overrides: repositoryModelOverrides,
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
             review_memory_enabled: false,
             review_analytics_enabled: false,

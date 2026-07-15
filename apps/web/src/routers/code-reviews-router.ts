@@ -40,6 +40,19 @@ const ManuallyAddedRepositoryInputSchema = z.object({
   private: z.boolean(),
 });
 
+// Personal integrations are GitHub/GitLab only, so override repo IDs are numeric.
+const RepositoryModelOverrideInputSchema = z.object({
+  repositoryId: z.number(),
+  repoFullName: z.string().max(511),
+  modelSlug: z.string(),
+  thinkingEffort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+});
+
 const SaveReviewConfigInputSchema = z.object({
   platform: PlatformSchema,
   reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']),
@@ -55,6 +68,7 @@ const SaveReviewConfigInputSchema = z.object({
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
+  repositoryModelOverrides: z.array(RepositoryModelOverrideInputSchema).optional(),
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
@@ -166,6 +180,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           repositorySelectionMode: 'all' as const,
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
+          repositoryModelOverrides: [],
           disableReviewMd: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -186,6 +201,17 @@ export const personalReviewAgentRouter = createTRPCRouter({
           (repositoryId): repositoryId is number => typeof repositoryId === 'number'
         ),
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
+        repositoryModelOverrides: (cfg.repository_model_overrides ?? [])
+          .filter(
+            (override): override is typeof override & { repository_id: number } =>
+              typeof override.repository_id === 'number'
+          )
+          .map(override => ({
+            repositoryId: override.repository_id,
+            repoFullName: override.repo_full_name,
+            modelSlug: override.model_slug,
+            thinkingEffort: override.thinking_effort ?? null,
+          })),
         disableReviewMd: cfg.disable_review_md ?? true,
         reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
@@ -209,6 +235,16 @@ export const personalReviewAgentRouter = createTRPCRouter({
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
           [];
 
+        // Per-repository model overrides are independent of the trigger selection —
+        // they apply in both 'all' and 'selected' modes. IDs are numeric for personal
+        // (GitHub/GitLab) integrations, enforced by the input schema.
+        const repositoryModelOverrides = (input.repositoryModelOverrides ?? []).map(override => ({
+          repository_id: override.repositoryId,
+          repo_full_name: override.repoFullName,
+          model_slug: override.modelSlug,
+          thinking_effort: override.thinkingEffort ?? null,
+        }));
+
         // Save the agent config
         await upsertAgentConfigForOwner({
           owner,
@@ -224,6 +260,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             repository_selection_mode: input.repositorySelectionMode || 'all',
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
+            repository_model_overrides: repositoryModelOverrides,
             disable_review_md: input.disableReviewMd ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,

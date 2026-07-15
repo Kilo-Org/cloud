@@ -4,7 +4,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -33,8 +33,8 @@ import {
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
-import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { SessionMessageList } from '@/components/agents/session-message-list';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
@@ -110,6 +110,10 @@ export function SessionDetailContent({
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
+  const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
+  const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
+  const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
+  const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
 
@@ -232,17 +236,6 @@ export function SessionDetailContent({
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
   });
-
-  const {
-    flatListRef,
-    handleContentSizeChange,
-    handleListLayout,
-    handleScroll,
-    handleScrollBeginDrag,
-    handleScrollEndDrag,
-    handleMomentumScrollBegin,
-    handleMomentumScrollEnd,
-  } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
 
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -604,28 +597,23 @@ export function SessionDetailContent({
       );
     }
     return (
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={item => item.info.id}
+      <SessionMessageList
+        sessionId={sessionId}
+        messages={messages}
+        hasOlderMessages={hasOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onLoadOlderMessages={() => {
+          void manager.loadOlderMessages();
+        }}
         renderItem={renderItem}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        onMomentumScrollBegin={handleMomentumScrollBegin}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        onContentSizeChange={handleContentSizeChange}
-        onLayout={handleListLayout}
-        scrollEventThrottle={16}
         ListFooterComponent={
           <>
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </>
         }
-        contentContainerClassName="py-2"
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
       />
     );
   }

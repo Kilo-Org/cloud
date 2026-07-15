@@ -141,6 +141,79 @@ describe('remote command catalog schema', () => {
     expect(new TextEncoder().encode(serialized).byteLength).toBeGreaterThan(512 * 1024);
     expect(remoteCommandCatalogV1Schema.safeParse(multibyteCatalog).success).toBe(false);
   });
+
+  it('normalizes an omitted `hints` key to an empty array', () => {
+    // Older CLI versions serialize commands without a `hints` key at all.
+    // The wire shape must accept that and emit `hints: []` so SlashCommandInfo
+    // stays structurally satisfied without fail-closing the whole catalog.
+    const parsed = remoteCommandCatalogV1Schema.parse({
+      protocolVersion: 1,
+      commands: [
+        { name: 'review', description: 'Review changes', source: 'command' },
+        { name: 'compact', description: 'compact the current session context' },
+      ],
+    });
+    expect(parsed).toEqual({
+      protocolVersion: 1,
+      commands: [
+        { name: 'review', description: 'Review changes', source: 'command', hints: [] },
+        { name: 'compact', description: 'compact the current session context', hints: [] },
+      ],
+    });
+  });
+
+  it('preserves explicit hints values when provided', () => {
+    const parsed = remoteCommandCatalogV1Schema.parse({
+      protocolVersion: 1,
+      commands: [
+        { name: 'review', description: 'Review changes', source: 'command', hints: ['$ARGUMENTS'] },
+      ],
+    });
+    expect(parsed.commands[0]?.hints).toEqual(['$ARGUMENTS']);
+  });
+
+  it('still rejects malformed hints (non-string entry, over-length string, over cap)', () => {
+    const base = {
+      name: 'review',
+      description: 'Review changes',
+      source: 'command' as const,
+    };
+    expect(
+      remoteCommandCatalogV1Schema.safeParse({
+        protocolVersion: 1,
+        commands: [{ ...base, hints: [123] }],
+      }).success
+    ).toBe(false);
+    expect(
+      remoteCommandCatalogV1Schema.safeParse({
+        protocolVersion: 1,
+        commands: [{ ...base, hints: ['x'.repeat(2_001)] }],
+      }).success
+    ).toBe(false);
+    expect(
+      remoteCommandCatalogV1Schema.safeParse({
+        protocolVersion: 1,
+        commands: [{ ...base, hints: Array.from({ length: 33 }, () => 'hint') }],
+      }).success
+    ).toBe(false);
+  });
+
+  it('still rejects commands carrying unknown keys after relaxing hints', () => {
+    expect(
+      remoteCommandCatalogV1Schema.safeParse({
+        protocolVersion: 1,
+        commands: [
+          {
+            name: 'review',
+            description: 'Review changes',
+            source: 'command',
+            hints: ['$ARGUMENTS'],
+            template: 'private implementation detail',
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('parseRemoteCommandCatalog', () => {

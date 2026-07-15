@@ -49,6 +49,16 @@ describe('createMobileSlashCommandList', () => {
     expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND]);
   });
 
+  it('exposes only the reserved /new command when the remote catalog is empty and upgrade-required', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      [],
+      remoteState({ commands: [], refresh: 'upgrade-required', message: 'Please upgrade your CLI' })
+    );
+    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND]);
+    expect(list.some(command => command.name === 'compact')).toBe(false);
+  });
+
   it('keeps /new available under an upgrade-required refresh so the user gets a clear upgrade message instead of a silent prompt', () => {
     const list = createMobileSlashCommandList(
       'remote',

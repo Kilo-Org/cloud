@@ -351,7 +351,10 @@ const remoteSlashCommandInfoSchema = z
     agent: remoteCommandStringSchema.optional(),
     model: remoteCommandStringSchema.optional(),
     source: z.enum(['command', 'mcp', 'skill']).optional(),
-    hints: z.array(remoteCommandStringSchema).max(REMOTE_COMMAND_MAX_HINTS),
+    // `hints` is optional on the wire: older CLI versions omit it entirely.
+    // SlashCommandInfo requires a non-nullable array, so missing entries
+    // normalize to an empty array instead of fail-closing the catalog.
+    hints: z.array(remoteCommandStringSchema).max(REMOTE_COMMAND_MAX_HINTS).optional().default([]),
     subtask: z.boolean().optional(),
   })
   .strict();

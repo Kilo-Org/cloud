@@ -120,12 +120,13 @@ describe('buildCouncilResult', () => {
         { specialistId: 'performance', vote: 'pass', findings: [] },
       ]),
     });
-    // security has its own model (anthropic/x) but no effort override → base effort.
+    // security has its OWN model (anthropic/x) and no effort override → it does NOT inherit
+    // the base model's effort (variants are model-specific), so thinkingEffort is null.
     expect(result.specialists.find(s => s.id === 'security')).toMatchObject({
       model: 'anthropic/x',
-      thinkingEffort: 'high',
+      thinkingEffort: null,
     });
-    // performance has neither → both fall back to the review defaults.
+    // performance inherits the default model, so it also inherits the base effort.
     expect(result.specialists.find(s => s.id === 'performance')).toMatchObject({
       model: 'base/model',
       thinkingEffort: 'high',

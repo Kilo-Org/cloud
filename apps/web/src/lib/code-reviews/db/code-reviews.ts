@@ -258,13 +258,20 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
  */
 export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCodeReview | null> {
   try {
+    // Do NOT select the heavy `council_result` JSONB: this getter feeds many hot, non-detail
+    // callers (status/usage callbacks, CLI, dispatch, cancel/retrigger) that never read it.
+    // The column is kept off the wire and returned as null; the one consumer that needs it —
+    // the review-detail `get` procedure — loads it explicitly via `getCodeReviewCouncilResult`.
+    // Returning the full row type (with council_result: null) avoids churning every caller.
+    const { council_result: _councilResult, ...columns } =
+      getTableColumns(cloud_agent_code_reviews);
     const [review] = await db
-      .select()
+      .select(columns)
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, reviewId))
       .limit(1);
 
-    return review || null;
+    return review ? { ...review, council_result: null } : null;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'getCodeReviewById' },
@@ -272,6 +279,23 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
     });
     throw error;
   }
+}
+
+/**
+ * Fetches ONLY the persisted `council_result` for a review (council runs). Kept separate
+ * from `getCodeReviewById` so the heavy JSONB is loaded solely by the review-detail path
+ * that renders it, not by every full-row read.
+ */
+export async function getCodeReviewCouncilResult(
+  reviewId: string
+): Promise<CodeReviewCouncilResult | null> {
+  const [row] = await db
+    .select({ council_result: cloud_agent_code_reviews.council_result })
+    .from(cloud_agent_code_reviews)
+    .where(eq(cloud_agent_code_reviews.id, reviewId))
+    .limit(1);
+
+  return row?.council_result ?? null;
 }
 
 export async function listDispatchableCodeReviewOwnerCandidates(

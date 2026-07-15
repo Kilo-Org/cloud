@@ -1292,7 +1292,9 @@ const RESERVED_AGENT_SLUGS = new Set([
 // Cloud-agent-next caps a runtime-agent model slug at this many chars
 // (`Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH`). Keep the per-specialist model constraint in
 // lockstep so a council request valid at creation cannot fail at session preparation.
-const MAX_RUNTIME_AGENT_MODEL_LENGTH = 200;
+// Exported so the review-creation path can apply the SAME bound to the council BASE model
+// (which specialists without an override inherit into `runtimeAgents[].model`).
+export const MAX_RUNTIME_AGENT_MODEL_LENGTH = 200;
 
 export const CouncilSpecialistSchema = z.object({
   id: z

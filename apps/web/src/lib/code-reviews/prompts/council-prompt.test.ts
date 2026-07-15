@@ -57,6 +57,27 @@ describe('buildCouncilRuntimeAgents', () => {
     expect(agent.config.model).toBe('default/model');
     expect(agent.config.variant).toBeUndefined();
   });
+
+  it('does NOT inherit the default variant for a specialist on its own model', () => {
+    const [agent] = buildCouncilRuntimeAgents({
+      // Own model, no effort override → must not borrow the base model's variant.
+      specialists: [specialist({ id: 'security', model_slug: 'anthropic/x' })],
+      defaultModel: 'default/model',
+      defaultVariant: 'high',
+    });
+    expect(agent.config.model).toBe('anthropic/x');
+    expect(agent.config.variant).toBeUndefined();
+  });
+
+  it('inherits the default variant only when the specialist also inherits the default model', () => {
+    const [agent] = buildCouncilRuntimeAgents({
+      specialists: [specialist({ id: 'security' })],
+      defaultModel: 'default/model',
+      defaultVariant: 'high',
+    });
+    expect(agent.config.model).toBe('default/model');
+    expect(agent.config.variant).toBe('high');
+  });
 });
 
 describe('buildCouncilOrchestratorPrompt', () => {

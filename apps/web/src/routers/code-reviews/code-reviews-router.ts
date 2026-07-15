@@ -17,6 +17,7 @@ import {
   listCodeReviews,
   countCodeReviews,
   getCodeReviewById,
+  getCodeReviewCouncilResult,
   cancelCodeReview,
   resetCodeReviewForRetry,
   updateCheckRunId,
@@ -368,7 +369,13 @@ export const codeReviewRouter = createTRPCRouter({
             cached: 0,
           };
 
-      return successResult({ review, attempts, tokenUsage });
+      // The detail screen renders the council breakdown, so this is the one path that needs
+      // `council_result`. `getCodeReviewById` omits the heavy JSONB, so load it explicitly
+      // (council runs only) and merge it back into the returned review.
+      const council_result =
+        review.review_type === 'council' ? await getCodeReviewCouncilResult(input.reviewId) : null;
+
+      return successResult({ review: { ...review, council_result }, attempts, tokenUsage });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;

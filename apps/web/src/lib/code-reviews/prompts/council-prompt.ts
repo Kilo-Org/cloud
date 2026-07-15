@@ -69,8 +69,9 @@ export function buildCouncilOrchestratorPrompt(params: {
     '',
     `Governance (for context only — our system computes the final decision): ${describeAggregationStrategy(aggregationStrategy)}`,
     '',
-    'When every specialist has reported, emit EXACTLY ONE machine-readable manifest as the',
-    'VERY LAST line of your final message, on its own line, with no text after it:',
+    'When every specialist has reported, emit EXACTLY ONE machine-readable manifest on its',
+    'own line in your final message, verbatim on a line by itself. It does NOT need to be',
+    'the very last line — if any other trailing markers are required, they may follow it:',
     '',
     `<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"specialistId":"<id>","model":"<model the specialist reported, or omit>","vote":"pass|warn|block|abstain","highestSeverity":"<label or null>","findings":[{"path":"<path>","line":<number|null>,"severity":"<label>","rationale":"<text>"}]}]} -->`,
     '',
@@ -92,6 +93,12 @@ export function buildCouncilOrchestratorPrompt(params: {
  * specialist, each pinned to its own model/effort (falling back to the review default).
  * `model` is always resolved so a per-specialist `variant` always has a model (required
  * by cloud-agent-next's schema).
+ *
+ * A specialist only inherits the review's default `variant` when it also inherits the
+ * default MODEL. Variants (thinking-effort levels) are model-specific, so a specialist
+ * running on its OWN model must not borrow the base model's effort — that pairing can be
+ * invalid and fail (or run wrong) at session preparation. Such a specialist gets no
+ * variant unless it explicitly set its own.
  */
 export function buildCouncilRuntimeAgents(params: {
   specialists: CouncilSpecialist[];
@@ -100,7 +107,8 @@ export function buildCouncilRuntimeAgents(params: {
 }): RuntimeAgentInput[] {
   const { specialists, defaultModel, defaultVariant } = params;
   return specialists.map(specialist => {
-    const variant = specialist.thinking_effort ?? defaultVariant;
+    const usesDefaultModel = !specialist.model_slug;
+    const variant = specialist.thinking_effort ?? (usesDefaultModel ? defaultVariant : undefined);
     return {
       slug: specialist.id,
       name: specialist.name,

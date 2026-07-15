@@ -61,7 +61,10 @@ export function buildCouncilResult(params: {
       // is what we hand cloud-agent-next in `buildCouncilRuntimeAgents`, so the fallback
       // still reflects the request even when the specialist doesn't self-report.
       model: reported?.model ?? member.model_slug ?? baseModel,
-      thinkingEffort: member.thinking_effort ?? baseThinkingEffort,
+      // Mirror `buildCouncilRuntimeAgents`: only inherit the base effort when the specialist
+      // also inherited the base model (variants are model-specific). A specialist on its own
+      // model shows no effort unless it set one.
+      thinkingEffort: member.thinking_effort ?? (member.model_slug ? null : baseThinkingEffort),
       vote: reported?.vote ?? 'abstain',
       highestSeverity: reported?.highestSeverity ?? null,
       findings: reported?.findings ?? [],
@@ -77,37 +80,54 @@ export function buildCouncilResult(params: {
 }
 
 /**
- * Captures a completed council session's outcome and persists `council_result` for the
- * cloud UI. No-op when the review is not a council run or has no council config.
- *
- * Intentionally does NOT swallow a persistence failure: callers invoke this BEFORE marking
- * the review completed, so a thrown error fails the status callback and cloud-agent-next
- * redelivers it — retrying the write — rather than leaving a `completed` council run
- * permanently without a result. `buildCouncilResult` itself is pure and never throws
- * (a missing/invalid manifest fails closed to `block`), so the only failure here is the DB
- * write, which is exactly what we want to retry.
+ * Pure: derives the council result for a completed review from its stored council config +
+ * the final assistant message. Returns null when the review is not a council run or has no
+ * council config (nothing to persist). No DB access, never throws (fails closed to `block`).
  */
-export async function finalizeCouncilResultForReview(params: {
+export function computeCouncilResultForReview(params: {
   review: CloudAgentCodeReview;
   lastAssistantMessageText: string | null | undefined;
-}): Promise<void> {
+}): CodeReviewCouncilResult | null {
   const { review, lastAssistantMessageText } = params;
-  if (review.review_type !== 'council') return;
+  if (review.review_type !== 'council') return null;
   const agentConfig = getManualCodeReviewConfig(review)?.agentConfig;
   const council = agentConfig?.council;
-  if (!council) return;
+  if (!council) return null;
 
-  const councilResult = buildCouncilResult({
+  return buildCouncilResult({
     council,
     baseModel: agentConfig.model_slug ?? null,
     baseThinkingEffort: agentConfig.thinking_effort ?? null,
     lastAssistantMessageText,
   });
+}
 
-  await setCodeReviewCouncilResult(review.id, councilResult);
+/**
+ * Captures a completed council session's outcome and persists `council_result` for the
+ * cloud UI. No-op when the review is not a council run or has no council config.
+ *
+ * Used only on the NON-analytics completion path — there this write runs BEFORE the review
+ * is marked completed, so a thrown error fails the status callback and cloud-agent-next
+ * redelivers it (retrying the write) rather than leaving a `completed` council run without a
+ * result. `computeCouncilResultForReview` is pure and never throws, so the only failure here
+ * is the DB write, which is exactly what we want to retry.
+ *
+ * The ANALYTICS completion path does NOT use this — it marks the parent completed inside a
+ * transaction, so it persists `council_result` in that SAME transaction (atomic) instead;
+ * otherwise a completed-but-council-write-failed run could never be repaired (redelivery
+ * short-circuits on the already-terminal parent).
+ */
+export async function finalizeCouncilResultForReview(params: {
+  review: CloudAgentCodeReview;
+  lastAssistantMessageText: string | null | undefined;
+}): Promise<void> {
+  const councilResult = computeCouncilResultForReview(params);
+  if (!councilResult) return;
+
+  await setCodeReviewCouncilResult(params.review.id, councilResult);
 
   logExceptInTest('[finalize-council-result] Persisted council result', {
-    reviewId: review.id,
+    reviewId: params.review.id,
     decision: councilResult.decision,
     specialistCount: councilResult.specialists.length,
   });

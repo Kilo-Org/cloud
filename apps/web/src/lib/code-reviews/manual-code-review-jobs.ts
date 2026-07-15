@@ -5,6 +5,7 @@ import * as z from 'zod';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   CodeReviewCouncilConfigSchema,
+  MAX_RUNTIME_AGENT_MODEL_LENGTH,
   type CodeReviewType,
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
@@ -184,6 +185,23 @@ export async function createManualCodeReviewJob(params: {
   // actual council behavior (isCouncilActive) in agreement.
   const councilActive = isCouncilActive(input.council);
   const reviewType: CodeReviewType = councilActive ? 'council' : 'standard';
+
+  // A council specialist without its own model inherits the review's base model into
+  // `runtimeAgents[].model`, which cloud-agent-next caps at MAX_RUNTIME_AGENT_MODEL_LENGTH.
+  // Per-specialist models are already bounded by the schema; bound the inherited base too so
+  // a council request accepted here cannot fail later at session preparation. (Only matters
+  // when some enabled specialist actually inherits the base — an unrealistic length, but a
+  // cheap parity guard against the wider `modelSlug` bound.)
+  if (councilActive && input.council) {
+    const baseModel = input.modelSlug ?? '';
+    const someInheritsBase = enabledSpecialists(input.council).some(s => !s.model_slug);
+    if (someInheritsBase && baseModel.length > MAX_RUNTIME_AGENT_MODEL_LENGTH) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `The review model slug is too long for a council run (max ${MAX_RUNTIME_AGENT_MODEL_LENGTH} characters).`,
+      });
+    }
+  }
 
   // Council uses the exact same flow as a standard manual review — the only difference is
   // running specialists. Output mode is therefore identical for both: `kilo` in local dev

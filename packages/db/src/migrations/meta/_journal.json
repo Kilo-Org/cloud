@@ -1296,13 +1296,6 @@
       "when": 1783961455295,
       "tag": "0184_cute_iron_monger",
       "breakpoints": true
-    },
-    {
-      "idx": 185,
-      "version": "7",
-      "when": 1784042420151,
-      "tag": "0185_ambitious_chamber",
-      "breakpoints": true
     }
   ]
 }

@@ -93,7 +93,10 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
 import { parseCodeReviewAnalyticsManifest } from '@/lib/code-reviews/analytics/contracts';
 import { finalizeCompletedCodeReviewWithAnalytics } from '@/lib/code-reviews/analytics/db';
-import { finalizeCouncilResultForReview } from '@/lib/code-reviews/council/finalize-council-result';
+import {
+  computeCouncilResultForReview,
+  finalizeCouncilResultForReview,
+} from '@/lib/code-reviews/council/finalize-council-result';
 import {
   getManualCodeReviewConfig,
   shouldPublishCodeReviewToProvider,
@@ -1053,6 +1056,13 @@ export async function POST(
         executionId,
         completedAt: callbackCompletedAt,
         capture,
+        // Persist the council outcome atomically with the completion claim, so a council
+        // write failure can't leave a completed council review without a result (redelivery
+        // would short-circuit on the already-terminal parent). No-op for standard runs.
+        councilResult: computeCouncilResultForReview({
+          review,
+          lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+        }),
       });
 
       if (completionResult.outcome !== 'applied') {
@@ -1322,14 +1332,15 @@ export async function POST(
       status === 'cancelled' &&
       isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
 
-    // Persist the council outcome BEFORE marking the review completed. Council results
-    // surface only in the cloud UI (never posted to a PR), and this is the authoritative
-    // (non-stale) completion callback. Writing it first means a `completed` council review
-    // always has a `council_result`; if this write fails it throws, the callback returns
-    // an error, and cloud-agent-next redelivers — retrying finalization — rather than
-    // leaving a completed run permanently without a result (a terminal-state guard would
-    // otherwise short-circuit the retry before reaching a post-completion finalizer).
-    if (status === 'completed' && review.review_type === 'council') {
+    // Non-analytics completion path only: persist the council outcome BEFORE marking the
+    // review completed. Writing it first means a `completed` council review always has a
+    // `council_result`; if this write fails it throws, the callback returns an error, and
+    // cloud-agent-next redelivers — retrying finalization — rather than leaving a completed
+    // run permanently without a result. The ANALYTICS path is handled above, where
+    // council_result is written atomically inside the completion transaction (its parent
+    // is already completed by the time control reaches here, so the redelivery-retry design
+    // would not hold on that path).
+    if (status === 'completed' && review.review_type === 'council' && !analyticsCompletionApplied) {
       await finalizeCouncilResultForReview({
         review,
         lastAssistantMessageText: rawPayload.lastAssistantMessageText,

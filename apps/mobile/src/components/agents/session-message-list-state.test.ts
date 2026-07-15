@@ -1,6 +1,9 @@
 import { type OlderMessagesError } from 'cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
-import { selectSessionMessageListHeaderState } from '@/components/agents/session-message-list-state';
+import {
+  selectSessionMessageListHeaderState,
+  shouldTriggerOlderMessagesLoad,
+} from '@/components/agents/session-message-list-state';
 
 function error(kind: OlderMessagesError['kind']): OlderMessagesError {
   return { kind };
@@ -87,5 +90,97 @@ describe('selectSessionMessageListHeaderState', () => {
         olderMessagesOmittedItemCount: 5,
       })
     ).toEqual({ kind: 'loading' });
+  });
+});
+
+describe('shouldTriggerOlderMessagesLoad', () => {
+  it('returns false when there are no older messages', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: false,
+        isLoadingOlderMessages: false,
+        isInFlight: false,
+        olderMessagesError: null,
+      })
+    ).toBe(false);
+  });
+
+  it('returns false when a page is already loading', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: true,
+        isInFlight: false,
+        olderMessagesError: null,
+      })
+    ).toBe(false);
+  });
+
+  it('returns false while the local in-flight latch is still set', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: false,
+        isInFlight: true,
+        olderMessagesError: null,
+      })
+    ).toBe(false);
+  });
+
+  it('returns false for a non-retryable invalid_data terminal failure', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: false,
+        isInFlight: false,
+        olderMessagesError: error('invalid_data'),
+      })
+    ).toBe(false);
+  });
+
+  it('returns false for a non-retryable too_large terminal failure', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: false,
+        isInFlight: false,
+        olderMessagesError: error('too_large'),
+      })
+    ).toBe(false);
+  });
+
+  it('returns true for a retryable failure so the gesture can re-trigger', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: false,
+        isInFlight: false,
+        olderMessagesError: error('retryable'),
+      })
+    ).toBe(true);
+  });
+
+  it('returns true in the happy path with no error and a cursor', () => {
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: false,
+        isInFlight: false,
+        olderMessagesError: null,
+      })
+    ).toBe(true);
+  });
+
+  it('gives the loading/in-flight guards priority over the retryable path', () => {
+    // Loading and in-flight are checked before the error kind, so even a
+    // retryable error cannot re-trigger while work is outstanding.
+    expect(
+      shouldTriggerOlderMessagesLoad({
+        hasOlderMessages: true,
+        isLoadingOlderMessages: true,
+        isInFlight: true,
+        olderMessagesError: error('retryable'),
+      })
+    ).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import { type ViewStyle } from 'react-native';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
+import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
@@ -62,16 +63,14 @@ export function SessionMessageList({
   // prevents noisy re-fires from FlashList's onStartReached callback.
   const inFlightRef = useRef(false);
   const handleStartReached = useCallback(() => {
-    if (!hasOlderMessages) {
-      return;
-    }
-    if (isLoadingOlderMessages) {
-      return;
-    }
-    if (inFlightRef.current) {
-      return;
-    }
-    if (olderMessagesError && olderMessagesError.kind !== 'retryable') {
+    if (
+      !shouldTriggerOlderMessagesLoad({
+        hasOlderMessages,
+        isLoadingOlderMessages,
+        isInFlight: inFlightRef.current,
+        olderMessagesError,
+      })
+    ) {
       return;
     }
     inFlightRef.current = true;

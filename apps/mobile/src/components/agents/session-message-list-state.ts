@@ -48,3 +48,41 @@ export function selectSessionMessageListHeaderState({
   }
   return { kind: 'hidden' };
 }
+
+type ShouldTriggerOlderMessagesLoadInputs = {
+  hasOlderMessages: boolean;
+  isLoadingOlderMessages: boolean;
+  isInFlight: boolean;
+  olderMessagesError: OlderMessagesError | null;
+};
+
+/**
+ * Decide whether `onStartReached` should trigger an older-page load.
+ *
+ * The guard is intentionally conservative: it blocks the call when there is no
+ * older cursor, when a page is already loading, when the component's local
+ * in-flight latch is still set, or when the most recent failure is a
+ * non-retryable terminal state. Retryable failures are allowed to re-fire so
+ * the FlashList gesture can retry without requiring an explicit tap on the
+ * Retry CTA.
+ */
+export function shouldTriggerOlderMessagesLoad({
+  hasOlderMessages,
+  isLoadingOlderMessages,
+  isInFlight,
+  olderMessagesError,
+}: ShouldTriggerOlderMessagesLoadInputs): boolean {
+  if (!hasOlderMessages) {
+    return false;
+  }
+  if (isLoadingOlderMessages) {
+    return false;
+  }
+  if (isInFlight) {
+    return false;
+  }
+  if (olderMessagesError && olderMessagesError.kind !== 'retryable') {
+    return false;
+  }
+  return true;
+}

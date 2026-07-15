@@ -710,6 +710,14 @@ export async function prepareReviewPayload(
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });
 
+    // A council run replaces the standard sub-agent sharding policy with a coordinator
+    // contract (one sub-agent per specialist, no self-review), so the base prompt must OMIT
+    // that policy — otherwise the two sets of sub-agent instructions contradict and a small
+    // PR could skip specialists and fail closed. Determined here so the prompt is generated
+    // without the policy; reused by the council fork below.
+    const councilConfig = config.council;
+    const councilActive = review.review_type === 'council' && isCouncilActive(councilConfig);
+
     // 6. Generate dynamic review prompt
     const { prompt, version } = await generateReviewPrompt(
       config,
@@ -725,6 +733,7 @@ export async function prepareReviewPayload(
         manualInstructions: manualConfig?.instructions ?? null,
         outputMode,
         expectedHeadSha: review.head_sha,
+        omitSubAgentGuidance: councilActive,
       }
     );
 
@@ -792,9 +801,8 @@ export async function prepareReviewPayload(
     // Council fork: a council run delegates to one sub-agent per specialist (each on its
     // own model) in a single session. We build `reviewAgents` (domain contract) and the
     // cloud-agent-next `runtimeAgents` (execution), and swap the prompt to the coordinator
-    // prompt. `isCouncilActive` guarantees the config is enabled with >= the minimum.
-    const councilConfig = config.council;
-    const councilActive = review.review_type === 'council' && isCouncilActive(councilConfig);
+    // prompt. `councilActive` (computed above, gating `omitSubAgentGuidance`) guarantees the
+    // config is enabled with >= the minimum specialists.
     const councilMembers = councilActive && councilConfig ? enabledSpecialists(councilConfig) : [];
     const aggregationStrategy = councilConfig?.aggregation_strategy ?? 'any_blocking_member';
 

@@ -2,6 +2,8 @@
 
 Use this workflow when the main session is planning or implementing work whose product surface is the mobile app. Start Kilo from `apps/mobile/` so the role agents in `.kilo/agent/` are discovered. The implementation itself is not restricted to `apps/mobile`: an accepted plan may require cloud services, tRPC routers, shared packages, infrastructure, or a sibling checkout such as `~/Projects/kilocode`.
 
+Work must always be done in a dedicated worktree, regardless of the repository. This applies to the cloud repository and all sibling repositories touched by the plan. The orchestrator and role agents must not edit the primary checkout or the main checkout of any repository.
+
 The main session is the orchestrator and should use a strong model. Role agents use `kilo/kilo-auto/efficient`. The orchestrator retains product judgment, architecture decisions, loop control, final verification, Git integration, and pull-request ownership. Prefer small, logically scoped commits throughout the flow instead of one final catch-all commit.
 
 ## Feature State Matrix
@@ -51,6 +53,7 @@ Every dispatch should include:
 - Observable acceptance criteria
 - The four-state feature matrix, with each state's trigger/classification, message intent, CTA label and outcome or required absence, and automated/E2E coverage
 - Repositories and worktrees in scope
+- The dedicated worktree path for every repository in scope, including sibling repositories
 - Existing uncommitted changes that must be preserved
 - Exact checks or user flows expected for that stage
 - Prior findings being addressed, including rejected findings that must not be reopened without new evidence

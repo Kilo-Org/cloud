@@ -287,6 +287,16 @@ test('mobile workflow keeps generated E2E fixtures out of Git', () => {
   assert.match(workflow, /git status/i);
 });
 
+test('mobile workflow requires dedicated worktrees in every repository', () => {
+  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
+
+  assert.match(workflow, /Work must always be done in a dedicated worktree/i);
+  assert.match(workflow, /regardless of (?:the )?repository/i);
+  assert.match(workflow, /sibling repositories/i);
+  assert.match(workflow, /must not edit the primary checkout/i);
+  assert.match(workflow, /(?:or|and) the main checkout/i);
+});
+
 test('remote CLI runbook is secret-free and defers credential-bearing setup to the orchestrator', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
   const remoteCliSection = runbook.slice(

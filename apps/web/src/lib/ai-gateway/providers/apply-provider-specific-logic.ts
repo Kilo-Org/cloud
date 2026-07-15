@@ -21,7 +21,7 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -138,8 +138,9 @@ export async function applyProviderSpecificLogic(
 
     repairChatCompletionsTools(requestToMutate.body);
 
-    if (isOpenCodeBasedClient(originalHeaders)) {
-      // Workaround for bugs in the chat completions client.
+    if (isClaudeModel(requestedModel)) {
+      // Workaround for older clients corrupting Claude reasoning, resulting in:
+      // `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified
       fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
     }
   }

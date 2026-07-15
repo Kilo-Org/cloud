@@ -1322,6 +1322,20 @@ export async function POST(
       status === 'cancelled' &&
       isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
 
+    // Persist the council outcome BEFORE marking the review completed. Council results
+    // surface only in the cloud UI (never posted to a PR), and this is the authoritative
+    // (non-stale) completion callback. Writing it first means a `completed` council review
+    // always has a `council_result`; if this write fails it throws, the callback returns
+    // an error, and cloud-agent-next redelivers — retrying finalization — rather than
+    // leaving a completed run permanently without a result (a terminal-state guard would
+    // otherwise short-circuit the retry before reaching a post-completion finalizer).
+    if (status === 'completed' && review.review_type === 'council') {
+      await finalizeCouncilResultForReview({
+        review,
+        lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+      });
+    }
+
     if (analyticsCompletionApplied) {
       // Parent and accepted attempt completion were claimed with analytics in one transaction.
     } else if (isModelNotFoundCancellation) {
@@ -1349,15 +1363,6 @@ export async function POST(
       }
     } else {
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
-    }
-
-    // Council runs surface their outcome only in the cloud UI (never posted to a PR), so
-    // capture the manifest + code-owned decision and persist it on completion.
-    if (status === 'completed' && review.review_type === 'council') {
-      await finalizeCouncilResultForReview({
-        review,
-        lastAssistantMessageText: rawPayload.lastAssistantMessageText,
-      });
     }
 
     let providerTerminalReason = terminalReason;

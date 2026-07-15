@@ -35,6 +35,7 @@ describe('buildCouncilResult', () => {
     const result = buildCouncilResult({
       council,
       baseModel: 'base/model',
+      baseThinkingEffort: null,
       lastAssistantMessageText: manifestText([
         {
           specialistId: 'security',
@@ -63,10 +64,79 @@ describe('buildCouncilResult', () => {
     });
   });
 
+  it('prefers the model the specialist REPORTED (auto slug resolved) over the configured model', () => {
+    const result = buildCouncilResult({
+      council,
+      baseModel: 'base/model',
+      baseThinkingEffort: null,
+      lastAssistantMessageText: manifestText([
+        // security configured as anthropic/x but reports the concrete resolved model.
+        {
+          specialistId: 'security',
+          model: 'anthropic/claude-sonnet-5',
+          vote: 'pass',
+          findings: [],
+        },
+        // performance left on default (base/model) and reports what it resolved to.
+        {
+          specialistId: 'performance',
+          model: 'openai/gpt-5',
+          vote: 'pass',
+          findings: [],
+        },
+      ]),
+    });
+
+    expect(result.specialists.find(s => s.id === 'security')?.model).toBe(
+      'anthropic/claude-sonnet-5'
+    );
+    expect(result.specialists.find(s => s.id === 'performance')?.model).toBe('openai/gpt-5');
+  });
+
+  it('falls back to the configured/base model when the specialist reports no model', () => {
+    const result = buildCouncilResult({
+      council,
+      baseModel: 'base/model',
+      baseThinkingEffort: null,
+      lastAssistantMessageText: manifestText([
+        // No `model` field → fall back to the configured per-specialist model.
+        { specialistId: 'security', vote: 'pass', findings: [] },
+        // No `model` field, no per-specialist override → fall back to the review base model.
+        { specialistId: 'performance', vote: 'pass', findings: [] },
+      ]),
+    });
+
+    expect(result.specialists.find(s => s.id === 'security')?.model).toBe('anthropic/x');
+    expect(result.specialists.find(s => s.id === 'performance')?.model).toBe('base/model');
+  });
+
+  it('falls back to the review base model AND base thinking effort for specialists without overrides', () => {
+    const result = buildCouncilResult({
+      council,
+      baseModel: 'base/model',
+      baseThinkingEffort: 'high',
+      lastAssistantMessageText: manifestText([
+        { specialistId: 'security', vote: 'pass', findings: [] },
+        { specialistId: 'performance', vote: 'pass', findings: [] },
+      ]),
+    });
+    // security has its own model (anthropic/x) but no effort override → base effort.
+    expect(result.specialists.find(s => s.id === 'security')).toMatchObject({
+      model: 'anthropic/x',
+      thinkingEffort: 'high',
+    });
+    // performance has neither → both fall back to the review defaults.
+    expect(result.specialists.find(s => s.id === 'performance')).toMatchObject({
+      model: 'base/model',
+      thinkingEffort: 'high',
+    });
+  });
+
   it('fails closed when a configured specialist is missing from the manifest', () => {
     const result = buildCouncilResult({
       council,
       baseModel: 'base/model',
+      baseThinkingEffort: null,
       lastAssistantMessageText: manifestText([
         { specialistId: 'security', vote: 'pass', findings: [] },
       ]),
@@ -74,7 +144,10 @@ describe('buildCouncilResult', () => {
 
     expect(result.decision).toBe('block'); // missing performance → no coverage → block
     const performance = result.specialists.find(s => s.id === 'performance');
-    expect(performance).toMatchObject({ vote: 'abstain', highestSeverity: null });
+    expect(performance).toMatchObject({
+      vote: 'abstain',
+      highestSeverity: null,
+    });
     expect(performance?.findings).toEqual([]);
   });
 
@@ -82,6 +155,7 @@ describe('buildCouncilResult', () => {
     const result = buildCouncilResult({
       council,
       baseModel: 'base/model',
+      baseThinkingEffort: null,
       lastAssistantMessageText: 'no marker here',
     });
 
@@ -93,6 +167,7 @@ describe('buildCouncilResult', () => {
     const result = buildCouncilResult({
       council,
       baseModel: null,
+      baseThinkingEffort: null,
       lastAssistantMessageText: `<!-- ${COUNCIL_RESULT_MARKER_TAG} {not json} -->`,
     });
     expect(result.decision).toBe('block');

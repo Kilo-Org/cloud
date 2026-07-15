@@ -133,6 +133,12 @@ export const CouncilSpecialistResultSchema = z.object({
   vote: CouncilVoteSchema,
   highestSeverity: z.string().max(64).nullable().optional(),
   findings: z.array(CouncilFindingSchema).max(200).default([]),
+  // Best-effort: the concrete model this specialist actually ran on, as reported back by
+  // the specialist itself. We assign a model per specialist, but an "auto" slug (e.g.
+  // `kilo-auto/...`) resolves to a concrete model at runtime inside cloud-agent-next, which
+  // the web side never sees otherwise. Lenient/optional (a missing model must NOT invalidate
+  // the manifest); capture falls back to the configured per-specialist model when absent.
+  model: z.string().max(200).nullable().optional(),
 });
 export type CouncilSpecialistResult = z.infer<typeof CouncilSpecialistResultSchema>;
 
@@ -449,7 +455,11 @@ export function decideCouncilFromManifest(
   if (missingSpecialistIds.length > 0) {
     return { decision: 'block', votes, missingSpecialistIds };
   }
-  return { decision: computeCouncilDecision(votes, strategy), votes, missingSpecialistIds };
+  return {
+    decision: computeCouncilDecision(votes, strategy),
+    votes,
+    missingSpecialistIds,
+  };
 }
 
 // ============================================================================

@@ -164,7 +164,6 @@ export async function createManualCodeReviewJob(params: {
   const input = ManualCodeReviewJobInputSchema.parse(params.input);
   const platform = input.platform;
   const localMode = isLocalCodeReviewDevelopmentEnabled();
-  const outputMode: ManualCodeReviewConfig['outputMode'] = localMode ? 'kilo' : 'provider';
   const instructions = normalizeManualInstructions(input.instructions);
 
   // Reject an enabled council that is under the specialist minimum, so a request can't be
@@ -185,6 +184,12 @@ export async function createManualCodeReviewJob(params: {
   // actual council behavior (isCouncilActive) in agreement.
   const councilActive = isCouncilActive(input.council);
   const reviewType: CodeReviewType = councilActive ? 'council' : 'standard';
+
+  // Council uses the exact same flow as a standard manual review — the only difference is
+  // running specialists. Output mode is therefore identical for both: `kilo` in local dev
+  // (public repos, no PR posting) and `provider` in prod (authenticated clone incl. private
+  // repos, posts to the PR). No council-specific publish handling.
+  const outputMode: ManualCodeReviewConfig['outputMode'] = localMode ? 'kilo' : 'provider';
 
   // Fail fast on entitlement before doing any provider/network work. The creation
   // boundary (`createCodeReview`) re-checks this as the authoritative gate, so this repeats

@@ -1271,12 +1271,42 @@ export const COUNCIL_AGGREGATION_STRATEGIES = [
 export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
 export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
 
+// A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
+// execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
+// contract: start with a lowercase letter, only lowercase letters/digits/hyphens, max 50
+// chars, and not collide with a built-in agent mode. Keep this in lockstep with
+// cloud-agent-next's `RuntimeAgentSchema.slug` + `AgentModes` (services/cloud-agent-next/src/schema.ts).
+// This must list EVERY built-in `AgentModes` value; a stale/partial copy lets a council id
+// pass web validation but fail cloud-agent-next session preparation.
+const RESERVED_AGENT_SLUGS = new Set([
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+  'build',
+  'architect',
+  'custom',
+]);
+
+// Cloud-agent-next caps a runtime-agent model slug at this many chars
+// (`Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH`). Keep the per-specialist model constraint in
+// lockstep so a council request valid at creation cannot fail at session preparation.
+const MAX_RUNTIME_AGENT_MODEL_LENGTH = 200;
+
 export const CouncilSpecialistSchema = z.object({
   id: z
     .string()
     .min(1)
-    .max(64)
-    .regex(/^[a-z0-9_-]+$/, 'Specialist id must be a lowercase slug'),
+    .max(50)
+    .regex(
+      /^[a-z][a-z0-9-]*$/,
+      'Specialist id must be a runtime-agent slug (start with a lowercase letter; lowercase letters, digits, or hyphens; max 50 chars)'
+    )
+    .refine(
+      id => !RESERVED_AGENT_SLUGS.has(id),
+      'Specialist id must not collide with a built-in agent mode'
+    ),
   role: z.enum(COUNCIL_SPECIALIST_ROLES),
   name: z.string().min(1).max(80),
   enabled: z.boolean(),
@@ -1286,8 +1316,9 @@ export const CouncilSpecialistSchema = z.object({
   instructions: z.string().max(2_000).nullable().optional(),
   // Per-specialist model + thinking effort. In single-session execution these map to
   // cloud-agent-next `runtimeAgents[]` so each specialist sub-agent runs on its own
-  // model; unset falls back to the review's default model.
-  model_slug: z.string().max(512).optional(),
+  // model; unset falls back to the review's default model. Bounded to the downstream
+  // runtime-agent model limit so a valid council request can't fail at session prep.
+  model_slug: z.string().max(MAX_RUNTIME_AGENT_MODEL_LENGTH).optional(),
   thinking_effort: z
     .string()
     .max(50)

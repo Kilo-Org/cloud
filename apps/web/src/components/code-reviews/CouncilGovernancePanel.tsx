@@ -75,6 +75,15 @@ export function CouncilGovernancePanel({
               </span>
             </div>
 
+            {/*
+              PR4: the decision above is an advisory pass/fail score only — it is surfaced
+              here but does not (yet) block the pull request merge. Keep in sync with the
+              TODO(council) note in finalize-council-result.ts.
+            */}
+            <p className="text-muted-foreground text-xs">
+              This is an advisory pass/fail score and does not block the pull request yet.
+            </p>
+
             <ul className="divide-border divide-y">
               {councilResult.specialists.map(specialist => (
                 <li key={specialist.id} className="space-y-2 py-3 first:pt-0 last:pb-0">

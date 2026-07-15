@@ -22,13 +22,21 @@ import { logExceptInTest } from '@/lib/utils.server';
  *
  * Fails CLOSED: a missing/invalid manifest → `decision: 'block'`; a configured specialist
  * absent from the manifest → `abstain` (and, via `decideCouncilFromManifest`, blocks).
+ *
+ * TODO(council): the `decision` here is ADVISORY for PR4 — a pass/fail score surfaced in the
+ * cloud UI only. It is NOT yet wired into the PR merge gate (`gateResult`), so a council
+ * `block` does not hard-block the PR. Threading the code-owned decision into `gateResult`
+ * (so `block` actually fails the merge check) is deferred to a later PR — see the council
+ * plan's beta-readiness gate ("Validate the council PR output in a deployed run"). Keep the
+ * UI copy in `CouncilGovernancePanel` in sync with this advisory-only status.
  */
 export function buildCouncilResult(params: {
   council: CodeReviewCouncilConfig;
   baseModel: string | null;
+  baseThinkingEffort: string | null;
   lastAssistantMessageText: string | null | undefined;
 }): CodeReviewCouncilResult {
-  const { council, baseModel, lastAssistantMessageText } = params;
+  const { council, baseModel, baseThinkingEffort, lastAssistantMessageText } = params;
   const members = enabledSpecialists(council);
   const strategy = council.aggregation_strategy;
   const configuredIds = members.map(member => member.id);
@@ -47,9 +55,13 @@ export function buildCouncilResult(params: {
       id: member.id,
       role: member.role,
       name: member.name,
-      // The model that actually ran this specialist (we assign it), for display.
-      model: member.model_slug ?? baseModel,
-      thinkingEffort: member.thinking_effort ?? null,
+      // The model that actually ran this specialist, for display. Prefer the concrete model
+      // the specialist REPORTED (resolves an "auto" slug to what really ran); fall back to
+      // the model we configured for it, then the review's base model. The configured value
+      // is what we hand cloud-agent-next in `buildCouncilRuntimeAgents`, so the fallback
+      // still reflects the request even when the specialist doesn't self-report.
+      model: reported?.model ?? member.model_slug ?? baseModel,
+      thinkingEffort: member.thinking_effort ?? baseThinkingEffort,
       vote: reported?.vote ?? 'abstain',
       highestSeverity: reported?.highestSeverity ?? null,
       findings: reported?.findings ?? [],
@@ -66,37 +78,37 @@ export function buildCouncilResult(params: {
 
 /**
  * Captures a completed council session's outcome and persists `council_result` for the
- * cloud UI. No-op when the review is not a council run or has no council config. Never
- * throws — a capture/persist failure must not break the status callback.
+ * cloud UI. No-op when the review is not a council run or has no council config.
+ *
+ * Intentionally does NOT swallow a persistence failure: callers invoke this BEFORE marking
+ * the review completed, so a thrown error fails the status callback and cloud-agent-next
+ * redelivers it — retrying the write — rather than leaving a `completed` council run
+ * permanently without a result. `buildCouncilResult` itself is pure and never throws
+ * (a missing/invalid manifest fails closed to `block`), so the only failure here is the DB
+ * write, which is exactly what we want to retry.
  */
 export async function finalizeCouncilResultForReview(params: {
   review: CloudAgentCodeReview;
   lastAssistantMessageText: string | null | undefined;
 }): Promise<void> {
   const { review, lastAssistantMessageText } = params;
-  try {
-    if (review.review_type !== 'council') return;
-    const agentConfig = getManualCodeReviewConfig(review)?.agentConfig;
-    const council = agentConfig?.council;
-    if (!council) return;
+  if (review.review_type !== 'council') return;
+  const agentConfig = getManualCodeReviewConfig(review)?.agentConfig;
+  const council = agentConfig?.council;
+  if (!council) return;
 
-    const councilResult = buildCouncilResult({
-      council,
-      baseModel: agentConfig.model_slug ?? null,
-      lastAssistantMessageText,
-    });
+  const councilResult = buildCouncilResult({
+    council,
+    baseModel: agentConfig.model_slug ?? null,
+    baseThinkingEffort: agentConfig.thinking_effort ?? null,
+    lastAssistantMessageText,
+  });
 
-    await setCodeReviewCouncilResult(review.id, councilResult);
+  await setCodeReviewCouncilResult(review.id, councilResult);
 
-    logExceptInTest('[finalize-council-result] Persisted council result', {
-      reviewId: review.id,
-      decision: councilResult.decision,
-      specialistCount: councilResult.specialists.length,
-    });
-  } catch (error) {
-    logExceptInTest('[finalize-council-result] Failed to persist council result', {
-      reviewId: review.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  logExceptInTest('[finalize-council-result] Persisted council result', {
+    reviewId: review.id,
+    decision: councilResult.decision,
+    specialistCount: councilResult.specialists.length,
+  });
 }

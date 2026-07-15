@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -57,6 +58,28 @@ export function CouncilSpecialistPicker({
     onChange({ ...selections, [id]: { ...current, ...patch } });
   };
 
+  // Prune any specialist's thinking effort once it's no longer valid for its effective model
+  // — e.g. when the review's default model changes and a specialist left on the default now
+  // has a different (or empty) effort set. Without this, a stale/invalid effort would stay in
+  // state and be submitted as a runtime-agent variant. Skipped while models load (effort sets
+  // can be transiently empty). Converges: the pruned state produces no further change.
+  useEffect(() => {
+    if (isLoadingModels) return;
+    let changed = false;
+    const next: Record<string, CouncilSpecialistSelection> = {};
+    for (const [id, selection] of Object.entries(selections)) {
+      const effortModel = selection.modelSlug ?? defaultModelSlug ?? null;
+      const validEfforts = effortModel ? getAvailableThinkingEfforts(effortModel) : [];
+      if (selection.thinkingEffort && !validEfforts.includes(selection.thinkingEffort)) {
+        next[id] = { ...selection, thinkingEffort: null };
+        changed = true;
+      } else {
+        next[id] = selection;
+      }
+    }
+    if (changed) onChange(next);
+  }, [selections, defaultModelSlug, isLoadingModels, onChange]);
+
   return (
     <div className="space-y-3">
       {COUNCIL_SPECIALIST_PRESETS.map(preset => {
@@ -101,7 +124,10 @@ export function CouncilSpecialistPicker({
                     value={selection.modelSlug ?? undefined}
                     // Changing the model clears the effort, since valid efforts are model-specific.
                     onValueChange={value =>
-                      update(preset.id, { modelSlug: value || null, thinkingEffort: null })
+                      update(preset.id, {
+                        modelSlug: value || null,
+                        thinkingEffort: null,
+                      })
                     }
                     variant="compact"
                     modal={modal}

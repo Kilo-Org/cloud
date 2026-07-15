@@ -4070,7 +4070,7 @@ export const platform_oauth_credentials = pgTable(
     platform_integration_id: uuid()
       .notNull()
       .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    platform: text().notNull(),
+    platform: text(),
     authorized_by_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
@@ -4106,9 +4106,9 @@ export const platform_access_token_credentials = pgTable(
   {
     id: idPrimaryKeyColumn,
     platform_integration_id: uuid().notNull(),
-    owned_by_organization_id: uuid().notNull(),
-    platform: text().notNull().$type<'bitbucket'>(),
-    integration_type: text().notNull().$type<'workspace_access_token'>(),
+    owned_by_organization_id: uuid(),
+    platform: text().$type<'bitbucket'>(),
+    integration_type: text().$type<'workspace_access_token'>(),
     token_encrypted: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
     provider_credential_type: text().notNull().$type<'workspace_access_token'>(),

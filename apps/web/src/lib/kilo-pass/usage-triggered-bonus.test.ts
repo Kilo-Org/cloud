@@ -15,6 +15,7 @@ import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
@@ -36,8 +37,10 @@ async function seedBaseIssuance(params: {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAtIso?: string | null;
-  welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
+  paymentProvider?: KiloPassPaymentProvider;
+  welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   initialWelcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
+  issuanceCreatedAt?: string;
 }) {
   const {
     kiloUserId,
@@ -48,17 +51,21 @@ async function seedBaseIssuance(params: {
     currentStreakMonths,
     nextYearlyIssueAt,
     startedAtIso,
+    paymentProvider = KiloPassPaymentProvider.Stripe,
     welcomePromoEligibilityReason,
     initialWelcomePromoEligibilityReason,
+    issuanceCreatedAt,
   } = params;
 
-  const stripeSubscriptionId = `sub_${Math.random()}`;
+  const providerSubscriptionId = `sub_${Math.random()}`;
   const subscriptionRow = await db
     .insert(kilo_pass_subscriptions)
     .values({
       kilo_user_id: kiloUserId,
-      provider_subscription_id: stripeSubscriptionId,
-      stripe_subscription_id: stripeSubscriptionId,
+      payment_provider: paymentProvider,
+      provider_subscription_id: providerSubscriptionId,
+      stripe_subscription_id:
+        paymentProvider === KiloPassPaymentProvider.Stripe ? providerSubscriptionId : null,
       tier,
       cadence,
       status: 'active',
@@ -91,10 +98,12 @@ async function seedBaseIssuance(params: {
       source: KiloPassIssuanceSource.StripeInvoice,
       stripe_invoice_id: stripeInvoiceId,
       initial_welcome_promo_eligibility_reason:
-        welcomePromoEligibilityReason ??
-        (cadence === KiloPassCadence.Monthly
-          ? KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim
-          : undefined),
+        welcomePromoEligibilityReason !== undefined
+          ? welcomePromoEligibilityReason
+          : cadence === KiloPassCadence.Monthly
+            ? KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim
+            : undefined,
+      ...(issuanceCreatedAt ? { created_at: issuanceCreatedAt } : {}),
     })
     .returning({ id: kilo_pass_issuances.id });
 
@@ -188,6 +197,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       stripeInvoiceId: 'inv_test_monthly_referral_bonus_blocks_usage_bonus',
       currentStreakMonths: 1,
       nextYearlyIssueAt: null,
+      welcomePromoEligibilityReason: null,
+      issuanceCreatedAt: '2026-05-28T12:06:19.999Z',
     });
 
     const [referralCredit] = await db
@@ -515,6 +526,89 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     expect(userRow?.kilo_pass_threshold).toBeNull();
   });
 
+  test('monthly: pre-gate Stripe issuance with no decision receives first-month promo', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 20_000_000,
+      kilo_pass_threshold: 19_000_000,
+    });
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Monthly,
+      tier: KiloPassTier.Tier19,
+      issueMonth: '2026-05-01',
+      stripeInvoiceId: 'inv_test_pre_gate_null_reason',
+      currentStreakMonths: 1,
+      nextYearlyIssueAt: null,
+      welcomePromoEligibilityReason: null,
+      issuanceCreatedAt: '2026-05-28T12:06:19.999Z',
+    });
+
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: '2026-06-01T00:00:00.000Z',
+      db,
+    });
+
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    const bonusTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
+    });
+    expect(bonusTx?.amount_microdollars).toBe(9_500_000);
+
+    const audit = await db.query.kilo_pass_audit_log.findFirst({
+      where: and(
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.BonusCreditsIssued),
+        eq(kilo_pass_audit_log.related_monthly_issuance_id, issuanceId)
+      ),
+    });
+    const monthlyDecision = isRecord(audit?.payload_json)
+      ? audit.payload_json.monthlyBonusDecision
+      : null;
+    expect(monthlyDecision).toEqual(
+      expect.objectContaining({ welcomePromoPolicy: 'account-history-only' })
+    );
+  });
+
+  test('monthly: Stripe issuance at gate boundary with no decision receives ramp bonus', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 20_000_000,
+      kilo_pass_threshold: 19_000_000,
+    });
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Monthly,
+      tier: KiloPassTier.Tier19,
+      issueMonth: '2026-05-01',
+      stripeInvoiceId: 'inv_test_at_gate_null_reason',
+      currentStreakMonths: 1,
+      nextYearlyIssueAt: null,
+      welcomePromoEligibilityReason: null,
+      issuanceCreatedAt: '2026-05-28T12:06:20.000Z',
+    });
+
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: '2026-06-01T00:00:00.000Z',
+      db,
+    });
+
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    const bonusTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
+    });
+    expect(bonusTx?.amount_microdollars).toBe(950_000);
+  });
+
   test('monthly: reused card eligibility issues regular ramp bonus instead of first-month promo', async () => {
     const user = await insertTestUser({
       microdollars_used: 20_000_000,
@@ -594,6 +688,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       stripeInvoiceId: 'inv_test_monthly_zero',
       currentStreakMonths: 1,
       nextYearlyIssueAt: null,
+      welcomePromoEligibilityReason: null,
+      issuanceCreatedAt: '2026-05-28T12:06:19.999Z',
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({

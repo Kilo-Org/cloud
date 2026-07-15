@@ -80,7 +80,11 @@ import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
-import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
+import {
+  getInitialWelcomePromoContextForSubscription,
+  getKiloPassWelcomePromoPolicy,
+  type KiloPassWelcomePromoPolicy,
+} from '@/lib/kilo-pass/welcome-promo-context';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logHostingActivationInfo = sentryLogger('kilo-pass-hosting-activation', 'info');
@@ -333,6 +337,7 @@ function getNextBillingAtFromSubscriptionStart(subscription: {
 function getNextKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
   return computeKiloPassBonusCreditsUsd({
@@ -341,7 +346,7 @@ function getNextKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.subscription.startedAt,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
 }
@@ -349,6 +354,7 @@ function getNextKiloPassBonusCreditsUsd(params: {
 function getCurrentKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
   return computeKiloPassBonusCreditsUsd({
@@ -357,7 +363,7 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.subscription.startedAt,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
 }
@@ -707,14 +713,18 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     subscriptionId: params.subscription.subscriptionId,
   });
-  const [isBonusUnlocked, baseCreditsIssuedAtIso, welcomePromoEligibilityReason] =
-    await Promise.all([
-      getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
-      getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
-      getInitialWelcomePromoEligibilityReasonForSubscription(db, {
-        subscriptionId: params.subscription.subscriptionId,
-      }),
-    ]);
+  const [isBonusUnlocked, baseCreditsIssuedAtIso, initialWelcomePromoContext] = await Promise.all([
+    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+    getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
+    getInitialWelcomePromoContextForSubscription(db, {
+      subscriptionId: params.subscription.subscriptionId,
+    }),
+  ]);
+  const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
+    paymentProvider: params.subscription.paymentProvider,
+    initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
+  });
+  const welcomePromoEligibilityReason = initialWelcomePromoContext?.eligibilityReason ?? null;
   const usageStartInclusiveIso = getUsageStartInclusiveIso({
     subscription: params.subscription,
     baseCreditsIssuedAtIso,
@@ -732,6 +742,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
       subscription: params.subscription,
       isFirstTimeSubscriberEver,
+      welcomePromoPolicy,
       welcomePromoEligibilityReason,
     }),
     nextBillingAt: params.nextBillingAt,
@@ -742,6 +753,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
     currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
       subscription: params.subscription,
       isFirstTimeSubscriberEver,
+      welcomePromoPolicy,
       welcomePromoEligibilityReason,
     }),
     isBonusUnlocked,

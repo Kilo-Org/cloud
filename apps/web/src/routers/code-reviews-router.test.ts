@@ -540,9 +540,6 @@ describe('review agent config REVIEW.md setting', () => {
 
     await db.insert(platform_access_token_credentials).values({
       platform_integration_id: integration.id,
-      owned_by_organization_id: organization.id,
-      platform: 'bitbucket',
-      integration_type: 'workspace_access_token',
       token_encrypted: 'encrypted-token',
       provider_credential_type: 'workspace_access_token',
       provider_scopes: providerScopes,
@@ -652,9 +649,6 @@ describe('review agent config REVIEW.md setting', () => {
           eq(agent_configs.owned_by_organization_id, organization.id)
         )
       );
-    await db
-      .delete(platform_access_token_credentials)
-      .where(eq(platform_access_token_credentials.owned_by_organization_id, organization.id));
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, testUser.id));

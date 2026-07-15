@@ -709,9 +709,6 @@ describe('User', () => {
         .insert(platform_access_token_credentials)
         .values({
           platform_integration_id: integration.id,
-          owned_by_organization_id: organization.id,
-          platform: 'bitbucket',
-          integration_type: 'workspace_access_token',
           token_encrypted: 'encrypted-workspace-access-token',
           provider_credential_type: 'workspace_access_token',
           provider_scopes: ['account', 'repository', 'repository:write'],

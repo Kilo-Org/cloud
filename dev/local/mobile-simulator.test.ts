@@ -1697,7 +1697,7 @@ test('new preparing claims include both the current PID and process identity', (
 test('attaches a rollback cleanup failure to the original prepare error', () => {
   const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
   const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
-  let caught: Error | undefined;
+  let caught: (Error & { cleanupError?: unknown }) | undefined;
 
   try {
     try {
@@ -1707,38 +1707,38 @@ test('attaches a rollback cleanup failure to the original prepare error', () => 
         worktreeRoot,
         requestedId: 'B',
         prepare: () => {
-          // Replace the claim file with a directory so the exact-own
-          // rollback rmSync fails deterministically. The error from
-          // fs.rmSync on a directory is platform-specific (EBUSY,
-          // EPERM, ENOTDIR); the test only asserts that the original
-          // prepare failure is the primary message and that the
-          // cleanup failure is attached for the operator.
-          const claimPath = path.join(lockRoot, 'B.json');
-          fs.rmSync(claimPath, { force: true });
-          fs.mkdirSync(claimPath);
           throw new Error('bootstatus failed');
+        },
+        fileOperations: {
+          // Inject an rmSync that throws only for the exact claim file
+          // so the rollback cleanup failure path is exercised
+          // deterministically across platforms.
+          rmSync: (filePath, options) => {
+            if (filePath === path.join(lockRoot, 'B.json')) {
+              throw new Error('injected cleanup deletion failure');
+            }
+            fs.rmSync(filePath, options);
+          },
         },
       });
     } catch (error) {
-      caught = error as Error;
+      caught = error as Error & { cleanupError?: unknown };
     }
 
     assert.ok(caught, 'claimSimulator must throw when prepare fails');
     // The original prepare failure must be the primary message.
     assert.match(String(caught), /bootstatus failed/);
-    // The cleanup failure must be attached so the operator can see it.
-    const withCleanup = caught as Error & { cleanupError?: unknown };
+    // The cleanup failure must be attached specifically as `cleanupError`
+    // so the operator can see it. We assert on `cleanupError` directly
+    // (not via `cause`, which is always set on every PrepareError and
+    // would mask a missing cleanupError).
     assert.ok(
-      withCleanup.cleanupError !== undefined || caught.cause !== undefined,
-      'cleanup failure must be attached to the prepare error'
+      caught.cleanupError !== undefined,
+      'cleanupError must be attached to the prepare error so the operator can see the rollback failure'
     );
+    const cleanupError = caught.cleanupError as Error;
+    assert.match(String(cleanupError), /injected cleanup deletion failure/);
   } finally {
-    // Clean up the swapped directory if it still exists.
-    try {
-      fs.rmSync(path.join(lockRoot, 'B.json'), { recursive: true, force: true });
-    } catch {
-      // ignore
-    }
     fs.rmSync(lockRoot, { recursive: true, force: true });
     fs.rmSync(worktreeRoot, { recursive: true, force: true });
   }

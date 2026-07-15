@@ -62,6 +62,11 @@ type ClaimArgs = {
   pidAlive?: (pid: number) => boolean;
   fileOperations?: {
     readFileSync?: (filePath: string, encoding: 'utf8') => string;
+    // Injectable rmSync used only for exact-own rollback deletion.
+    // Default is `fs.rmSync`. Tests can inject a throwing stub to
+    // verify cleanup-error attachment without platform-specific
+    // filesystem tricks.
+    rmSync?: (filePath: string, options: { force?: boolean }) => void;
   };
 };
 
@@ -569,6 +574,7 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
       // cleanup problem.
       withClaimMutationLock(lockRoot, device.id, () => {
         const result = readClaimRaw(lockRoot, device.id);
+        const rmSync = args.fileOperations?.rmSync ?? fs.rmSync;
         if (prepareError) {
           if (prepareError.shutdownFailed) {
             // Preserve the preparing claim so a peer cannot adopt a
@@ -578,7 +584,7 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
           }
           if (result.kind === 'current' && result.record.claimId === claimId) {
             try {
-              fs.rmSync(lockPath(lockRoot, device.id), { force: true });
+              rmSync(lockPath(lockRoot, device.id), { force: true });
             } catch (cleanupError) {
               // Attach the cleanup failure to the original prepare error
               // so the operator sees both; the original prepare failure
@@ -751,7 +757,7 @@ function main(): void {
     console.log(`Released ${requestedId}`);
     return;
   }
-  throw new Error('Usage: pnpm dev:mobile:simulator <claim [udid]|release <udid]>');
+  throw new Error('Usage: pnpm dev:mobile:simulator <claim [udid]|release <udid>>');
 }
 
 const isMain =

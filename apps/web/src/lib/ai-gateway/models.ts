@@ -32,7 +32,10 @@ import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exc
 import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
 import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import { deepseekDiscountedModels } from '@/lib/ai-gateway/providers/deepseek';
+import {
+  deepseek_v4_pro_discounted_model,
+  deepseekDiscountedModels,
+} from '@/lib/ai-gateway/providers/deepseek';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
@@ -53,7 +56,7 @@ export const preferredModels = [
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   gpt_5_6_sol_stealth_model.public_id,
-  'deepseek/deepseek-v4-pro',
+  deepseek_v4_pro_discounted_model.public_id,
   GLM_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,

@@ -14,7 +14,7 @@ describe('OpenRouter Models Config', () => {
       CLAUDE_SONNET_CURRENT_MODEL_ID,
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       gpt_5_6_sol_stealth_model.public_id,
-      'deepseek/deepseek-v4-pro',
+      'deepseek/deepseek-v4-pro:discounted',
       QWEN37_PLUS_MODEL_ID,
       'z-ai/glm-5.2',
     ];
@@ -27,7 +27,7 @@ describe('OpenRouter Models Config', () => {
       GPT_CURRENT_MODEL_ID,
       'openai/gpt-5.6-terra',
       'stealth/claude-opus-4.8',
-      'deepseek/deepseek-v4-pro:discounted',
+      'deepseek/deepseek-v4-pro',
       'stealth/qwen3.6-plus',
     ];
 

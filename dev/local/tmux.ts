@@ -108,6 +108,12 @@ function createSession(sessionName: string, env?: Record<string, string>): void 
   });
 }
 
+function setSessionEnvironment(sessionName: string, env: Record<string, string>): void {
+  for (const [key, value] of Object.entries(env)) {
+    execFileSync('tmux', ['set-environment', '-t', sessionName, key, value], { stdio: 'ignore' });
+  }
+}
+
 function killSession(sessionName: string): void {
   try {
     execSync(`tmux kill-session -t ${sessionName}`, { stdio: 'ignore' });
@@ -150,6 +156,26 @@ function createWindow(
 
   const output = execFileSync('tmux', args, { encoding: 'utf-8' }).trim();
   return parseInt(output, 10);
+}
+
+function setPaneServiceIdentity(
+  sessionName: string,
+  windowTarget: string | number,
+  pane: number,
+  serviceName: string
+): void {
+  execFileSync(
+    'tmux',
+    [
+      'set-option',
+      '-p',
+      '-t',
+      `${sessionName}:${windowTarget}.${pane}`,
+      '@kilo_service',
+      serviceName,
+    ],
+    { stdio: 'ignore' }
+  );
 }
 
 function buildInteractiveShellCommand(
@@ -370,6 +396,24 @@ type PaneInfo = { windowIndex: number; paneIndex: number };
  */
 function findServicePane(sessionName: string, serviceName: string): PaneInfo | undefined {
   try {
+    const panes = execFileSync(
+      'tmux',
+      [
+        'list-panes',
+        '-s',
+        '-t',
+        sessionName,
+        '-F',
+        '#{window_index}:#{pane_index}:#{@kilo_service}',
+      ],
+      { encoding: 'utf8' }
+    ).trim();
+    for (const line of panes.split('\n')) {
+      const [windowIndex, paneIndex, identity] = line.split(':');
+      if (identity === serviceName) {
+        return { windowIndex: Number(windowIndex), paneIndex: Number(paneIndex) };
+      }
+    }
     // Check named windows first (service in its own window)
     const windows = listWindows(sessionName);
     const win = windows.find(w => w.name === serviceName);
@@ -389,6 +433,26 @@ function findServicePane(sessionName: string, serviceName: string): PaneInfo | u
   } catch {
     return undefined;
   }
+}
+
+function captureServicePane(sessionName: string, serviceName: string, historyLines = 200): string {
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) {
+    throw new Error(`Service ${serviceName} is not running in ${sessionName}`);
+  }
+  return execFileSync(
+    'tmux',
+    [
+      'capture-pane',
+      '-p',
+      '-J',
+      '-t',
+      `${sessionName}:${pane.windowIndex}.${pane.paneIndex}`,
+      '-S',
+      `-${historyLines}`,
+    ],
+    { encoding: 'utf8' }
+  );
 }
 
 function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
@@ -503,9 +567,11 @@ export {
   sessionExists,
   findOtherKiloDevSessions,
   createSession,
+  setSessionEnvironment,
   killSession,
   attachSession,
   createWindow,
+  setPaneServiceIdentity,
   buildInteractiveShellCommand,
   sendKeys,
   sendInterrupt,
@@ -523,6 +589,7 @@ export {
   breakPane,
   countPanes,
   findServicePane,
+  captureServicePane,
   isPaneRunningCommand,
   paneHasRunningChild,
   selectPane,

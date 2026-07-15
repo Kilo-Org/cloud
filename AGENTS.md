@@ -69,3 +69,12 @@ package manifests before running repository JavaScript or package scripts. Load
 ## Security Baseline
 
 - Never log tokens, credentials, API keys, authentication headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` when headers must be retained or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry.
+
+## Kilobot Review Remarks
+
+When addressing a Kilobot review remark:
+
+1. Verify that the remark is valid. If unsure, attempt to reproduce it with an E2E or unit test.
+2. If valid, fix it and commit the change. Prefer small commits in general.
+3. Reply in the review thread, then resolve the thread.
+4. Push the commits.

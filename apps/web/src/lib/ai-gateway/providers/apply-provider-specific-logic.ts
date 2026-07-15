@@ -21,13 +21,14 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { type FraudDetectionHeaders } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
   repairMessagesTools,
   sanitizeBinaryToolResults,
 } from '@/lib/ai-gateway/tool-calling';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
   addCacheBreakpoints,
   enableReasoningSummaries,
@@ -40,6 +41,7 @@ import {
   rewriteChatCompletionsOneOfAsAnyOf,
   isFriendliChatCompletionsRequest,
 } from '@/lib/ai-gateway/schema-rewrite';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
@@ -97,12 +99,16 @@ export function applyPreferredProvider(
   }
 }
 
-export function applyGatewayModelsFallback(
+export async function applyGatewayModelsFallback(
   providerId: ProviderId,
   requestedModel: string,
   requestToMutate: GatewayRequest
 ) {
-  if (isFableModel(requestedModel) && (providerId === 'openrouter' || providerId === 'vercel')) {
+  if (
+    !(await isFreeModel(requestedModel)) &&
+    isFableModel(requestedModel) &&
+    (providerId === 'openrouter' || providerId === 'vercel')
+  ) {
     requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
     return;
   }
@@ -122,14 +128,21 @@ export async function applyProviderSpecificLogic(
   sessionId: string | null,
   taskId: string | null
 ) {
-  applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
+
     repairChatCompletionsTools(requestToMutate.body);
+
+    if (isClaudeModel(requestedModel)) {
+      // Workaround for older clients corrupting Claude reasoning, resulting in:
+      // `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified
+      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
+    }
   }
 
   if (requestToMutate.kind === 'messages') {

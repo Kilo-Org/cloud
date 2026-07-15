@@ -21,10 +21,10 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
 describe('applyGatewayModelsFallback', () => {
   it.each<ProviderId>(['openrouter', 'vercel'])(
     'sets Opus as the Fable fallback for the %s provider',
-    providerId => {
+    async providerId => {
       const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
 
-      applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
+      await applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
 
       expect(request.body.models).toEqual([
         'anthropic/claude-fable-5',
@@ -33,18 +33,18 @@ describe('applyGatewayModelsFallback', () => {
     }
   );
 
-  it('removes caller-provided fallbacks for Fable on other providers', () => {
+  it('removes caller-provided fallbacks for Fable on other providers', async () => {
     const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
 
-    applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
+    await applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
 
     expect(request.body.models).toBeUndefined();
   });
 
-  it('removes caller-provided fallbacks for other models', () => {
+  it('removes caller-provided fallbacks for other models', async () => {
     const request = makeRequest('openai/gpt-4o', ['caller/fallback']);
 
-    applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
+    await applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
 
     expect(request.body.models).toBeUndefined();
   });

@@ -26,6 +26,7 @@ export type SessionModelOption = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
+  contextWindow?: number;
   provider?: { id: string; name: string };
   modelRef?: ModelRef;
   overrideSource?: RemoteModelOverride['source'];
@@ -209,6 +210,7 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
+        contextWindow: model.limits.context,
         provider: { id: provider.id, name: provider.name ?? provider.id },
         modelRef: { providerID: provider.id, modelID: model.id },
         overrideSource: 'cli-catalog',
@@ -260,9 +262,13 @@ function createUnavailableOption(modelRef: ModelRef): SessionModelOption {
 }
 
 function createGatewayOption(model: ModelOption): SessionModelOption {
+  // Strip the raw `context_length` so it doesn't leak onto SessionModelOption;
+  // the projection below owns the camelCase `contextWindow` field.
+  const { context_length: _contextLength, ...rest } = model;
   return {
-    ...model,
+    ...rest,
     displayId: model.id,
+    contextWindow: model.context_length ?? undefined,
     showGatewayMetadata: true,
   };
 }

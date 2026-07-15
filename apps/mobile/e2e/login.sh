@@ -3,7 +3,7 @@
 #
 # Requests an email sign-in code, reads it from the local email outbox
 # (dev/logs/emails/, written by the Next.js dev server), and verifies it —
-# leaving the app signed in on Home. No-op if already signed in.
+# leaving the app signed in on Home.
 #
 # Usage:
 #   e2e/login.sh <device-udid> [email]
@@ -20,6 +20,8 @@ EMAIL="${2:-e2e-mobile@example.com}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 OUTBOX="${OUTBOX:-$REPO_ROOT/dev/logs/emails}"
+
+"$SCRIPT_DIR/preflight.sh" "$DEVICE"
 
 # Newest sign-in-code email for EMAIL, or empty.
 latest_email() {
@@ -38,25 +40,26 @@ latest_email() {
 
 before="$(latest_email)"
 
-echo "==> requesting sign-in code for $EMAIL"
-maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+echo "==> signing out and requesting sign-in code for $EMAIL"
+if ! maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"; then
+  echo "==> retrying launch and sign-in request once after a dev-client startup failure"
+  maestro --device "$DEVICE" test -e "EMAIL=$EMAIL" "$SCRIPT_DIR/flows/login-request-code.yaml"
+fi
 
 # Wait for a newer outbox email than we had before (the send is async).
 code=""
-for _ in $(seq 1 10); do
+for _ in $(seq 1 120); do
   after="$(latest_email)"
   if [ -n "$after" ] && [ "$after" != "$before" ]; then
     code="$(perl -0777 -ne 'print $1 if /letter-spacing:\s*8px.*?>\s*(\d{6})\s*</s' "$after")"
     [ -n "$code" ] && break
   fi
-  sleep 1
+  sleep 0.25
 done
 
 if [ -z "$code" ]; then
-  echo "==> no new sign-in code; verifying existing session"
-  maestro --device "$DEVICE" test "$SCRIPT_DIR/flows/login-assert-home.yaml"
-  echo "==> already signed in"
-  exit
+  echo "==> no new sign-in code received" >&2
+  exit 1
 fi
 
 echo "==> verifying sign-in code"

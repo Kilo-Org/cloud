@@ -25,7 +25,7 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.2',
+  version: '1.0.3',
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
@@ -83,6 +83,14 @@ const config: ExpoConfig = {
             { name: 'RecaptchaInterop', modular_headers: true },
           ],
         },
+      },
+    ],
+    [
+      'expo-speech-recognition',
+      {
+        microphonePermission: 'Allow Kilo to use your microphone to turn speech into text.',
+        speechRecognitionPermission:
+          'Allow Kilo to use speech recognition to turn your voice into text.',
       },
     ],
     'expo-router',

@@ -2,7 +2,7 @@
 description: Implements an approved mobile-app plan, including required changes in cloud services, shared packages, or sibling repositories
 mode: subagent
 model: kilo/kilo-auto/efficient
-steps: 50
+steps: 80
 permission:
   edit: allow
   external_directory: allow

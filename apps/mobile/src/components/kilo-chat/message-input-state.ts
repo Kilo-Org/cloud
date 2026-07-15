@@ -16,6 +16,11 @@ type SubmittedMessageDraft = {
   replyingToMessageId?: string;
 };
 
+type MessageInputSubmission = {
+  completion: Promise<void>;
+  draft: SubmittedMessageDraft;
+};
+
 type MessageInputContentInput = {
   text: string;
   readyAttachmentBlocks?: readonly AttachmentBlock[];
@@ -133,12 +138,12 @@ export function submitMessageInputDraft({
     text: string,
     inReplyToMessageId?: string,
     controls?: MessageInputSubmitControls
-  ) => void;
+  ) => void | Promise<void>;
   onSendContentBlocks?: (
     content: InputContentBlock[],
     inReplyToMessageId?: string,
     controls?: MessageInputSubmitControls
-  ) => void;
+  ) => void | Promise<void>;
   clearInput: () => void;
   setCanSend: (canSend: boolean) => void;
   getCurrentReplyingToMessageId?: () => string | undefined;
@@ -146,7 +151,7 @@ export function submitMessageInputDraft({
   readyAttachmentBlocks?: readonly AttachmentBlock[];
   hasUploadingAttachment?: boolean;
   hasFailedAttachment?: boolean;
-}): SubmittedMessageDraft | null {
+}): MessageInputSubmission | null {
   const draft = valueRef.current;
   if (
     !canSubmitMessageInputContent({
@@ -178,13 +183,14 @@ export function submitMessageInputDraft({
     return true;
   };
   const controls = { clearDraft };
-  if (onSendContentBlocks) {
-    onSendContentBlocks(content, replyingToMessageId, controls);
-  } else {
-    onSend(text, replyingToMessageId, controls);
-  }
+  const sendResult = onSendContentBlocks
+    ? onSendContentBlocks(content, replyingToMessageId, controls)
+    : onSend(text, replyingToMessageId, controls);
+  const completion = (async (): Promise<void> => {
+    await sendResult;
+  })();
   if (clearOnSubmit) {
     clearDraft();
   }
-  return submitted;
+  return { completion, draft: submitted };
 }

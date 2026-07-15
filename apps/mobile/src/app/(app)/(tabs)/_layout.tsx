@@ -79,6 +79,7 @@ export default function TabsLayout() {
         name="(0_home)"
         options={{
           title: 'Home',
+          tabBarAccessibilityLabel: 'Home, tab, 1 of 4',
           tabBarLabel: ({ focused }) => <TabLabel label="Home" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <House size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
@@ -94,7 +95,7 @@ export default function TabsLayout() {
         name="(1_kiloclaw)"
         options={{
           title: 'KiloClaw',
-          tabBarAccessibilityLabel: 'KiloClaw',
+          tabBarAccessibilityLabel: 'KiloClaw, tab, 2 of 4',
           tabBarLabel: ({ focused }) => (
             <TabLabel
               label={fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 'Kilo\nClaw' : 'KiloClaw'}
@@ -117,6 +118,7 @@ export default function TabsLayout() {
         name="(2_agents)"
         options={{
           title: 'Agents',
+          tabBarAccessibilityLabel: 'Agents, tab, 3 of 4',
           tabBarLabel: ({ focused }) => <TabLabel label="Agents" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <Bot size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
@@ -132,6 +134,7 @@ export default function TabsLayout() {
         name="(3_profile)"
         options={{
           title: 'Profile',
+          tabBarAccessibilityLabel: 'Profile, tab, 4 of 4',
           tabBarLabel: ({ focused }) => <TabLabel label="Profile" focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <UserRound size={22} color={color} strokeWidth={focused ? 2 : 1.5} />

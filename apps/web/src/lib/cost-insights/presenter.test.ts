@@ -465,6 +465,77 @@ describe('Cost Insights presenter', () => {
     ]);
   });
 
+  it('uses exact current-hour evidence when rollup coverage has not been initialized', () => {
+    expect(
+      formatSpendEvidence(
+        [
+          {
+            hourStart: '2026-06-25T22:00:00.000Z',
+            variableMicrodollars: null,
+            scheduledMicrodollars: null,
+            totalMicrodollars: null,
+            variableRecordCount: null,
+            scheduledRecordCount: null,
+            isCovered: false,
+          },
+          {
+            hourStart: '2026-06-25T23:00:00.000Z',
+            variableMicrodollars: null,
+            scheduledMicrodollars: null,
+            totalMicrodollars: null,
+            variableRecordCount: null,
+            scheduledRecordCount: null,
+            isCovered: false,
+          },
+        ],
+        '24h',
+        {
+          hourStart: '2026-06-25T23:00:00.000Z',
+          variableMicrodollars: 3_320_000,
+          scheduledMicrodollars: 0,
+          totalMicrodollars: 3_320_000,
+          variableRecordCount: null,
+          scheduledRecordCount: null,
+          isCovered: true,
+        }
+      )
+    ).toEqual([
+      expect.objectContaining({
+        periodStart: '2026-06-25T22:00:00.000Z',
+        coverage: 'unavailable',
+        variableUsd: null,
+      }),
+      expect.objectContaining({
+        periodStart: '2026-06-25T23:00:00.000Z',
+        coverage: 'complete',
+        variableUsd: 3.32,
+        scheduledUsd: 0,
+      }),
+    ]);
+  });
+
+  it('includes exact current-hour spend in a complete daily chart bucket', () => {
+    const points = Array.from({ length: 24 }, (_, hour) => ({
+      hourStart: `2026-06-25T${String(hour).padStart(2, '0')}:00:00.000Z`,
+      variableMicrodollars: hour === 23 ? 3_320_000 : 0,
+      scheduledMicrodollars: 0,
+      totalMicrodollars: hour === 23 ? 3_320_000 : 0,
+      variableRecordCount: hour === 23 ? 1 : 0,
+      scheduledRecordCount: 0,
+      isCovered: true,
+    }));
+
+    expect(formatSpendEvidence(points, '7d')).toEqual([
+      expect.objectContaining({
+        periodStart: '2026-06-25T00:00:00.000Z',
+        periodEndExclusive: '2026-06-26T00:00:00.000Z',
+        coverage: 'complete',
+        variableUsd: 3.32,
+        scheduledUsd: 0,
+      }),
+    ]);
+  });
+
   it('rejects covered evidence with missing category totals instead of coercing it to zero', () => {
     expect(() =>
       formatSpendEvidence(

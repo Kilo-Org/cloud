@@ -1279,7 +1279,7 @@ export async function getOwnerRollingSpendExact(
 
 export async function getOwnerRolling24HourSpendExact(
   primaryDatabase: ExactRollingDatabase,
-  params: { owner: CostInsightSpendOwner; asOf?: string }
+  params: { owner: CostInsightSpendOwner; asOf?: string; fallbackToCanonical?: boolean }
 ): Promise<OwnerRolling24HourSpendExact> {
   return await getOwnerRollingSpendExact(primaryDatabase, {
     ...params,

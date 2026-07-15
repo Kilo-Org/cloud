@@ -39,26 +39,8 @@ describe('buildRemoteSessionAttentionPushBody', () => {
 });
 
 describe('dispatchRemoteSessionAttentionSignal', () => {
-  it('sends a push with a stable executionId and web-viewing suppression flag', async () => {
-    const sendPush = vi.fn(async () => ({ dispatched: true }));
-    const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
-      { hasActiveCliSession: async () => true, sendPush }
-    );
-
-    expect(outcome).toBe('sent');
-    expect(sendPush).toHaveBeenCalledWith({
-      userId: 'usr_1',
-      cliSessionId: 'ses_1',
-      executionId: 'remote:msg-1',
-      status: 'completed',
-      body: 'Done',
-      suppressIfViewingSession: true,
-    });
-  });
-
-  it('suppresses the push when no connected CLI reports the session', async () => {
-    const hasActiveCliSession = vi.fn(async () => false);
+  it('suppresses pushes while remote-session presence reporting is unavailable', async () => {
+    const hasActiveCliSession = vi.fn(async () => true);
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const outcome = await dispatchRemoteSessionAttentionSignal(
       { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
@@ -66,7 +48,8 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     );
 
     expect(outcome).toBe('suppressed');
-    expect(hasActiveCliSession).toHaveBeenCalledOnce();
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
     expect(sendPush).not.toHaveBeenCalled();
   });
+
 });

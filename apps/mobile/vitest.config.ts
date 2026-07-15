@@ -9,6 +9,9 @@ export default defineConfig({
       'cloud-agent-sdk/message-id': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/message-id.ts', import.meta.url)
       ),
+      'cloud-agent-sdk/context-usage': fileURLToPath(
+        new URL('../../apps/web/src/lib/cloud-agent-sdk/context-usage.ts', import.meta.url)
+      ),
       'cloud-agent-sdk/cli-model': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/cli-model.ts', import.meta.url)
       ),
@@ -36,6 +39,7 @@ export default defineConfig({
       'src/lib/kilo-pass/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.tsx',
       'src/lib/onboarding/**/*.test.ts',
+      'src/lib/voice-input/**/*.test.ts',
       'src/components/**/*.test.ts',
     ],
   },

@@ -13,6 +13,7 @@ const lightColors = {
   muted: '#F0EEE6',
   mutedForeground: '#6F6A61',
   destructive: '#BE4E3F',
+  destructiveForeground: '#FFFFFF',
   border: 'rgba(20, 15, 10, 0.09)',
   card: '#FFFFFF',
 
@@ -45,6 +46,7 @@ const darkColors = {
   muted: '#1F1F24',
   mutedForeground: '#8A8680',
   destructive: '#F28B7A',
+  destructiveForeground: '#1A1A10',
   border: 'rgba(255, 255, 255, 0.07)',
   card: '#17171A',
 

@@ -7,7 +7,7 @@
  * acquire/release semantics closes that window: the second call sees the lock
  * held and bails before any side effect, upload, parser, or callback runs.
  */
-type SubmitLock = {
+export type SubmitLock = {
   acquire(): boolean;
   release(): void;
   /**

@@ -108,7 +108,7 @@ describe('message input typing behavior', () => {
       },
     });
 
-    expect(submitted).toEqual({
+    expect(submitted?.draft).toEqual({
       content: [readyAttachmentBlock],
       text: '',
       replyingToMessageId: undefined,
@@ -151,7 +151,7 @@ describe('message input typing behavior', () => {
     });
 
     expect(typingCount).toBe(1);
-    expect(submitted).toEqual({
+    expect(submitted?.draft).toEqual({
       content: [{ type: 'text', text: 'hello' }],
       text: 'hello',
       replyingToMessageId: 'reply-1',
@@ -217,7 +217,7 @@ describe('message input typing behavior', () => {
       clearOnSubmit: false,
     });
 
-    expect(submitted).toEqual({
+    expect(submitted?.draft).toEqual({
       content: [{ type: 'text', text: 'edited draft' }],
       text: 'edited draft',
       replyingToMessageId: undefined,
@@ -257,7 +257,7 @@ describe('message input typing behavior', () => {
     }
     clearDraft();
 
-    expect(submitted).toEqual({
+    expect(submitted?.draft).toEqual({
       content: [{ type: 'text', text: 'edited draft' }],
       text: 'edited draft',
       replyingToMessageId: undefined,

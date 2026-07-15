@@ -22,6 +22,10 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
+export function isGeminiModel(model: string) {
+  return model.includes('gemini');
+}
+
 export function isGemini3Model(model: string) {
   return model.includes('gemini-3');
 }

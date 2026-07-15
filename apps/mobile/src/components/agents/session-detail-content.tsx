@@ -16,6 +16,15 @@ import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-sel
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
+import {
+  type ContextSheetIdentity,
+  getContextSheetMountState,
+} from '@/components/agents/context-usage-display';
+import {
+  SessionContextCostFallback,
+  SessionContextMetrics,
+} from '@/components/agents/session-context-metrics';
+import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import {
@@ -52,6 +61,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
   type ModelPickerSelection,
@@ -102,6 +112,9 @@ export function SessionDetailContent({
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
+  const contextUsage = useAtomValue(manager.atoms.contextUsage);
+  const [openContextSheetIdentity, setOpenContextSheetIdentity] =
+    useState<ContextSheetIdentity | null>(null);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -140,6 +153,49 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
+  const contextInfo = useMemo(
+    () => resolveSessionContextInfo(contextUsage, sessionModels.options),
+    [contextUsage, sessionModels.options]
+  );
+  const contextModelAndProvider = useMemo(() => {
+    if (!contextInfo) {
+      return { model: '', provider: '' };
+    }
+    const match = sessionModels.options.find(
+      option =>
+        (option.modelRef?.providerID === contextInfo.providerID &&
+          option.modelRef.modelID === contextInfo.modelID) ||
+        (contextInfo.providerID === 'kilo' &&
+          option.showGatewayMetadata &&
+          option.id === contextInfo.modelID)
+    );
+    return {
+      model: match?.name ?? match?.displayId ?? contextInfo.modelID,
+      provider:
+        match?.provider?.name ??
+        (contextInfo.providerID === 'kilo' ? 'Kilo' : contextInfo.providerID),
+    };
+  }, [contextInfo, sessionModels.options]);
+  const headerRight = contextInfo ? (
+    <SessionContextMetrics
+      info={contextInfo}
+      totalCost={totalCost}
+      onPress={() => {
+        setOpenContextSheetIdentity({
+          sessionId,
+          providerID: contextInfo.providerID,
+          modelID: contextInfo.modelID,
+        });
+      }}
+    />
+  ) : (
+    <SessionContextCostFallback totalCost={totalCost} />
+  );
+  const sheetMountState = getContextSheetMountState(
+    contextInfo,
+    openContextSheetIdentity,
+    sessionId
+  );
   const catalogGenerationIdentity =
     remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
   const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
@@ -203,6 +259,21 @@ export function SessionDetailContent({
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  useEffect(() => {
+    setOpenContextSheetIdentity(openIdentity => {
+      if (
+        !openIdentity ||
+        (contextInfo &&
+          openIdentity.sessionId === sessionId &&
+          openIdentity.providerID === contextInfo.providerID &&
+          openIdentity.modelID === contextInfo.modelID)
+      ) {
+        return openIdentity;
+      }
+      return null;
+    });
+  }, [contextInfo, sessionId]);
 
   useEffect(() => {
     if (
@@ -425,14 +496,7 @@ export function SessionDetailContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={title}
-        headerRight={
-          totalCost > 0 ? (
-            <Text className="text-sm text-muted-foreground">${totalCost.toFixed(4)}</Text>
-          ) : undefined
-        }
-      />
+      <ScreenHeader title={title} headerRight={headerRight} />
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -447,6 +511,19 @@ export function SessionDetailContent({
       )}
 
       <View style={{ height: bottom }} className="bg-background" />
+
+      {sheetMountState.mounted ? (
+        <SessionContextSheet
+          visible={sheetMountState.visible}
+          info={sheetMountState.info}
+          modelDisplay={contextModelAndProvider.model}
+          providerDisplay={contextModelAndProvider.provider}
+          totalCost={totalCost}
+          onClose={() => {
+            setOpenContextSheetIdentity(null);
+          }}
+        />
+      ) : null}
 
       {childSession ? (
         <ChildSessionSheet

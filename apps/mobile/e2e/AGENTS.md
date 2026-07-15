@@ -57,6 +57,8 @@ tmux list-windows -t <dev-session>
 
 Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.
 
+E2E fixtures must never be committed. When a flow needs generated fixture files, create them in a temporary directory such as one returned by `mktemp -d`, run the flow against that directory, and ensure the fixtures and temporary directory are cleaned up before finishing.
+
 ## iOS Simulator
 
 Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the command prefers an unclaimed shutdown device and boots it. Pass a UDID only when intentionally claiming that device:
@@ -85,7 +87,7 @@ xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
 
-Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The login helper dismisses the clean-install tracking alert and Expo dev-menu introduction when present.
+Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The shared launch flows dismiss the clean-install tracking alert, accept the Expo dev-menu introduction with `Continue`, and then close the full Expo/React Native developer menu containing Fast Refresh and Element Inspector with its `Close` accessibility action.
 
 ## Sign In and Out
 
@@ -148,41 +150,16 @@ Attach a screenshot of the changed flow to the PR when it helps review. For tran
 
 ## Remote CLI Session Flows
 
-Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. Install the CLI in a disposable directory, never globally:
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the user's local auth token, installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer-token environment already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands. Reuse the orchestrator-prepared session and verify session discovery and mirroring by inspecting its pane and the mobile list:
 
 ```bash
-CLI_SCRATCH=$(mktemp -d /tmp/kilo-cli.XXXXXX)
-npm install --prefix "$CLI_SCRATCH" @kilocode/cli
-E2E_EMAIL=${E2E_EMAIL:-e2e-mobile@example.com}
-USER_ID=$(pnpm -s dev:seed app:user-id "$E2E_EMAIL" --json | jq -r .userId)
-TOKEN=$(NEXTAUTH_SECRET=$(grep '^NEXTAUTH_SECRET=' .env.local | cut -d= -f2- | tr -d '"') \
-  USER_ID="$USER_ID" node -e '
-const crypto = require("crypto");
-const b64 = value => Buffer.from(JSON.stringify(value)).toString("base64url");
-const header = b64({ alg: "HS256", typ: "JWT" });
-const payload = b64({ kiloUserId: process.env.USER_ID, apiTokenPepper: null, version: 3 });
-const signature = crypto.createHmac("sha256", process.env.NEXTAUTH_SECRET)
-  .update(`${header}.${payload}`).digest("base64url");
-process.stdout.write(`${header}.${payload}.${signature}`);
-')
-```
-
-Do not print or log the token. Read the actual Next.js and session-ingest ports from `pnpm dev:status --json`, then run the CLI in its own tmux session:
-
-```bash
-CLI_SESSION="kilo-e2e-$(basename "$PWD")"
-tmux new-session -d -s "$CLI_SESSION" -c "$PWD"
-tmux set-environment -t "$CLI_SESSION" KILO_API_URL http://localhost:<nextjs-port>
-tmux set-environment -t "$CLI_SESSION" KILO_SESSION_INGEST_URL http://localhost:<session-ingest-port>
-tmux set-environment -t "$CLI_SESSION" KILO_AUTH_CONTENT \
-  "$(printf '{"kilo":{"type":"api","key":"%s"}}' "$TOKEN")"
-tmux set-environment -t "$CLI_SESSION" KILO_REMOTE 1
-tmux set-environment -t "$CLI_SESSION" KILO_CLI_BIN "$CLI_SCRATCH/node_modules/.bin/kilo"
-tmux new-window -t "$CLI_SESSION" -n cli -c "$PWD" '"$KILO_CLI_BIN"'
+CLI_SESSION="kilo-e2e-cli-$(basename "$PWD")"
+tmux ls
+tmux list-windows -t "$CLI_SESSION"
 tmux capture-pane -p -t "$CLI_SESSION":cli -S -100
 ```
 
-The mobile list updates after the CLI WebSocket connects and its first heartbeat (usually about 12 seconds). Use `tmux send-keys` for automation; slash commands need one Enter for autocomplete and another to submit.
+Drive the orchestrator-prepared session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. The mobile list updates after the CLI WebSocket connects and its first heartbeat (usually about 12 seconds). If the orchestrator has not prepared a session for this worktree, stop and ask the orchestrator to install the CLI, mint a token, and start the session before exercising CLI flows.
 
 ## Android Emulator
 
@@ -224,13 +201,11 @@ The existing login/logout helpers accept either an iOS simulator UDID or an Andr
 
 ## Cleanup
 
-Clean up only resources you started:
+Clean up only resources you started. The remote CLI session and its disposable install are owned by the orchestrator; do not kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create:
 
 ```bash
-tmux kill-session -t "$CLI_SESSION"       # if created
 tmux kill-session -t "$IOS_BUILD_SESSION" # if created
 tmux kill-session -t "$ANDROID_SESSION"   # if created
-rm -rf "$CLI_SCRATCH"                     # if created
 rm -f "$LOGIN_LOG"                        # if created
 pnpm dev:stop                              # only if you started this worktree's stack
 xcrun simctl shutdown <udid>               # only if you booted it
@@ -246,4 +221,7 @@ Verify cleanup:
 pnpm dev:status --json
 tmux ls
 xcrun simctl list devices booted
+git status --short
 ```
+
+Confirm no generated E2E fixtures remain tracked or untracked in the repository.

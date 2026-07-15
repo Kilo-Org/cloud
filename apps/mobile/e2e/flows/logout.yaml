@@ -9,6 +9,11 @@ appId: com.kilocode.kiloapp
 ---
 - runFlow:
     when:
+      visible: 'Verify code'
+    commands:
+      - tapOn: 'Back'
+- runFlow:
+    when:
       notVisible: 'Welcome to Kilo Code'
     commands:
       - runFlow:
@@ -43,4 +48,4 @@ appId: com.kilocode.kiloapp
       - tapOn:
           text: 'Sign out'
           index: 0
-- assertVisible: 'Welcome to Kilo Code'
+- assertVisible: 'you@example.com'

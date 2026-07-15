@@ -6,7 +6,12 @@ import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 import { cn } from '@/lib/utils';
+import {
+  VoiceInputButton,
+  VoiceInputStatus as VoiceInputStatusView,
+} from '@/components/voice-input-control';
 import { MessageAttachmentPreviewStrip } from './message-attachment-preview-strip';
 import { messageInputKeyboardProps, messageInputTextStyle } from './message-input-layout';
 import { type ComposerAttachmentQueue } from './message-input-types';
@@ -17,7 +22,6 @@ type Props = {
   attachmentQueue: ComposerAttachmentQueue | null;
   botName?: string | null;
   controlsDisabled: boolean;
-  disabled?: boolean;
   disabledReason?: string | null;
   showInstanceCta?: boolean;
   onOpenInstance?: () => void;
@@ -38,6 +42,7 @@ type Props = {
   onRemoveEditableAttachment: (attachmentId: string) => void;
   onRetryAttachment: (tempId: string) => void;
   onSubmit: () => void;
+  onVoiceInputToggle: () => void;
   overLimit: boolean;
   replyingTo?: Message | null;
   sendDisabled: boolean;
@@ -45,13 +50,16 @@ type Props = {
   showCounter: boolean;
   shouldScroll: boolean;
   typingMembers: Map<string, number>;
+  voiceInputActive: boolean;
+  voiceInputAvailable: boolean;
+  voiceInputDisabled: boolean;
+  voiceInputStatus: VoiceInputStatus;
 };
 
 export function MessageInputView({
   attachmentQueue,
   botName,
   controlsDisabled,
-  disabled,
   disabledReason,
   showInstanceCta,
   onOpenInstance,
@@ -72,6 +80,7 @@ export function MessageInputView({
   onRemoveEditableAttachment,
   onRetryAttachment,
   onSubmit,
+  onVoiceInputToggle,
   overLimit,
   replyingTo,
   sendDisabled,
@@ -79,8 +88,13 @@ export function MessageInputView({
   showCounter,
   shouldScroll,
   typingMembers,
+  voiceInputActive,
+  voiceInputAvailable,
+  voiceInputDisabled,
+  voiceInputStatus,
 }: Props) {
   const colors = useThemeColors();
+  const inputDisabled = controlsDisabled || voiceInputActive;
 
   return (
     <>
@@ -144,14 +158,14 @@ export function MessageInputView({
           {showAttachmentButton ? (
             <Pressable
               onPress={onOpenAttachmentPicker}
-              disabled={controlsDisabled}
+              disabled={controlsDisabled || voiceInputActive}
               className={cn(
                 'h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70',
-                controlsDisabled && 'opacity-50'
+                (controlsDisabled || voiceInputActive) && 'opacity-50'
               )}
               accessibilityRole="button"
               accessibilityLabel="Attach file"
-              accessibilityState={{ disabled: controlsDisabled }}
+              accessibilityState={{ disabled: controlsDisabled || voiceInputActive }}
             >
               <Paperclip size={18} color={colors.foreground} />
             </Pressable>
@@ -162,7 +176,7 @@ export function MessageInputView({
               className={cn(
                 'rounded-md border bg-card px-3 text-foreground',
                 overLimit ? 'border-destructive' : 'border-input',
-                disabled && 'opacity-50'
+                inputDisabled && 'opacity-50'
               )}
               style={[messageInputTextStyle, { height: inputHeight }]}
               placeholder="Message"
@@ -170,8 +184,8 @@ export function MessageInputView({
               defaultValue={initialText}
               multiline
               scrollEnabled={shouldScroll}
-              editable={!disabled}
-              accessibilityState={{ disabled }}
+              editable={!inputDisabled}
+              accessibilityState={{ disabled: inputDisabled }}
               onChangeText={onChangeText}
               onFocus={onInputFocus}
               onBlur={onInputBlur}
@@ -179,6 +193,13 @@ export function MessageInputView({
               {...messageInputKeyboardProps}
             />
           </View>
+          {voiceInputAvailable ? (
+            <VoiceInputButton
+              disabled={voiceInputDisabled}
+              status={voiceInputStatus}
+              onPress={onVoiceInputToggle}
+            />
+          ) : null}
           {onCancelEdit && (
             <Pressable
               onPress={onCancelEdit}
@@ -208,6 +229,7 @@ export function MessageInputView({
             <Send size={18} color={colors.primaryForeground} />
           </Pressable>
         </View>
+        <VoiceInputStatusView status={voiceInputStatus} />
         {showCounter ? (
           <View className="items-end justify-center">
             <Text className={cn('text-xs text-muted-foreground', overLimit && 'text-destructive')}>

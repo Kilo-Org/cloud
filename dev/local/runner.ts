@@ -369,13 +369,13 @@ export function restartServiceInTmux(
         return;
       }
       try {
-        const envPrefix = Object.entries(env ?? {})
+        const envArgs = Object.entries(env ?? {})
           .map(([key, value]) => `${key}=${shellQuote(value)}`)
           .join(' ');
         sendKeys(
           sessionName,
           currentPane.windowIndex,
-          envPrefix ? `${envPrefix} ${cmd}` : cmd,
+          envArgs ? `env ${envArgs} ${cmd}` : cmd,
           currentPane.paneIndex
         );
         settle('relaunched');

@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-const migrationTag = '0185_smiling_stranger';
+const migrationTag = '0186_concerned_spot';
 
 describe('admin permissions migration', () => {
   it('backfills only admins that matched the previous grant-authority predicate', async () => {

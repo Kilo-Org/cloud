@@ -84,9 +84,6 @@ async function insertStaticIntegration(
 
   await db.insert(platform_access_token_credentials).values({
     platform_integration_id: integration.id,
-    owned_by_organization_id: organizationId,
-    platform: 'bitbucket',
-    integration_type: 'workspace_access_token',
     token_encrypted: 'ciphertext',
     expires_at: '2030-01-01T23:59:59.999Z',
     provider_credential_type: 'workspace_access_token',
@@ -133,9 +130,6 @@ async function replaceWithWinnerIntegration(
     await tx.insert(platform_access_token_credentials).values({
       id: '66666666-6666-4666-8666-666666666666',
       platform_integration_id: winnerIntegrationId,
-      owned_by_organization_id: organizationId,
-      platform: 'bitbucket',
-      integration_type: 'workspace_access_token',
       token_encrypted: 'reconnected-ciphertext',
       expires_at: '2030-01-01T23:59:59.999Z',
       provider_credential_type: 'workspace_access_token',
@@ -254,6 +248,35 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
       workspace: { uuid: WORKSPACE_UUID, slug: 'acme' },
     });
   });
+
+  it.each(['organization', 'platform', 'integration type'] as const)(
+    'rejects a credential when its parent changes %s',
+    async parentAttribute => {
+      const integration = await insertStaticIntegration(organization.id, user.id);
+
+      if (parentAttribute === 'organization') {
+        const otherOrganization = await createTestOrganization('Other Cache Org', user.id, 0);
+        await db
+          .update(platform_integrations)
+          .set({ owned_by_organization_id: otherOrganization.id })
+          .where(eq(platform_integrations.id, integration.id));
+      } else if (parentAttribute === 'platform') {
+        await db
+          .update(platform_integrations)
+          .set({ platform: 'github' })
+          .where(eq(platform_integrations.id, integration.id));
+      } else {
+        await db
+          .update(platform_integrations)
+          .set({ integration_type: 'oauth' })
+          .where(eq(platform_integrations.id, integration.id));
+      }
+
+      await expect(getBitbucketWorkspaceAccessTokenStatus(organization.id)).resolves.toMatchObject({
+        status: 'not_connected',
+      });
+    }
+  );
 
   it('reports permissions beyond the required Workspace Access Token scopes', async () => {
     const integration = await insertStaticIntegration(organization.id, user.id);

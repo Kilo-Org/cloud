@@ -1,9 +1,9 @@
 import {
   KiloPassCadence,
-  KiloPassPaymentProvider,
   type KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
 } from '@/lib/kilo-pass/enums';
+import type { KiloPassWelcomePromoPolicy } from '@/lib/kilo-pass/welcome-promo-context';
 import {
   computeMonthlyCadenceBonusPercent,
   computeYearlyCadenceMonthlyBonusUsd,
@@ -45,16 +45,16 @@ export function computeMonthlyKiloPassBonusDecision(params: {
   startedAtIso: string | null;
   streakMonths: number;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
-  requiresSettledPaymentDecision?: boolean;
   issueMonth?: string;
 }): KiloPassMonthlyBonusDecision {
   const streakMonths = Math.max(1, params.streakMonths);
+  const hasRequiredPaymentEligibility =
+    params.welcomePromoPolicy === 'account-history-only' ||
+    isAllowedStripeWelcomePromoReason(params.welcomePromoEligibilityReason);
   const isEligibleForWelcomePromo =
-    params.isFirstTimeSubscriberEver &&
-    (params.requiresSettledPaymentDecision
-      ? isAllowedStripeWelcomePromoReason(params.welcomePromoEligibilityReason)
-      : true);
+    params.isFirstTimeSubscriberEver && hasRequiredPaymentEligibility;
   const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
     tier: params.tier,
     streakMonths,
@@ -83,6 +83,7 @@ export function computeMonthlyKiloPassBonusDecision(params: {
         startedAt: params.startedAtIso,
         issueMonth: params.issueMonth ?? null,
         bonusPercentApplied,
+        welcomePromoPolicy: params.welcomePromoPolicy,
         welcomePromoEligibilityReason: params.welcomePromoEligibilityReason ?? null,
       },
       bonusKind,
@@ -96,7 +97,7 @@ export function computeKiloPassBonusCreditsUsd(params: {
   startedAtIso: string | null;
   streakMonths: number;
   isFirstTimeSubscriberEver: boolean;
-  paymentProvider: KiloPassPaymentProvider;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
   if (params.cadence === KiloPassCadence.Yearly) {
@@ -112,9 +113,7 @@ export function computeKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.startedAtIso,
     streakMonths: params.streakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    requiresSettledPaymentDecision:
-      params.paymentProvider === KiloPassPaymentProvider.Stripe &&
-      params.welcomePromoEligibilityReason != null,
+    welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   }).bonusUsd;
 }

@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import {
   claimAndroidDevice,
+  readGradleWrapperVersion,
   releaseAndroidDevice,
   resolveAndroidEnvironment,
 } from './mobile-android';
@@ -116,4 +117,55 @@ test('recovers an orphaned Android claim mutation lock', () => {
     fs.rmSync(mutationLockPath, { recursive: true, force: true });
     fs.rmSync(worktreeRoot, { recursive: true, force: true });
   }
+});
+
+test('creates an explicit ready Android claim', () => {
+  const serial = `test-ready-${process.pid}-${Date.now()}`;
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const filePath = path.join(os.tmpdir(), 'kilo-mobile-android-claims', `${serial}.json`);
+
+  try {
+    const claim = claimAndroidDevice(serial, worktreeRoot);
+    assert.equal(claim.status, 'ready');
+    assert.equal(typeof claim.claimId, 'string');
+    assert.ok(claim.claimId.length > 0);
+    assert.equal(JSON.parse(fs.readFileSync(filePath, 'utf8')).status, 'ready');
+  } finally {
+    fs.rmSync(filePath, { force: true });
+    fs.rmSync(`${filePath}.lock`, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('upgrades a same-worktree legacy Android claim to ready', () => {
+  const serial = `test-upgrade-${process.pid}-${Date.now()}`;
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const filePath = path.join(os.tmpdir(), 'kilo-mobile-android-claims', `${serial}.json`);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(
+    filePath,
+    JSON.stringify({ serial, worktreeRoot, claimedAt: new Date().toISOString() })
+  );
+
+  try {
+    const claim = claimAndroidDevice(serial, worktreeRoot);
+    assert.equal(claim.status, 'ready');
+    assert.equal(JSON.parse(fs.readFileSync(filePath, 'utf8')).status, 'ready');
+  } finally {
+    fs.rmSync(filePath, { force: true });
+    fs.rmSync(`${filePath}.lock`, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('reads the Gradle version from the worktree wrapper properties without launching Gradle', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-android-project-'));
+  const wrapper = path.join(root, 'gradle/wrapper');
+  fs.mkdirSync(wrapper, { recursive: true });
+  fs.writeFileSync(
+    path.join(wrapper, 'gradle-wrapper.properties'),
+    'distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\n'
+  );
+
+  assert.equal(readGradleWrapperVersion(root), '8.14.3');
 });

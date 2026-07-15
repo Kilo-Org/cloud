@@ -314,9 +314,6 @@ async function insertPlatformAccessTokenCredential(
     .insert(schema.platform_access_token_credentials)
     .values({
       platform_integration_id: integration.id,
-      owned_by_organization_id: integration.owned_by_organization_id ?? crypto.randomUUID(),
-      platform: 'bitbucket',
-      integration_type: 'workspace_access_token',
       token_encrypted: 'encrypted-workspace-access-token',
       provider_credential_type: 'workspace_access_token',
       provider_scopes: ['account', 'repository', 'repository:write'],
@@ -785,7 +782,7 @@ describe('database schema', () => {
   });
 
   describe('platform access token credentials', () => {
-    it('stores one verified Bitbucket Workspace Access Token credential for an organization integration', async () => {
+    it('stores one verified Bitbucket Workspace Access Token credential whose parent owns its identity', async () => {
       await withPlatformAccessTokenTestData(async ({ organizationId }) => {
         const integration = await insertPlatformIntegration(organizationId);
 
@@ -794,11 +791,18 @@ describe('database schema', () => {
         expect(credential).toEqual(
           expect.objectContaining({
             platform_integration_id: integration.id,
+            owned_by_organization_id: null,
+            platform: null,
+            integration_type: null,
+            provider_credential_type: 'workspace_access_token',
+            credential_version: 1,
+          })
+        );
+        expect(integration).toEqual(
+          expect.objectContaining({
             owned_by_organization_id: organizationId,
             platform: 'bitbucket',
             integration_type: 'workspace_access_token',
-            provider_credential_type: 'workspace_access_token',
-            credential_version: 1,
           })
         );
         expect(credential).not.toHaveProperty('capability_profile');

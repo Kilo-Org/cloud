@@ -1296,6 +1296,13 @@
       "when": 1783961455295,
       "tag": "0184_cute_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 185,
+      "version": "7",
+      "when": 1784129617576,
+      "tag": "0185_lowly_mandroid",
+      "breakpoints": true
     }
   ]
 }

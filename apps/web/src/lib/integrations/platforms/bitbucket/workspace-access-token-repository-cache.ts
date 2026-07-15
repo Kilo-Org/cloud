@@ -127,9 +127,6 @@ async function loadIntegration(organizationId: string) {
       authInvalidAt: platform_integrations.auth_invalid_at,
       authInvalidReason: platform_integrations.auth_invalid_reason,
       credentialId: platform_access_token_credentials.id,
-      credentialOrganizationId: platform_access_token_credentials.owned_by_organization_id,
-      credentialPlatform: platform_access_token_credentials.platform,
-      credentialIntegrationType: platform_access_token_credentials.integration_type,
       providerCredentialType: platform_access_token_credentials.provider_credential_type,
       providerScopes: platform_access_token_credentials.provider_scopes,
       providerVerifiedAt: platform_access_token_credentials.provider_verified_at,
@@ -139,15 +136,7 @@ async function loadIntegration(organizationId: string) {
     .from(platform_integrations)
     .leftJoin(
       platform_access_token_credentials,
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
-        eq(platform_access_token_credentials.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
-        eq(
-          platform_access_token_credentials.integration_type,
-          BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
-        )
-      )
+      eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id)
     )
     .where(
       and(
@@ -217,7 +206,7 @@ function toIsoTimestamp(value: string | null): string | null {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
-function parseIntegration(row: LoadedIntegration, organizationId: string) {
+function parseIntegration(row: LoadedIntegration) {
   const metadata = BitbucketWorkspaceAccessTokenMetadataSchema.safeParse(row.metadata);
   const workspaceUuid = z.uuid().safeParse(row.workspaceUuid);
   const workspaceSlug = WorkspaceSlugSchema.safeParse(row.workspaceSlug);
@@ -233,12 +222,7 @@ function parseIntegration(row: LoadedIntegration, organizationId: string) {
     ? parseCachedRepositories(row.repositories, row.repositoriesSyncedAt, workspace)
     : null;
   const credential =
-    row.credentialId !== null &&
-    row.credentialOrganizationId === organizationId &&
-    row.credentialPlatform === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM &&
-    row.credentialIntegrationType === BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE &&
-    row.credentialVersion !== null &&
-    row.credentialVersion > 0
+    row.credentialId !== null && row.credentialVersion !== null && row.credentialVersion > 0
       ? { id: row.credentialId, version: row.credentialVersion }
       : null;
   const hasValidCredentialEvidence =
@@ -278,7 +262,7 @@ function parseIntegration(row: LoadedIntegration, organizationId: string) {
 
 async function loadParsedIntegration(organizationId: string) {
   const row = await loadIntegration(organizationId);
-  return row ? parseIntegration(row, organizationId) : null;
+  return row ? parseIntegration(row) : null;
 }
 
 function isRefreshableIntegration(
@@ -456,15 +440,7 @@ async function isObservedCredentialGenerationCurrent(
     .from(platform_integrations)
     .innerJoin(
       platform_access_token_credentials,
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
-        eq(platform_access_token_credentials.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
-        eq(
-          platform_access_token_credentials.integration_type,
-          BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
-        )
-      )
+      eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id)
     )
     .where(
       and(
@@ -615,7 +591,6 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
               platform_access_token_credentials.platform_integration_id,
               integration.row.integrationId
             ),
-            eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
             eq(platform_access_token_credentials.credential_version, credential.version)
           )
         );

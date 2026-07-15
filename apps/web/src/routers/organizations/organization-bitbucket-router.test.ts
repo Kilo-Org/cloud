@@ -132,9 +132,6 @@ async function insertStaticIntegration(organizationId: string, actorUserId: stri
 
   await db.insert(platform_access_token_credentials).values({
     platform_integration_id: integration.id,
-    owned_by_organization_id: organizationId,
-    platform: 'bitbucket',
-    integration_type: 'workspace_access_token',
     token_encrypted: 'secret-ciphertext-must-not-be-returned',
     expires_at: null,
     provider_credential_type: 'workspace_access_token',

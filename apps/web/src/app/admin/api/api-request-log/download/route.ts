@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
   // but TypeScript treats them as distinct - hence the cast.
   const webStream = Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
 
-  const sanitize = (s: string) => s.replaceAll('/', '-').replaceAll(':', '-');
+  const sanitize = (value: string) => value.replaceAll(/[^a-zA-Z0-9._-]/g, '-');
   const safeUserId = userId ? sanitize(userId) : 'all-users';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';

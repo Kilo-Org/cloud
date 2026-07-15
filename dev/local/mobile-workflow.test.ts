@@ -383,8 +383,8 @@ test('mobile planner hands implementation to a fresh tmux orchestrator', () => {
   assert.match(workflow, /named.*tmux window/is);
   assert.match(workflow, /-c <dedicated-worktree>\/apps\/mobile/);
   assert.match(workflow, /kilo run --interactive/);
-  assert.match(workflow, /--model kilo\/openai\/gpt-5\.6-sol/);
-  assert.match(workflow, /--variant medium/);
+  assert.match(workflow, /--model kilo\/kilo-auto\/frontier/);
+  assert.doesNotMatch(launchShape, /--variant/);
   assert.doesNotMatch(launchShape, /(?:--continue|--session)/);
 });
 

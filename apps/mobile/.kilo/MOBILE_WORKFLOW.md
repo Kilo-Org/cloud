@@ -30,10 +30,10 @@ Use the current tmux session and a unique, descriptive window name. The canonica
 tmux new-window -t <planner-tmux-session> \
   -n <feature>-orchestrator \
   -c <dedicated-worktree>/apps/mobile \
-  'kilo run --interactive --model kilo/openai/gpt-5.6-sol --variant medium --title "<feature> orchestrator" --file <sanitized-handoff-file> "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate."'
+  'kilo run --interactive --model kilo/kilo-auto/frontier --title "<feature> orchestrator" --file <sanitized-handoff-file> "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate."'
 ```
 
-Use `kilo run --interactive` without `--continue` or `--session`; session freshness is required. The planner verifies that the tmux window started and then returns its window name, worktree paths, model, variant, and handoff-file path to the user. The fresh orchestrator must delete the temporary handoff file after ingesting it and before completion.
+Use `kilo run --interactive` without `--continue`, `--session`, or `--variant`; session freshness and Kilo Auto Frontier's default reasoning setting are required. The planner verifies that the tmux window started and then returns its window name, worktree paths, model, and handoff-file path to the user. The fresh orchestrator must delete the temporary handoff file after ingesting it and before completion.
 
 ## Feature State Matrix
 

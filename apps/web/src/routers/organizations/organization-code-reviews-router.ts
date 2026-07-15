@@ -22,6 +22,7 @@ import {
 import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
+  type RepositoryModelOverride,
 } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
@@ -71,7 +72,10 @@ const ManuallyAddedRepositoryInputSchema = z.object({
 const RepositoryModelOverrideInputSchema = z.object({
   repositoryId: z.union([z.number(), z.string()]),
   repoFullName: z.string().max(511),
-  modelSlug: z.string(),
+  // Keep in sync with RepositoryModelOverrideSchema.model_slug (canonical storage),
+  // so an over-long slug is rejected at save time rather than failing the config's
+  // canonical parse on read.
+  modelSlug: z.string().max(512),
   thinkingEffort: z
     .string()
     .max(50)
@@ -526,7 +530,9 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         // they apply in both 'all' and 'selected' modes. Keep only overrides whose id
         // type matches the platform (numeric for GitHub/GitLab, UUID string for
         // Bitbucket), mirroring how selected repository ids are validated.
-        const repositoryModelOverrides = (input.repositoryModelOverrides ?? [])
+        const repositoryModelOverrides: RepositoryModelOverride[] = (
+          input.repositoryModelOverrides ?? []
+        )
           .filter(override =>
             isBitbucket
               ? typeof override.repositoryId === 'string'

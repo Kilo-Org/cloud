@@ -10,7 +10,7 @@ import {
   upsertAgentConfigForOwner,
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
-import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -44,7 +44,10 @@ const ManuallyAddedRepositoryInputSchema = z.object({
 const RepositoryModelOverrideInputSchema = z.object({
   repositoryId: z.number(),
   repoFullName: z.string().max(511),
-  modelSlug: z.string(),
+  // Keep in sync with RepositoryModelOverrideSchema.model_slug (canonical storage),
+  // so an over-long slug is rejected at save time rather than failing the config's
+  // canonical parse on read.
+  modelSlug: z.string().max(512),
   thinkingEffort: z
     .string()
     .max(50)
@@ -238,7 +241,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
         // Per-repository model overrides are independent of the trigger selection —
         // they apply in both 'all' and 'selected' modes. IDs are numeric for personal
         // (GitHub/GitLab) integrations, enforced by the input schema.
-        const repositoryModelOverrides = (input.repositoryModelOverrides ?? []).map(override => ({
+        const repositoryModelOverrides: RepositoryModelOverride[] = (
+          input.repositoryModelOverrides ?? []
+        ).map(override => ({
           repository_id: override.repositoryId,
           repo_full_name: override.repoFullName,
           model_slug: override.modelSlug,

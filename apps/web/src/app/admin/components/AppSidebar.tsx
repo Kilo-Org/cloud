@@ -29,7 +29,6 @@ import {
   Coins,
   Scale,
   Route,
-  ScrollText,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -251,16 +250,6 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Alerting',
     url: '/admin/alerting',
     icon: () => <Bell />,
-  },
-  {
-    title: () => 'API Request Log',
-    url: '/admin/api-request-log',
-    icon: () => <Database />,
-  },
-  {
-    title: () => 'Request Logging Opt-ins',
-    url: '/admin/request-logging-opt-ins',
-    icon: () => <ScrollText />,
   },
 ];
 

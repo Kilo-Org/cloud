@@ -10,6 +10,8 @@ import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
 import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
+import { ApiRequestLogContent } from '@/app/admin/api-request-log/ApiRequestLogContent';
+import { RequestLoggingOptInsContent } from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -17,18 +19,22 @@ const VALID_TABS: readonly string[] = [
   'routing',
   'model-experiments',
   'experiment-requests',
+  'api-request-log',
+  'request-logging-opt-ins',
 ];
 type Tab =
   | 'sync-providers'
   | 'custom-llms'
   | 'routing'
   | 'model-experiments'
-  | 'experiment-requests';
+  | 'experiment-requests'
+  | 'api-request-log'
+  | 'request-logging-opt-ins';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
 const tabTriggerClass =
-  'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
+  'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground shrink-0 rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium whitespace-nowrap transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
 
 export default function AdminGatewayPage() {
   const searchParams = useSearchParams();
@@ -70,7 +76,7 @@ export default function AdminGatewayPage() {
       <div className="flex w-full flex-col gap-y-4">
         <h2 className="text-2xl font-bold">Gateway</h2>
         <Tabs value={activeTab} onValueChange={onTabChange}>
-          <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+          <TabsList className="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="sync-providers" className={tabTriggerClass}>
               Sync Providers
             </TabsTrigger>
@@ -85,6 +91,12 @@ export default function AdminGatewayPage() {
             </TabsTrigger>
             <TabsTrigger value="experiment-requests" className={tabTriggerClass}>
               Experiment Requests
+            </TabsTrigger>
+            <TabsTrigger value="api-request-log" className={tabTriggerClass}>
+              API Request Log
+            </TabsTrigger>
+            <TabsTrigger value="request-logging-opt-ins" className={tabTriggerClass}>
+              Request Logging Opt-ins
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
@@ -101,6 +113,12 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="experiment-requests" className="mt-4">
             <ModelExperimentRequestsContent />
+          </TabsContent>
+          <TabsContent value="api-request-log" className="mt-4">
+            <ApiRequestLogContent />
+          </TabsContent>
+          <TabsContent value="request-logging-opt-ins" className="mt-4">
+            <RequestLoggingOptInsContent />
           </TabsContent>
         </Tabs>
       </div>

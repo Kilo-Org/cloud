@@ -3657,4 +3657,72 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
     expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
   });
+
+  it('does not let a late initial page from an earlier switchSession clobber the active session when both target the same session id', async () => {
+    // Regression: the initial-page callback used to read `loadOlderGeneration`
+    // at invocation time. A second `switchSession` to the same session id
+    // advances the generation in `clearAllAtoms()` before the first
+    // switch's `onInitialPageLoaded` callback runs, so the stale page
+    // passed the generation check (equal to the new generation) and
+    // overwrote the active session's cursor / messages / omitted-item
+    // count. The fix captures the generation synchronously when the
+    // callback is created.
+    let resolveFirstPage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const firstPagePromise = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolveFirstPage = resolve;
+    });
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage.mockReturnValueOnce(firstPagePromise).mockResolvedValueOnce(
+      makePage({
+        kiloSessionId: 'ses-1',
+        nextCursor: 'current-cursor',
+        messages: [makePageMessage('msg-current', 'ses-1', 'current')],
+        omittedItemCount: 0,
+      })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    // Wait for the first switchSession to fully set up: the first
+    // session.connect() must have kicked off the slow fetchSnapshotPage
+    // and wired its `onInitialPageLoaded` callback before the second
+    // switchSession advances `switchGeneration` and tears the first
+    // switchSession's setup down.
+    const first = mgr.switchSession(kiloId('ses-1'));
+    await first;
+
+    const second = mgr.switchSession(kiloId('ses-1'));
+    await second;
+    // Flush microtasks so the second switch's page is delivered through
+    // `onInitialPageLoaded` and the active session's pagination state is
+    // settled before we resolve the stale first page.
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    // The active session's pagination state reflects the second switch.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+    ).toEqual(['msg-current']);
+
+    // The first switch's slow page eventually resolves. Its stale
+    // cursor, messages, and omitted count must not overwrite the
+    // active session's pagination state.
+    resolveFirstPage(
+      makePage({
+        kiloSessionId: 'ses-1',
+        nextCursor: 'stale-cursor',
+        messages: [makePageMessage('msg-stale', 'ses-1', 'stale')],
+        omittedItemCount: 99,
+      })
+    );
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+    ).toEqual(['msg-current']);
+  });
 });

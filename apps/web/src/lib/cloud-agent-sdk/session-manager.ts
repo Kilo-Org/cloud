@@ -967,9 +967,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // Persist the bounded page's cursor / hasOlderMessages / omittedItemCount
     // so `loadOlderMessages` can continue from where the transport left off.
     // This is a no-op for stale (pre-switchSession) callbacks because
-    // `loadOlderGeneration` advances on every switch.
+    // `loadOlderGeneration` advances on every switch. The generation is
+    // captured synchronously here, at callback creation time: reading
+    // `loadOlderGeneration` from inside the callback would be tautological
+    // when the same session id is switched twice in a row, because the
+    // second switch's `clearAllAtoms()` advance lands before the first
+    // switch's `onInitialPageLoaded` callback runs, letting a stale page
+    // pass the generation check and clobber the active session's cursor
+    // and omitted-item count.
+    const initialPageGeneration = loadOlderGeneration;
     const recordInitialPage = (page: SessionSnapshotPage): void => {
-      applyPage({ ...page, kind: 'success' }, loadOlderGeneration);
+      applyPage({ ...page, kind: 'success' }, initialPageGeneration);
     };
 
     const session = createCloudAgentSession({

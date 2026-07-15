@@ -5,6 +5,8 @@ import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import {
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
+  shouldFollowSessionContentSize,
+  shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
 
@@ -87,9 +89,13 @@ export function useSessionListAutoScroll<ItemT>({
     clearAutoScrollRetryTimeout();
     autoScrollRetryTimeoutRef.current = setTimeout(() => {
       autoScrollRetryTimeoutRef.current = null;
+      // The 80ms safety-net retry must not gate on `isAutoScrolling`:
+      // a programmatic scroll that's still within its 150ms window
+      // would otherwise suppress the retry and make it dead during the
+      // highest-frequency streaming window. It still honours the
+      // user-facing and follow-bottom guards.
       if (
-        shouldScheduleSessionAutoScroll({
-          isAutoScrolling: isAutoScrollingRef.current,
+        shouldRetrySessionAutoScroll({
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
         })
@@ -184,18 +190,26 @@ export function useSessionListAutoScroll<ItemT>({
     (_width: number, height: number) => {
       const didContentHeightChange = height !== lastContentHeightRef.current;
       lastContentHeightRef.current = height;
+      // Content-size follow must not gate on `isAutoScrolling`: rapid
+      // streaming content-size changes that arrive during the 150ms
+      // programmatic-scroll window must still keep the viewport pinned
+      // to the bottom. Gating on `!isAutoScrolling` here would silently
+      // drop every streaming update that lands inside the debounce
+      // window. Bypass `scheduleScrollToLatestMessage` (which keeps
+      // the `!isAutoScrolling` guard for the initial itemCount /
+      // handleListLayout triggers) and trigger the programmatic scroll
+      // directly.
       if (
-        shouldScheduleSessionAutoScroll({
-          isAutoScrolling: isAutoScrollingRef.current,
+        shouldFollowSessionContentSize({
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
-        }) &&
-        didContentHeightChange
+          didContentHeightChange,
+        })
       ) {
-        scheduleScrollToLatestMessage();
+        scrollToLatestMessage();
       }
     },
-    [scheduleScrollToLatestMessage]
+    [scrollToLatestMessage]
   );
 
   const handleListLayout = useCallback(() => {

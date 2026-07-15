@@ -46,3 +46,60 @@ export function shouldScheduleSessionAutoScroll({
   }
   return true;
 }
+
+/**
+ * Decide whether the 80ms safety-net retry should re-scroll to the latest
+ * message. Unlike `shouldScheduleSessionAutoScroll`, this does NOT gate on
+ * `isAutoScrolling`: the whole point of the retry is to recover when the
+ * first scroll didn't reach the bottom, and a programmatic scroll that's
+ * still in flight (within the 150ms `isAutoScrolling` window) must not
+ * suppress the retry. It must still honour the user-facing guards:
+ *  - `isUserScrolling`  – the user is dragging or in momentum, never yank.
+ *  - `shouldAutoScroll` – the user has scrolled away from the bottom.
+ */
+export function shouldRetrySessionAutoScroll({
+  isUserScrolling,
+  shouldAutoScroll,
+}: {
+  isUserScrolling: boolean;
+  shouldAutoScroll: boolean;
+}): boolean {
+  if (!shouldAutoScroll) {
+    return false;
+  }
+  if (isUserScrolling) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Decide whether a streaming content-size change should trigger a follow
+ * scroll to the latest message. Like `shouldRetrySessionAutoScroll`, this
+ * does NOT gate on `isAutoScrolling`: rapid streaming content-size changes
+ * that arrive during the 150ms programmatic-scroll window must still keep
+ * the viewport pinned to the bottom. It still honours the user-facing
+ * guards and additionally requires the content height to have actually
+ * changed since the last call (otherwise every redundant measurement would
+ * re-scroll even when no new content was added).
+ */
+export function shouldFollowSessionContentSize({
+  isUserScrolling,
+  shouldAutoScroll,
+  didContentHeightChange,
+}: {
+  isUserScrolling: boolean;
+  shouldAutoScroll: boolean;
+  didContentHeightChange: boolean;
+}): boolean {
+  if (!shouldAutoScroll) {
+    return false;
+  }
+  if (isUserScrolling) {
+    return false;
+  }
+  if (!didContentHeightChange) {
+    return false;
+  }
+  return true;
+}

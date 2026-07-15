@@ -148,32 +148,16 @@ Attach a screenshot of the changed flow to the PR when it helps review. For tran
 
 ## Remote CLI Session Flows
 
-Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator must mint the user's local auth token and pass it as `KILO_E2E_AUTH_TOKEN`; role agents must not read environment files or receive `NEXTAUTH_SECRET`. Install the CLI in a disposable directory, never globally:
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the user's local auth token, installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer-token environment already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands. Reuse the orchestrator-prepared session and verify session discovery and mirroring by inspecting its pane and the mobile list:
 
 ```bash
-CLI_SCRATCH=$(mktemp -d /tmp/kilo-cli.XXXXXX)
-npm install --prefix "$CLI_SCRATCH" @kilocode/cli
-E2E_EMAIL=${E2E_EMAIL:-e2e-mobile@example.com}
-USER_ID=$(pnpm -s dev:seed app:user-id "$E2E_EMAIL" --json | jq -r .userId)
-TOKEN="${KILO_E2E_AUTH_TOKEN:?orchestrator must provide KILO_E2E_AUTH_TOKEN}"
-```
-
-Do not print or log the token. Read the actual Next.js and session-ingest ports from `pnpm dev:status --json`, then run the CLI in its own tmux session:
-
-```bash
-CLI_SESSION="kilo-e2e-$(basename "$PWD")"
-tmux new-session -d -s "$CLI_SESSION" -c "$PWD"
-tmux set-environment -t "$CLI_SESSION" KILO_API_URL http://localhost:<nextjs-port>
-tmux set-environment -t "$CLI_SESSION" KILO_SESSION_INGEST_URL http://localhost:<session-ingest-port>
-tmux set-environment -t "$CLI_SESSION" KILO_AUTH_CONTENT \
-  "$(printf '{"kilo":{"type":"api","key":"%s"}}' "$TOKEN")"
-tmux set-environment -t "$CLI_SESSION" KILO_REMOTE 1
-tmux set-environment -t "$CLI_SESSION" KILO_CLI_BIN "$CLI_SCRATCH/node_modules/.bin/kilo"
-tmux new-window -t "$CLI_SESSION" -n cli -c "$PWD" '"$KILO_CLI_BIN"'
+CLI_SESSION="kilo-e2e-cli-$(basename "$PWD")"
+tmux ls
+tmux list-windows -t "$CLI_SESSION"
 tmux capture-pane -p -t "$CLI_SESSION":cli -S -100
 ```
 
-The mobile list updates after the CLI WebSocket connects and its first heartbeat (usually about 12 seconds). Use `tmux send-keys` for automation; slash commands need one Enter for autocomplete and another to submit.
+Drive the orchestrator-prepared session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. The mobile list updates after the CLI WebSocket connects and its first heartbeat (usually about 12 seconds). If the orchestrator has not prepared a session for this worktree, stop and ask the orchestrator to install the CLI, mint a token, and start the session before exercising CLI flows.
 
 ## Android Emulator
 
@@ -215,13 +199,11 @@ The existing login/logout helpers accept either an iOS simulator UDID or an Andr
 
 ## Cleanup
 
-Clean up only resources you started:
+Clean up only resources you started. The remote CLI session and its disposable install are owned by the orchestrator; do not kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create:
 
 ```bash
-tmux kill-session -t "$CLI_SESSION"       # if created
 tmux kill-session -t "$IOS_BUILD_SESSION" # if created
 tmux kill-session -t "$ANDROID_SESSION"   # if created
-rm -rf "$CLI_SCRATCH"                     # if created
 rm -f "$LOGIN_LOG"                        # if created
 pnpm dev:stop                              # only if you started this worktree's stack
 xcrun simctl shutdown <udid>               # only if you booted it

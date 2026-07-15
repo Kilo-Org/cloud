@@ -51,5 +51,4 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     expect(hasActiveCliSession).not.toHaveBeenCalled();
     expect(sendPush).not.toHaveBeenCalled();
   });
-
 });

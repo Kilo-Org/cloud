@@ -136,6 +136,9 @@ importers:
 
   .:
     devDependencies:
+      '@expo/fingerprint':
+        specifier: 0.16.7
+        version: 0.16.7
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4

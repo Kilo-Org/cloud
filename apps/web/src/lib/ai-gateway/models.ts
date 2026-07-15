@@ -10,7 +10,6 @@ import {
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import {
-  CLAUDE_OPUS_4_8_STEALTH_MODEL_ID,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
@@ -55,21 +54,16 @@ export const preferredModels = [
   ...autoFreeModels,
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  claude_opus_4_8_stealth_model.status === 'public'
-    ? CLAUDE_OPUS_4_8_STEALTH_MODEL_ID
-    : CLAUDE_OPUS_CURRENT_MODEL_ID,
+  CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
-  'openai/gpt-5.6-terra',
-
+  ...(gpt_5_6_sol_stealth_model.status === 'public' ? [gpt_5_6_sol_stealth_model.public_id] : []),
   deepseek_v4_pro_discounted_model.status === 'public'
     ? deepseek_v4_pro_discounted_model.public_id
     : 'deepseek/deepseek-v4-pro',
   GLM_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
-  qwen36_plus_stealth_model.status === 'public'
-    ? qwen36_plus_stealth_model.public_id
-    : QWEN37_PLUS_MODEL_ID,
+  QWEN37_PLUS_MODEL_ID,
 ];
 
 export function isPdfSupportingModel(model: string): boolean {

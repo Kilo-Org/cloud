@@ -3,6 +3,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { createProjectHashAsync } from '@expo/fingerprint';
+
+import {
+  buildAndroidCompatibilityKey,
+  buildAndroidFingerprintOptions,
+  buildAndroidInstallCommand,
+  pruneAndroidCache,
+  runAndroidBuild,
+} from './mobile-android-build';
+import { withNativeBuildSemaphore } from './mobile-native-build';
 import { withProcessLock } from './process-lock';
 
 type AndroidEnvironment = {
@@ -21,7 +31,13 @@ type ResolveArgs = {
   javaMajor?: (javaHome: string) => number | undefined;
 };
 
-type DeviceClaim = { serial: string; worktreeRoot: string; claimedAt: string };
+type DeviceClaim = {
+  serial: string;
+  worktreeRoot: string;
+  claimedAt: string;
+  claimId: string;
+  status: 'ready';
+};
 type ClaimOptions = {
   fileOperations?: {
     readFileSync?: (filePath: string, encoding: 'utf8') => string;
@@ -157,8 +173,14 @@ function claimAndroidDevice(
   return withClaimMutationLock(filePath, () => {
     try {
       const readFileSync = options?.fileOperations?.readFileSync ?? fs.readFileSync;
-      const claim = JSON.parse(readFileSync(filePath, 'utf8')) as DeviceClaim;
-      if (claim.worktreeRoot === worktreeRoot) return claim;
+      const claim = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<DeviceClaim>;
+      if (claim.worktreeRoot === worktreeRoot) {
+        if (claim.status === 'ready' && typeof claim.claimId === 'string')
+          return claim as DeviceClaim;
+        const upgraded = buildReadyClaim(serial, worktreeRoot);
+        fs.writeFileSync(filePath, JSON.stringify(upgraded));
+        return upgraded;
+      }
       if (fs.existsSync(claim.worktreeRoot))
         throw new Error(`${serial} is claimed by ${claim.worktreeRoot}`);
       fs.rmSync(filePath, { force: true });
@@ -171,10 +193,20 @@ function claimAndroidDevice(
         throw error;
       }
     }
-    const claim = { serial, worktreeRoot, claimedAt: new Date().toISOString() };
+    const claim = buildReadyClaim(serial, worktreeRoot);
     fs.writeFileSync(filePath, JSON.stringify(claim), { flag: 'wx' });
     return claim;
   });
+}
+
+function buildReadyClaim(serial: string, worktreeRoot: string): DeviceClaim {
+  return {
+    serial,
+    worktreeRoot,
+    claimedAt: new Date().toISOString(),
+    claimId: `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    status: 'ready',
+  };
 }
 
 function releaseAndroidDevice(serial: string, worktreeRoot: string): void {
@@ -187,7 +219,7 @@ function releaseAndroidDevice(serial: string, worktreeRoot: string): void {
   });
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   const env = environment();
   const worktreeRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
@@ -204,13 +236,56 @@ function main(): void {
     console.log(JSON.stringify({ ...env, avds, worktree: path.basename(process.cwd()) }, null, 2));
     return;
   }
-  if (command === 'build') {
-    return run(
-      'npx',
-      ['expo', 'run:android', '--no-install', '--no-bundler', ...args],
-      env,
-      path.join(worktreeRoot, 'apps/mobile')
+  const mobileRoot = path.join(worktreeRoot, 'apps/mobile');
+  const cacheRoot = path.join(os.homedir(), 'Library/Caches/Kilo/mobile-android-builds');
+  if (command === 'fingerprint') {
+    if (args.length !== 0) throw new Error('Usage: pnpm dev:mobile:android fingerprint');
+    const nativeHash = await createProjectHashAsync(mobileRoot, buildAndroidFingerprintOptions());
+    const compatibility = {
+      ...androidCompatibility(env, mobileRoot),
+      nativeHash,
+      buildMode: 'debug-dev-client' as const,
+    };
+    console.log(
+      JSON.stringify(
+        { key: buildAndroidCompatibilityKey(compatibility), ...compatibility },
+        null,
+        2
+      )
     );
+    return;
+  }
+  if (command === 'prune') {
+    if (args.length !== 0) throw new Error('Usage: pnpm dev:mobile:android prune');
+    console.log(JSON.stringify(pruneAndroidCache(cacheRoot), null, 2));
+    return;
+  }
+  if (command === 'build') {
+    const serial = args[0];
+    if (!serial) throw new Error('Usage: pnpm dev:mobile:android build <serial>');
+    const claimRoot = path.join(os.tmpdir(), 'kilo-mobile-android-claims');
+    await runAndroidBuild(serial, {
+      cacheRoot,
+      claimRoot,
+      worktreeRoot,
+      mobileRoot,
+      fingerprint: (root, options) => createProjectHashAsync(root, options),
+      compatibility: () => androidCompatibility(env, mobileRoot),
+      withNativeBuildSlot: runBuild =>
+        withNativeBuildSemaphore({
+          root: path.join(os.homedir(), 'Library/Caches/Kilo'),
+          run: runBuild,
+        }),
+      build: staging => buildAndroidApk(env, mobileRoot, staging),
+      readPackageId: apkPath => readAndroidPackageId(env, apkPath),
+      install: (deviceSerial, apkPath) => {
+        const command = buildAndroidInstallCommand(env.adb, deviceSerial, apkPath);
+        run(command.command, command.args, env);
+      },
+      now: () => new Date(),
+    });
+    console.log(`Installed ${serial}`);
+    return;
   }
   if (command === 'claim') {
     const requested = args[0];
@@ -234,20 +309,118 @@ function main(): void {
     return run(env.sdkmanager, args, env);
   }
   throw new Error(
-    'Usage: pnpm dev:mobile:android [doctor|build|claim|release|adb|emulator|sdkmanager] [args...]'
+    'Usage: pnpm dev:mobile:android [doctor|fingerprint|build|prune|claim|release|adb|emulator|sdkmanager] [args...]'
   );
 }
 
 const isMain =
   process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename);
 if (isMain) {
-  try {
-    main();
-  } catch (error) {
+  main().catch(error => {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
-  }
+  });
 }
 
-export { claimAndroidDevice, releaseAndroidDevice, resolveAndroidEnvironment };
+function androidCompatibility(env: AndroidEnvironment, mobileRoot: string) {
+  const gradleProject = path.join(mobileRoot, 'android');
+  const gradlew = path.join(gradleProject, 'gradlew');
+  if (!fs.existsSync(gradlew)) {
+    throw new Error(
+      `Generated Android project is missing at ${gradleProject}. Run \`npx expo prebuild --platform android\` in apps/mobile first.`
+    );
+  }
+  const gradleVersion = readGradleWrapperVersion(gradleProject);
+  const javaResult = spawnSync(path.join(env.javaHome, 'bin/java'), ['-version'], {
+    encoding: 'utf8',
+  });
+  const javaVersion = `${javaResult.stdout}${javaResult.stderr}`.match(/version "([^"]+)"/)?.[1];
+  if (!gradleVersion || !javaVersion)
+    throw new Error('Unable to determine Android build toolchain');
+  const platforms = listVersions(path.join(env.sdkRoot, 'platforms'));
+  const buildTools = listVersions(path.join(env.sdkRoot, 'build-tools'));
+  return {
+    gradleVersion,
+    javaVersion,
+    androidSdkIdentity: `${platforms.at(-1) ?? 'none'}/${buildTools.at(-1) ?? 'none'}`,
+    hostArch: process.arch,
+  };
+}
+
+function readGradleWrapperVersion(androidRoot: string): string {
+  const properties = fs.readFileSync(
+    path.join(androidRoot, 'gradle/wrapper/gradle-wrapper.properties'),
+    'utf8'
+  );
+  const version = properties.match(/gradle-([0-9][0-9.]*)-(?:all|bin)\.zip/)?.[1];
+  if (!version) throw new Error('Unable to determine Gradle wrapper version');
+  return version;
+}
+
+async function buildAndroidApk(
+  env: AndroidEnvironment,
+  mobileRoot: string,
+  staging: string
+): Promise<string> {
+  const androidRoot = path.join(mobileRoot, 'android');
+  const gradlew = path.join(androidRoot, 'gradlew');
+  if (!fs.existsSync(gradlew)) {
+    throw new Error(
+      `Generated Android project is missing at ${androidRoot}. Run \`npx expo prebuild --platform android\` in apps/mobile first.`
+    );
+  }
+  const sourceApk = path.join(androidRoot, 'app/build/outputs/apk/debug/app-debug.apk');
+  fs.rmSync(sourceApk, { force: true });
+  run(
+    gradlew,
+    [
+      'app:assembleDebug',
+      '--no-daemon',
+      '--project-cache-dir',
+      path.join(staging, 'project-cache'),
+    ],
+    env,
+    androidRoot
+  );
+  if (!fs.existsSync(sourceApk)) {
+    throw new Error(`Gradle did not produce the expected APK at ${sourceApk}`);
+  }
+  const stagedApk = path.join(staging, 'app-debug.apk');
+  fs.copyFileSync(sourceApk, stagedApk);
+  return stagedApk;
+}
+
+function readAndroidPackageId(env: AndroidEnvironment, apkPath: string): string | undefined {
+  const buildTools = listVersions(path.join(env.sdkRoot, 'build-tools'));
+  const version = buildTools.at(-1);
+  if (!version) throw new Error('Android build-tools are not installed');
+  const aapt = path.join(env.sdkRoot, 'build-tools', version, 'aapt');
+  const output = execFileSync(aapt, ['dump', 'badging', apkPath], {
+    encoding: 'utf8',
+    env: androidProcessEnv(env),
+  });
+  return output.match(/^package: name='([^']+)'/m)?.[1];
+}
+
+function listVersions(root: string): string[] {
+  if (!fs.existsSync(root)) return [];
+  return fs.readdirSync(root).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function androidProcessEnv(env: AndroidEnvironment): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ANDROID_HOME: env.sdkRoot,
+    ANDROID_SDK_ROOT: env.sdkRoot,
+    JAVA_HOME: env.javaHome,
+    PATH: env.path,
+  };
+}
+
+export {
+  claimAndroidDevice,
+  readGradleWrapperVersion,
+  releaseAndroidDevice,
+  resolveAndroidEnvironment,
+};
 export type { AndroidEnvironment };

@@ -186,12 +186,14 @@ test('Android tooling is resolved independently of the agent PATH', async () => 
   assert.match(env.path, /android-commandlinetools\/platform-tools/);
 });
 
-test('Android workflow uses Maestro first and applies resolved tooling to Expo builds', () => {
+test('Android workflow uses Maestro first and applies resolved tooling to cached native builds', () => {
   const android = fs.readFileSync('dev/local/mobile-android.ts', 'utf8');
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
   assert.match(android, /'build'/);
-  assert.match(android, /'run:android'/);
+  assert.match(android, /runAndroidBuild/);
+  assert.match(android, /withNativeBuildSemaphore/);
+  assert.match(android, /app:assembleDebug/);
   assert.match(android, /path\.join\(worktreeRoot, 'apps\/mobile'\)/);
   assert.match(runbook, /Use Maestro as the primary Android automation driver/);
   assert.match(runbook, /Fall back to repository-wrapped ADB/);

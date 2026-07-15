@@ -689,12 +689,61 @@ function makeBuildDeps(overrides: Partial<BuildDeps> = {}): BuildDeps {
       fs.cpSync(src, dest, { recursive: true });
     },
     mkdtemp: () => fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-stage-')),
+    withNativeBuildSlot: run => run(),
     validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) =>
       validateSimulatorClaim(udid, worktreeRoot, claimRoot),
     sleep: (ms: number) => new Promise(resolve => setTimeout(resolve, Math.max(ms, 1))),
     ...overrides,
   };
 }
+
+test('runBuild enters the host native-build slot only on cache miss', async () => {
+  const cacheRoot = makeTempDir('build-slot');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-slot';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  let slots = 0;
+  const deps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    withNativeBuildSlot: async run => {
+      slots += 1;
+      return run();
+    },
+    build: async ({ derivedDataPath }) => {
+      const app = path.join(
+        derivedDataPath,
+        'Build',
+        'Products',
+        'Debug-iphonesimulator',
+        'Kilo.app'
+      );
+      fs.mkdirSync(app, { recursive: true });
+      fs.writeFileSync(path.join(app, 'Info.plist'), '<plist/>');
+    },
+  });
+
+  try {
+    await runBuild(udid, deps);
+    await runBuild(udid, deps);
+    assert.equal(slots, 1);
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
 
 test('runBuild installs a cached entry on hit and does not invoke the builder', async () => {
   const cacheRoot = makeTempDir('build-hit');

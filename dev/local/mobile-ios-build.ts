@@ -6,6 +6,8 @@ import path from 'node:path';
 
 import { createProjectHashAsync, DEFAULT_SOURCE_SKIPS, SourceSkips } from '@expo/fingerprint';
 
+import { withNativeBuildSemaphore } from './mobile-native-build';
+
 // Compatibility dimensions hashed into the cache key. Any change must
 // invalidate the key so cached artifacts are not reused for an
 // incompatible environment.
@@ -883,6 +885,7 @@ export type BuildDeps = {
   install: (udid: string, appPath: string) => void;
   copyDir: (src: string, dest: string) => void;
   mkdtemp: (prefix: string) => string;
+  withNativeBuildSlot: <T>(run: () => Promise<T>) => Promise<T>;
   validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) => void;
   sleep?: (ms: number) => Promise<void>;
 };
@@ -1071,14 +1074,16 @@ export async function runBuild(udid: string, deps: BuildDeps): Promise<void> {
     lockRoot,
     deps: lockDeps,
     producer: () =>
-      publishCacheEntry({
-        env: deps.env,
-        key,
-        compatibility,
-        worktreeRoot: deps.worktreeRoot,
-        udid,
-        deps,
-      }),
+      deps.withNativeBuildSlot(() =>
+        publishCacheEntry({
+          env: deps.env,
+          key,
+          compatibility,
+          worktreeRoot: deps.worktreeRoot,
+          udid,
+          deps,
+        })
+      ),
     readResult: async () =>
       lookupCache({
         env: deps.env,
@@ -1189,6 +1194,11 @@ async function main(): Promise<void> {
         fs.mkdirSync(path.dirname(prefix), { recursive: true });
         return fs.mkdtempSync(prefix);
       },
+      withNativeBuildSlot: run =>
+        withNativeBuildSemaphore({
+          root: path.join(env.cacheRoot, '..'),
+          run,
+        }),
       validateClaim: (udid: string, worktreeRoot: string, claimRoot: string) =>
         validateSimulatorClaim(udid, worktreeRoot, claimRoot),
     });

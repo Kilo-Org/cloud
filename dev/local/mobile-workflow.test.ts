@@ -275,6 +275,18 @@ test('mobile workflow keeps secret-bearing environment files out of subagent con
   assert.doesNotMatch(runbook, /grep .*\.env/);
 });
 
+test('mobile workflow keeps generated E2E fixtures out of Git', () => {
+  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
+  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+
+  for (const document of [workflow, runbook]) {
+    assert.match(document, /E2E fixtures must never be committed/i);
+    assert.match(document, /temporary directory/i);
+    assert.match(document, /clean(?:ed)? up/i);
+  }
+  assert.match(workflow, /git status/i);
+});
+
 test('remote CLI runbook is secret-free and defers credential-bearing setup to the orchestrator', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
   const remoteCliSection = runbook.slice(

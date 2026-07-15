@@ -57,6 +57,8 @@ tmux list-windows -t <dev-session>
 
 Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.
 
+E2E fixtures must never be committed. When a flow needs generated fixture files, create them in a temporary directory such as one returned by `mktemp -d`, run the flow against that directory, and ensure the fixtures and temporary directory are cleaned up before finishing.
+
 ## iOS Simulator
 
 Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the command prefers an unclaimed shutdown device and boots it. Pass a UDID only when intentionally claiming that device:
@@ -219,4 +221,7 @@ Verify cleanup:
 pnpm dev:status --json
 tmux ls
 xcrun simctl list devices booted
+git status --short
 ```
+
+Confirm no generated E2E fixtures remain tracked or untracked in the repository.

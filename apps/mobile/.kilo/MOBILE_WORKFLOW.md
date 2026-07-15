@@ -56,6 +56,7 @@ Every dispatch should include:
 - Prior findings being addressed, including rejected findings that must not be reopened without new evidence
 - The intended commit boundary for the assigned slice
 - A prohibition on reading secret-bearing environment files: role agents must not read `.env`, `.env.*`, `.dev.vars`, or equivalent files. Use documented setup commands, sanitized status or manifest output, and sanitized explicit values supplied by the orchestrator instead.
+- A prohibition on committing generated E2E fixtures: E2E fixtures must never be committed. Role agents may create them only in a temporary directory for the current run and must clean them up before returning control.
 
 Do not ask a role agent to infer context from the conversation it cannot see. Keep cross-repository changes on coordinated branches or working trees, and give the reviewer and verifier the location of every related diff. Never place secrets or raw environment-file contents in a handoff; provide only the minimum sanitized explicit values required for the task.
 
@@ -73,3 +74,4 @@ The orchestrator may call the work complete only when:
 - The main session has reviewed the complete diff and owns the Git/PR actions
 - The PR is assigned to the requesting human
 - Kilobot has reviewed the latest head and there are no unresolved actionable Kilobot comments
+- Generated E2E fixtures have been cleaned up, and final `git status` confirms none are tracked or untracked in the repository

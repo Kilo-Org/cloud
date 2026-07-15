@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { CODE_REVIEW_COUNCIL_FLAG } from '@/lib/code-reviews/core/council-selection';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
@@ -59,8 +61,17 @@ export function ReviewAgentPageClient({
   const router = useRouter();
   const selectedPlatform = initialPlatform;
 
+  // The council UI shows for `localMode || (entitled && rolloutFlag)`. Entitlement only
+  // matters in the second branch, so skip the (DB-backed) entitlement query unless the
+  // rollout flag is on AND we're not in local mode (local mode bypasses entitlement). This
+  // avoids a per-page-load entitlement lookup for the users who can't see council anyway;
+  // server-side creation still enforces entitlement regardless.
+  const councilFlagEnabled = useFeatureFlagEnabled(CODE_REVIEW_COUNCIL_FLAG);
   const { data: councilEntitlement } = useQuery(
-    trpc.organizations.reviewAgent.getCouncilEntitlement.queryOptions({ organizationId })
+    trpc.organizations.reviewAgent.getCouncilEntitlement.queryOptions(
+      { organizationId },
+      { enabled: !localCodeReviewDevelopmentEnabled && !!councilFlagEnabled }
+    )
   );
   const councilEntitled = councilEntitlement?.entitled ?? false;
 

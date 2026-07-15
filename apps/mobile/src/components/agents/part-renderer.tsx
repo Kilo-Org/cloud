@@ -10,6 +10,7 @@ import {
   isReasoningPart,
   isTextPart,
   isToolPart,
+  shouldRenderReasoningPart,
 } from './part-types';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
@@ -51,6 +52,9 @@ export function PartRenderer({
     );
   }
   if (isReasoningPart(part)) {
+    if (!shouldRenderReasoningPart(part, isStreaming ?? false)) {
+      return null;
+    }
     return (
       <MessageErrorBoundary>
         <ReasoningPartRenderer

@@ -12,9 +12,7 @@ export function fixOpenCodeDuplicateReasoning(
 ) {
   // workaround for @openrouter/ai-sdk-provider v1 duplicating reasoning
   // possibly fixed in https://github.com/OpenRouterTeam/ai-sdk-provider/pull/344/
-  console.debug(
-    `[fixOpenCodeDuplicateReasoning] start, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
-  );
+  let requestMutated = false;
   for (const msg of request.messages) {
     const msgWithReasoning = msg as MessageWithReasoning;
     if (!msgWithReasoning.reasoning_details) {
@@ -29,32 +27,24 @@ export function fixOpenCodeDuplicateReasoning(
           encryptedDataSet.add(rd.data);
           return true;
         }
-        console.debug(
-          `[fixOpenCodeDuplicateReasoning] removing duplicated encrypted reasoning, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
-        );
+        requestMutated = true;
         return false;
       }
       if (rd.type === ReasoningDetailType.Text) {
         if (isClaudeModel(requestedModel) && !rd.signature) {
-          console.debug(
-            `[fixOpenCodeDuplicateReasoning] removing reasoning text without signature, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
-          );
+          requestMutated = true;
           return false;
         }
         if (rd.signature) {
           if (signatureSet.has(rd.signature)) {
-            console.debug(
-              `[fixOpenCodeDuplicateReasoning] removing duplicated reasoning signature, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
-            );
+            requestMutated = true;
             return false;
           }
           signatureSet.add(rd.signature);
         }
         if (rd.text) {
           if (textSet.has(rd.text)) {
-            console.debug(
-              `[fixOpenCodeDuplicateReasoning] removing duplicated reasoning text, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
-            );
+            requestMutated = true;
             return false;
           }
           textSet.add(rd.text);
@@ -63,5 +53,10 @@ export function fixOpenCodeDuplicateReasoning(
       }
       return true;
     });
+  }
+  if (requestMutated) {
+    console.debug(
+      `[fixOpenCodeDuplicateReasoning] removed duplicate or invalid reasoning, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
+    );
   }
 }

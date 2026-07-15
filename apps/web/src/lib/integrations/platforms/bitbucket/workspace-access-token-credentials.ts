@@ -301,8 +301,7 @@ export async function rotateBitbucketWorkspaceAccessToken(
         eq(
           platform_integrations.integration_type,
           BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
-        ),
-        eq(platform_access_token_credentials.owned_by_organization_id, organizationId)
+        )
       )
     );
   if (!observed || !observed.workspaceUuid || !observed.workspaceSlug) {
@@ -356,8 +355,7 @@ export async function rotateBitbucketWorkspaceAccessToken(
           eq(
             platform_integrations.integration_type,
             BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
-          ),
-          eq(platform_access_token_credentials.owned_by_organization_id, organizationId)
+          )
         )
       )
       .for('update');
@@ -389,7 +387,6 @@ export async function rotateBitbucketWorkspaceAccessToken(
         and(
           eq(platform_access_token_credentials.id, observed.credentialId),
           eq(platform_access_token_credentials.platform_integration_id, observed.integrationId),
-          eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
           eq(platform_access_token_credentials.credential_version, observed.credentialVersion)
         )
       )
@@ -514,9 +511,6 @@ export async function connectBitbucketWorkspaceAccessToken(
     await tx.insert(platform_access_token_credentials).values({
       id: credentialId,
       platform_integration_id: integrationId,
-      owned_by_organization_id: organizationId,
-      platform: BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
-      integration_type: BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
       token_encrypted: tokenEncrypted,
       expires_at: null,
       provider_credential_type: validation.providerCredentialType,

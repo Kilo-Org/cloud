@@ -5,7 +5,6 @@ import {
   createRequestLoggingOptIn,
   deleteRequestLoggingOptIn,
   getRequestLoggingOptIns,
-  invalidateRequestLoggingOptInsCache,
   type RequestLoggingOptIn,
 } from '@/lib/ai-gateway/request-logging-opt-ins';
 
@@ -42,7 +41,6 @@ export const adminRequestLoggingOptInsRouter = createTRPCRouter({
         message: 'The request logging opt-in limit has been reached.',
       });
     }
-    invalidateRequestLoggingOptInsCache();
     return entry;
   }),
 
@@ -50,7 +48,6 @@ export const adminRequestLoggingOptInsRouter = createTRPCRouter({
     if (!(await deleteRequestLoggingOptIn(input.id))) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Request logging opt-in not found.' });
     }
-    invalidateRequestLoggingOptInsCache();
     return { id: input.id };
   }),
 });

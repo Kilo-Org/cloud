@@ -80,10 +80,6 @@ const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
   []
 );
 
-export function invalidateRequestLoggingOptInsCache(): void {
-  getCachedRequestLoggingOptIns.invalidate();
-}
-
 export async function createRequestLoggingOptIn(
   entry: RequestLoggingOptIn
 ): Promise<'created' | 'duplicate' | 'full'> {

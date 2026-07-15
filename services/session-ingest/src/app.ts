@@ -6,7 +6,9 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 
 import { kiloJwtAuthMiddleware } from './middleware/kilo-jwt-auth';
+import { runtimeControlAuthMiddleware } from './middleware/runtime-control-auth';
 import { api } from './routes/api';
+import { runtimeControlApi } from './routes/runtime-control';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionExport } from './services/session-export';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -23,6 +25,11 @@ export const app = new Hono<{
 // Protect all /api routes with Kilo user API JWT auth.
 app.use('/api/*', kiloJwtAuthMiddleware);
 app.route('/api', api);
+
+// Internal runtime-control surface: audience-bound JWT against
+// NEXTAUTH_SECRET_PROD, separate from the user-facing /api auth.
+app.use('/internal/runtime-control/*', runtimeControlAuthMiddleware);
+app.route('/internal/runtime-control', runtimeControlApi);
 
 // Public session endpoint: look up a session by public_id and return all ingested DO events.
 app.get('/session/:sessionId', async c => {

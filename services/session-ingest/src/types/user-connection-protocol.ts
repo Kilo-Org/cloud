@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  localRuntimePresenceSchema,
+  type LocalRuntimePresence,
+} from '@kilocode/session-ingest-contracts';
 
 // Use z.string() for session IDs (not the strict sessionIdSchema from ws-protocol)
 // because the CLI's remote-protocol.ts uses z.string() — the strict ses_ format
@@ -6,12 +10,33 @@ import { z } from 'zod';
 
 // -- CLI → DO (CLIOutbound) ---------------------------------------------------
 
+/**
+ * Optional runtime presence a CLI may attach to a heartbeat. The DO rejects
+ * presence whose `connectionId` does not match the authenticated socket
+ * attachment and rejects a presence whose `runtimeId` differs from one already
+ * recorded on a live socket (no in-place runtime ID mutation). The shape is
+ * reused from the cross-service contract so mobile and CLI agree on the
+ * fields, and the relay can re-emit it without re-parsing.
+ */
+const heartbeatRuntimePresenceSchema = localRuntimePresenceSchema;
+
+export function parseCliRuntimePresence(value: unknown): LocalRuntimePresence {
+  return heartbeatRuntimePresenceSchema.parse(value);
+}
+
 export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('heartbeat'),
     // Absent on CLI builds older than the protocolVersion field itself — treat
     // a missing value as a legacy CLI with no negotiated wire protocol.
     protocolVersion: z.string().optional(),
+    // Optional monotonic sequence so the relay can echo it back inside the
+    // heartbeat ACK. Legacy CLIs omit it; the relay still sends a bare
+    // heartbeat_ack in that case.
+    sequence: z.number().int().nonnegative().optional(),
+    // Optional first-class runtime presence. A zero-session heartbeat still
+    // advertises the runtime, so mobile can show an idle local runtime.
+    runtime: heartbeatRuntimePresenceSchema.optional(),
     sessions: z.array(
       z.object({
         id: z.string(),
@@ -63,6 +88,9 @@ export const CLIInboundMessageSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('heartbeat_ack'),
+    // Optional monotonic sequence echoed from the inbound heartbeat. Legacy
+    // CLIs (no sequence on the wire) still receive a bare ack.
+    sequence: z.number().int().nonnegative().optional(),
   }),
 ]);
 

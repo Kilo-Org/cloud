@@ -41,6 +41,7 @@ import { modelsRouter } from '@/routers/models-router';
 import { codingPlansRouter } from '@/routers/coding-plans-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
+import { localRuntimeControlRouter } from '@/routers/local-runtime-control-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
 import { costInsightsRouter } from '@/routers/cost-insights-router';
@@ -88,6 +89,7 @@ export const rootRouter = createTRPCRouter({
   codingPlans: codingPlansRouter,
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
+  localRuntimeControl: localRuntimeControlRouter,
   usageAnalytics: usageAnalyticsRouter,
   mcpGateway: mcpGatewayRouter,
   mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,

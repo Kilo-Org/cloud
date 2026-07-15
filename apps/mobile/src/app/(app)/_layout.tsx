@@ -26,6 +26,8 @@ export default function AppLayout() {
             >
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
+              <Stack.Screen name="agent-chat/new/cloud" options={{ headerShown: false }} />
+              <Stack.Screen name="agent-chat/new/local" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/[session-id]" />
               <Stack.Screen
                 name="agent-chat/model-picker"

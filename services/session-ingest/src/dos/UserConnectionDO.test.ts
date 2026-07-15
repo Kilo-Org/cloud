@@ -215,12 +215,16 @@ function sendHeartbeat(
     status: string;
     title: string;
   }>,
-  protocolVersion?: string
+  protocolVersion?: string,
+  runtime?: Record<string, unknown>,
+  sequence?: number
 ) {
   const msg = JSON.stringify({
     type: 'heartbeat',
     sessions,
     ...(protocolVersion ? { protocolVersion } : {}),
+    ...(runtime ? { runtime } : {}),
+    ...(sequence !== undefined ? { sequence } : {}),
   });
   doInstance.webSocketMessage(cliWs as never, msg);
 }
@@ -2272,6 +2276,347 @@ describe('UserConnectionDO', () => {
       );
 
       expect(server.deserializeAttachment()).toMatchObject({ role: 'cli', kiloUserId: 'usr_1' });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Local runtime presence (first-class, independent of sessions)
+  // -------------------------------------------------------------------------
+
+  describe('local runtime presence', () => {
+    const validRuntime = {
+      runtimeId: '8db3de9a-350f-4fad-a539-8e0da3bbcf5e',
+      connectionId: 'cli-1',
+      protocolVersion: 1,
+      cliVersion: '7.4.7',
+      displayName: 'Alice Mac',
+      projectName: 'customer-repo',
+      capabilities: ['catalog.v1', 'create-and-run.v1'],
+    };
+    const otherRuntime = {
+      ...validRuntime,
+      runtimeId: 'b14c2a7d-4e2d-4f1a-9c8d-7e8f1b2c3d4e',
+      connectionId: 'cli-2',
+    };
+    const capabilityMissingRuntime = {
+      ...validRuntime,
+      runtimeId: '0c0a1b2c-3d4e-4f60-8a8b-9c0d1e2f3a4b',
+      connectionId: 'cli-3',
+      capabilities: ['catalog.v1'],
+    };
+
+    it('returns an empty list when no runtimes are present', () => {
+      const { doInstance } = setup();
+      expect(doInstance.getRuntimePresence()).toEqual([]);
+    });
+
+    it('ignores a legacy heartbeat that omits the runtime field', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      expect(doInstance.getRuntimePresence()).toEqual([]);
+    });
+
+    it('registers a zero-session heartbeat as runtime presence', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      // Public RPC returns the safe contract shape (no internal heartbeat
+      // timestamp, no paths).
+      expect(doInstance.getRuntimePresence()).toEqual([validRuntime]);
+    });
+
+    it('keeps a runtime registered even when it has zero sessions', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      const runtimes = doInstance.getRuntimePresence();
+      expect(runtimes).toHaveLength(1);
+      // No duplicate connected/updated events on consecutive identical heartbeats.
+      const connectedMsgs = allSent(webWs).filter(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtime.connected'
+      );
+      expect(connectedMsgs).toHaveLength(0);
+    });
+
+    it('rejects a heartbeat whose runtime.connectionId differs from the socket attachment', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      sendHeartbeat(doInstance, cliWs, [], undefined, {
+        ...validRuntime,
+        connectionId: 'cli-other',
+      });
+
+      expect(doInstance.getRuntimePresence()).toEqual([]);
+      // The connectionId is opaque routing metadata; the warn may include it,
+      // but must not include the prompt/secret content.
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(validRuntime.displayName);
+    });
+
+    it('rejects a heartbeat that mutates the runtimeId of a live socket', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      expect(doInstance.getRuntimePresence()).toHaveLength(1);
+
+      sendHeartbeat(doInstance, cliWs, [], undefined, {
+        ...validRuntime,
+        runtimeId: otherRuntime.runtimeId,
+      });
+
+      // Original runtime is preserved; the mutated request is rejected.
+      expect(doInstance.getRuntimePresence()).toEqual([validRuntime]);
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it('tracks multiple runtimes independently and exposes them all', () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      const cli3 = addCliSocket(mockCtx, 'cli-3');
+
+      sendHeartbeat(doInstance, cli1, [], undefined, validRuntime);
+      sendHeartbeat(doInstance, cli2, [], undefined, otherRuntime);
+      sendHeartbeat(doInstance, cli3, [], undefined, capabilityMissingRuntime);
+
+      const runtimes = doInstance.getRuntimePresence();
+      expect(runtimes).toHaveLength(3);
+      expect(runtimes.map(r => r.runtimeId).sort()).toEqual(
+        [validRuntime.runtimeId, otherRuntime.runtimeId, capabilityMissingRuntime.runtimeId].sort()
+      );
+    });
+
+    it('emits runtime.connected on first presence and runtime.updated on metadata change', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      webWs.send.mockClear();
+
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      const connected = allSent(webWs).find(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtime.connected'
+      );
+      expect(connected).toEqual({
+        type: 'system',
+        event: 'runtime.connected',
+        data: { runtime: validRuntime },
+      });
+
+      webWs.send.mockClear();
+      const updatedRuntime = { ...validRuntime, displayName: 'Alice Studio' };
+      sendHeartbeat(doInstance, cliWs, [], undefined, updatedRuntime);
+
+      const updated = allSent(webWs).find(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtime.updated'
+      );
+      expect(updated).toEqual({
+        type: 'system',
+        event: 'runtime.updated',
+        data: { runtime: updatedRuntime },
+      });
+    });
+
+    it('sends a runtimes.list system event when a viewer connects', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+
+      const webWs = connectWebSocket(doInstance, 'viewer-1');
+      const listMsg = allSent(webWs).find(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtimes.list'
+      ) as { type: string; event: string; data: { runtimes: unknown[] } };
+      expect(listMsg).toMatchObject({ type: 'system', event: 'runtimes.list' });
+      expect(listMsg.data.runtimes).toEqual([validRuntime]);
+    });
+
+    it('emits an empty runtimes.list on viewer connect when no runtimes exist', () => {
+      const { doInstance } = setup();
+      const webWs = connectWebSocket(doInstance, 'viewer-1');
+      const listMsg = allSent(webWs).find(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtimes.list'
+      );
+      expect(listMsg).toEqual({ type: 'system', event: 'runtimes.list', data: { runtimes: [] } });
+    });
+
+    it('echoes the optional heartbeat sequence on the ACK', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime, 11);
+      const acks = allSent(cliWs).filter(
+        (m: Record<string, unknown>) => m.type === 'heartbeat_ack'
+      );
+      expect(acks).toContainEqual({ type: 'heartbeat_ack', sequence: 11 });
+    });
+
+    it('sends a bare heartbeat_ack for legacy CLIs that omit the sequence', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      const acks = allSent(cliWs).filter(
+        (m: Record<string, unknown>) => m.type === 'heartbeat_ack'
+      );
+      expect(acks).toContainEqual({ type: 'heartbeat_ack' });
+    });
+
+    it('persists runtime metadata in the WebSocket attachment for hibernation', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      const att = cliWs.deserializeAttachment() as Record<string, unknown>;
+      expect(att).toMatchObject({ role: 'cli' });
+      expect(att.runtime).toMatchObject({ runtimeId: validRuntime.runtimeId });
+    });
+
+    it('reconstructs the runtime registry from attachments after hibernation', () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, cli1, [], undefined, validRuntime);
+      sendHeartbeat(doInstance, cli2, [], undefined, otherRuntime);
+
+      // Simulate hibernation: a brand new DO instance reads state from
+      // attachments only.
+      const ctx2 = createMockCtx();
+      for (const ws of mockCtx.sockets) {
+        ctx2.addSocket(ws);
+      }
+      const fresh = new UserConnectionDO(ctx2.build() as never, {} as never);
+      const reconstructed = fresh.getRuntimePresence();
+      const ids = reconstructed.map(r => r.runtimeId).sort();
+      expect(ids).toEqual([validRuntime.runtimeId, otherRuntime.runtimeId].sort());
+    });
+
+    it('emits runtime.disconnected on socket close and removes the runtime', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      webWs.send.mockClear();
+
+      mockCtx.removeSocket(cliWs);
+      disconnectCli(doInstance, cliWs);
+
+      const disc = allSent(webWs).find(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtime.disconnected'
+      );
+      expect(disc).toEqual({
+        type: 'system',
+        event: 'runtime.disconnected',
+        data: {
+          runtimeId: validRuntime.runtimeId,
+          connectionId: 'cli-1',
+        },
+      });
+      expect(doInstance.getRuntimePresence()).toEqual([]);
+    });
+
+    it('evicts stale runtimes on alarm and emits runtime.disconnected exactly once', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      webWs.send.mockClear();
+
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+      await doInstance.alarm();
+      // The alarm calls ws.close on the stale socket; the runtime disconnect
+      // is broadcast when the close callback fires.
+      expect(cliWs.close).toHaveBeenCalledWith(4408, 'heartbeat timeout');
+      mockCtx.removeSocket(cliWs);
+      disconnectCli(doInstance, cliWs);
+
+      // The viewer sees exactly one runtime.disconnected with the exact fence.
+      const discMsgs = allSent(webWs).filter(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtime.disconnected'
+      );
+      expect(discMsgs).toEqual([
+        {
+          type: 'system',
+          event: 'runtime.disconnected',
+          data: { runtimeId: validRuntime.runtimeId, connectionId: 'cli-1' },
+        },
+      ]);
+      expect(doInstance.getRuntimePresence()).toEqual([]);
+    });
+
+    it('does not remove the current runtime when a replaced stale socket closes', () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = connectCliSocket(doInstance, 'cli-1');
+      sendHeartbeat(doInstance, firstCli, [], undefined, validRuntime);
+
+      // Replacement socket connects with the same connectionId.
+      const secondCli = connectCliSocket(doInstance, 'cli-1');
+      sendHeartbeat(doInstance, secondCli, [], undefined, validRuntime);
+
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      webWs.send.mockClear();
+
+      // The first (stale) socket's close event fires after the replacement
+      // is in place. This must not drop the runtime.
+      disconnectCli(doInstance, firstCli);
+
+      const discMsgs = allSent(webWs).filter(
+        (m: Record<string, unknown>) => m.type === 'system' && m.event === 'runtime.disconnected'
+      );
+      expect(discMsgs).toEqual([]);
+      expect(doInstance.getRuntimePresence()).toHaveLength(1);
+    });
+
+    it('rejects a heartbeat whose runtime fails strict validation (no presence)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      // Unknown capability string.
+      sendHeartbeat(doInstance, cliWs, [], undefined, {
+        ...validRuntime,
+        capabilities: ['unknown.v9'],
+      });
+      expect(doInstance.getRuntimePresence()).toEqual([]);
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it('keeps existing sessions behavior unchanged when runtime presence is added', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')], '1', validRuntime);
+
+      // Session-list still surfaces sessions from the live socket.
+      const sessions = doInstance.getActiveSessions();
+      expect(sessions).toEqual([
+        { id: 'ses_main', status: 'busy', title: 'Test', connectionId: 'cli-1', protocolVersion: '1' },
+      ]);
+      // And the runtime list is independent.
+      expect(doInstance.getRuntimePresence()).toHaveLength(1);
+    });
+
+    it('does not register the same runtimeId twice across two different sockets', () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      // Same runtimeId, two different sockets (mutating attempt from a second
+      // CLI that reuses the first runtime's id). The mutation rejection path
+      // already covers the same-socket case; here we ensure cross-socket
+      // collisions also fail closed.
+      sendHeartbeat(doInstance, cli1, [], undefined, validRuntime);
+      sendHeartbeat(doInstance, cli2, [], undefined, validRuntime);
+
+      expect(doInstance.getRuntimePresence()).toHaveLength(1);
+    });
+
+    it('keeps a zero-session runtime in the active RPC list', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      expect(doInstance.getRuntimePresence()).toHaveLength(1);
     });
   });
 });

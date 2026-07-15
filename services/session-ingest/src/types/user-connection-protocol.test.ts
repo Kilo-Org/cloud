@@ -5,9 +5,20 @@ import {
   WebOutboundMessageSchema,
   WebInboundMessageSchema,
   SessionEventPayloadSchema,
+  parseCliRuntimePresence,
 } from './user-connection-protocol';
+import { localRuntimeCapabilitySchema } from '@kilocode/session-ingest-contracts';
 
 const validSessionId = 'ses_12345678901234567890123456';
+const validRuntime = {
+  runtimeId: '8db3de9a-350f-4fad-a539-8e0da3bbcf5e',
+  connectionId: 'cli-conn-1',
+  protocolVersion: 1,
+  cliVersion: '7.4.7',
+  displayName: 'Alice Mac',
+  projectName: 'customer-repo',
+  capabilities: ['catalog.v1', 'create-and-run.v1'],
+};
 
 describe('CLIOutboundMessageSchema', () => {
   it('parses valid heartbeat', () => {
@@ -433,5 +444,171 @@ describe('extra fields', () => {
     };
     const result = WebOutboundMessageSchema.parse(msg);
     expect(result).not.toHaveProperty('extra');
+  });
+});
+
+describe('heartbeat runtime presence', () => {
+  it('parses a legacy heartbeat without runtime field as no-presence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: validSessionId, status: 'busy', title: 'Fix bug' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.runtime).toBeUndefined();
+    }
+  });
+
+  it('parses a heartbeat with a zero-session runtime', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [],
+      runtime: validRuntime,
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.runtime).toEqual(validRuntime);
+    }
+  });
+
+  it('parses a heartbeat with a non-empty sessions array and runtime together', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: validSessionId, status: 'busy', title: 'Fix bug' }],
+      runtime: validRuntime,
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an optional integer heartbeat sequence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [],
+      runtime: validRuntime,
+      sequence: 7,
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sequence).toBe(7);
+    }
+  });
+
+  it('rejects a non-integer heartbeat sequence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [],
+      runtime: validRuntime,
+      sequence: 1.5,
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a negative heartbeat sequence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [],
+      runtime: validRuntime,
+      sequence: -1,
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('heartbeat_ack sequence', () => {
+  it('parses heartbeat_ack without a sequence (legacy)', () => {
+    const msg = { type: 'heartbeat_ack' };
+    const result = CLIInboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+  });
+
+  it('parses heartbeat_ack with an integer sequence', () => {
+    const msg = { type: 'heartbeat_ack', sequence: 7 };
+    const result = CLIInboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat_ack') {
+      expect(result.data.sequence).toBe(7);
+    }
+  });
+
+  it('rejects heartbeat_ack with a non-integer sequence', () => {
+    const msg = { type: 'heartbeat_ack', sequence: 'seven' };
+    const result = CLIInboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('parseCliRuntimePresence', () => {
+  it('parses a valid runtime presence into the canonical contract shape', () => {
+    const result = parseCliRuntimePresence(validRuntime);
+    expect(result).toEqual({
+      runtimeId: '8db3de9a-350f-4fad-a539-8e0da3bbcf5e',
+      connectionId: 'cli-conn-1',
+      protocolVersion: 1,
+      cliVersion: '7.4.7',
+      displayName: 'Alice Mac',
+      projectName: 'customer-repo',
+      capabilities: ['catalog.v1', 'create-and-run.v1'],
+    });
+  });
+
+  it('rejects an unknown capability string', () => {
+    expect(() =>
+      parseCliRuntimePresence({
+        ...validRuntime,
+        capabilities: ['unknown.v9'],
+      })
+    ).toThrow();
+  });
+
+  it('rejects a duplicate capability list', () => {
+    expect(() =>
+      parseCliRuntimePresence({
+        ...validRuntime,
+        capabilities: ['catalog.v1', 'catalog.v1'],
+      })
+    ).toThrow();
+  });
+
+  it('rejects a runtime that exceeds the capability cap of 2', () => {
+    const thirdCap = localRuntimeCapabilitySchema.options[0];
+    expect(() =>
+      parseCliRuntimePresence({
+        ...validRuntime,
+        capabilities: ['catalog.v1', 'create-and-run.v1', thirdCap],
+      })
+    ).toThrow();
+  });
+
+  it('rejects extra fields on strict presence', () => {
+    expect(() =>
+      parseCliRuntimePresence({
+        ...validRuntime,
+        directory: '/Users/alice/private',
+      } as unknown as typeof validRuntime)
+    ).toThrow();
+  });
+
+  it('rejects a missing uuid runtimeId', () => {
+    expect(() =>
+      parseCliRuntimePresence({
+        ...validRuntime,
+        runtimeId: 'not-a-uuid',
+      })
+    ).toThrow();
+  });
+
+  it('rejects an overlong cliVersion', () => {
+    expect(() =>
+      parseCliRuntimePresence({
+        ...validRuntime,
+        cliVersion: 'x'.repeat(33),
+      })
+    ).toThrow();
   });
 });

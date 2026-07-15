@@ -4,13 +4,14 @@ import type { Env } from '../env';
 import { getSessionIngestDO } from './SessionIngestDO';
 import {
   CLIOutboundMessageSchema,
+  parseCliRuntimePresence,
   type CLIInboundMessage,
   type SessionEventPayload,
   SessionEventPayloadSchema,
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
-
+import type { LocalRuntimePresence } from '@kilocode/session-ingest-contracts';
 type HeartbeatSession = {
   id: string;
   status: string;
@@ -19,6 +20,8 @@ type HeartbeatSession = {
   gitBranch?: string;
   parentSessionId?: string;
 };
+
+type RuntimeMetadata = LocalRuntimePresence & { lastHeartbeatAt: number };
 
 type WSAttachment =
   | {
@@ -32,6 +35,9 @@ type WSAttachment =
       // Set from the authenticated /user/cli route; undefined on sockets
       // accepted before this field existed. Needed for the session-ready push.
       kiloUserId?: string;
+      // Safe runtime metadata persisted across hibernation. Never includes
+      // the absolute launch directory; only sanitized display labels.
+      runtime?: RuntimeMetadata;
     }
   | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
 
@@ -76,6 +82,13 @@ export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
   private static readonly PENDING_COMMAND_TTL_MS = 35_000;
   private static readonly MAX_PENDING_COMMANDS = 128;
+  /**
+   * Hard cap on first-class runtimes. Matches the bounded contract used by
+   * the internal runtime-control HTTP route and the local-runtime schema
+   * (`localRuntimeListResponseSchema`). One DO is one Kilo user, so 32 is
+   * far above the realistic fan-in.
+   */
+  private static readonly MAX_RUNTIMES = 32;
 
   // Which CLI connection owns each session
   private sessionOwners = new Map<string, string>();
@@ -101,6 +114,10 @@ export class UserConnectionDO extends DurableObject<Env> {
   >();
   // Last heartbeat timestamp per CLI connectionId (for staleness eviction)
   private lastHeartbeatAt = new Map<string, number>();
+  // First-class runtime presence indexed by runtimeId. Lives independently of
+  // session ownership — a zero-session heartbeat still creates an entry, and
+  // CLI sockets without a runtime field never populate this map.
+  private runtimes = new Map<string, RuntimeMetadata>();
 
   private stateReconstructed = false;
 
@@ -110,6 +127,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     let cliCount = 0;
     let webCount = 0;
     let sessionCount = 0;
+    let runtimeCount = 0;
 
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = ws.deserializeAttachment() as WSAttachment | null;
@@ -117,7 +135,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       if (attachment.role === 'cli') {
         cliCount++;
-        const { connectionId, sessions, protocolVersion } = attachment;
+        const { connectionId, sessions, protocolVersion, runtime } = attachment;
         this.connectionSessions.set(connectionId, sessions);
         this.connectionProtocolVersion.set(connectionId, protocolVersion);
         sessionCount += sessions.length;
@@ -125,6 +143,10 @@ export class UserConnectionDO extends DurableObject<Env> {
           this.sessionOwners.set(session.id, connectionId);
         }
         this.lastHeartbeatAt.set(connectionId, Date.now());
+        if (runtime) {
+          this.runtimes.set(runtime.runtimeId, runtime);
+          runtimeCount++;
+        }
       } else {
         if (attachment.replaced) continue;
         webCount++;
@@ -143,6 +165,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       cliSockets: cliCount,
       webSockets: webCount,
       sessions: sessionCount,
+      runtimes: runtimeCount,
       subscriptions: this.webSubscriptions.size,
     });
 
@@ -197,17 +220,23 @@ export class UserConnectionDO extends DurableObject<Env> {
       server.serializeAttachment(attachment);
 
       const sessions = this.aggregateSessions();
+      const runtimes = this.getRuntimePresence();
 
       console.log('Web socket connected', {
         connectionId,
         totalWebSockets: this.ctx.getWebSockets('web').length,
         activeSessions: sessions.length,
+        activeRuntimes: runtimes.length,
       });
-
       this.sendToWeb(server, {
         type: 'system',
         event: 'sessions.list',
         data: { sessions },
+      });
+      this.sendToWeb(server, {
+        type: 'system',
+        event: 'runtimes.list',
+        data: { runtimes: this.getRuntimePresence() },
       });
     }
 
@@ -290,7 +319,8 @@ export class UserConnectionDO extends DurableObject<Env> {
         }
       }
       // handleCliDisconnect will clean up connectionSessions/sessionOwners/lastHeartbeatAt
-      // via the webSocketClose callback
+      // and emit runtime.disconnected for the owned runtime (if any) via the
+      // webSocketClose callback.
     }
 
     this.scheduleNextAlarm(now);
@@ -321,7 +351,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'heartbeat':
-        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion);
+        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion, msg.runtime, msg.sequence);
         break;
       case 'event':
         this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
@@ -336,13 +366,61 @@ export class UserConnectionDO extends DurableObject<Env> {
     ws: WebSocket,
     attachment: WSAttachment & { role: 'cli' },
     sessions: HeartbeatSession[],
-    protocolVersion: string | undefined
+    protocolVersion: string | undefined,
+    rawRuntime: unknown,
+    sequence: number | undefined
   ): void {
     const { connectionId } = attachment;
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
     this.scheduleNextAlarm(now);
+
+    // Resolve the runtime presence (if any) BEFORE applying session updates
+    // so a strict-failure or fence mismatch can fail closed without touching
+    // session state. The parsed value, when present, is the new authoritative
+    // metadata for this CLI socket.
+    let nextRuntime: RuntimeMetadata | undefined;
+    if (rawRuntime !== undefined) {
+      let parsedRuntime;
+      try {
+        parsedRuntime = parseCliRuntimePresence(rawRuntime);
+      } catch (error) {
+        console.warn('Runtime presence rejected by strict parse', {
+          connectionId,
+          issues: error instanceof Error ? error.message : 'unknown',
+        });
+        return;
+      }
+      if (parsedRuntime.connectionId !== connectionId) {
+        console.warn('Runtime presence rejected: connectionId mismatch', {
+          connectionId,
+        });
+        return;
+      }
+      // Mutation rejection: a live socket may not change its runtimeId.
+      // If the attachment already records a runtime for this socket and the
+      // new heartbeat carries a different runtimeId, fail closed.
+      if (attachment.runtime && attachment.runtime.runtimeId !== parsedRuntime.runtimeId) {
+        console.warn('Runtime presence rejected: runtimeId mutation on live socket', {
+          connectionId,
+          previousRuntimeId: attachment.runtime.runtimeId,
+          nextRuntimeId: parsedRuntime.runtimeId,
+        });
+        return;
+      }
+      // Cross-socket collision: a different socket already owns this runtimeId.
+      const existing = this.runtimes.get(parsedRuntime.runtimeId);
+      if (existing && existing.connectionId !== connectionId) {
+        console.warn('Runtime presence rejected: runtimeId already owned by another socket', {
+          connectionId,
+          runtimeId: parsedRuntime.runtimeId,
+          ownerConnectionId: existing.connectionId,
+        });
+        return;
+      }
+      nextRuntime = { ...parsedRuntime, lastHeartbeatAt: now };
+    }
 
     // Remove sessions this connection previously owned but no longer reports
     const previousSessions = this.connectionSessions.get(connectionId) ?? [];
@@ -378,6 +456,41 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
+    // Update runtime registry and emit exactly one event. The event fires
+    // regardless of whether sessions are present.
+    let runtimeEvent: WebInboundMessage | undefined;
+    if (nextRuntime) {
+      const previous = this.runtimes.get(nextRuntime.runtimeId);
+      if (!previous) {
+        if (this.runtimes.size >= UserConnectionDO.MAX_RUNTIMES) {
+          console.warn('Runtime presence rejected: registry at capacity', {
+            connectionId,
+            max: UserConnectionDO.MAX_RUNTIMES,
+          });
+          // Drop the proposed presence — do not register and do not emit. The
+          // session updates above still apply, so the CLI keeps working.
+          nextRuntime = undefined;
+        } else {
+          this.runtimes.set(nextRuntime.runtimeId, nextRuntime);
+          runtimeEvent = {
+            type: 'system',
+            event: 'runtime.connected',
+            data: { runtime: this.publicRuntime(nextRuntime) },
+          };
+        }
+      } else if (runtimeMetadataChanged(previous, nextRuntime)) {
+        this.runtimes.set(nextRuntime.runtimeId, nextRuntime);
+        runtimeEvent = {
+          type: 'system',
+          event: 'runtime.updated',
+          data: { runtime: this.publicRuntime(nextRuntime) },
+        };
+      } else {
+        // Same metadata, same runtimeId: refresh heartbeat timestamp only.
+        this.runtimes.set(nextRuntime.runtimeId, nextRuntime);
+      }
+    }
+
     // Persist to attachment for hibernation recovery
     const updatedAttachment: WSAttachment = {
       role: 'cli',
@@ -385,6 +498,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       sessions,
       protocolVersion,
       kiloUserId: attachment.kiloUserId,
+      ...(nextRuntime ? { runtime: nextRuntime } : {}),
     };
     ws.serializeAttachment(updatedAttachment);
 
@@ -412,7 +526,20 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
-    this.sendToCli(ws, { type: 'heartbeat_ack' });
+    if (runtimeEvent) {
+      this.broadcastToWeb(runtimeEvent);
+    }
+
+    this.sendToCli(ws, sequence !== undefined ? { type: 'heartbeat_ack', sequence } : { type: 'heartbeat_ack' });
+  }
+
+  /**
+   * Strip the internal `lastHeartbeatAt` envelope before exposing a runtime
+   * outside the DO. The contract intentionally has no path.
+   */
+  private publicRuntime(runtime: RuntimeMetadata): LocalRuntimePresence {
+    const { lastHeartbeatAt: _drop, ...publicShape } = runtime;
+    return publicShape;
   }
 
   /**
@@ -719,9 +846,21 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.connectionProtocolVersion.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
 
+    // Remove the runtime that was owned by this exact connection. A
+    // connection's runtime is whichever entry points at this connectionId —
+    // runtimes are not shared across CLIs.
+    const evictedRuntimes: LocalRuntimePresence[] = [];
+    for (const [runtimeId, runtime] of this.runtimes) {
+      if (runtime.connectionId === connectionId) {
+        this.runtimes.delete(runtimeId);
+        evictedRuntimes.push(this.publicRuntime(runtime));
+      }
+    }
+
     console.log('CLI socket disconnected', {
       connectionId,
       droppedSessions: ownedSessions.size,
+      droppedRuntimes: evictedRuntimes.length,
       remainingCliSockets: this.ctx.getWebSockets('cli').length,
     });
 
@@ -732,6 +871,14 @@ export class UserConnectionDO extends DurableObject<Env> {
       event: 'cli.disconnected',
       data: { connectionId },
     });
+
+    for (const runtime of evictedRuntimes) {
+      this.broadcastToWeb({
+        type: 'system',
+        event: 'runtime.disconnected',
+        data: { runtimeId: runtime.runtimeId, connectionId },
+      });
+    }
   }
 
   private handleWebDisconnect(ws: WebSocket): void {
@@ -781,6 +928,17 @@ export class UserConnectionDO extends DurableObject<Env> {
   > {
     this.ensureState();
     return this.aggregateSessions();
+  }
+
+  /**
+   * Public, read-only list of every first-class runtime the DO currently
+   * tracks. Runtimes with empty session arrays and runtimes that lost a
+   * required capability (e.g. CLI upgrade not yet shipped) are both
+   * included so mobile can render a precise recovery surface.
+   */
+  getRuntimePresence(): LocalRuntimePresence[] {
+    this.ensureState();
+    return [...this.runtimes.values()].map(r => this.publicRuntime(r));
   }
 
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
@@ -983,6 +1141,24 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
     return result;
   }
+}
+
+function runtimeMetadataChanged(previous: RuntimeMetadata, next: RuntimeMetadata): boolean {
+  return (
+    previous.cliVersion !== next.cliVersion ||
+    previous.displayName !== next.displayName ||
+    previous.projectName !== next.projectName ||
+    !capabilitiesEqual(previous.capabilities, next.capabilities) ||
+    previous.protocolVersion !== next.protocolVersion
+  );
+}
+
+function capabilitiesEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 export function getUserConnectionDO(env: Env, params: { kiloUserId: string }) {

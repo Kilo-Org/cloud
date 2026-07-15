@@ -179,13 +179,11 @@ export async function GET(request: NextRequest) {
   // but TypeScript treats them as distinct - hence the cast.
   const webStream = Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
 
-  const sanitize = (value: string) => value.replaceAll(/[^a-zA-Z0-9._-]/g, '-');
-  const safeUserId = userId ? `_${sanitize(userId)}` : '';
-  const safeStartDate = startDate ? `_${startDate}` : '';
-  const safeEndDate = endDate ? `_${endDate}` : '';
+  const sanitize = (s: string) => s.replaceAll('/', '-').replaceAll(':', '-');
+  const safeUserId = userId ? sanitize(userId) : 'all-users';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
-  const filename = `api-request-log${safeUserId}${safeStartDate}${safeEndDate}${safeModel}${safeSessionId}.zip`;
+  const filename = `api-request-log_${safeUserId}_${startDate ?? 'any-start'}_${endDate ?? 'any-end'}${safeModel}${safeSessionId}.zip`;
 
   return new Response(webStream, {
     headers: {

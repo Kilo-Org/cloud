@@ -33,6 +33,10 @@ import {
 } from '@/components/agents/session-working-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import {
+  resolveLoadedCliSessionPresenceId,
+  useCliSessionPresence,
+} from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
@@ -136,6 +140,12 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  const presenceSessionId = resolveLoadedCliSessionPresenceId(
+    sessionId,
+    fetchedData?.kiloSessionId
+  );
+  useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);

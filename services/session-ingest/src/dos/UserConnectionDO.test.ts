@@ -3035,4 +3035,487 @@ describe('UserConnectionDO', () => {
       expect(dumped).not.toContain(sentinel);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // createAndRunLocalSession RPC (Slice 3B)
+  // -------------------------------------------------------------------------
+
+  describe('createAndRunLocalSession RPC', () => {
+    const runtime = {
+      runtimeId: '8db3de9a-350f-4fad-a539-8e0da3bbcf5e',
+      connectionId: 'cli-1',
+      protocolVersion: 1,
+      cliVersion: '7.4.7',
+      displayName: 'Alice Mac',
+      projectName: 'customer-repo',
+      capabilities: ['catalog.v1', 'create-and-run.v1'],
+    };
+    const runtimesMissingCreate = {
+      ...runtime,
+      runtimeId: '1c0a1b2c-3d4e-4f60-8a8b-9c0d1e2f3a4b',
+      connectionId: 'cli-3',
+      capabilities: ['catalog.v1'],
+    };
+    const fence = {
+      runtimeId: runtime.runtimeId,
+      connectionId: 'cli-1',
+    };
+    const validRequest = {
+      protocolVersion: 1,
+      requestId: '0c0a1b2c-3d4e-4f60-8a8b-9c0d1e2f3a4b',
+      prompt: 'hello',
+      model: { providerID: 'kilo', modelID: 'kilo/auto' },
+      agent: 'build',
+    } as const;
+    const promptStartedSessionId = 'ses_a1b2c3d4e5f67890123456789a'; // 30 chars: 'ses_' + 26
+    const promptPartialSessionId = 'ses_b2c3d4e5f67890123456789cde'; // 30 chars: 'ses_' + 26
+    const successResult = {
+      protocolVersion: 1,
+      sessionId: promptStartedSessionId,
+      promptStarted: true,
+    } as const;
+    const promptFailedResult = {
+      protocolVersion: 1,
+      sessionId: promptPartialSessionId,
+      promptStarted: false,
+      error: {
+        code: 'PROMPT_START_FAILED',
+        message: 'The session was created, but the first prompt did not start.',
+      },
+    } as const;
+
+    it('resolves with the strict success result for an exact fence and routes the strict request to the exact socket', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const sent = parseSent(cliWs);
+      expect(sent).toMatchObject({
+        type: 'command',
+        command: 'create_and_run',
+        data: validRequest,
+      });
+      const correlationId = (sent as { id: string }).id;
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: successResult,
+      });
+
+      await expect(promise).resolves.toEqual(successResult);
+    });
+
+    it('forwards the request body exactly with the strict v1 fields', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const request = {
+        ...validRequest,
+        variant: 'thinking',
+        requestId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      };
+      const promise = doInstance.createAndRunLocalSession(fence, request);
+      const sent = parseSent(cliWs);
+      expect(sent).toMatchObject({ type: 'command', command: 'create_and_run', data: request });
+      const correlationId = (sent as { id: string }).id;
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: successResult });
+      await promise;
+    });
+
+    it('resolves with the terminal partial when the CLI returns promptStarted:false', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: promptFailedResult });
+
+      await expect(promise).resolves.toEqual(promptFailedResult);
+    });
+
+    it('does not fall back to the first available CLI when the exact connectionId is missing', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, cli1, [], undefined, runtime);
+      sendHeartbeat(
+        doInstance,
+        cli2,
+        [],
+        undefined,
+        { ...runtime, runtimeId: 'aaaaaaaa-1111-4111-8111-111111111111', connectionId: 'cli-2' }
+      );
+      cli1.send.mockClear();
+      cli2.send.mockClear();
+
+      await expect(
+        doInstance.createAndRunLocalSession(
+          { runtimeId: runtime.runtimeId, connectionId: 'cli-does-not-exist' },
+          validRequest
+        )
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+
+      expect(cli1.send).not.toHaveBeenCalled();
+      expect(cli2.send).not.toHaveBeenCalled();
+    });
+
+    it('returns RUNTIME_NOT_CONNECTED when the runtime is not registered', async () => {
+      const { doInstance } = setup();
+
+      await expect(
+        doInstance.createAndRunLocalSession(
+          { runtimeId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', connectionId: 'cli-1' },
+          validRequest
+        )
+      ).rejects.toMatchObject({ code: 'RUNTIME_NOT_CONNECTED' });
+    });
+
+    it('returns RUNTIME_FENCE_MISMATCH when the connectionId does not match the live runtime', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+
+      await expect(
+        doInstance.createAndRunLocalSession(
+          { runtimeId: runtime.runtimeId, connectionId: 'cli-other' },
+          validRequest
+        )
+      ).rejects.toBeInstanceOf(LocalRuntimeCommandError);
+      await expect(
+        doInstance.createAndRunLocalSession(
+          { runtimeId: runtime.runtimeId, connectionId: 'cli-other' },
+          validRequest
+        )
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('returns RUNTIME_FENCE_MISMATCH when the runtime was replaced and a new connectionId now owns the runtime', async () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, firstCli, [], undefined, runtime);
+
+      mockCtx.removeSocket(firstCli);
+      disconnectCli(doInstance, firstCli);
+
+      const secondCli = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(
+        doInstance,
+        secondCli,
+        [],
+        undefined,
+        { ...runtime, connectionId: 'cli-2' }
+      );
+
+      await expect(
+        doInstance.createAndRunLocalSession(fence, validRequest)
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('rejects when the runtime does not advertise the create-and-run.v1 capability', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-3');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtimesMissingCreate);
+
+      await expect(
+        doInstance.createAndRunLocalSession(
+          {
+            runtimeId: runtimesMissingCreate.runtimeId,
+            connectionId: 'cli-3',
+          },
+          validRequest
+        )
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('rejects an invalid request body before any pending work is allocated', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      await expect(
+        doInstance.createAndRunLocalSession(fence, { ...validRequest, prompt: '' })
+      ).rejects.toMatchObject({ code: 'INVALID_RUNTIME_RESPONSE' });
+      expect(cliWs.send).not.toHaveBeenCalled();
+    });
+
+    it('rejects a generic viewer WebSocket command "create_and_run" with COMMAND_NOT_ALLOWED', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      sendCommand(doInstance, webWs, {
+        id: 'viewer-cmd',
+        command: 'create_and_run',
+        data: validRequest,
+      });
+
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'viewer-cmd',
+        error: {
+          source: 'relay',
+          code: 'COMMAND_NOT_ALLOWED',
+          message: 'Command not allowed',
+        },
+      });
+    });
+
+    it('maps a typed CLI INVALID_REQUEST error to INVALID_RUNTIME_RESPONSE', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: { code: 'INVALID_REQUEST', message: 'invalid create_and_run request' },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'INVALID_RUNTIME_RESPONSE' });
+    });
+
+    it('preserves a CLI CATALOG_CHANGED error verbatim as CATALOG_CHANGED', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: { code: 'CATALOG_CHANGED', message: 'model not found in runtime catalog' },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'CATALOG_CHANGED' });
+    });
+
+    it.each(['CREATE_FAILED', 'ANNOUNCE_FAILED', 'INTERNAL'])(
+      'maps a typed CLI %s error to RUNTIME_COMMAND_FAILED without surfacing the raw message',
+      async code => {
+        const { doInstance, mockCtx } = setup();
+        const cliWs = addCliSocket(mockCtx, 'cli-1');
+        sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+        cliWs.send.mockClear();
+
+        const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+        const correlationId = getCorrelationId(cliWs);
+
+        sendCliResponse(doInstance, cliWs, {
+          id: correlationId,
+          error: { code, message: 'super-secret-cli-leak-marker' },
+        });
+
+        await expect(promise).rejects.toMatchObject({ code: 'RUNTIME_COMMAND_FAILED' });
+        const dumped = JSON.stringify({ cause: await promise.catch(e => e) });
+        expect(dumped).not.toContain('super-secret-cli-leak-marker');
+      }
+    );
+
+    it('maps an "unknown command" CLI error to CLI_UPGRADE_REQUIRED', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: create_and_run',
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'CLI_UPGRADE_REQUIRED' });
+    });
+
+    it('returns INVALID_RUNTIME_RESPONSE when the CLI result fails strict validation', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        // Wrong discriminator literal — strict schema rejects it.
+        result: {
+          protocolVersion: 1,
+          sessionId: 'not-a-real-session-id',
+          promptStarted: true,
+        },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'INVALID_RUNTIME_RESPONSE' });
+    });
+
+    it('returns RESULT_TOO_LARGE when the create-and-run response exceeds the cap', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+
+      const oversized = 'x'.repeat(20 * 1024);
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { ...successResult, promptStarted: oversized as never },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
+    });
+
+    it('returns COMMAND_EXPIRED when the response does not arrive before the pending TTL elapses', async () => {
+      const now = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      await Promise.resolve();
+
+      vi.mocked(Date.now).mockReturnValue(now + 35_001);
+      await doInstance.alarm();
+
+      await expect(promise).rejects.toMatchObject({ code: 'COMMAND_EXPIRED' });
+    });
+
+    it('returns RUNTIME_FENCE_MISMATCH when the runtime disconnects before responding', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+
+      mockCtx.removeSocket(cliWs);
+      disconnectCli(doInstance, cliWs);
+
+      await expect(promise).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('ignores a late response from a non-target socket and does not settle the pending promise', async () => {
+      const { doInstance, mockCtx } = setup();
+      const targetCli = addCliSocket(mockCtx, 'cli-1');
+      const otherCli = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, targetCli, [], undefined, runtime);
+      sendHeartbeat(
+        doInstance,
+        otherCli,
+        [],
+        undefined,
+        {
+          ...runtime,
+          runtimeId: 'aaaaaaaa-1111-4111-8111-111111111111',
+          connectionId: 'cli-2',
+        }
+      );
+      targetCli.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(targetCli);
+
+      sendCliResponse(doInstance, otherCli, {
+        id: correlationId,
+        result: { ...successResult, sessionId: 'ses_other_user_id_placeholder0' },
+      });
+
+      const settled = await Promise.race([
+        promise.then(() => 'settled' as const).catch(() => 'settled' as const),
+        new Promise<'pending'>(resolve => setTimeout(() => resolve('pending'), 5)),
+      ]);
+      expect(settled).toBe('pending');
+
+      sendCliResponse(doInstance, targetCli, { id: correlationId, result: successResult });
+      await expect(promise).resolves.toEqual(successResult);
+    });
+
+    it('forwards the strict requestId to the CLI without modification', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const requestId = '11111111-2222-4333-8444-555555555555';
+      const request = { ...validRequest, requestId };
+      const promise = doInstance.createAndRunLocalSession(fence, request);
+      const sent = parseSent(cliWs);
+      expect((sent as { data: { requestId: string } }).data.requestId).toBe(requestId);
+      const correlationId = (sent as { id: string }).id;
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: successResult });
+      await promise;
+    });
+
+    it('never logs the raw prompt, raw CLI error, or raw result content', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const prompt = 'super-secret-prompt-must-not-be-logged';
+      const request = { ...validRequest, prompt };
+      const promise = doInstance.createAndRunLocalSession(fence, request);
+      const correlationId = getCorrelationId(cliWs);
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { ...successResult, sessionId: 'ses_log_placeholder_xxxxxxxxxx' },
+      });
+      await promise;
+
+      const dumped = JSON.stringify({
+        errors: errorSpy.mock.calls,
+        warns: warnSpy.mock.calls,
+      });
+      expect(dumped).not.toContain(prompt);
+      expect(dumped).not.toContain('ses_log_placeholder_xxxxxxxxxx');
+    });
+
+    it('never logs the raw CLI error envelope on a typed failure', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, runtime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.createAndRunLocalSession(fence, validRequest);
+      const correlationId = getCorrelationId(cliWs);
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: { code: 'INTERNAL', message: 'super-secret-cli-error-leak-marker' },
+      });
+      await expect(promise).rejects.toMatchObject({ code: 'RUNTIME_COMMAND_FAILED' });
+
+      const dumped = JSON.stringify({
+        errors: errorSpy.mock.calls,
+        warns: warnSpy.mock.calls,
+      });
+      expect(dumped).not.toContain('super-secret-cli-error-leak-marker');
+    });
+  });
 });

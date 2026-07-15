@@ -12,7 +12,11 @@ import {
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
 import {
+  createAndRunLocalSessionRequestSchema,
+  createAndRunLocalSessionResultSchema,
   localRuntimeCatalogSchema,
+  type CreateAndRunLocalSessionRequest,
+  type CreateAndRunLocalSessionResult,
   type LocalRuntimeCatalog,
   type LocalRuntimeControlErrorCode,
   type LocalRuntimeFence,
@@ -50,6 +54,14 @@ type WSAttachment =
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 
 /**
+ * Bounded size for a `create_and_run` CLI result. The discriminated union is
+ * tiny (sessionId + promptStarted + optional fixed message), so a few KiB is
+ * more than enough. The cap is intentionally separate from the catalog cap
+ * so one relay response class cannot exhaust the other.
+ */
+export const MAX_CREATE_AND_RUN_RESULT_BYTES = 16 * 1024;
+
+/**
  * Internal, typed failure raised by `UserConnectionDO.getRuntimeCatalog` (and
  * surfaced through the internal HTTP route). The relay never re-emits a raw
  * CLI error string — every failure collapses to a stable, mobile-branched
@@ -67,6 +79,7 @@ export class LocalRuntimeCommandError extends Error {
 }
 
 const GET_CATALOG_COMMAND = 'get_catalog';
+const CREATE_AND_RUN_COMMAND = 'create_and_run';
 const COMMAND_NOT_ALLOWED_VIEWER_ERROR = {
   source: 'relay' as const,
   code: 'COMMAND_NOT_ALLOWED' as const,
@@ -137,7 +150,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     {
       ws?: WebSocket;
       pending?: {
-        resolve: (value: LocalRuntimeCatalog) => void;
+        resolve: (value: LocalRuntimeCatalog | CreateAndRunLocalSessionResult) => void;
         reject: (reason: LocalRuntimeCommandError) => void;
       };
       sessionId?: string;
@@ -637,54 +650,36 @@ export class UserConnectionDO extends DurableObject<Env> {
     // reach the response path or the logs.
     if (entry.command === GET_CATALOG_COMMAND) {
       if (entry.pending) {
-        if (error !== undefined) {
-          entry.pending.reject(
-            this.classifyGetCatalogError(error)
-          );
-          return;
-        }
-        if (result === undefined) {
-          entry.pending.reject(
-            new LocalRuntimeCommandError(
-              'INVALID_RUNTIME_RESPONSE',
-              'Runtime returned no result'
-            )
-          );
-          return;
-        }
-        const serializedResult = safeStringifyForSize(result);
-        if (serializedResult === null) {
-          entry.pending.reject(
-            new LocalRuntimeCommandError('INVALID_RUNTIME_RESPONSE', 'Result was not serializable')
-          );
-          return;
-        }
-        const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
-        if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
-          entry.pending.reject(
-            new LocalRuntimeCommandError(
-              'RESULT_TOO_LARGE',
-              'Catalog response is too large'
-            )
-          );
-          return;
-        }
-        const parsed = localRuntimeCatalogSchema.safeParse(result);
-        if (!parsed.success) {
-          entry.pending.reject(
-            new LocalRuntimeCommandError(
-              'INVALID_RUNTIME_RESPONSE',
-              'Catalog response failed strict validation'
-            )
-          );
-          return;
-        }
-        entry.pending.resolve(parsed.data);
+        this.settlePendingWithResult(entry.pending, result, error, {
+          parse: value => localRuntimeCatalogSchema.parse(value),
+          maxBytes: MAX_CATALOG_RESULT_BYTES,
+          tooLargeCode: 'RESULT_TOO_LARGE',
+          tooLargeMessage: 'Catalog response is too large',
+          classifyError: err => this.classifyGetCatalogError(err),
+        });
         return;
       }
       // No pending destination — fall through to the legacy path only as a
       // last resort (e.g. a get_catalog command snuck in via the WS path,
       // which is already blocked by COMMAND_NOT_ALLOWED upstream).
+    }
+
+    if (entry.command === CREATE_AND_RUN_COMMAND) {
+      if (entry.pending) {
+        this.settlePendingWithResult<CreateAndRunLocalSessionResult>(
+          entry.pending,
+          result,
+          error,
+          {
+            parse: value => createAndRunLocalSessionResultSchema.parse(value),
+            maxBytes: MAX_CREATE_AND_RUN_RESULT_BYTES,
+            tooLargeCode: 'RESULT_TOO_LARGE',
+            tooLargeMessage: 'Create-and-run response is too large',
+            classifyError: err => this.classifyCreateAndRunError(err),
+          }
+        );
+        return;
+      }
     }
 
     if (
@@ -731,6 +726,107 @@ export class UserConnectionDO extends DurableObject<Env> {
       );
     }
     return new LocalRuntimeCommandError('RUNTIME_COMMAND_FAILED', 'Runtime command failed');
+  }
+
+  /**
+   * Map a `create_and_run` CLI error to a stable relay code. The CLI
+   * reports failures as a typed `{code, message}` envelope (see
+   * `RemoteSender` in the CLI). The mobile-branched codes map as follows:
+   *
+   * - `INVALID_REQUEST` → `INVALID_RUNTIME_RESPONSE` (the request shape
+   *   the relay produced did not match the CLI's strict parser; the CLI
+   *   never produced a session, so this is the same surface as a malformed
+   *   runtime reply).
+   * - `CATALOG_CHANGED` → `CATALOG_CHANGED` (unchanged on purpose; mobile
+   *   branches on this exact code to refresh the catalog).
+   * - `CREATE_FAILED` / `ANNOUNCE_FAILED` / `INTERNAL` →
+   *   `RUNTIME_COMMAND_FAILED` (CLI already produced a safe, fixed-message
+   *   string; the relay re-classifies to a stable, mobile-visible code
+   *   without surfacing the raw message).
+   *
+   * Legacy CLIs that report `unknown command` (string form) collapse to
+   * `CLI_UPGRADE_REQUIRED`. Any other shape collapses to the safe catch
+   * all.
+   */
+  private classifyCreateAndRunError(error: unknown): LocalRuntimeCommandError {
+    if (typeof error === 'string' && error.toLowerCase().includes('unknown command')) {
+      return new LocalRuntimeCommandError(
+        'CLI_UPGRADE_REQUIRED',
+        'CLI is too old to create a session'
+      );
+    }
+    if (isRecord(error) && typeof error.code === 'string') {
+      switch (error.code) {
+        case 'CATALOG_CHANGED':
+          return new LocalRuntimeCommandError('CATALOG_CHANGED', 'Catalog request rejected');
+        case 'INVALID_REQUEST':
+          return new LocalRuntimeCommandError(
+            'INVALID_RUNTIME_RESPONSE',
+            'Runtime rejected the create-and-run request'
+          );
+        case 'CREATE_FAILED':
+        case 'ANNOUNCE_FAILED':
+        case 'INTERNAL':
+          return new LocalRuntimeCommandError('RUNTIME_COMMAND_FAILED', 'Runtime command failed');
+        default:
+          return new LocalRuntimeCommandError('RUNTIME_COMMAND_FAILED', 'Runtime command failed');
+      }
+    }
+    return new LocalRuntimeCommandError('RUNTIME_COMMAND_FAILED', 'Runtime command failed');
+  }
+
+  /**
+   * Shared settlement path for relay-originated RPCs. The promise
+   * destination is the only caller; viewer-origin responses follow the
+   * legacy path below. The CLI error envelope is intentionally never
+   * surfaced — the relay re-classifies to a stable code and chooses the
+   * safe user-facing message.
+   */
+  private settlePendingWithResult<T>(
+    pending: {
+      resolve: (value: LocalRuntimeCatalog | CreateAndRunLocalSessionResult) => void;
+      reject: (reason: LocalRuntimeCommandError) => void;
+    },
+    result: unknown,
+    error: unknown,
+    options: {
+      parse: (value: unknown) => T;
+      maxBytes: number;
+      tooLargeCode: LocalRuntimeControlErrorCode;
+      tooLargeMessage: string;
+      classifyError: (error: unknown) => LocalRuntimeCommandError;
+    }
+  ): void {
+    if (error !== undefined) {
+      pending.reject(options.classifyError(error));
+      return;
+    }
+    if (result === undefined) {
+      pending.reject(
+        new LocalRuntimeCommandError('INVALID_RUNTIME_RESPONSE', 'Runtime returned no result')
+      );
+      return;
+    }
+    const serializedResult = safeStringifyForSize(result);
+    if (serializedResult === null) {
+      pending.reject(
+        new LocalRuntimeCommandError('INVALID_RUNTIME_RESPONSE', 'Result was not serializable')
+      );
+      return;
+    }
+    const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
+    if (resultBytes > options.maxBytes) {
+      pending.reject(new LocalRuntimeCommandError(options.tooLargeCode, options.tooLargeMessage));
+      return;
+    }
+    try {
+      const parsed = options.parse(result);
+      pending.resolve(parsed as LocalRuntimeCatalog | CreateAndRunLocalSessionResult);
+    } catch {
+      pending.reject(
+        new LocalRuntimeCommandError('INVALID_RUNTIME_RESPONSE', 'Result failed strict validation')
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -840,11 +936,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     const now = Date.now();
     this.expirePendingCommands(now);
 
-    // `get_catalog` is reserved for the relay-originated `getRuntimeCatalog`
-    // RPC and is not a viewer-initiated command. Refuse it explicitly so a
-    // generic viewer WebSocket cannot impersonate the relay, then return
-    // before allocating any pending work.
-    if (msg.command === GET_CATALOG_COMMAND) {
+    // `get_catalog` and `create_and_run` are reserved for the
+    // relay-originated RPCs and are not viewer-initiated commands. Refuse
+    // them explicitly so a generic viewer WebSocket cannot impersonate
+    // the relay, then return before allocating any pending work.
+    if (msg.command === GET_CATALOG_COMMAND || msg.command === CREATE_AND_RUN_COMMAND) {
       this.sendToWeb(ws, {
         type: 'response',
         id: msg.id,
@@ -1079,6 +1175,68 @@ export class UserConnectionDO extends DurableObject<Env> {
    * replaced — each with a stable, mobile-branched error code.
    */
   async getRuntimeCatalog(fence: LocalRuntimeFence): Promise<LocalRuntimeCatalog> {
+    return this.dispatchRuntimeCommand<LocalRuntimeCatalog>(fence, {
+      command: GET_CATALOG_COMMAND,
+      requiredCapability: 'catalog.v1',
+      commandData: { protocolVersion: 1 },
+    });
+  }
+
+  /**
+   * Relay-originated sessionless create-and-run. The same private
+   * dispatcher validates the exact runtimeId+connectionId fence and the
+   * `create-and-run.v1` capability, routes the strict request to the
+   * exact CLI socket, and rejects wrong-socket responses. The Promise
+   * settles on the CLI's typed success/partial result, an unknown
+   * command, the typed CLI error envelope, a pending TTL expiry, or a
+   * disconnect/replacement — each with a stable, mobile-branched code.
+   *
+   * The CLI is the authority on the session ID and prompt-start outcome;
+   * the DO NEVER mints, mutates, or fabricates the session ID. The
+   * strict result parser uses the cloud-owned `sessionIdSchema`, so a CLI
+   * that reports anything other than a `ses_…` ID is rejected as
+   * `INVALID_RUNTIME_RESPONSE`.
+   */
+  async createAndRunLocalSession(
+    fence: LocalRuntimeFence,
+    request: CreateAndRunLocalSessionRequest
+  ): Promise<CreateAndRunLocalSessionResult> {
+    // The request is parsed at the boundary. The CLI re-validates against
+    // the same schema, but the DO also parses so a misrouted or
+    // duplicated request can fail closed before the CLI sees it.
+    const parsedRequest = createAndRunLocalSessionRequestSchema.safeParse(request);
+    if (!parsedRequest.success) {
+      throw new LocalRuntimeCommandError(
+        'INVALID_RUNTIME_RESPONSE',
+        'Create-and-run request failed strict validation'
+      );
+    }
+
+    return this.dispatchRuntimeCommand<CreateAndRunLocalSessionResult>(fence, {
+      command: CREATE_AND_RUN_COMMAND,
+      requiredCapability: 'create-and-run.v1',
+      commandData: parsedRequest.data,
+    });
+  }
+
+  /**
+   * Private dispatcher shared by `getRuntimeCatalog` and
+   * `createAndRunLocalSession`. It validates the fence and the required
+   * capability against the live socket BEFORE any pending work is
+   * allocated, so a misrouted or capability-mismatched call never
+   * reaches the CLI. The command is sent to the exact CLI socket, never
+   * a fallback. The Promise settles when the targeted CLI replies, the
+   * pending TTL elapses, the runtime disconnects, or the runtime is
+   * replaced — each with a stable, mobile-branched error code.
+   */
+  private async dispatchRuntimeCommand<T>(
+    fence: LocalRuntimeFence,
+    options: {
+      command: string;
+      requiredCapability: 'catalog.v1' | 'create-and-run.v1';
+      commandData: unknown;
+    }
+  ): Promise<T> {
     this.ensureState();
     const now = Date.now();
     this.expirePendingCommands(now);
@@ -1102,10 +1260,10 @@ export class UserConnectionDO extends DurableObject<Env> {
         'Runtime is owned by a different connection'
       );
     }
-    if (!runtime.capabilities.includes('catalog.v1')) {
+    if (!runtime.capabilities.includes(options.requiredCapability)) {
       throw new LocalRuntimeCommandError(
         'RUNTIME_FENCE_MISMATCH',
-        'Runtime does not advertise the catalog.v1 capability'
+        `Runtime does not advertise the ${options.requiredCapability} capability`
       );
     }
 
@@ -1125,10 +1283,15 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     const correlationId = crypto.randomUUID();
-    const promise = new Promise<LocalRuntimeCatalog>((resolve, reject) => {
+    const promise = new Promise<T>((resolve, reject) => {
       this.pendingCommands.set(correlationId, {
-        pending: { resolve, reject },
-        command: GET_CATALOG_COMMAND,
+        pending: {
+          resolve: resolve as (
+            value: LocalRuntimeCatalog | CreateAndRunLocalSessionResult
+          ) => void,
+          reject,
+        },
+        command: options.command,
         targetConnectionId: fence.connectionId,
         expiresAt: now + UserConnectionDO.PENDING_COMMAND_TTL_MS,
         targetCliWs: targetCli,
@@ -1139,8 +1302,8 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.sendToCli(targetCli, {
       type: 'command',
       id: correlationId,
-      command: GET_CATALOG_COMMAND,
-      data: { protocolVersion: 1 },
+      command: options.command,
+      data: options.commandData,
     });
 
     return promise;
@@ -1270,8 +1433,8 @@ export class UserConnectionDO extends DurableObject<Env> {
           new LocalRuntimeCommandError(
             'RUNTIME_FENCE_MISMATCH',
             entry.expectedOwnerConnectionId
-              ? 'Session owner changed before catalog could be read'
-              : 'Runtime disconnected before catalog could be read'
+              ? 'Session owner changed before runtime command could be read'
+              : 'Runtime disconnected before runtime command could be read'
           )
         );
         continue;
@@ -1403,6 +1566,10 @@ function safeStringifyForSize(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function getUserConnectionDO(env: Env, params: { kiloUserId: string }) {

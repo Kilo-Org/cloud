@@ -13,7 +13,21 @@ import {
 import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
-import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import { cliSessionsV2Router, parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import type * as ReadinessModule from '@/lib/local-runtime-control/readiness';
+
+jest.mock('@/lib/local-runtime-control/readiness', () => {
+  const actual = jest.requireActual<typeof ReadinessModule>(
+    '@/lib/local-runtime-control/readiness'
+  );
+  return {
+    ...actual,
+    // Probe is exercised end-to-end in its own unit suite; the router test only
+    // needs a controllable single-shot stub. The implementation re-reads the DB
+    // on its own to honor the scoped (sessionId, kiloUserId) contract.
+    waitForOwnedCliSession: jest.fn(),
+  };
+});
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
@@ -1332,6 +1346,164 @@ describe('cli-sessions-v2-router', () => {
           .where(eq(cli_sessions_v2.session_id, sessionId));
         await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
       }
+    });
+  });
+
+  describe('readiness', () => {
+    // sessionIdSchema enforces a 30-character `ses_…` ID.
+    const SESSION_ID = 'ses_readiness_query_owned_30ch';
+    const OTHER_SESSION_ID = 'ses_readiness_query_other_30ch';
+    const MISSING_SESSION_ID = 'ses_readiness_query_miss_30chr';
+
+    type ReadinessOutcome = { organizationId: string | null } | null;
+
+    function makeReadinessMock() {
+      const mocked = jest.mocked(
+        jest.requireMock<typeof ReadinessModule>(
+          '@/lib/local-runtime-control/readiness'
+        ).waitForOwnedCliSession
+      );
+      // Mirror the production probe exactly: read the owned row, then run
+      // ensureOrganizationAccess on the resolved organizationId. We honor the
+      // call's `deps` contract — including the membership re-check that drives
+      // the FORBIDDEN surface for removed members.
+      mocked.mockImplementation(
+        async (params: {
+          sessionId: string;
+          userId: string;
+          deps: {
+            query: (s: string, u: string) => Promise<ReadinessOutcome>;
+            ensureOrganizationAccess: (organizationId: string) => Promise<void>;
+          };
+        }): Promise<ReadinessOutcome> => {
+          const row = await params.deps.query(params.sessionId, params.userId);
+          if (row === null) return null;
+          if (row.organizationId !== null) {
+            await params.deps.ensureOrganizationAccess(row.organizationId);
+          }
+          return row;
+        }
+      );
+      return mocked;
+    }
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: SESSION_ID,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+      await db.insert(cli_sessions_v2).values({
+        session_id: OTHER_SESSION_ID,
+        kilo_user_id: otherUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+      makeReadinessMock();
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, SESSION_ID));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, OTHER_SESSION_ID));
+    });
+
+    it('is registered on the router', () => {
+      const names = Object.keys(cliSessionsV2Router._def.procedures);
+      expect(names).toContain('readiness');
+    });
+
+    it('rejects an invalid session_id shape', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.readiness({ session_id: 'bad' })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('returns pending for a session that does not exist (no leak of existence)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.readiness({ session_id: MISSING_SESSION_ID });
+      expect(result).toEqual({ status: 'pending' });
+    });
+
+    it('returns pending for a session owned by a different user (no cross-user leak)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.readiness({ session_id: OTHER_SESSION_ID });
+      expect(result).toEqual({ status: 'pending' });
+    });
+
+    it('returns ready with null organizationId for a personal session owned by the caller', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.readiness({ session_id: SESSION_ID });
+      expect(result).toEqual({ status: 'ready', organizationId: null });
+    });
+
+    it('returns ready with the organizationId for an org session when the caller is still a member', async () => {
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganization.id,
+        kilo_user_id: regularUser.id,
+        role: 'member',
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ organization_id: testOrganization.id })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.readiness({ session_id: SESSION_ID });
+        expect(result).toEqual({
+          status: 'ready',
+          organizationId: testOrganization.id,
+        });
+      } finally {
+        await db
+          .update(cli_sessions_v2)
+          .set({ organization_id: null })
+          .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+        await db
+          .delete(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, testOrganization.id),
+              eq(organization_memberships.kilo_user_id, regularUser.id)
+            )
+          );
+      }
+    });
+
+    it('returns FORBIDDEN for an org session only AFTER the owned row exists, when the caller is no longer a member', async () => {
+      // Attach the session to the org even though regularUser has no membership
+      // in the test fixture (the beforeAll creates regularUser, but we never
+      // give them a membership in this test).
+      await db
+        .update(cli_sessions_v2)
+        .set({ organization_id: testOrganization.id })
+        .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.readiness({ session_id: SESSION_ID })
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      } finally {
+        await db
+          .update(cli_sessions_v2)
+          .set({ organization_id: null })
+          .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+      }
+    });
+
+    it('does not call Cloud Agent (no cloud-agent SDK import in the readiness path)', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+      const caller = await createCallerForUser(regularUser.id);
+      await caller.cliSessionsV2.readiness({ session_id: SESSION_ID });
+      const calls = fetchSpy.mock.calls.map(call => String(call[0]));
+      expect(calls.some(url => url.includes('cloud-agent-next'))).toBe(false);
+      fetchSpy.mockRestore();
     });
   });
 });

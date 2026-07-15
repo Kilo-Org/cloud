@@ -3,6 +3,7 @@ import {
   LocalRuntimeControlRequestError,
   type LocalRuntimeList,
 } from './client';
+import type { CreateAndRunLocalSessionRequest } from '@kilocode/session-ingest-contracts';
 
 const mockConfig = {
   sessionIngestWorkerUrl: 'https://session-ingest.example.workers.dev',
@@ -406,5 +407,228 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
       LocalRuntimeControlClient.getCatalog('usr_alice', fence)
     ).rejects.toBeInstanceOf(Error);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('LocalRuntimeControlClient.createAndRun', () => {
+  const fence = {
+    runtimeId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+    connectionId: 'cli-77',
+  };
+  const validRequest = {
+    protocolVersion: 1,
+    requestId: '0c0a1b2c-3d4e-4f60-8a8b-9c0d1e2f3a4b',
+    prompt: 'hello',
+    model: { providerID: 'kilo', modelID: 'kilo/auto' },
+    agent: 'build',
+  } as const satisfies CreateAndRunLocalSessionRequest;
+  const successEnvelope = {
+    result: {
+      protocolVersion: 1,
+      sessionId: 'ses_a1b2c3d4e5f67890123456789a',
+      promptStarted: true,
+    },
+  };
+
+  beforeEach(() => {
+    mockConfig.sessionIngestWorkerUrl = 'https://session-ingest.example.workers.dev';
+    mockTokenOptions.length = 0;
+    jest.restoreAllMocks();
+  });
+
+  it('mints a five-minute audience-bound internal token and POSTs the exact body', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(successEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    await LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest);
+
+    expect(mockTokenOptions).toEqual([
+      {
+        userId: 'usr_alice',
+        options: {
+          expiresIn: 5 * 60,
+          audience: 'session-ingest:runtime-control',
+        },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [calledUrl, calledInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toBe(
+      'https://session-ingest.example.workers.dev/internal/runtime-control/create-and-run'
+    );
+    expect(calledInit.method).toBe('POST');
+    expect(calledInit.headers).toEqual({
+      Authorization: 'Bearer audience-bound-token:usr_alice:session-ingest:runtime-control',
+      'content-type': 'application/json',
+    });
+    expect(calledInit.body).toBe(JSON.stringify({ fence, request: validRequest }));
+    expect(calledInit.signal).toBeDefined();
+  });
+
+  it('returns the strict-parsed success result', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(successEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    const result = await LocalRuntimeControlClient.createAndRun(
+      'usr_alice',
+      fence,
+      validRequest
+    );
+
+    expect(result.result.sessionId).toBe('ses_a1b2c3d4e5f67890123456789a');
+    expect(result.result.promptStarted).toBe(true);
+  });
+
+  it('returns the promptStarted:false partial result', async () => {
+    const partialEnvelope = {
+      result: {
+        protocolVersion: 1,
+        sessionId: 'ses_b2c3d4e5f67890123456789cde',
+        promptStarted: false,
+        error: {
+          code: 'PROMPT_START_FAILED',
+          message: 'The session was created, but the first prompt did not start.',
+        },
+      },
+    };
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(partialEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    const result = await LocalRuntimeControlClient.createAndRun(
+      'usr_alice',
+      fence,
+      validRequest
+    );
+
+    expect(result.result.promptStarted).toBe(false);
+    if (result.result.promptStarted === false) {
+      expect(result.result.error.code).toBe('PROMPT_START_FAILED');
+    }
+  });
+
+  it('uses a 30s AbortSignal timeout', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(successEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    await LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest);
+
+    const [, calledInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const signal = calledInit.signal as AbortSignal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal.aborted).toBe(false);
+  });
+
+  it('throws a typed error carrying upstreamCode on a structured error envelope', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: {
+            source: 'relay',
+            code: 'RUNTIME_NOT_CONNECTED',
+            message: 'Runtime is not currently connected',
+          },
+        }),
+        { status: 404, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await expect(
+      LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)
+    ).rejects.toMatchObject({
+      name: 'LocalRuntimeCreateAndRunError',
+      upstreamCode: 'RUNTIME_NOT_CONNECTED',
+    });
+  });
+
+  it('throws a typed error on a malformed envelope', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ not: 'a result' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    await expect(
+      LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)
+    ).rejects.toBeInstanceOf(Error);
+  });
+
+  it('throws a typed error on a network failure', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('socket reset'));
+
+    await expect(
+      LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)
+    ).rejects.toMatchObject({ name: 'LocalRuntimeCreateAndRunError' });
+  });
+
+  it.each([401, 403, 409, 412, 429, 500, 504])(
+    'throws a typed error on a non-2xx response (status %s)',
+    async status => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(new Response('upstream blew up', { status }));
+
+      await expect(
+        LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)
+      ).rejects.toMatchObject({ name: 'LocalRuntimeCreateAndRunError' });
+    }
+  );
+
+  it('throws a typed error when SESSION_INGEST_WORKER_URL is not configured', async () => {
+    mockConfig.sessionIngestWorkerUrl = '';
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    await expect(
+      LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)
+    ).rejects.toBeInstanceOf(Error);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never logs the token, the prompt, or the response body on failure', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response('super-secret-response-body-must-not-leak', { status: 500 })
+      );
+
+    await expect(
+      LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)
+    ).rejects.toBeInstanceOf(Error);
+
+    const dumped = JSON.stringify({
+      warns: warn.mock.calls,
+      errors: errorSpy.mock.calls,
+    });
+    expect(dumped).not.toContain('super-secret-response-body-must-not-leak');
+    expect(dumped).not.toContain('audience-bound-token:usr_alice');
+    expect(dumped).not.toContain('hello');
   });
 });

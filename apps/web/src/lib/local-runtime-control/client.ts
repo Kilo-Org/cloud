@@ -3,13 +3,17 @@ import 'server-only';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import {
+  createAndRunLocalSessionRequestSchema,
   getLocalRuntimeCatalogRequestSchema,
   localRuntimeCatalogResponseSchema,
   localRuntimeControlErrorCodeSchema,
+  localRuntimeCreateResponseSchema,
   localRuntimeErrorResponseSchema,
   localRuntimeFenceSchema,
   localRuntimeListResponseSchema,
   SESSION_INGEST_RUNTIME_CONTROL_AUDIENCE,
+  type CreateAndRunLocalSessionRequest,
+  type CreateAndRunLocalSessionResult,
   type LocalRuntimeFence,
   type LocalRuntimeListResponse,
 } from '@kilocode/session-ingest-contracts';
@@ -17,6 +21,7 @@ import { remoteModelCatalogV1Schema, type RemoteModelCatalogV1 } from '@/lib/clo
 
 const RUNTIME_LIST_TIMEOUT_MS = 5_000;
 const RUNTIME_CATALOG_TIMEOUT_MS = 5_000;
+const RUNTIME_CREATE_AND_RUN_TIMEOUT_MS = 30_000;
 
 export class LocalRuntimeControlRequestError extends Error {
   constructor(message: string) {
@@ -26,8 +31,9 @@ export class LocalRuntimeControlRequestError extends Error {
 }
 
 /**
- * Typed error raised by `LocalRuntimeControlClient.getCatalog` when the relay
- * returns a structured error envelope. The `upstreamCode` is the stable
+ * Typed error raised by `LocalRuntimeControlClient.getCatalog` and
+ * `LocalRuntimeControlClient.createAndRun` when the relay returns a
+ * structured error envelope. The `upstreamCode` is the stable
  * `LocalRuntimeControlErrorCode` and is exposed to the mobile client as
  * `error.data.upstreamCode` so the recovery branch can be chosen in-app.
  */
@@ -38,6 +44,23 @@ export class LocalRuntimeCatalogError extends Error {
   ) {
     super(message);
     this.name = 'LocalRuntimeCatalogError';
+  }
+}
+
+/**
+ * Typed error raised by `LocalRuntimeControlClient.createAndRun` when the
+ * relay returns a structured error envelope. The `upstreamCode` is the
+ * stable `LocalRuntimeControlErrorCode` and is exposed to the mobile
+ * client as `error.data.upstreamCode` so the recovery branch can be
+ * chosen in-app.
+ */
+export class LocalRuntimeCreateAndRunError extends Error {
+  constructor(
+    public readonly upstreamCode: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'LocalRuntimeCreateAndRunError';
   }
 }
 
@@ -224,5 +247,117 @@ export const LocalRuntimeControlClient = {
         defaultAgent: envelope.data.catalog.defaultAgent,
       },
     };
+  },
+
+  /**
+   * Forward a create-and-run request to the bound runtime. The fence is
+   * the exact (runtimeId, connectionId) pair mobile resolved from the
+   * runtime list; the relay validates that the fence still matches the
+   * live socket and routes the strict request to that exact socket. The
+   * CLI is the authority on the session ID and prompt-start outcome; the
+   * client NEVER mints, mutates, or fabricates the session ID.
+   *
+   * The response is the strict `{ result }` envelope where `result` is
+   * the CLI's typed success or `promptStarted:false` partial. The
+   * server-side readiness wait against `cli_sessions_v2` is owned by the
+   * `localRuntimeControl.createAndRun` tRPC mutation, not by this
+   * client.
+   *
+   * Failures collapse to `LocalRuntimeCreateAndRunError` with a stable
+   * `upstreamCode` (always one of the
+   * `LocalRuntimeControlErrorCode` values, or `UNKNOWN` for an
+   * unparseable envelope). The caller MUST branch on `upstreamCode` to
+   * choose the recovery flow.
+   */
+  async createAndRun(
+    userId: string,
+    fence: LocalRuntimeFence,
+    request: CreateAndRunLocalSessionRequest
+  ): Promise<{ result: CreateAndRunLocalSessionResult }> {
+    if (!SESSION_INGEST_WORKER_URL) {
+      throw new LocalRuntimeCreateAndRunError(
+        'UNKNOWN',
+        'Session ingest worker URL is not configured'
+      );
+    }
+
+    const token = buildAudienceToken(userId);
+    const parsedFence = localRuntimeFenceSchema.parse(fence);
+    const parsedRequest = createAndRunLocalSessionRequestSchema.parse(request);
+    const body = JSON.stringify({ fence: parsedFence, request: parsedRequest });
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `${SESSION_INGEST_WORKER_URL}/internal/runtime-control/create-and-run`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'content-type': 'application/json',
+          },
+          body,
+          signal: AbortSignal.timeout(RUNTIME_CREATE_AND_RUN_TIMEOUT_MS),
+        }
+      );
+    } catch {
+      throw new LocalRuntimeCreateAndRunError(
+        'UNKNOWN',
+        'Local runtime create-and-run request failed'
+      );
+    }
+
+    if (!response.ok) {
+      // Attempt to extract a structured upstream code from the body without
+      // surfacing any other content. A non-2xx with a parseable envelope
+      // becomes a typed error; otherwise we fall back to UNKNOWN.
+      const raw = await response.text().catch(() => '');
+      let upstreamCode = 'UNKNOWN';
+      try {
+        const envelope = localRuntimeErrorResponseSchema.safeParse(JSON.parse(raw));
+        if (envelope.success) {
+          const codeParse = localRuntimeControlErrorCodeSchema.safeParse(
+            envelope.data.error.code
+          );
+          if (codeParse.success) upstreamCode = codeParse.data;
+        }
+      } catch {
+        // ignore — the body was not JSON; keep UNKNOWN
+      }
+      throw new LocalRuntimeCreateAndRunError(
+        upstreamCode,
+        `Local runtime create-and-run request failed (${response.status})`
+      );
+    }
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(await response.text());
+    } catch {
+      throw new LocalRuntimeCreateAndRunError(
+        'UNKNOWN',
+        'Local runtime create-and-run response was not valid JSON'
+      );
+    }
+
+    const envelope = localRuntimeCreateResponseSchema.safeParse(parsedBody);
+    if (!envelope.success) {
+      // The envelope failed strict validation; the upstream returned a
+      // malformed body, not a structured error. Surface as INVALID_RUNTIME_RESPONSE
+      // if the body has a recognizable error code, otherwise UNKNOWN.
+      const fallback = localRuntimeErrorResponseSchema.safeParse(parsedBody);
+      if (fallback.success) {
+        throw new LocalRuntimeCreateAndRunError(
+          fallback.data.error.code,
+          fallback.data.error.message
+        );
+      }
+      throw new LocalRuntimeCreateAndRunError(
+        'UNKNOWN',
+        'Local runtime create-and-run response was malformed'
+      );
+    }
+
+    return { result: envelope.data.result };
   },
 };

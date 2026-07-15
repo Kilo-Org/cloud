@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { sessionIdSchema } from './rpc-contract';
+
 /**
  * Audience for the five-minute, audience-bound internal JWT that authenticates
  * the web app's Local Runtime Control module against the session-ingest
@@ -147,14 +149,14 @@ export const createAndRunLocalSessionResultSchema = z.discriminatedUnion('prompt
   z
     .object({
       protocolVersion: z.literal(1),
-      sessionId: z.string().min(1).max(128),
+      sessionId: sessionIdSchema,
       promptStarted: z.literal(true),
     })
     .strict(),
   z
     .object({
       protocolVersion: z.literal(1),
-      sessionId: z.string().min(1).max(128),
+      sessionId: sessionIdSchema,
       promptStarted: z.literal(false),
       error: z
         .object({
@@ -166,6 +168,40 @@ export const createAndRunLocalSessionResultSchema = z.discriminatedUnion('prompt
     .strict(),
 ]);
 export type CreateAndRunLocalSessionResult = z.infer<typeof createAndRunLocalSessionResultSchema>;
+
+/**
+ * Server-side envelope for the `localRuntimeControl.createAndRun` mutation.
+ *
+ * The relay completes the runtime command and returns a CLI result; the
+ * server then waits for the announced session row to become fetchable
+ * through `cli_sessions_v2` so the mobile client can navigate directly to
+ * the existing session detail route. The envelope is a discriminated union
+ * so callers never have to infer which path the server took.
+ *
+ * - `ready`: the row is owned by the requesting user. The CLI result is
+ *   returned exactly as the relay produced it.
+ * - `session_not_ready`: the server exhausted its bounded wait without
+ *   observing an owned row. The CLI result is still returned so mobile can
+ *   open the existing session (for `promptStarted:false`) or poll the
+ *   separate `cliSessionsV2.readiness` query for recovery. The server NEVER
+ *   issues a second relay create command.
+ */
+export const localRuntimeCreateOutputSchema = z.discriminatedUnion('status', [
+  z
+    .object({
+      status: z.literal('ready'),
+      result: createAndRunLocalSessionResultSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('session_not_ready'),
+      code: z.literal('SESSION_NOT_READY'),
+      result: createAndRunLocalSessionResultSchema,
+    })
+    .strict(),
+]);
+export type LocalRuntimeCreateOutput = z.infer<typeof localRuntimeCreateOutputSchema>;
 
 /**
  * Response envelope for the list endpoint. The list is capped at 32 runtimes

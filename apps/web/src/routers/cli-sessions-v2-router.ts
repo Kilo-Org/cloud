@@ -46,6 +46,8 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import { after } from 'next/server';
+import { waitForOwnedCliSession } from '@/lib/local-runtime-control/readiness';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -1296,6 +1298,71 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      return { share_id: body.public_id, session_id: input.kilo_session_id };
+    return { share_id: body.public_id, session_id: input.kilo_session_id };
+  }),
+
+  /**
+   * Public readiness probe for a single session owned by the caller. Used by
+   * mobile to recover from a `localRuntimeControl.createAndRun` that returned
+   * `session_not_ready`. The probe is a single-shot DB read; bounded polling
+   * is owned by the readiness module's `waitForOwnedCliSession` and runs only
+   * inside the createAndRun mutation.
+   *
+   * - `pending` — the row is not observable to the caller. This collapses
+   *   "missing" and "owned by a different user" into a single non-leaking
+   *   state so the existence of an unrelated session is never revealed.
+   * - `ready` — the row is owned by the caller; `organizationId` is the
+   *   row's value (string or null). For org-scoped rows, the caller's current
+   *   membership is re-validated; a removed member receives FORBIDDEN.
+   *
+   * The query never calls the cloud-agent DO — the readiness path is owned
+   * entirely by `cli_sessions_v2`. The cloud-agent SDK is only touched by
+   * session fetches that need runtime state.
+   */
+  readiness: baseProcedure
+    .input(z.object({ session_id: sessionIdSchema }).strict())
+    .query(async ({ ctx, input }) => {
+      const ready = await waitForOwnedCliSession({
+        sessionId: input.session_id,
+        userId: ctx.user.id,
+        deps: {
+          query: async (sessionId, kiloUserId) => {
+            const [row] = await db
+              .select({ organizationId: cli_sessions_v2.organization_id })
+              .from(cli_sessions_v2)
+              .where(
+                and(
+                  eq(cli_sessions_v2.session_id, sessionId),
+                  eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+                )
+              )
+              .limit(1);
+            if (!row) return null;
+            return { organizationId: row.organizationId ?? null };
+          },
+          ensureOrganizationAccess: async organizationId => {
+            try {
+              await ensureOrganizationAccess(ctx, organizationId);
+            } catch (err) {
+              if (err instanceof TRPCError && err.code === 'UNAUTHORIZED') {
+                throw new TRPCError({
+                  code: 'FORBIDDEN',
+                  message: 'You no longer have access to this organization',
+                  cause: err,
+                });
+              }
+              throw err;
+            }
+          },
+        },
+      });
+
+      if (ready === null) {
+        return { status: 'pending' as const };
+      }
+      return {
+        status: 'ready' as const,
+        organizationId: ready.organizationId,
+      };
     }),
 });

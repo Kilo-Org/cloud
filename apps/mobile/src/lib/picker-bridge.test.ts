@@ -5,6 +5,8 @@ import {
   clearModelPickerBridge,
   commitModelPickerSelection,
   getModelPickerBridge,
+  type ModelPickerSelection,
+  type ModelPickerSelectionScope,
   resolveModelPickerSelection,
   setModelPickerBridge,
 } from './picker-bridge';
@@ -37,7 +39,7 @@ describe('model picker bridge', () => {
   });
 
   it('preserves exact model identity and override source while resetting an invalid variant', () => {
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(selection: ModelPickerSelection) => void>();
     setModelPickerBridge({
       ...currentSelectionScope,
       options: [remoteOption],
@@ -49,7 +51,6 @@ describe('model picker bridge', () => {
     });
 
     const bridge = getModelPickerBridge();
-    expect(bridge).not.toBeNull();
     if (!bridge) {
       throw new Error('Expected model picker bridge');
     }
@@ -71,10 +72,10 @@ describe('model picker bridge', () => {
 
   it('treats session, owner, protocol, and catalog generation changes as stale scopes', () => {
     const catalogGenerationIdentity = {};
-    const scope = {
+    const scope: ModelPickerSelectionScope = {
       sessionId: 'session-a',
       ownerConnectionId: 'owner-a',
-      protocol: 'v1' as const,
+      protocol: 'v1',
       catalogGenerationIdentity,
     };
 
@@ -92,7 +93,7 @@ describe('model picker bridge', () => {
   });
 
   it('discards a detached selection when its session catalog scope is stale', () => {
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(selection: ModelPickerSelection) => void>();
     const catalogGenerationIdentity = {};
     const bridge = {
       options: [remoteOption],
@@ -114,7 +115,7 @@ describe('model picker bridge', () => {
   });
 
   it('commits a detached selection while its session catalog scope is current', () => {
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(selection: ModelPickerSelection) => void>();
     const bridge = {
       options: [remoteOption],
       currentValue: remoteOption.id,

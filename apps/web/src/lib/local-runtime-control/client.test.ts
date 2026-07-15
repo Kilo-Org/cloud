@@ -12,7 +12,6 @@ const mockTokenOptions: Array<{
   userId: string;
   options?: { expiresIn?: number; audience?: string };
 }> = [];
-
 jest.mock('@/lib/config.server', () => ({
   get SESSION_INGEST_WORKER_URL() {
     return mockConfig.sessionIngestWorkerUrl;
@@ -183,5 +182,229 @@ describe('LocalRuntimeControlClient.list', () => {
     });
     expect(dumped).not.toContain('super-secret-response-body-must-not-leak');
     expect(dumped).not.toContain('audience-bound-token:usr_alice');
+  });
+});
+
+describe('LocalRuntimeControlClient.getCatalog', () => {
+  const fence = {
+    runtimeId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+    connectionId: 'cli-77',
+  };
+  const validWireModels = {
+    all: [
+      {
+        id: 'kilo',
+        name: 'Kilo',
+        source: 'env',
+        env: [],
+        options: {},
+        models: {
+          'kilo/auto': {
+            id: 'kilo/auto',
+            providerID: 'kilo',
+            api: { id: 'kilo/auto', url: '', npm: '' },
+            name: 'Auto',
+            capabilities: {
+              temperature: false,
+              reasoning: false,
+              attachment: false,
+              toolcall: false,
+              input: { text: true, audio: false, image: false, video: false, pdf: false },
+              output: { text: true, audio: false, image: false, video: false, pdf: false },
+              interleaved: false,
+            },
+            cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+            limit: { context: 1, output: 1 },
+            status: 'active',
+            options: {},
+            headers: {},
+            release_date: '',
+          },
+        },
+      },
+    ],
+    default: { kilo: 'kilo/auto' },
+    connected: ['kilo'],
+    failed: [],
+    protocolVersion: 1,
+    truncated: false,
+  };
+  const validCatalogEnvelope = {
+    catalog: {
+      protocolVersion: 1,
+      models: validWireModels,
+      agents: [{ slug: 'build', name: 'Build' }],
+      defaultAgent: 'build',
+    },
+  };
+
+  beforeEach(() => {
+    mockConfig.sessionIngestWorkerUrl = 'https://session-ingest.example.workers.dev';
+    mockTokenOptions.length = 0;
+    jest.restoreAllMocks();
+  });
+
+  it('mints a five-minute audience-bound internal token and POSTs the exact body', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(validCatalogEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    await LocalRuntimeControlClient.getCatalog('usr_alice', fence);
+
+    expect(mockTokenOptions).toEqual([
+      {
+        userId: 'usr_alice',
+        options: {
+          expiresIn: 5 * 60,
+          audience: 'session-ingest:runtime-control',
+        },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [calledUrl, calledInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toBe(
+      'https://session-ingest.example.workers.dev/internal/runtime-control/catalog'
+    );
+    expect(calledInit.method).toBe('POST');
+    expect(calledInit.headers).toEqual({
+      Authorization: 'Bearer audience-bound-token:usr_alice:session-ingest:runtime-control',
+      'content-type': 'application/json',
+    });
+    expect(calledInit.body).toBe(JSON.stringify({ fence, request: { protocolVersion: 1 } }));
+    expect(calledInit.signal).toBeDefined();
+  });
+
+  it('returns the parsed typed catalog with parsed models and agents/default', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(validCatalogEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    const result = await LocalRuntimeControlClient.getCatalog('usr_alice', fence);
+
+    expect(result.catalog.protocolVersion).toBe(1);
+    expect(result.catalog.defaultAgent).toBe('build');
+    expect(result.catalog.agents).toEqual([{ slug: 'build', name: 'Build' }]);
+    expect(result.catalog.models.protocolVersion).toBe(1);
+    expect(result.catalog.models.providers).toHaveLength(1);
+    expect(result.catalog.models.providers[0]?.id).toBe('kilo');
+    expect(result.catalog.models.providers[0]?.models).toHaveLength(1);
+    expect(result.catalog.models.providers[0]?.models[0]?.id).toBe('kilo/auto');
+    expect(result.catalog.models.truncated).toBe(false);
+  });
+
+  it('uses a 5s AbortSignal timeout', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(validCatalogEnvelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+    await LocalRuntimeControlClient.getCatalog('usr_alice', fence);
+
+    const [, calledInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const signal = calledInit.signal as AbortSignal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    // The AbortSignal.timeout(5000) signal aborts at 5s; just assert it exists
+    // and is not pre-aborted.
+    expect(signal.aborted).toBe(false);
+  });
+
+  it('throws a typed error carrying upstreamCode on a structured error envelope', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: {
+            source: 'relay',
+            code: 'RUNTIME_NOT_CONNECTED',
+            message: 'Runtime is not currently connected',
+          },
+        }),
+        { status: 404, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await expect(
+      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
+    ).rejects.toMatchObject({
+      name: 'LocalRuntimeCatalogError',
+      upstreamCode: 'RUNTIME_NOT_CONNECTED',
+    });
+  });
+
+  it('throws a typed error on a malformed models payload', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          catalog: {
+            protocolVersion: 1,
+            models: { not: 'a real catalog' },
+            agents: [],
+            defaultAgent: 'build',
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await expect(
+      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
+    ).rejects.toBeInstanceOf(Error);
+  });
+
+  it('throws a typed error on a malformed envelope', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ not: 'a catalog' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    await expect(
+      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
+    ).rejects.toBeInstanceOf(Error);
+  });
+
+  it('throws a typed error on a network failure', async () => {
+    jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('socket reset'));
+
+    await expect(
+      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
+    ).rejects.toMatchObject({ name: 'LocalRuntimeCatalogError' });
+  });
+
+  it.each([401, 403, 409, 412, 429, 500, 504])(
+    'throws a typed error on a non-2xx response (status %s)',
+    async status => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(new Response('upstream blew up', { status }));
+
+      await expect(
+        LocalRuntimeControlClient.getCatalog('usr_alice', fence)
+      ).rejects.toMatchObject({ name: 'LocalRuntimeCatalogError' });
+    }
+  );
+
+  it('throws a typed error when SESSION_INGEST_WORKER_URL is not configured', async () => {
+    mockConfig.sessionIngestWorkerUrl = '';
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    await expect(
+      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
+    ).rejects.toBeInstanceOf(Error);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

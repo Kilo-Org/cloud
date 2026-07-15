@@ -11,7 +11,13 @@ import {
   type WebInboundMessage,
   WebOutboundMessageSchema,
 } from '../types/user-connection-protocol';
-import type { LocalRuntimePresence } from '@kilocode/session-ingest-contracts';
+import {
+  localRuntimeCatalogSchema,
+  type LocalRuntimeCatalog,
+  type LocalRuntimeControlErrorCode,
+  type LocalRuntimeFence,
+  type LocalRuntimePresence,
+} from '@kilocode/session-ingest-contracts';
 type HeartbeatSession = {
   id: string;
   status: string;
@@ -42,6 +48,30 @@ type WSAttachment =
   | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
+
+/**
+ * Internal, typed failure raised by `UserConnectionDO.getRuntimeCatalog` (and
+ * surfaced through the internal HTTP route). The relay never re-emits a raw
+ * CLI error string — every failure collapses to a stable, mobile-branched
+ * code; the message is operator-facing only and never leaves the worker
+ * unredacted.
+ */
+export class LocalRuntimeCommandError extends Error {
+  constructor(
+    public readonly code: LocalRuntimeControlErrorCode,
+    message: string
+  ) {
+    super(message);
+    this.name = 'LocalRuntimeCommandError';
+  }
+}
+
+const GET_CATALOG_COMMAND = 'get_catalog';
+const COMMAND_NOT_ALLOWED_VIEWER_ERROR = {
+  source: 'relay' as const,
+  code: 'COMMAND_NOT_ALLOWED' as const,
+  message: 'Command not allowed',
+};
 
 const SESSION_OWNER_CHANGED_ERROR = {
   source: 'relay',
@@ -98,13 +128,20 @@ export class UserConnectionDO extends DurableObject<Env> {
   private connectionSessions = new Map<string, HeartbeatSession[]>();
   // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
   private connectionProtocolVersion = new Map<string, string | undefined>();
-  // Pending command responses: correlationId → originating web socket
+  // Pending command responses: correlationId → destination. Viewer-originated
+  // commands carry the originating `ws`; relay-originated RPCs (e.g.
+  // getRuntimeCatalog) carry an internal `pending` Promise instead. Either
+  // one is set, never both.
   private pendingCommands = new Map<
     string,
     {
-      ws: WebSocket;
+      ws?: WebSocket;
+      pending?: {
+        resolve: (value: LocalRuntimeCatalog) => void;
+        reject: (reason: LocalRuntimeCommandError) => void;
+      };
       sessionId?: string;
-      originalId: string;
+      originalId?: string;
       command: string;
       expectedOwnerConnectionId?: string;
       targetConnectionId: string;
@@ -595,19 +632,82 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (!entry || entry.targetCliWs !== respondingWs) return;
     this.pendingCommands.delete(id);
 
-    if (entry.command === 'list_models' && result !== undefined) {
+    // Relay-originated RPC (get_catalog): validate, cap, and settle the
+    // pending Promise. Raw catalog content and CLI error strings never
+    // reach the response path or the logs.
+    if (entry.command === GET_CATALOG_COMMAND) {
+      if (entry.pending) {
+        if (error !== undefined) {
+          entry.pending.reject(
+            this.classifyGetCatalogError(error)
+          );
+          return;
+        }
+        if (result === undefined) {
+          entry.pending.reject(
+            new LocalRuntimeCommandError(
+              'INVALID_RUNTIME_RESPONSE',
+              'Runtime returned no result'
+            )
+          );
+          return;
+        }
+        const serializedResult = safeStringifyForSize(result);
+        if (serializedResult === null) {
+          entry.pending.reject(
+            new LocalRuntimeCommandError('INVALID_RUNTIME_RESPONSE', 'Result was not serializable')
+          );
+          return;
+        }
+        const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
+        if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
+          entry.pending.reject(
+            new LocalRuntimeCommandError(
+              'RESULT_TOO_LARGE',
+              'Catalog response is too large'
+            )
+          );
+          return;
+        }
+        const parsed = localRuntimeCatalogSchema.safeParse(result);
+        if (!parsed.success) {
+          entry.pending.reject(
+            new LocalRuntimeCommandError(
+              'INVALID_RUNTIME_RESPONSE',
+              'Catalog response failed strict validation'
+            )
+          );
+          return;
+        }
+        entry.pending.resolve(parsed.data);
+        return;
+      }
+      // No pending destination — fall through to the legacy path only as a
+      // last resort (e.g. a get_catalog command snuck in via the WS path,
+      // which is already blocked by COMMAND_NOT_ALLOWED upstream).
+    }
+
+    if (
+      (entry.command === 'list_models' || entry.command === GET_CATALOG_COMMAND) &&
+      result !== undefined
+    ) {
       const serializedResult = JSON.stringify(result);
       const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
       if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
-        this.sendToWeb(entry.ws, {
-          type: 'response',
-          id: entry.originalId,
-          error: CATALOG_TOO_LARGE_ERROR,
-        });
+        if (entry.ws) {
+          if (!entry.originalId) return;
+          this.sendToWeb(entry.ws, {
+            type: 'response',
+            id: entry.originalId,
+            error: CATALOG_TOO_LARGE_ERROR,
+          });
+        }
         return;
       }
     }
 
+    if (!entry.ws) return;
+    if (!entry.originalId) return;
     this.sendToWeb(entry.ws, {
       type: 'response',
       id: entry.originalId,
@@ -616,6 +716,21 @@ export class UserConnectionDO extends DurableObject<Env> {
         ? { error: typeof error === 'string' ? error : CLI_COMMAND_ERROR }
         : {}),
     });
+  }
+
+  /**
+   * Map a CLI error from a `get_catalog` response to a stable relay code.
+   * The CLI's original message is intentionally not propagated; the relay
+   * chooses the user-facing message and never logs the raw string.
+   */
+  private classifyGetCatalogError(error: unknown): LocalRuntimeCommandError {
+    if (typeof error === 'string' && error.toLowerCase().includes('unknown command')) {
+      return new LocalRuntimeCommandError(
+        'CLI_UPGRADE_REQUIRED',
+        'CLI is too old to expose a model catalog'
+      );
+    }
+    return new LocalRuntimeCommandError('RUNTIME_COMMAND_FAILED', 'Runtime command failed');
   }
 
   // ---------------------------------------------------------------------------
@@ -724,6 +839,19 @@ export class UserConnectionDO extends DurableObject<Env> {
   ): void {
     const now = Date.now();
     this.expirePendingCommands(now);
+
+    // `get_catalog` is reserved for the relay-originated `getRuntimeCatalog`
+    // RPC and is not a viewer-initiated command. Refuse it explicitly so a
+    // generic viewer WebSocket cannot impersonate the relay, then return
+    // before allocating any pending work.
+    if (msg.command === GET_CATALOG_COMMAND) {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: COMMAND_NOT_ALLOWED_VIEWER_ERROR,
+      });
+      return;
+    }
 
     // Find target CLI
     let targetCli: WebSocket | undefined;
@@ -941,6 +1069,83 @@ export class UserConnectionDO extends DurableObject<Env> {
     return [...this.runtimes.values()].map(r => this.publicRuntime(r));
   }
 
+  /**
+   * Relay-originated catalog fetch. The exact runtime (runtimeId +
+   * connectionId) is validated against the live socket and capability set
+   * BEFORE any pending work is allocated, so a misrouted call never
+   * reaches the CLI. The command is sent to the exact CLI socket, never a
+   * fallback. The Promise settles when the targeted CLI replies, the
+   * pending TTL elapses, the runtime disconnects, or the runtime is
+   * replaced — each with a stable, mobile-branched error code.
+   */
+  async getRuntimeCatalog(fence: LocalRuntimeFence): Promise<LocalRuntimeCatalog> {
+    this.ensureState();
+    const now = Date.now();
+    this.expirePendingCommands(now);
+
+    // Exact runtimeId lookup. A missing runtimeId means the runtime was
+    // never seen or has been evicted — the safe mobile state is to refresh
+    // the list and pick another runtime, so surface NOT_FOUND.
+    const runtime = this.runtimes.get(fence.runtimeId);
+    if (!runtime) {
+      throw new LocalRuntimeCommandError(
+        'RUNTIME_NOT_CONNECTED',
+        'Runtime is not currently connected'
+      );
+    }
+
+    // Fence must point at the live socket that owns the runtime. A live
+    // socket is required so we have a target to send the command to.
+    if (runtime.connectionId !== fence.connectionId) {
+      throw new LocalRuntimeCommandError(
+        'RUNTIME_FENCE_MISMATCH',
+        'Runtime is owned by a different connection'
+      );
+    }
+    if (!runtime.capabilities.includes('catalog.v1')) {
+      throw new LocalRuntimeCommandError(
+        'RUNTIME_FENCE_MISMATCH',
+        'Runtime does not advertise the catalog.v1 capability'
+      );
+    }
+
+    const targetCli = this.findCliByConnectionId(fence.connectionId);
+    if (!targetCli) {
+      throw new LocalRuntimeCommandError(
+        'RUNTIME_FENCE_MISMATCH',
+        'Runtime socket is not currently connected'
+      );
+    }
+
+    if (this.pendingCommands.size >= UserConnectionDO.MAX_PENDING_COMMANDS) {
+      throw new LocalRuntimeCommandError(
+        'PENDING_COMMAND_LIMIT',
+        'Too many pending commands'
+      );
+    }
+
+    const correlationId = crypto.randomUUID();
+    const promise = new Promise<LocalRuntimeCatalog>((resolve, reject) => {
+      this.pendingCommands.set(correlationId, {
+        pending: { resolve, reject },
+        command: GET_CATALOG_COMMAND,
+        targetConnectionId: fence.connectionId,
+        expiresAt: now + UserConnectionDO.PENDING_COMMAND_TTL_MS,
+        targetCliWs: targetCli,
+      });
+    });
+    this.scheduleNextAlarm(now);
+
+    this.sendToCli(targetCli, {
+      type: 'command',
+      id: correlationId,
+      command: GET_CATALOG_COMMAND,
+      data: { protocolVersion: 1 },
+    });
+
+    return promise;
+  }
+
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
     this.ensureState();
     const parsed = SessionEventPayloadSchema.parse(event);
@@ -1058,14 +1263,26 @@ export class UserConnectionDO extends DurableObject<Env> {
 
   private failPendingCommandsForSocket(targetWs: WebSocket): void {
     for (const [id, entry] of this.pendingCommands) {
-      if (entry.targetCliWs === targetWs) {
-        this.sendToWeb(entry.ws, {
-          type: 'response',
-          id: entry.originalId,
-          error: entry.expectedOwnerConnectionId ? SESSION_OWNER_CHANGED_ERROR : 'CLI disconnected',
-        });
-        this.pendingCommands.delete(id);
+      if (entry.targetCliWs !== targetWs) continue;
+      this.pendingCommands.delete(id);
+      if (entry.pending) {
+        entry.pending.reject(
+          new LocalRuntimeCommandError(
+            'RUNTIME_FENCE_MISMATCH',
+            entry.expectedOwnerConnectionId
+              ? 'Session owner changed before catalog could be read'
+              : 'Runtime disconnected before catalog could be read'
+          )
+        );
+        continue;
       }
+      if (!entry.ws) continue;
+      if (!entry.originalId) continue;
+      this.sendToWeb(entry.ws, {
+        type: 'response',
+        id: entry.originalId,
+        error: entry.expectedOwnerConnectionId ? SESSION_OWNER_CHANGED_ERROR : 'CLI disconnected',
+      });
     }
   }
 
@@ -1078,6 +1295,17 @@ export class UserConnectionDO extends DurableObject<Env> {
         continue;
       }
       this.pendingCommands.delete(id);
+      if (entry.pending) {
+        entry.pending.reject(
+          new LocalRuntimeCommandError(
+            'RUNTIME_FENCE_MISMATCH',
+            'Session owner changed before command completed'
+          )
+        );
+        continue;
+      }
+      if (!entry.ws) continue;
+      if (!entry.originalId) continue;
       this.sendToWeb(entry.ws, {
         type: 'response',
         id: entry.originalId,
@@ -1090,6 +1318,14 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const [id, entry] of this.pendingCommands) {
       if (entry.expiresAt > now) continue;
       this.pendingCommands.delete(id);
+      if (entry.pending) {
+        entry.pending.reject(
+          new LocalRuntimeCommandError('COMMAND_EXPIRED', 'Command expired before response')
+        );
+        continue;
+      }
+      if (!entry.ws) continue;
+      if (!entry.originalId) continue;
       this.sendToWeb(entry.ws, {
         type: 'response',
         id: entry.originalId,
@@ -1159,6 +1395,14 @@ function capabilitiesEqual(a: readonly string[], b: readonly string[]): boolean 
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+function safeStringifyForSize(value: unknown): string | null {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
 }
 
 export function getUserConnectionDO(env: Env, params: { kiloUserId: string }) {

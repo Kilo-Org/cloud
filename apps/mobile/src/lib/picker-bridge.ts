@@ -1,6 +1,40 @@
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
+export type {
+  RuntimeCatalogAgentSelection,
+  RuntimeCatalogAgentSelectionScope,
+} from './picker-bridge-runtime-agent';
+export type {
+  RuntimeCatalogModelSelection,
+  RuntimeCatalogModelSelectionScope,
+} from './picker-bridge-runtime-catalog';
+export type { RuntimePickerSelectionScope } from './picker-bridge-runtime';
+export {
+  areRuntimeCatalogAgentSelectionScopesEqual,
+  clearRuntimeCatalogAgentPickerBridge,
+  commitRuntimeCatalogAgentPickerSelection,
+  getRuntimeCatalogAgentPickerBridge,
+  resolveRuntimeCatalogAgentSelection,
+  setRuntimeCatalogAgentPickerBridge,
+} from './picker-bridge-runtime-agent';
+export {
+  areRuntimeCatalogModelSelectionScopesEqual,
+  clearRuntimeCatalogModelPickerBridge,
+  commitRuntimeCatalogModelPickerSelection,
+  getRuntimeCatalogModelPickerBridge,
+  resolveRuntimeCatalogModelSelection,
+  setRuntimeCatalogModelPickerBridge,
+} from './picker-bridge-runtime-catalog';
+export {
+  areRuntimePickerSelectionScopesEqual,
+  clearRuntimePickerBridge,
+  commitRuntimePickerSelection,
+  getRuntimePickerBridge,
+  resolveRuntimePickerSelection,
+  setRuntimePickerBridge,
+} from './picker-bridge-runtime';
+
 export type ModelPickerSelection = {
   option: SessionModelOption;
   variant: string;

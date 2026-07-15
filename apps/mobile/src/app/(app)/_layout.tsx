@@ -57,6 +57,33 @@ export default function AppLayout() {
                 }}
               />
               <Stack.Screen
+                name="agent-chat/runtime-picker"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.5, fullSheetDetent],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
+                name="agent-chat/runtime-catalog-agent-picker"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.5, fullSheetDetent],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
+                name="agent-chat/runtime-catalog-model-picker"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.5, fullSheetDetent],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
                 name="kilo-pass"
                 options={{
                   presentation: 'modal',

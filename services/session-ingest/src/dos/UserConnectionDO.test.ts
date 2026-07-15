@@ -12,7 +12,11 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-import { MAX_CATALOG_RESULT_BYTES, UserConnectionDO } from './UserConnectionDO';
+import {
+  LocalRuntimeCommandError,
+  MAX_CATALOG_RESULT_BYTES,
+  UserConnectionDO,
+} from './UserConnectionDO';
 
 // ---------------------------------------------------------------------------
 // Mock WebSocket
@@ -2617,6 +2621,418 @@ describe('UserConnectionDO', () => {
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
       expect(doInstance.getRuntimePresence()).toHaveLength(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getRuntimeCatalog RPC (Slice 2)
+  // -------------------------------------------------------------------------
+
+  describe('getRuntimeCatalog RPC', () => {
+    const validRuntime = {
+      runtimeId: '8db3de9a-350f-4fad-a539-8e0da3bbcf5e',
+      connectionId: 'cli-1',
+      protocolVersion: 1,
+      cliVersion: '7.4.7',
+      displayName: 'Alice Mac',
+      projectName: 'customer-repo',
+      capabilities: ['catalog.v1', 'create-and-run.v1'],
+    };
+    const otherRuntime = {
+      ...validRuntime,
+      runtimeId: 'b14c2a7d-4e2d-4f1a-9c8d-7e8f1b2c3d4e',
+      connectionId: 'cli-2',
+    };
+    const capabilityMissingRuntime = {
+      ...validRuntime,
+      runtimeId: '0c0a1b2c-3d4e-4f60-8a8b-9c0d1e2f3a4b',
+      connectionId: 'cli-3',
+      capabilities: ['create-and-run.v1'],
+    };
+    const fence = {
+      runtimeId: validRuntime.runtimeId,
+      connectionId: 'cli-1',
+    };
+    const wireModels = {
+      all: [
+        {
+          id: 'kilo',
+          name: 'Kilo',
+          source: 'env',
+          env: [],
+          options: {},
+          models: {
+            'kilo/auto': {
+              id: 'kilo/auto',
+              providerID: 'kilo',
+              api: { id: 'kilo/auto', url: '', npm: '' },
+              name: 'Auto',
+              capabilities: {
+                temperature: false,
+                reasoning: false,
+                attachment: false,
+                toolcall: false,
+                input: { text: true, audio: false, image: false, video: false, pdf: false },
+                output: { text: true, audio: false, image: false, video: false, pdf: false },
+                interleaved: false,
+              },
+              cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+              limit: { context: 1, output: 1 },
+              status: 'active',
+              options: {},
+              headers: {},
+              release_date: '',
+            },
+          },
+        },
+      ],
+      default: { kilo: 'kilo/auto' },
+      connected: ['kilo'],
+      failed: [],
+      protocolVersion: 1,
+      truncated: false,
+    };
+    const validCatalog = {
+      protocolVersion: 1,
+      models: wireModels,
+      agents: [
+        {
+          slug: 'build',
+          name: 'Build',
+          description: 'Default build agent',
+        },
+      ],
+      defaultAgent: 'build',
+    };
+
+    it('returns the strict catalog for an exact fence and routes the command to the exact socket', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(cliWs);
+      expect(parseSent(cliWs)).toMatchObject({
+        type: 'command',
+        command: 'get_catalog',
+        data: { protocolVersion: 1 },
+      });
+
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result: validCatalog });
+
+      await expect(promise).resolves.toEqual(validCatalog);
+    });
+
+    it('does not fall back to the first available CLI when the exact connectionId is missing', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, cli1, [], undefined, validRuntime);
+      sendHeartbeat(
+        doInstance,
+        cli2,
+        [],
+        undefined,
+        { ...otherRuntime, connectionId: 'cli-2' }
+      );
+      cli1.send.mockClear();
+      cli2.send.mockClear();
+
+      await expect(
+        doInstance.getRuntimeCatalog({
+          runtimeId: validRuntime.runtimeId,
+          connectionId: 'cli-does-not-exist',
+        })
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+
+      expect(cli1.send).not.toHaveBeenCalled();
+      expect(cli2.send).not.toHaveBeenCalled();
+    });
+
+    it('returns RUNTIME_NOT_CONNECTED when the runtime is not registered', async () => {
+      const { doInstance } = setup();
+
+      await expect(
+        doInstance.getRuntimeCatalog({
+          runtimeId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          connectionId: 'cli-1',
+        })
+      ).rejects.toMatchObject({ code: 'RUNTIME_NOT_CONNECTED' });
+    });
+
+    it('returns RUNTIME_FENCE_MISMATCH when the connectionId does not match the live runtime', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+
+      await expect(
+        doInstance.getRuntimeCatalog({
+          runtimeId: validRuntime.runtimeId,
+          connectionId: 'cli-other',
+        })
+      ).rejects.toBeInstanceOf(LocalRuntimeCommandError);
+      await expect(
+        doInstance.getRuntimeCatalog({
+          runtimeId: validRuntime.runtimeId,
+          connectionId: 'cli-other',
+        })
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('returns RUNTIME_FENCE_MISMATCH when the socket was replaced and a new connectionId now owns the runtime', async () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, firstCli, [], undefined, validRuntime);
+
+      // The original socket disconnects; the runtime is evicted by
+      // handleCliDisconnect.
+      mockCtx.removeSocket(firstCli);
+      disconnectCli(doInstance, firstCli);
+
+      // A new socket takes the same runtimeId under a new connectionId.
+      const secondCli = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(
+        doInstance,
+        secondCli,
+        [],
+        undefined,
+        { ...validRuntime, connectionId: 'cli-2' }
+      );
+
+      // The old fence no longer matches the live owner; a refresh would be
+      // required before retrying.
+      await expect(
+        doInstance.getRuntimeCatalog({
+          runtimeId: validRuntime.runtimeId,
+          connectionId: 'cli-1',
+        })
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('rejects when the runtime does not advertise the catalog.v1 capability', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-3');
+      sendHeartbeat(doInstance, cliWs, [], undefined, capabilityMissingRuntime);
+
+      await expect(
+        doInstance.getRuntimeCatalog({
+          runtimeId: capabilityMissingRuntime.runtimeId,
+          connectionId: 'cli-3',
+        })
+      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('rejects a generic viewer WebSocket command "get_catalog" with COMMAND_NOT_ALLOWED', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+      webWs.send.mockClear();
+
+      sendCommand(doInstance, webWs, {
+        id: 'viewer-cmd',
+        command: 'get_catalog',
+        data: { protocolVersion: 1 },
+      });
+
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'viewer-cmd',
+        error: {
+          source: 'relay',
+          code: 'COMMAND_NOT_ALLOWED',
+          message: 'Command not allowed',
+        },
+      });
+    });
+
+    it('maps an "unknown command" CLI error to CLI_UPGRADE_REQUIRED', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: get_catalog',
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'CLI_UPGRADE_REQUIRED' });
+    });
+
+    it('returns RESULT_TOO_LARGE when the catalog response exceeds 512 KiB', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { padding: 'x'.repeat(MAX_CATALOG_RESULT_BYTES + 1) },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
+    });
+
+    it('returns INVALID_RUNTIME_RESPONSE when the result fails strict parsing', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(cliWs);
+
+      // Wrong protocolVersion literal — the cross-service contract is strict
+      // and `.strict()`-rejects any extra field, so a single bad discriminator
+      // is the smallest reproducible failure.
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { protocolVersion: 2, models: {}, agents: [], defaultAgent: 'build' },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'INVALID_RUNTIME_RESPONSE' });
+    });
+
+    it('returns RUNTIME_COMMAND_FAILED on a CLI-supplied non-relay error', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(cliWs);
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: { code: 'INTERNAL', message: 'boom' },
+      });
+
+      await expect(promise).rejects.toMatchObject({ code: 'RUNTIME_COMMAND_FAILED' });
+    });
+
+    it('returns COMMAND_EXPIRED when the response does not arrive before the pending TTL elapses', async () => {
+      const now = 1_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      // Drain the microtask queue so the promise attaches
+      await Promise.resolve();
+
+      vi.mocked(Date.now).mockReturnValue(now + 35_001);
+      await doInstance.alarm();
+
+      await expect(promise).rejects.toMatchObject({ code: 'COMMAND_EXPIRED' });
+    });
+
+    it('returns RUNTIME_FENCE_MISMATCH when the runtime disconnects before responding', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+
+      mockCtx.removeSocket(cliWs);
+      disconnectCli(doInstance, cliWs);
+
+      await expect(promise).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+    });
+
+    it('ignores a late response from a non-target socket and does not settle the pending promise', async () => {
+      const { doInstance, mockCtx } = setup();
+      const targetCli = addCliSocket(mockCtx, 'cli-1');
+      const otherCli = addCliSocket(mockCtx, 'cli-2');
+      sendHeartbeat(doInstance, targetCli, [], undefined, validRuntime);
+      sendHeartbeat(
+        doInstance,
+        otherCli,
+        [],
+        undefined,
+        { ...otherRuntime, connectionId: 'cli-2' }
+      );
+      targetCli.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(targetCli);
+
+      // A stray response from a different socket must not resolve the promise.
+      sendCliResponse(doInstance, otherCli, {
+        id: correlationId,
+        result: { ...validCatalog, defaultAgent: 'wrong' },
+      });
+
+      // The promise must still be pending. We use a small synchronous check
+      // (Promise.race with a 0ms timer) to confirm it has not settled.
+      const settled = await Promise.race([
+        promise.then(() => 'settled' as const).catch(() => 'settled' as const),
+        new Promise<'pending'>(resolve => setTimeout(() => resolve('pending'), 5)),
+      ]);
+      expect(settled).toBe('pending');
+
+      // The correct socket can still respond.
+      sendCliResponse(doInstance, targetCli, { id: correlationId, result: validCatalog });
+      await expect(promise).resolves.toEqual(validCatalog);
+    });
+
+    it('routes a fresh request to the replacement socket after the original disconnects', async () => {
+      const { doInstance, mockCtx } = setup();
+      const firstCli = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, firstCli, [], undefined, validRuntime);
+
+      // Old socket closes; in production closeStaleSocket triggers
+      // webSocketClose. The mock doesn't auto-remove from the list, so
+      // do it explicitly before adding the replacement.
+      mockCtx.removeSocket(firstCli);
+      disconnectCli(doInstance, firstCli);
+
+      // Reconnect: the new socket has the same connectionId.
+      const secondCli = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, secondCli, [], undefined, validRuntime);
+      secondCli.send.mockClear();
+
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(secondCli);
+      sendCliResponse(doInstance, secondCli, { id: correlationId, result: validCatalog });
+
+      await expect(promise).resolves.toEqual(validCatalog);
+    });
+
+    it('does not log the raw catalog payload on success', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], undefined, validRuntime);
+      cliWs.send.mockClear();
+
+      const sentinel = 'raw-catalog-payload-must-not-be-logged';
+      const promise = doInstance.getRuntimeCatalog(fence);
+      const correlationId = getCorrelationId(cliWs);
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        result: { ...validCatalog, defaultAgent: sentinel },
+      });
+      await promise;
+
+      const dumped = JSON.stringify({
+        errors: errorSpy.mock.calls,
+        warns: warnSpy.mock.calls,
+      });
+      expect(dumped).not.toContain(sentinel);
     });
   });
 });

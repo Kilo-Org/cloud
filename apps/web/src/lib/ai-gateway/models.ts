@@ -57,7 +57,9 @@ export const preferredModels = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_CURRENT_MODEL_ID,
   ...(gpt_5_6_sol_stealth_model.status === 'public' ? [gpt_5_6_sol_stealth_model.public_id] : []),
-  deepseek_v4_pro_discounted_model.public_id,
+  deepseek_v4_pro_discounted_model.status === 'public'
+    ? deepseek_v4_pro_discounted_model.public_id
+    : 'deepseek/deepseek-v4-pro',
   GLM_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,

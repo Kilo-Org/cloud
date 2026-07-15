@@ -4,6 +4,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { deepseek_v4_pro_discounted_model } from '@/lib/ai-gateway/providers/deepseek';
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
@@ -14,7 +15,9 @@ describe('OpenRouter Models Config', () => {
       CLAUDE_SONNET_CURRENT_MODEL_ID,
       CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,
-      'deepseek/deepseek-v4-pro:discounted',
+      deepseek_v4_pro_discounted_model.status === 'public'
+        ? deepseek_v4_pro_discounted_model.public_id
+        : 'deepseek/deepseek-v4-pro',
       QWEN37_PLUS_MODEL_ID,
       'z-ai/glm-5.2',
     ];
@@ -26,7 +29,6 @@ describe('OpenRouter Models Config', () => {
     const supersededModels = [
       'openai/gpt-5.6-terra',
       'stealth/claude-opus-4.8',
-      'deepseek/deepseek-v4-pro',
       'stealth/qwen3.6-plus',
     ];
 
@@ -42,5 +44,11 @@ describe('OpenRouter Models Config', () => {
     } else {
       expect(preferredModels).not.toContain(gpt_5_6_sol_stealth_model.public_id);
     }
+
+    const inactiveDeepSeekVariant =
+      deepseek_v4_pro_discounted_model.status === 'public'
+        ? 'deepseek/deepseek-v4-pro'
+        : deepseek_v4_pro_discounted_model.public_id;
+    expect(preferredModels).not.toContain(inactiveDeepSeekVariant);
   });
 });

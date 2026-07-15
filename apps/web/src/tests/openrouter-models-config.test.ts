@@ -13,9 +13,7 @@ describe('OpenRouter Models Config', () => {
     const expectedModels = [
       CLAUDE_SONNET_CURRENT_MODEL_ID,
       CLAUDE_OPUS_CURRENT_MODEL_ID,
-      gpt_5_6_sol_stealth_model.status === 'public'
-        ? gpt_5_6_sol_stealth_model.public_id
-        : GPT_CURRENT_MODEL_ID,
+      GPT_CURRENT_MODEL_ID,
       'deepseek/deepseek-v4-pro:discounted',
       QWEN37_PLUS_MODEL_ID,
       'z-ai/glm-5.2',
@@ -36,10 +34,13 @@ describe('OpenRouter Models Config', () => {
       expect(preferredModels).not.toContain(model);
     });
 
-    const inactiveSolVariant =
-      gpt_5_6_sol_stealth_model.status === 'public'
-        ? GPT_CURRENT_MODEL_ID
-        : gpt_5_6_sol_stealth_model.public_id;
-    expect(preferredModels).not.toContain(inactiveSolVariant);
+    if (gpt_5_6_sol_stealth_model.status === 'public') {
+      expect(preferredModels).toContain(gpt_5_6_sol_stealth_model.public_id);
+      expect(preferredModels.indexOf(GPT_CURRENT_MODEL_ID)).toBeLessThan(
+        preferredModels.indexOf(gpt_5_6_sol_stealth_model.public_id)
+      );
+    } else {
+      expect(preferredModels).not.toContain(gpt_5_6_sol_stealth_model.public_id);
+    }
   });
 });

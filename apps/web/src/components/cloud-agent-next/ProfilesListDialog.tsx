@@ -1090,10 +1090,12 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                       placeholder="npm install"
                       className="font-mono"
                       autoFocus
+                      disabled={savingCommands}
                       onKeyDown={e => {
+                        if (savingCommands) return;
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          handleSaveCommand(index);
+                          void handleSaveCommand(index);
                         } else if (e.key === 'Escape') {
                           resetEditCommandForm();
                         }
@@ -1113,20 +1115,14 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                         onClick={() => handleSaveCommand(index)}
                         disabled={savingCommands}
                       >
-                        {savingCommands ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Save'
-                        )}
+                        {savingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   // View mode
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-5 shrink-0 text-xs">
-                      {index + 1}.
-                    </span>
+                    <span className="text-muted-foreground w-5 shrink-0 text-xs">{index + 1}.</span>
                     <code className="bg-muted flex-1 truncate rounded px-2 py-1 font-mono text-sm">
                       {cmd.command}
                     </code>
@@ -1147,8 +1143,7 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
                         className="h-7 w-7"
                         onClick={() => handleMoveCommand(index, 'down')}
                         disabled={
-                          index === (profile?.commands.length ?? 0) - 1 ||
-                          commandActionsDisabled
+                          index === (profile?.commands.length ?? 0) - 1 || commandActionsDisabled
                         }
                         aria-label="Move down"
                       >

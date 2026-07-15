@@ -150,7 +150,13 @@ describe('buildSessionSections', () => {
       ids(
         buildSessionSections({
           activeNow: true,
-          activeSessions: [active({ id: 'match', title: 'Fix checkout', gitUrl: 'https://github.com/kilo/repo.git' })],
+          activeSessions: [
+            active({
+              id: 'match',
+              title: 'Fix checkout',
+              gitUrl: 'https://github.com/kilo/repo.git',
+            }),
+          ],
           storedGroups: [],
           platformFilter: [],
           projectFilter: ['https://github.com/kilo/repo.git'],
@@ -196,7 +202,10 @@ describe('buildSessionSections', () => {
 
     const sections = buildSessionSections({
       activeNow: true,
-      activeSessions: [active({ id: 'remote-only' }), active({ id: 'remote-org', organizationId: 'org-1' })],
+      activeSessions: [
+        active({ id: 'remote-only' }),
+        active({ id: 'remote-org', organizationId: 'org-1' }),
+      ],
       storedGroups: [{ label: 'Today', sessions: [orgStored] }],
       platformFilter: [],
       projectFilter: [],
@@ -259,8 +268,6 @@ describe('buildSessionSections', () => {
       organizationId: null,
     });
 
-    expect(ids(sections)).toEqual([
-      { title: 'Today', ids: ['returned'], kinds: ['stored'] },
-    ]);
+    expect(ids(sections)).toEqual([{ title: 'Today', ids: ['returned'], kinds: ['stored'] }]);
   });
 });

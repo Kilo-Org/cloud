@@ -17,11 +17,15 @@ function readStringArray(value: unknown): string[] {
 }
 
 export function parseStoredAgentSessionFilters(raw: string | null): AgentSessionFilters | null {
-  if (!raw) return null;
+  if (!raw) {
+    return null;
+  }
 
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) return null;
+    if (!isRecord(parsed)) {
+      return null;
+    }
 
     return {
       activeNow: typeof parsed.activeNow === 'boolean' ? parsed.activeNow : true,

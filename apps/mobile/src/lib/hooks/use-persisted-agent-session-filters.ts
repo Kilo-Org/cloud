@@ -9,7 +9,9 @@ import {
 } from '@/lib/agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
 
-type FiltersUpdater = Partial<AgentSessionFilters> | ((prev: AgentSessionFilters) => AgentSessionFilters);
+type FiltersUpdater =
+  | Partial<AgentSessionFilters>
+  | ((prev: AgentSessionFilters) => AgentSessionFilters);
 type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
 
 async function loadStoredFilters(): Promise<AgentSessionFilters> {
@@ -18,7 +20,9 @@ async function loadStoredFilters(): Promise<AgentSessionFilters> {
 }
 
 export function usePersistedAgentSessionFilters() {
-  const [filters, setFiltersState] = useState<AgentSessionFilters>(() => createDefaultAgentSessionFilters());
+  const [filters, setFiltersState] = useState<AgentSessionFilters>(() =>
+    createDefaultAgentSessionFilters()
+  );
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {

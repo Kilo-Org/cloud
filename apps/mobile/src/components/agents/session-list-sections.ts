@@ -31,11 +31,19 @@ const knownPlatforms = new Set([
 ]);
 
 function matchesPlatformSelection(platform: string, selected: string[]): boolean {
-  if (selected.length === 0) return true;
+  if (selected.length === 0) {
+    return true;
+  }
   return selected.some(value => {
-    if (value === 'cloud-agent') return platform === 'cloud-agent' || platform === 'cloud-agent-web';
-    if (value === 'extension') return platform === 'vscode' || platform === 'agent-manager';
-    if (value === 'other') return !knownPlatforms.has(platform);
+    if (value === 'cloud-agent') {
+      return platform === 'cloud-agent' || platform === 'cloud-agent-web';
+    }
+    if (value === 'extension') {
+      return platform === 'vscode' || platform === 'agent-manager';
+    }
+    if (value === 'other') {
+      return !knownPlatforms.has(platform);
+    }
     return platform === value;
   });
 }
@@ -52,8 +60,13 @@ function matchesActiveFilters(
     return false;
   }
   const platform = session.createdOnPlatform ?? 'cli';
-  if (!matchesPlatformSelection(platform, input.platformFilter)) return false;
-  if (input.projectFilter.length > 0 && (!session.gitUrl || !input.projectFilter.includes(session.gitUrl))) {
+  if (!matchesPlatformSelection(platform, input.platformFilter)) {
+    return false;
+  }
+  if (
+    input.projectFilter.length > 0 &&
+    (!session.gitUrl || !input.projectFilter.includes(session.gitUrl))
+  ) {
     return false;
   }
   return input.searchQuery
@@ -71,7 +84,9 @@ export function buildSessionSections(input: BuildSessionSectionsInput): SessionS
   const storedGroups = input.storedGroups.map(group => ({
     ...group,
     sessions: group.sessions.filter(session => {
-      if (seenStoredIds.has(session.session_id)) return false;
+      if (seenStoredIds.has(session.session_id)) {
+        return false;
+      }
       seenStoredIds.add(session.session_id);
       return true;
     }),
@@ -90,7 +105,9 @@ export function buildSessionSections(input: BuildSessionSectionsInput): SessionS
         .map(session => storedItem(session, activeIds)),
       ...activeOnly.map((session): RemoteSessionItem => ({ kind: 'remote', session })),
     ];
-    if (activeItems.length > 0) result.push({ title: 'Active now', data: activeItems });
+    if (activeItems.length > 0) {
+      result.push({ title: 'Active now', data: activeItems });
+    }
   } else if (activeOnly.length > 0) {
     result.push({
       title: 'Remote',

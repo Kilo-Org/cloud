@@ -21,13 +21,14 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { type FraudDetectionHeaders } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
   repairMessagesTools,
   sanitizeBinaryToolResults,
 } from '@/lib/ai-gateway/tool-calling';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
   addCacheBreakpoints,
   enableReasoningSummaries,
@@ -134,7 +135,14 @@ export async function applyProviderSpecificLogic(
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
+
     repairChatCompletionsTools(requestToMutate.body);
+
+    if (isClaudeModel(requestedModel)) {
+      // Workaround for older clients corrupting Claude reasoning, resulting in:
+      // `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified
+      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
+    }
   }
 
   if (requestToMutate.kind === 'messages') {

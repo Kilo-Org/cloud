@@ -17,6 +17,7 @@ import {
   formatSafeCloudAgentFailureDiagnostic,
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
+import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { trpcClient } from '@/lib/trpc';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
@@ -130,6 +131,7 @@ export function createMobileAgentSessionManager({
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
     },
+    fetchSnapshotPage: fetchMobileSessionSnapshotPage,
     api: {
       send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {

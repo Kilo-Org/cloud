@@ -11,7 +11,7 @@ import {
   type UserWebConnection,
   type UserWebSystemEvent,
 } from './user-web-connection';
-import type { KiloSessionId, SessionSnapshot } from './types';
+import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 
 const KILO_SESSION_ID = kiloId('kilo-ses-1');
@@ -1215,6 +1215,320 @@ describe('CliLiveTransport unified user web connection', () => {
       transport.send!({ payload: { type: 'command', command: 'review', arguments: '' } })
     ).rejects.toThrow('Slash commands are not supported on the CLI live transport yet');
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Page-seam + reconnect: transport uses fetchSnapshotPage for the initial
+// bounded read AND for reconnect/delayed resync replays, but only the initial
+// read fires onInitialPageLoaded. A reconnect must never reset the user's
+// already-advanced older-pages cursor back to the latest 50.
+// ---------------------------------------------------------------------------
+
+type FetchPage = (
+  kiloSessionId: KiloSessionId,
+  options: { cursor?: string }
+) => Promise<SessionSnapshotPageOutcome | null>;
+
+type CreatePageTransportOptions = {
+  fetchSnapshotPage: FetchPage;
+  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  onInitialPageLoaded?: (page: {
+    info: { id: string };
+    messages: Array<{ info: { id: string; sessionID: string }; parts: unknown[] }>;
+    nextCursor: string | null;
+    omittedItemCount: number;
+  }) => void;
+  onError?: (message: string) => void;
+};
+
+function createPageTransport(options: CreatePageTransportOptions) {
+  const chatEvents: ChatEvent[] = [];
+  const serviceEvents: ServiceEvent[] = [];
+  let replayCompleteCount = 0;
+  const userWebConnection = createConnection();
+  const fetchSnapshotPage = jest.fn(options.fetchSnapshotPage);
+  const onInitialPageLoaded = jest.fn(options.onInitialPageLoaded ?? (() => undefined));
+  const onError = jest.fn(options.onError ?? (() => undefined));
+
+  const transport = createCliLiveTransport({
+    kiloSessionId: KILO_SESSION_ID,
+    userWebConnection,
+    ...(options.fetchSnapshot ? { fetchSnapshot: options.fetchSnapshot } : {}),
+    fetchSnapshotPage,
+    onInitialPageLoaded,
+    onError,
+  })({
+    onChatEvent: event => chatEvents.push(event),
+    onServiceEvent: event => serviceEvents.push(event),
+    onReplayComplete: () => {
+      replayCompleteCount += 1;
+    },
+  });
+
+  return {
+    transport,
+    userWebConnection,
+    chatEvents,
+    serviceEvents,
+    fetchSnapshotPage,
+    onInitialPageLoaded,
+    onError,
+    getReplayCompleteCount: () => replayCompleteCount,
+  };
+}
+
+function makeLivePage(
+  options: {
+    nextCursor?: string | null;
+    omittedItemCount?: number;
+    id?: string;
+  } = {}
+): Extract<SessionSnapshotPageOutcome, { kind: 'success' }> {
+  return {
+    kind: 'success',
+    info: { id: options.id ?? KILO_SESSION_ID },
+    messages: [],
+    nextCursor: options.nextCursor ?? null,
+    omittedItemCount: options.omittedItemCount ?? 0,
+  };
+}
+
+describe('CliLiveTransport page-seam + reconnect', () => {
+  it('uses fetchSnapshotPage for the initial bounded read and reports it via onInitialPageLoaded', async () => {
+    const page = makeLivePage({ nextCursor: 'cursor-A', omittedItemCount: 2 });
+    const { transport, fetchSnapshotPage, onInitialPageLoaded, serviceEvents } =
+      createPageTransport({
+        fetchSnapshotPage: async () => page,
+      });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {});
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+    // session.created from the page must have flowed through.
+    expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
+    transport.destroy();
+  });
+
+  it('does not call onInitialPageLoaded again on a reconnect replay (cursor preserved)', async () => {
+    const initial = makeLivePage({ nextCursor: 'cursor-A', omittedItemCount: 0 });
+    const reconnect = makeLivePage({ nextCursor: 'cursor-B', omittedItemCount: 0 });
+    const fetchSnapshotPage = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(reconnect);
+    const onInitialPageLoaded = jest.fn();
+    const {
+      transport,
+      userWebConnection,
+      fetchSnapshotPage: _fetch,
+    } = createPageTransport({
+      fetchSnapshotPage,
+      onInitialPageLoaded,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+    expect(onInitialPageLoaded).toHaveBeenLastCalledWith(initial);
+
+    // Reconnect replay: the transport re-fetches the page (so the manager's
+    // already-advanced older-pages cursor is not overwritten), but it must
+    // NOT fire onInitialPageLoaded again — that hook is the manager's signal
+    // to advance `loadOlderGeneration`, which would reset the cursor.
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(_fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('does not call onInitialPageLoaded on the delayed resync replay', async () => {
+    jest.useFakeTimers();
+    try {
+      const initial = makeLivePage({ nextCursor: 'cursor-A' });
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValue(makeLivePage({ nextCursor: 'cursor-B' }));
+      const onInitialPageLoaded = jest.fn();
+      const { transport, userWebConnection } = createPageTransport({
+        fetchSnapshotPage,
+        onInitialPageLoaded,
+      });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      userWebConnection.emitReconnect();
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Still only the initial page fired the hook; reconnect + resync
+      // replays never reset the user's older-pages cursor.
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('surfaces retryable_failure on the initial read via onError but stays subscribed', async () => {
+    const onError = jest.fn();
+    const { transport, userWebConnection, onInitialPageLoaded, serviceEvents } =
+      createPageTransport({
+        fetchSnapshotPage: async () => ({ kind: 'retryable_failure' }),
+        onError,
+      });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onInitialPageLoaded).not.toHaveBeenCalled();
+    // No session.created was emitted because no successful page replayed.
+    expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+    expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
+    transport.destroy();
+  });
+
+  it('surfaces too_large and invalid_data typed failures via onError', async () => {
+    for (const failure of [
+      { kind: 'too_large' as const, expected: 'Session history too large to load' },
+      { kind: 'invalid_data' as const, expected: 'Session history is unavailable' },
+    ]) {
+      const onError = jest.fn();
+      const { transport, onInitialPageLoaded } = createPageTransport({
+        fetchSnapshotPage: async () => failure,
+        onError,
+      });
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onError).toHaveBeenCalledWith(failure.expected);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      transport.destroy();
+    }
+  });
+
+  it('treats a null page result as session not found via onError', async () => {
+    const onError = jest.fn();
+    const { transport, onInitialPageLoaded } = createPageTransport({
+      fetchSnapshotPage: async () => null,
+      onError,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onInitialPageLoaded).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('prefers fetchSnapshotPage over legacy fetchSnapshot when both are provided', async () => {
+    const page = makeLivePage({ nextCursor: 'cursor-A' });
+    const fetchSnapshot = jest.fn(() =>
+      Promise.reject(new Error('legacy fetchSnapshot must not be called'))
+    );
+    const { transport, fetchSnapshotPage, onInitialPageLoaded } = createPageTransport({
+      fetchSnapshotPage: async () => page,
+      fetchSnapshot,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+    expect(fetchSnapshot).not.toHaveBeenCalled();
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+    transport.destroy();
+  });
+
+  it('drains buffered live events only after a successful reconnect page', async () => {
+    let resolveReconnectPage: ((page: SessionSnapshotPageOutcome | null) => void) | undefined;
+    const initial = makeLivePage({ nextCursor: 'cursor-A' });
+    const fetchSnapshotPage = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+      .mockResolvedValueOnce(initial)
+      .mockReturnValueOnce(
+        new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+          resolveReconnectPage = resolve;
+        })
+      );
+    const { transport, userWebConnection, chatEvents } = createPageTransport({
+      fetchSnapshotPage,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+    // After the initial bounded read, the buffer is drained; emitting now
+    // passes the event straight through.
+    emitMessageUpdated(userWebConnection);
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(1);
+
+    // Trigger a reconnect, then emit a new live event while the page is
+    // still in flight. It must be buffered, not emitted ahead of the page.
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(1);
+
+    emitMessageUpdated(userWebConnection);
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(1);
+
+    // Resolving the reconnect page must drain the buffered event AFTER the
+    // page replay so we never show a newer message over an older snapshot.
+    resolveReconnectPage?.(makeLivePage({ nextCursor: 'cursor-B' }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(2);
+    transport.destroy();
+  });
+
+  it('swallows a rejected reconnect page without leaving events stranded', async () => {
+    const initial = makeLivePage({ nextCursor: 'cursor-A' });
+    const fetchSnapshotPage = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+      .mockResolvedValueOnce(initial)
+      .mockRejectedValueOnce(new Error('reconnect refetch failed'));
+    const onError = jest.fn();
+    const { transport, userWebConnection, chatEvents, getReplayCompleteCount } =
+      createPageTransport({
+        fetchSnapshotPage,
+        onError,
+      });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    emitMessageUpdated(userWebConnection);
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Initial reconnect errors must not surface to the manager — the live
+    // stream carries on. The buffered event must still be drained.
+    expect(onError).not.toHaveBeenCalled();
+    expect(chatEvents).toHaveLength(1);
+    expect(getReplayCompleteCount()).toBeGreaterThanOrEqual(2);
     transport.destroy();
   });
 });

@@ -409,6 +409,8 @@ export const kilocode_users = pgTable(
       .notNull()
       .unique(),
     is_admin: boolean().default(false).notNull(),
+    is_super_admin: boolean().default(false).notNull(),
+    can_view_sessions: boolean().default(false).notNull(),
     can_manage_credits: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
@@ -465,6 +467,14 @@ export const kilocode_users = pgTable(
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
+    check(
+      'kilocode_users_is_super_admin_requires_admin_check',
+      sql`NOT ${table.is_super_admin} OR ${table.is_admin}`
+    ),
+    check(
+      'kilocode_users_can_view_sessions_requires_admin_check',
+      sql`NOT ${table.can_view_sessions} OR ${table.is_admin}`
+    ),
     check(
       'kilocode_users_can_manage_credits_requires_admin_check',
       sql`NOT ${table.can_manage_credits} OR ${table.is_admin}`

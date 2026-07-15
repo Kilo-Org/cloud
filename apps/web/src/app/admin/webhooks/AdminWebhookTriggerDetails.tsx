@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Webhook, ExternalLink, ShieldCheck } from 'lucide-react';
 import { WebhookRequestsContent } from '@/app/(app)/cloud/webhooks/[triggerId]/requests/WebhookRequestsContent';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 type AdminWebhookTriggerDetailsProps = {
   params: Promise<{ id: string; triggerId: string }>;
@@ -30,6 +31,7 @@ function formatTimestamp(value: string) {
 export function AdminWebhookTriggerDetails({ params, scope }: AdminWebhookTriggerDetailsProps) {
   const { id, triggerId } = use(params);
   const trpc = useTRPC();
+  const { canViewSessions } = useAdminPermissions();
 
   const ownerId = decodeURIComponent(id);
   const isOrg = scope === 'organization';
@@ -202,12 +204,14 @@ export function AdminWebhookTriggerDetails({ params, scope }: AdminWebhookTrigge
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Captured Requests</h2>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/session-traces">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open Session Traces
-              </Link>
-            </Button>
+            {canViewSessions && (
+              <Button variant="outline" size="sm" className="h-11" asChild>
+                <Link href="/admin/session-traces">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open Session Traces
+                </Link>
+              </Button>
+            )}
           </div>
           <WebhookRequestsContent
             params={params}

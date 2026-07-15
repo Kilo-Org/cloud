@@ -1,5 +1,11 @@
 // admin-router.ts
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import {
+  adminProcedure,
+  createTRPCRouter,
+  sessionViewerProcedure,
+  superadminProcedure,
+} from '@/lib/trpc/init';
+import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin } from '@/lib/admin/platform-admin';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -299,6 +305,20 @@ const SetPlatformAdminAccessSchema = z.object({
   isAdmin: z.boolean(),
 });
 
+const SetAdminPermissionsSchema = z.object({
+  userId: z.string().min(1),
+  permissions: z
+    .object({
+      isSuperadmin: z.boolean().optional(),
+      canViewSessions: z.boolean().optional(),
+      canManageCredits: z.boolean().optional(),
+    })
+    .refine(
+      permissions => Object.values(permissions).some(value => value !== undefined),
+      'At least one permission must be provided'
+    ),
+});
+
 // Narrow column projection shared by the platform-admin roster and
 // candidate-search results. Both `.select(...)` call sites below reuse this
 // same object (rather than repeating the column list) so their result shapes
@@ -311,11 +331,15 @@ const platformAdminUserColumns = {
   google_user_image_url: kilocode_users.google_user_image_url,
   hosted_domain: kilocode_users.hosted_domain,
   blocked_reason: kilocode_users.blocked_reason,
+  is_super_admin: kilocode_users.is_super_admin,
+  can_view_sessions: kilocode_users.can_view_sessions,
   can_manage_credits: kilocode_users.can_manage_credits,
   is_admin: kilocode_users.is_admin,
 };
 
 type PlatformAdminUser = InferColumnsDataTypes<typeof platformAdminUserColumns>;
+
+const SUPERADMIN_MEMBERSHIP_LOCK_KEY = 'platform-superadmin-membership';
 
 function toPlatformAdminUser(user: typeof kilocode_users.$inferSelect): PlatformAdminUser {
   return {
@@ -325,9 +349,42 @@ function toPlatformAdminUser(user: typeof kilocode_users.$inferSelect): Platform
     google_user_image_url: user.google_user_image_url,
     hosted_domain: user.hosted_domain,
     blocked_reason: user.blocked_reason,
+    is_super_admin: user.is_super_admin,
+    can_view_sessions: user.can_view_sessions,
     can_manage_credits: user.can_manage_credits,
     is_admin: user.is_admin,
   };
+}
+
+async function lockSuperadminMembership(tx: DrizzleTransaction) {
+  await tx.execute(
+    sql`SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(${SUPERADMIN_MEMBERSHIP_LOCK_KEY}, 0))`
+  );
+}
+
+async function assertNotLastUnblockedSuperadmin(
+  tx: DrizzleTransaction,
+  target: typeof kilocode_users.$inferSelect
+) {
+  if (!target.is_admin || !target.is_super_admin || target.blocked_reason !== null) return;
+
+  const [result] = await tx
+    .select({ value: sql<number>`count(*)::int` })
+    .from(kilocode_users)
+    .where(
+      and(
+        eq(kilocode_users.is_admin, true),
+        eq(kilocode_users.is_super_admin, true),
+        isNull(kilocode_users.blocked_reason)
+      )
+    );
+
+  if (!result || result.value <= 1) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'The final unblocked superadmin cannot be revoked.',
+    });
+  }
 }
 
 const GetStytchFingerprintsSchema = z.object({
@@ -406,9 +463,21 @@ const CancelKiloClawSubscriptionSchema = z.object({
 });
 
 export const adminRouter = createTRPCRouter({
-  getPermissions: adminProcedure.query(({ ctx }) => ({
-    canManageCredits: userCanManageCredits(ctx.user),
-  })),
+  getPermissions: adminProcedure.query(async ({ ctx }) => {
+    const currentUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, ctx.user.id),
+    });
+
+    if (!currentUser || currentUser.blocked_reason !== null || !currentUser.is_admin) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+    }
+
+    return {
+      isSuperadmin: userIsSuperadmin(currentUser),
+      canViewSessions: userCanViewSessions(currentUser),
+      canManageCredits: userCanManageCredits(currentUser),
+    };
+  }),
   kiloclawReferrals: adminKiloclawReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
@@ -1505,10 +1574,7 @@ export const adminRouter = createTRPCRouter({
 
       return {
         currentUserId: ctx.user.id,
-        canGrantAdmins: isEligibleForPlatformAdmin(
-          ctx.user.google_user_email,
-          ctx.user.hosted_domain
-        ),
+        canManageAdmins: userIsSuperadmin(ctx.user),
         admins,
       };
     }),
@@ -1517,16 +1583,9 @@ export const adminRouter = createTRPCRouter({
     // kilocode.ai users. Filtering here is a UX convenience, not a security
     // boundary: setPlatformAdminAccess independently re-validates eligibility
     // against freshly locked rows before granting.
-    searchPlatformAdminCandidates: adminProcedure
+    searchPlatformAdminCandidates: superadminProcedure
       .input(SearchPlatformAdminCandidatesSchema)
-      .query(async ({ input, ctx }) => {
-        if (!isEligibleForPlatformAdmin(ctx.user.google_user_email, ctx.user.hosted_domain)) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Only a qualifying kilocode.ai admin can search for grant candidates.',
-          });
-        }
-
+      .query(async ({ input }) => {
         const escaped = input.query.replace(/[%_\\]/g, '\\$&');
 
         const candidates = await db
@@ -1554,7 +1613,7 @@ export const adminRouter = createTRPCRouter({
         return candidates;
       }),
 
-    setPlatformAdminAccess: adminProcedure
+    setPlatformAdminAccess: superadminProcedure
       .input(SetPlatformAdminAccessSchema)
       .mutation(async ({ input, ctx }) => {
         const actorId = ctx.user.id;
@@ -1567,9 +1626,133 @@ export const adminRouter = createTRPCRouter({
           });
         }
 
-        return await db.transaction(async tx => {
-          // Deterministic lock ordering (by ID) avoids deadlocks when two
-          // admins concurrently act on each other in opposite directions.
+        const updateAccess = async (serializeSuperadminRemoval: boolean) =>
+          db.transaction(async tx => {
+            if (serializeSuperadminRemoval) {
+              await lockSuperadminMembership(tx);
+            }
+
+            // Deterministic lock ordering (by ID) avoids deadlocks when two
+            // admins concurrently act on each other in opposite directions.
+            const lockIds = [...new Set([actorId, targetId])].sort();
+            const lockedRows = await tx
+              .select()
+              .from(kilocode_users)
+              .where(inArray(kilocode_users.id, lockIds))
+              .orderBy(asc(kilocode_users.id))
+              .for('update');
+
+            const actor = lockedRows.find(row => row.id === actorId);
+            const target = lockedRows.find(row => row.id === targetId);
+
+            if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+              throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
+            }
+
+            if (!target) {
+              throw new TRPCError({ code: 'NOT_FOUND', message: 'Target user not found' });
+            }
+
+            // An ordinary-admin revoke needs no global lock. If the locked row
+            // shows that this operation would reduce superadmin membership,
+            // release the row locks and retry under the membership lock.
+            if (!input.isAdmin && target.is_super_admin && !serializeSuperadminRemoval) {
+              return { retryWithMembershipLock: true as const };
+            }
+
+            // No-op: the target already has the requested state. Return early
+            // without rotating the session pepper or inserting a duplicate note.
+            if (target.is_admin === input.isAdmin) {
+              return {
+                retryWithMembershipLock: false as const,
+                result: { changed: false as const, user: toPlatformAdminUser(target) },
+              };
+            }
+
+            if (input.isAdmin) {
+              if (!isEligibleForPlatformAdmin(target.google_user_email, target.hosted_domain)) {
+                throw new TRPCError({
+                  code: 'FORBIDDEN',
+                  message: 'Target user is not eligible for platform admin access.',
+                });
+              }
+            } else {
+              await assertNotLastUnblockedSuperadmin(tx, target);
+            }
+
+            const [updatedTarget] = await tx
+              .update(kilocode_users)
+              .set(
+                input.isAdmin
+                  ? {
+                      is_admin: true,
+                      web_session_pepper: crypto.randomUUID(),
+                      api_token_pepper: crypto.randomUUID(),
+                    }
+                  : {
+                      is_admin: false,
+                      is_super_admin: false,
+                      can_view_sessions: false,
+                      can_manage_credits: false,
+                      web_session_pepper: crypto.randomUUID(),
+                      api_token_pepper: crypto.randomUUID(),
+                    }
+              )
+              .where(eq(kilocode_users.id, target.id))
+              .returning();
+
+            if (!updatedTarget) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to update target user',
+              });
+            }
+
+            await tx.insert(user_admin_notes).values({
+              kilo_user_id: target.id,
+              admin_kilo_user_id: actor.id,
+              note_content: input.isAdmin
+                ? 'Granted platform admin access.'
+                : 'Revoked platform admin access.',
+            });
+
+            return {
+              retryWithMembershipLock: false as const,
+              result: { changed: true as const, user: toPlatformAdminUser(updatedTarget) },
+            };
+          });
+
+        const firstAttempt = await updateAccess(false);
+        if (!firstAttempt.retryWithMembershipLock) return firstAttempt.result;
+
+        const serializedAttempt = await updateAccess(true);
+        if (serializedAttempt.retryWithMembershipLock) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to serialize superadmin revocation',
+          });
+        }
+        return serializedAttempt.result;
+      }),
+
+    setAdminPermissions: superadminProcedure
+      .input(SetAdminPermissionsSchema)
+      .mutation(async ({ input, ctx }) => {
+        const actorId = ctx.user.id;
+        const targetId = input.userId;
+
+        if (actorId === targetId && input.permissions.isSuperadmin !== undefined) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Another superadmin must change your superadmin access.',
+          });
+        }
+
+        return db.transaction(async tx => {
+          if (input.permissions.isSuperadmin !== undefined) {
+            await lockSuperadminMembership(tx);
+          }
+
           const lockIds = [...new Set([actorId, targetId])].sort();
           const lockedRows = await tx
             .select()
@@ -1581,62 +1764,49 @@ export const adminRouter = createTRPCRouter({
           const actor = lockedRows.find(row => row.id === actorId);
           const target = lockedRows.find(row => row.id === targetId);
 
-          if (!actor || !actor.is_admin) {
-            throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+          if (!actor || actor.blocked_reason !== null || !userIsSuperadmin(actor)) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Superadmin access required' });
           }
-
           if (!target) {
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Target user not found' });
           }
+          if (!target.is_admin) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Target user must be a platform admin.',
+            });
+          }
 
-          // No-op: the target already has the requested state. Return early
-          // without rotating the session pepper or inserting a duplicate note —
-          // there is no permission change here, so there is nothing to sign out of.
-          // Checked before eligibility so a redundant "grant" against an
-          // already-admin target (e.g. a grandfathered admin outside
-          // kilocode.ai) is always a no-op, not a FORBIDDEN error.
-          if (target.is_admin === input.isAdmin) {
+          const changes = {
+            ...(input.permissions.isSuperadmin !== undefined &&
+              input.permissions.isSuperadmin !== target.is_super_admin && {
+                is_super_admin: input.permissions.isSuperadmin,
+              }),
+            ...(input.permissions.canViewSessions !== undefined &&
+              input.permissions.canViewSessions !== target.can_view_sessions && {
+                can_view_sessions: input.permissions.canViewSessions,
+              }),
+            ...(input.permissions.canManageCredits !== undefined &&
+              input.permissions.canManageCredits !== target.can_manage_credits && {
+                can_manage_credits: input.permissions.canManageCredits,
+              }),
+          };
+
+          if (Object.keys(changes).length === 0) {
             return { changed: false as const, user: toPlatformAdminUser(target) };
           }
 
-          if (input.isAdmin) {
-            if (!isEligibleForPlatformAdmin(actor.google_user_email, actor.hosted_domain)) {
-              throw new TRPCError({
-                code: 'FORBIDDEN',
-                message: 'Only a qualifying kilocode.ai admin can grant platform admin access.',
-              });
-            }
-            if (!isEligibleForPlatformAdmin(target.google_user_email, target.hosted_domain)) {
-              throw new TRPCError({
-                code: 'FORBIDDEN',
-                message: 'Target user is not eligible for platform admin access.',
-              });
-            }
+          if (changes.is_super_admin === false) {
+            await assertNotLastUnblockedSuperadmin(tx, target);
           }
 
-          // Rotate both the web session pepper AND the API token pepper on any
-          // privilege change. getUserFromAuth authorizes bearer tokens from the
-          // current DB is_admin value after only matching api_token_pepper, so a
-          // token minted while the user was non-admin would otherwise become
-          // admin-capable the instant we grant (and, on revoke, a pre-revoke
-          // token would retain admin capability). Rotating the pepper here
-          // invalidates every previously-issued token in the same transaction.
           const [updatedTarget] = await tx
             .update(kilocode_users)
-            .set(
-              input.isAdmin
-                ? {
-                    is_admin: true,
-                    web_session_pepper: crypto.randomUUID(),
-                    api_token_pepper: crypto.randomUUID(),
-                  }
-                : {
-                    is_admin: false,
-                    can_manage_credits: false,
-                    web_session_pepper: crypto.randomUUID(),
-                    api_token_pepper: crypto.randomUUID(),
-                  }
-            )
+            .set({
+              ...changes,
+              web_session_pepper: crypto.randomUUID(),
+              api_token_pepper: crypto.randomUUID(),
+            })
             .where(eq(kilocode_users.id, target.id))
             .returning();
 
@@ -1647,13 +1817,28 @@ export const adminRouter = createTRPCRouter({
             });
           }
 
-          await tx.insert(user_admin_notes).values({
-            kilo_user_id: target.id,
-            admin_kilo_user_id: actor.id,
-            note_content: input.isAdmin
-              ? 'Granted platform admin access.'
-              : 'Revoked platform admin access.',
-          });
+          const notes = [
+            changes.is_super_admin !== undefined &&
+              (changes.is_super_admin
+                ? 'Granted superadmin access.'
+                : 'Revoked superadmin access.'),
+            changes.can_view_sessions !== undefined &&
+              (changes.can_view_sessions
+                ? 'Granted session viewer access.'
+                : 'Revoked session viewer access.'),
+            changes.can_manage_credits !== undefined &&
+              (changes.can_manage_credits
+                ? 'Granted credit manager access.'
+                : 'Revoked credit manager access.'),
+          ].filter((note): note is string => typeof note === 'string');
+
+          await tx.insert(user_admin_notes).values(
+            notes.map(note_content => ({
+              kilo_user_id: target.id,
+              admin_kilo_user_id: actor.id,
+              note_content,
+            }))
+          );
 
           return { changed: true as const, user: toPlatformAdminUser(updatedTarget) };
         });
@@ -1921,7 +2106,7 @@ export const adminRouter = createTRPCRouter({
   cloudAgentNext: adminCloudAgentNextRouter,
 
   sessionTraces: createTRPCRouter({
-    resolveCloudAgentSession: adminProcedure
+    resolveCloudAgentSession: sessionViewerProcedure
       .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
       .query(async ({ input }) => {
         // Check v1 first
@@ -1952,7 +2137,7 @@ export const adminRouter = createTRPCRouter({
         });
       }),
 
-    get: adminProcedure
+    get: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {
         if (isNewSession(input.session_id)) {
@@ -2019,7 +2204,7 @@ export const adminRouter = createTRPCRouter({
         };
       }),
 
-    getMessages: adminProcedure
+    getMessages: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {
         if (isNewSession(input.session_id)) {
@@ -2081,7 +2266,7 @@ export const adminRouter = createTRPCRouter({
         }
       }),
 
-    getApiConversationHistory: adminProcedure
+    getApiConversationHistory: sessionViewerProcedure
       .input(z.object({ session_id: sessionIdSchema }))
       .query(async ({ input }) => {
         if (isNewSession(input.session_id)) {

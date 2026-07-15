@@ -30,6 +30,10 @@ type RemoteSessionRowProps = {
     title: string;
     status: string;
     gitBranch?: string;
+    // Optional: when the active record was enriched with stored metadata
+    // (see active-sessions-router enrichment), use it so stored Cloud rows
+    // label as CLOUD AGENT and genuine active-only fallbacks label as CLI.
+    createdOnPlatform?: string;
   };
   onPress: () => void;
 };
@@ -230,7 +234,7 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
   return (
     <Pressable onPress={onPress} accessibilityLabel={title} className="active:opacity-70">
       <SessionRow
-        agentLabel="CLOUD AGENT"
+        agentLabel={platformLabel(session.createdOnPlatform ?? 'cli')}
         title={title}
         subtitle={session.gitBranch}
         meta={session.status.toUpperCase()}

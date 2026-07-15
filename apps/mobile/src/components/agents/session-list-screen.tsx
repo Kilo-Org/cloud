@@ -10,13 +10,10 @@ import {
   SessionFilterChips,
   SessionFilterModal,
 } from '@/components/agents/platform-filter-modal';
+import { buildSessionSections } from '@/components/agents/session-list-sections';
 import {
   expandPlatformFilter,
   formatGitUrlProject,
-  matchesSearch,
-  type RemoteSessionItem,
-  type SessionSection,
-  type StoredSessionItem,
 } from '@/components/agents/session-list-helpers';
 import { ScreenHeader } from '@/components/screen-header';
 import {
@@ -34,10 +31,12 @@ export function AgentSessionListScreen() {
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
+    activeNow,
     platformFilter,
     projectFilter,
     hasLoaded: filtersLoaded,
     setFilters,
+    setActiveNow,
     setPlatformFilter,
     setProjectFilter,
   } = usePersistedAgentSessionFilters();
@@ -85,7 +84,6 @@ export function AgentSessionListScreen() {
     storedSessions,
     dateGroups,
     activeSessions,
-    activeSessionIds,
     isLoading,
     isError,
     hasNextPage,
@@ -176,69 +174,35 @@ export function AgentSessionListScreen() {
   // `isSearchPending` drives a lightweight inline indicator instead.
   const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
 
-  const sections = useMemo<SessionSection[]>(() => {
-    const result: SessionSection[] = [];
-    const storedSessionIds = new Set(storedSessions.map(session => session.session_id));
+  // Stored sessions are cursor-paginated, so a client-side filter would only
+  // see the loaded pages. When a query is active, use the server search
+  // results (which cover the full history) instead.
+  const storedGroups = useMemo(
+    () => (effectiveSearchQuery ? search.dateGroups : dateGroups),
+    [dateGroups, effectiveSearchQuery, search.dateGroups]
+  );
 
-    const filteredActive = activeSessions.filter(session => {
-      if (storedSessionIds.has(session.id)) {
-        return false;
-      }
-
-      if (projectFilter.length > 0 && !session.gitUrl) {
-        return false;
-      }
-
-      if (projectFilter.length > 0 && session.gitUrl && !projectFilter.includes(session.gitUrl)) {
-        return false;
-      }
-
-      return effectiveSearchQuery
-        ? matchesSearch(effectiveSearchQuery, session.title, session.gitUrl ?? null)
-        : true;
-    });
-
-    if (filteredActive.length > 0) {
-      result.push({
-        title: 'Remote',
-        data: filteredActive.map(
-          (session): RemoteSessionItem => ({
-            kind: 'remote',
-            session,
-          })
-        ),
-      });
-    }
-
-    // Stored sessions are cursor-paginated, so a client-side filter would only
-    // see the loaded pages. When a query is active, use the server search
-    // results (which cover the full history) instead.
-    const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
-    for (const group of storedGroups) {
-      if (group.sessions.length > 0) {
-        result.push({
-          title: group.label,
-          data: group.sessions.map(
-            (session): StoredSessionItem => ({
-              kind: 'stored',
-              session,
-              isLive: activeSessionIds.has(session.session_id),
-            })
-          ),
-        });
-      }
-    }
-
-    return result;
-  }, [
-    activeSessionIds,
-    activeSessions,
-    dateGroups,
-    effectiveSearchQuery,
-    projectFilter,
-    search.dateGroups,
-    storedSessions,
-  ]);
+  const sections = useMemo(
+    () =>
+      buildSessionSections({
+        activeNow,
+        activeSessions,
+        storedGroups,
+        platformFilter,
+        projectFilter,
+        searchQuery: effectiveSearchQuery,
+        organizationId,
+      }),
+    [
+      activeNow,
+      activeSessions,
+      effectiveSearchQuery,
+      organizationId,
+      platformFilter,
+      projectFilter,
+      storedGroups,
+    ]
+  );
 
   const navigateToSession = useCallback(
     (sessionId: string, sessionOrgId?: string | null) => {
@@ -256,12 +220,12 @@ export function AgentSessionListScreen() {
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
 
-  const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
+  const hasActiveFilter = activeNow || platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
   const handleClearQuery = useCallback(() => {
     handleClearSearch();
-    setFilters({ platformFilter: [], projectFilter: [] });
+    setFilters({ activeNow: false, platformFilter: [], projectFilter: [] });
   }, [handleClearSearch, setFilters]);
 
   return (
@@ -286,9 +250,13 @@ export function AgentSessionListScreen() {
       />
       <Animated.View layout={LinearTransition}>
         <SessionFilterChips
+          activeNow={activeNow}
           platformFilter={platformFilter}
           projectFilter={projectFilter}
           projectOptions={projectOptions}
+          onRemoveActiveNow={() => {
+            setActiveNow(false);
+          }}
           onRemovePlatform={platform => {
             setPlatformFilter(prev => prev.filter(p => p !== platform));
           }}
@@ -321,8 +289,7 @@ export function AgentSessionListScreen() {
       </Animated.View>
       {showFilterModal && (
         <SessionFilterModal
-          selectedPlatforms={platformFilter}
-          selectedProjects={projectFilter}
+          selectedFilters={{ activeNow, platformFilter, projectFilter }}
           projectOptions={projectOptions}
           onClose={() => {
             setShowFilterModal(false);

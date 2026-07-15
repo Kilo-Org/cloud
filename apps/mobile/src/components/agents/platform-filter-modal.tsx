@@ -24,6 +24,7 @@ export type ProjectFilterOption = {
 };
 
 type SessionFilters = {
+  activeNow: boolean;
   platformFilter: string[];
   projectFilter: string[];
 };
@@ -32,11 +33,11 @@ type SessionFilterChipsProps = SessionFilters & {
   projectOptions: ProjectFilterOption[];
   onRemovePlatform: (platform: string) => void;
   onRemoveProject: (gitUrl: string) => void;
+  onRemoveActiveNow: () => void;
 };
 
 type SessionFilterModalProps = {
-  selectedPlatforms: string[];
-  selectedProjects: string[];
+  selectedFilters: SessionFilters;
   projectOptions: ProjectFilterOption[];
   onClose: () => void;
   onApply: (filters: SessionFilters) => void;
@@ -107,15 +108,17 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
 }
 
 export function SessionFilterChips({
+  activeNow,
   platformFilter,
   projectFilter,
   projectOptions,
   onRemovePlatform,
   onRemoveProject,
+  onRemoveActiveNow,
 }: Readonly<SessionFilterChipsProps>) {
   const colors = useThemeColors();
 
-  if (platformFilter.length === 0 && projectFilter.length === 0) {
+  if (!activeNow && platformFilter.length === 0 && projectFilter.length === 0) {
     return null;
   }
 
@@ -125,6 +128,19 @@ export function SessionFilterChips({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={chipScrollContentStyle}
     >
+      {activeNow && (
+        <Pressable
+          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
+          onPress={onRemoveActiveNow}
+          accessibilityRole="button"
+          accessibilityLabel="Remove Active now filter"
+        >
+          <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
+            Active now
+          </Text>
+          <X size={12} color={colors.accentSoftForeground} />
+        </Pressable>
+      )}
       {projectFilter.map(gitUrl => {
         const label = projectFilterLabel(gitUrl, projectOptions);
         return (
@@ -168,14 +184,18 @@ export function SessionFilterChips({
 }
 
 export function SessionFilterModal({
-  selectedPlatforms,
-  selectedProjects,
+  selectedFilters,
   projectOptions,
   onClose,
   onApply,
 }: Readonly<SessionFilterModalProps>) {
-  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
-  const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
+  const [draftActiveNow, setDraftActiveNow] = useState(selectedFilters.activeNow);
+  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedFilters.platformFilter);
+  const [draftProjects, setDraftProjects] = useState<string[]>(selectedFilters.projectFilter);
+
+  const toggleActiveNow = () => {
+    setDraftActiveNow(value => !value);
+  };
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -213,6 +233,11 @@ export function SessionFilterModal({
           <Text className="text-base font-semibold">Filter sessions</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
+              <FilterCheckboxRow
+                label="Active now"
+                isChecked={draftActiveNow}
+                onPress={toggleActiveNow}
+              />
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
                   Platform
@@ -253,7 +278,11 @@ export function SessionFilterModal({
             </Button>
             <Button
               onPress={() => {
-                onApply({ platformFilter: draftPlatforms, projectFilter: draftProjects });
+                onApply({
+                  activeNow: draftActiveNow,
+                  platformFilter: draftPlatforms,
+                  projectFilter: draftProjects,
+                });
                 onClose();
               }}
             >

@@ -31,6 +31,10 @@ vi.mock('./dos/UserConnectionDO', () => ({
   getUserConnectionDO: vi.fn(),
 }));
 
+vi.mock('./dos/SessionAccessCacheDO', () => ({
+  getSessionAccessCacheDO: vi.fn(),
+}));
+
 vi.mock('./session-events', async importOriginal => {
   const actual = await importOriginal<typeof SessionEvents>();
   return {
@@ -50,6 +54,7 @@ vi.mock('./util/ingest-limits', () => ({
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
+import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { notifyUserSessionEvent } from './session-events';
 import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
@@ -920,6 +925,101 @@ describe('computeSessionMetadataUpdates', () => {
   it('ignores a null "platform" change (creation value stays sticky)', () => {
     const updates = computeSessionMetadataUpdates(new Map([['platform', null]]), fixedNow);
     expect('created_on_platform' in updates).toBe(false);
+  });
+});
+
+describe('queue organization changes', () => {
+  it('invalidates cached session access after persisting organization scope', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const persistedSession = {
+      session_id: sessionId,
+      created_at: '2026-05-05T00:00:00.000Z',
+      updated_at: '2026-05-05T00:00:01.000Z',
+      title: null,
+      created_on_platform: null,
+      organization_id: organizationId,
+      git_url: null,
+      git_branch: null,
+      parent_session_id: null,
+      status: null,
+      status_updated_at: null,
+    };
+    const selectResults: unknown[][] = [[{ session_id: sessionId }], [persistedSession]];
+    const selectResult = vi.fn(async () => selectResults.shift() ?? []);
+    const select = {
+      from: vi.fn(() => select),
+      where: vi.fn(() => select),
+      limit: vi.fn(() => select),
+      for: vi.fn(() => select),
+      then: vi.fn((resolve: (value: unknown) => unknown) => resolve(selectResult())),
+    };
+    const update = {
+      set: vi.fn(() => update),
+      where: vi.fn(() => update),
+      then: vi.fn((resolve: (value: undefined) => unknown) => resolve(undefined)),
+    };
+    const dbRef: Record<string, unknown> = {};
+    const db = {
+      select: vi.fn(() => select),
+      update: vi.fn(() => update),
+      transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(dbRef)),
+    } as unknown as ReturnType<typeof getWorkerDb>;
+    Object.assign(dbRef, db);
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      ingest: vi.fn(async () => ({ changes: [{ name: 'orgId', value: organizationId }] })),
+    } as never);
+    const remove = vi.fn(async () => undefined);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ remove } as never);
+
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            JSON.stringify({
+              data: [
+                { type: 'kilo_meta', data: { platform: 'cloud-agent-web', orgId: organizationId } },
+              ],
+            })
+          )
+        );
+        controller.close();
+      },
+    });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => ({ body })),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+    } as never;
+    const ack = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'ingest/org-change',
+              kiloUserId: 'usr_test',
+              sessionId,
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry: vi.fn(),
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(getSessionAccessCacheDO).toHaveBeenCalledWith(env, { kiloUserId: 'usr_test' });
+    expect(remove).toHaveBeenCalledWith(sessionId);
   });
 });
 

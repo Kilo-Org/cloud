@@ -25,9 +25,15 @@ vi.mock('./dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
 }));
 
+vi.mock('./dos/SessionAccessCacheDO', () => ({
+  SessionAccessCacheDO: class SessionAccessCacheDO {},
+  getSessionAccessCacheDO: vi.fn(),
+}));
+
 import { app } from './index';
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 
 type TestBindings = {
   HYPERDRIVE: { connectionString: string };
@@ -35,6 +41,7 @@ type TestBindings = {
   SESSION_ACCESS_CACHE_DO: unknown;
   NEXTAUTH_SECRET: unknown;
   NEXTAUTH_SECRET_RAW?: string;
+  INTERNAL_API_SECRET_PROD: { get(): Promise<string> };
 };
 
 function makeDbFakes() {
@@ -59,7 +66,98 @@ const defaultEnv: TestBindings = {
   SESSION_ACCESS_CACHE_DO: {},
   NEXTAUTH_SECRET: {},
   NEXTAUTH_SECRET_RAW: 'secret',
+  INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
 };
+
+describe('session access invalidation route', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('rejects invalidation without the internal secret', async () => {
+    const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+
+    const res = await app.request(
+      '/internal/session-access/invalidate',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(401);
+    expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+  });
+
+  it.each(['wrong-secretxxx', 'wrong'])(
+    'rejects invalidation with an incorrect internal secret: %s',
+    async secret => {
+      const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+      vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+        cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+      );
+
+      const res = await app.request(
+        '/internal/session-access/invalidate',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'X-Internal-Secret': secret,
+          },
+          body: JSON.stringify({
+            kiloUserId: 'usr_removed',
+            organizationId: '11111111-1111-4111-8111-111111111111',
+          }),
+        },
+        defaultEnv
+      );
+
+      expect(res.status).toBe(401);
+      expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+      expect(cache.invalidateOrganization).not.toHaveBeenCalled();
+    }
+  );
+
+  it('invalidates cached access for the removed organization member', async () => {
+    const cache = { invalidateOrganization: vi.fn(async () => undefined) };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      cache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+
+    const res = await app.request(
+      '/internal/session-access/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(204);
+    expect(getSessionAccessCacheDO).toHaveBeenCalledWith(defaultEnv, {
+      kiloUserId: 'usr_removed',
+    });
+    expect(cache.invalidateOrganization).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111'
+    );
+  });
+});
 
 describe('public session route', () => {
   beforeEach(() => {

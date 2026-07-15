@@ -457,8 +457,12 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         forceRefresh: z.boolean().optional().default(false),
       })
     )
-    .query(async ({ input }) => {
-      return await fetchGitLabRepositoriesForOrganization(input.organizationId, input.forceRefresh);
+    .query(async ({ ctx, input }) => {
+      return await fetchGitLabRepositoriesForOrganization(
+        input.organizationId,
+        ctx.user.id,
+        input.forceRefresh
+      );
     }),
 
   /**
@@ -631,7 +635,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             if (webhookSecret) {
               try {
                 // Get a valid access token (handles refresh if expired)
-                const accessToken = await getValidGitLabToken(integration);
+                const accessToken = await getValidGitLabToken(integration, {
+                  userId: ctx.user.id,
+                  organizationId: input.organizationId,
+                });
 
                 const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
                   (repositoryId): repositoryId is number => typeof repositoryId === 'number'

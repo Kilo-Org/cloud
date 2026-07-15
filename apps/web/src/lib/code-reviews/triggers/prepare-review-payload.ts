@@ -508,7 +508,10 @@ export async function prepareReviewPayload(
         }
 
         try {
-          gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
+          gitlabToken = await getOrCreateProjectAccessToken(integration, projectId, {
+            userId: owner.userId,
+            ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+          });
           logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
             reviewId,
             repoFullName: review.repo_full_name,

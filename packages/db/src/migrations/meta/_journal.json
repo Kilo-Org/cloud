@@ -1324,6 +1324,13 @@
       "when": 1784213741489,
       "tag": "0188_unusual_titanium_man",
       "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1784224821060,
+      "tag": "0189_elite_patriot",
+      "breakpoints": true
     }
   ]
 }

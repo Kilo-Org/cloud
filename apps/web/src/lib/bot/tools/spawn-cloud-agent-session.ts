@@ -25,6 +25,7 @@ import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
+import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
@@ -136,10 +137,15 @@ export default async function spawnCloudAgentSession(
   const kilocodeOrganizationId = owner.type === 'org' ? owner.id : undefined;
 
   if (args.gitlabProject) {
+    const gitLabActorUserId =
+      owner.type === 'org' ? await getBotUserId(owner.id, 'code-review') : owner.id;
+    if (!gitLabActorUserId) {
+      return { response: 'Error: No acting user is configured for this GitLab organization.' };
+    }
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
       owner.type === 'org'
-        ? await getGitLabTokenForOrganization(owner.id)
+        ? await getGitLabTokenForOrganization(owner.id, gitLabActorUserId)
         : await getGitLabTokenForUser(owner.id);
 
     if (!gitlabToken) {

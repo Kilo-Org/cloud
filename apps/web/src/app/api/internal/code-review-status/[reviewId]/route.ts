@@ -53,8 +53,8 @@ import {
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import {
+  getValidGitLabProjectAccessToken,
   getValidGitLabToken,
-  getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
@@ -869,14 +869,28 @@ async function upsertModelNotFoundSummary(
 
 /**
  * Resolves a GitLab access token for a review's project.
- * Prefers a stored Project Access Token; falls back to the user's OAuth token.
+ * Uses the exact project credential when a project ID is present.
  */
 async function resolveGitLabAccessToken(
   integration: PlatformIntegration,
   projectId: number | null
 ): Promise<string> {
-  const storedPrat = projectId ? getStoredProjectAccessToken(integration, projectId) : null;
-  return storedPrat ? storedPrat.token : await getValidGitLabToken(integration);
+  let userId: string;
+  let organizationId: string | undefined;
+  if (integration.owned_by_organization_id) {
+    organizationId = integration.owned_by_organization_id;
+    const botUserId = await getBotUserId(organizationId, 'code-review');
+    if (!botUserId) throw new Error('GitLab organization has no configured acting user');
+    userId = botUserId;
+  } else if (integration.owned_by_user_id) {
+    userId = integration.owned_by_user_id;
+  } else {
+    throw new Error('GitLab integration has no owner');
+  }
+  const actor = { userId, ...(organizationId ? { organizationId } : {}) };
+  return projectId
+    ? await getValidGitLabProjectAccessToken(integration, projectId, actor)
+    : await getValidGitLabToken(integration, actor);
 }
 
 /**

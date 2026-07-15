@@ -8,6 +8,8 @@ import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
+  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
@@ -34,7 +36,14 @@ import {
   parseGitLabCloneUrl,
   type GitLabCloneUrlFailureReason,
 } from './gitlab-url.js';
-import { GitLabTokenService } from './gitlab-token-service.js';
+import {
+  GitLabCredentialBrokerRequestSchema,
+  createGitLabCredentialBroker,
+  handleGitLabCredentialBrokerRequest,
+} from './gitlab-credential-broker-handler.js';
+import { GitLabCredentialAuditRequestSchema } from './gitlab-credential-audit.js';
+import { runGitLabCredentialAudit } from './gitlab-credential-audit-handler.js';
+import type { GitLabCredentialBroker } from './gitlab-credential-broker.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
 import {
   GitHubSessionCapabilityCodec,
@@ -245,6 +254,8 @@ const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
 const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review/pull-request';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH = '/internal/bitbucket/code-review/webhooks/delete';
+const GITLAB_CREDENTIAL_BROKER_PATH = '/internal/gitlab/credentials';
+const GITLAB_CREDENTIAL_AUDIT_PATH = '/internal/gitlab/credential-audit';
 const INTERNAL_REQUEST_MAX_BYTES = 16_000;
 
 const BitbucketPullRequestHttpRequestSchema = BitbucketPullRequestRequestSchema.omit({
@@ -578,7 +589,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
   private installationLookupService: InstallationLookupService;
   private gitlabLookupService: GitLabLookupService;
-  private gitlabTokenService: GitLabTokenService;
+  private gitlabCredentialResolver: GitLabCredentialBroker;
   private githubUserAuthorizationService: GitHubUserAuthorizationService;
 
   constructor(ctx: ExecutionContext, env: CloudflareEnv) {
@@ -586,7 +597,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     this.githubService = new GitHubTokenService(env);
     this.installationLookupService = new InstallationLookupService(env);
     this.gitlabLookupService = new GitLabLookupService(env);
-    this.gitlabTokenService = new GitLabTokenService(env);
+    this.gitlabCredentialResolver = createGitLabCredentialBroker(env);
     this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
   }
 
@@ -928,7 +939,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   async getGitLabToken(params: GetGitLabTokenParams): Promise<GetGitLabTokenResult> {
     return resolveGitLabRuntimeToken(params, {
       lookupService: this.gitlabLookupService,
-      tokenService: this.gitlabTokenService,
+      credentialResolver: this.gitlabCredentialResolver,
     });
   }
 
@@ -945,7 +956,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       { ...params, repositoryUrl: params.gitUrl },
       {
         lookupService: this.gitlabLookupService,
-        tokenService: this.gitlabTokenService,
+        credentialResolver: this.gitlabCredentialResolver,
       }
     );
     if (!runtimeToken.success) return runtimeToken;
@@ -1045,23 +1056,31 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'identity_mismatch' };
     }
 
-    let token: string;
-    if (claims.source.type === 'integration') {
-      const integrationToken = await this.gitlabTokenService.getToken(
-        integration.integrationId,
-        integration.metadata
-      );
-      if (!integrationToken.success) return { success: false, reason: 'source_unavailable' };
-      token = integrationToken.token;
-    } else {
-      const projectToken = integration.metadata.project_tokens?.[String(claims.source.projectId)];
-      if (!projectToken) return { success: false, reason: 'source_unavailable' };
-      const currentTokenDigest = await sha256Digest(projectToken.token);
+    const selector =
+      claims.source.type === 'integration'
+        ? ({ credential: 'integration', integrationId: claims.integrationId } as const)
+        : ({
+            credential: 'project-exact',
+            integrationId: claims.integrationId,
+            projectId: String(claims.source.projectId),
+          } as const);
+    const credential = await this.gitlabCredentialResolver.resolveCredential(context, selector);
+    if (
+      credential.status !== 'available' ||
+      credential.source.type !== claims.source.type ||
+      ('credentialId' in claims.source && credential.credentialId !== claims.source.credentialId) ||
+      ('credentialVersion' in claims.source &&
+        credential.credentialVersion !== claims.source.credentialVersion)
+    ) {
+      return { success: false, reason: 'source_unavailable' };
+    }
+    if ('tokenDigest' in claims.source) {
+      const currentTokenDigest = await sha256Digest(credential.token);
       if (!timingSafeEqual(currentTokenDigest, claims.source.tokenDigest)) {
         return { success: false, reason: 'source_unavailable' };
       }
-      token = projectToken.token;
     }
+    const token = credential.token;
 
     if (upstream.authSurface === 'git') {
       return {
@@ -1133,11 +1152,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   }
 
   private getGitLabAuthType(integration: GitLabLookupSuccess): GitLabAuthType | null {
-    if (integration.metadata.auth_type) return integration.metadata.auth_type;
     if (integration.integrationType === 'oauth' || integration.integrationType === 'pat') {
       return integration.integrationType;
     }
-    return null;
+    return integration.metadata.auth_type ?? null;
   }
 
   private getGitLabSessionIdentity(integration: GitLabLookupSuccess): GitLabSessionIdentity | null {
@@ -1149,36 +1167,100 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 export default {
   async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
+    const isGitLabCredentialAudit = url.pathname === GITLAB_CREDENTIAL_AUDIT_PATH;
+    const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
+    const privateGitLabHeaders =
+      isGitLabCredentialAudit || isGitLabCredentialBroker
+        ? { 'Cache-Control': 'no-store' }
+        : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
     if (
       url.pathname !== DISCONNECT_PATH &&
       url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
+      url.pathname !== GITLAB_CREDENTIAL_BROKER_PATH &&
+      !isGitLabCredentialAudit &&
       !codeReviewAudience
     ) {
       return new Response(null, { status: 404 });
     }
-    if (request.method !== 'POST') return new Response(null, { status: 405 });
+    if (request.method !== 'POST') {
+      return new Response(null, { status: 405, headers: privateGitLabHeaders });
+    }
 
     const token = extractBearerToken(request.headers.get('Authorization'));
-    if (!token) return Response.json({ error: 'unauthorized' }, { status: 401 });
+    if (!token) {
+      return Response.json(
+        { error: 'unauthorized' },
+        { status: 401, headers: privateGitLabHeaders }
+      );
+    }
 
     let secret: string;
     try {
       secret = await resolveSecret(env.NEXTAUTH_SECRET);
     } catch {
-      return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
+      return Response.json(
+        { error: 'authentication_unavailable' },
+        { status: 503, headers: privateGitLabHeaders }
+      );
     }
-    if (!secret) return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
+    if (!secret) {
+      return Response.json(
+        { error: 'authentication_unavailable' },
+        { status: 503, headers: privateGitLabHeaders }
+      );
+    }
 
     let authorization: Awaited<ReturnType<typeof verifyKiloToken>>;
     try {
       const audience =
         url.pathname === BITBUCKET_REPOSITORIES_PATH
           ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
-          : codeReviewAudience;
+          : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
+            ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
+            : isGitLabCredentialAudit
+              ? GITLAB_CREDENTIAL_AUDIT_AUDIENCE
+              : codeReviewAudience;
       authorization = await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
-      return Response.json({ error: 'unauthorized' }, { status: 401 });
+      return Response.json(
+        { error: 'unauthorized' },
+        { status: 401, headers: privateGitLabHeaders }
+      );
+    }
+
+    if (isGitLabCredentialAudit) {
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json(
+          { error: 'invalid_request' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      const parsed = GitLabCredentialAuditRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { error: 'invalid_request' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      try {
+        const audit = await runGitLabCredentialAudit(env, authorization.kiloUserId, parsed.data);
+        if (!audit.authorized) {
+          return Response.json(
+            { error: 'forbidden' },
+            { status: 403, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+        return Response.json(audit.result, { headers: { 'Cache-Control': 'no-store' } });
+      } catch {
+        return Response.json(
+          { error: 'temporarily_unavailable' },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
     }
 
     if (url.pathname === BITBUCKET_REPOSITORIES_PATH) {
@@ -1193,6 +1275,41 @@ export default {
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
+    if (url.pathname === GITLAB_CREDENTIAL_BROKER_PATH) {
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json(
+          { status: 'invalid_request' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      const parsed = GitLabCredentialBrokerRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { status: 'invalid_request' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      try {
+        const result = await handleGitLabCredentialBrokerRequest(
+          env,
+          {
+            userId: authorization.kiloUserId,
+            ...(authorization.organizationId ? { orgId: authorization.organizationId } : {}),
+          },
+          parsed.data
+        );
+        return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
+      } catch {
+        return Response.json(
+          { status: 'temporarily_unavailable' },
+          { headers: { 'Cache-Control': 'no-store' } }
+        );
       }
     }
 

@@ -103,6 +103,7 @@ const mockFetchGitHubRepositoriesForOrganization = jest.fn<
 const mockFetchGitLabRepositoriesForOrganization = jest.fn<
   (
     organizationId: string,
+    actorUserId: string,
     forceRefresh: boolean
   ) => Promise<{
     repositories: unknown[];
@@ -515,7 +516,7 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
     ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForOrganization],
   ] as const)(
     'lists organization %s repositories without creating a runtime client',
-    async (_, method, fetchRepositories) => {
+    async (platform, method, fetchRepositories) => {
       const repositories = {
         repositories: [],
         integrationInstalled: true,
@@ -528,7 +529,18 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
         caller[method]({ organizationId: ORGANIZATION_ID, forceRefresh: true })
       ).resolves.toEqual(repositories);
       expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
-      expect(fetchRepositories).toHaveBeenCalledWith(ORGANIZATION_ID, true);
+      if (platform === 'GitLab') {
+        expect(mockFetchGitLabRepositoriesForOrganization).toHaveBeenCalledWith(
+          ORGANIZATION_ID,
+          'member-user',
+          true
+        );
+      } else {
+        expect(mockFetchGitHubRepositoriesForOrganization).toHaveBeenCalledWith(
+          ORGANIZATION_ID,
+          true
+        );
+      }
       expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
     }
   );

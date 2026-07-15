@@ -4124,15 +4124,15 @@ export const platform_oauth_credentials = pgTable(
       .notNull()
       .references(() => platform_integrations.id, { onDelete: 'cascade' }),
     platform: text(),
-    authorized_by_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    authorized_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     provider_subject_id: text().notNull(),
     provider_subject_login: text().notNull(),
+    provider_base_url: text(),
     access_token_encrypted: text().notNull(),
     access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
-    refresh_token_encrypted: text().notNull(),
+    refresh_token_encrypted: text(),
     refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    oauth_client_secret_encrypted: text(),
     credential_version: integer().notNull().default(1),
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revocation_reason: text(),
@@ -4148,6 +4148,10 @@ export const platform_oauth_credentials = pgTable(
       table.platform_integration_id
     ),
     index('IDX_platform_oauth_credentials_authorized_by_user_id').on(table.authorized_by_user_id),
+    check(
+      'platform_oauth_credentials_credential_version_check',
+      sql`${table.credential_version} > 0`
+    ),
   ]
 );
 
@@ -4164,11 +4168,17 @@ export const platform_access_token_credentials = pgTable(
     integration_type: text().$type<'workspace_access_token'>(),
     token_encrypted: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
-    provider_credential_type: text().notNull().$type<'workspace_access_token'>(),
-    provider_scopes: text().array().notNull(),
-    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    provider_credential_type: text()
+      .notNull()
+      .$type<'workspace_access_token' | 'personal_access_token' | 'project_access_token'>(),
+    provider_resource_id: text(),
+    provider_base_url: text(),
+    authorized_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    provider_metadata: jsonb(),
+    provider_scopes: text().array(),
+    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     credential_version: integer().notNull().default(1),
-    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -4177,14 +4187,28 @@ export const platform_access_token_credentials = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    unique('UQ_platform_access_token_credentials_platform_integration_id').on(
-      table.platform_integration_id
-    ),
+    uniqueIndex('UQ_platform_access_token_credentials_integration_level')
+      .on(table.platform_integration_id)
+      .where(isNull(table.provider_resource_id)),
+    uniqueIndex('UQ_platform_access_token_credentials_resource')
+      .on(table.platform_integration_id, table.provider_credential_type, table.provider_resource_id)
+      .where(isNotNull(table.provider_resource_id)),
     foreignKey({
       columns: [table.platform_integration_id],
       foreignColumns: [platform_integrations.id],
       name: 'FK_platform_access_token_credentials_parent',
     }).onDelete('cascade'),
+    index('IDX_platform_access_token_credentials_authorized_by_user_id').on(
+      table.authorized_by_user_id
+    ),
+    check(
+      'platform_access_token_credentials_credential_version_check',
+      sql`${table.credential_version} > 0`
+    ),
+    check(
+      'platform_access_token_credentials_resource_id_check',
+      sql`${table.provider_resource_id} IS NULL OR ${table.provider_resource_id} <> ''`
+    ),
   ]
 );
 

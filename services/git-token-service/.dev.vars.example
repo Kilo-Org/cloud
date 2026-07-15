@@ -39,12 +39,13 @@ GITLAB_CLIENT_SECRET=
 # Bitbucket Cloud OAuth consumer credentials shared with Web
 BITBUCKET_CLIENT_ID=
 BITBUCKET_CLIENT_SECRET=
-# Shared RSA/AES envelope keypair for persisted Bitbucket OAuth and Workspace Access Token credentials.
+# Shared RSA/AES platform-credential envelope keypair for persisted Bitbucket and GitLab credentials.
 # Generate outside the repository and never commit key material:
 #   pnpm exec tsx dev/generate-rsa-env-keypair.ts -- --out-dir <secure-output-dir> \
 #     --public-env BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY \
 #     --private-env BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY
-# Use the same key ID and public key in Web; keep the private key in this Worker only.
+# The BITBUCKET-prefixed names are legacy; use the same key ID and public key in Web and keep
+# the private key in this Worker only.
 # Provision these as per-Worker secrets; the key material exceeds Secrets Store's size limit.
 BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID=
 BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY=

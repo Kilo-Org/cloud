@@ -14,6 +14,7 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
   buildBitbucketOrganizationCredentialLockKey,
   buildBitbucketWorkspaceAccessTokenAad,
+  BitbucketWorkspaceAccessTokenCredentialRowSchema,
   hasBitbucketAccessTokenFamilyPrefix,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
   normalizeBitbucketWorkspaceAccessTokenScopes,
@@ -179,7 +180,6 @@ export function buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
   return db
     .select({
       integrationId: platform_integrations.id,
-      credentialId: platform_access_token_credentials.id,
       organizationId: platform_integrations.owned_by_organization_id,
       ownedByUserId: platform_integrations.owned_by_user_id,
       platform: platform_integrations.platform,
@@ -189,12 +189,7 @@ export function buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
       accountId: platform_integrations.platform_account_id,
       accountLogin: platform_integrations.platform_account_login,
       authInvalidAt: platform_integrations.auth_invalid_at,
-      tokenEncrypted: platform_access_token_credentials.token_encrypted,
-      providerCredentialType: platform_access_token_credentials.provider_credential_type,
-      providerScopes: platform_access_token_credentials.provider_scopes,
-      providerVerifiedAt: platform_access_token_credentials.provider_verified_at,
-      credentialVersion: platform_access_token_credentials.credential_version,
-      lastValidatedAt: platform_access_token_credentials.last_validated_at,
+      credential: platform_access_token_credentials,
     })
     .from(platform_integrations)
     .innerJoin(
@@ -318,7 +313,34 @@ class DrizzleBitbucketWorkspaceAccessTokenAuthorizationStore implements Bitbucke
   }): Promise<BitbucketWorkspaceAccessTokenAuthorizationCandidate | null> {
     const [candidate] = await buildBitbucketWorkspaceAccessTokenAuthorizationQuery(this.db, input);
     if (!candidate?.organizationId) return null;
-    return { ...candidate, organizationId: candidate.organizationId };
+    const credential = BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse(
+      candidate.credential
+    );
+    if (
+      !credential.success ||
+      credential.data.platform_integration_id !== candidate.integrationId
+    ) {
+      return null;
+    }
+    return {
+      integrationId: candidate.integrationId,
+      credentialId: credential.data.id,
+      organizationId: candidate.organizationId,
+      ownedByUserId: candidate.ownedByUserId,
+      platform: candidate.platform,
+      integrationType: candidate.integrationType,
+      integrationStatus: candidate.integrationStatus,
+      installationId: candidate.installationId,
+      accountId: candidate.accountId,
+      accountLogin: candidate.accountLogin,
+      authInvalidAt: candidate.authInvalidAt,
+      tokenEncrypted: credential.data.token_encrypted,
+      providerCredentialType: credential.data.provider_credential_type,
+      providerScopes: credential.data.provider_scopes,
+      providerVerifiedAt: credential.data.provider_verified_at,
+      credentialVersion: credential.data.credential_version,
+      lastValidatedAt: credential.data.last_validated_at,
+    };
   }
 
   async markUsed(

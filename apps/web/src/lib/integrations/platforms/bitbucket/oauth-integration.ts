@@ -99,10 +99,7 @@ async function findBitbucketOAuthIntegration(owner: Owner) {
     .from(platform_integrations)
     .leftJoin(
       platform_oauth_credentials,
-      and(
-        eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_oauth_credentials.platform, PLATFORM.BITBUCKET)
-      )
+      eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
     )
     .where(oauthIntegrationCondition(owner))
     .limit(1);

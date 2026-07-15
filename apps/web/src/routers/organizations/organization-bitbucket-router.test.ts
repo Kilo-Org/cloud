@@ -177,7 +177,6 @@ async function insertPendingOAuthIntegration(organizationId: string, actorUserId
 
   await db.insert(platform_oauth_credentials).values({
     platform_integration_id: integration.id,
-    platform: 'bitbucket',
     authorized_by_user_id: actorUserId,
     provider_subject_id: '44444444-4444-4444-8444-444444444444',
     provider_subject_login: 'bucket-admin',
@@ -224,7 +223,6 @@ async function insertActiveOAuthIntegration(organizationId: string, actorUserId:
 
   await db.insert(platform_oauth_credentials).values({
     platform_integration_id: integration.id,
-    platform: 'bitbucket',
     authorized_by_user_id: actorUserId,
     provider_subject_id: '44444444-4444-4444-8444-444444444444',
     provider_subject_login: 'bucket-admin',

@@ -233,6 +233,7 @@ async function insertCodingPlanSubscription(values: {
 }
 
 type PlatformIntegrationInsert = typeof schema.platform_integrations.$inferInsert;
+type PlatformOAuthCredentialInsert = typeof schema.platform_oauth_credentials.$inferInsert;
 type PlatformAccessTokenCredentialInsert =
   typeof schema.platform_access_token_credentials.$inferInsert;
 
@@ -325,6 +326,32 @@ async function insertPlatformAccessTokenCredential(
 
   if (!credential) {
     throw new Error('Failed to insert platform access token credential');
+  }
+
+  return credential;
+}
+
+async function insertPlatformOAuthCredential(
+  integration: typeof schema.platform_integrations.$inferSelect,
+  overrides: Partial<PlatformOAuthCredentialInsert> = {}
+): Promise<typeof schema.platform_oauth_credentials.$inferSelect> {
+  const [credential] = await schemaTestDb.db
+    .insert(schema.platform_oauth_credentials)
+    .values({
+      platform_integration_id: integration.id,
+      authorized_by_user_id: null,
+      provider_subject_id: 'gitlab-subject-123',
+      provider_subject_login: 'gitlab-user',
+      provider_base_url: 'https://gitlab.example.com',
+      access_token_encrypted: 'encrypted-gitlab-oauth-access-token',
+      refresh_token_encrypted: null,
+      oauth_client_secret_encrypted: 'encrypted-gitlab-oauth-client-secret',
+      ...overrides,
+    })
+    .returning();
+
+  if (!credential) {
+    throw new Error('Failed to insert platform OAuth credential');
   }
 
   return credential;
@@ -781,7 +808,112 @@ describe('database schema', () => {
     expect(Object.hasOwn(schema, 'platform_access_token_credentials')).toBe(true);
   });
 
+  describe('platform OAuth credentials', () => {
+    it('stores a legacy GitLab OAuth credential with a custom client secret and no recoverable authorizer or refresh token', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId, {
+          platform: 'gitlab',
+          integration_type: 'oauth',
+        });
+
+        const credential = await insertPlatformOAuthCredential(integration);
+
+        expect(credential).toEqual(
+          expect.objectContaining({
+            platform_integration_id: integration.id,
+            authorized_by_user_id: null,
+            provider_base_url: 'https://gitlab.example.com',
+            refresh_token_encrypted: null,
+            oauth_client_secret_encrypted: 'encrypted-gitlab-oauth-client-secret',
+          })
+        );
+      });
+    });
+
+    it('rejects a non-positive credential version', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId, {
+          platform: 'gitlab',
+          integration_type: 'oauth',
+        });
+
+        await expectPlatformCredentialConstraintViolation(
+          insertPlatformOAuthCredential(integration, { credential_version: 0 }),
+          'platform_oauth_credentials_credential_version_check'
+        );
+      });
+    });
+  });
+
   describe('platform access token credentials', () => {
+    it('stores a GitLab PAT credential without fabricated organization or validation evidence', async () => {
+      await withPlatformAccessTokenTestData(async ({ userId, organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId, {
+          owned_by_organization_id: null,
+          owned_by_user_id: userId,
+          platform: 'gitlab',
+          integration_type: 'pat',
+        });
+
+        const credential = await insertPlatformAccessTokenCredential(integration, {
+          provider_credential_type: 'personal_access_token',
+          provider_scopes: null,
+          provider_verified_at: null,
+          last_validated_at: null,
+          provider_resource_id: null,
+          provider_base_url: 'https://gitlab.example.com',
+          authorized_by_user_id: userId,
+          provider_metadata: {},
+        });
+
+        expect(credential).toEqual(
+          expect.objectContaining({
+            provider_credential_type: 'personal_access_token',
+            provider_scopes: null,
+            provider_verified_at: null,
+            last_validated_at: null,
+            provider_resource_id: null,
+            provider_base_url: 'https://gitlab.example.com',
+            authorized_by_user_id: userId,
+            provider_metadata: {},
+          })
+        );
+      });
+    });
+
+    it('stores one integration-level credential and multiple resource-scoped credentials', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId, {
+          platform: 'gitlab',
+          integration_type: 'pat',
+        });
+
+        await insertPlatformAccessTokenCredential(integration, {
+          provider_credential_type: 'personal_access_token',
+          provider_base_url: 'https://gitlab.example.com',
+        });
+        await insertPlatformAccessTokenCredential(integration, {
+          provider_credential_type: 'project_access_token',
+          provider_resource_id: '100',
+          provider_base_url: 'https://gitlab.example.com',
+        });
+        await insertPlatformAccessTokenCredential(integration, {
+          provider_credential_type: 'project_access_token',
+          provider_resource_id: '200',
+          provider_base_url: 'https://gitlab.example.com',
+        });
+
+        expect(
+          await schemaTestDb.db
+            .select()
+            .from(schema.platform_access_token_credentials)
+            .where(
+              eq(schema.platform_access_token_credentials.platform_integration_id, integration.id)
+            )
+        ).toHaveLength(3);
+      });
+    });
+
     it('stores one verified Bitbucket Workspace Access Token credential whose parent owns its identity', async () => {
       await withPlatformAccessTokenTestData(async ({ organizationId }) => {
         const integration = await insertPlatformIntegration(organizationId);
@@ -791,9 +923,6 @@ describe('database schema', () => {
         expect(credential).toEqual(
           expect.objectContaining({
             platform_integration_id: integration.id,
-            owned_by_organization_id: null,
-            platform: null,
-            integration_type: null,
             provider_credential_type: 'workspace_access_token',
             credential_version: 1,
           })
@@ -822,14 +951,61 @@ describe('database schema', () => {
       });
     });
 
-    it('rejects a second credential for the same integration', async () => {
+    it('rejects a non-positive credential version', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId);
+
+        await expectPlatformCredentialConstraintViolation(
+          insertPlatformAccessTokenCredential(integration, { credential_version: 0 }),
+          'platform_access_token_credentials_credential_version_check'
+        );
+      });
+    });
+
+    it('rejects an empty resource ID', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId, {
+          platform: 'gitlab',
+          integration_type: 'pat',
+        });
+
+        await expectPlatformCredentialConstraintViolation(
+          insertPlatformAccessTokenCredential(integration, {
+            provider_credential_type: 'project_access_token',
+            provider_resource_id: '',
+          }),
+          'platform_access_token_credentials_resource_id_check'
+        );
+      });
+    });
+
+    it('rejects a second integration-level credential for the same integration', async () => {
       await withPlatformAccessTokenTestData(async ({ organizationId }) => {
         const integration = await insertPlatformIntegration(organizationId);
         await insertPlatformAccessTokenCredential(integration);
 
         await expectPlatformCredentialConstraintViolation(
           insertPlatformAccessTokenCredential(integration),
-          'UQ_platform_access_token_credentials_platform_integration_id'
+          'UQ_platform_access_token_credentials_integration_level'
+        );
+      });
+    });
+
+    it('rejects a duplicate resource credential for the same integration and type', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId, {
+          platform: 'gitlab',
+          integration_type: 'pat',
+        });
+        const resourceCredential: Partial<PlatformAccessTokenCredentialInsert> = {
+          provider_credential_type: 'project_access_token',
+          provider_resource_id: '100',
+        };
+        await insertPlatformAccessTokenCredential(integration, resourceCredential);
+
+        await expectPlatformCredentialConstraintViolation(
+          insertPlatformAccessTokenCredential(integration, resourceCredential),
+          'UQ_platform_access_token_credentials_resource'
         );
       });
     });

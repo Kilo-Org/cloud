@@ -32,9 +32,10 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
+  getValidGitLabProjectAccessToken,
   getValidGitLabToken,
-  getStoredProjectAccessToken,
 } from '@/lib/integrations/gitlab-service';
+import type { GitLabCredentialActor } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
@@ -76,7 +77,7 @@ import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
  * would be a no-op for all subsequent status callbacks because `check_run_id`
  * was cleared during reset.
  */
-async function recreatePRGateCheck(review: CloudAgentCodeReview) {
+async function recreatePRGateCheck(review: CloudAgentCodeReview, actor: GitLabCredentialActor) {
   const platform = CodeReviewPlatformSchema.parse(review.platform);
   if (!shouldPublishCodeReviewToProvider(review)) return;
   if (platform === PLATFORM.BITBUCKET || !review.platform_integration_id) return;
@@ -127,10 +128,9 @@ async function recreatePRGateCheck(review: CloudAgentCodeReview) {
       `[retrigger] Created check run ${checkRunId} for ${review.repo_full_name}#${review.pr_number}`
     );
   } else if (platform === PLATFORM.GITLAB) {
-    const storedPrat = review.platform_project_id
-      ? getStoredProjectAccessToken(integration, review.platform_project_id)
-      : null;
-    const accessToken = storedPrat ? storedPrat.token : await getValidGitLabToken(integration);
+    const accessToken = review.platform_project_id
+      ? await getValidGitLabProjectAccessToken(integration, review.platform_project_id, actor)
+      : await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
@@ -153,7 +153,7 @@ async function recreatePRGateCheck(review: CloudAgentCodeReview) {
  * Without this, cancelling a pending review leaves a stale queued/pending gate
  * that permanently blocks protected branches.
  */
-async function cancelPRGateCheck(review: CloudAgentCodeReview) {
+async function cancelPRGateCheck(review: CloudAgentCodeReview, actor: GitLabCredentialActor) {
   const platform = CodeReviewPlatformSchema.parse(review.platform);
   if (!shouldPublishCodeReviewToProvider(review)) return;
   if (platform === PLATFORM.BITBUCKET || !review.platform_integration_id) return;
@@ -185,10 +185,9 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview) {
       `[cancel] Finalized check run for ${review.repo_full_name}#${review.pr_number}`
     );
   } else if (platform === PLATFORM.GITLAB) {
-    const storedPrat = review.platform_project_id
-      ? getStoredProjectAccessToken(integration, review.platform_project_id)
-      : null;
-    const accessToken = storedPrat ? storedPrat.token : await getValidGitLabToken(integration);
+    const accessToken = review.platform_project_id
+      ? await getValidGitLabProjectAccessToken(integration, review.platform_project_id, actor)
+      : await getValidGitLabToken(integration, actor);
     const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
@@ -423,6 +422,13 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
+      const credentialActor: GitLabCredentialActor = {
+        userId: ctx.user.id,
+        ...(review.owned_by_organization_id
+          ? { organizationId: review.owned_by_organization_id }
+          : {}),
+      };
+
       // Don't allow cancelling already completed/failed/cancelled/interrupted reviews
       if (['completed', 'failed', 'cancelled', 'interrupted'].includes(review.status)) {
         throw new TRPCError({
@@ -451,7 +457,7 @@ export const codeReviewRouter = createTRPCRouter({
             );
             await cancelCodeReview(input.reviewId);
             try {
-              await cancelPRGateCheck(review);
+              await cancelPRGateCheck(review, credentialActor);
             } catch (gateError) {
               logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
             }
@@ -467,7 +473,7 @@ export const codeReviewRouter = createTRPCRouter({
             console.error('Worker cancel failed, updating DB directly:', workerError);
             await cancelCodeReview(input.reviewId);
             try {
-              await cancelPRGateCheck(review);
+              await cancelPRGateCheck(review, credentialActor);
             } catch (gateError) {
               logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
             }
@@ -481,7 +487,7 @@ export const codeReviewRouter = createTRPCRouter({
       // For pending reviews (not yet dispatched to worker), update DB and finalize gate
       await cancelCodeReview(input.reviewId);
       try {
-        await cancelPRGateCheck(review);
+        await cancelPRGateCheck(review, credentialActor);
       } catch (gateError) {
         logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
       }
@@ -596,7 +602,10 @@ export const codeReviewRouter = createTRPCRouter({
 
         // Re-create PR gate check so status callbacks can update it.
         try {
-          await recreatePRGateCheck(review);
+          await recreatePRGateCheck(review, {
+            userId: owner.userId,
+            ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+          });
         } catch (gateError) {
           // Non-blocking — the review still retries even if the gate check fails
           logExceptInTest('[retrigger] Failed to re-create PR gate check:', gateError);

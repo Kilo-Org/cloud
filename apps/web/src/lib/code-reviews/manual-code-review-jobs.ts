@@ -456,7 +456,10 @@ async function resolveConnectedGitLabSource(
     const instanceUrl = getGitLabIntegrationInstanceUrl(integration);
     if (parsed.origin !== instanceUrl) continue;
 
-    const accessToken = await getValidGitLabToken(integration);
+    const accessToken = await getValidGitLabToken(integration, {
+      userId: owner.userId,
+      ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+    });
     const rawMergeRequest = await fetchGitLabMergeRequest({
       accessToken,
       projectId: parsed.projectPath,

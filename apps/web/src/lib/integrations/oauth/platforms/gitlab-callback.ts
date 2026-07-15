@@ -2,10 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   exchangeGitLabOAuthCode,
@@ -13,27 +10,17 @@ import {
   fetchGitLabProjects,
   calculateTokenExpiry,
 } from '@/lib/integrations/platforms/gitlab/adapter';
-import { instanceUrlChanged } from '@/lib/integrations/gitlab-service';
-import {
-  isDefaultGitLabInstanceUrl,
-  normalizeGitLabInstanceUrl,
-} from '@/lib/integrations/platforms/gitlab/instance-url';
+import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { APP_URL } from '@/lib/constants';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 import {
   type VerifiedGitLabOAuthState,
   verifyGitLabOAuthState,
 } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 import { appendIntegrationOAuthRedirectQuery } from '@/lib/integrations/oauth/common';
-
-/**
- * Generates a secure random webhook secret for GitLab webhook verification
- */
-function generateWebhookSecret(): string {
-  return randomBytes(32).toString('hex');
-}
+import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
 
 function buildGitLabRedirectPath(
   state: Pick<VerifiedGitLabOAuthState, 'owner' | 'returnTo'> | null | undefined,
@@ -171,85 +158,22 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
 
     const tokenExpiresAt = calculateTokenExpiry(tokens.created_at, tokens.expires_in);
 
-    const ownershipCondition =
-      owner.type === 'user'
-        ? eq(platform_integrations.owned_by_user_id, owner.id)
-        : eq(platform_integrations.owned_by_organization_id, owner.id);
+    const stored = await storeGitLabOAuthIntegration({
+      owner,
+      authorizedByUserId: user.id,
+      providerBaseUrl: normalizedInstanceUrl,
+      providerUser: { id: gitlabUser.id.toString(), login: gitlabUser.username },
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      accessTokenExpiresAt: tokenExpiresAt,
+      oauthClientId: customCredentials?.clientId ?? null,
+      oauthClientSecret: customCredentials?.clientSecret ?? null,
+      scopes: tokens.scope.split(' '),
+      repositories: repositories && repositories.length > 0 ? repositories : null,
+    });
 
-    const [existing] = await db
-      .select()
-      .from(platform_integrations)
-      .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.GITLAB)))
-      .limit(1);
-
-    const existingMetadata = existing?.metadata as Record<string, unknown> | null;
-
-    // Detect if the GitLab instance URL changed (e.g. gitlab.com -> self-hosted)
-    const isInstanceChange =
-      existing !== undefined &&
-      instanceUrlChanged(
-        existingMetadata?.gitlab_instance_url as string | undefined,
-        normalizedInstanceUrl
-      );
-
-    const webhookSecret = isInstanceChange
-      ? generateWebhookSecret()
-      : ((existingMetadata?.webhook_secret as string | undefined) ?? generateWebhookSecret());
-
-    const metadata: Record<string, unknown> = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: tokenExpiresAt,
-      gitlab_instance_url: isDefaultGitLabInstanceUrl(normalizedInstanceUrl)
-        ? undefined
-        : normalizedInstanceUrl,
-      webhook_secret: webhookSecret,
-      auth_type: 'oauth',
-      // Only preserve webhooks/tokens if same instance
-      configured_webhooks: isInstanceChange ? undefined : existingMetadata?.configured_webhooks,
-      project_tokens: isInstanceChange ? undefined : existingMetadata?.project_tokens,
-    };
-
-    if (customCredentials) {
-      metadata.client_id = customCredentials.clientId;
-      metadata.client_secret = customCredentials.clientSecret;
-    }
-
-    if (existing) {
-      await db
-        .update(platform_integrations)
-        .set({
-          platform_account_id: gitlabUser.id.toString(),
-          platform_account_login: gitlabUser.username,
-          scopes: tokens.scope.split(' '),
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          repositories: repositories && repositories.length > 0 ? repositories : null,
-          metadata,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(platform_integrations.id, existing.id));
-
-      // If instance changed, reset the code review agent config
-      if (isInstanceChange) {
-        await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
-      }
-    } else {
-      await db.insert(platform_integrations).values({
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform: PLATFORM.GITLAB,
-        integration_type: 'oauth',
-        platform_installation_id: gitlabUser.id.toString(), // Use GitLab user ID as "installation" ID
-        platform_account_id: gitlabUser.id.toString(),
-        platform_account_login: gitlabUser.username,
-        permissions: null, // GitLab OAuth doesn't have granular permissions like GitHub Apps
-        scopes: tokens.scope.split(' '),
-        repository_access: 'all', // OAuth grants access to all user's projects
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        repositories: repositories && repositories.length > 0 ? repositories : null,
-        metadata,
-        installed_at: new Date().toISOString(),
-      });
+    if (stored.instanceChanged) {
+      await resetCodeReviewConfigForOwner(owner, PLATFORM.GITLAB);
     }
 
     const successPath = verifiedState.returnTo

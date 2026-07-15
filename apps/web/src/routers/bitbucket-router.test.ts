@@ -74,7 +74,6 @@ async function insertPendingIntegration(organizationId: string, authorizedByUser
   if (!integration) throw new Error('Expected Bitbucket integration');
   await db.insert(platform_oauth_credentials).values({
     platform_integration_id: integration.id,
-    platform: 'bitbucket',
     authorized_by_user_id: authorizedByUserId,
     provider_subject_id: '123e4567-e89b-12d3-a456-426614174010',
     provider_subject_login: 'bucket-admin',

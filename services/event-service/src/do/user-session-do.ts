@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { clientMessageSchema, MAX_CONTEXTS } from '@kilocode/event-service';
-import { logger, withLogTags } from '../util/logger';
+import { configureDevLogging, logger, withLogTags } from '../util/logger';
 import type { ServerMessage } from '../types';
 
 type SerializedState = { contexts: string[] };
@@ -12,67 +12,77 @@ export class UserSessionDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
-    const upgradeHeader = request.headers.get('Upgrade');
-    if (upgradeHeader !== 'websocket') {
-      return new Response('Expected WebSocket upgrade', { status: 426 });
-    }
+    return withLogTags({ source: 'UserSessionDO.fetch' }, () => {
+      configureDevLogging(this.env);
+      const upgradeHeader = request.headers.get('Upgrade');
+      if (upgradeHeader !== 'websocket') {
+        logger.debug('fetch: rejecting non-websocket request');
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
 
-    const pair = new WebSocketPair();
-    const [client, server] = [pair[0], pair[1]];
+      const pair = new WebSocketPair();
+      const [client, server] = [pair[0], pair[1]];
 
-    this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ contexts: [] } satisfies SerializedState);
+      this.ctx.acceptWebSocket(server);
+      server.serializeAttachment({ contexts: [] } satisfies SerializedState);
 
-    return new Response(null, { status: 101, webSocket: client });
+      logger.debug('fetch: accepted websocket');
+      return new Response(null, { status: 101, webSocket: client });
+    });
   }
 
   async webSocketMessage(ws: WebSocket, rawMessage: string | ArrayBuffer): Promise<void> {
-    if (typeof rawMessage !== 'string') return;
+    return withLogTags({ source: 'UserSessionDO.webSocketMessage' }, () => {
+      configureDevLogging(this.env);
+      if (typeof rawMessage !== 'string') return;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawMessage);
-    } catch {
-      return;
-    }
-
-    const result = clientMessageSchema.safeParse(parsed);
-    if (!result.success) return;
-    const msg = result.data;
-
-    switch (msg.type) {
-      case 'context.subscribe': {
-        const state = this.getState(ws);
-        let overflowed = false;
-        for (const ctx of msg.contexts) {
-          if (state.contexts.size >= MAX_CONTEXTS && !state.contexts.has(ctx)) {
-            overflowed = true;
-            continue;
-          }
-          state.contexts.add(ctx);
-        }
-        this.saveState(ws, state);
-        if (overflowed) {
-          const errorMsg = {
-            type: 'error',
-            code: 'too_many_contexts',
-            max: MAX_CONTEXTS,
-          } satisfies ServerMessage;
-          try {
-            ws.send(JSON.stringify(errorMsg));
-          } catch {
-            // Connection dead — hibernation will clean up
-          }
-        }
-        break;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawMessage);
+      } catch {
+        return;
       }
-      case 'context.unsubscribe': {
-        const state = this.getState(ws);
-        for (const ctx of msg.contexts) state.contexts.delete(ctx);
-        this.saveState(ws, state);
-        break;
+
+      const result = clientMessageSchema.safeParse(parsed);
+      if (!result.success) return;
+      const msg = result.data;
+
+      switch (msg.type) {
+        case 'context.subscribe': {
+          const state = this.getState(ws);
+          let overflowed = false;
+          for (const ctx of msg.contexts) {
+            if (state.contexts.size >= MAX_CONTEXTS && !state.contexts.has(ctx)) {
+              overflowed = true;
+              continue;
+            }
+            state.contexts.add(ctx);
+          }
+          this.saveState(ws, state);
+          logger.debug('subscribed', { contexts: msg.contexts, overflowed });
+          if (overflowed) {
+            const errorMsg = {
+              type: 'error',
+              code: 'too_many_contexts',
+              max: MAX_CONTEXTS,
+            } satisfies ServerMessage;
+            try {
+              ws.send(JSON.stringify(errorMsg));
+            } catch {
+              // Connection dead — hibernation will clean up
+            }
+          }
+          break;
+        }
+        case 'context.unsubscribe': {
+          const state = this.getState(ws);
+          for (const ctx of msg.contexts) state.contexts.delete(ctx);
+          this.saveState(ws, state);
+          logger.debug('unsubscribed', { contexts: msg.contexts });
+          break;
+        }
       }
-    }
+    });
   }
 
   // Required by the hibernation API: workerd calls webSocketClose on any
@@ -92,6 +102,7 @@ export class UserSessionDO extends DurableObject<Env> {
     payload: unknown
   ): Promise<boolean> {
     return withLogTags({ source: 'UserSessionDO.pushEvent' }, () => {
+      configureDevLogging(this.env);
       logger.setTags({ userId: this.ctx.id.name, context, event });
 
       const sockets = this.ctx.getWebSockets();
@@ -109,18 +120,25 @@ export class UserSessionDO extends DurableObject<Env> {
           // Connection dead — hibernation will clean up
         }
       }
+      logger.debug('pushEvent: delivered', { sockets: sockets.length, delivered });
       return delivered;
     });
   }
 
   async hasContext(context: string): Promise<boolean> {
     return withLogTags({ source: 'UserSessionDO.hasContext' }, () => {
+      configureDevLogging(this.env);
       logger.setTags({ userId: this.ctx.id.name, context });
+      let present = false;
       for (const ws of this.ctx.getWebSockets()) {
         const state = this.getState(ws);
-        if (state.contexts.has(context)) return true;
+        if (state.contexts.has(context)) {
+          present = true;
+          break;
+        }
       }
-      return false;
+      logger.debug('hasContext', { present });
+      return present;
     });
   }
 

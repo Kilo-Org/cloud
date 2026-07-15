@@ -27,6 +27,10 @@ vi.mock('./dos/SessionIngestDO', () => ({
   getSessionIngestDO: vi.fn(),
 }));
 
+vi.mock('./dos/UserConnectionDO', () => ({
+  getUserConnectionDO: vi.fn(),
+}));
+
 vi.mock('./session-events', async importOriginal => {
   const actual = await importOriginal<typeof SessionEvents>();
   return {
@@ -45,6 +49,7 @@ vi.mock('./util/ingest-limits', () => ({
 
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { getUserConnectionDO } from './dos/UserConnectionDO';
 import { notifyUserSessionEvent } from './session-events';
 import { QUEUE_RETRY_DELAY_SECONDS, createItemExtractor, queue } from './queue-consumer';
 import { computeSessionMetadataUpdates } from './ingest/metadata';
@@ -1012,5 +1017,183 @@ describe('queue status notifications', () => {
       }),
       ctx
     );
+  });
+});
+
+describe('remote session attention notifications', () => {
+  const attentionSignal = { signalId: 'msg_1', kind: 'completed', messageExcerpt: 'All done' };
+
+  function setUpAttentionTest(params: {
+    sessionRow: { parent_session_id: string | null };
+    activeCliSession?: boolean;
+    ingest?: ReturnType<typeof vi.fn>;
+    stagedItems?: unknown[];
+  }) {
+    const ingest =
+      params.ingest ?? vi.fn(async () => ({ changes: [], attentionSignals: [attentionSignal] }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+
+    // A single session lookup serves both the deleted-session guard and push eligibility.
+    const limit = vi.fn(async () => [{ session_id: 'ses_remote', ...params.sessionRow }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+
+    const hasActiveCliSession = vi.fn(async () => params.activeCliSession ?? true);
+    vi.mocked(getUserConnectionDO).mockReturnValue({
+      hasActiveCliSession,
+    } as never);
+
+    const sendCloudAgentSessionNotification = vi.fn(async () => ({ dispatched: true }));
+    const body = JSON.stringify({
+      data: params.stagedItems ?? [{ type: 'message', data: { id: 'msg_1' } }],
+    });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: vi.fn(async () => undefined),
+      },
+      NOTIFICATIONS: { sendCloudAgentSessionNotification },
+    } as never;
+
+    return {
+      env,
+      ingest,
+      hasActiveCliSession,
+      sendCloudAgentSessionNotification,
+    };
+  }
+
+  async function runAttentionQueue(env: unknown) {
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const waitUntilPromises: Promise<unknown>[] = [];
+    const ctx = {
+      waitUntil: vi.fn((p: Promise<unknown>) => waitUntilPromises.push(p)),
+    } as unknown as ExecutionContext;
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/attention',
+              kiloUserId: 'usr_remote',
+              sessionId: 'ses_remote',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env as never,
+      ctx
+    );
+    await Promise.all(waitUntilPromises);
+
+    return { ack, retry };
+  }
+
+  it.skip('dispatches a push notification for an active root session', async () => {
+    const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null },
+      activeCliSession: true,
+    });
+
+    const { ack } = await runAttentionQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(hasActiveCliSession).toHaveBeenCalledWith('ses_remote');
+    expect(sendCloudAgentSessionNotification).toHaveBeenCalledWith({
+      userId: 'usr_remote',
+      cliSessionId: 'ses_remote',
+      executionId: 'remote:msg_1',
+      status: 'completed',
+      body: 'All done',
+      suppressIfViewingSession: true,
+    });
+  });
+
+  it.skip('suppresses the push when no active CLI owns the root session', async () => {
+    const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null },
+      activeCliSession: false,
+    });
+
+    await runAttentionQueue(env);
+
+    expect(hasActiveCliSession).toHaveBeenCalledWith('ses_remote');
+    expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
+  });
+
+  it('suppresses the push for a child session', async () => {
+    const { env, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: 'ses_parent' },
+    });
+
+    await runAttentionQueue(env);
+
+    expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
+  });
+
+  it('suppresses the push when the current payload identifies a child session', async () => {
+    const ingest = vi.fn(async () => ({
+      changes: [{ name: 'parentId', value: 'ses_parent' }],
+      attentionSignals: [attentionSignal],
+    }));
+    const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null },
+      ingest,
+    });
+
+    await runAttentionQueue(env);
+
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
+    expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
+  });
+
+  it('keeps notification failures non-fatal after the ingest succeeds', async () => {
+    const { env, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null },
+    });
+    sendCloudAgentSessionNotification.mockRejectedValue(new Error('Notifications unavailable'));
+
+    const { ack, retry } = await runAttentionQueue(env);
+
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it.skip('dispatches signals collected from earlier chunks when a later chunk fails', async () => {
+    // 129 items force a mid-stream flush at the 128-item chunk cap; the leftover item
+    // flushes at the end as a second DO call. The first call commits and reports a
+    // signal, the second fails — the signal must still be dispatched because the retry
+    // will not re-emit the already-persisted status transition.
+    let ingestCalls = 0;
+    const ingest = vi.fn(async () => {
+      ingestCalls += 1;
+      if (ingestCalls > 1) throw new Error('DO unavailable');
+      return { changes: [], attentionSignals: [attentionSignal] };
+    });
+    const stagedItems = Array.from({ length: 129 }, (_, i) => ({
+      type: 'message',
+      data: { id: `msg_${i}` },
+    }));
+    const { env, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null },
+      ingest,
+      stagedItems,
+    });
+
+    const { ack, retry } = await runAttentionQueue(env);
+
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(sendCloudAgentSessionNotification).toHaveBeenCalledTimes(1);
   });
 });

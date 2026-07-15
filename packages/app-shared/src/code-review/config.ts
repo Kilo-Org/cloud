@@ -1,5 +1,15 @@
 import type { CodeReviewPlatform, GateThreshold, ReviewStyle } from './enums';
 
+// Wire shape of a per-repository model override. Mirrors the tRPC input/output
+// contract (camelCase); the persisted snake_case shape lives in
+// RepositoryModelOverrideSchema in @kilocode/db/schema-types.
+export type RepositoryModelOverrideInput = {
+  repositoryId: number | string;
+  repoFullName: string;
+  modelSlug: string;
+  thinkingEffort: string | null;
+};
+
 // Structural shape of the review config a save request is built from —
 // matches apps/mobile/src/lib/code-reviewer-config.ts's ReviewConfigData
 // (mobile keeps that name/type locally, derived from its tRPC query output;
@@ -13,6 +23,7 @@ export type CodeReviewConfigInput = {
   gateThreshold: GateThreshold;
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: (number | string)[];
+  repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
 };
 
@@ -25,6 +36,7 @@ export type CodeReviewConfigPatch = Partial<{
   gateThreshold: GateThreshold;
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: (number | string)[];
+  repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
 }>;
 
@@ -59,6 +71,9 @@ export function buildSaveConfigInput(
         ? ('selected' as const)
         : config.repositorySelectionMode,
     selectedRepositoryIds: config.selectedRepositoryIds,
+    // Preserve web-created overrides across mobile settings edits (mobile has no
+    // override editing UI in v1). The server prunes these to the current selection.
+    repositoryModelOverrides: config.repositoryModelOverrides,
     disableReviewMd: config.disableReviewMd,
     ...(platform === 'gitlab' ? { autoConfigureWebhooks: true as const } : {}),
     ...patch,

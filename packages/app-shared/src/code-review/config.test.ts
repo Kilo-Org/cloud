@@ -14,6 +14,7 @@ const config: CodeReviewConfigInput = {
   gateThreshold: 'off',
   repositorySelectionMode: 'all',
   selectedRepositoryIds: [],
+  repositoryModelOverrides: [],
   disableReviewMd: true,
 };
 
@@ -30,8 +31,26 @@ describe('buildSaveConfigInput', () => {
       gateThreshold: 'off',
       repositorySelectionMode: 'all',
       selectedRepositoryIds: [],
+      repositoryModelOverrides: [],
       disableReviewMd: true,
     });
+  });
+
+  it('preserves repository model overrides across an unrelated patch', () => {
+    const overrides = [
+      {
+        repositoryId: 123,
+        repoFullName: 'acme/api',
+        modelSlug: 'anthropic/claude-opus-4.8',
+        thinkingEffort: null,
+      },
+    ];
+    const input = buildSaveConfigInput(
+      'github',
+      { ...config, repositoryModelOverrides: overrides },
+      { reviewStyle: 'strict' }
+    );
+    expect(input.repositoryModelOverrides).toEqual(overrides);
   });
 
   it('applies patches over current values', () => {

@@ -5,6 +5,7 @@ import {
   JetBrainsMono_500Medium,
   JetBrainsMono_600SemiBold,
 } from '@expo-google-fonts/jetbrains-mono';
+import { ThemeProvider } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';
 import { useFonts } from 'expo-font';
@@ -32,6 +33,7 @@ import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate'
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
+import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import {
   checkInitialNotification,
@@ -325,6 +327,7 @@ function RootLayoutNav() {
 
 function RootLayout() {
   const ref = useNavigationContainerRef();
+  const navigationTheme = useNavigationTheme();
 
   useEffect(() => {
     if (ref.current) {
@@ -340,10 +343,12 @@ function RootLayout() {
   }, []);
 
   return (
-    <AppRootProviders>
-      <StatusBar style="auto" />
-      <RootLayoutNav />
-    </AppRootProviders>
+    <ThemeProvider value={navigationTheme}>
+      <AppRootProviders>
+        <StatusBar style="auto" />
+        <RootLayoutNav />
+      </AppRootProviders>
+    </ThemeProvider>
   );
 }
 

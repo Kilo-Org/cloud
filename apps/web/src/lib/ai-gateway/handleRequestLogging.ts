@@ -3,20 +3,9 @@ import { db } from '@/lib/drizzle';
 import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { kilologHash } from '@/lib/ai-gateway/kilologHash';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
-
-const users = [
-  '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
-  'a8cd59cc6df67645c2f509948ee9a579582a7593db43fbad9bcf37cce38f2d87', // https://kilo-code.slack.com/archives/C09H2GDAJ75/p1776149178143169
-  'de30ace080f1ea4d269c0d37b68fd41f3e6895751ce032a713fe6e07eb314dfb', // https://kilo-code.slack.com/archives/C090U1NLQUC/p1778487038443649?thread_ts=1778480356.436739&cid=C090U1NLQUC
-  '1a4310f6b09d4ab3a84ff778cb1c77046ce50b21b85d3837a668a38b09faa5f3', // https://app.usepylon.com/support/issues/views/9243f7cb-081d-4484-9138-dc1cefe86ce5?issueNumber=22891
-  '4c8c9532aba4b75a3778d28b7b8201724dc0065820c1c515bd5aeda76cf203bf', // https://app.usepylon.com/support/issues/views/all-issues?issueNumber=24166
-];
-
-const organizations = [
-  '3f48333c176a29aaeeb25f3475e38511fc7184b34321a1605a3c0db54cae6df4', // kilo
-];
+import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
+import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 
 async function isLoggingEnabledForUser(
   user: User | null,
@@ -24,9 +13,11 @@ async function isLoggingEnabledForUser(
 ): Promise<boolean> {
   if (user?.google_user_email.endsWith('@kilo.ai')) return true;
   if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
-  if (user?.id && users.includes(await kilologHash(user.id))) return true;
-  if (organizationId && organizations.includes(await kilologHash(organizationId))) return true;
-  return false;
+  if (organizationId === KILO_ORGANIZATION_ID) return true;
+  return isDynamicallyOptedIntoRequestLogging({
+    accountId: user?.id ?? null,
+    organizationId,
+  });
 }
 
 export async function handleRequestLogging(params: {

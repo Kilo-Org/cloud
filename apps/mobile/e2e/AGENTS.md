@@ -21,7 +21,7 @@ xcrun simctl list devices booted
 
 Reuse a complete stack already running for this worktree. Do not start a competing stack or stop an unrelated `kilo-dev-*` session.
 
-`kiloclaw-docker-tcp` on port 23750 is the sole intentional host-wide exception: it is a stateless loopback proxy to the same Docker socket. The runner reuses an occupied proxy. Never kill a `socat` process owned by another worktree to free this port.
+The sole intentional host-wide proxy exception is port `23750`. The repository-managed `kiloclaw-docker-tcp` service on that port is the sole intentional host-wide exception: it is a stateless loopback proxy to the same Docker socket. The runner reuses an occupied proxy. Never kill a `socat` process owned by another worktree to free this port.
 
 When this worktree has no stack, start the complete mobile flow. Secondary worktrees automatically receive an isolated port offset, and mobile startup generates and explicitly injects this worktree's LAN URLs before Metro starts. Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale parent-shell values must not select the bundle endpoints:
 
@@ -37,6 +37,14 @@ The session-ingest env step creates the JWT Secrets Store binding; without it th
 Secrets Store state is local to each Worker directory. `dev:start` runs env sync for its selected service graph and refreshes every source-backed secret before launching Workers; secret creation failures are fatal. Do not run bare `wrangler secrets-store` commands: use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source and Wrangler receives a complete non-interactive prompt.
 
 Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are `up`. Restarts are asynchronous; if `mobile` is still starting, inspect its log and rerun status instead of restarting the stack. Use reported ports; never assume defaults in a secondary worktree.
+
+### Host Networking Safety
+
+You must never map port `8081` or another shared host port to a worktree Metro port. Except for the repository-managed `23750` proxy above, do not create ad hoc proxies, redirects, tunnels, NAT rules, or listeners to repair stale Expo state.
+
+After an exact development-client URL reconnect fails, perform at most one supported recovery through the existing preflight and launch flow. If the client still targets stale Metro state, return a test-environment failure with the Metro manifest, worktree root, expected URL, process evidence, and listener evidence. Do not route around bundle-provenance validation.
+
+When an unexpected listener exists, report its PID, parent PID, command, bind address, and port. Stop it only when the current invocation can prove it created the process. Otherwise return the ownership evidence to the orchestrator.
 
 ## Logs and tmux
 
@@ -61,31 +69,29 @@ E2E fixtures must never be committed. When a flow needs generated fixture files,
 
 ## iOS Simulator
 
-Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the command prefers an unclaimed shutdown device and boots it. Pass a UDID only when intentionally claiming that device:
+Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the command prefers an unclaimed shutdown device and boots it. A prewarm verifier uses `--phase prewarm`; the fresh acceptance verifier reclaims the same worktree-owned device with `--phase verify`:
 
 ```bash
-pnpm dev:mobile:simulator claim [udid]
+pnpm dev:mobile:simulator claim [udid] --phase prewarm
+pnpm dev:mobile:simulator claim [udid] --phase verify
 ```
 
-Uninstall Kilo, then build from this worktree in a dedicated tmux session. A fresh checkout generates the gitignored `ios/` directory and installs pods, so the first build takes a few minutes and is noisy:
+The wrapper visibly renames a claimed device to `Kilo E2E - <sanitized-worktree-basename> - <phase>`. Verifiers must not call `xcrun simctl rename` directly. Releasing an owned claim restores the original simulator name before removing the claim.
+
+Install a validated cached native build. A compatible fingerprint avoids rebuilding; a cache miss is serialized through the host-wide native compiler semaphore:
 
 ```bash
-xcrun simctl uninstall <udid> com.kilocode.kiloapp 2>/dev/null || true
-IOS_BUILD_SESSION="kilo-e2e-ios-$(basename "$PWD")"
-tmux new-session -d -s "$IOS_BUILD_SESSION" -c "$PWD/apps/mobile"
-tmux set-option -t "$IOS_BUILD_SESSION" remain-on-exit on
-tmux respawn-pane -k -t "$IOS_BUILD_SESSION":0.0 \
-  "npx expo run:ios --device <udid> --no-bundler"
-tmux capture-pane -p -t "$IOS_BUILD_SESSION" -S -80
-tmux display-message -p -t "$IOS_BUILD_SESSION" '#{pane_dead} #{pane_dead_status}'
+pnpm dev:mobile:ios build <udid>
 ```
 
-Poll the bounded pane tail until `pane_dead` is `1` and `pane_dead_status` is `0`; do not stream the full native build into agent context. Then connect to the Metro URL shown by this worktree's `mobile` pane. `expo run:ios --no-bundler` may still open port 8081 instead of the worktree-safe port:
+Do not consume an arbitrary DerivedData app or run a separate Expo native build. Connect the validated app to the Metro URL shown by this worktree's `mobile` pane:
 
 ```bash
 xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
+
+Prefer `xcrun simctl openurl` for low-level scheme reconnection to avoid Safari's external-app confirmation. If an acceptance flow intentionally follows the scheme through Safari or a WebView, inspect the hierarchy for the exact message `Open this page in "Kilo"?`, then tap the exact `Open` accessibility action. This is one bounded optional prompt within the existing five-second optional-prompt budget, not permission to add another fixed wait.
 
 Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The shared launch flows dismiss the clean-install tracking alert, accept the Expo dev-menu introduction with `Continue`, and then close the full Expo/React Native developer menu containing Fast Refresh and Element Inspector with its `Close` accessibility action.
 
@@ -179,9 +185,10 @@ pnpm dev:mobile:android adb wait-for-device
 pnpm dev:mobile:android claim <serial>
 pnpm dev:mobile:android adb reverse tcp:<nextjs-port> tcp:<nextjs-port>
 pnpm dev:mobile:android adb reverse tcp:<metro-port> tcp:<metro-port>
-cd apps/mobile
-pnpm -w dev:mobile:android build
+pnpm dev:mobile:android build <serial>
 ```
+
+The build command installs a validated cached APK when the Android native fingerprint and toolchain match. Do not install an APK from another output path or invoke Gradle directly.
 
 Use Maestro as the primary Android automation driver, matching iOS. Fall back to repository-wrapped ADB when Maestro cannot inspect or operate a native prompt, when direct intent/process control is required, or when diagnosing the emulator itself. Android setup still uses ADB for readiness and port reversal. Use the repository wrapper rather than bare `adb`:
 
@@ -204,7 +211,6 @@ The existing login/logout helpers accept either an iOS simulator UDID or an Andr
 Clean up only resources you started. The remote CLI session and its disposable install are owned by the orchestrator; do not kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create:
 
 ```bash
-tmux kill-session -t "$IOS_BUILD_SESSION" # if created
 tmux kill-session -t "$ANDROID_SESSION"   # if created
 rm -f "$LOGIN_LOG"                        # if created
 pnpm dev:stop                              # only if you started this worktree's stack

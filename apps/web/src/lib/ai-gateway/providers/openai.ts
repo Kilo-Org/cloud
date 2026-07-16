@@ -5,6 +5,10 @@ export function isOpenAiModel(requestedModel: string) {
   );
 }
 
+export function isOpenAiProModel(requestedModel: string) {
+  return isOpenAiModel(requestedModel) && requestedModel.includes('pro');
+}
+
 export function isGptOssModel(requestedModel: string) {
   return requestedModel.includes('gpt-oss');
 }

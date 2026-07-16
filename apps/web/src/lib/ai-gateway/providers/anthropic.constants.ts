@@ -125,5 +125,13 @@ export function isClaudeModel(requestedModel: string) {
 }
 
 export function isFableModel(requestedModel: string) {
-  return requestedModel.includes('claude-fable');
+  return isClaudeModel(requestedModel) && requestedModel.includes('fable');
+}
+
+export function isOpusFastModel(requestedModel: string) {
+  return (
+    isClaudeModel(requestedModel) &&
+    requestedModel.includes('opus') &&
+    requestedModel.includes('fast')
+  );
 }

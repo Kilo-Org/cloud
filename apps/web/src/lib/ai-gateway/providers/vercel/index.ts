@@ -28,6 +28,8 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
+import { isOpenAiProModel } from '@/lib/ai-gateway/providers/openai';
+import { isOpusFastModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -147,7 +149,7 @@ export function getAnthropicProviderOptions(
     options.effort = request.body.text.verbosity;
   }
 
-  if (requestedModel.includes('opus') && requestedModel.includes('fast')) {
+  if (isOpusFastModel(requestedModel)) {
     options.speed = 'fast';
   }
 
@@ -163,7 +165,7 @@ export function getOpenAIProviderOptions(
 ): OpenAILanguageModelResponsesOptions | undefined {
   const options: OpenAILanguageModelResponsesOptions = {};
 
-  if (requestedModel.includes('gpt') && requestedModel.includes('pro')) {
+  if (isOpenAiProModel(requestedModel)) {
     options.reasoningMode = 'pro';
   }
 

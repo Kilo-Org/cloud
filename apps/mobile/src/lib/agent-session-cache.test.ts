@@ -3,9 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 
 describe('invalidateAgentSessionQueries', () => {
-  it('invalidates session list and recent repository queries', async () => {
+  it('invalidates session list, recent repository, and active session queries', async () => {
     const listFilter = { queryKey: ['cliSessionsV2', 'list'] };
     const recentRepositoriesFilter = { queryKey: ['cliSessionsV2', 'recentRepositories'] };
+    const activeListFilter = { queryKey: ['activeSessions', 'list'] };
     const queryClient = {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
     };
@@ -14,11 +15,15 @@ describe('invalidateAgentSessionQueries', () => {
         list: { pathFilter: () => listFilter },
         recentRepositories: { pathFilter: () => recentRepositoriesFilter },
       },
+      activeSessions: {
+        list: { pathFilter: () => activeListFilter },
+      },
     };
 
     await invalidateAgentSessionQueries(queryClient, trpc);
 
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(listFilter);
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(recentRepositoriesFilter);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(activeListFilter);
   });
 });

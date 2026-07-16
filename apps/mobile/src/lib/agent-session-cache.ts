@@ -9,6 +9,9 @@ type AgentSessionTrpcQueries = {
     list: QueryPathFilter;
     recentRepositories: QueryPathFilter;
   };
+  activeSessions: {
+    list: QueryPathFilter;
+  };
 };
 
 export async function invalidateAgentSessionQueries(
@@ -18,5 +21,6 @@ export async function invalidateAgentSessionQueries(
   await Promise.all([
     queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
+    queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter()),
   ]);
 }

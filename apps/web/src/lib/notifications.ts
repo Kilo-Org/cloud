@@ -67,16 +67,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showOnlyOnLegacyExtension: true,
   },
   {
-    id: 'star-giveaway-june-2026',
-    title: 'GitHub Star Giveaway',
-    message:
-      "We're giving away $500 of AI Credits when we reach 25,000 stars on GitHub. Support us:",
-    action: {
-      actionText: 'github.com/Kilo-Org/kilocode',
-      actionURL: 'https://github.com/Kilo-Org/kilocode/',
-    },
-  },
-  {
     id: 'stealth-opus-discount-may-25',
     title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
     message:

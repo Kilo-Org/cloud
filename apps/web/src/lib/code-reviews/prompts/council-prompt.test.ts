@@ -98,6 +98,27 @@ describe('buildCouncilOrchestratorPrompt', () => {
     // Coordinator must not compute the decision itself.
     expect(prompt.toLowerCase()).toContain('do not compute an overall decision');
   });
+
+  it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {
+    const prompt = buildCouncilOrchestratorPrompt({
+      basePrompt: 'BASE',
+      specialists: [
+        specialist({ id: 'security', name: 'Security' }),
+        specialist({ id: 'performance', name: 'Performance', role: 'performance' }),
+      ],
+      aggregationStrategy: 'majority',
+    });
+
+    // 1. Startup line names the specialists AND the formatted governance label — assert the
+    // full fragment so it isn't satisfied by the separate `describeAggregationStrategy` text.
+    expect(prompt).toContain(
+      'Starting council review with 2 specialists (Security, Performance) using Majority governance.'
+    );
+    // 2. Per-specialist start. 3. All-done. 4. Done message.
+    expect(prompt).toContain('Starting <name> review...');
+    expect(prompt).toContain('All specialists complete');
+    expect(prompt).toContain('Council review complete.');
+  });
 });
 
 describe('buildSpecialistAgentPrompt', () => {

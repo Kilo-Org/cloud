@@ -5,6 +5,7 @@ import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-
 import {
   COUNCIL_RESULT_MARKER_TAG,
   describeAggregationStrategy,
+  formatAggregationStrategy,
 } from '@kilocode/worker-utils/code-review-council';
 
 /**
@@ -56,6 +57,7 @@ export function buildCouncilOrchestratorPrompt(params: {
   const roster = specialists
     .map(s => `- subagent_type "${s.id}" — ${s.name}: ${s.lens}`)
     .join('\n');
+  const specialistNames = specialists.map(s => s.name).join(', ');
 
   const coordination = [
     '# COUNCIL MODE',
@@ -68,6 +70,15 @@ export function buildCouncilOrchestratorPrompt(params: {
     roster,
     '',
     `Governance (for context only — our system computes the final decision): ${describeAggregationStrategy(aggregationStrategy)}`,
+    '',
+    // A council coordinator is mostly quiet (it delegates and waits), so the live session log
+    // looks empty and the run appears stuck. Narrate progress so the operator sees it working.
+    'Progress updates — print each of the following as a plain-text status line on its own',
+    'line, at the moment you reach it, so the run shows live progress in the session log:',
+    `- At the very start, before delegating: "Starting council review with ${specialists.length} specialists (${specialistNames}) using ${formatAggregationStrategy(aggregationStrategy)} governance."`,
+    '- Immediately before you start each specialist, name it: "Starting <name> review..."',
+    '- Once every specialist has reported back: "All specialists complete. Aggregating results..."',
+    '- When you are finished (right before the manifest below): "Council review complete."',
     '',
     'When every specialist has reported, emit EXACTLY ONE machine-readable manifest on its',
     'own line in your final message, verbatim on a line by itself. It does NOT need to be',

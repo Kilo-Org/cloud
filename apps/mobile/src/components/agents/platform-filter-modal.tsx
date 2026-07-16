@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
+import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +20,11 @@ const PLATFORM_FILTERS = [
 ] as const;
 const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
 
+const SORT_OPTIONS: readonly { value: AgentSessionSortBy; label: string }[] = [
+  { value: 'updated_at', label: 'Last updated' },
+  { value: 'created_at', label: 'Created' },
+];
+
 export type ProjectFilterOption = {
   gitUrl: string;
   displayName: string;
@@ -26,9 +33,10 @@ export type ProjectFilterOption = {
 type SessionFilters = {
   platformFilter: string[];
   projectFilter: string[];
+  sortBy: AgentSessionSortBy;
 };
 
-type SessionFilterChipsProps = SessionFilters & {
+type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
   projectOptions: ProjectFilterOption[];
   onRemovePlatform: (platform: string) => void;
   onRemoveProject: (gitUrl: string) => void;
@@ -37,6 +45,7 @@ type SessionFilterChipsProps = SessionFilters & {
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
   selectedProjects: string[];
+  selectedSortBy: AgentSessionSortBy;
   projectOptions: ProjectFilterOption[];
   onClose: () => void;
   onApply: (filters: SessionFilters) => void;
@@ -170,12 +179,14 @@ export function SessionFilterChips({
 export function SessionFilterModal({
   selectedPlatforms,
   selectedProjects,
+  selectedSortBy,
   projectOptions,
   onClose,
   onApply,
 }: Readonly<SessionFilterModalProps>) {
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
+  const [draftSortBy, setDraftSortBy] = useState<AgentSessionSortBy>(selectedSortBy);
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -213,6 +224,22 @@ export function SessionFilterModal({
           <Text className="text-base font-semibold">Filter sessions</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
+              <View className="gap-1">
+                <Text variant="eyebrow" className="px-3">
+                  Sort by
+                </Text>
+                {SORT_OPTIONS.map(option => (
+                  <ChoiceRow
+                    key={option.value}
+                    label={option.label}
+                    selected={draftSortBy === option.value}
+                    onPress={() => {
+                      setDraftSortBy(option.value);
+                    }}
+                    className="rounded-lg px-3"
+                  />
+                ))}
+              </View>
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
                   Platform
@@ -253,7 +280,11 @@ export function SessionFilterModal({
             </Button>
             <Button
               onPress={() => {
-                onApply({ platformFilter: draftPlatforms, projectFilter: draftProjects });
+                onApply({
+                  platformFilter: draftPlatforms,
+                  projectFilter: draftProjects,
+                  sortBy: draftSortBy,
+                });
                 onClose();
               }}
             >

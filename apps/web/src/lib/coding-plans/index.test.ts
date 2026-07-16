@@ -88,6 +88,7 @@ describe('coding plans', () => {
       providerName: 'MiniMax',
       name: 'Token Plan Plus',
       providerId: PROVIDER_ID,
+      coveredModelIds: ['minimax/minimax-m3'],
       costMicrodollars: COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
@@ -97,6 +98,7 @@ describe('coding plans', () => {
       providerName: 'MiniMax',
       name: 'Token Plan Max',
       providerId: PROVIDER_ID,
+      coveredModelIds: ['minimax/minimax-m3'],
       costMicrodollars: MAX_COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([
@@ -109,6 +111,7 @@ describe('coding plans', () => {
       providerName: 'MiniMax',
       name: 'Token Plan Ultra',
       providerId: PROVIDER_ID,
+      coveredModelIds: ['minimax/minimax-m3'],
       costMicrodollars: ULTRA_COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([

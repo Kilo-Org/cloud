@@ -22,6 +22,5 @@ export const muse_spark_1_1_model: KiloExclusiveModel = {
       },
     },
   ],
-  exclusive_to: [],
   inference_provider_restriction: [],
 };

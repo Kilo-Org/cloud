@@ -10,7 +10,7 @@ import {
   organization_memberships,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
@@ -1332,6 +1332,64 @@ describe('cli-sessions-v2-router', () => {
           .where(eq(cli_sessions_v2.session_id, sessionId));
         await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
       }
+    });
+  });
+
+  describe('search ordering', () => {
+    const olderCreatedNewerUpdated = 'ses_search_sort_old_created';
+    const newerCreatedOlderUpdated = 'ses_search_sort_new_created';
+    const searchableTitle = 'mobile-search-sort-fixture';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: olderCreatedNewerUpdated,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: searchableTitle,
+          created_at: '2026-01-01T10:00:00.000Z',
+          updated_at: '2026-01-04T10:00:00.000Z',
+        },
+        {
+          session_id: newerCreatedOlderUpdated,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: searchableTitle,
+          created_at: '2026-01-03T10:00:00.000Z',
+          updated_at: '2026-01-02T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          inArray(cli_sessions_v2.session_id, [olderCreatedNewerUpdated, newerCreatedOlderUpdated])
+        );
+    });
+
+    it('defaults search to updated_at descending', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: searchableTitle });
+
+      expect(result.results.map(session => session.session_id)).toEqual([
+        olderCreatedNewerUpdated,
+        newerCreatedOlderUpdated,
+      ]);
+    });
+
+    it('orders search by created_at descending when requested', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: searchableTitle,
+        orderBy: 'created_at',
+      });
+
+      expect(result.results.map(session => session.session_id)).toEqual([
+        newerCreatedOlderUpdated,
+        olderCreatedNewerUpdated,
+      ]);
     });
   });
 });

@@ -39,3 +39,13 @@ export function isPartStreaming(part: Part): boolean {
   }
   return false;
 }
+
+export function shouldRenderReasoningPart(part: Part, isStreaming: boolean): boolean {
+  if (!isReasoningPart(part)) {
+    return false;
+  }
+  if (part.text.trim() !== '') {
+    return true;
+  }
+  return isStreaming && isPartStreaming(part);
+}

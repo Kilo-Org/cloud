@@ -119,10 +119,7 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 }
 
 const unavailableModels = [
-  // these models are not available in the EU
-  'grok-latest',
-  'grok-4.5',
-  'sakana/fugu',
+  'sakana/fugu', // this model is not available in the EU
 ];
 
 async function enhancedModelList(models: OpenRouterModel[]) {

@@ -4,7 +4,7 @@ import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
-import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
+import { isGrokModel, isGrok42Model, isGrok45Model } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
@@ -101,7 +101,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (
     isMinimaxModel(model) ||
     isKimiModel(model) ||
-    isGrokToggleableReasoningModel(model) ||
+    isGrok42Model(model) ||
     isQwenModel(model) ||
     isGemmaModel(model) ||
     model.includes('mimo')
@@ -114,7 +114,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.startsWith('inception/mercury-2')) {
     return REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH;
   }
-  if (isStepModel(model)) {
+  if (isStepModel(model) || isGrok45Model(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
   }
   if (isDeepseekModel(model) || isGlmModel(model)) {

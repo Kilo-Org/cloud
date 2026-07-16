@@ -18,10 +18,6 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/models', () => ({
-  ...jest.requireActual('@/lib/ai-gateway/models'),
-  filterByFeature: jest.fn(),
-}));
 jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
@@ -46,7 +42,6 @@ const { getAvailableModelsForOrganization } = jest.requireMock(
 );
 const { getCachedRoutingTable } = jest.requireMock('@/lib/ai-gateway/auto-routing-table-cache');
 const { getAutoFreeCandidates } = jest.requireMock('@/lib/ai-gateway/auto-model/resolution');
-const { filterByFeature } = jest.requireMock('@/lib/ai-gateway/models');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
@@ -57,7 +52,6 @@ const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
-const mockedFilterByFeature = jest.mocked(filterByFeature);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -83,10 +77,6 @@ function request(headers?: Record<string, string>) {
 describe('GET /api/openrouter/models', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockedFilterByFeature.mockImplementation(
-      (models: Array<{ id: string }>, feature: string | null) =>
-        feature === 'code-review' ? models.filter(model => model.id !== 'feature/excluded') : models
-    );
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       organizationId: null,
@@ -188,57 +178,25 @@ describe('GET /api/openrouter/models', () => {
     });
   });
 
-  test('builds auto-routing choices from feature-filtered models', async () => {
+  test('adds auto-routing to organization models', async () => {
     const efficientModel = makeModel('kilo-auto/efficient');
     const allowedModel = makeModel('openai/gpt-5.4-mini');
-    const excludedModel = makeModel('feature/excluded');
-    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
-      data: [efficientModel, allowedModel, excludedModel],
-    });
-    mockedGetCachedRoutingTable.mockResolvedValue({
-      routes: {
-        'implementation/code_generation': [{ model: allowedModel.id }, { model: excludedModel.id }],
-      },
-    } as never);
-
-    const response = await GET(request({ 'x-kilocode-feature': 'code-review' }));
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      data: [
-        {
-          ...efficientModel,
-          autoRouting: {
-            models: [allowedModel.id],
-          },
-        },
-        allowedModel,
-      ],
-    });
-  });
-
-  test('adds auto-routing to organization models after feature filtering', async () => {
-    const efficientModel = makeModel('kilo-auto/efficient');
-    const allowedModel = makeModel('openai/gpt-5.4-mini');
-    const excludedModel = makeModel('feature/excluded');
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-id' },
       organizationId: 'org-1',
       authFailedResponse: null,
     } as never);
     mockedGetAvailableModelsForOrganization.mockResolvedValue({
-      data: [efficientModel, allowedModel, excludedModel],
+      data: [efficientModel, allowedModel],
     } as never);
     mockedGetCachedRoutingTable.mockResolvedValue({
       routes: {
-        'implementation/code_generation': [{ model: allowedModel.id }, { model: excludedModel.id }],
+        'implementation/code_generation': [{ model: allowedModel.id }],
       },
     } as never);
 
-    const response = await GET(request({ 'x-kilocode-feature': 'code-review' }));
+    const response = await GET(request());
 
-    // The feature-excluded model must appear in neither the top-level list nor the
-    // Auto Efficient choices — enrichment runs after filterByFeature.
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       data: [

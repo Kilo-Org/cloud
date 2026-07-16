@@ -318,6 +318,7 @@ const SearchInputSchema = z.object({
   search_string: z.string().min(1),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   offset: z.number().min(0).optional().default(0),
+  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
@@ -534,11 +535,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       search_string,
       limit,
       offset,
+      orderBy,
       createdOnPlatform,
       organizationId,
       includeChildren,
       gitUrl,
     } = input;
+
+    const orderColumn =
+      orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
 
     const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
 
@@ -569,7 +574,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         .from(cli_sessions_v2)
         .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
         .where(baseWhere)
-        .orderBy(desc(cli_sessions_v2.updated_at))
+        .orderBy(desc(orderColumn))
         .limit(limit)
         .offset(offset),
       db

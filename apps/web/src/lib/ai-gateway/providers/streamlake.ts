@@ -12,6 +12,5 @@ export const kat_coder_pro_v2_5_free_model: KiloExclusiveModel = {
   gateway: 'streamlake',
   internal_id: 'ep-fsp5wc-1783487206835267047',
   pricing: null,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };

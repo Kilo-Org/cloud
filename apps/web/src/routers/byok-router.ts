@@ -119,7 +119,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
-    const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id, false)];
+    const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id)];
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {

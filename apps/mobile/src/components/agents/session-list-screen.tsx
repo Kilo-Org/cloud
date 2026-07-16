@@ -19,6 +19,7 @@ import {
   type StoredSessionItem,
 } from '@/components/agents/session-list-helpers';
 import { ScreenHeader } from '@/components/screen-header';
+import { clearAgentSessionNarrowingFilters } from '@/lib/agent-session-filters';
 import {
   useAgentSessions,
   useAgentSessionSearch,
@@ -36,6 +37,7 @@ export function AgentSessionListScreen() {
   const {
     platformFilter,
     projectFilter,
+    sortBy,
     hasLoaded: filtersLoaded,
     setFilters,
     setPlatformFilter,
@@ -97,6 +99,7 @@ export function AgentSessionListScreen() {
     gitUrl,
     organizationId,
     enabled: ready,
+    sortBy,
   });
   const isSearching = searchQuery.length > 0;
   const search = useAgentSessionSearch({
@@ -105,6 +108,7 @@ export function AgentSessionListScreen() {
     gitUrl,
     organizationId,
     enabled: ready && isSearching,
+    sortBy,
   });
   const { data: recentRepositories } = useRecentAgentRepositories({
     organizationId,
@@ -261,7 +265,9 @@ export function AgentSessionListScreen() {
 
   const handleClearQuery = useCallback(() => {
     handleClearSearch();
-    setFilters({ platformFilter: [], projectFilter: [] });
+    // Functional update so the persisted sort preference is preserved
+    // across "Clear search" / "Clear filters".
+    setFilters(prev => clearAgentSessionNarrowingFilters(prev));
   }, [handleClearSearch, setFilters]);
 
   return (
@@ -317,12 +323,14 @@ export function AgentSessionListScreen() {
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
+          sortBy={sortBy}
         />
       </Animated.View>
       {showFilterModal && (
         <SessionFilterModal
           selectedPlatforms={platformFilter}
           selectedProjects={projectFilter}
+          selectedSortBy={sortBy}
           projectOptions={projectOptions}
           onClose={() => {
             setShowFilterModal(false);

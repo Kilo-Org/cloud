@@ -40,6 +40,10 @@ import {
   cloudStatusForPreparingEvent,
   materializePreparationEvent,
 } from '../session/preparation-history.js';
+import {
+  classifyAttentionKilocodeEvent,
+  type AttentionEvent,
+} from './ingest-attention-classifier.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -257,6 +261,14 @@ export type IngestDOContext = {
   ) => Promise<void>;
   /** Persist the slash-command catalog so connecting clients can be hydrated. */
   setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
+  /**
+   * Optional callback invoked for qualifying question/permission kilocode
+   * events. Synchronous/fire-and-forget; the DO owns any `waitUntil` for
+   * external notification IO. Duplicate snapshot replays call it again
+   * and dedup is the notification dispatch's job (idempotency key on
+   * `executionId`), not this hook's.
+   */
+  onAttentionEvent?: (event: AttentionEvent) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -743,6 +755,10 @@ export function createIngestHandler(
               }
             );
             ws.serializeAttachment(attachment);
+            const attention = classifyAttentionKilocodeEvent(ingestEvent.data);
+            if (attention) {
+              doContext.onAttentionEvent?.(attention);
+            }
           } else {
             console.warn('Invalid kilocode event payload');
           }

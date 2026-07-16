@@ -27,7 +27,51 @@ function attempt(id: string, triggerMessageId: string) {
     startedAt: 1,
     completedAt: 2,
     revision: 1,
-    steps: [],
+    // A real cold-start attempt always records at least one substantive step;
+    // without one a completed attempt is treated as a warm-reuse no-op and hidden.
+    steps: [
+      {
+        id: `${id}:step`,
+        key: 'cloning',
+        kind: 'phase' as const,
+        label: 'cloning',
+        status: 'completed' as const,
+        startedAt: 1,
+        revision: 1,
+      },
+    ],
+  };
+}
+
+function warmReuseAttempt(id: string, triggerMessageId: string) {
+  return {
+    id,
+    triggerMessageId,
+    status: 'completed' as const,
+    startedAt: 1,
+    completedAt: 2,
+    revision: 1,
+    // Only the always-on sandbox markers `ensureWrapper` emits for every delivery.
+    steps: [
+      {
+        id: `${id}:provision`,
+        key: 'sandbox_provision',
+        kind: 'phase' as const,
+        label: 'sandbox_provision',
+        status: 'completed' as const,
+        startedAt: 1,
+        revision: 1,
+      },
+      {
+        id: `${id}:boot`,
+        key: 'sandbox_boot',
+        kind: 'phase' as const,
+        label: 'sandbox_boot',
+        status: 'completed' as const,
+        startedAt: 1,
+        revision: 1,
+      },
+    ],
   };
 }
 
@@ -54,6 +98,29 @@ describe('session transcript', () => {
     expect(transcript.map(item => getSessionTranscriptItemKey(item))).toEqual([
       'msg_011',
       'preparation:attempt_older',
+    ]);
+  });
+
+  it('hides warm-reuse completed attempts that only ran synthetic sandbox markers', () => {
+    const transcript = mergeSessionTranscript(
+      [message('msg_001')],
+      [warmReuseAttempt('attempt_warm', 'msg_001')]
+    );
+
+    expect(transcript.map(item => getSessionTranscriptItemKey(item))).toEqual(['msg_001']);
+  });
+
+  it('keeps a running attempt even if it only has synthetic markers so far', () => {
+    const running = {
+      ...warmReuseAttempt('attempt_running', 'msg_001'),
+      status: 'running' as const,
+      completedAt: undefined,
+    };
+    const transcript = mergeSessionTranscript([message('msg_001')], [running]);
+
+    expect(transcript.map(item => getSessionTranscriptItemKey(item))).toEqual([
+      'msg_001',
+      'preparation:attempt_running',
     ]);
   });
 });

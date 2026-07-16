@@ -1,3 +1,4 @@
+import { isNoOpCompletedPreparationAttempt } from 'cloud-agent-sdk/preparation-attempts';
 import { type PreparationAttempt, type StoredMessage } from 'cloud-agent-sdk';
 
 export type SessionTranscriptItem =
@@ -12,8 +13,16 @@ export function mergeSessionTranscript(
   messages: readonly StoredMessage[],
   preparationAttempts: readonly PreparationAttempt[]
 ): SessionTranscriptItem[] {
+  // `ensureWrapper` records a completed attempt for every message delivery,
+  // even warm reuse. Drop no-op completed attempts so "Environment prepared"
+  // surfaces only for genuine cold starts. Running and failed attempts are
+  // always kept: live progress may still arrive, and failures must stay visible.
+  const visibleAttempts = preparationAttempts.filter(
+    attempt => !isNoOpCompletedPreparationAttempt(attempt)
+  );
+
   const byMessageId = new Map<string, PreparationAttempt[]>();
-  for (const attempt of preparationAttempts) {
+  for (const attempt of visibleAttempts) {
     const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
     byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
   }
@@ -27,7 +36,7 @@ export function mergeSessionTranscript(
       items.push({ type: 'preparation', attempt });
     }
   }
-  for (const attempt of preparationAttempts) {
+  for (const attempt of visibleAttempts) {
     if (!messageIds.has(attempt.triggerMessageId)) {
       items.push({ type: 'preparation', attempt });
     }

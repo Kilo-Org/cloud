@@ -202,7 +202,7 @@ export function CodeReviewJobsCard({
   const [manualJobInstructions, setManualJobInstructions] = useState('');
   const [manualJobCouncilEnabled, setManualJobCouncilEnabled] = useState(false);
   const [manualJobCouncilAggregation, setManualJobCouncilAggregation] =
-    useState<CouncilAggregationStrategy>('any_blocking_member');
+    useState<CouncilAggregationStrategy>('advisory');
   const [manualJobCouncilSelections, setManualJobCouncilSelections] = useState<
     Record<string, CouncilSpecialistSelection>
   >(() => defaultCouncilSelections());
@@ -351,7 +351,7 @@ export function CodeReviewJobsCard({
     );
     setManualJobInstructions('');
     setManualJobCouncilEnabled(false);
-    setManualJobCouncilAggregation('any_blocking_member');
+    setManualJobCouncilAggregation('advisory');
     setManualJobCouncilSelections(defaultCouncilSelections());
     setManualJobSubmitted(false);
     setManualJobSubmitError(null);

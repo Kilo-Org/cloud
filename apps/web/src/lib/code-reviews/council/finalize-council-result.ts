@@ -8,7 +8,9 @@ import type {
 } from '@kilocode/db/schema-types';
 import {
   decideCouncilFromManifest,
+  deriveSpecialistVote,
   enabledSpecialists,
+  highestSeverityOf,
   parseCouncilResultManifest,
 } from '@kilocode/worker-utils/code-review-council';
 import { getManualCodeReviewConfig } from '../manual-config';
@@ -65,16 +67,23 @@ export function buildCouncilResult(params: {
       // also inherited the base model (variants are model-specific). A specialist on its own
       // model shows no effort unless it set one.
       thinkingEffort: member.thinking_effort ?? (member.model_slug ? null : baseThinkingEffort),
-      vote: reported?.vote ?? 'abstain',
-      highestSeverity: reported?.highestSeverity ?? null,
+      // v2: vote + highest severity are DERIVED from the reported findings, never model-authored.
+      // A specialist that did NOT report is treated as `block` (fail closed) with no findings.
+      vote: reported ? deriveSpecialistVote(reported.findings) : 'block',
+      highestSeverity: reported ? highestSeverityOf(reported.findings) : null,
       findings: reported?.findings ?? [],
     };
   });
 
+  // Advisory → no aggregate verdict (null). Otherwise: a captured manifest decides via
+  // `decideCouncilFromManifest` (coverage-checked, fail-closed); a missing/invalid manifest
+  // (no coverage) fails closed to `block`.
   const decision =
-    capture.status === 'captured'
-      ? decideCouncilFromManifest(configuredIds, capture.manifest, strategy).decision
-      : 'block';
+    strategy === 'advisory'
+      ? null
+      : capture.status === 'captured'
+        ? decideCouncilFromManifest(configuredIds, capture.manifest, strategy).decision
+        : 'block';
 
   return { decision, aggregationStrategy: strategy, specialists };
 }

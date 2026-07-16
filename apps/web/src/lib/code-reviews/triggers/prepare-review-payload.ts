@@ -807,7 +807,7 @@ export async function prepareReviewPayload(
     // prompt. `councilActive` (computed above, gating `omitSubAgentGuidance`) guarantees the
     // config is enabled with >= the minimum specialists.
     const councilMembers = councilActive && councilConfig ? enabledSpecialists(councilConfig) : [];
-    const aggregationStrategy = councilConfig?.aggregation_strategy ?? 'any_blocking_member';
+    const aggregationStrategy = councilConfig?.aggregation_strategy ?? 'advisory';
 
     // Forward-shaped agent selections. Standard = a single 'standard' agent mirroring the
     // session's model/effort; council = one entry per enabled specialist.

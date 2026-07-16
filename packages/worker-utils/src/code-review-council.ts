@@ -5,21 +5,20 @@
  * web app and the `code-review-infra` worker can import it without duplicating logic.
  *
  * Scope: the settled, capture-agnostic pieces — the code-owned governance DECISION,
- * the per-specialist result contract (vote + findings), the single-session combined
- * result manifest + parser, the display-only governance marker, specialist presets,
- * and the automated review-type stub. Prompt builders (web) and execution wiring
- * (worker/DO, runtimeAgents) live with their callers, not here.
+ * the per-specialist result contract (findings only; votes are DERIVED), the single-session
+ * combined result manifest + parser, specialist presets, and the automated review-type stub.
+ * Prompt builders (web) and execution wiring (worker/DO, runtimeAgents) live with their
+ * callers, not here.
  *
- * The council runs as ONE cloud-agent session: an orchestrator delegates to one
- * sub-agent per specialist (each pinned to its own model via `runtimeAgents[]`), then
- * relays every specialist's structured result in its final message. Our code — never
- * the model — computes the decision from the collected votes.
+ * v2: the model reports FACTS only (findings + a fixed severity per finding). Code derives
+ * each specialist's BINARY vote (any critical finding → block), then computes the aggregate
+ * decision per the governance mode (advisory → no decision; unanimous/majority → block/pass).
+ * The model never authors a vote, decision, or verdict.
  */
 
 import * as z from 'zod';
 import {
   CouncilFindingSchema,
-  CouncilVoteSchema,
   type CodeReviewCouncilConfig,
   type CodeReviewType,
   type CouncilAggregationStrategy,
@@ -30,85 +29,89 @@ import {
 } from '@kilocode/db/schema-types';
 
 // ============================================================================
-// Governance decision (code-owned, deterministic)
+// Governance decision (code-owned, deterministic) — v2
 // ============================================================================
 
-/** A specialist's vote as seen by aggregation. */
+/** A specialist's BINARY vote as seen by aggregation (code-derived, never model-authored). */
 export type SpecialistVote = { specialistId: string; vote: CouncilVote };
 
+/** Ranking of the canonical severity scale; higher = more severe. Off-scale labels rank 0. */
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  warning: 3,
+  suggestion: 2,
+  nitpick: 1,
+};
+
+function severityRank(severity: string): number {
+  return SEVERITY_RANK[severity.trim().toLowerCase()] ?? 0;
+}
+
+/** Whether a finding severity counts as BLOCKING (v2: only `critical`). Case/space-insensitive. */
+export function isBlockingSeverity(severity: string | null | undefined): boolean {
+  return (severity ?? '').trim().toLowerCase() === 'critical';
+}
+
 /**
- * Computes the council governance decision from the collected specialist votes using
- * the selected strategy. This is the deterministic, code-owned replacement for asking
- * the model to compute the decision. The semantics MUST stay in lockstep with
- * `describeAggregationStrategy` (the prompt text the specialists/orchestrator see).
+ * The highest-severity label present in a specialist's findings (original casing preserved),
+ * or null if there are none. Ranks off the canonical scale; unknown labels rank lowest.
+ */
+export function highestSeverityOf(findings: readonly CouncilFinding[]): string | null {
+  let top: string | null = null;
+  let topRank = 0;
+  for (const finding of findings) {
+    const rank = severityRank(finding.severity);
+    if (rank > topRank || (rank === 0 && top === null)) {
+      topRank = rank;
+      top = finding.severity;
+    }
+  }
+  return top;
+}
+
+/**
+ * Derives a specialist's BINARY vote from its findings — code-owned, never model-authored.
+ * Any finding at the blocking severity (`critical`) → `block`; otherwise (including zero
+ * findings — "I ran and found nothing") → `pass`. This is the "a member votes yes/no, not
+ * 'warning'" rule: severity is the model's judgment, the vote follows deterministically.
+ */
+export function deriveSpecialistVote(findings: readonly CouncilFinding[]): CouncilVote {
+  return findings.some(finding => isBlockingSeverity(finding.severity)) ? 'block' : 'pass';
+}
+
+/**
+ * Computes the aggregate council decision from the collected BINARY specialist votes.
+ * Only the enforcing modes are valid here ('unanimous' | 'majority'); 'advisory' produces
+ * NO decision and is handled by `decideCouncilFromManifest`.
  *
- * Abstain semantics (deliberate): a returned `abstain` vote is treated leniently — it
- * is NOT counted under `any_blocking_member` or `majority` (so a specialist that ran
- * but had nothing to flag does not force a block), and only `unanimous_required`
- * blocks on it. The one universal guard is total no-coverage: if there is no usable
- * vote at all (empty, or every specialist abstained), the decision is `block` for
- * every strategy (never pass on absent coverage).
+ * - `unanimous` — block unless every specialist voted pass (any block → block). Strict.
+ * - `majority`  — block only when block votes outnumber pass votes. Lenient (ties → pass).
  *
- * IMPORTANT: this operates only on the votes it is GIVEN. It does NOT know which
- * specialists were configured, so it cannot detect a missing/dropped specialist. That
- * coverage-integrity guard (missing configured specialist → block regardless of
- * strategy) lives in `decideCouncilFromManifest`, which callers should use when
- * deciding from a captured manifest.
+ * Empty votes → `block` (never pass on absent coverage). Missing-configured-specialist
+ * coverage is enforced separately in `decideCouncilFromManifest`.
  */
 export function computeCouncilDecision(
   votes: readonly SpecialistVote[],
-  strategy: CouncilAggregationStrategy
+  strategy: Exclude<CouncilAggregationStrategy, 'advisory'>
 ): CouncilVote {
-  const counts = { pass: 0, warn: 0, block: 0, abstain: 0 } satisfies Record<CouncilVote, number>;
-  for (const { vote } of votes) counts[vote]++;
-
-  // No usable signal (empty, or every specialist abstained) => never pass.
-  if (counts.pass + counts.warn + counts.block === 0) return 'block';
-
-  const anyWarn = counts.warn > 0;
-
+  if (votes.length === 0) return 'block'; // no usable coverage → never pass
+  const blockCount = votes.filter(vote => vote.vote === 'block').length;
+  const passCount = votes.length - blockCount;
   switch (strategy) {
-    case 'majority': {
-      if (counts.block > counts.pass) return 'block';
-      return anyWarn ? 'warn' : 'pass';
-    }
-    case 'unanimous_required': {
-      if (counts.block > 0 || counts.abstain > 0) return 'block';
-      return anyWarn ? 'warn' : 'pass';
-    }
-    case 'any_blocking_member':
-    default: {
-      if (counts.block > 0) return 'block';
-      return anyWarn ? 'warn' : 'pass';
-    }
+    case 'majority':
+      return blockCount > passCount ? 'block' : 'pass';
+    case 'unanimous':
+    default:
+      return blockCount > 0 ? 'block' : 'pass';
   }
 }
 
 /**
- * Whether a governance decision should block merge. `block` always blocks; `warn` is
- * non-blocking here (warning-as-blocking is a separate gate-threshold policy).
+ * Whether a governance decision should block merge. `block` blocks; `pass` and `null`
+ * (advisory — no verdict) do not.
  */
-export function councilDecisionBlocksMerge(decision: CouncilVote): boolean {
+export function councilDecisionBlocksMerge(decision: CouncilVote | null): boolean {
   return decision === 'block';
-}
-
-/** Human-readable governance rule text so the orchestrator applies the SELECTED strategy.
- * Every configured specialist is a voting member; all votes count equally. Keep the
- * wording in lockstep with `computeCouncilDecision`. */
-export function describeAggregationStrategy(strategy: CouncilAggregationStrategy): string {
-  // Every strategy blocks when there is no usable coverage (no votes at all, or every
-  // specialist abstained) — this MUST match the guard in `computeCouncilDecision`.
-  const noCoverageRule =
-    ' If no specialist produced a usable vote (all abstained, or no votes at all), the decision is block.';
-  switch (strategy) {
-    case 'majority':
-      return `Majority: count votes across all specialists. If block votes outnumber pass votes, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
-    case 'unanimous_required':
-      return `Unanimous: every specialist must vote pass. If any specialist voted block or abstain, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
-    case 'any_blocking_member':
-    default:
-      return `Any blocking member: if any specialist voted block, the decision is block. Otherwise, if any specialist voted warn, the decision is warn. Otherwise pass.${noCoverageRule}`;
-  }
 }
 
 // ============================================================================
@@ -124,14 +127,13 @@ export { CouncilFindingSchema as CouncilSpecialistFindingSchema } from '@kilocod
 export type CouncilSpecialistFinding = CouncilFinding;
 
 /**
- * One specialist's structured result. STRICT only on `vote` (the load-bearing value
- * the code-side decision depends on); findings + severity are lenient. `findings` is
- * the full list surfaced in the Kilo UI and published to the PR.
+ * One specialist's structured result (v2). The model reports ONLY facts: `findings` (each
+ * with a severity from the canonical scale). It does NOT report a vote — the vote is
+ * code-derived from the findings (`deriveSpecialistVote`). `highestSeverity` is likewise
+ * derived, not reported. Lenient throughout so an off-scale label never rejects the manifest.
  */
 export const CouncilSpecialistResultSchema = z.object({
   specialistId: z.string().min(1).max(64),
-  vote: CouncilVoteSchema,
-  highestSeverity: z.string().max(64).nullable().optional(),
   findings: z.array(CouncilFindingSchema).max(200).default([]),
   // Best-effort: the concrete model this specialist actually ran on, as reported back by
   // the specialist itself. We assign a model per specialist, but an "auto" slug (e.g.
@@ -144,10 +146,10 @@ export type CouncilSpecialistResult = z.infer<typeof CouncilSpecialistResultSche
 
 /**
  * Marker tag for the single-session combined council manifest. The orchestrator emits
- * ONE of these in its final message, carrying every specialist's result. (One marker
- * + strict schema is more deterministic than N scattered per-specialist markers.)
+ * ONE of these in its final message, carrying every specialist's findings. v2 dropped the
+ * model-authored `vote` (code derives it), so the shape changed → the tag version bumped.
  */
-export const COUNCIL_RESULT_MARKER_TAG = 'kilo-code-review-council:v1';
+export const COUNCIL_RESULT_MARKER_TAG = 'kilo-code-review-council:v2';
 
 /** Hard cap on the manifest JSON payload (UTF-8 bytes) to bound parsing cost. */
 export const COUNCIL_RESULT_MAX_BYTES = 128 * 1024;
@@ -350,14 +352,15 @@ export type CouncilSpecialistSummary = {
   findingsCount: number;
 };
 
-/** Summarizes each specialist's result (findings count included) for UI display. */
+/** Summarizes each specialist's result (findings count included) for UI display. Vote and
+ * highest severity are DERIVED from the findings (the model reports neither). */
 export function summarizeCouncilManifest(
   manifest: CouncilResultManifest
 ): CouncilSpecialistSummary[] {
   return manifest.specialists.map(specialist => ({
     specialistId: specialist.specialistId,
-    vote: specialist.vote,
-    highestSeverity: specialist.highestSeverity ?? null,
+    vote: deriveSpecialistVote(specialist.findings),
+    highestSeverity: highestSeverityOf(specialist.findings),
     findingsCount: specialist.findings.length,
   }));
 }
@@ -404,20 +407,21 @@ export function reconcileCouncilVotes(
   for (const specialist of manifest.specialists) {
     counts.set(specialist.specialistId, (counts.get(specialist.specialistId) ?? 0) + 1);
   }
-  const reported = new Map(manifest.specialists.map(s => [s.specialistId, s.vote]));
+  const reported = new Map(manifest.specialists.map(s => [s.specialistId, s]));
 
   const votes: SpecialistVote[] = [];
   const missingSpecialistIds: string[] = [];
   // Iterate the DEDUPED configured ids so a specialist is never counted more than once.
   for (const specialistId of configuredSeen) {
-    const vote = reported.get(specialistId);
+    const specialist = reported.get(specialistId);
     // Reliable coverage requires exactly one configured entry AND exactly one report.
     if (
       !duplicateConfigured.has(specialistId) &&
       counts.get(specialistId) === 1 &&
-      vote !== undefined
+      specialist !== undefined
     ) {
-      votes.push({ specialistId, vote });
+      // The vote is DERIVED from the reported findings, never model-authored.
+      votes.push({ specialistId, vote: deriveSpecialistVote(specialist.findings) });
     } else {
       missingSpecialistIds.push(specialistId);
     }
@@ -425,9 +429,9 @@ export function reconcileCouncilVotes(
   return { votes, missingSpecialistIds };
 }
 
-/** A council decision plus the coverage that produced it. */
+/** A council decision plus the coverage that produced it. `decision` is null in advisory mode. */
 export type CouncilDecision = {
-  decision: CouncilVote;
+  decision: CouncilVote | null;
   votes: SpecialistVote[];
   missingSpecialistIds: string[];
 };
@@ -452,6 +456,10 @@ export function decideCouncilFromManifest(
   strategy: CouncilAggregationStrategy
 ): CouncilDecision {
   const { votes, missingSpecialistIds } = reconcileCouncilVotes(configuredSpecialistIds, manifest);
+  // Advisory: report the derived votes but compute NO aggregate verdict and no gate.
+  if (strategy === 'advisory') {
+    return { decision: null, votes, missingSpecialistIds };
+  }
   if (missingSpecialistIds.length > 0) {
     return { decision: 'block', votes, missingSpecialistIds };
   }
@@ -462,57 +470,9 @@ export function decideCouncilFromManifest(
   };
 }
 
-// ============================================================================
-// Governance marker (display-only human-readable summary)
-// ============================================================================
-
-/** Marker tag for the human-readable governance summary. Display-only: it is NOT the
- * source of the decision (our code computes that via `computeCouncilDecision`). */
-export const GOVERNANCE_MARKER_TAG = 'kilo-review-governance:v1';
-
-const GovernanceMemberSchema = z.object({
-  id: z.string(),
-  vote: CouncilVoteSchema,
-  // Display-only label; accept any wording the model emits (e.g. "low", "info",
-  // "none") so a severity vocabulary mismatch never rejects the whole marker.
-  highestSeverity: z
-    .string()
-    .max(50)
-    .nullable()
-    .optional()
-    .transform(value => (value && value.toLowerCase() !== 'none' ? value : null)),
-  reason: z.string().max(1000).optional(),
-});
-
-// The overall `decision` is deliberately NOT part of this schema: it is code-owned
-// (`computeCouncilDecision`), and a model-authored decision here could contradict it in
-// the UI. Consumers render the per-member votes from this marker and inject the computed
-// decision. Any `decision` key the model emits is ignored (non-strict object strips it).
-export const GovernanceSchema = z.object({
-  members: z.array(GovernanceMemberSchema).max(8),
-});
-export type Governance = z.infer<typeof GovernanceSchema>;
-export type GovernanceMember = z.infer<typeof GovernanceMemberSchema>;
-
-/**
- * Extracts and validates the display-only governance marker (per-member votes/reasons)
- * from an assistant message. Returns null when absent or malformed. This drives display
- * only; the overall merge decision comes from `computeCouncilDecision`, never from here.
- */
-export function parseGovernanceMarker(text: string | null | undefined): Governance | null {
-  if (!text) return null;
-  // Same line-anchored, brace-aware, size-capped extraction as the manifest parser.
-  const { json } = extractLastMarkerJson(text, GOVERNANCE_MARKER_TAG);
-  if (json === null) return null;
-  if (utf8ByteLengthExceeds(json, COUNCIL_RESULT_MAX_BYTES)) return null;
-  try {
-    const parsed: unknown = JSON.parse(json);
-    const result = GovernanceSchema.safeParse(parsed);
-    return result.success ? result.data : null;
-  } catch {
-    return null;
-  }
-}
+// (v1's display-only "kilo-review-governance:v1" marker was removed in v2: the model no
+// longer authors votes/decisions, so there is nothing model-reported to render from a
+// separate marker. Per-specialist votes are DERIVED from the manifest findings.)
 
 // ============================================================================
 // Council config helpers
@@ -537,14 +497,14 @@ export function isCouncilActive(council: CodeReviewCouncilConfig | undefined | n
 }
 
 const AGGREGATION_STRATEGY_LABELS: Record<CouncilAggregationStrategy, string> = {
-  any_blocking_member: 'Any blocking member',
+  advisory: 'Advisory (report only)',
+  unanimous: 'Unanimous',
   majority: 'Majority',
-  unanimous_required: 'Unanimous required',
 };
 
-/** Display label for an aggregation strategy (falls back to the default label). */
+/** Display label for a governance mode (falls back to the safe-default advisory label). */
 export function formatAggregationStrategy(strategy: string | null | undefined): string {
-  if (!strategy) return AGGREGATION_STRATEGY_LABELS.any_blocking_member;
+  if (!strategy) return AGGREGATION_STRATEGY_LABELS.advisory;
   return AGGREGATION_STRATEGY_LABELS[strategy as CouncilAggregationStrategy] ?? strategy;
 }
 

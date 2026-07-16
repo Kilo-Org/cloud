@@ -1245,8 +1245,19 @@ export const COUNCIL_SPECIALIST_ROLES = [
 ] as const;
 export type CouncilSpecialistRole = (typeof COUNCIL_SPECIALIST_ROLES)[number];
 
-export const CouncilVoteSchema = z.enum(['pass', 'warn', 'block', 'abstain']);
+// Council decision model v2: a vote is BINARY (yes/no). "warn"/"abstain" are NOT votes —
+// a warning is a finding severity (see COUNCIL_FINDING_SEVERITIES), and a specialist that
+// ran always votes (no-findings = pass). Votes are code-DERIVED from findings, never
+// authored by the model. Same binary type is reused for the aggregate decision.
+export const CouncilVoteSchema = z.enum(['pass', 'block']);
 export type CouncilVote = z.infer<typeof CouncilVoteSchema>;
+
+// Finding severity scale (v2). The LLM assigns one per finding — this is where its
+// judgment lives. `critical` is the only BLOCKING severity: any critical finding makes the
+// specialist's derived vote `block`; warning/suggestion/nitpick are informational.
+export const COUNCIL_FINDING_SEVERITIES = ['critical', 'warning', 'suggestion', 'nitpick'] as const;
+export const CouncilFindingSeveritySchema = z.enum(COUNCIL_FINDING_SEVERITIES);
+export type CouncilFindingSeverity = (typeof COUNCIL_FINDING_SEVERITIES)[number];
 
 /**
  * Review type for a run. 'standard' is the existing single-reviewer scan; 'council'
@@ -1261,13 +1272,14 @@ export const CODE_REVIEW_TRIGGER_SOURCES = ['manual', 'webhook'] as const;
 export const CodeReviewTriggerSourceSchema = z.enum(CODE_REVIEW_TRIGGER_SOURCES);
 export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSchema>;
 
-// 'weighted' is intentionally omitted until per-specialist vote weights exist in the
-// config — offering it now would be an aggregation option we cannot actually honor.
-export const COUNCIL_AGGREGATION_STRATEGIES = [
-  'any_blocking_member',
-  'majority',
-  'unanimous_required',
-] as const;
+// Governance mode (v2). Field is still named `aggregation_strategy` for continuity, but the
+// values are the three DISTINCT modes under binary votes:
+// - 'advisory'  — report votes/findings only; compute NO aggregate decision and NO merge gate.
+// - 'unanimous' — block unless EVERY specialist votes pass (i.e. any block → block). Strict.
+// - 'majority'  — block only when block votes outnumber pass votes. Lenient.
+// (v1's 'any_blocking_member' is dropped: with no abstain, it is mathematically identical to
+// 'unanimous'. 'advisory' is the safe default so a new council never blocks a merge unasked.)
+export const COUNCIL_AGGREGATION_STRATEGIES = ['advisory', 'unanimous', 'majority'] as const;
 export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
 export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
 
@@ -1338,7 +1350,9 @@ export const CodeReviewCouncilConfigSchema = z.object({
   // and retained while council is toggled off. Defaults true so an existing council
   // object (e.g. from a manual job) is treated as enabled.
   enabled: z.boolean().default(true),
-  aggregation_strategy: CouncilAggregationStrategySchema.default('any_blocking_member'),
+  // Default 'advisory' — the safety net: a council runs and reports, but never blocks a merge
+  // until an org explicitly picks unanimous/majority.
+  aggregation_strategy: CouncilAggregationStrategySchema.default('advisory'),
   // Specialist ids must be unique: a specialist must not appear (and therefore vote)
   // more than once, or vote aggregation could be skewed by a duplicate.
   specialists: z
@@ -1363,6 +1377,9 @@ export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSche
 export const CouncilFindingSchema = z.object({
   path: z.string().max(1024),
   line: z.number().int().nonnegative().nullable().optional(),
+  // Canonical scale is COUNCIL_FINDING_SEVERITIES; kept a bounded string (not a strict enum)
+  // so an off-scale label from the model never rejects the whole manifest. Vote derivation
+  // normalizes and only treats `critical` as blocking (see `deriveSpecialistVote`).
   severity: z.string().max(64),
   rationale: z.string().max(4000),
 });
@@ -1375,6 +1392,7 @@ export const CouncilResultSpecialistSchema = z.object({
   // The model/effort that actually ran this specialist (we assign these), for display.
   model: z.string().max(512).nullable(),
   thinkingEffort: z.string().max(50).nullable(),
+  // Binary, CODE-DERIVED from this specialist's findings (any critical → block).
   vote: CouncilVoteSchema,
   highestSeverity: z.string().max(64).nullable(),
   findings: z.array(CouncilFindingSchema).max(200),
@@ -1385,8 +1403,9 @@ export type CouncilResultSpecialist = z.infer<typeof CouncilResultSpecialistSche
 // council runs are not posted to a PR). The capture code maps the parsed
 // `kilo-code-review-council:v1` manifest + the code-owned decision into this storage contract.
 export const CodeReviewCouncilResultSchema = z.object({
-  // The code-owned governance decision (never model-authored).
-  decision: CouncilVoteSchema,
+  // The code-owned governance decision (never model-authored). NULL in `advisory` mode —
+  // there is no aggregate verdict, only the per-specialist votes/findings.
+  decision: CouncilVoteSchema.nullable(),
   aggregationStrategy: CouncilAggregationStrategySchema,
   specialists: z.array(CouncilResultSpecialistSchema).max(8),
 });

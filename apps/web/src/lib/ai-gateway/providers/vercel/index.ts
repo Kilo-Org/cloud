@@ -106,9 +106,8 @@ export async function shouldRouteToVercel(
   }
 
   const provider = request.body.provider;
-  const only = provider?.only;
-  const ignore = provider?.ignore;
-  if (only || ignore?.length) {
+  if (provider && (provider.only || provider.ignore?.length)) {
+    const { only, ignore } = provider;
     const vercelInferenceProviders =
       await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
 

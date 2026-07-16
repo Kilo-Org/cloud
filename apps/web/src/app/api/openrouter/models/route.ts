@@ -24,9 +24,9 @@ async function tryGetUserFromAuth() {
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
-export async function GET(_request: NextRequest): Promise<
-  NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
-> {
+export async function GET(
+  _request: NextRequest
+): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId

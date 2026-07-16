@@ -60,14 +60,17 @@ export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): 
 }
 
 const VercelInferenceProvidersSchema = z.array(z.string());
-const vercelInferenceProviderFetchers = new Map<string, () => Promise<string[] | null>>();
+const vercelInferenceProviderFetchers = new Map<
+  string,
+  () => Promise<ReadonlyArray<string> | null>
+>();
 
 export function getCachedVercelInferenceProviderIdsForModel(
   modelId: string
-): Promise<string[] | null> {
+): Promise<ReadonlyArray<string> | null> {
   let fetchProviders = vercelInferenceProviderFetchers.get(modelId);
   if (!fetchProviders) {
-    fetchProviders = createCachedFetch<string[] | null>(
+    fetchProviders = createCachedFetch<ReadonlyArray<string> | null>(
       async () => {
         const raw = await redisClient.get<string>(vercelInferenceProvidersRedisKey(modelId));
         if (raw === null) {

@@ -26,7 +26,6 @@ import {
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -41,7 +40,7 @@ const getVercelRoutingPercentage = createCachedFetch(
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
-  vercelInferenceProviders: string[] | null
+  vercelInferenceProviders: ReadonlyArray<string> | null
 ) {
   if (!vercelInferenceProviders) {
     return true;
@@ -60,23 +59,29 @@ export function passesVercelRoutingPercentage(randomSeed: string, routingPercent
   return wholePercentageBucket + fractionalPercentageBucket / 1_000 < routingPercentage;
 }
 
+async function getAcceptableDeepSeekProviders(
+  vercelDeepseekModelId: string,
+  only: string[] | undefined
+) {
+  const availableProviders =
+    await getCachedVercelInferenceProviderIdsForModel(vercelDeepseekModelId);
+  const acceptableProviders = only
+    ? new Set(only.map(p => openRouterToVercelInferenceProviderId(p))).intersection(
+        new Set(availableProviders)
+      )
+    : new Set(availableProviders);
+  acceptableProviders.delete(VercelUserByokInferenceProviderIdSchema.enum.novita); // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
+  return acceptableProviders;
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
-  kiloExclusiveModel: KiloExclusiveModel | null,
   request: GatewayRequest,
   randomSeed: string
 ) {
   if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       '[shouldRouteToVercel] not routing to Vercel because of unsupported provider options'
-    );
-    return false;
-  }
-
-  if (!kiloExclusiveModel?.flags.includes('vercel-routing') && isDeepseekModel(requestedModel)) {
-    // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
-    console.debug(
-      '[shouldRouteToVercel] not routing to Vercel because some of its DeepSeek providers have tool call issues'
     );
     return false;
   }
@@ -98,6 +103,17 @@ export async function shouldRouteToVercel(
   }
 
   const only = request.body.provider?.only;
+
+  if (
+    isDeepseekModel(requestedModel) &&
+    (await getAcceptableDeepSeekProviders(requestedModel, only)).size == 0
+  ) {
+    console.debug(
+      '[shouldRouteToVercel] not routing to Vercel because some of its DeepSeek providers have tool call issues'
+    );
+    return false;
+  }
+
   if (only) {
     const vercelInferenceProviders =
       await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
@@ -112,11 +128,21 @@ export async function shouldRouteToVercel(
   return true;
 }
 
-function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig {
+async function convertProviderOptions(
+  requestToMutate: GatewayRequest
+): Promise<VercelProviderConfig> {
+  const vercelModelId = requestToMutate.body.model;
   const provider = requestToMutate.body.provider;
+  const acceptableDeepSeekProviders =
+    vercelModelId && isDeepseekModel(vercelModelId)
+      ? await getAcceptableDeepSeekProviders(vercelModelId, provider?.only)
+      : undefined;
   return {
     gateway: {
-      only: provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
+      only:
+        acceptableDeepSeekProviders && acceptableDeepSeekProviders.size > 0
+          ? [...acceptableDeepSeekProviders]
+          : provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
@@ -180,7 +206,7 @@ export function getVercelInferenceProviderConfigForUserByok(
   return [key, list];
 }
 
-export function applyVercelSettings(
+export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
@@ -207,7 +233,7 @@ export function applyVercelSettings(
       },
     };
   } else {
-    requestToMutate.body.providerOptions = convertProviderOptions(requestToMutate);
+    requestToMutate.body.providerOptions = await convertProviderOptions(requestToMutate);
   }
 
   if (requestToMutate.body.providerOptions) {

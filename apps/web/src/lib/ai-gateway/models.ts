@@ -41,9 +41,6 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
   'tencent/hy3:free',
-  kat_coder_pro_v2_5_free_model.status === 'public'
-    ? kat_coder_pro_v2_5_free_model.public_id
-    : null,
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);
 
@@ -53,7 +50,11 @@ export const preferredModels = [
   KILO_AUTO_EFFICIENT_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
 
-  ...autoFreeModels,
+  'tencent/hy3:free',
+  kat_coder_pro_v2_5_free_model.status === 'public'
+    ? kat_coder_pro_v2_5_free_model.public_id
+    : null,
+  ...autoFreeModels.filter(m => m !== 'tencent/hy3:free'),
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -66,7 +67,7 @@ export const preferredModels = [
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
   QWEN37_PLUS_MODEL_ID,
-];
+].filter((m): m is string => m !== null);
 
 export function isPdfSupportingModel(model: string): boolean {
   return isClaudeModel(model) || isOpenAiModel(model) || isGrokModel(model) || isGeminiModel(model);

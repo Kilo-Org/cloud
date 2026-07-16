@@ -95,8 +95,30 @@ describe('buildCouncilOrchestratorPrompt', () => {
     expect(prompt).toContain('subagent_type "security"');
     expect(prompt).toContain('subagent_type "performance"');
     expect(prompt).toContain('BASE REVIEW CONTEXT');
-    // Coordinator must not compute the decision itself.
-    expect(prompt.toLowerCase()).toContain('do not compute an overall decision');
+    // Coordinator must not put a decision in the MACHINE-READABLE manifest (our code owns it).
+    expect(prompt.toLowerCase()).toContain('do not put an overall decision in the');
+  });
+
+  it('instructs the coordinator to publish the aggregated review + a council voting table', () => {
+    const prompt = buildCouncilOrchestratorPrompt({
+      basePrompt: 'BASE',
+      specialists: [
+        specialist({ id: 'security', name: 'Security' }),
+        specialist({ id: 'performance', name: 'Performance', role: 'performance' }),
+      ],
+      aggregationStrategy: 'majority',
+    });
+
+    // Owns publishing (specialists are read-only), following the base publication instructions.
+    expect(prompt).toContain('YOU publish the review');
+    expect(prompt.toLowerCase()).toContain('publication instructions');
+    // Council voting table in the summary, with vote icons.
+    expect(prompt).toContain('## Council review');
+    expect(prompt).toContain('Specialist | Model | Vote | Findings');
+    expect(prompt).toContain('✅ Pass');
+    expect(prompt).toContain('⚠️ Warn');
+    expect(prompt).toContain('⛔ Block');
+    expect(prompt).toContain('➖ Abstain');
   });
 
   it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {
@@ -127,5 +149,13 @@ describe('buildSpecialistAgentPrompt', () => {
     expect(prompt).toContain('security concerns');
     expect(prompt).toContain('"vote"');
     expect(prompt).toContain('findings');
+  });
+
+  it('bounds the specialist: read-only, diff-scoped, and convergent (no runaway loop)', () => {
+    const prompt = buildSpecialistAgentPrompt(specialist({ id: 'testing', name: 'Test coverage' }));
+    expect(prompt).toContain('READ-ONLY');
+    expect(prompt).toContain('Do NOT run, execute, build, or test anything');
+    expect(prompt).toContain('ONLY the changed files');
+    expect(prompt).toContain('report and STOP');
   });
 });

@@ -41,6 +41,9 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
   'tencent/hy3:free',
+  kat_coder_pro_v2_5_free_model.status === 'public'
+    ? kat_coder_pro_v2_5_free_model.public_id
+    : null,
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);
 

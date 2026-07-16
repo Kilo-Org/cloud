@@ -23,6 +23,8 @@ import type {
   KiloSessionId,
   ResolvedSession,
   SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
   SessionInfo,
   SessionActivity,
   AgentStatus,
@@ -35,6 +37,7 @@ import type {
   MessageDeliveryState,
   MessageInfo,
   Part,
+  OlderMessagesError,
   PreparationAttempt,
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
@@ -154,6 +157,17 @@ type SessionManagerConfig = {
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  /**
+   * Page-aware root snapshot fetch. Called by transports for the initial
+   * bounded load and by the manager for `loadOlderMessages`. Optional so the
+   * legacy `fetchSnapshot`-only path keeps working for callers that haven't
+   * migrated to the paginated endpoint yet (e.g. server-side, tests). The
+   * mobile adapter is the canonical provider.
+   */
+  fetchSnapshotPage?: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<SessionSnapshotPageOutcome | null>;
   websocketBaseUrl?: string;
   userWebConnection: UserWebConnection;
   api: CloudAgentApi;
@@ -218,11 +232,27 @@ type SessionManagerAtoms = {
   contextUsage: Atom<ContextUsage | undefined>;
   childMessages: Atom<(childSessionId: string) => StoredMessage[]>;
   childSessionHydrationState: Atom<(childSessionId: string) => ChildSessionHydrationState>;
+  /** True when the latest page left a non-null cursor (more history to load). */
+  hasOlderMessages: W<boolean>;
+  /** True while `loadOlderMessages()` is fetching a page. */
+  isLoadingOlderMessages: W<boolean>;
+  /** Typed failure from the most recent older-messages load. */
+  olderMessagesError: W<OlderMessagesError | null>;
+  /** Total items omitted across every page loaded so far (initial + older). */
+  olderMessagesOmittedItemCount: W<number>;
 };
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
+  /**
+   * Load the next page of older messages for the active session using the
+   * stored cursor. Dedupes concurrent calls, never clears existing/live
+   * messages, and classifies typed failures into `olderMessagesError`.
+   * No-op when there is no cursor or a non-retryable terminal failure was
+   * already surfaced for the active session.
+   */
+  loadOlderMessages(): Promise<void>;
   send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
@@ -394,6 +424,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   const availableCommandsAtom = atom<SlashCommandInfo[]>([]);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
+  const hasOlderMessagesAtom = atom<boolean>(false);
+  const isLoadingOlderMessagesAtom = atom<boolean>(false);
+  const olderMessagesErrorAtom = atom<OlderMessagesError | null>(null);
+  const olderMessagesOmittedItemCountAtom = atom<number>(0);
 
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
@@ -460,6 +494,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
   const childSessionHydrationRequests = new Map<string, Promise<void>>();
+  // Pagination state for `loadOlderMessages`. Reset on every switchSession.
+  let olderMessagesCursor: string | null = null;
+  // Monotonically increasing per-session generation; older-page results
+  // whose `expectedLoadOlderGeneration` doesn't match are dropped.
+  let loadOlderGeneration = 0;
+  // In-flight older-page load, used to dedupe concurrent calls and to let
+  // late callers await the same result.
+  let olderMessagesInFlight: Promise<void> | null = null;
+  // Once a non-retryable terminal failure lands, we permanently disable
+  // further older-page loads for the active session.
+  let olderMessagesTerminal: boolean = false;
 
   function setIndicator(ind: SessionStatusIndicator | null): void {
     if (indicatorTimer !== null) {
@@ -512,6 +557,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(childSessionHydrationStatesAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
+    store.set(hasOlderMessagesAtom, false);
+    store.set(isLoadingOlderMessagesAtom, false);
+    store.set(olderMessagesErrorAtom, null);
+    store.set(olderMessagesOmittedItemCountAtom, 0);
+    olderMessagesCursor = null;
+    loadOlderGeneration += 1;
+    olderMessagesInFlight = null;
+    olderMessagesTerminal = false;
   }
 
   function setChildSessionHydrationState(
@@ -762,6 +815,117 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     });
   }
 
+  // Replay a `SessionSnapshotPageOutcome` into the active storage. Returns
+  // whether the page was applied (so the caller can also persist the cursor
+  // and atom updates). Generation-aware: a stale caller's result is
+  // discarded silently. Used by both `switchSession` (initial page) and
+  // `loadOlderMessages` (subsequent pages).
+  function applyPage(outcome: SessionSnapshotPageOutcome, expectedGeneration: number): boolean {
+    if (expectedGeneration !== loadOlderGeneration) return false;
+    if (outcome.kind !== 'success') return false;
+
+    // Defense-in-depth: a stale or mismatched page must not overwrite the
+    // active session's messages or cursor. This catches races where a
+    // fetchSnapshotPage result arrives after switchSession has retargeted the
+    // manager to a different session.
+    if (activeSessionId === null || outcome.info.id !== activeSessionId) return false;
+
+    const storage = store.get(sessionStorageAtom);
+    if (!storage) return false;
+
+    const chatProcessor = createChatProcessor(storage);
+    for (const message of outcome.messages) {
+      chatProcessor.process({ type: 'message.updated', info: message.info });
+      for (const part of message.parts) {
+        chatProcessor.process({ type: 'message.part.updated', part });
+      }
+    }
+
+    olderMessagesCursor = outcome.nextCursor;
+    store.set(hasOlderMessagesAtom, outcome.nextCursor !== null);
+    store.set(
+      olderMessagesOmittedItemCountAtom,
+      store.get(olderMessagesOmittedItemCountAtom) + outcome.omittedItemCount
+    );
+    store.set(olderMessagesErrorAtom, null);
+    return true;
+  }
+
+  async function loadOlderMessages(): Promise<void> {
+    // Terminal failures block any further backend hits until the next
+    // switchSession (which resets `olderMessagesTerminal`).
+    if (olderMessagesTerminal) return;
+    // No cursor means nothing left to load.
+    if (olderMessagesCursor === null) return;
+    // Dedupe: if a load is already in flight, every caller awaits the
+    // same result instead of starting a parallel backend request.
+    if (olderMessagesInFlight) return olderMessagesInFlight;
+
+    const kiloSessionId = activeSessionId;
+    if (!kiloSessionId) return;
+    if (!config.fetchSnapshotPage) return;
+    const fetchSnapshotPage = config.fetchSnapshotPage;
+
+    const cursor = olderMessagesCursor;
+    const expectedGeneration = loadOlderGeneration;
+
+    const loadPromise = (async (): Promise<void> => {
+      store.set(isLoadingOlderMessagesAtom, true);
+      let outcome: SessionSnapshotPageOutcome | null;
+      try {
+        outcome = await fetchSnapshotPage(kiloSessionId, { cursor });
+      } catch (_err) {
+        // Network/transport-level failures map to a retryable outcome so
+        // the UI exposes a Retry CTA. The cursor is preserved.
+        if (expectedGeneration !== loadOlderGeneration) return;
+        store.set(olderMessagesErrorAtom, { kind: 'retryable' });
+        store.set(isLoadingOlderMessagesAtom, false);
+        return;
+      }
+      if (expectedGeneration !== loadOlderGeneration) return;
+
+      if (outcome === null) {
+        // Access-not-found (worker 404). Treat as terminal; the session
+        // is no longer readable.
+        olderMessagesTerminal = true;
+        store.set(olderMessagesErrorAtom, { kind: 'invalid_data' });
+        store.set(hasOlderMessagesAtom, false);
+        store.set(isLoadingOlderMessagesAtom, false);
+        return;
+      }
+
+      if (outcome.kind === 'success') {
+        applyPage(outcome, expectedGeneration);
+        store.set(isLoadingOlderMessagesAtom, false);
+        return;
+      }
+
+      if (outcome.kind === 'retryable_failure') {
+        store.set(olderMessagesErrorAtom, { kind: 'retryable' });
+        // Keep the cursor so a subsequent retry continues from here.
+        store.set(isLoadingOlderMessagesAtom, false);
+        return;
+      }
+
+      // `invalid_data` and `too_large` are non-retryable terminal states:
+      // don't auto-hide the older loader (the user may want to see the
+      // banner), and don't accept further loads for this session.
+      olderMessagesTerminal = true;
+      store.set(olderMessagesErrorAtom, { kind: outcome.kind });
+      store.set(hasOlderMessagesAtom, false);
+      store.set(isLoadingOlderMessagesAtom, false);
+    })();
+
+    olderMessagesInFlight = loadPromise;
+    try {
+      await loadPromise;
+    } finally {
+      if (olderMessagesInFlight === loadPromise) {
+        olderMessagesInFlight = null;
+      }
+    }
+  }
+
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     childSessionHydrationGeneration += 1;
     childSessionHydrationRequests.clear();
@@ -812,6 +976,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     config.onKiloSessionCreated?.(kiloSessionId);
 
+    // Persist the bounded page's cursor / hasOlderMessages / omittedItemCount
+    // so `loadOlderMessages` can continue from where the transport left off.
+    // This is a no-op for stale (pre-switchSession) callbacks because
+    // `loadOlderGeneration` advances on every switch. The generation is
+    // captured synchronously here, at callback creation time: reading
+    // `loadOlderGeneration` from inside the callback would be tautological
+    // when the same session id is switched twice in a row, because the
+    // second switch's `clearAllAtoms()` advance lands before the first
+    // switch's `onInitialPageLoaded` callback runs, letting a stale page
+    // pass the generation check and clobber the active session's cursor
+    // and omitted-item count.
+    const initialPageGeneration = loadOlderGeneration;
+    const recordInitialPage = (page: SessionSnapshotPage): void => {
+      applyPage({ ...page, kind: 'success' }, initialPageGeneration);
+    };
+
     const session = createCloudAgentSession({
       kiloSessionId,
       resolveSession: config.resolveSession,
@@ -819,6 +999,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         getTicket: config.getTicket,
         api: config.api,
         fetchSnapshot: config.fetchSnapshot,
+        ...(config.fetchSnapshotPage ? { fetchSnapshotPage: config.fetchSnapshotPage } : {}),
+        onInitialPageLoaded: recordInitialPage,
         userWebConnection: config.userWebConnection,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
@@ -1174,6 +1356,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   return {
     switchSession,
     hydrateChildSession,
+    loadOlderMessages,
     send,
     setRemoteModelOverride,
     retryRemoteModels,
@@ -1229,6 +1412,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       contextUsage: contextUsageAtom,
       childMessages: childMessagesAtom,
       childSessionHydrationState: childSessionHydrationStateAtom,
+      hasOlderMessages: hasOlderMessagesAtom,
+      isLoadingOlderMessages: isLoadingOlderMessagesAtom,
+      olderMessagesError: olderMessagesErrorAtom,
+      olderMessagesOmittedItemCount: olderMessagesOmittedItemCountAtom,
     },
   };
 }

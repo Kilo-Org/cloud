@@ -1,15 +1,10 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import {
-  type CloudStatus,
-  type KiloSessionId,
-  type PreparationAttempt,
-  type StoredMessage,
-} from 'cloud-agent-sdk';
+import { type CloudStatus, type KiloSessionId } from 'cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -44,12 +39,19 @@ import {
   useCliSessionPresence,
 } from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
-import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { SessionMessageList } from '@/components/agents/session-message-list';
+import {
+  getSessionTranscriptItemKey,
+  mergeSessionTranscript,
+  type SessionTranscriptItem,
+} from '@/components/agents/session-transcript';
+import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -83,10 +85,6 @@ type SessionDetailContentProps = {
   sessionId: KiloSessionId;
   openedVia?: 'push' | 'app';
 };
-
-type TranscriptItem =
-  | { type: 'message'; message: StoredMessage }
-  | { type: 'preparation'; attempt: PreparationAttempt };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
   preparing: 'Setting up environment...',
@@ -127,6 +125,10 @@ export function SessionDetailContent({
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
+  const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
+  const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
+  const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
+  const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
 
@@ -256,20 +258,6 @@ export function SessionDetailContent({
     selectedVariant: sessionModels.selectedVariant,
   });
 
-  const {
-    flatListRef,
-    handleContentSizeChange,
-    handleListLayout,
-    handleScroll,
-    handleScrollBeginDrag,
-    handleScrollEndDrag,
-    handleMomentumScrollBegin,
-    handleMomentumScrollEnd,
-  } = useSessionAutoScroll<TranscriptItem>({
-    itemCount: messages.length + preparationAttempts.length,
-    resetKey: sessionId,
-  });
-
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
     if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
@@ -340,32 +328,13 @@ export function SessionDetailContent({
     [manager]
   );
 
-  const transcript = useMemo<TranscriptItem[]>(() => {
-    const byMessageId = new Map<string, PreparationAttempt[]>();
-    for (const attempt of preparationAttempts) {
-      const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
-      byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
-    }
-    const items: TranscriptItem[] = [];
-    for (const message of messages) {
-      items.push({ type: 'message', message });
-      for (const attempt of byMessageId.get(message.info.id) ?? []) {
-        items.push({ type: 'preparation', attempt });
-      }
-    }
-    for (const attempt of preparationAttempts) {
-      if (
-        !byMessageId.has(attempt.triggerMessageId) ||
-        !messages.some(message => message.info.id === attempt.triggerMessageId)
-      ) {
-        items.push({ type: 'preparation', attempt });
-      }
-    }
-    return items;
-  }, [messages, preparationAttempts]);
+  const transcript = useMemo(
+    () => mergeSessionTranscript(messages, preparationAttempts),
+    [messages, preparationAttempts]
+  );
 
   const renderItem = useCallback(
-    ({ item }: { item: TranscriptItem }) =>
+    ({ item }: { item: SessionTranscriptItem }) =>
       item.type === 'preparation' ? (
         <PreparationGroup attempt={item.attempt} />
       ) : (
@@ -452,8 +421,16 @@ export function SessionDetailContent({
 
   const emptyStateText = statusIndicator ? null : 'No messages yet';
 
-  const title =
-    fetchedData?.kiloSessionId === sessionId ? (fetchedData.title ?? 'Session') : 'Session';
+  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  const rename = useSessionDetailRename({
+    sessionId,
+    isLoaded: isSessionLoaded,
+    serverTitle,
+    fallbackTitle: 'Session',
+  });
+  const handleRenameSave = rename.submit;
+  const handleRenameClose = rename.closeModal;
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
@@ -507,7 +484,16 @@ export function SessionDetailContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} headerRight={headerRight} />
+      <ScreenHeader
+        title={rename.title}
+        headerRight={headerRight}
+        {...(rename.isTitleInteractive
+          ? {
+              onTitlePress: rename.openModal,
+              onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+            }
+          : {})}
+      />
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -550,6 +536,16 @@ export function SessionDetailContent({
           onClose={() => {
             setChildSession(undefined);
           }}
+        />
+      ) : null}
+
+      {rename.isTitleInteractive && rename.isModalOpen ? (
+        <RenameModal
+          title="Rename session"
+          placeholder="Session name"
+          initialValue={rename.modalInitialValue}
+          onSave={handleRenameSave}
+          onClose={handleRenameClose}
         />
       ) : null}
     </View>
@@ -663,30 +659,24 @@ export function SessionDetailContent({
       );
     }
     return (
-      <FlatList
-        ref={flatListRef}
-        data={transcript}
-        keyExtractor={item =>
-          item.type === 'message' ? item.message.info.id : `preparation:${item.attempt.id}`
-        }
+      <SessionMessageList
+        sessionId={sessionId}
+        items={transcript}
+        keyExtractor={getSessionTranscriptItemKey}
+        hasOlderMessages={hasOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onLoadOlderMessages={() => {
+          void manager.loadOlderMessages();
+        }}
         renderItem={renderItem}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        onMomentumScrollBegin={handleMomentumScrollBegin}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        onContentSizeChange={handleContentSizeChange}
-        onLayout={handleListLayout}
-        scrollEventThrottle={16}
         ListFooterComponent={
           <>
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </>
         }
-        contentContainerClassName="py-2"
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
       />
     );
   }

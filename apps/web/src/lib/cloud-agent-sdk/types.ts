@@ -24,6 +24,12 @@ export type {
 
 import type { UserMessage, AssistantMessage, Part } from '@/types/opencode.gen';
 
+export type {
+  KiloSdkMessageHistory,
+  KiloSdkMessageHistoryPage,
+  KiloSdkStoredMessage,
+} from '@kilocode/session-ingest-contracts';
+
 // ---------------------------------------------------------------------------
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
 // ---------------------------------------------------------------------------
@@ -207,3 +213,43 @@ export type SessionSnapshot = {
     parts: Part[];
   }>;
 };
+
+/**
+ * Bounded page of persisted SDK messages for a Kilo session. Returned by the
+ * `fetchSnapshotPage` seam that the mobile client uses to walk the history
+ * one page at a time. `nextCursor` is the opaque cursor to pass to the next
+ * page (or `null` when the history has been fully read); `omittedItemCount`
+ * reports how many individual items the worker filtered out before the page
+ * left the DO so the UI can faithfully report omissions.
+ */
+export type SessionSnapshotPage = {
+  info: SessionInfo;
+  messages: SessionSnapshot['messages'];
+  nextCursor: string | null;
+  omittedItemCount: number;
+};
+
+/**
+ * Result of a single `fetchSnapshotPage` call. The discriminated `kind` lets
+ * the caller distinguish a successful bounded read from typed worker-side
+ * failures (`retryable_failure` for transient DO read issues,
+ * `invalid_data` for shape mismatches, `too_large` for oversize pages) so
+ * retry semantics can be surfaced without inferring them from the worker's
+ * text. `null` represents an access-not-found outcome (worker returns 404).
+ */
+export type SessionSnapshotPageOutcome =
+  | (SessionSnapshotPage & { kind: 'success' })
+  | { kind: 'retryable_failure' }
+  | { kind: 'invalid_data' }
+  | { kind: 'too_large' };
+
+/**
+ * Typed failure state for the manager's older-messages load. Mirrors the
+ * worker-side `SessionSnapshotPageOutcome` failure kinds so the UI can
+ * surface a Retry CTA for `retryable` and a terminal no-CTA state for
+ * `invalid_data` / `too_large` without re-deriving retry semantics.
+ */
+export type OlderMessagesError =
+  | { kind: 'retryable' }
+  | { kind: 'invalid_data' }
+  | { kind: 'too_large' };

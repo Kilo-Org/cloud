@@ -1,13 +1,32 @@
+import { type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useRef } from 'react';
-import { type FlatList, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
-type UseSessionAutoScrollParams = {
+import {
+  isSessionListAtBottom,
+  SESSION_LIST_BOTTOM_THRESHOLD_PX,
+  shouldFollowSessionContentSize,
+  shouldRetrySessionAutoScroll,
+  shouldScheduleSessionAutoScroll,
+} from '@/components/agents/use-session-auto-scroll-state';
+
+type UseSessionListAutoScrollParams = {
   itemCount: number;
   resetKey: string;
 };
 
-export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionAutoScrollParams) {
-  const flatListRef = useRef<FlatList<ItemT>>(null);
+/**
+ * FlashList-compatible companion to `useSessionAutoScroll`. Mirrors the
+ * "follow the latest message" behavior: keep auto-following while the user
+ * is at the bottom, stop once they scroll away, never yank during drag or
+ * momentum. Pure decisions live in `use-session-auto-scroll-state` for
+ * unit testing without React.
+ */
+export function useSessionListAutoScroll<ItemT>({
+  itemCount,
+  resetKey,
+}: UseSessionListAutoScrollParams) {
+  const listRef = useRef<FlashListRef<ItemT>>(null);
   const shouldAutoScrollRef = useRef(true);
   const isAutoScrollingRef = useRef(false);
   // Tracks whether the user is currently dragging or the list is still in a
@@ -47,10 +66,9 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   const scrollToLatestMessage = useCallback(() => {
     isAutoScrollingRef.current = true;
     clearAutoScrollResetTimeout();
-    flatListRef.current?.scrollToOffset({
-      offset: lastContentHeightRef.current,
-      animated: false,
-    });
+    // FlashList in v2 supports `scrollToEnd` directly. The list is rendered
+    // in chronological order, so the end is the newest message.
+    listRef.current?.scrollToEnd({ animated: false });
     autoScrollResetTimeoutRef.current = setTimeout(() => {
       isAutoScrollingRef.current = false;
       autoScrollResetTimeoutRef.current = null;
@@ -58,14 +76,30 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   }, [clearAutoScrollResetTimeout]);
 
   const scheduleScrollToLatestMessage = useCallback(() => {
-    if (isUserScrollingRef.current) {
+    if (
+      !shouldScheduleSessionAutoScroll({
+        isAutoScrolling: isAutoScrollingRef.current,
+        isUserScrolling: isUserScrollingRef.current,
+        shouldAutoScroll: shouldAutoScrollRef.current,
+      })
+    ) {
       return;
     }
     scrollToLatestMessage();
     clearAutoScrollRetryTimeout();
     autoScrollRetryTimeoutRef.current = setTimeout(() => {
       autoScrollRetryTimeoutRef.current = null;
-      if (shouldAutoScrollRef.current && !isUserScrollingRef.current) {
+      // The 80ms safety-net retry must not gate on `isAutoScrolling`:
+      // a programmatic scroll that's still within its 150ms window
+      // would otherwise suppress the retry and make it dead during the
+      // highest-frequency streaming window. It still honours the
+      // user-facing and follow-bottom guards.
+      if (
+        shouldRetrySessionAutoScroll({
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+        })
+      ) {
         scrollToLatestMessage();
       }
     }, 80);
@@ -94,8 +128,12 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   const updateAutoScrollFromEvent = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
-      shouldAutoScrollRef.current = distanceFromBottom < 100;
+      shouldAutoScrollRef.current = isSessionListAtBottom({
+        contentHeight: contentSize.height,
+        viewportHeight: layoutMeasurement.height,
+        offsetY: contentOffset.y,
+        thresholdPx: SESSION_LIST_BOTTOM_THRESHOLD_PX,
+      });
     },
     []
   );
@@ -152,21 +190,42 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
     (_width: number, height: number) => {
       const didContentHeightChange = height !== lastContentHeightRef.current;
       lastContentHeightRef.current = height;
-      if (shouldAutoScrollRef.current && didContentHeightChange && !isUserScrollingRef.current) {
-        scheduleScrollToLatestMessage();
+      // Content-size follow must not gate on `isAutoScrolling`: rapid
+      // streaming content-size changes that arrive during the 150ms
+      // programmatic-scroll window must still keep the viewport pinned
+      // to the bottom. Gating on `!isAutoScrolling` here would silently
+      // drop every streaming update that lands inside the debounce
+      // window. Bypass `scheduleScrollToLatestMessage` (which keeps
+      // the `!isAutoScrolling` guard for the initial itemCount /
+      // handleListLayout triggers) and trigger the programmatic scroll
+      // directly.
+      if (
+        shouldFollowSessionContentSize({
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+          didContentHeightChange,
+        })
+      ) {
+        scrollToLatestMessage();
       }
     },
-    [scheduleScrollToLatestMessage]
+    [scrollToLatestMessage]
   );
 
   const handleListLayout = useCallback(() => {
-    if (shouldAutoScrollRef.current && !isUserScrollingRef.current) {
+    if (
+      shouldScheduleSessionAutoScroll({
+        isAutoScrolling: isAutoScrollingRef.current,
+        isUserScrolling: isUserScrollingRef.current,
+        shouldAutoScroll: shouldAutoScrollRef.current,
+      })
+    ) {
       scheduleScrollToLatestMessage();
     }
   }, [scheduleScrollToLatestMessage]);
 
   return {
-    flatListRef,
+    listRef,
     handleContentSizeChange,
     handleListLayout,
     handleScroll,

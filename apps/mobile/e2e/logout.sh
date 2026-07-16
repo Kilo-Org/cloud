@@ -5,7 +5,7 @@
 # Usage:
 #   e2e/logout.sh <device-udid>
 #
-# Requires: maestro. See e2e/AGENTS.md ("Login / logout helper flows").
+# Requires: maestro. See e2e/AGENTS.md ("Sign In and Out").
 set -euo pipefail
 
 DEVICE="${1:?usage: logout.sh <device-udid>}"

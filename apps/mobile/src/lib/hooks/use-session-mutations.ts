@@ -75,6 +75,12 @@ export function useSessionMutations() {
   // overwrite a newer one's result. Rename goes through a modal confirm and
   // delete through Alert.alert, so an adjacent double-fire of the same op
   // is already impossible — no dedupe needed here.
+  //
+  // `renameSession` is the list's fire-and-forget caller. Detail callers
+  // (e.g. the session detail header) use `renameSessionAsync`, which awaits
+  // the same mutation + chain so a rejection surfaces the existing toast,
+  // rolls back the list cache, and lets the caller keep its modal open for
+  // retry.
   return {
     deleteSession: (sessionId: string) => {
       void (async () => {
@@ -99,6 +105,15 @@ export function useSessionMutations() {
           // Already surfaced via the mutation's own onError (toast + rollback).
         }
       })();
+    },
+    renameSessionAsync: async (sessionId: string, title: string) => {
+      // The mutation's onError toasts and rolls back the list cache before
+      // this rejection propagates, so callers can rethrow to keep their
+      // modal open without duplicating user-visible error handling.
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      await chainSave(sessionId, () =>
+        renameSessionMutation.mutateAsync({ session_id: sessionId, title })
+      );
     },
   };
 }

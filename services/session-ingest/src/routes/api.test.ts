@@ -130,6 +130,7 @@ function makeDbFakes() {
   const selectResult = vi.fn<() => Promise<unknown[]>>(async () => []);
   const select = {
     from: vi.fn(() => select),
+    leftJoin: vi.fn(() => select),
     where: vi.fn((_condition: unknown) => select),
     limit: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
@@ -1087,6 +1088,191 @@ describe('api routes', () => {
     expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8');
     expect(await res.text()).toBe(payload);
     expect(ingestStub.getAllStream).toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for invalid sessionId', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/not-a-session/messages', { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid sessionId' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for an invalid limit', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=999', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid limit' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for limit=0 (the generic endpoint is always bounded)', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=0', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid limit' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for limit=0 even when a cursor is supplied', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        'http://local/session/ses_12345678901234567890123456/messages?limit=0&before=eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MTc2MTAwMDAwMDEwMH0',
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid limit' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 when before is supplied without a positive limit', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?before=not-valid', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid paging input' });
+  });
+
+  it('GET /session/:sessionId/messages returns 404 when the user does not own the session', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([]);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ success: false, error: 'session_not_found' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('GET /session/:sessionId/messages returns the bounded page for an owned session', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const sdkStoredMessage = {
+      info: {
+        id: 'msg_user_01',
+        sessionID: 'ses_12345678901234567890123456',
+        role: 'user',
+        time: { created: 1761000000100 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      },
+      parts: [
+        {
+          id: 'prt_user_01',
+          sessionID: 'ses_12345678901234567890123456',
+          messageID: 'msg_user_01',
+          type: 'text',
+          text: 'hello',
+        },
+      ],
+    };
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [sdkStoredMessage],
+      nextCursor: 'opaque-cursor',
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      history: {
+        messages: [sdkStoredMessage],
+        nextCursor: 'opaque-cursor',
+        omittedItemCount: 0,
+      },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: undefined });
+  });
+
+  it('GET /session/:sessionId/messages defaults an omitted limit to the shared page size', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({
+      limit: 50,
+      before: undefined,
+    });
+  });
+
+  it('GET /session/:sessionId/messages preserves durable retryable / too_large / invalid_data outcomes', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const app = makeApiApp();
+
+    for (const history of [
+      { kind: 'retryable_failure', phase: 'page_parts' },
+      { kind: 'too_large', maximumBytes: 8 * 1024 * 1024, phase: 'message_scan' },
+      { kind: 'invalid_data' },
+    ]) {
+      vi.mocked(getSessionIngestDO).mockReturnValue({
+        readKiloSdkMessages: vi.fn(async () => history),
+      } as never);
+      const res = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/messages?limit=10', {
+          method: 'GET',
+        }),
+        makeTestEnv()
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        success: true,
+        kiloSessionId: 'ses_12345678901234567890123456',
+        history,
+      });
+    }
   });
 
   it('DELETE /session/:sessionId revokes cache, clears DO, and deletes descendants child-first', async () => {

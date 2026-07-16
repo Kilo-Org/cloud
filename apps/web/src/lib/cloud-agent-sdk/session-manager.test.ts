@@ -17,6 +17,8 @@ import type {
   ResolvedSession,
   SessionActivity,
   SessionInfo,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { NormalizedEvent } from './normalizer';
@@ -109,7 +111,14 @@ jest.mock('./session', () => ({
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
       onError?: (message: string) => void;
-      transport?: { userWebConnection?: unknown };
+      transport?: {
+        userWebConnection?: unknown;
+        fetchSnapshotPage?: (
+          kiloSessionId: string,
+          options: { cursor?: string }
+        ) => Promise<unknown>;
+        onInitialPageLoaded?: (page: unknown) => void;
+      };
     }) => {
       latestStorage = sessionConfig.storage;
       mockSession.storage = sessionConfig.storage;
@@ -121,6 +130,34 @@ jest.mock('./session', () => ({
           kiloSessionId: kiloId(sessionConfig.kiloSessionId),
           cloudAgentSessionId: cloudAgentId('agent-1'),
         });
+        // Simulate the transport's initial bounded read so the manager's
+        // pagination state is populated. The real transport would call
+        // `fetchSnapshotPage` and then `onInitialPageLoaded` with the page,
+        // or surface a typed failure via `onError`.
+        const transport = sessionConfig.transport;
+        if (transport?.fetchSnapshotPage) {
+          void Promise.resolve(transport.fetchSnapshotPage(sessionConfig.kiloSessionId, {})).then(
+            page => {
+              if (page && typeof page === 'object' && 'kind' in page) {
+                if (page.kind === 'success' && transport.onInitialPageLoaded) {
+                  transport.onInitialPageLoaded(page);
+                } else if (page.kind !== 'success' && sessionConfig.onError) {
+                  // Mirror the real transport's typed-failure handling:
+                  // it surfaces a stable error message via the manager's
+                  // `onError` channel so the standard session-error UI
+                  // shows the failure.
+                  const message =
+                    page.kind === 'retryable_failure'
+                      ? 'Session history temporarily unavailable'
+                      : page.kind === 'too_large'
+                        ? 'Session history too large to load'
+                        : 'Session history is unavailable';
+                  sessionConfig.onError(message);
+                }
+              }
+            }
+          );
+        }
         sessionConfig.onSessionCreated?.({ id: sessionConfig.kiloSessionId });
       });
       mockSessionCallbacks.onSessionCreated = sessionConfig.onSessionCreated;
@@ -3237,5 +3274,478 @@ describe('isReadOnly during connecting phase', () => {
     subscriberCallbackRef.current?.();
 
     expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bounded initial snapshot + loadOlderMessages
+// ---------------------------------------------------------------------------
+
+type SessionSnapshotPageFetch = NonNullable<SessionManagerConfig['fetchSnapshotPage']>;
+
+function makePageMessage(
+  id: string,
+  sessionID: string,
+  text: string
+): SessionSnapshotPage['messages'][number] {
+  return {
+    info: stubUserMessage({ id, sessionID }),
+    parts: [stubTextPart({ id: `${id}-text`, sessionID, messageID: id, text })],
+  };
+}
+
+function makePage(
+  options: {
+    kiloSessionId?: string;
+    messages?: SessionSnapshotPage['messages'];
+    nextCursor?: string | null;
+    omittedItemCount?: number;
+  } = {}
+): SessionSnapshotPageOutcome {
+  return {
+    kind: 'success',
+    info: { id: options.kiloSessionId ?? 'ses-1' },
+    messages: options.messages ?? [],
+    nextCursor: options.nextCursor ?? null,
+    omittedItemCount: options.omittedItemCount ?? 0,
+  };
+}
+
+function createPageFetchMock(
+  impl: SessionSnapshotPageFetch
+): jest.MockedFunction<SessionSnapshotPageFetch> {
+  return jest.fn(impl) as jest.MockedFunction<SessionSnapshotPageFetch>;
+}
+
+describe('createSessionManager — paginated initial snapshot + loadOlderMessages', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+    mockSession.connect.mockClear();
+    mockSession.disconnect.mockClear();
+    mockSession.destroy.mockClear();
+    mockSession.send.mockClear();
+    mockSession.interrupt.mockClear();
+    mockSession.respondToPermission.mockClear();
+    mockSession.canSend = true;
+    mockSession.canInterrupt = true;
+    mockSession.state.subscribe.mockImplementation(callback => {
+      callback();
+      return () => {};
+    });
+    mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+    mockSession.state.getCloudStatus.mockReturnValue(null);
+    mockSession.state.getPendingMessages.mockReturnValue(new Map());
+    mockSession.storage = latestStorage;
+    latestStorage = null;
+    mockSessionCallbacks.onSessionCreated = undefined;
+    mockSessionCallbacks.onSessionUpdated = undefined;
+    mockSessionCallbacks.onQuestionAsked = undefined;
+    mockSessionCallbacks.onQuestionResolved = undefined;
+    mockSessionCallbacks.onPermissionAsked = undefined;
+    mockSessionCallbacks.onPermissionResolved = undefined;
+    mockSessionCallbacks.onResolved = undefined;
+  });
+
+  it('loads the initial bounded page on switchSession and stores the cursor', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A', omittedItemCount: 2 })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(fetchSnapshotPage).toHaveBeenCalledWith('ses-1', {});
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(2);
+  });
+
+  it('does not set hasOlderMessages when the initial page has no cursor', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: null })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+  });
+
+  it('loadOlderMessages fetches the next page with the stored cursor and merges messages', async () => {
+    const callArgs: Array<{ cursor?: string }> = [];
+    const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+      callArgs.push({ ...options });
+      if (!options.cursor) {
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-2', 'ses-1', 'newer')],
+          nextCursor: 'cursor-A',
+        });
+      }
+      if (options.cursor === 'cursor-A') {
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-1', 'ses-1', 'older')],
+          nextCursor: null,
+          omittedItemCount: 3,
+        });
+      }
+      return makePage({ kiloSessionId: 'ses-1' });
+    });
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+    await mgr.loadOlderMessages();
+    expect(callArgs).toEqual([{}, { cursor: 'cursor-A' }]);
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(3);
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+
+    const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+    expect(messages.map(m => m.info.id)).toEqual(['msg-1', 'msg-2']);
+  });
+
+  it('loadOlderMessages is a no-op when there is no cursor', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: null })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    // Only the initial call
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates concurrent loadOlderMessages calls', async () => {
+    let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolvePage = resolve;
+    });
+
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockReturnValueOnce(slowPage);
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    const first = mgr.loadOlderMessages();
+    const second = mgr.loadOlderMessages();
+
+    resolvePage(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }));
+
+    await Promise.all([first, second]);
+
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(2);
+  });
+
+  it('does not run loadOlderMessages again after a switchSession', async () => {
+    // Set up the slow promise and the one-time mocks in the order the
+    // session-manager will consume them: initial → older load → next initial.
+    let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolvePage = resolve;
+    });
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockReturnValueOnce(slowPage)
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-2', nextCursor: null }))
+      .mockResolvedValue(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    // Start loadOlder, but switch before it resolves.
+    const older = mgr.loadOlderMessages();
+    const switching = mgr.switchSession(kiloId('ses-2'));
+    resolvePage(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }));
+    await Promise.all([older, switching]);
+
+    // After the switch, hasOlderMessages reflects the new session (no cursor).
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+  });
+
+  it('surfaces retryable_failure on initial load via the standard error atom', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () => ({
+      kind: 'retryable_failure' as const,
+    }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).not.toBeNull();
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+  });
+
+  it('surfaces non-retryable failure on initial load and disables further older loads', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce({ kind: 'too_large' as const })
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).not.toBeNull();
+    // No cursor was set, so hasOlderMessages must remain false and the
+    // backend must not be hit again.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(1);
+  });
+
+  it('keeps existing messages and exposes retryable older error when loadOlderMessages fails retryably', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce({ kind: 'retryable_failure' as const });
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    const messageCountBefore = atomValue<StoredMessage[]>(
+      config.store,
+      mgr.atoms.messagesList
+    ).length;
+    expect(messageCountBefore).toBe(0);
+
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      kind: 'retryable',
+    });
+    // Cursor must remain so a retry can pick it up.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+
+    // Retryable retry — backend should be hit again and succeed.
+    fetchSnapshotPage.mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+  });
+
+  it('treats a null older page outcome as terminal invalid_data and stops hitting the backend', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      kind: 'invalid_data',
+    });
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+    // A second call should be a no-op (no backend hit).
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects an older page whose session id does not match the active session', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce(
+        makePage({
+          kiloSessionId: 'ses-other',
+          messages: [makePageMessage('msg-other', 'ses-1', 'other')],
+          nextCursor: null,
+          omittedItemCount: 5,
+        })
+      );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+    expect(messages.map(m => m.info.id)).not.toContain('msg-other');
+    // The cursor must stay at the previously known value so a later valid page can continue.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+  });
+
+  it('marks non-retryable older failures as terminal and stops hitting the backend', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce({ kind: 'invalid_data' as const })
+      .mockResolvedValue(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      kind: 'invalid_data',
+    });
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+    // A second call should be a no-op (no backend hit).
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(2);
+  });
+
+  it('advances the cursor on an empty older page with a non-null continuation', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce(
+        makePage({ kiloSessionId: 'ses-1', messages: [], nextCursor: 'cursor-B' })
+      )
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+    await mgr.loadOlderMessages();
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+    await mgr.loadOlderMessages();
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+    // The empty-with-cursor page must not have caused an infinite loop — we
+    // made forward progress (3 calls total: initial, empty, final).
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(3);
+  });
+
+  it('exposes isLoadingOlderMessages while a load is in flight', async () => {
+    let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolvePage = resolve;
+    });
+
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockReturnValueOnce(slowPage);
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    const loading = mgr.loadOlderMessages();
+    expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(true);
+
+    resolvePage(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+    await loading;
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+  });
+
+  it('does not let a late initial page from an earlier switchSession clobber the active session when both target the same session id', async () => {
+    // Regression: the initial-page callback used to read `loadOlderGeneration`
+    // at invocation time. A second `switchSession` to the same session id
+    // advances the generation in `clearAllAtoms()` before the first
+    // switch's `onInitialPageLoaded` callback runs, so the stale page
+    // passed the generation check (equal to the new generation) and
+    // overwrote the active session's cursor / messages / omitted-item
+    // count. The fix captures the generation synchronously when the
+    // callback is created.
+    let resolveFirstPage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const firstPagePromise = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolveFirstPage = resolve;
+    });
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage.mockReturnValueOnce(firstPagePromise).mockResolvedValueOnce(
+      makePage({
+        kiloSessionId: 'ses-1',
+        nextCursor: 'current-cursor',
+        messages: [makePageMessage('msg-current', 'ses-1', 'current')],
+        omittedItemCount: 0,
+      })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    // Wait for the first switchSession to fully set up: the first
+    // session.connect() must have kicked off the slow fetchSnapshotPage
+    // and wired its `onInitialPageLoaded` callback before the second
+    // switchSession advances `switchGeneration` and tears the first
+    // switchSession's setup down.
+    const first = mgr.switchSession(kiloId('ses-1'));
+    await first;
+
+    const second = mgr.switchSession(kiloId('ses-1'));
+    await second;
+    // Flush microtasks so the second switch's page is delivered through
+    // `onInitialPageLoaded` and the active session's pagination state is
+    // settled before we resolve the stale first page.
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    // The active session's pagination state reflects the second switch.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+    ).toEqual(['msg-current']);
+
+    // The first switch's slow page eventually resolves. Its stale
+    // cursor, messages, and omitted count must not overwrite the
+    // active session's pagination state.
+    resolveFirstPage(
+      makePage({
+        kiloSessionId: 'ses-1',
+        nextCursor: 'stale-cursor',
+        messages: [makePageMessage('msg-stale', 'ses-1', 'stale')],
+        omittedItemCount: 99,
+      })
+    );
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+    ).toEqual(['msg-current']);
   });
 });

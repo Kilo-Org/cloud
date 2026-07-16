@@ -11,7 +11,12 @@ import {
 } from './schemas';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { TransportFactory, TransportSendInput, TransportSink } from './transport';
-import type { KiloSessionId, SessionSnapshot } from './types';
+import type {
+  KiloSessionId,
+  SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
+} from './types';
 import {
   UserWebCommandError,
   type UserWebCliEvent,
@@ -22,6 +27,23 @@ type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  /**
+   * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
+   * (initial bounded read AND reconnect immediate + delayed resync) uses it
+   * so the transport never overwrites older messages already loaded via
+   * `loadOlderMessages`. The initial read additionally fires
+   * `onInitialPageLoaded` so the manager can record the cursor.
+   */
+  fetchSnapshotPage?: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<SessionSnapshotPageOutcome | null>;
+  /**
+   * Called after a successful initial bounded page read. Reconnect and
+   * delayed-resync replays do NOT call this so the user's already-advanced
+   * older-messages cursor is never reset to the latest 50.
+   */
+  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
   onError?: (message: string) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onCapabilityChange?: () => void;
@@ -172,10 +194,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
     }
 
-    function replaySnapshot(snapshot: SessionSnapshot): void {
-      sink.onServiceEvent({ type: 'session.created', info: snapshot.info });
+    function replayPage(page: SessionSnapshotPage): void {
+      sink.onServiceEvent({ type: 'session.created', info: page.info });
 
-      for (const msg of snapshot.messages) {
+      for (const msg of page.messages) {
         sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
@@ -381,12 +403,17 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const replayCurrentSnapshot = (reportError: boolean): void => {
           snapshotReplayGeneration += 1;
           const expectedSnapshotReplayGeneration = snapshotReplayGeneration;
+          // The very first call (from `connect()`) is the initial bounded
+          // read and fires `onInitialPageLoaded`; reconnect and delayed
+          // resync calls deliberately do not, so the manager's already-
+          // advanced older-messages cursor is never reset on reconnect.
+          const isInitial = reportError;
           if (bufferedCliEvents !== null) {
             bufferedEventsFromSupersededSnapshot.push(...bufferedCliEvents);
           }
           bufferedCliEvents = [];
 
-          if (!config.fetchSnapshot) {
+          if (!config.fetchSnapshot && !config.fetchSnapshotPage) {
             bufferedCliEvents = [
               ...bufferedEventsFromSupersededSnapshot,
               ...(bufferedCliEvents ?? []),
@@ -396,37 +423,70 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             return;
           }
 
-          void config.fetchSnapshot(config.kiloSessionId).then(
-            snapshot => {
-              if (
-                expectedGeneration !== generation ||
-                expectedSnapshotReplayGeneration !== snapshotReplayGeneration
-              ) {
-                return;
-              }
-              bufferedEventsFromSupersededSnapshot = [];
-              replaySnapshot(snapshot);
-              drainBufferedCliEvents();
-            },
-            (error: unknown) => {
-              if (
-                expectedGeneration !== generation ||
-                expectedSnapshotReplayGeneration !== snapshotReplayGeneration
-              ) {
-                return;
-              }
-              if (reportError) {
-                const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
-                config.onError?.(message);
-              }
-              bufferedCliEvents = [
-                ...bufferedEventsFromSupersededSnapshot,
-                ...(bufferedCliEvents ?? []),
-              ];
-              bufferedEventsFromSupersededSnapshot = [];
-              drainBufferedCliEvents();
+          const onPage = (page: SessionSnapshotPage): void => {
+            if (
+              expectedGeneration !== generation ||
+              expectedSnapshotReplayGeneration !== snapshotReplayGeneration
+            ) {
+              return;
             }
-          );
+            if (isInitial) {
+              config.onInitialPageLoaded?.(page);
+            }
+            bufferedEventsFromSupersededSnapshot = [];
+            replayPage(page);
+            drainBufferedCliEvents();
+          };
+          const onError = (error: unknown): void => {
+            if (
+              expectedGeneration !== generation ||
+              expectedSnapshotReplayGeneration !== snapshotReplayGeneration
+            ) {
+              return;
+            }
+            if (reportError) {
+              const message = error instanceof Error ? error.message : 'Failed to fetch snapshot';
+              config.onError?.(message);
+            }
+            bufferedCliEvents = [
+              ...bufferedEventsFromSupersededSnapshot,
+              ...(bufferedCliEvents ?? []),
+            ];
+            bufferedEventsFromSupersededSnapshot = [];
+            drainBufferedCliEvents();
+          };
+
+          if (config.fetchSnapshotPage) {
+            void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
+              if (page && page.kind === 'success') {
+                onPage(page);
+              } else {
+                onError(
+                  new Error(
+                    page === null
+                      ? 'Session not found'
+                      : page.kind === 'retryable_failure'
+                        ? 'Session history temporarily unavailable'
+                        : page.kind === 'too_large'
+                          ? 'Session history too large to load'
+                          : 'Session history is unavailable'
+                  )
+                );
+              }
+            }, onError);
+            return;
+          }
+
+          if (config.fetchSnapshot) {
+            void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
+              onPage({
+                info: snapshot.info,
+                messages: snapshot.messages,
+                nextCursor: null,
+                omittedItemCount: 0,
+              });
+            }, onError);
+          }
         };
 
         replayCurrentSnapshot(true);

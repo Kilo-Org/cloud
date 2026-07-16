@@ -127,6 +127,9 @@ export { calculateContextUsagePercentage } from './context-usage';
 export type { ContextUsage } from './context-usage';
 
 export type {
+  KiloSdkMessageHistory,
+  KiloSdkMessageHistoryPage,
+  KiloSdkStoredMessage,
   MessageInfo,
   ProcessedMessage,
   SessionPhase,
@@ -150,6 +153,9 @@ export type {
   CloudAgentSessionId,
   ResolvedSession,
   SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
+  OlderMessagesError,
   // Re-exported opencode types
   Part,
   TextPart,

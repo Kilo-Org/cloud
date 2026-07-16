@@ -1,5 +1,5 @@
 import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
-import { type OlderMessagesError, type StoredMessage } from 'cloud-agent-sdk';
+import { type OlderMessagesError } from 'cloud-agent-sdk';
 import { useCallback, useEffect, useRef } from 'react';
 import { type ViewStyle } from 'react-native';
 
@@ -16,21 +16,23 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // otherwise spam the FlashList event log.
 const ON_START_REACHED_THRESHOLD = 0.5;
 
-type SessionMessageListProps = {
+type SessionMessageListProps<T> = {
   sessionId: string;
-  messages: readonly StoredMessage[];
+  items: readonly T[];
+  keyExtractor: (item: T) => string;
   hasOlderMessages: boolean;
   isLoadingOlderMessages: boolean;
   olderMessagesError: OlderMessagesError | null;
   olderMessagesOmittedItemCount: number;
   onLoadOlderMessages: () => void;
-  renderItem: ListRenderItem<StoredMessage>;
+  renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
 };
 
-export function SessionMessageList({
+export function SessionMessageList<T>({
   sessionId,
-  messages,
+  items,
+  keyExtractor,
   hasOlderMessages,
   isLoadingOlderMessages,
   olderMessagesError,
@@ -38,7 +40,7 @@ export function SessionMessageList({
   onLoadOlderMessages,
   renderItem,
   ListFooterComponent,
-}: Readonly<SessionMessageListProps>) {
+}: Readonly<SessionMessageListProps<T>>) {
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
@@ -52,8 +54,8 @@ export function SessionMessageList({
     handleScrollEndDrag,
     handleMomentumScrollBegin,
     handleMomentumScrollEnd,
-  } = useSessionListAutoScroll<StoredMessage>({
-    itemCount: messages.length,
+  } = useSessionListAutoScroll<T>({
+    itemCount: items.length,
     resetKey: sessionId,
   });
 
@@ -93,15 +95,15 @@ export function SessionMessageList({
 
   // Defensive: the structural list ref is required by the hook but
   // downstream types may infer it as nullable.
-  const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<StoredMessage>>;
+  const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<T>>;
 
   return (
-    <FlashList<StoredMessage>
+    <FlashList<T>
       ref={listRefSafe}
       style={listStyle}
       contentContainerStyle={listContentContainerStyle}
-      data={messages}
-      keyExtractor={item => item.info.id}
+      data={items}
+      keyExtractor={keyExtractor}
       renderItem={renderItem}
       onScroll={handleScroll}
       onScrollBeginDrag={handleScrollBeginDrag}

@@ -16,7 +16,11 @@
  */
 
 import { createKilo } from '@kilocode/sdk';
-import { SESSION_ID_RE } from '../../src/shared/protocol.js';
+import {
+  SESSION_ID_RE,
+  type PreparingEventDataV2,
+  type PreparingStep,
+} from '../../src/shared/protocol.js';
 import { WRAPPER_VERSION } from '../../src/shared/wrapper-version.js';
 import { WrapperState } from './state.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
@@ -38,6 +42,9 @@ import type {
   WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
 import {
+  type BootstrapProgress,
+  type BootstrapProgressEvent,
+  type BootstrapProgressStep,
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
   RestoredWorkspaceReconciliationError,
@@ -586,6 +593,13 @@ async function main() {
 
     const readyStartedAt = Date.now();
     let progressChannel: Awaited<ReturnType<typeof openIngestProgressChannel>> | undefined;
+    // Revisions must strictly increase across every producer touching this
+    // attempt: the server emits early progress (small revisions counted up
+    // from the materialized snapshot) before the wrapper exists, and a
+    // readiness retry re-enters here with the same attemptId. Starting from
+    // the current epoch keeps each readySession pass above both.
+    let preparationRevision = Date.now();
+    let emitPreparing: ((data: PreparingEventDataV2) => void) | undefined;
     logToFile(
       `session/ready received agentSessionId=${request.agentSessionId} kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0} platform=${request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM ?? '(unset)'} stateConnected=${state.isConnected}`
     );
@@ -632,15 +646,144 @@ async function main() {
       logToFile(
         `session/ready bootstrap workspace starting kiloSessionId=${request.kiloSessionId}`
       );
-      const workspaceBootstrap = prepareWrapperBootstrapWorkspace(
-        request,
-        (step, message) => {
+      let activeStepId: string | undefined;
+      const completedStepIds = new Set<string>();
+      emitPreparing = (data: PreparingEventDataV2): void => {
+        const event = {
+          ...data,
+          revision: ++preparationRevision,
+          timestamp: Date.now(),
+        } satisfies PreparingEventDataV2;
+        state.sendToIngest({
+          streamEventType: 'preparing',
+          data: event,
+          timestamp: new Date(event.timestamp).toISOString(),
+        });
+      };
+      const emitBootstrapProgress: BootstrapProgress = (
+        eventOrStep: BootstrapProgressEvent | BootstrapProgressStep,
+        legacyMessage?: string
+      ) => {
+        const event: BootstrapProgressEvent =
+          typeof eventOrStep === 'string'
+            ? {
+                type: 'progress',
+                step: eventOrStep,
+                stepId: `phase:${eventOrStep}`,
+                detail: legacyMessage ?? '',
+              }
+            : eventOrStep;
+        const message =
+          event.type === 'output'
+            ? event.output
+            : event.type === 'progress'
+              ? event.detail
+              : event.type === 'failed'
+                ? event.safeError
+                : event.type === 'started'
+                  ? event.label
+                  : 'Preparation complete';
+        if (!request.preparation) {
           state.sendToIngest({
             streamEventType: 'preparing',
-            data: { step, message },
+            data: { step: event.step, message },
             timestamp: new Date().toISOString(),
           });
-        },
+          return;
+        }
+        const base = {
+          version: 2 as const,
+          attemptId: request.preparation.attemptId,
+          triggerMessageId: request.preparation.triggerMessageId,
+          revision: ++preparationRevision,
+          timestamp: Date.now(),
+          step: event.step as PreparingStep,
+          message,
+        };
+        if (event.type === 'started') {
+          if (activeStepId && !completedStepIds.has(activeStepId)) {
+            emitPreparing?.({ ...base, action: 'step_completed', stepId: activeStepId });
+            completedStepIds.add(activeStepId);
+          }
+          activeStepId = event.stepId;
+          emitPreparing?.({
+            ...base,
+            action: 'step_started',
+            stepId: event.stepId,
+            kind: event.kind,
+            label: event.label,
+            ...(event.command === undefined ? {} : { command: event.command }),
+            ...(event.commandIndex === undefined ? {} : { commandIndex: event.commandIndex }),
+            ...(event.commandCount === undefined ? {} : { commandCount: event.commandCount }),
+          });
+          return;
+        }
+        if (event.type === 'progress') {
+          if (activeStepId !== event.stepId) {
+            if (activeStepId && !completedStepIds.has(activeStepId)) {
+              emitPreparing?.({ ...base, action: 'step_completed', stepId: activeStepId });
+              completedStepIds.add(activeStepId);
+            }
+            activeStepId = event.stepId;
+            emitPreparing?.({
+              ...base,
+              action: 'step_started',
+              stepId: event.stepId,
+              kind: 'phase',
+              label: event.step.replaceAll('_', ' '),
+            });
+          }
+          emitPreparing?.({
+            ...base,
+            action: 'step_progress',
+            stepId: event.stepId,
+            detail: event.detail,
+          });
+          return;
+        }
+        if (event.type === 'output') {
+          emitPreparing?.({
+            ...base,
+            action: 'step_output',
+            stepId: event.stepId,
+            output: event.output,
+          });
+          return;
+        }
+        if (event.type === 'completed') {
+          completedStepIds.add(event.stepId);
+          emitPreparing?.({
+            ...base,
+            action: 'step_completed',
+            stepId: event.stepId,
+            exitCode: event.exitCode,
+          });
+          return;
+        }
+        completedStepIds.add(event.stepId);
+        emitPreparing?.({
+          ...base,
+          action: 'step_failed',
+          stepId: event.stepId,
+          safeError: event.safeError,
+          exitCode: event.exitCode,
+        });
+      };
+      if (request.preparation) {
+        emitPreparing({
+          version: 2,
+          attemptId: request.preparation.attemptId,
+          triggerMessageId: request.preparation.triggerMessageId,
+          revision: ++preparationRevision,
+          timestamp: Date.now(),
+          step: 'workspace_setup',
+          message: 'Preparing environment',
+          action: 'attempt_started',
+        });
+      }
+      const workspaceBootstrap = prepareWrapperBootstrapWorkspace(
+        request,
+        emitBootstrapProgress,
         {},
         workspaceBootstrapController.signal
       );
@@ -653,9 +796,6 @@ async function main() {
       logToFile(
         `session/ready bootstrap workspace finished kiloSessionId=${request.kiloSessionId}`
       );
-
-      progressChannel?.close();
-      progressChannel = undefined;
 
       if (isShuttingDown) return wrapperFinalizingResponse();
       const runtimeStartup = startKiloRuntime(
@@ -675,6 +815,32 @@ async function main() {
         `session/ready complete kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt}`
       );
 
+      if (request.preparation) {
+        if (activeStepId && !completedStepIds.has(activeStepId)) {
+          emitPreparing({
+            version: 2,
+            attemptId: request.preparation.attemptId,
+            triggerMessageId: request.preparation.triggerMessageId,
+            revision: ++preparationRevision,
+            timestamp: Date.now(),
+            step: 'kilo_server',
+            message: 'Starting Kilo',
+            action: 'step_completed',
+            stepId: activeStepId,
+          });
+        }
+        emitPreparing({
+          version: 2,
+          attemptId: request.preparation.attemptId,
+          triggerMessageId: request.preparation.triggerMessageId,
+          revision: ++preparationRevision,
+          timestamp: Date.now(),
+          step: 'ready',
+          message: 'Preparation complete',
+          action: 'attempt_completed',
+        });
+      }
+
       return {
         status: 'ready',
         kiloSessionId: request.kiloSessionId,
@@ -687,6 +853,25 @@ async function main() {
         },
       };
     } catch (error) {
+      if (request.preparation) {
+        const safeError =
+          error instanceof WrapperBootstrapError
+            ? error.message
+            : error instanceof RestoredWorkspaceReconciliationError
+              ? 'Workspace reconciliation failed'
+              : 'Environment preparation failed';
+        emitPreparing?.({
+          version: 2,
+          attemptId: request.preparation.attemptId,
+          triggerMessageId: request.preparation.triggerMessageId,
+          revision: ++preparationRevision,
+          timestamp: Date.now(),
+          step: 'failed',
+          message: safeError,
+          action: 'attempt_failed',
+          safeError,
+        });
+      }
       if (isShuttingDown) {
         logToFile(
           `session/ready aborted by shutdown kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt}`

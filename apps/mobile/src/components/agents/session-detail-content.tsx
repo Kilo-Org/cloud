@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import { type CloudStatus, type KiloSessionId } from 'cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
@@ -27,6 +27,7 @@ import {
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
+import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
@@ -40,6 +41,11 @@ import {
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import {
+  getSessionTranscriptItemKey,
+  mergeSessionTranscript,
+  type SessionTranscriptItem,
+} from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
@@ -102,6 +108,7 @@ export function SessionDetailContent({
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
+  const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
@@ -302,13 +309,13 @@ export function SessionDetailContent({
     sessionId,
   ]);
 
-  const lastAssistantIndex = useMemo(() => {
+  const lastAssistantMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i]?.info.role === 'assistant') {
-        return i;
+        return messages[i]?.info.id ?? null;
       }
     }
-    return -1;
+    return null;
   }, [messages]);
 
   const handleOpenChildSession = useCallback(
@@ -319,19 +326,27 @@ export function SessionDetailContent({
     [manager]
   );
 
+  const transcript = useMemo(
+    () => mergeSessionTranscript(messages, preparationAttempts),
+    [messages, preparationAttempts]
+  );
+
   const renderItem = useCallback(
-    ({ item, index }: { item: StoredMessage; index: number }) => (
-      <MessageBubble
-        message={item}
-        isLastAssistantMessage={index === lastAssistantIndex}
-        isSessionStreaming={isStreaming}
-        getChildMessages={getChildMessages}
-        defaultReasoningExpanded={reasoningDefaultExpanded}
-        onOpenChildSession={handleOpenChildSession}
-      />
-    ),
+    ({ item }: { item: SessionTranscriptItem }) =>
+      item.type === 'preparation' ? (
+        <PreparationGroup attempt={item.attempt} />
+      ) : (
+        <MessageBubble
+          message={item.message}
+          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
+          isSessionStreaming={isStreaming}
+          getChildMessages={getChildMessages}
+          defaultReasoningExpanded={reasoningDefaultExpanded}
+          onOpenChildSession={handleOpenChildSession}
+        />
+      ),
     [
-      lastAssistantIndex,
+      lastAssistantMessageId,
       isStreaming,
       getChildMessages,
       reasoningDefaultExpanded,
@@ -617,7 +632,8 @@ export function SessionDetailContent({
     return (
       <SessionMessageList
         sessionId={sessionId}
-        messages={messages}
+        items={transcript}
+        keyExtractor={getSessionTranscriptItemKey}
         hasOlderMessages={hasOlderMessages}
         isLoadingOlderMessages={isLoadingOlderMessages}
         olderMessagesError={olderMessagesError}

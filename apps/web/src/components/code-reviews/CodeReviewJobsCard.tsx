@@ -47,6 +47,24 @@ import { CodeReviewStreamView } from './CodeReviewStreamView';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { Switch } from '@/components/ui/switch';
+import {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  type CouncilAggregationStrategy,
+} from '@kilocode/db/schema-types';
+import {
+  COUNCIL_MIN_SPECIALISTS,
+  formatAggregationStrategy,
+} from '@kilocode/worker-utils/code-review-council';
+import { CouncilSpecialistPicker } from './CouncilSpecialistPicker';
+import {
+  CODE_REVIEW_COUNCIL_FLAG,
+  buildCouncilSpecialists,
+  countEnabledSelections,
+  defaultCouncilSelections,
+  type CouncilSpecialistSelection,
+} from '@/lib/code-reviews/core/council-selection';
 import {
   getAvailableThinkingEfforts,
   thinkingEffortLabel,
@@ -76,6 +94,8 @@ type CodeReviewJobsCardProps = {
   localCodeReviewDevelopmentEnabled?: boolean;
   defaultModelSlug?: string | null;
   defaultThinkingEffort?: string | null;
+  /** Whether this owner is entitled to council (enterprise + active). */
+  councilEntitled?: boolean;
 };
 
 const PAGE_SIZE = 10;
@@ -167,6 +187,7 @@ export function CodeReviewJobsCard({
   localCodeReviewDevelopmentEnabled = false,
   defaultModelSlug,
   defaultThinkingEffort,
+  councilEntitled = false,
 }: CodeReviewJobsCardProps) {
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -179,8 +200,22 @@ export function CodeReviewJobsCard({
   );
   const [manualJobThinkingEffort, setManualJobThinkingEffort] = useState<string | null>(null);
   const [manualJobInstructions, setManualJobInstructions] = useState('');
+  const [manualJobCouncilEnabled, setManualJobCouncilEnabled] = useState(false);
+  const [manualJobCouncilAggregation, setManualJobCouncilAggregation] =
+    useState<CouncilAggregationStrategy>('any_blocking_member');
+  const [manualJobCouncilSelections, setManualJobCouncilSelections] = useState<
+    Record<string, CouncilSpecialistSelection>
+  >(() => defaultCouncilSelections());
   const [manualJobSubmitted, setManualJobSubmitted] = useState(false);
   const [manualJobSubmitError, setManualJobSubmitError] = useState<string | null>(null);
+
+  // Council UI shows in local dev, or for entitled enterprise orgs with the rollout flag.
+  const councilFlagEnabled = useFeatureFlagEnabled(CODE_REVIEW_COUNCIL_FLAG);
+  const councilUiEnabled =
+    localCodeReviewDevelopmentEnabled || (councilEntitled && !!councilFlagEnabled);
+  const manualJobCouncilEnabledCount = countEnabledSelections(manualJobCouncilSelections);
+  const manualJobCouncilBelowMin =
+    manualJobCouncilEnabled && manualJobCouncilEnabledCount < COUNCIL_MIN_SPECIALISTS;
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -264,7 +299,11 @@ export function CodeReviewJobsCard({
     ? orgCreateManualReviewJobMutation.isPending
     : personalCreateManualReviewJobMutation.isPending;
   const manualJobSubmitDisabled =
-    isManualJobSubmitting || isLoadingModels || modelOptions.length === 0 || !manualJobModelAllowed;
+    isManualJobSubmitting ||
+    isLoadingModels ||
+    modelOptions.length === 0 ||
+    !manualJobModelAllowed ||
+    manualJobCouncilBelowMin;
 
   useEffect(() => {
     if (
@@ -311,6 +350,9 @@ export function CodeReviewJobsCard({
       selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug)
     );
     setManualJobInstructions('');
+    setManualJobCouncilEnabled(false);
+    setManualJobCouncilAggregation('any_blocking_member');
+    setManualJobCouncilSelections(defaultCouncilSelections());
     setManualJobSubmitted(false);
     setManualJobSubmitError(null);
   }
@@ -370,12 +412,27 @@ export function CodeReviewJobsCard({
       return;
     }
 
+    if (manualJobCouncilEnabled && manualJobCouncilEnabledCount < COUNCIL_MIN_SPECIALISTS) {
+      setManualJobSubmitError(`Select at least ${COUNCIL_MIN_SPECIALISTS} council specialists.`);
+      return;
+    }
+
+    const council =
+      councilUiEnabled && manualJobCouncilEnabled
+        ? {
+            enabled: true,
+            aggregation_strategy: manualJobCouncilAggregation,
+            specialists: buildCouncilSpecialists(manualJobCouncilSelections),
+          }
+        : undefined;
+
     const input = {
       platform,
       url: manualJobUrl.trim(),
       modelSlug: manualJobModelSlug,
       thinkingEffort: manualJobThinkingEffort,
       instructions: manualJobInstructions.trim() || undefined,
+      council,
     };
 
     if (organizationId) {
@@ -528,6 +585,79 @@ export function CodeReviewJobsCard({
                 {MANUAL_INSTRUCTIONS_MAX_LENGTH} characters.
               </p>
             </div>
+
+            {councilUiEnabled && (
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="grid gap-1 leading-none">
+                    <Label htmlFor="manual-code-review-council" className="font-medium">
+                      Council review
+                    </Label>
+                    <p className="text-muted-foreground text-sm">
+                      Run multiple specialists, each on its own model, and combine their votes.
+                    </p>
+                  </div>
+                  <Switch
+                    id="manual-code-review-council"
+                    checked={manualJobCouncilEnabled}
+                    onCheckedChange={setManualJobCouncilEnabled}
+                    disabled={isManualJobSubmitting}
+                    aria-label="Enable council review"
+                  />
+                </div>
+
+                {manualJobCouncilEnabled && (
+                  <div className="space-y-4">
+                    <CouncilSpecialistPicker
+                      selections={manualJobCouncilSelections}
+                      onChange={setManualJobCouncilSelections}
+                      modelOptions={modelOptions}
+                      isLoadingModels={isLoadingModels}
+                      disabled={isManualJobSubmitting}
+                      defaultModelSlug={manualJobModelSlug}
+                      modal
+                    />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-code-review-council-aggregation">
+                        Governance decision
+                      </Label>
+                      <Select
+                        value={manualJobCouncilAggregation}
+                        onValueChange={value =>
+                          setManualJobCouncilAggregation(value as CouncilAggregationStrategy)
+                        }
+                        disabled={isManualJobSubmitting}
+                      >
+                        <SelectTrigger
+                          id="manual-code-review-council-aggregation"
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNCIL_AGGREGATION_STRATEGIES.map(strategy => (
+                            <SelectItem key={strategy} value={strategy}>
+                              {formatAggregationStrategy(strategy)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p
+                        className={
+                          manualJobCouncilBelowMin
+                            ? 'text-destructive text-sm'
+                            : 'text-muted-foreground text-sm'
+                        }
+                      >
+                        Select {COUNCIL_MIN_SPECIALISTS}–4 specialists.{' '}
+                        {manualJobCouncilEnabledCount} selected.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </form>
         <DialogFooter>

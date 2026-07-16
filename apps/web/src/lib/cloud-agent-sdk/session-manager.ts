@@ -38,6 +38,7 @@ import type {
   MessageInfo,
   Part,
   OlderMessagesError,
+  PreparationAttempt,
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from './array-utils';
@@ -212,6 +213,8 @@ type SessionManagerAtoms = {
   activity: W<SessionActivity>;
   agentStatus: W<AgentStatus>;
   cloudStatus: W<CloudStatus | null>;
+  setupLog: W<readonly string[]>;
+  preparationAttempts: W<readonly PreparationAttempt[]>;
   sessionConfig: W<SessionConfig | null>;
   sessionType: W<ActiveSessionType | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
@@ -401,6 +404,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activityAtom = atom<SessionActivity>({ type: 'connecting' });
   const agentStatusAtom = atom<AgentStatus>({ type: 'idle' });
   const cloudStatusAtom = atom<CloudStatus | null>(null);
+  const setupLogAtom = atom<readonly string[]>([]);
+  const preparationAttemptsAtom = atom<readonly PreparationAttempt[]>([]);
   const sessionConfigAtom = atom<SessionConfig | null>(null);
   const sessionTypeAtom = atom<ActiveSessionType | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
@@ -537,6 +542,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activityAtom, { type: 'connecting' });
     store.set(agentStatusAtom, { type: 'idle' });
     store.set(cloudStatusAtom, null);
+    store.set(setupLogAtom, []);
+    store.set(preparationAttemptsAtom, []);
     store.set(sessionConfigAtom, null);
     store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
@@ -739,6 +746,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       store.set(agentStatusAtom, st);
       store.set(cloudStatusAtom, cs);
+      store.set(setupLogAtom, session.state.getSetupLog());
+      store.set(
+        preparationAttemptsAtom,
+        'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : []
+      );
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
@@ -1379,6 +1391,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activity: activityAtom,
       agentStatus: agentStatusAtom,
       cloudStatus: cloudStatusAtom,
+      setupLog: setupLogAtom,
+      preparationAttempts: preparationAttemptsAtom,
       sessionConfig: sessionConfigAtom,
       sessionType: sessionTypeAtom,
       chatUI: chatUIAtom,

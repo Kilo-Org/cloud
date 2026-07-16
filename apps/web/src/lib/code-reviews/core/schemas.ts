@@ -239,8 +239,12 @@ export type TriggerReviewParams = z.infer<typeof TriggerReviewParamsSchema>;
 /**
  * Response type for list code reviews
  */
+// List rows exclude the potentially large `council_result` JSONB — the jobs list is
+// polled frequently and never renders council results (only the review-detail path does).
+export type CodeReviewListItem = Omit<CloudAgentCodeReview, 'council_result'>;
+
 export type ListCodeReviewsResponse = {
-  reviews: CloudAgentCodeReview[];
+  reviews: CodeReviewListItem[];
   total: number;
   hasMore: boolean;
 };

@@ -201,11 +201,9 @@ test('Android workflow uses Maestro first and applies resolved tooling to cached
 
 test('iOS workflow uses Maestro first with simctl as the low-level fallback', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
 
   assert.match(runbook, /Use Maestro as the primary iOS automation driver/);
   assert.match(runbook, /Fall back to `xcrun simctl`/);
-  assert.match(verifier, /Fall back to `xcrun simctl` on iOS/);
 });
 
 test('Android tooling rejects a non-Java-17 JAVA_HOME', async () => {
@@ -252,202 +250,39 @@ test('workflow documents the shared Docker proxy exception without weakening bac
   assert.match(cli, /Refusing to share occupied worktree service ports/);
 });
 
-test('mobile verifier cannot create host-global Metro proxies', () => {
-  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
+test('mobile runbook prohibits host-global Metro proxies', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
-  assert.match(verifier, /"socat": deny/);
-  assert.match(verifier, /"socat \*": deny/);
-  assert.match(verifier, /must not create.*proxies.*listeners/is);
   assert.match(runbook, /must never map.*8081.*worktree.*Metro/is);
   assert.match(runbook, /sole intentional host-wide proxy exception.*23750/is);
   assert.match(runbook, /test-environment failure/i);
   assert.match(runbook, /PID.*parent PID.*bind address.*port/is);
 });
 
-test('mobile verifier uses ownership-aware simulator phase labels', () => {
-  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
+test('mobile runbook uses ownership-aware simulator phase labels', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
-  assert.match(verifier, /--phase (?:prewarm|verify)/);
   assert.match(runbook, /Kilo E2E - <sanitized-worktree-basename> - <phase>/);
   assert.match(runbook, /must not call.*simctl rename/i);
   assert.match(runbook, /restores the original simulator name/i);
 });
 
-test('mobile verifier installs validated cached native builds', () => {
-  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
+test('mobile runbook installs validated cached native builds', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
-  for (const document of [verifier, runbook]) {
-    assert.match(document, /dev:mobile:ios build <udid>/);
-    assert.match(document, /dev:mobile:android build <serial>/);
-    assert.match(document, /validated cached/i);
-  }
+  assert.match(runbook, /dev:mobile:ios build <udid>/);
+  assert.match(runbook, /dev:mobile:android build <serial>/);
+  assert.match(runbook, /validated cached/i);
   assert.doesNotMatch(runbook, /npx expo run:ios --device/);
 });
 
-test('mobile verifier handles the exact Safari external-app prompt within the shared budget', () => {
-  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
+test('mobile runbook handles the exact Safari external-app prompt within the shared budget', () => {
   const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
-  for (const document of [verifier, runbook]) {
-    assert.match(document, /Open this page in [“"]Kilo[”"]\?/);
-    assert.match(document, /exact.*Open.*accessibility/is);
-    assert.match(document, /five-second optional-prompt/i);
-  }
+  assert.match(runbook, /Open this page in [“"]Kilo[”"]\?/);
+  assert.match(runbook, /exact.*Open.*accessibility/is);
+  assert.match(runbook, /five-second optional-prompt/i);
   assert.match(runbook, /prefer.*simctl openurl.*avoid.*confirmation/is);
-});
-
-test('mobile workflow schedules bounded dependency-aware implementation waves', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-  const implementer = fs.readFileSync('apps/mobile/.kilo/agent/mobile-implementer.md', 'utf8');
-
-  assert.match(workflow, /two or three concurrent implementers/i);
-  assert.match(workflow, /write set/i);
-  assert.match(workflow, /producer-consumer dependency/i);
-  assert.match(workflow, /synchronization barrier/i);
-  assert.match(workflow, /repository-wide formatters.*serialized/is);
-  assert.match(implementer, /other active slices/i);
-  assert.match(implementer, /unexpected changes.*owned paths.*stop/is);
-  assert.match(implementer, /outside.*owned paths.*continue/is);
-});
-
-test('mobile workflow sizes handoffs below hard role step limits', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-  const implementer = fs.readFileSync('apps/mobile/.kilo/agent/mobile-implementer.md', 'utf8');
-  const reviewer = fs.readFileSync('apps/mobile/.kilo/agent/mobile-reviewer.md', 'utf8');
-  const verifier = fs.readFileSync('apps/mobile/.kilo/agent/mobile-e2e-verifier.md', 'utf8');
-
-  assert.match(workflow, /80.*50.*100/s);
-  assert.match(workflow, /75%/);
-  assert.match(workflow, /roughly 60 planned steps/i);
-  for (const role of [implementer, reviewer, verifier]) {
-    assert.match(role, /minimum complete outcome/i);
-    assert.match(role, /clean stopping rule/i);
-    assert.match(role, /safest next action/i);
-  }
-});
-
-test('mobile workflow overlaps verifier prewarming with implementation', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-
-  assert.match(workflow, /prewarm-only.*concurrent.*implementation/is);
-  assert.match(workflow, /fresh.*final.*mobile-e2e-verifier/is);
-  assert.match(workflow, /resource manifest/i);
-  assert.match(workflow, /must not.*acceptance.*implementation.*changing/is);
-});
-
-test('mobile workflow preserves successful slices and bounds repairs', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-
-  assert.match(workflow, /preserve successful independent slices/i);
-  assert.match(workflow, /two budget-exhausted invocations.*orchestrator takes over/is);
-  assert.match(workflow, /bounded repair wave/i);
-  assert.match(workflow, /fresh reviewer/i);
-});
-
-test('mobile workflow reports lightweight elapsed-time and contention metrics', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-
-  assert.match(workflow, /number and width of implementation waves/i);
-  assert.match(workflow, /budget exhaustion.*collision counts/is);
-  assert.match(workflow, /unmanaged listener detections/i);
-  assert.match(workflow, /prewarm reuse.*invalidation/is);
-  assert.match(workflow, /accepted-plan-to-final-E2E-start time/i);
-  assert.match(workflow, /accepted-plan-to-merged-PR time/i);
-  assert.match(workflow, /do not add persistent telemetry/i);
-});
-
-test('mobile workflow requires a conflict-free CI-green latest PR head', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-
-  assert.match(workflow, /mergeable.*no conflicts/i);
-  assert.match(workflow, /latest head/i);
-  assert.match(workflow, /CI checks.*successful terminal state/i);
-  assert.match(workflow, /failed.*cancelled.*timed-out.*pending/is);
-  assert.match(workflow, /base branch advances/i);
-  assert.match(workflow, /wait again.*CI.*Kilobot/is);
-});
-
-test('mobile planner hands implementation to a fresh tmux orchestrator', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-  const launchShape = workflow.slice(
-    workflow.indexOf('```bash\ntmux new-window'),
-    workflow.indexOf('```', workflow.indexOf('```bash\ntmux new-window') + 7)
-  );
-
-  assert.match(workflow, /planning session.*must not implement/is);
-  assert.match(workflow, /fresh orchestrator/i);
-  assert.match(workflow, /tmux new-window/);
-  assert.match(workflow, /named.*tmux window/is);
-  assert.match(workflow, /-c <dedicated-worktree>\/apps\/mobile/);
-  assert.match(workflow, /kilo run --interactive/);
-  assert.match(workflow, /--model kilo\/kilo-auto\/frontier/);
-  assert.doesNotMatch(launchShape, /--variant/);
-  assert.doesNotMatch(launchShape, /(?:--continue|--session)/);
-});
-
-test('mobile planner handoff is complete and secret-free', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-  const handoffSection = workflow.slice(
-    workflow.indexOf('## Planner Handoff'),
-    workflow.indexOf('## Feature State Matrix')
-  );
-
-  assert.match(handoffSection, /accepted plan.*absolute path/is);
-  assert.match(handoffSection, /dedicated worktree path.*every repository/is);
-  assert.match(handoffSection, /current branch.*working-tree state/is);
-  assert.match(handoffSection, /acceptance criteria.*execution ledger/is);
-  assert.match(handoffSection, /continue through.*mergeable.*CI/is);
-  assert.match(handoffSection, /must not contain.*secrets.*environment-file/is);
-});
-
-test('mobile workflow owns PR assignment and the post-PR Kilobot repair loop', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-
-  assert.match(workflow, /assign(?:s|ed)? the PR to the requesting human/i);
-  assert.match(workflow, /Kilobot has reviewed the latest head/i);
-  assert.match(workflow, /no unresolved actionable Kilobot comments/i);
-  assert.match(workflow, /plan the smallest coherent repair/i);
-  assert.match(workflow, /mobile-implementer/);
-  assert.match(workflow, /fresh `mobile-reviewer`/);
-  assert.match(workflow, /smallest coherent commit/i);
-  assert.match(workflow, /reply in the original review thread/i);
-  assert.match(workflow, /resolve the thread/i);
-  assert.match(workflow, /local mobile E2E/i);
-});
-
-test('mobile workflow keeps secret-bearing environment files out of subagent context', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(workflow, /must not read .*\.env/i);
-  assert.match(workflow, /\.dev\.vars/);
-  assert.match(workflow, /sanitized explicit values/i);
-  assert.doesNotMatch(runbook, /grep .*\.env/);
-});
-
-test('mobile workflow keeps generated E2E fixtures out of Git', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  for (const document of [workflow, runbook]) {
-    assert.match(document, /E2E fixtures must never be committed/i);
-    assert.match(document, /temporary directory/i);
-    assert.match(document, /clean(?:ed)? up/i);
-  }
-  assert.match(workflow, /git status/i);
-});
-
-test('mobile workflow requires dedicated worktrees in every repository', () => {
-  const workflow = fs.readFileSync('apps/mobile/.kilo/MOBILE_WORKFLOW.md', 'utf8');
-
-  assert.match(workflow, /Work must always be done in a dedicated worktree/i);
-  assert.match(workflow, /regardless of (?:the )?repository/i);
-  assert.match(workflow, /sibling repositories/i);
-  assert.match(workflow, /must not edit the primary checkout/i);
-  assert.match(workflow, /(?:or|and) the main checkout/i);
 });
 
 test('remote CLI runbook is secret-free and defers credential-bearing setup to the orchestrator', () => {

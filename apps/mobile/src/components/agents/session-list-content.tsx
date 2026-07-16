@@ -1,8 +1,9 @@
-import { Bot, Plus, Search, SearchX } from 'lucide-react-native';
+import { Search, X } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   RefreshControl,
   SectionList,
   TextInput,
@@ -13,10 +14,12 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type SessionItem, type SessionSection } from '@/components/agents/session-list-helpers';
+import {
+  AgentSessionFilteredEmptyState,
+  AgentSessionListEmptyState,
+} from '@/components/agents/session-list-empty-states';
 import { RemoteSessionRow, StoredSessionRow } from '@/components/agents/session-row';
-import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -45,6 +48,13 @@ type AgentSessionListContentProps = {
   hasActiveQuery: boolean;
   isSearching: boolean;
   onClearQuery: () => void;
+  /**
+   * Narrow clear path used by the in-field X: resets the debounced
+   * search query (and the local `hasText` flag) WITHOUT touching the
+   * persisted platform/project narrowing filters. The broad
+   * `onClearQuery` path keeps owning that.
+   */
+  onClearSearchOnly: () => void;
   onCreateSession: () => void;
   sortBy: AgentSessionSortBy;
 };
@@ -65,6 +75,7 @@ export function AgentSessionListContent({
   hasActiveQuery,
   isSearching,
   onClearQuery,
+  onClearSearchOnly,
   onCreateSession,
   sortBy,
 }: Readonly<AgentSessionListContentProps>) {
@@ -74,14 +85,44 @@ export function AgentSessionListContent({
   const { deleteSession, renameSession } = useSessionMutations();
   const [refreshing, setRefreshing] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
+  // Tracks whether the uncontrolled TextInput currently has visible
+  // text — the iOS search-field X is only rendered while this is true.
+  // Derived locally from `onChangeText`; the TextInput itself stays
+  // uncontrolled per the iOS TextInput rule (controlled `value` races
+  // with native keystrokes on iOS).
+  const [hasText, setHasText] = useState(false);
 
   // The search TextInput is uncontrolled (see iOS TextInput rules — controlled
   // `value` causes keystroke races), so clearing the query in state alone
   // wouldn't clear what's visibly typed. Imperatively clear the input too.
+  //
+  // Broad path used by the empty-state "Clear search" / "Clear filters"
+  // CTAs: the screen's `onClearQuery` ALSO resets the persisted
+  // platform/project narrowing filters, which is why the X has its own
+  // narrower handler below.
   const handleClearQuery = useCallback(() => {
     searchInputRef.current?.clear();
+    setHasText(false);
     onClearQuery();
   }, [onClearQuery]);
+
+  // Narrow path used by the in-field X: clears the input, dismisses
+  // the keyboard, and resets the local `hasText` flag so the X
+  // disappears — all without touching the persisted narrowing filters.
+  const handleClearSearchOnly = useCallback(() => {
+    searchInputRef.current?.clear();
+    searchInputRef.current?.blur();
+    setHasText(false);
+    onClearSearchOnly();
+  }, [onClearSearchOnly]);
+
+  const handleSearchInputChange = useCallback(
+    (text: string) => {
+      setHasText(text.length > 0);
+      onSearchChange(text);
+    },
+    [onSearchChange]
+  );
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
@@ -103,11 +144,22 @@ export function AgentSessionListContent({
             className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
             placeholder="Search sessions..."
             placeholderTextColor={colors.mutedForeground}
-            onChangeText={onSearchChange}
+            onChangeText={handleSearchInputChange}
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {hasText ? (
+            <Pressable
+              onPress={handleClearSearchOnly}
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+              hitSlop={12}
+              className="active:opacity-70"
+            >
+              <X size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ) : null}
         </View>
         {isSearchPending ? (
           <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
@@ -124,64 +176,14 @@ export function AgentSessionListContent({
         ) : null}
       </View>
     ),
-    [colors.mutedForeground, showInlineError, isSearchPending, onSearchChange]
-  );
-
-  const emptyStateAction = useMemo(
-    () => (
-      <Button variant="outline" onPress={onCreateSession}>
-        <Plus size={16} color={colors.foreground} />
-        <Text>New coding task</Text>
-      </Button>
-    ),
-    [colors.foreground, onCreateSession]
-  );
-
-  const clearQueryAction = useMemo(
-    () => (
-      <Button variant="outline" onPress={handleClearQuery}>
-        <Text>{isSearching ? 'Clear search' : 'Clear filters'}</Text>
-      </Button>
-    ),
-    [handleClearQuery, isSearching]
-  );
-
-  // Only reachable when `hasAnySessions` is true (the true first-use empty
-  // state is handled separately below), which means an active search or
-  // filter narrowed the results to zero matches — never show the "create a
-  // task" CTA here, it's not the fix for a filter that's too narrow.
-  const filteredEmptyComponent = useMemo(
-    () => (
-      <View className="items-center justify-center pt-16">
-        <EmptyState
-          icon={SearchX}
-          title="No sessions match"
-          description={
-            isSearching ? 'Try a different search term.' : 'Try adjusting or clearing your filters.'
-          }
-          action={clearQueryAction}
-        />
-      </View>
-    ),
-    [clearQueryAction, isSearching]
-  );
-
-  // The query in error produced no rows to show — surface a retry for it
-  // (search or list, whichever `onRetry` targets) instead of pretending the
-  // empty result is a real "no matches".
-  const queryErrorEmptyComponent = useMemo(
-    () => (
-      <View className="items-center gap-4 pt-16">
-        <QueryError
-          placement="top"
-          className="pt-0"
-          message={isSearching ? 'Could not search sessions' : 'Could not load sessions'}
-          onRetry={onRetry}
-        />
-        {clearQueryAction}
-      </View>
-    ),
-    [clearQueryAction, isSearching, onRetry]
+    [
+      colors.mutedForeground,
+      handleClearSearchOnly,
+      handleSearchInputChange,
+      hasText,
+      isSearchPending,
+      showInlineError,
+    ]
   );
 
   const organizationIdBySessionId = useMemo(
@@ -283,22 +285,24 @@ export function AgentSessionListContent({
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center"
+        className="flex-1"
         style={tabBarClearanceStyle}
       >
-        <EmptyState
-          icon={Bot}
-          title="No sessions yet"
-          description="Start a coding task from your phone. Your sessions will appear here."
-          action={emptyStateAction}
-        />
+        <AgentSessionListEmptyState onCreateSession={onCreateSession} />
       </Animated.View>
     );
   }
 
   let emptyComponent = null;
   if (hasActiveQuery) {
-    emptyComponent = isError ? queryErrorEmptyComponent : filteredEmptyComponent;
+    emptyComponent = (
+      <AgentSessionFilteredEmptyState
+        variant={isError ? 'queryError' : 'filtered'}
+        isSearching={isSearching}
+        onClearQuery={handleClearQuery}
+        onRetry={onRetry}
+      />
+    );
   }
 
   return (

@@ -82,6 +82,17 @@ describe('chat link actions', () => {
     expect(mockedShare).not.toHaveBeenCalled();
   });
 
+  it('treats a false clipboard result as a retryable failure', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(false);
+
+    await performChatLinkAction('copy', 'https://kilo.ai/docs');
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Could not copy link', {
+      action: { label: 'Try again', onClick: expect.any(Function) },
+    });
+  });
+
   it('shares the exact URL without treating dismissal as failure', async () => {
     mockedShare.mockResolvedValue({ action: Share.dismissedAction });
 

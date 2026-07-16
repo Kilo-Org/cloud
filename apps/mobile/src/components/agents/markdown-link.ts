@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { type AccessibilityActionInfo } from 'react-native';
+import { type AccessibilityActionInfo, type GestureResponderEvent } from 'react-native';
 
 const URL_HOST_PATTERN = /^[a-z][a-z\d+.-]*:\/\/([^/?#]+)/i;
 
@@ -28,4 +28,15 @@ export function getLinkAccessibilityActions(
   enabled: boolean
 ): AccessibilityActionInfo[] | undefined {
   return enabled ? [{ name: 'showLinkActions', label: 'Show link actions' }] : undefined;
+}
+
+export function getLinkLongPressHandler(
+  onLongPressLink: ((href: string, event?: GestureResponderEvent) => void) | undefined,
+  href: string
+): ((event: GestureResponderEvent) => void) | undefined {
+  return onLongPressLink
+    ? event => {
+        onLongPressLink(href, event);
+      }
+    : undefined;
 }

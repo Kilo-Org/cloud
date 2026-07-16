@@ -15,6 +15,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import {
   getLinkAccessibilityActions,
+  getLinkLongPressHandler,
   LINK_ACCESSIBILITY_HINT,
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
@@ -125,9 +126,7 @@ class MarkdownRenderer extends Renderer {
             this.onLongPressLink?.(href);
           }
         }}
-        onLongPress={event => {
-          this.onLongPressLink?.(href, event);
-        }}
+        onLongPress={getLinkLongPressHandler(this.onLongPressLink, href)}
         onPress={() => {
           void openExternalUrl(href, { label: accessibilityLabel });
         }}

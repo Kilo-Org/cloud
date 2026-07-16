@@ -55,7 +55,10 @@ export async function performChatLinkAction(action: ChatLinkAction, href: string
 
   if (action === 'copy') {
     try {
-      await Clipboard.setStringAsync(href);
+      const copied = await Clipboard.setStringAsync(href);
+      if (!copied) {
+        throw new Error('Clipboard rejected link');
+      }
       toast.success('Link copied');
     } catch {
       showRetryableError('Could not copy link', async () => {

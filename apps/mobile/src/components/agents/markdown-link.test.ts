@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getLinkAccessibilityActions,
+  getLinkLongPressHandler,
   LINK_ACCESSIBILITY_HINT,
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
+
+const onLongPressLink = () => undefined;
 
 describe('resolveLinkAccessibilityLabel', () => {
   it('prefers an explicit title', () => {
@@ -40,5 +43,10 @@ describe('link action accessibility', () => {
     expect(getLinkAccessibilityActions(true)).toEqual([
       { name: 'showLinkActions', label: 'Show link actions' },
     ]);
+  });
+
+  it('attaches a long-press handler only when chat link actions are enabled', () => {
+    expect(getLinkLongPressHandler(undefined, 'https://kilo.ai')).toBeUndefined();
+    expect(getLinkLongPressHandler(onLongPressLink, 'https://kilo.ai')).toBeTypeOf('function');
   });
 });

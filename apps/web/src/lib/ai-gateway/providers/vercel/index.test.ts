@@ -1,5 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import {
+  applyVercelSettings,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
@@ -102,6 +103,27 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
         'bedrock',
       ])
     ).toEqual([]);
+  });
+});
+
+describe('applyVercelSettings', () => {
+  it('emits only non-ignored providers in the Vercel gateway options', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: {
+          only: ['anthropic', 'amazon-bedrock'],
+          ignore: ['amazon-bedrock'],
+        },
+      },
+    };
+
+    applyVercelSettings('anthropic/claude-sonnet-4.5', request, null);
+
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
+    expect(request.body.provider).toBeUndefined();
   });
 });
 

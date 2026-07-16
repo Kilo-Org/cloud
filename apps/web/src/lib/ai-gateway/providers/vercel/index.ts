@@ -145,9 +145,12 @@ export async function shouldRouteToVercel(
 
 function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig {
   const provider = requestToMutate.body.provider;
+  const ignored = new Set(provider?.ignore?.map(openRouterToVercelInferenceProviderId));
   return {
     gateway: {
-      only: provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
+      only: provider?.only
+        ?.map(openRouterToVercelInferenceProviderId)
+        .filter(providerId => !ignored.has(providerId)),
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,

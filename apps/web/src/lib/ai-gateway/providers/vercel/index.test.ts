@@ -1,6 +1,6 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import {
-  applyVercelSettings,
+  convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
@@ -8,16 +8,6 @@ import {
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getCachedVercelInferenceProviderIdsForModel } from '@/lib/ai-gateway/providers/gateway-models-cache';
-
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
-  getVercelModelsFromRedis: jest.fn(),
-}));
-
-const mockGetCachedVercelInferenceProviderIdsForModel = jest.mocked(
-  getCachedVercelInferenceProviderIdsForModel
-);
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
@@ -116,13 +106,8 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
   });
 });
 
-describe('applyVercelSettings', () => {
-  it('emits only available non-ignored providers without changing provider.only', async () => {
-    mockGetCachedVercelInferenceProviderIdsForModel.mockResolvedValue([
-      'anthropic',
-      'bedrock',
-      'vertex',
-    ]);
+describe('convertProviderOptions', () => {
+  it('emits only available non-ignored providers without changing provider.only', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
@@ -136,12 +121,10 @@ describe('applyVercelSettings', () => {
     };
 
     const provider = request.body.provider;
+    const providerOptions = convertProviderOptions(request, ['anthropic', 'bedrock', 'vertex']);
 
-    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, null);
-
-    expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
+    expect(providerOptions.gateway?.only).toEqual(['anthropic']);
     expect(provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
-    expect(request.body.provider).toBeUndefined();
   });
 });
 

@@ -52,7 +52,8 @@ export function groupAgentSessionsByDate<T extends SessionTimestamps>(
   // Defensive: tolerate callers (e.g. older call sites) that pass an unknown
   // string here, the same way parseAgentSessionSortBy would have.
   const resolvedSort = parseAgentSessionSortBy(sortBy);
-  const sorted = [...sessions].toSorted(
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread already prevents mutation of the source
+  const sorted = [...sessions].sort(
     (a, b) => timestampMs(b, resolvedSort) - timestampMs(a, resolvedSort)
   );
 

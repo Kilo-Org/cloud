@@ -16,7 +16,7 @@ import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
+import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
@@ -120,7 +120,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (isDeepseekModel(model) || isGlmModel(model)) {
     return REASONING_VARIANTS_NONE_HIGH_XHIGH;
   }
-  if (model === muse_spark_1_1_model.public_id) {
+  if (isMuseModel(model)) {
     return REASONING_VARIANTS_NONE_MINIMAL_LOW_MEDIUM_HIGH;
   }
   return undefined;
@@ -148,7 +148,7 @@ export function getAiSdkProvider(
   ) {
     return 'anthropic';
   }
-  if (isOpenAiModel(model) || isGrokModel(model) || model === muse_spark_1_1_model.public_id) {
+  if (isOpenAiModel(model) || isGrokModel(model) || isMuseModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';

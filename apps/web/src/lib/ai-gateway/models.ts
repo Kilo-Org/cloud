@@ -28,7 +28,6 @@ import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
-import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
 import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import {
@@ -86,7 +85,6 @@ export const kiloExclusiveModels = [
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_stealth_model,
-  muse_spark_1_1_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

@@ -99,10 +99,6 @@ describe('mapModelIdToVercel', () => {
   });
 
   describe('kilo-exclusive models', () => {
-    it('maps a Vercel-exclusive model to its internal id', () => {
-      expect(mapModelIdToVercel('meta/muse-spark-1.1')).toBe('meta/muse-spark-1.1');
-    });
-
     it('maps an exclusive flagged with vercel-routing to its internal id', () => {
       // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
       // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.

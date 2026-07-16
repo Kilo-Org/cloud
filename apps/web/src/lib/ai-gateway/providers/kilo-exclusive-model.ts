@@ -187,9 +187,6 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   if (model.flags.includes('stealth')) {
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
   }
-  if (model.public_id.includes('muse-')) {
-    return { slug: 'meta', name: 'Meta', training: false, retainsPrompts: true };
-  }
   if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
     return null;
   }

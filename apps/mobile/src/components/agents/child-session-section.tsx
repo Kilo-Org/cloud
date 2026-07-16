@@ -8,8 +8,16 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import {
+  type ChildSessionCardState,
+  getChildSessionActivityLabel,
+  getChildSessionCardState,
+  getTaskToolSessionId,
+} from './child-session-card-state';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { isToolPart } from './part-types';
+
+export { getTaskToolSessionId } from './child-session-card-state';
 
 const MAX_NESTING_DEPTH = 5;
 
@@ -27,78 +35,6 @@ type ChildSessionSectionProps = {
   onOpenChildSession: OpenChildSession;
 };
 
-function getStringProperty(obj: unknown, key: string): string | undefined {
-  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
-    return undefined;
-  }
-  const value = (obj as Record<string, unknown>)[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
-export function getTaskToolSessionId(part: ToolPart): KiloSessionId | undefined {
-  if (part.tool !== 'task') {
-    return undefined;
-  }
-  const { state } = part;
-  if (state.status === 'running' || state.status === 'completed') {
-    return getStringProperty(state.metadata, 'sessionId') as KiloSessionId | undefined;
-  }
-  return undefined;
-}
-
-function findRunningToolInMessage(
-  msg: StoredMessage
-): { tool: string; context?: string } | undefined {
-  for (let j = msg.parts.length - 1; j >= 0; j -= 1) {
-    const p = msg.parts[j];
-    if (p && isToolPart(p) && (p.state.status === 'running' || p.state.status === 'pending')) {
-      return { tool: p.tool, context: getToolContext(p) };
-    }
-  }
-  return undefined;
-}
-
-function getCurrentRunningTool(
-  messages: StoredMessage[]
-): { tool: string; context?: string } | undefined {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const msg = messages[i];
-    if (msg?.info.role === 'assistant') {
-      const result = findRunningToolInMessage(msg);
-      if (result) {
-        return result;
-      }
-    }
-  }
-  return undefined;
-}
-
-function getToolContext(p: ToolPart): string | undefined {
-  const input = p.state.input;
-
-  if (p.tool === 'read' || p.tool === 'edit' || p.tool === 'write') {
-    const filePath = getStringProperty(input, 'filePath');
-    return filePath ? filePath.split('/').pop() : undefined;
-  }
-  if (p.tool === 'bash') {
-    const command = getStringProperty(input, 'command');
-    if (!command) {
-      return undefined;
-    }
-    const firstWord = command.split(/\s+/)[0];
-    return firstWord && firstWord.length > 20 ? `${firstWord.slice(0, 20)}…` : firstWord;
-  }
-  if (p.tool === 'glob' || p.tool === 'grep') {
-    const pattern = getStringProperty(input, 'pattern');
-    return pattern && pattern.length > 25 ? `${pattern.slice(0, 25)}…` : pattern;
-  }
-  if (p.tool === 'task') {
-    const description = getStringProperty(input, 'description');
-    return description && description.length > 30 ? `${description.slice(0, 30)}…` : description;
-  }
-  return undefined;
-}
-
 export function ChildSessionSection({
   part,
   childMessages,
@@ -106,14 +42,15 @@ export function ChildSessionSection({
 }: Readonly<ChildSessionSectionProps>) {
   const colors = useThemeColors();
 
-  const description = getStringProperty(part.state.input, 'description');
-  const prompt = getStringProperty(part.state.input, 'prompt');
-  const subtitle = description ?? (prompt ? truncateText(prompt, 60) : 'task');
+  const { agentName, taskName, latestActivity }: ChildSessionCardState = getChildSessionCardState(
+    part,
+    childMessages
+  );
+  const latestActivityLabel = getChildSessionActivityLabel(latestActivity);
+
   const { status } = part.state;
   const isRunning = status === 'running' || status === 'pending';
   const sessionId = getTaskToolSessionId(part);
-
-  const currentTool = isRunning ? getCurrentRunningTool(childMessages) : undefined;
 
   const borderColor = getStatusBorderColor(status, colors);
 
@@ -128,12 +65,12 @@ export function ChildSessionSection({
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
         onPress={() => {
           if (sessionId) {
-            onOpenChildSession(sessionId, subtitle);
+            onOpenChildSession(sessionId, taskName);
           }
         }}
         disabled={!sessionId}
         accessibilityRole="button"
-        accessibilityLabel={`${subtitle}, ${status}`}
+        accessibilityLabel={`${agentName}, ${taskName}, ${latestActivityLabel}, ${status}`}
         accessibilityHint={sessionId ? 'Open subagent session' : undefined}
         accessibilityState={{ disabled: !sessionId }}
       >
@@ -146,21 +83,22 @@ export function ChildSessionSection({
         )}
 
         <View className="flex-1">
-          <Text className="text-sm text-foreground" numberOfLines={1}>
-            {subtitle}
+          <Text className="text-xs leading-4 text-agent-sky" numberOfLines={1}>
+            {agentName}
           </Text>
-          {isRunning ? (
-            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
-              {currentTool ? (
-                <>
-                  <Text className="text-xs leading-4 text-agent-sky">{currentTool.tool}</Text>
-                  {currentTool.context ? ` ${currentTool.context}` : ''}
-                </>
-              ) : (
-                ' '
-              )}
-            </Text>
-          ) : null}
+          <Text className="text-sm leading-5 text-foreground" numberOfLines={1}>
+            {taskName}
+          </Text>
+          <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+            {latestActivity === 'Waiting for activity' ? (
+              latestActivity
+            ) : (
+              <>
+                <Text className="text-xs leading-4 text-agent-sky">{latestActivity.tool}</Text>
+                {latestActivity.context ? ` ${latestActivity.context}` : ''}
+              </>
+            )}
+          </Text>
         </View>
 
         <StatusBadge status={status} />
@@ -252,8 +190,4 @@ function getStatusTextClass(status: string): string {
     return 'text-destructive';
   }
   return 'text-info';
-}
-
-function truncateText(text: string, maxLength: number): string {
-  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }

@@ -6,8 +6,6 @@ import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrout
 import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { filterByFeature } from '@/lib/ai-gateway/models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
@@ -27,9 +25,8 @@ async function tryGetUserFromAuth() {
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
 export async function GET(
-  request: NextRequest
+  _request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId
@@ -38,7 +35,7 @@ export async function GET(
     if (result) {
       return NextResponse.json({
         ...result,
-        data: await addAutoRoutingModels(filterByFeature(result.data, feature)),
+        data: await addAutoRoutingModels(result.data),
       });
     }
 
@@ -46,11 +43,11 @@ export async function GET(
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
-    const models = await addAutoRoutingModels(filterByFeature(data.data, feature));
+    const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
       const experimentModels = await listAvailableExperimentModels();
       return NextResponse.json({
-        data: models.concat(filterByFeature(experimentModels, feature)),
+        data: models.concat(experimentModels),
       });
     }
 
@@ -64,10 +61,7 @@ export async function GET(
       enabledByokProviderIds
     );
     return NextResponse.json({
-      data: modelsWithByokAvailability.concat(
-        filterByFeature(byokModels, feature),
-        filterByFeature(experimentModels, feature)
-      ),
+      data: modelsWithByokAvailability.concat(byokModels, experimentModels),
     });
   } catch (error) {
     captureException(error, {

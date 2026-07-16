@@ -1,17 +1,17 @@
 # Mobile E2E Runbook
 
-Use this runbook for interactive verification against a local backend. Commands run from the repository root unless a step says otherwise. The repository dev runner keeps long-lived services in a worktree-specific tmux session; use it instead of loose background processes.
+Use this runbook for interactive verification against a local backend. Run commands from the repository root unless a step says otherwise. The repository dev runner keeps long-lived services in a worktree-specific tmux session; use it instead of loose background processes.
 
 ## Fresh Worktree Quickstart
 
-If dependencies or local env files are missing, run this once. This also authorizes both worktree `.envrc` files and copies local env files from the primary checkout:
+If dependencies or local env files are missing, run this once. It authorizes both worktree `.envrc` files and copies local env files from the primary checkout:
 
 ```bash
 node --version # must be v24; activate the root .nvmrc first if needed
 pnpm dev:worktree:prepare
 ```
 
-Record pre-existing state so you clean up only resources you create:
+Record pre-existing state so you later clean up only resources you created:
 
 ```bash
 pnpm dev:status --json
@@ -21,9 +21,9 @@ xcrun simctl list devices booted
 
 Reuse a complete stack already running for this worktree. Do not start a competing stack or stop an unrelated `kilo-dev-*` session.
 
-The sole intentional host-wide proxy exception is port `23750`. The repository-managed `kiloclaw-docker-tcp` service on that port is the sole intentional host-wide exception: it is a stateless loopback proxy to the same Docker socket. The runner reuses an occupied proxy. Never kill a `socat` process owned by another worktree to free this port.
+Port `23750` is the sole intentional host-wide exception: the repository-managed `kiloclaw-docker-tcp` service is a stateless loopback proxy to the shared Docker socket, and the runner reuses it when the port is occupied. Never kill a `socat` process owned by another worktree to free this port.
 
-When this worktree has no stack, start the complete mobile flow. Secondary worktrees automatically receive an isolated port offset, and mobile startup generates and explicitly injects this worktree's LAN URLs before Metro starts. Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale parent-shell values must not select the bundle endpoints:
+When this worktree has no stack, start the complete mobile flow. Secondary worktrees automatically receive an isolated port offset, and mobile startup generates and injects this worktree's LAN URLs before Metro starts. Do not export `KILO_PORT_OFFSET` or source `apps/mobile/.env`; stale parent-shell values must not select the bundle endpoints:
 
 ```bash
 pnpm dev:env -y cloudflare-session-ingest
@@ -32,23 +32,25 @@ pnpm drizzle migrate
 pnpm dev:status --json
 ```
 
-The session-ingest env step creates the JWT Secrets Store binding; without it the worker can appear healthy while rejecting every session request. `event-service` is required for presence and notification behavior.
+Notes:
 
-Secrets Store state is local to each Worker directory. `dev:start` runs env sync for its selected service graph and refreshes every source-backed secret before launching Workers; secret creation failures are fatal. Do not run bare `wrangler secrets-store` commands: use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source and Wrangler receives a complete non-interactive prompt.
-
-Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are `up`. Restarts are asynchronous; if `mobile` is still starting, inspect its log and rerun status instead of restarting the stack. Use reported ports; never assume defaults in a secondary worktree.
+- The `dev:env` step creates the JWT Secrets Store binding. Without it the session-ingest worker looks healthy while rejecting every session request.
+- `event-service` is required for presence and notification behavior.
+- Secrets Store state is local to each Worker directory. `dev:start` syncs env for its service graph and refreshes every source-backed secret before launching Workers; a secret creation failure is fatal.
+- Never run bare `wrangler secrets-store` commands. Use `pnpm dev:env -y <group>` from the repository root so values come from the canonical local source and Wrangler gets a complete non-interactive prompt.
+- Confirm `mobile`, `nextjs`, `cloudflare-session-ingest`, `cloud-agent-next`, `kiloclaw`, and `event-service` are `up`. Restarts are asynchronous: if `mobile` is still starting, inspect its log and rerun status instead of restarting the stack.
+- Use the ports reported by `dev:status`; never assume defaults in a secondary worktree.
 
 ### Host Networking Safety
 
-You must never map port `8081` or another shared host port to a worktree Metro port. Except for the repository-managed `23750` proxy above, do not create ad hoc proxies, redirects, tunnels, NAT rules, or listeners to repair stale Expo state.
-
-After an exact development-client URL reconnect fails, perform at most one supported recovery through the existing preflight and launch flow. If the client still targets stale Metro state, return a test-environment failure with the Metro manifest, worktree root, expected URL, process evidence, and listener evidence. Do not route around bundle-provenance validation.
-
-When an unexpected listener exists, report its PID, parent PID, command, bind address, and port. Stop it only when the current invocation can prove it created the process. Otherwise return the ownership evidence to the orchestrator.
+- Never map port `8081` or any other shared host port to a worktree Metro port.
+- Except for the `23750` proxy above, never create ad hoc proxies, redirects, tunnels, NAT rules, or listeners to repair stale Expo state.
+- If an exact development-client URL reconnect fails, perform at most one supported recovery through the existing preflight and launch flow. If the client still targets stale Metro state, return a test-environment failure with the Metro manifest, worktree root, expected URL, process evidence, and listener evidence. Do not route around bundle-provenance validation.
+- If an unexpected listener exists, report its PID, parent PID, command, bind address, and port. Stop it only when you can prove the current invocation created it; otherwise return the ownership evidence to the orchestrator.
 
 ## Logs and tmux
 
-Prefer the stable log files. When pane output is required, let the runner find the service wherever the dashboard moved it:
+Prefer the stable log files, and let the runner locate a service pane wherever the dashboard moved it:
 
 ```bash
 pnpm dev:status --json
@@ -56,57 +58,58 @@ tail -n 200 dev/logs/<service>.log
 pnpm dev:capture mobile
 ```
 
-Do not guess a tmux window from `tmux ls` or use `<session>:<service>` directly; a service pane can be joined into the dashboard and no longer have a same-named window. Use `pnpm dev:capture <service>` for inspection. Use raw tmux only for an interactive process after reading the exact `session` from `pnpm dev:status --json` and resolving the pane with `tmux list-panes -a`.
-
-```bash
-tmux ls
-tmux list-windows -t <dev-session>
-```
-
-Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.
-
-E2E fixtures must never be committed. When a flow needs generated fixture files, create them in a temporary directory such as one returned by `mktemp -d`, run the flow against that directory, and ensure the fixtures and temporary directory are cleaned up before finishing.
+- Never guess a tmux window from `tmux ls` or address `<session>:<service>` directly; a service pane may be joined into the dashboard with no same-named window. Use `pnpm dev:capture <service>` for inspection.
+- Use raw tmux only for an interactive process, after reading the exact `session` from `pnpm dev:status --json` and resolving the pane with `tmux list-panes -a`.
+- Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.
+- E2E fixtures must never be committed. Create generated fixtures in a temporary directory (`mktemp -d`), run the flow against it, and delete it before finishing.
 
 ## iOS Simulator
 
-Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the command prefers an unclaimed shutdown device and boots it. A prewarm verifier uses `--phase prewarm`; the fresh acceptance verifier reclaims the same worktree-owned device with `--phase verify`:
+Never share a simulator with another worktree. Claim one before any build, install, login, Maestro, or MCP action; the claim command prefers an unclaimed shutdown iPhone and boots it. A prewarm verifier uses `--phase prewarm`; the fresh acceptance verifier reclaims the same worktree-owned device with `--phase verify`:
 
 ```bash
 pnpm dev:mobile:simulator claim [udid] --phase prewarm
 pnpm dev:mobile:simulator claim [udid] --phase verify
 ```
 
-The wrapper visibly renames a claimed device to `Kilo E2E - <sanitized-worktree-basename> - <phase>`. Verifiers must not call `xcrun simctl rename` directly. Releasing an owned claim restores the original simulator name before removing the claim.
+The wrapper visibly renames a claimed device to `Kilo E2E - <sanitized-worktree-basename> - <phase>` and restores the original simulator name on release. Never call `xcrun simctl rename` directly.
 
-Install a validated cached native build. A compatible fingerprint avoids rebuilding; a cache miss is serialized through the host-wide native compiler semaphore:
+Install a validated cached native build. A compatible fingerprint skips rebuilding; a cache miss is serialized through the host-wide native compiler semaphore. Do not consume an arbitrary DerivedData app or run a separate Expo native build:
 
 ```bash
 pnpm dev:mobile:ios build <udid>
 ```
 
-Do not consume an arbitrary DerivedData app or run a separate Expo native build. Connect the validated app to the Metro URL shown by this worktree's `mobile` pane:
+Connect the app to the Metro URL shown by this worktree's `mobile` pane:
 
 ```bash
 xcrun simctl openurl <udid> \
   "exp+kilo-app://expo-development-client/?url=http%3A%2F%2F<lan-ip>%3A<metro-port>"
 ```
 
-Prefer `xcrun simctl openurl` for low-level scheme reconnection to avoid Safari's external-app confirmation. If an acceptance flow intentionally follows the scheme through Safari or a WebView, inspect the hierarchy for the exact message `Open this page in "Kilo"?`, then tap the exact `Open` accessibility action. This is one bounded optional prompt within the existing five-second optional-prompt budget, not permission to add another fixed wait.
+Prefer `xcrun simctl openurl` for scheme reconnection: it avoids Safari's external-app confirmation. When an acceptance flow intentionally goes through Safari or a WebView, inspect the hierarchy for the exact message `Open this page in "Kilo"?` and tap the exact `Open` accessibility action. This is one bounded optional prompt inside the existing five-second optional-prompt budget, not permission to add another fixed wait.
 
-Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen alone does not prove bundle provenance. The login preflight also reads Metro's development manifest and verifies `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. These endpoint extras come from the Metro manifest in a dev client; after env changes, regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config/plugins changed. The shared launch flows dismiss the clean-install tracking alert, accept the Expo dev-menu introduction with `Continue`, and then close the full Expo/React Native developer menu containing Fast Refresh and Element Inspector with its `Close` accessibility action.
+Before testing, capture the `mobile` pane and verify `Starting project at <this-worktree>/apps/mobile` plus a fresh `iOS Bundled` line. Seeing the Kilo login screen does not prove bundle provenance. The login preflight additionally reads Metro's development manifest and checks `expoConfig.extra.apiBaseUrl` and `_internal.projectRoot` against this worktree. A dev client gets these extras from the Metro manifest, so after env changes: regenerate env, restart Metro, reconnect the dev client to the exact Metro URL, and reload. Rebuild only when native config or plugins changed.
+
+The shared launch flows dismiss the clean-install tracking alert, accept the Expo dev-menu introduction with `Continue`, and close the full Expo/React Native developer menu (the one containing Fast Refresh and Element Inspector) with its `Close` accessibility action.
 
 ## Sign In and Out
 
-Backend and Metro must be running. These idempotent wrappers first verify simulator ownership, this worktree's required services, generated API port, and Metro project provenance, then reconnect the dev client to that exact Metro URL before launch. Do not bypass their preflight or call the YAML login steps directly:
+Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Maestro runs. Never bypass their preflight or call the YAML login steps directly:
 
 ```bash
 apps/mobile/e2e/login.sh <udid> [email]  # default: e2e-mobile@example.com
 apps/mobile/e2e/logout.sh <udid>
 ```
 
-Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies it, accepts first-account consent, and asserts Home. It retries only the known dev-client launch/request boundary once. The wrappers use preflight to open the exact dev-client URL, then `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app. `flows/open-app.yaml` remains the standalone cold-launch flow.
+Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. It retries only the known dev-client launch/request boundary once. The wrappers open the exact dev-client URL via preflight, then `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app. `flows/open-app.yaml` is the standalone cold-launch flow.
 
-Native prompts are states in the flow, not errors to tap through blindly. The shared launch flow recognizes the iOS tracking prompt (`Allow “Kilo” to track your activity across other companies’ apps and websites?`) and chooses `Ask App Not to Track`; login handles notification permission after authentication. Feature-triggered prompts such as speech recognition and microphone access must be handled only when the acceptance flow reaches that feature: inspect the hierarchy, copy the exact button accessibility text (`Allow` or `Don’t Allow`), and choose the state required by the test. Never use a generic `tapOn: 'Allow'` before identifying which prompt is visible.
+Native prompts are states in the flow, not errors to tap through blindly:
+
+- The shared launch flow answers the iOS tracking prompt (`Allow “Kilo” to track your activity across other companies’ apps and websites?`) with `Ask App Not to Track`.
+- Login handles the notification permission after authentication.
+- Handle feature-triggered prompts (speech recognition, microphone) only when the acceptance flow reaches that feature: inspect the hierarchy, copy the exact button accessibility text (`Allow` or `Don’t Allow`), and choose the state the test requires.
+- Never use a generic `tapOn: 'Allow'` before identifying which prompt is visible.
 
 Maestro can emit a large interactive transcript. For agent-driven runs, keep successful output out of context and show only a bounded failure tail:
 
@@ -119,8 +122,8 @@ apps/mobile/e2e/login.sh <udid> >"$LOGIN_LOG" 2>&1 || \
 When editing the flows, preserve these device-tested constraints:
 
 - Tap the Kilo home-screen icon; Maestro `launchApp` can bounce the Expo dev client to SpringBoard.
-- Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override them in the installed Maestro version.
-- Target the email field by `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
+- Pass `EMAIL` and `OTP` with `-e`; flow-level defaults override `-e` values in the installed Maestro version.
+- Target the email field by its placeholder `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
 - The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
 
 Seed only when needed:
@@ -132,17 +135,14 @@ pnpm dev:seed app:add-credits <user-id> <usd>
 
 ## Maestro
 
-One-time machine setup:
+One-time machine setup: `brew install maestro`. For MCP, use stdio command `maestro mcp`, then restart the agent session so its tools appear.
 
-```bash
-brew install maestro
-```
+Rules:
 
-For MCP use stdio command `maestro mcp`, then restart the agent session so its tools appear. Inspect the screen before selecting elements and re-inspect after UI changes. Never guess a selector from the visible label or screenshot: copy the exact `txt` or `a11y` value from `maestro_inspect_screen`, mapping `a11y` to Maestro `text:`. Maestro text matching is full-string regex, not substring matching.
-
-Use Maestro as the primary iOS automation driver. Fall back to `xcrun simctl` only when Maestro cannot inspect or operate a native state, or when low-level simulator control is required. iOS setup still uses `simctl` for boot, install/uninstall, dev-client URL reconnection, screenshots, shutdown, and cleanup.
-
-Tab buttons are exposed through React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels are `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, and `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before using these examples because tab count or labels can change.
+- Use Maestro as the primary automation driver on both iOS and Android. Fall back to `xcrun simctl` (iOS) or repository-wrapped ADB (Android) only when Maestro cannot inspect or operate a native state, or when low-level device control is required. Setup still uses `simctl`/ADB for boot, install, dev-client URL reconnection, screenshots, shutdown, and cleanup.
+- Inspect the screen before selecting elements and re-inspect after UI changes.
+- Never guess a selector from a visible label or screenshot. Copy the exact `txt` or `a11y` value from `maestro_inspect_screen`, mapping `a11y` to Maestro `text:`. Maestro text matching is full-string regex, not substring matching.
+- Tab buttons expose React Navigation's full accessibility labels, not the visible uppercase text. Current iOS labels: `Home, tab, 1 of 4`, `KiloClaw, tab, 2 of 4`, `Agents, tab, 3 of 4`, `Profile, tab, 4 of 4`. `tapOn: 'Agents'` is wrong. Inspect again before relying on these examples; tab count and labels can change.
 
 CLI fallback:
 
@@ -156,7 +156,9 @@ Attach a screenshot of the changed flow to the PR when it helps review. For tran
 
 ## Remote CLI Session Flows
 
-Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the user's local auth token, installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer-token environment already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands. Reuse the orchestrator-prepared session and verify session discovery and mirroring by inspecting its pane and the mobile list:
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the user's local auth token, installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer token already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands.
+
+Reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 
 ```bash
 CLI_SESSION="kilo-e2e-cli-$(basename "$PWD")"
@@ -165,17 +167,17 @@ tmux list-windows -t "$CLI_SESSION"
 tmux capture-pane -p -t "$CLI_SESSION":cli -S -100
 ```
 
-Drive the orchestrator-prepared session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. The mobile list updates after the CLI WebSocket connects and its first heartbeat (usually about 12 seconds). If the orchestrator has not prepared a session for this worktree, stop and ask the orchestrator to install the CLI, mint a token, and start the session before exercising CLI flows.
+Drive the session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. The mobile list updates after the CLI WebSocket connects and its first heartbeat (about 12 seconds). If no session is prepared for this worktree, stop and ask the orchestrator to install the CLI, mint a token, and start the session.
 
 ## Android Emulator
 
-Do not conclude that Android is unavailable from `command -v adb` or the agent's inherited `PATH`. The repository resolves the SDK and JDK 17 from `ANDROID_HOME`, `~/Library/Android/sdk`, and standard Homebrew locations. Run the doctor first; it prints resolved absolute paths and available AVDs:
+Do not conclude Android is unavailable from `command -v adb` or the inherited `PATH`. The repository resolves the SDK and JDK 17 from `ANDROID_HOME`, `~/Library/Android/sdk`, and standard Homebrew locations. Run the doctor first; it prints resolved absolute paths and available AVDs:
 
 ```bash
 pnpm dev:mobile:android doctor
 ```
 
-Use the wrappers for all Android tooling so the resolved SDK/JDK environment is applied, including the Expo/Gradle build:
+Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied:
 
 ```bash
 ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
@@ -190,7 +192,7 @@ pnpm dev:mobile:android build <serial>
 
 The build command installs a validated cached APK when the Android native fingerprint and toolchain match. Do not install an APK from another output path or invoke Gradle directly.
 
-Use Maestro as the primary Android automation driver, matching iOS. Fall back to repository-wrapped ADB when Maestro cannot inspect or operate a native prompt, when direct intent/process control is required, or when diagnosing the emulator itself. Android setup still uses ADB for readiness and port reversal. Use the repository wrapper rather than bare `adb`:
+ADB fallback commands (Maestro remains the primary driver, as above):
 
 ```bash
 pnpm dev:mobile:android adb devices -l
@@ -202,26 +204,29 @@ pnpm dev:mobile:android adb -s <serial> shell input text '<text>'
 pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 ```
 
-Derive tap coordinates from the current `uiautomator` bounds, not screenshots or remembered positions. Re-dump after every navigation or prompt. Android's `localhost` is the emulator, so restore both `adb reverse` mappings after clearing app data. The dev-client scheme is `exp+kilo-app`. `adb shell pm clear com.kilocode.kiloapp` also forgets the Metro URL, so re-open the dev-client URL afterward with `adb shell am start`.
+Android specifics:
 
-The existing login/logout helpers accept either an iOS simulator UDID or an Android ADB serial. Their shared preflight applies platform-specific device ownership and reconnects the dev client to this worktree before Maestro runs.
+- Derive tap coordinates from the current `uiautomator` bounds, never from screenshots or remembered positions. Re-dump after every navigation or prompt.
+- Android's `localhost` is the emulator itself, so restore both `adb reverse` mappings after clearing app data.
+- The dev-client scheme is `exp+kilo-app`. `adb shell pm clear com.kilocode.kiloapp` also forgets the Metro URL; re-open the dev-client URL afterward with `adb shell am start`.
+- The login/logout helpers accept either an iOS simulator UDID or an Android ADB serial; their shared preflight applies platform-specific ownership checks and reconnects the dev client to this worktree.
 
 ## Cleanup
 
-Clean up only resources you started. The remote CLI session and its disposable install are owned by the orchestrator; do not kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create:
+Clean up only resources you started. The remote CLI session and its disposable install belong to the orchestrator; do not kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create.
 
 ```bash
-tmux kill-session -t "$ANDROID_SESSION"   # if created
-rm -f "$LOGIN_LOG"                        # if created
-pnpm dev:stop                              # only if you started this worktree's stack
-xcrun simctl shutdown <udid>               # only if you booted it
-pnpm dev:mobile:simulator release <udid>    # release every simulator you claimed
+tmux kill-session -t "$ANDROID_SESSION"      # if created
+rm -f "$LOGIN_LOG"                           # if created
+pnpm dev:stop                                # only if you started this worktree's stack
+xcrun simctl shutdown <udid>                 # only if you booted it
+pnpm dev:mobile:simulator release <udid>     # release every simulator you claimed
 pnpm dev:mobile:android release <serial>     # release every Android device you claimed
 ```
 
-Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill unrelated `kilo-dev-*` sessions, stop a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.
+Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, shut down a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.
 
-Verify cleanup:
+Verify cleanup, and confirm no generated E2E fixtures remain tracked or untracked:
 
 ```bash
 pnpm dev:status --json
@@ -229,5 +234,3 @@ tmux ls
 xcrun simctl list devices booted
 git status --short
 ```
-
-Confirm no generated E2E fixtures remain tracked or untracked in the repository.

@@ -130,6 +130,15 @@ export type GetCloudAgentRootSessionSnapshotResult = CloudAgentRootSessionSnapsh
 
 export const MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE = 100;
 
+/**
+ * Default page size for the generic `getSessionMessages` endpoint. Mobile
+ * clients walk history one bounded page at a time without specifying a limit
+ * most of the time; this default is applied at every layer (contract, HTTP,
+ * tRPC) BEFORE the request reaches the DO so the bounded reader never falls
+ * back to the legacy unbounded scan.
+ */
+export const DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE = 50;
+
 export const listCloudAgentRootSessionsSchema = z.object({
   kiloUserId: z.string().min(1),
   limit: z.number().int().min(1).max(100).optional().default(100),
@@ -634,6 +643,50 @@ export type CloudAgentRootSessionMessages = {
 };
 export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessages | null;
 
+/**
+ * Generic authorized paginated history request used by `cliSessionsV2` for any
+ * Kilo session (root cloud-agent, child, or remote CLI) the user owns and
+ * still has organization access to. Reuses the existing opaque cursor and
+ * bounded DO reader so the new method is byte-identical to
+ * `getCloudAgentRootSessionMessages` aside from the access-check boundary.
+ *
+ * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and must be
+ * a positive integer; the schema applies `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE`
+ * (50) when omitted so the request is always bounded before reaching the DO.
+ * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
+ * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
+ * `before` requires a positive `limit`; the default guarantees this unless
+ * the caller explicitly supplies a non-positive `limit`.
+ */
+export const getSessionMessagesSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    kiloSessionId: sessionIdSchema,
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
+    before: z.string().min(1).optional(),
+  })
+  .superRefine((params, ctx) => {
+    if (params.before === undefined) return;
+    if (!validateKiloSdkMessagesCursor(params.before)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['before'],
+        message: 'before is not a valid message cursor',
+      });
+    }
+  });
+export type GetSessionMessagesParams = z.input<typeof getSessionMessagesSchema>;
+export type AuthorizedSessionMessages = {
+  kiloSessionId: string;
+  history: KiloSdkMessageHistory | null;
+};
+export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
+
 export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (params: CreateSessionForCloudAgentParams) => Promise<void>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
@@ -649,4 +702,5 @@ export type SessionIngestRpcMethods = {
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;
+  getSessionMessages: (params: GetSessionMessagesParams) => Promise<GetSessionMessagesResult>;
 };

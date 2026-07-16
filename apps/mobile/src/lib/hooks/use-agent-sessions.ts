@@ -2,8 +2,17 @@ import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import {
+  buildAgentSessionListInput,
+  buildAgentSessionSearchInput,
+} from '@/lib/agent-session-input';
+import { groupAgentSessionsByDate } from '@/lib/agent-session-groups';
+import {
+  type AgentSessionSortBy,
+  DEFAULT_AGENT_SESSION_SORT,
+  parseAgentSessionSortBy,
+} from '@/lib/agent-session-sort';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp } from '@/lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -13,22 +22,33 @@ export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'
 
 export type ActiveSession = RouterOutputs['activeSessions']['list']['sessions'][number];
 
-type DateGroup = {
-  label: string;
-  sessions: StoredSession[];
-};
-
 type UseAgentSessionsOptions = {
   createdOnPlatform?: string | string[];
   gitUrl?: string | string[];
   organizationId?: string | null;
   enabled?: boolean;
+  /**
+   * Field to order by. Defaults to `updated_at` so callers that don't
+   * care (e.g. Home's session surface) keep the legacy behavior bit-for-bit.
+   */
+  sortBy?: AgentSessionSortBy;
 };
 
 type UseRecentAgentRepositoriesOptions = {
   organizationId?: string | null;
   enabled?: boolean;
 };
+
+// ── Query-input builders ─────────────────────────────────────────────
+
+/**
+ * Resolve the effective sort once and use it for both the server `orderBy`
+ * field and the client-side date grouping, so the section a row lands in
+ * always agrees with the timestamp it shows.
+ */
+function resolveSortBy(sortBy: AgentSessionSortBy | undefined): AgentSessionSortBy {
+  return parseAgentSessionSortBy(sortBy ?? DEFAULT_AGENT_SESSION_SORT);
+}
 
 // ── Date helpers ─────────────────────────────────────────────────────
 
@@ -50,27 +70,15 @@ function getUpdatedSince(days: number): string {
 
 // ── Queries ──────────────────────────────────────────────────────────
 
-const SESSIONS_PAGE_SIZE = 30;
-
 function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
 
   return useInfiniteQuery(
-    trpc.cliSessionsV2.list.infiniteQueryOptions(
-      {
-        limit: SESSIONS_PAGE_SIZE,
-        orderBy: 'updated_at',
-        includeChildren: false,
-        createdOnPlatform: options?.createdOnPlatform,
-        gitUrl: options?.gitUrl,
-        organizationId: options?.organizationId,
-      },
-      {
-        staleTime: 30_000,
-        enabled: options?.enabled,
-        getNextPageParam: lastPage => lastPage.nextCursor,
-      }
-    )
+    trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(options ?? {}), {
+      staleTime: 30_000,
+      enabled: options?.enabled,
+      getNextPageParam: lastPage => lastPage.nextCursor,
+    })
   );
 }
 
@@ -100,75 +108,6 @@ export function useRecentAgentRepositories(options?: UseRecentAgentRepositoriesO
   );
 }
 
-// ── Date grouping ────────────────────────────────────────────────────
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function getWeekdayName(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
-}
-
-function groupSessionsByDate(sessions: StoredSession[]): DateGroup[] {
-  const now = new Date();
-  const yesterday = addDays(now, -1);
-
-  const buckets = new Map<string, StoredSession[]>();
-  const bucketOrder: string[] = [];
-
-  function addToBucket(label: string, session: StoredSession) {
-    const existing = buckets.get(label);
-    if (existing) {
-      existing.push(session);
-    } else {
-      buckets.set(label, [session]);
-      bucketOrder.push(label);
-    }
-  }
-
-  for (const session of sessions) {
-    const date = parseTimestamp(session.updated_at);
-
-    if (isSameDay(date, now)) {
-      addToBucket('Today', session);
-    } else if (isSameDay(date, yesterday)) {
-      addToBucket('Yesterday', session);
-    } else {
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      if (diffDays <= 7) {
-        addToBucket(getWeekdayName(date), session);
-      } else {
-        addToBucket('Older', session);
-      }
-    }
-  }
-
-  // Sort "Older" bucket by updated_at descending
-  const olderBucket = buckets.get('Older');
-  if (olderBucket) {
-    olderBucket.sort(
-      (a, b) => parseTimestamp(b.updated_at).getTime() - parseTimestamp(a.updated_at).getTime()
-    );
-  }
-
-  return bucketOrder.map(label => ({
-    label,
-    sessions: buckets.get(label) ?? [],
-  }));
-}
-
 // ── Search ───────────────────────────────────────────────────────────
 
 type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
@@ -182,28 +121,18 @@ type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
  */
 export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   const trpc = useTRPC();
+  const sortBy = resolveSortBy(options.sortBy);
 
   const query = useQuery(
-    trpc.cliSessionsV2.search.queryOptions(
-      {
-        search_string: options.searchQuery,
-        // Endpoint max; no offset paging — past 50 matches, refining the query is the answer.
-        limit: 50,
-        includeChildren: false,
-        createdOnPlatform: options.createdOnPlatform,
-        gitUrl: options.gitUrl,
-        organizationId: options.organizationId,
-      },
-      {
-        staleTime: 30_000,
-        enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
-        placeholderData: keepPreviousData,
-      }
-    )
+    trpc.cliSessionsV2.search.queryOptions(buildAgentSessionSearchInput(options), {
+      staleTime: 30_000,
+      enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
+      placeholderData: keepPreviousData,
+    })
   );
 
   const sessions = useMemo(() => query.data?.results ?? [], [query.data]);
-  const dateGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
+  const dateGroups = useMemo(() => groupAgentSessionsByDate(sessions, sortBy), [sessions, sortBy]);
 
   return {
     dateGroups,
@@ -216,11 +145,13 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
 // ── Main hook ────────────────────────────────────────────────────────
 
 export function useAgentSessions(options?: UseAgentSessionsOptions) {
+  const sortBy = resolveSortBy(options?.sortBy);
   const stored = useStoredSessions(options);
   const active = useActiveSessions(options);
 
   // A session can repeat across pages when it is updated while older pages
-  // load (the cursor is its updated_at), so dedupe by session_id.
+  // load (the cursor follows the selected sort field), so dedupe by
+  // session_id.
   const storedSessions = useMemo(() => {
     const seen = new Set<string>();
     const sessions: StoredSession[] = [];
@@ -239,7 +170,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);
 
-  const dateGroups = useMemo(() => groupSessionsByDate(storedSessions), [storedSessions]);
+  const dateGroups = useMemo(
+    () => groupAgentSessionsByDate(storedSessions, sortBy),
+    [storedSessions, sortBy]
+  );
 
   return {
     storedSessions,

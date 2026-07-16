@@ -8,6 +8,7 @@ import {
   bootSimulator,
   buildSimulatorLabel,
   claimSimulator,
+  listIosDevices,
   parseClaimArgs,
   releaseSimulator,
   type SimulatorDevice,
@@ -48,9 +49,175 @@ function recordingOutput(
 }
 
 const devices: SimulatorDevice[] = [
-  { id: 'A', name: 'Kilo E2E-A', state: 'Booted' },
-  { id: 'B', name: 'Kilo E2E-B', state: 'Shutdown' },
+  {
+    id: 'A',
+    name: 'Kilo E2E-A',
+    state: 'Booted',
+    deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro',
+  },
+  {
+    id: 'B',
+    name: 'Kilo E2E-B',
+    state: 'Shutdown',
+    deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16',
+  },
 ];
+
+test('implicitly claims a shutdown iPhone before a booted iPhone and skips iPads', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const typedDevices = [
+    {
+      id: 'MALFORMED',
+      name: 'Malformed device',
+      state: 'Shutdown',
+      deviceTypeIdentifier: 'invalid.com.apple.CoreSimulator.SimDeviceType.iPhone-16',
+    },
+    {
+      id: 'IPAD',
+      name: 'iPad Pro (11-inch) (M4)',
+      state: 'Shutdown',
+      deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M4',
+    },
+    {
+      id: 'BOOTED-IPHONE',
+      name: 'iPhone 16 Pro',
+      state: 'Booted',
+      deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro',
+    },
+    {
+      id: 'SHUTDOWN-IPHONE',
+      name: 'iPhone 16',
+      state: 'Shutdown',
+      deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16',
+    },
+  ];
+
+  try {
+    const claim = claimSimulator({ devices: typedDevices, lockRoot, worktreeRoot });
+
+    assert.equal(claim.device.id, 'SHUTDOWN-IPHONE');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('explicitly claims a requested iPad', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+  const typedDevices = [
+    {
+      id: 'IPAD',
+      name: 'iPad Pro (11-inch) (M4)',
+      state: 'Shutdown',
+      deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M4',
+    },
+  ];
+
+  try {
+    const claim = claimSimulator({
+      devices: typedDevices,
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'IPAD',
+    });
+
+    assert.equal(claim.device.id, 'IPAD');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('explicitly claims a valid requested simulator without family metadata', () => {
+  const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+
+  try {
+    const claim = claimSimulator({
+      devices: [{ id: 'UNKNOWN-FAMILY', name: 'Unknown family', state: 'Shutdown' }],
+      lockRoot,
+      worktreeRoot,
+      requestedId: 'UNKNOWN-FAMILY',
+    });
+
+    assert.equal(claim.device.id, 'UNKNOWN-FAMILY');
+  } finally {
+    fs.rmSync(lockRoot, { recursive: true, force: true });
+    fs.rmSync(worktreeRoot, { recursive: true, force: true });
+  }
+});
+
+test('preserves deviceTypeIdentifier from simctl device listings', () => {
+  const deviceTypeIdentifier = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro';
+  const exec = () =>
+    JSON.stringify({
+      devices: {
+        'com.apple.CoreSimulator.SimRuntime.iOS-18-5': [
+          {
+            udid: 'IPHONE',
+            name: 'iPhone 16 Pro',
+            state: 'Shutdown',
+            deviceTypeIdentifier,
+          },
+        ],
+      },
+    });
+
+  assert.deepEqual(listIosDevices(exec), [
+    {
+      id: 'IPHONE',
+      name: 'iPhone 16 Pro',
+      state: 'Shutdown',
+      deviceTypeIdentifier,
+    },
+  ]);
+});
+
+for (const [description, deviceTypeIdentifier] of [
+  ['missing', undefined],
+  ['null', null],
+  ['numeric', 16],
+] as const) {
+  test(`implicit claims skip ${description} simctl device type metadata and continue to an iPhone`, () => {
+    const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));
+    const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-worktree-'));
+    const malformedDevice = {
+      udid: `INVALID-${description.toUpperCase()}`,
+      name: `Invalid ${description}`,
+      state: 'Shutdown',
+      ...(deviceTypeIdentifier === undefined ? {} : { deviceTypeIdentifier }),
+    };
+    const exec = () =>
+      JSON.stringify({
+        devices: {
+          'com.apple.CoreSimulator.SimRuntime.iOS-18-5': [
+            malformedDevice,
+            {
+              udid: 'VALID-IPHONE',
+              name: 'iPhone 16 Pro',
+              state: 'Booted',
+              deviceTypeIdentifier: 'com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro',
+            },
+          ],
+        },
+      });
+
+    try {
+      const claim = claimSimulator({
+        devices: listIosDevices(exec),
+        lockRoot,
+        worktreeRoot,
+      });
+
+      assert.equal(claim.device.id, 'VALID-IPHONE');
+    } finally {
+      fs.rmSync(lockRoot, { recursive: true, force: true });
+      fs.rmSync(worktreeRoot, { recursive: true, force: true });
+    }
+  });
+}
 
 test('claims an unowned simulator instead of sharing another worktree simulator', () => {
   const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-simulator-locks-'));

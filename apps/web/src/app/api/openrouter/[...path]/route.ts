@@ -25,11 +25,7 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import {
-  isDeadFreeModel,
-  isExcludedForFeature,
-  isKiloExclusiveFreeModel,
-} from '@/lib/ai-gateway/models';
+import { isDeadFreeModel, isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -40,7 +36,6 @@ import {
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
-  featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
   malformedJsonResponse,
@@ -344,13 +339,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   let effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
-  // Reject early (before rate limiting) if the model is exclusive to other features.
-  if (isExcludedForFeature(effectiveModelIdLowerCased, feature)) {
-    console.warn(
-      `Model ${effectiveModelIdLowerCased} is not available for feature ${feature}; rejecting.`
-    );
-    return featureExclusiveModelResponse(effectiveModelIdLowerCased);
-  }
   if (!ipAddress) {
     return NextResponse.json(
       {

@@ -10,10 +10,12 @@ import {
   organization_memberships,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
+import { TRPCError } from '@trpc/server';
 import { parseGitHubOwnerRepo } from '@/routers/cli-sessions-v2-router';
+import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
@@ -33,6 +35,17 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => {
   return {
     ...actual,
     fetchPullRequestForBranch: jest.fn(),
+  };
+});
+
+// Same trick for the paginated session-message client. The web router only
+// calls `fetchSessionMessagesPage`; the rest of the module keeps its real
+// implementation via `requireActual`.
+jest.mock('@/lib/session-ingest-client', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@/lib/session-ingest-client');
+  return {
+    ...actual,
+    fetchSessionMessagesPage: jest.fn(),
   };
 });
 
@@ -134,6 +147,314 @@ describe('cli-sessions-v2-router', () => {
         caller.cliSessionsV2.getSessionMessages({ session_id: sessionId })
       ).rejects.toThrow('Session not found');
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getSessionMessagesPage', () => {
+    const sessionId = 'ses_messages_page_test_1234';
+    let fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
+
+    beforeEach(async () => {
+      const { fetchSessionMessagesPage: imported } = jest.requireMock(
+        '@/lib/session-ingest-client'
+      ) as {
+        fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
+      };
+      fetchSessionMessagesPage = imported;
+      fetchSessionMessagesPage.mockReset();
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns the bounded page and the opaque next cursor for an owned session', async () => {
+      const history = {
+        messages: [
+          {
+            info: {
+              id: 'msg_user_01',
+              sessionID: sessionId,
+              role: 'user' as const,
+              time: { created: 1761000000100 },
+              agent: 'build',
+              model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+            },
+            parts: [
+              {
+                id: 'prt_user_01',
+                sessionID: sessionId,
+                messageID: 'msg_user_01',
+                type: 'text' as const,
+                text: 'hello',
+              },
+            ],
+          },
+        ],
+        nextCursor: 'opaque-cursor',
+        omittedItemCount: 0,
+      };
+      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toEqual({ kiloSessionId: sessionId, history });
+      expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
+        limit: 50,
+      });
+    });
+
+    it('forwards the continuation cursor to the client', async () => {
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const validCursor = btoa(JSON.stringify({ id: 'msg_user_01', time: 1761000000100 })).replace(
+        /=+$/,
+        ''
+      );
+      await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 25,
+        cursor: validCursor,
+      });
+
+      expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
+        limit: 25,
+        before: validCursor,
+      });
+    });
+
+    it('defaults an omitted limit to 50 before calling the client (bounded request)', async () => {
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      await caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId });
+
+      // The tRPC input schema must fill in the shared default before the
+      // client is called so the worker's bounded reader always sees a
+      // positive limit and never falls back to the legacy unbounded scan.
+      expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
+        limit: 50,
+      });
+    });
+
+    it('defaults an omitted limit to 50 and forwards a cursor that would otherwise be cursor-only', async () => {
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const validCursor = btoa(JSON.stringify({ id: 'msg_user_01', time: 1761000000100 })).replace(
+        /=+$/,
+        ''
+      );
+      await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        cursor: validCursor,
+      });
+
+      expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
+        limit: 50,
+        before: validCursor,
+      });
+    });
+
+    it('preserves retryable_failure so the UI can offer Retry', async () => {
+      const history = { kind: 'retryable_failure' as const, phase: 'page_parts' as const };
+      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 10,
+      });
+
+      expect(result).toEqual({ kiloSessionId: sessionId, history });
+    });
+
+    it('preserves too_large and invalid_data as non-retryable outcomes', async () => {
+      for (const history of [
+        {
+          kind: 'too_large' as const,
+          maximumBytes: 8 * 1024 * 1024,
+          phase: 'message_scan' as const,
+        },
+        { kind: 'invalid_data' as const },
+      ]) {
+        fetchSessionMessagesPage.mockReset();
+        fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 10,
+        });
+        expect(result).toEqual({ kiloSessionId: sessionId, history });
+      }
+    });
+
+    it('returns an empty page for a valid session without persisted messages', async () => {
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+      });
+    });
+
+    it('rejects a session owned by another user before calling the client', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects a session the user no longer has organization access to', async () => {
+      const orgSessionId = 'ses_messages_page_org_test_12345';
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganization.id,
+        kilo_user_id: regularUser.id,
+        role: 'member',
+      });
+      await db.insert(cli_sessions_v2).values({
+        session_id: orgSessionId,
+        kilo_user_id: regularUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      try {
+        // Simulate losing membership without re-creating it in afterEach.
+        await db
+          .delete(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, testOrganization.id),
+              eq(organization_memberships.kilo_user_id, regularUser.id)
+            )
+          );
+
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.getSessionMessagesPage({ session_id: orgSessionId, limit: 50 })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, orgSessionId));
+      }
+    });
+
+    it('rejects a positive limit above the shared maximum before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 101 })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects limit=0 (the generic endpoint is always bounded) before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 0 })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects limit=0 even when a cursor is supplied', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const validCursor = btoa(JSON.stringify({ id: 'msg_user_01', time: 1761000000100 })).replace(
+        /=+$/,
+        ''
+      );
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 0,
+          cursor: validCursor,
+        })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('maps a client throw to a stable INTERNAL_SERVER_ERROR (no client retry inference)', async () => {
+      const clientError = new Error(
+        'Session ingest messages page failed: 500 Internal Server Error'
+      );
+      fetchSessionMessagesPage.mockRejectedValueOnce(clientError);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = await caller.cliSessionsV2
+        .getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+        .catch(err => err);
+      // The router must surface a stable, tRPC-shaped error so the mobile
+      // client can map it without inferring retry semantics from the worker
+      // message text. Assert a TRPCError with a stable message so we don't
+      // depend on Sentry's tRPC middleware's default fallback.
+      expect(rejection).toBeInstanceOf(TRPCError);
+      expect(rejection).toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch session messages page',
+      });
+    });
+
+    it('rejects a continuation cursor without a positive limit', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, cursor: 'bad' })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed continuation cursor before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 10,
+          cursor: 'not-a-real-cursor',
+        })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid session id before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: 'not-a-session', limit: 50 })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
     });
   });
 
@@ -1332,6 +1653,64 @@ describe('cli-sessions-v2-router', () => {
           .where(eq(cli_sessions_v2.session_id, sessionId));
         await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
       }
+    });
+  });
+
+  describe('search ordering', () => {
+    const olderCreatedNewerUpdated = 'ses_search_sort_old_created';
+    const newerCreatedOlderUpdated = 'ses_search_sort_new_created';
+    const searchableTitle = 'mobile-search-sort-fixture';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: olderCreatedNewerUpdated,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: searchableTitle,
+          created_at: '2026-01-01T10:00:00.000Z',
+          updated_at: '2026-01-04T10:00:00.000Z',
+        },
+        {
+          session_id: newerCreatedOlderUpdated,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: searchableTitle,
+          created_at: '2026-01-03T10:00:00.000Z',
+          updated_at: '2026-01-02T10:00:00.000Z',
+        },
+      ]);
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          inArray(cli_sessions_v2.session_id, [olderCreatedNewerUpdated, newerCreatedOlderUpdated])
+        );
+    });
+
+    it('defaults search to updated_at descending', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: searchableTitle });
+
+      expect(result.results.map(session => session.session_id)).toEqual([
+        olderCreatedNewerUpdated,
+        newerCreatedOlderUpdated,
+      ]);
+    });
+
+    it('orders search by created_at descending when requested', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: searchableTitle,
+        orderBy: 'created_at',
+      });
+
+      expect(result.results.map(session => session.session_id)).toEqual([
+        newerCreatedOlderUpdated,
+        olderCreatedNewerUpdated,
+      ]);
     });
   });
 });

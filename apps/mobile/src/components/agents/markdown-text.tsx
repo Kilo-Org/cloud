@@ -1,11 +1,24 @@
 import { type ReactNode, useMemo } from 'react';
-import { Text, type TextStyle, useColorScheme, View, type ViewStyle } from 'react-native';
+import {
+  type AccessibilityActionEvent,
+  type GestureResponderEvent,
+  Text,
+  type TextStyle,
+  useColorScheme,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { Renderer, useMarkdown } from 'react-native-marked';
 
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-import { resolveLinkAccessibilityLabel } from './markdown-link';
+import {
+  getLinkAccessibilityActions,
+  getLinkLongPressHandler,
+  LINK_ACCESSIBILITY_HINT,
+  resolveLinkAccessibilityLabel,
+} from './markdown-link';
 import {
   getMarkdownStyles,
   getPalette,
@@ -14,10 +27,13 @@ import {
 } from './markdown-palette';
 import { MarkdownTable } from './markdown-table';
 
-type MarkdownTextProps = {
+export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
+
+export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
   selectable?: boolean;
+  onLongPressLink?: MarkdownLinkLongPressHandler;
 };
 
 // The library's default `Renderer` renders code blocks with the `em` text
@@ -37,11 +53,17 @@ type MarkdownTextProps = {
 class MarkdownRenderer extends Renderer {
   private readonly palette: MarkdownPalette;
   private readonly selectable: boolean;
+  private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
 
-  constructor(palette: MarkdownPalette, selectable = true) {
+  constructor(
+    palette: MarkdownPalette,
+    selectable = true,
+    onLongPressLink?: MarkdownLinkLongPressHandler
+  ) {
     super();
     this.palette = palette;
     this.selectable = selectable;
+    this.onLongPressLink = onLongPressLink;
   }
 
   private textNode(children: string | ReactNode[], styles?: TextStyle): ReactNode {
@@ -88,17 +110,25 @@ class MarkdownRenderer extends Renderer {
     styles?: TextStyle,
     title?: string
   ): ReactNode {
+    const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
+    const linkActionsEnabled = this.onLongPressLink !== undefined;
+
     return (
       <Text
         selectable={this.selectable}
         accessibilityRole="link"
-        accessibilityHint="Opens in a new window"
-        accessibilityLabel={resolveLinkAccessibilityLabel(children, href, title)}
+        accessibilityHint={LINK_ACCESSIBILITY_HINT}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityActions={getLinkAccessibilityActions(linkActionsEnabled)}
         key={this.getKey()}
+        onAccessibilityAction={(event: AccessibilityActionEvent) => {
+          if (event.nativeEvent.actionName === 'showLinkActions') {
+            this.onLongPressLink?.(href);
+          }
+        }}
+        onLongPress={getLinkLongPressHandler(this.onLongPressLink, href)}
         onPress={() => {
-          void openExternalUrl(href, {
-            label: resolveLinkAccessibilityLabel(children, href, title),
-          });
+          void openExternalUrl(href, { label: accessibilityLabel });
         }}
         style={styles}
       >
@@ -151,6 +181,7 @@ export function MarkdownText({
   value,
   variant = 'assistant',
   selectable = true,
+  onLongPressLink,
 }: Readonly<MarkdownTextProps>) {
   const colorScheme = useColorScheme();
   const colors = useThemeColors();
@@ -159,7 +190,7 @@ export function MarkdownText({
     const palette = getPalette(variant, colors);
     return {
       styles: getMarkdownStyles(palette),
-      renderer: new MarkdownRenderer(palette, selectable),
+      renderer: new MarkdownRenderer(palette, selectable, onLongPressLink),
       theme: {
         colors: {
           text: palette.textColor,
@@ -169,7 +200,7 @@ export function MarkdownText({
         },
       },
     };
-  }, [variant, colors, selectable]);
+  }, [variant, colors, selectable, onLongPressLink]);
 
   const elements = useMarkdown(value, {
     colorScheme,

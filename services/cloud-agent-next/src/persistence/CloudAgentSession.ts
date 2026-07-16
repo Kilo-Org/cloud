@@ -54,6 +54,11 @@ import {
   type QueuedMessageSnapshot,
 } from '../websocket/stream.js';
 import {
+  getPreparationSnapshots,
+  reconcileStalePreparationAttempts,
+} from '../session/preparation-history.js';
+import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
+import {
   createIngestHandler,
   type IngestHandler,
   type IngestDOContext,
@@ -795,6 +800,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       this.streamHandler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
         deriveCloudStatus: () => this.deriveCloudStatus(),
         deriveQueuedMessages: () => this.deriveQueuedMessages(),
+        getPreparationSnapshots: async () => {
+          const metadata = await this.getMetadata();
+          reconcileStalePreparationAttempts(this.eventQueries, {
+            now: Date.now(),
+            sessionPrepared: Boolean(metadata?.lifecycle.preparedAt),
+          });
+          return getPreparationSnapshots(this.eventQueries);
+        },
         getAvailableCommands: () => this.getAvailableCommands(),
       });
       this.streamHandlerSessionId = sessionId;
@@ -3164,34 +3177,60 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     await this.scheduleAlarmAtOrBefore(Date.now() + PENDING_FLUSH_DEBOUNCE_MS);
 
-    const result = await this.getAgentRuntime().send(plan, {
-      onProgress: (step, message) => {
-        const now = Date.now();
+    const recorder = createPreparationProgressRecorder({
+      attemptId: crypto.randomUUID(),
+      triggerMessageId: plan.turn.messageId,
+      sessionId,
+      eventQueries: this.eventQueries,
+      broadcast: event =>
         this.broadcastVolatileEvent({
           executionId: eventSourceId,
           sessionId,
-          streamEventType: 'preparing',
-          payload: JSON.stringify({ step, message }),
-          timestamp: now,
-        });
-        this.broadcastVolatileEvent({
-          executionId: eventSourceId,
-          sessionId,
-          streamEventType: 'cloud.status',
-          payload: JSON.stringify({
-            cloudStatus: { type: 'preparing' as const, step, message },
-          }),
-          timestamp: now,
-        });
-      },
-      onWorkspaceReady: async ready => {
-        const readyResult = await this.recordSessionReady(ready);
-        if (!readyResult.success) {
-          throw new Error(readyResult.error ?? 'Failed to record session readiness');
-        }
-      },
-      onAccepted: delivery => this.recordRuntimeAcceptedMessage(plan, delivery),
+          streamEventType: event.stream_event_type,
+          payload: event.payload,
+          timestamp: event.timestamp,
+        }),
     });
+
+    let result: MessageDeliveryResult;
+    try {
+      result = await this.getAgentRuntime().send(
+        { ...plan, preparation: { attemptId: recorder.attemptId } },
+        {
+          onProgress: (step, message) => {
+            recorder.onProgress(step, message);
+            this.broadcastVolatileEvent({
+              executionId: eventSourceId,
+              sessionId,
+              streamEventType: 'cloud.status',
+              payload: JSON.stringify({
+                cloudStatus: { type: 'preparing' as const, step, message },
+              }),
+              timestamp: Date.now(),
+            });
+          },
+          onWorkspaceReady: async ready => {
+            const readyResult = await this.recordSessionReady(ready);
+            if (!readyResult.success) {
+              throw new Error(readyResult.error ?? 'Failed to record session readiness');
+            }
+          },
+          onAccepted: delivery => this.recordRuntimeAcceptedMessage(plan, delivery),
+        }
+      );
+    } catch (error) {
+      recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
+      throw error;
+    }
+
+    // The wrapper's own terminal event can be lost (its progress channel may
+    // drop before delivery), so settle the attempt from the delivery outcome:
+    // an accepted message proves preparation finished.
+    recorder.finalize(
+      result.success
+        ? { status: 'completed' }
+        : { status: 'failed', safeError: 'Environment preparation failed' }
+    );
 
     this.broadcastVolatileEvent({
       executionId: eventSourceId,

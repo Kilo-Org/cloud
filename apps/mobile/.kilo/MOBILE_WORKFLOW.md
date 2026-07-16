@@ -1,30 +1,81 @@
 # Mobile Agent Workflow
 
-Use this workflow when planning or implementing work whose product surface is the mobile app. Start Kilo from `apps/mobile/` so the role agents in `.kilo/agent/` are discovered. The implementation itself is not restricted to `apps/mobile`: an accepted plan may require cloud services, tRPC routers, shared packages, infrastructure, or a sibling checkout such as `~/Projects/kilocode`.
+Use this workflow when the product surface of the work is the mobile app. Start Kilo from `apps/mobile/` so the role agents in `.kilo/agent/` are discovered. The accepted plan may still change cloud services, tRPC routers, shared packages, infrastructure, or a sibling checkout such as `~/Projects/kilocode`: "mobile" describes the product, not a directory boundary.
 
-Work must always be done in a dedicated worktree, regardless of the repository. This applies to the cloud repository and all sibling repositories touched by the plan. The orchestrator and role agents must not edit the primary checkout or the main checkout of any repository.
+## Ground Rules
 
-The initial main session is the planner. After plan approval, a fresh session becomes the orchestrator. Role agents use `kilo/kilo-auto/efficient`. The orchestrator retains product judgment, architecture decisions, loop control, final verification, Git integration, and pull-request ownership. Prefer small, logically scoped commits throughout the flow instead of one final catch-all commit.
+These rules apply to every session and role. Later sections do not repeat them.
 
-Role step limits are hard ceilings: `mobile-implementer` has 80 steps, `mobile-reviewer` has 50, and `mobile-e2e-verifier` has 100. Size every handoff below 75% of its role limit; an implementation slice should normally fit in roughly 60 planned steps. Do not raise a global limit to compensate for an oversized task.
+- Work only in dedicated worktrees, in every repository the plan touches. Never edit the primary or main checkout of any repository.
+- The first session is the planner. After plan approval, a fresh session becomes the orchestrator. Role agents run on `kilo/kilo-auto/efficient`.
+- The orchestrator owns product judgment, architecture decisions, loop control, final verification, Git, and the PR. Role agents never dispatch other agents, commit, push, or create or update a PR.
+- Every reviewer and verifier invocation must be a fresh session so earlier conclusions cannot anchor later passes.
+- Choose the simplest maintainable implementation that fully satisfies the accepted requirements. Reuse existing code and contracts. Do not add abstraction or scope without evidence that it is required.
+- Make small, logically scoped commits throughout. Never squash the work into one catch-all commit unless the user explicitly requests it.
+- Repair-round limit: after three repair rounds on the same issue, the planner or orchestrator takes over, resolves the issue directly, and records the resolution. Never loop indefinitely.
+- Step limits are hard ceilings: `mobile-plan-reviewer` 40, `mobile-implementer` 80, `mobile-reviewer` 50, `mobile-e2e-verifier` 100. Size every handoff below 75% of the role's limit; an implementation slice should fit in roughly 60 planned steps. Never raise a limit to fit an oversized task; split the task instead.
 
-## Planner Handoff
+## Interaction Modes
 
-The planning session explores requirements, defines acceptance criteria, creates dedicated worktrees, and writes the approved plan. After the user approves the plan, the planning session must not implement it. It prepares a sanitized handoff and launches a fresh orchestrator in a named tmux window.
+The planner's first message must ask the user one question: is this run `hands on` or `hands off`? The selected mode governs the planner, the orchestrator, and every later decision.
+
+- `hands on`: ask the user one question at a time until requirements, trade-offs, acceptance criteria, and the plan are unambiguous. Obtain explicit user approval of the plan before launching the orchestrator. Ask the user when a repair loop or ambiguity cannot be resolved.
+- `hands off`: after mode selection, never ask the user a question and never wait for user approval. Treat all approvals as granted. Interrogate the plan yourself to expose missing requirements, trade-offs, risks, and acceptance criteria. Answer open questions from repository evidence and best judgment, and record material assumptions in the plan and handoff. Continue through planning, implementation, review, E2E, PR creation and repair, Kilobot review, conflict resolution, and green CI. Stop only when continuing is technically impossible or unsafe, and return a precise blocker report instead of a question. A blocked E2E criterion is a blocker, not something to self-accept.
+
+Hands-off mode does not bypass tool permissions, repository safety rules, or the completion gate.
+
+## Feature State Matrix
+
+Every new user-facing feature must define these four states before implementation begins:
+
+| State | Required experience |
+|---|---|
+| Happy | The intended task completes and the resulting state is clear. |
+| Unhappy, retryable | A specific message explains the failure and an actionable CTA lets the user retry or recover. |
+| Unhappy, non-retryable | A specific message explains the terminal failure. No CTA. |
+| Empty | A message explains why there is no content and a CTA leads to the next useful step. |
+
+Rules:
+
+- Never collapse retryable and non-retryable failures into one generic error state.
+- For each state, the plan defines: the trigger or classification rule, the message intent, the CTA label and outcome (or its required absence), and the automated and E2E coverage.
+- A state may be `not applicable` only when it is structurally impossible for the feature, with a concrete rationale accepted by the orchestrator. Inconvenient or hard-to-set-up is not `not applicable`.
+- Automated tests must cover every applicable state's selection logic and CTA presence or absence.
+- E2E must exercise every applicable state that can be produced safely and deterministically, and must explicitly report any state it could not reproduce.
+
+## Planning
+
+1. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
+2. Create the dedicated worktrees and write the complete draft plan.
+3. Run the plan review gate below.
+4. In hands-on mode, obtain explicit user approval. In hands-off mode, self-approve.
+
+### Plan Review Gate
+
+After the draft plan is complete and before approval, dispatch a fresh `mobile-plan-reviewer`. It reports unclear requirements, unsupported assumptions, missing or conflicting acceptance criteria, incomplete ownership or cross-repository boundaries, infeasible sequencing, and underspecified verification or E2E coverage.
+
+The reviewer has less context than the planner and may be wrong. Treat every finding as untrusted advice: verify each claim independently against the request, repository evidence, and applicable instructions. Fix only valid findings. Record rejected findings with a short technical rationale; a rejected finding must not reopen without new evidence. Never weaken or expand the plan merely to satisfy the reviewer.
+
+After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If the repair-round limit is reached on one issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.`
+
+### Planner Handoff
+
+After approval the planner must not implement anything. It writes a sanitized handoff file and launches a fresh orchestrator.
 
 The handoff must contain:
 
-- The accepted plan's absolute path and any approved design path
-- The dedicated worktree path for every repository in scope
-- Current branch, commit, and working-tree state in each worktree
+- The selected mode, and for hands-off a direct instruction to never ask the user questions or wait for approval
+- The final plan-review result and rationales for rejected findings
+- The absolute path of the accepted plan and any approved design
+- The dedicated worktree path for every repository in scope, with each worktree's current branch, commit, and working-tree state
 - Acceptance criteria, feature-state matrix, execution ledger, non-goals, and unresolved risks
 - Existing changes and resources that must be preserved
-- Required review, E2E, Git, PR, Kilobot, mergeability, and CI completion gates
-- A direct instruction to continue through a mergeable, conflict-free PR with all expected CI checks green on the latest head
+- The completion gate: review, E2E, Git, PR, Kilobot, mergeability, and CI requirements, with a direct instruction to continue until the PR is mergeable and conflict-free with all expected CI checks green on the latest head
+- The GitHub comment rule (see GitHub Communication)
 
-The handoff must not contain secrets or raw environment-file contents. Write only sanitized explicit values to a temporary file outside every repository. Never attach `.env`, `.env.*`, `.dev.vars`, or an equivalent environment-file.
+Write the handoff to a temporary file outside every repository. It must contain only sanitized explicit values: never secrets, raw environment-file contents, or an attached `.env`, `.env.*`, `.dev.vars`, or equivalent file.
 
-Use the current tmux session and a unique, descriptive window name. The canonical launch shape is:
+Launch the orchestrator in the current tmux session with a unique, descriptive window name:
 
 ```bash
 tmux new-window -t <planner-tmux-session> \
@@ -33,110 +84,95 @@ tmux new-window -t <planner-tmux-session> \
   'kilo run --interactive --model kilo/kilo-auto/frontier --title "<feature> orchestrator" --file <sanitized-handoff-file> "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate."'
 ```
 
-Use `kilo run --interactive` without `--continue`, `--session`, or `--variant`; session freshness and Kilo Auto Frontier's default reasoning setting are required. The planner verifies that the tmux window started and then returns its window name, worktree paths, model, and handoff-file path to the user. The fresh orchestrator must delete the temporary handoff file after ingesting it and before completion.
-
-## Feature State Matrix
-
-Every new user-facing feature must define and behaviorally test these states before implementation begins:
-
-| State | Required experience |
-|---|---|
-| Happy | The intended task completes and the resulting state is clear. |
-| Unhappy, retryable | A meaningful, specific message explains the failure and an actionable CTA lets the user retry or recover. |
-| Unhappy, non-retryable | A meaningful, specific message explains the terminal failure and no CTA is shown. |
-| Empty | A meaningful message explains why there is no content and an actionable CTA leads to the next useful step. |
-
-Do not collapse retryable and non-retryable failures into one generic error state. The accepted plan must define each state's trigger or classification rule, message intent, CTA label and outcome when required, and automated/E2E coverage. A state may be marked `not applicable` only when it is structurally impossible for that feature, with a concrete rationale accepted by the orchestrator; inconvenience or difficult setup is not sufficient. Automated tests must cover every applicable state's selection logic and CTA presence or absence. E2E must exercise all applicable states that can be produced safely and deterministically, and must report rather than silently omit states that cannot be reproduced.
+Use `kilo run --interactive` exactly as shown: no `--continue`, `--session`, or `--variant`, because the orchestrator must be a fresh session on Kilo Auto Frontier with its default reasoning setting. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
 
 ## Roles
 
 | Agent | Responsibility | Repository edits |
 |---|---|---|
+| `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | Denied |
 | `mobile-implementer` | Implements one bounded task from the accepted plan and runs narrow checks | Allowed where the task requires |
 | `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
-| `mobile-e2e-verifier` | Exercises accepted behavior on local services and a simulator/emulator | Denied |
-
-Reviewer and verifier invocations must be fresh sessions so earlier conclusions do not anchor later passes. Role agents do not dispatch other agents or perform commits, pushes, or PR operations.
+| `mobile-e2e-verifier` | Exercises accepted behavior; may create temporary state-generation fixtures in verify mode | Temporary, verify mode only |
 
 ## Execution Ledger
 
-After accepting the plan, split it into the smallest behaviorally meaningful and independently testable slices. Record each slice in an execution ledger before dispatch:
+Split the accepted plan into the smallest behaviorally meaningful, independently testable slices. Before dispatching anything, record each slice in a ledger:
 
 - Slice ID, dependencies, priority, and estimated step cost
 - Exact writable path set and forbidden path set in every repository
 - Shared generated outputs and mutable runtime resources
-- Producer-consumer dependency on contracts, schemas, generated code, or runtime state
-- Ownership-safe narrow checks and checks deferred until the synchronization barrier
+- Producer-consumer dependencies on contracts, schemas, generated code, or runtime state
+- Ownership-safe narrow checks, and checks deferred to the synchronization barrier
 - Intended commit boundary
 
-Two slices are parallel-safe only when their write sets do not overlap, neither consumes an unstable output from the other, they share no mutable runtime resource, and neither runs a repository-wide mutating command. File separation alone is not sufficient when one slice changes a contract consumed by another. Lockfiles, dependency installation, migrations, generated clients, repository-wide formatters, and broad autofix commands are always serialized.
+Two slices are parallel-safe only when all of these hold: their write sets do not overlap, neither consumes an unstable output of the other, they share no mutable runtime resource, and neither runs a repository-wide mutating command. File separation is not enough when one slice changes a contract the other consumes. Always serialize: lockfile changes, dependency installation, migrations, generated clients, repository-wide formatters, and broad autofix commands.
 
 ## Orchestration
 
-1. Discuss the request with the user. Inspect affected repositories, agree on acceptance criteria for every feature state in the matrix, produce an implementation plan, and create the execution ledger.
-2. Dispatch every ready independent slice in a bounded wave, capped at two or three concurrent implementers. Include all other active slices and ownership boundaries in each handoff. Run only ownership-safe narrow checks while the wave is active.
-3. Treat completion of every active implementer as a synchronization barrier. Inspect each result, ownership adherence, and the combined diff. Resolve integration and architecture decisions in the main session, then run shared mutating commands and shared checks once. Preserve successful independent slices when another slice fails.
-4. Dispatch one fresh `mobile-reviewer` over the coherent wave. Triage findings in the main session and route valid fixes through a bounded repair wave followed by a fresh reviewer. Record rejected findings with a short rationale.
-5. After checks and review pass, create concise logical commits at the ledger's intended per-slice boundaries. Never let a role agent commit. If a slice reaches two budget-exhausted invocations, the orchestrator takes over rather than raising role limits.
-6. Stop after three repair rounds for the same issue. The orchestrator takes over or asks the user to resolve the underlying ambiguity; never loop indefinitely.
-7. When device E2E is likely, dispatch a separate prewarm-only `mobile-e2e-verifier` concurrently with implementation. It may prepare stable services, claim and label a device, install a baseline native build only when unaffected by active slices, connect the exact Metro URL, and establish login state. It must not judge acceptance behavior while implementation is changing. Retain its resource manifest.
-8. After the coherent implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the prewarm resource manifest. It independently revalidates ownership and provenance, relabels the simulator to `verify`, runs acceptance flows, and owns cleanup. Route product failures through a bounded repair wave and fresh reviewer before another fresh final verifier.
-9. The main session performs the final full-diff review and repository-appropriate verification, commits any final narrowly scoped repair, then pushes and creates or updates the PR. Assign the PR to the requesting human. Do not squash the work into a catch-all commit unless the user explicitly requests it.
-10. Wait until Kilobot has reviewed the latest head. Fetch every Kilobot review thread, including comments that arrive after earlier repairs, and triage each finding in the main session using the repository-root `AGENTS.md` review-remark workflow.
-11. For each valid finding, plan the smallest coherent repair and send that bounded task to `mobile-implementer`. Run the required narrow checks, dispatch a fresh `mobile-reviewer`, and create the smallest coherent commit before pushing. Reply in the original review thread with the concrete fix, then resolve the thread. Reject invalid findings with technical evidence in the same thread instead of changing correct code.
-12. Repeat the Kilobot triage, implementer, fresh reviewer, commit, push, reply, and resolution cycle until Kilobot has reviewed the latest head and there are no unresolved actionable Kilobot comments. Preserve the three-repair-round limit for any one finding; the main session takes over or asks the user if that limit is reached.
-13. Run local mobile E2E again after Kilobot repairs that affect behavior, build/runtime configuration, or the E2E workflow. Documentation-only or test-only repairs may skip repeated device E2E when the orchestrator records why the previously verified behavior is unaffected.
-14. Inspect the exact latest PR head SHA, mergeability, merge-state status, expected CI checks, and latest-head Kilobot review. If the base branch advances, integrate the current base in the dedicated worktree, resolve conflicts, rerun affected checks and local E2E, obtain fresh review, and push the new head. Wait again for CI and Kilobot on that exact head.
+1. Ingest the handoff. Split work into ledger slices.
+2. Dispatch ready independent slices in a bounded wave of at most two or three concurrent `mobile-implementer`s. Each handoff lists the other active slices and their ownership boundaries. While a wave is active, run only ownership-safe narrow checks.
+3. When every implementer in the wave has returned, treat it as a synchronization barrier: inspect each result, ownership adherence, and the combined diff; resolve integration and architecture decisions yourself; run shared mutating commands and shared checks once. If one slice failed, preserve the successful ones.
+4. Dispatch one fresh `mobile-reviewer` over the coherent wave diff. Triage findings yourself: route valid findings through a bounded repair wave and then a fresh reviewer; record rejected findings with a short rationale.
+5. After checks and review pass, create the commits at the ledger's intended per-slice boundaries. If a slice exhausts its implementer budget twice, take it over yourself.
+6. When device E2E is likely, prewarm infrastructure concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Do not judge acceptance behavior while implementation is still changing. Record a resource manifest for the final verifier.
+7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier.
+8. Perform the final full-diff review and repository-appropriate verification yourself. Commit any final narrowly scoped repair, push, create or update the PR, and assign it to the requesting human.
+
+### Kilobot and CI Loop
+
+9. Wait until Kilobot has reviewed the latest head. Fetch every Kilobot review thread, including comments that arrive after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
+10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code.
+11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable Kilobot comment is unresolved.
+12. Rerun local mobile E2E after any Kilobot repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
+13. When the base branch advances, integrate the current base in the dedicated worktree and push the new head. Then apply exactly one of:
+    - No conflicts: do not rerun checks, E2E, or review. The merged tree matches the verified head, and CI and Kilobot run on the new SHA anyway.
+    - Conflicts resolved, certainly behavior-neutral: same as above, no reruns.
+    - Conflicts resolved, behavioral impact possible: rerun the affected checks and local E2E and obtain a fresh review before pushing.
+14. Always wait for CI and Kilobot on the exact latest head SHA, and confirm GitHub reports it mergeable.
+
+## GitHub Communication
+
+Every GitHub issue comment, PR comment, review comment, review body, and thread reply written by this workflow must begin exactly with `(bot) `. This includes replies to Kilobot and rejections of findings. Exceptions: the PR description and the PR title carry no prefix.
 
 ## Handoff Requirements
 
-Every dispatch should include:
+Every dispatch to a role agent must include:
 
-- The accepted plan task and explicit non-goals
-- Observable acceptance criteria
-- The four-state feature matrix, with each state's trigger/classification, message intent, CTA label and outcome or required absence, and automated/E2E coverage
-- Repositories and worktrees in scope
+- The assigned task, explicit non-goals, and observable acceptance criteria
+- The feature-state matrix for any new user-facing feature: each state's trigger or classification, message intent, CTA label and outcome or required absence, and coverage
 - The dedicated worktree path for every repository in scope, including sibling repositories
 - Existing uncommitted changes that must be preserved
-- Exact checks or user flows expected for that stage
+- The exact checks or user flows expected for that stage
 - Prior findings being addressed, including rejected findings that must not be reopened without new evidence
 - The intended commit boundary for the assigned slice
 - Priority order, minimum complete outcome, optional work to drop, and a clean stopping rule before budget exhaustion
-- Required continuation state: completed work, remaining work, failures, files touched, checks run or deferred, and safest next action
-- A prohibition on reading secret-bearing environment files: role agents must not read `.env`, `.env.*`, `.dev.vars`, or equivalent files. Use documented setup commands, sanitized status or manifest output, and sanitized explicit values supplied by the orchestrator instead.
-- A prohibition on committing generated E2E fixtures: E2E fixtures must never be committed. Role agents may create them only in a temporary directory for the current run and must clean them up before returning control.
+- Required continuation state on early stop: completed work, remaining work, failures, files touched, checks run or deferred, and safest next action
+- The GitHub comment rule (see GitHub Communication)
+- Secrets rule: role agents must not read `.env`, `.env.*`, `.dev.vars`, or equivalent files. Use documented setup commands, sanitized status output, and sanitized explicit values supplied by the orchestrator.
+- Fixture rule: generated E2E fixtures must never be committed. Create them only in a temporary directory for the current run and clean them up before returning.
 
-Do not ask a role agent to infer context from the conversation it cannot see. Keep cross-repository changes on coordinated branches or working trees, and give the reviewer and verifier the location of every related diff. Never place secrets or raw environment-file contents in a handoff; provide only the minimum sanitized explicit values required for the task.
+Never ask a role agent to infer context from a conversation it cannot see. Keep cross-repository changes on coordinated branches, and give reviewers and verifiers the location of every related diff. Never place secrets or raw environment-file contents in a handoff.
 
 ## Workflow Metrics
 
-The final report records lightweight in-session measurements when applicable:
-
-- Number and width of implementation waves
-- Budget exhaustion and collision counts
-- Unmanaged listener detections
-- Prewarm reuse or invalidation
-- Simulator relabel or original-name restoration failures
-- Accepted-plan-to-final-E2E-start time
-- Accepted-plan-to-merged-PR time
-- Review, E2E repair, and latest-head CI wait/repair rounds
-
-Do not add persistent telemetry or a new data store for these metrics.
+Record lightweight in-session measurements in the final report when applicable: wave count and width, budget exhaustions, ownership collisions, unmanaged listener detections, prewarm reuse or invalidation, simulator relabel or name-restoration failures, accepted-plan-to-final-E2E-start time, accepted-plan-to-merged-PR time, and review/E2E/CI repair rounds. Do not add persistent telemetry or a data store for these.
 
 ## Completion Gate
 
-The orchestrator may call the work complete only when:
+The orchestrator may declare the work complete only when every item holds:
 
 - All accepted plan tasks are implemented
-- Every applicable feature state has automated behavioral coverage, including required CTA presence or complete CTA absence
-- Every safely reproducible feature state has passed E2E verification; exceptions have an explicit rationale accepted by the orchestrator
-- Changes are organized into small logical commits with each commit internally coherent
+- Every applicable feature state has automated behavioral coverage, including CTA presence or complete absence
+- Every safely reproducible feature state has passed E2E verification; an exception requires explicit user acceptance in hands-on mode, and cannot be self-accepted in hands-off mode
+- Changes are organized into small, internally coherent logical commits
 - A fresh reviewer reports no valid actionable findings
-- E2E acceptance criteria pass, or a documented environment blocker is explicitly accepted by the user
 - Final automated checks pass in every changed repository
-- The main session has reviewed the complete diff and owns the Git/PR actions
+- The orchestrator has reviewed the complete diff and performed all Git and PR actions itself
 - The PR is assigned to the requesting human
-- Kilobot has reviewed the latest head and there are no unresolved actionable Kilobot comments
+- Kilobot has reviewed the latest head and no actionable Kilobot comment is unresolved
 - GitHub reports the exact latest head as mergeable with no conflicts
-- All expected CI checks on the latest head have reached a successful terminal state; failed, cancelled, timed-out, action-required, or pending checks block completion
-- Generated E2E fixtures have been cleaned up, and final `git status` confirms none are tracked or untracked in the repository
+- All expected CI checks on the latest head are in a successful terminal state; failed, cancelled, timed-out, action-required, or pending checks block completion
+- No generated E2E fixture remains tracked or untracked in any repository
+- Every verifier temporary edit is removed, and each repository's final Git state exactly matches its recorded pre-verification baseline
+- The temporary handoff file is deleted

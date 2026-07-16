@@ -1658,7 +1658,8 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
   async function buildPromptWrapperRequests(
     metadata: CloudAgentSessionState,
-    customizeEnv?: (env: PersistenceEnv) => void
+    customizeEnv?: (env: PersistenceEnv) => void,
+    preparation?: { attemptId: string }
   ) {
     const service = new SessionService();
     const env = createEnv();
@@ -1668,6 +1669,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     return service.buildWrapperSessionReadyAndPromptRequests({
       env,
       plan: {
+        ...(preparation ? { preparation } : {}),
         scope: {
           sessionId: 'agent_test',
           userId: 'user_test',
@@ -1993,6 +1995,14 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(JSON.stringify(result.readyRequest)).not.toContain('resolved-gitlab-token');
   });
 
+  it('continues the preparation attempt the delivery plan allocated', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata(), undefined, {
+      attemptId: 'attempt-from-do',
+    });
+
+    expect(result.readyRequest.preparation?.attemptId).toBe('attempt-from-do');
+  });
+
   it('uses direct GitLab authentication for a resumed DIND session', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata({ preparedAt: 1 }),
@@ -2147,6 +2157,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       },
       materialized: {
         setupCommands: ['pnpm install'],
+      },
+      preparation: {
+        triggerMessageId: 'msg_018f1e2d3c4bPayloadTestAAAA',
       },
     });
     expect(result.readyRequest).not.toHaveProperty('prompt');

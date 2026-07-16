@@ -18,6 +18,8 @@ import type {
   SuggestionState,
   CloudStatus,
   MessageDeliveryState,
+  PreparationAttempt,
+  PreparationStepSnapshot,
 } from './types';
 
 type ServiceStateConfig = {
@@ -66,6 +68,9 @@ type ServiceState = {
   getActivity(): SessionActivity;
   getStatus(): AgentStatus;
   getCloudStatus(): CloudStatus | null;
+  /** @deprecated Legacy transient setup output. */
+  getSetupLog(): readonly string[];
+  getPreparationAttempts(): readonly PreparationAttempt[];
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
   getSuggestion(): SuggestionState | null;
@@ -89,6 +94,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
   let cloudStatus: CloudStatus | null = null;
+  let setupLog: string[] = [];
+  let preparationAttempts: PreparationAttempt[] = [];
   let sessionInfo: SessionInfo | null = null;
   let question: QuestionState | null = null;
   let permission: PermissionState | null = null;
@@ -149,6 +156,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processStopped(event: Extract<ServiceEvent, { type: 'stopped' }>): void {
     activity = { type: 'idle' };
     cloudStatus = null;
+    setupLog = [];
 
     switch (event.reason) {
       case 'complete':
@@ -272,18 +280,206 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function processPreparing(event: Extract<ServiceEvent, { type: 'preparing' }>): void {
+    if (event.version === 2 && event.attemptId && event.triggerMessageId && event.action) {
+      const attempt = processPreparationEvent(event);
+      // Only an event that actually advanced the attempt may move cloudStatus.
+      // Stale duplicates and replayed snapshots of a finished attempt would
+      // otherwise flip a ready session back to 'preparing' and permanently
+      // disable the chat input.
+      if (attempt) {
+        cloudStatus =
+          attempt.status === 'completed'
+            ? { type: 'ready' }
+            : attempt.status === 'failed'
+              ? { type: 'error', message: attempt.safeError ?? event.message }
+              : { type: 'preparing', step: event.step, message: event.message };
+      }
+      notify();
+      return;
+    }
     if (event.step === 'ready') {
       cloudStatus = { type: 'ready' };
+      setupLog = [];
       if (event.branch) config.onBranchChanged?.(event.branch);
       config.onPreparationReady?.();
     } else if (event.step === 'failed') {
       cloudStatus = { type: 'error', message: event.message };
+      setupLog = [];
       config.onError?.(event.message);
       config.onPreparationFailed?.(event.message);
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
+      if (event.step === 'setup_commands' && event.message) {
+        setupLog = [...setupLog, event.message];
+      }
     }
     notify();
+  }
+
+  /**
+   * Apply one v2 preparation event to the attempts list. Returns the attempt
+   * in its post-event state when the event advanced it, or null when the
+   * event was stale or unusable and nothing changed.
+   */
+  function processPreparationEvent(
+    event: Extract<ServiceEvent, { type: 'preparing' }>
+  ): PreparationAttempt | null {
+    if (
+      event.version !== 2 ||
+      !event.attemptId ||
+      !event.triggerMessageId ||
+      event.revision === undefined ||
+      event.timestamp === undefined ||
+      !event.action
+    ) {
+      return null;
+    }
+    const eventTimestamp = event.timestamp;
+    const eventRevision = event.revision;
+    const existing = preparationAttempts.find(attempt => attempt.id === event.attemptId);
+    // Steps come from two independent emitters (the server before the wrapper
+    // boots, the wrapper after), and each only completes its own previous
+    // step. When the attempt changes hands (a running attempt re-announced)
+    // or reaches a terminal state, settle any step still marked running —
+    // its emitter is gone and no completion will ever arrive.
+    const settleRunningSteps = (
+      steps: readonly PreparationStepSnapshot[],
+      status: 'completed' | 'failed',
+      safeError?: string
+    ): PreparationStepSnapshot[] =>
+      steps.map(step =>
+        step.status === 'running'
+          ? {
+              ...step,
+              status,
+              completedAt: eventTimestamp,
+              ...(status === 'failed' && safeError !== undefined ? { safeError } : {}),
+              revision: eventRevision,
+            }
+          : step
+      );
+    if (event.action === 'attempt_started') {
+      if (existing && existing.revision >= event.revision) return null;
+      const handedOff = existing?.status === 'running' ? existing : undefined;
+      const attempt: PreparationAttempt = {
+        id: event.attemptId,
+        triggerMessageId: event.triggerMessageId,
+        status: 'running',
+        // The wrapper re-announces the attempt the server already started;
+        // keep the original start so the duration spans the whole preparation.
+        startedAt: handedOff ? handedOff.startedAt : event.timestamp,
+        revision: event.revision,
+        steps: handedOff
+          ? settleRunningSteps(handedOff.steps, 'completed')
+          : (existing?.steps ?? []),
+      };
+      preparationAttempts = [
+        ...preparationAttempts.filter(item => item.id !== attempt.id),
+        attempt,
+      ].sort((a, b) => a.startedAt - b.startedAt);
+      return attempt;
+    }
+    if (event.action === 'attempt_snapshot' && event.attempt) {
+      if (existing && existing.revision > event.attempt.revision) return null;
+      const snapshot = event.attempt;
+      const attempt: PreparationAttempt = {
+        id: snapshot.id,
+        triggerMessageId: snapshot.triggerMessageId,
+        status: snapshot.status,
+        startedAt: snapshot.startedAt,
+        ...(snapshot.completedAt === undefined ? {} : { completedAt: snapshot.completedAt }),
+        ...(snapshot.safeError === undefined ? {} : { safeError: snapshot.safeError }),
+        revision: snapshot.revision,
+        steps: existing?.steps ?? [],
+      };
+      preparationAttempts = [
+        ...preparationAttempts.filter(item => item.id !== attempt.id),
+        attempt,
+      ].sort((a, b) => a.startedAt - b.startedAt);
+      return attempt;
+    }
+    if (!existing) return null;
+    if (event.action === 'attempt_completed' || event.action === 'attempt_failed') {
+      if (existing.revision >= event.revision || existing.status !== 'running') return null;
+      const status = event.action === 'attempt_completed' ? 'completed' : 'failed';
+      const attempt: PreparationAttempt = {
+        ...existing,
+        status,
+        completedAt: event.timestamp,
+        ...(event.safeError === undefined ? {} : { safeError: event.safeError }),
+        revision: event.revision,
+        steps: settleRunningSteps(existing.steps, status, event.safeError),
+      };
+      preparationAttempts = preparationAttempts.map(item =>
+        item.id === existing.id ? attempt : item
+      );
+      return attempt;
+    }
+    if (!event.stepId) return null;
+    const existingStep = existing.steps.find(step => step.id === event.stepId);
+    let nextStep: PreparationStepSnapshot | undefined;
+    if (event.action === 'step_snapshot' && event.stepSnapshot) {
+      if (existingStep && existingStep.revision > event.stepSnapshot.revision) return null;
+      nextStep = event.stepSnapshot;
+    } else if (event.action === 'step_started' && event.kind && event.label) {
+      if (existingStep && existingStep.revision >= event.revision) return null;
+      nextStep = {
+        id: event.stepId,
+        key: event.step,
+        kind: event.kind,
+        label: event.label,
+        status: 'running',
+        startedAt: event.timestamp,
+        revision: event.revision,
+        ...(event.command === undefined ? {} : { command: event.command }),
+        ...(event.commandIndex === undefined ? {} : { commandIndex: event.commandIndex }),
+        ...(event.commandCount === undefined ? {} : { commandCount: event.commandCount }),
+      };
+    } else if (
+      existingStep &&
+      existingStep.revision < event.revision &&
+      existingStep.status === 'running'
+    ) {
+      if (event.action === 'step_progress' && event.detail !== undefined) {
+        nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
+      } else if (event.action === 'step_output' && event.output !== undefined) {
+        nextStep = {
+          ...existingStep,
+          outputTail: `${existingStep.outputTail ?? ''}${event.output}`,
+          revision: event.revision,
+        };
+      } else if (event.action === 'step_completed') {
+        nextStep = {
+          ...existingStep,
+          status: 'completed',
+          completedAt: event.timestamp,
+          ...(event.exitCode === undefined ? {} : { exitCode: event.exitCode }),
+          revision: event.revision,
+        };
+      } else if (event.action === 'step_failed' && event.safeError !== undefined) {
+        nextStep = {
+          ...existingStep,
+          status: 'failed',
+          completedAt: event.timestamp,
+          safeError: event.safeError,
+          ...(event.exitCode === undefined ? {} : { exitCode: event.exitCode }),
+          revision: event.revision,
+        };
+      }
+    }
+    if (!nextStep) return null;
+    const step = nextStep;
+    const attempt: PreparationAttempt = {
+      ...existing,
+      revision: Math.max(existing.revision, step.revision),
+      steps: [...existing.steps.filter(item => item.id !== step.id), step].sort(
+        (a, b) => a.startedAt - b.startedAt
+      ),
+    };
+    preparationAttempts = preparationAttempts.map(item =>
+      item.id === existing.id ? attempt : item
+    );
+    return attempt;
   }
 
   function processAutocommitStarted(
@@ -504,6 +700,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getActivity: () => activity,
     getStatus: () => status,
     getCloudStatus: () => cloudStatus,
+    getSetupLog: () => setupLog,
+    getPreparationAttempts: () => preparationAttempts,
     getQuestion: () => question,
     getPermission: () => permission,
     getSuggestion: () => suggestion,
@@ -514,6 +712,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       activity,
       status,
       cloudStatus,
+      setupLog,
+      preparationAttempts,
       sessionInfo,
       question,
       permission,
@@ -547,6 +747,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       activity = INITIAL_ACTIVITY;
       status = IDLE_STATUS;
       cloudStatus = null;
+      setupLog = [];
+      preparationAttempts = [];
       sessionInfo = null;
       question = null;
       permission = null;

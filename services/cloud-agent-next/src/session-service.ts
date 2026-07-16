@@ -2061,6 +2061,7 @@ export class SessionService {
         : [];
 
     const promptAgent = normalizeAgentMode(agent.mode);
+    const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
     const readyRequest: WrapperSessionReadyRequest = {
       agentSessionId: sessionId,
       userId,
@@ -2077,7 +2078,7 @@ export class SessionService {
         strictBranch: Boolean(
           metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt
         ),
-        preferSnapshot: metadata.lifecycle.preparedAt !== undefined,
+        preferSnapshot,
       },
       ...(repo ? { repo } : {}),
       ...(devcontainerRequested
@@ -2094,6 +2095,13 @@ export class SessionService {
         ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
       },
       session,
+      preparation: {
+        // Reuse the attempt the DO allocated (and may already have started
+        // with early sandbox-provisioning steps) so the wrapper's bootstrap
+        // events continue the same attempt instead of opening a second one.
+        attemptId: plan.preparation?.attemptId ?? crypto.randomUUID(),
+        triggerMessageId: turn.messageId,
+      },
     };
 
     if (turn.type === 'command') {

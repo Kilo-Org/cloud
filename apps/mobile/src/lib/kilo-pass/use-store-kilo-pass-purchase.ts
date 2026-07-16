@@ -96,6 +96,22 @@ type StoreKiloPassPurchaseContextValue = {
 };
 
 const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextValue | null>(null);
+
+const androidStoreKiloPassPurchaseValue: StoreKiloPassPurchaseContextValue = {
+  appStoreOwnershipPreflight: null,
+  purchase: async () => {
+    await Promise.resolve();
+  },
+  restorePurchases: async () => {
+    await Promise.resolve();
+    return 'failed';
+  },
+  isPending: false,
+  isRestoringPurchases: false,
+  errorMessage: null,
+  clearError: () => undefined,
+};
+
 type PurchaseCompletionResult =
   | { completed: true; errorMessage?: never }
   | { completed: false; errorMessage: string | null };
@@ -366,6 +382,18 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 }
 
 export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNode }) {
+  if (Platform.OS !== 'ios') {
+    return createElement(
+      StoreKiloPassPurchaseContext.Provider,
+      { value: androidStoreKiloPassPurchaseValue },
+      children
+    );
+  }
+
+  return createElement(IosStoreKiloPassPurchaseProvider, null, children);
+}
+
+function IosStoreKiloPassPurchaseProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);

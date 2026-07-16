@@ -94,6 +94,10 @@ import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '@/lib/code-re
 import { parseCodeReviewAnalyticsManifest } from '@/lib/code-reviews/analytics/contracts';
 import { finalizeCompletedCodeReviewWithAnalytics } from '@/lib/code-reviews/analytics/db';
 import {
+  computeCouncilResultForReview,
+  finalizeCouncilResultForReview,
+} from '@/lib/code-reviews/council/finalize-council-result';
+import {
   getManualCodeReviewConfig,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
@@ -1052,6 +1056,13 @@ export async function POST(
         executionId,
         completedAt: callbackCompletedAt,
         capture,
+        // Persist the council outcome atomically with the completion claim, so a council
+        // write failure can't leave a completed council review without a result (redelivery
+        // would short-circuit on the already-terminal parent). No-op for standard runs.
+        councilResult: computeCouncilResultForReview({
+          review,
+          lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+        }),
       });
 
       if (completionResult.outcome !== 'applied') {
@@ -1320,6 +1331,21 @@ export async function POST(
     const isModelNotFoundCancellation =
       status === 'cancelled' &&
       isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
+
+    // Non-analytics completion path only: persist the council outcome BEFORE marking the
+    // review completed. Writing it first means a `completed` council review always has a
+    // `council_result`; if this write fails it throws, the callback returns an error, and
+    // cloud-agent-next redelivers — retrying finalization — rather than leaving a completed
+    // run permanently without a result. The ANALYTICS path is handled above, where
+    // council_result is written atomically inside the completion transaction (its parent
+    // is already completed by the time control reaches here, so the redelivery-retry design
+    // would not hold on that path).
+    if (status === 'completed' && review.review_type === 'council' && !analyticsCompletionApplied) {
+      await finalizeCouncilResultForReview({
+        review,
+        lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+      });
+    }
 
     if (analyticsCompletionApplied) {
       // Parent and accepted attempt completion were claimed with analytics in one transaction.

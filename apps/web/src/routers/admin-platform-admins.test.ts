@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { kilocode_users, user_admin_notes } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -13,6 +13,7 @@ async function insertQualifyingAdmin(overrides: Parameters<typeof insertTestUser
     google_user_email: `qualifying-admin-${crypto.randomUUID()}@kilocode.ai`,
     hosted_domain: KILO_DOMAIN,
     is_admin: true,
+    is_super_admin: true,
     ...overrides,
   });
 }
@@ -22,6 +23,7 @@ async function insertGrandfatheredAdmin(overrides: Parameters<typeof insertTestU
     google_user_email: `grandfathered-admin-${crypto.randomUUID()}@example.com`,
     hosted_domain: hosted_domain_specials.non_workspace_google_account,
     is_admin: true,
+    is_super_admin: true,
     ...overrides,
   });
 }
@@ -72,21 +74,21 @@ describe('admin.users.listPlatformAdmins', () => {
     expect(adminIds).toContain(grandfathered.id);
   });
 
-  test('reports canGrantAdmins true for a qualifying kilocode.ai admin', async () => {
+  test('reports canManageAdmins true for a superadmin', async () => {
     const qualifying = await insertQualifyingAdmin();
     const caller = await createCallerForUser(qualifying.id);
 
     const result = await caller.admin.users.listPlatformAdmins();
-    expect(result.canGrantAdmins).toBe(true);
+    expect(result.canManageAdmins).toBe(true);
     expect(result.currentUserId).toBe(qualifying.id);
   });
 
-  test('reports canGrantAdmins false for a grandfathered outside-domain admin', async () => {
-    const grandfathered = await insertGrandfatheredAdmin();
-    const caller = await createCallerForUser(grandfathered.id);
+  test('reports canManageAdmins false for an ordinary admin', async () => {
+    const ordinaryAdmin = await insertGrandfatheredAdmin({ is_super_admin: false });
+    const caller = await createCallerForUser(ordinaryAdmin.id);
 
     const result = await caller.admin.users.listPlatformAdmins();
-    expect(result.canGrantAdmins).toBe(false);
+    expect(result.canManageAdmins).toBe(false);
   });
 });
 
@@ -100,9 +102,9 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  test('a grandfathered outside-domain admin cannot search candidates', async () => {
-    const grandfathered = await insertGrandfatheredAdmin();
-    const caller = await createCallerForUser(grandfathered.id);
+  test('an ordinary admin cannot search candidates', async () => {
+    const ordinaryAdmin = await insertGrandfatheredAdmin({ is_super_admin: false });
+    const caller = await createCallerForUser(ordinaryAdmin.id);
 
     await expect(
       caller.admin.users.searchPlatformAdminCandidates({ query: 'candidate' })
@@ -194,7 +196,7 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
 });
 
 describe('admin.users.setPlatformAdminAccess — grant', () => {
-  test('a qualifying admin can grant an eligible target', async () => {
+  test('a superadmin can grant an eligible target without subordinate permissions', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertEligibleCandidate({
       web_session_pepper: 'before-grant-pepper',
@@ -212,7 +214,8 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
 
     const updated = await getUser(target.id);
     expect(updated.is_admin).toBe(true);
-    // Grant sets only is_admin — can_manage_credits must remain untouched.
+    expect(updated.is_super_admin).toBe(false);
+    expect(updated.can_view_sessions).toBe(false);
     expect(updated.can_manage_credits).toBe(false);
     expect(updated.web_session_pepper).not.toBe('before-grant-pepper');
     // Grant must rotate api_token_pepper so pre-grant bearer tokens can't
@@ -242,8 +245,8 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     expect(unchanged.is_admin).toBe(false);
   });
 
-  test('a grandfathered outside-domain admin cannot grant', async () => {
-    const grandfathered = await insertGrandfatheredAdmin();
+  test('an ordinary admin cannot grant', async () => {
+    const grandfathered = await insertGrandfatheredAdmin({ is_super_admin: false });
     const target = await insertEligibleCandidate();
     const caller = await createCallerForUser(grandfathered.id);
 
@@ -326,10 +329,11 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
 });
 
 describe('admin.users.setPlatformAdminAccess — revoke', () => {
-  test('a qualifying admin can revoke another admin, clearing credit management together', async () => {
+  test('a superadmin can revoke another admin, clearing every subordinate permission', async () => {
     const admin = await insertQualifyingAdmin();
     const target = await insertQualifyingAdmin({
       can_manage_credits: true,
+      can_view_sessions: true,
       web_session_pepper: 'before-revoke-pepper',
       api_token_pepper: 'before-revoke-api-pepper',
     });
@@ -344,6 +348,8 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
 
     const updated = await getUser(target.id);
     expect(updated.is_admin).toBe(false);
+    expect(updated.is_super_admin).toBe(false);
+    expect(updated.can_view_sessions).toBe(false);
     expect(updated.can_manage_credits).toBe(false);
     expect(updated.web_session_pepper).not.toBe('before-revoke-pepper');
     // Revoke must rotate api_token_pepper so pre-revoke bearer tokens lose
@@ -356,7 +362,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
     expect(notes[0]?.admin_kilo_user_id).toBe(admin.id);
   });
 
-  test('a grandfathered outside-domain admin can revoke another admin', async () => {
+  test('a grandfathered outside-domain superadmin can revoke another admin', async () => {
     const grandfathered = await insertGrandfatheredAdmin();
     const target = await insertQualifyingAdmin();
     const caller = await createCallerForUser(grandfathered.id);
@@ -413,6 +419,277 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
     await expect(
       caller.admin.users.setPlatformAdminAccess({ userId: target.id, isAdmin: false })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  test('serializes concurrent platform revocations so one unblocked superadmin remains', async () => {
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'isolated platform-revoke test' })
+      .where(eq(kilocode_users.is_super_admin, true));
+    const first = await insertQualifyingAdmin();
+    const second = await insertQualifyingAdmin();
+    const firstCaller = await createCallerForUser(first.id);
+    const secondCaller = await createCallerForUser(second.id);
+
+    const results = await Promise.allSettled([
+      firstCaller.admin.users.setPlatformAdminAccess({ userId: second.id, isAdmin: false }),
+      secondCaller.admin.users.setPlatformAdminAccess({ userId: first.id, isAdmin: false }),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    const remaining = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(
+        and(
+          eq(kilocode_users.is_admin, true),
+          eq(kilocode_users.is_super_admin, true),
+          isNull(kilocode_users.blocked_reason)
+        )
+      );
+    expect(remaining).toHaveLength(1);
+  });
+});
+
+describe('admin.users.setAdminPermissions', () => {
+  test('ordinary admins cannot manage permissions', async () => {
+    const ordinaryAdmin = await insertQualifyingAdmin({ is_super_admin: false });
+    const target = await insertQualifyingAdmin();
+    const caller = await createCallerForUser(ordinaryAdmin.id);
+
+    await expect(
+      caller.admin.users.setAdminPermissions({
+        userId: target.id,
+        permissions: { canViewSessions: true },
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  test('requires at least one permission in the patch', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.users.setAdminPermissions({ userId: target.id, permissions: {} })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  test('applies only included fields, rotates credentials once, and attributes each note', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({
+      is_super_admin: false,
+      can_view_sessions: false,
+      can_manage_credits: true,
+      web_session_pepper: 'before-permissions-web',
+      api_token_pepper: 'before-permissions-api',
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { isSuperadmin: true, canViewSessions: true },
+    });
+
+    expect(result.changed).toBe(true);
+    expect(result.user.is_super_admin).toBe(true);
+    expect(result.user.can_view_sessions).toBe(true);
+    expect(result.user.can_manage_credits).toBe(true);
+
+    const updated = await getUser(target.id);
+    expect(updated.web_session_pepper).not.toBe('before-permissions-web');
+    expect(updated.api_token_pepper).not.toBe('before-permissions-api');
+    expect(updated.can_manage_credits).toBe(true);
+
+    const notes = await getUserAdminNotes(target.id);
+    expect(notes.map(note => note.note_content).sort()).toEqual([
+      'Granted session viewer access.',
+      'Granted superadmin access.',
+    ]);
+    expect(notes.every(note => note.admin_kilo_user_id === admin.id)).toBe(true);
+  });
+
+  test('permits self session-viewer and credit-manager changes but not self-superadmin changes', async () => {
+    const admin = await insertQualifyingAdmin();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.users.setAdminPermissions({
+        userId: admin.id,
+        permissions: { canViewSessions: true, canManageCredits: true },
+      })
+    ).resolves.toMatchObject({ changed: true });
+
+    await expect(
+      caller.admin.users.setAdminPermissions({
+        userId: admin.id,
+        permissions: { isSuperadmin: false },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  test('rejects targets that are not platform admins', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertEligibleCandidate();
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.users.setAdminPermissions({
+        userId: target.id,
+        permissions: { canViewSessions: true },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  test('repeated desired state is a no-op without credential rotation or duplicate notes', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({
+      can_view_sessions: true,
+      web_session_pepper: 'no-op-web',
+      api_token_pepper: 'no-op-api',
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { canViewSessions: true },
+    });
+
+    expect(result.changed).toBe(false);
+    const unchanged = await getUser(target.id);
+    expect(unchanged.web_session_pepper).toBe('no-op-web');
+    expect(unchanged.api_token_pepper).toBe('no-op-api');
+    expect(await getUserAdminNotes(target.id)).toHaveLength(0);
+  });
+
+  test('revokes session-viewer and credit-manager access with fixed attributed notes', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({
+      can_view_sessions: true,
+      can_manage_credits: true,
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { canViewSessions: false, canManageCredits: false },
+    });
+
+    const updated = await getUser(target.id);
+    expect(updated.can_view_sessions).toBe(false);
+    expect(updated.can_manage_credits).toBe(false);
+    const notes = await getUserAdminNotes(target.id);
+    expect(notes.map(note => note.note_content).sort()).toEqual([
+      'Revoked credit manager access.',
+      'Revoked session viewer access.',
+    ]);
+    expect(notes.every(note => note.admin_kilo_user_id === admin.id)).toBe(true);
+  });
+
+  test('records granted credit-manager and revoked superadmin notes', async () => {
+    const admin = await insertQualifyingAdmin();
+    const target = await insertQualifyingAdmin({ is_super_admin: false });
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { canManageCredits: true, isSuperadmin: true },
+    });
+    await caller.admin.users.setAdminPermissions({
+      userId: target.id,
+      permissions: { isSuperadmin: false },
+    });
+
+    const notes = await getUserAdminNotes(target.id);
+    expect(notes.map(note => note.note_content).sort()).toEqual([
+      'Granted credit manager access.',
+      'Granted superadmin access.',
+      'Revoked superadmin access.',
+    ]);
+    expect(notes.every(note => note.admin_kilo_user_id === admin.id)).toBe(true);
+  });
+
+  test('blocked superadmins cannot manage permissions', async () => {
+    const blocked = await insertQualifyingAdmin({ blocked_reason: 'security review' });
+    const target = await insertQualifyingAdmin();
+    const caller = await createCallerForUser(blocked.id);
+
+    await expect(
+      caller.admin.users.setAdminPermissions({
+        userId: target.id,
+        permissions: { canViewSessions: true },
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  test('serializes concurrent revocations so one unblocked superadmin remains', async () => {
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'isolated concurrent-superadmin test' })
+      .where(eq(kilocode_users.is_super_admin, true));
+    const first = await insertQualifyingAdmin();
+    const second = await insertQualifyingAdmin();
+    const firstCaller = await createCallerForUser(first.id);
+    const secondCaller = await createCallerForUser(second.id);
+
+    const results = await Promise.allSettled([
+      firstCaller.admin.users.setAdminPermissions({
+        userId: second.id,
+        permissions: { isSuperadmin: false },
+      }),
+      secondCaller.admin.users.setAdminPermissions({
+        userId: first.id,
+        permissions: { isSuperadmin: false },
+      }),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    const remaining = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(
+        and(
+          eq(kilocode_users.is_admin, true),
+          eq(kilocode_users.is_super_admin, true),
+          isNull(kilocode_users.blocked_reason)
+        )
+      );
+    expect(remaining).toHaveLength(1);
+  });
+
+  test('serializes mixed platform and permission revocations', async () => {
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'isolated mixed-superadmin test' })
+      .where(eq(kilocode_users.is_super_admin, true));
+    const first = await insertQualifyingAdmin();
+    const second = await insertQualifyingAdmin();
+    const firstCaller = await createCallerForUser(first.id);
+    const secondCaller = await createCallerForUser(second.id);
+
+    const results = await Promise.allSettled([
+      firstCaller.admin.users.setPlatformAdminAccess({ userId: second.id, isAdmin: false }),
+      secondCaller.admin.users.setAdminPermissions({
+        userId: first.id,
+        permissions: { isSuperadmin: false },
+      }),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    const remaining = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(
+        and(
+          eq(kilocode_users.is_admin, true),
+          eq(kilocode_users.is_super_admin, true),
+          isNull(kilocode_users.blocked_reason)
+        )
+      );
+    expect(remaining).toHaveLength(1);
   });
 });
 

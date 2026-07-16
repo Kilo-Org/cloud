@@ -38,6 +38,7 @@ describe('createServiceState', () => {
       expect(snap.activity).toEqual({ type: 'connecting' });
       expect(snap.status).toEqual({ type: 'idle' });
       expect(snap.cloudStatus).toBeNull();
+      expect(snap.setupLog).toEqual([]);
       expect(snap.sessionInfo).toBeNull();
       expect(snap.question).toBeNull();
       expect(snap.permission).toBeNull();
@@ -483,6 +484,341 @@ describe('createServiceState', () => {
       expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Clone failed' });
       expect(onError).toHaveBeenCalledWith('Clone failed');
       expect(onPreparationFailed).toHaveBeenCalledWith('Clone failed');
+    });
+
+    it('accumulates setup_commands messages into setupLog', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        step: 'setup_commands',
+        message: 'Running setup command 1 of 2: npm install',
+      });
+      state.process({ type: 'preparing', step: 'setup_commands', message: 'added 42 packages' });
+      state.process({
+        type: 'preparing',
+        step: 'setup_commands',
+        message: 'Running setup command 2 of 2: pip install',
+      });
+
+      expect(state.getSetupLog()).toEqual([
+        'Running setup command 1 of 2: npm install',
+        'added 42 packages',
+        'Running setup command 2 of 2: pip install',
+      ]);
+    });
+
+    it('clears setupLog on ready', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'preparing', step: 'setup_commands', message: 'npm install' });
+      state.process({ type: 'preparing', step: 'ready', message: 'Ready' });
+
+      expect(state.getSetupLog()).toEqual([]);
+    });
+
+    it('clears setupLog on failed', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'preparing', step: 'setup_commands', message: 'npm install' });
+      state.process({ type: 'preparing', step: 'failed', message: 'Setup failed' });
+
+      expect(state.getSetupLog()).toEqual([]);
+    });
+
+    it('does not accumulate non-setup_commands steps', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'preparing', step: 'cloning', message: 'Cloning...' });
+      state.process({ type: 'preparing', step: 'branch', message: 'Creating branch...' });
+
+      expect(state.getSetupLog()).toEqual([]);
+    });
+
+    it('v2 attempt lifecycle drives cloudStatus and stale events cannot regress it', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+      };
+
+      state.process({
+        ...base,
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getCloudStatus()?.type).toBe('preparing');
+
+      state.process({
+        ...base,
+        revision: 5,
+        timestamp: 2_000,
+        step: 'ready',
+        message: 'Preparation complete',
+        action: 'attempt_completed',
+      });
+      expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+
+      // A late-arriving wrapper event with an old revision must not flip the
+      // session back to 'preparing' — that would disable the chat input.
+      state.process({
+        ...base,
+        revision: 3,
+        timestamp: 1_500,
+        step: 'kilo_server',
+        message: 'Starting Kilo',
+        action: 'step_started',
+        stepId: 'phase:kilo_server',
+        kind: 'phase',
+        label: 'kilo server',
+      });
+      expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+    });
+
+    it('v2 attempt_failed sets cloudStatus to error with the safe error', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 2,
+        timestamp: 2_000,
+        step: 'failed',
+        message: 'failed',
+        action: 'attempt_failed',
+        safeError: 'Clone failed',
+      });
+
+      expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Clone failed' });
+    });
+
+    it('replayed snapshots of a completed attempt leave cloudStatus ready', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 4,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparation snapshot',
+        action: 'attempt_snapshot',
+        attempt: {
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'completed',
+          startedAt: 1_000,
+          completedAt: 2_000,
+          revision: 4,
+        },
+      });
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 3,
+        timestamp: 1_500,
+        step: 'kilo_server',
+        message: 'Preparation snapshot',
+        action: 'step_snapshot',
+        stepId: 'phase:kilo_server',
+        stepSnapshot: {
+          id: 'phase:kilo_server',
+          key: 'kilo_server',
+          kind: 'phase',
+          label: 'kilo server',
+          status: 'completed',
+          startedAt: 1_100,
+          completedAt: 1_500,
+          revision: 3,
+        },
+      });
+
+      expect(state.getCloudStatus()).toEqual({ type: 'ready' });
+    });
+
+    it('wrapper attempt_started keeps the original start of a running attempt', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+      };
+
+      state.process({
+        ...base,
+        revision: 1,
+        timestamp: 1_000,
+        action: 'attempt_started',
+      });
+      state.process({
+        ...base,
+        revision: 1_750_000_000_000,
+        timestamp: 9_000,
+        action: 'attempt_started',
+      });
+
+      expect(state.getPreparationAttempts()[0]?.startedAt).toBe(1_000);
+    });
+
+    it('wrapper attempt_started settles the running steps of the previous emitter', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'sandbox_boot',
+        message: 'Starting sandbox agent...',
+      };
+
+      state.process({ ...base, revision: 1, timestamp: 1_000, action: 'attempt_started' });
+      state.process({
+        ...base,
+        revision: 2,
+        timestamp: 2_000,
+        action: 'step_started',
+        stepId: 'phase:sandbox_boot',
+        kind: 'phase',
+        label: 'sandbox boot',
+      });
+      state.process({ ...base, revision: 3, timestamp: 5_000, action: 'attempt_started' });
+
+      const step = state.getPreparationAttempts()[0]?.steps[0];
+      expect(step?.status).toBe('completed');
+      expect(step?.completedAt).toBe(5_000);
+    });
+
+    it('a terminal attempt settles its dangling running steps', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        step: 'kilo_server',
+        message: 'Starting Kilo...',
+      };
+
+      state.process({ ...base, revision: 1, timestamp: 1_000, action: 'attempt_started' });
+      state.process({
+        ...base,
+        revision: 2,
+        timestamp: 2_000,
+        action: 'step_started',
+        stepId: 'phase:kilo_server',
+        kind: 'phase',
+        label: 'kilo server',
+      });
+      state.process({
+        ...base,
+        revision: 3,
+        timestamp: 6_000,
+        step: 'failed',
+        message: 'Clone failed',
+        action: 'attempt_failed',
+        safeError: 'Clone failed',
+      });
+
+      const step = state.getPreparationAttempts()[0]?.steps[0];
+      expect(step?.status).toBe('failed');
+      expect(step?.safeError).toBe('Clone failed');
+      expect(step?.completedAt).toBe(6_000);
+    });
+
+    it('hydrates an attempt and its steps from reload snapshots', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 4,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparation snapshot',
+        action: 'attempt_snapshot',
+        attempt: {
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'completed',
+          startedAt: 1_000,
+          completedAt: 2_000,
+          revision: 4,
+        },
+      });
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 3,
+        timestamp: 1_500,
+        step: 'setup_commands',
+        message: 'Preparation snapshot',
+        action: 'step_snapshot',
+        stepId: 'step-1',
+        stepSnapshot: {
+          id: 'step-1',
+          key: 'setup_commands',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+          status: 'completed',
+          startedAt: 1_100,
+          completedAt: 1_500,
+          revision: 3,
+          outputTail: 'Installed dependencies',
+        },
+      });
+
+      expect(state.getPreparationAttempts()).toEqual([
+        {
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'completed',
+          startedAt: 1_000,
+          completedAt: 2_000,
+          revision: 4,
+          steps: [
+            {
+              id: 'step-1',
+              key: 'setup_commands',
+              kind: 'setup_command',
+              label: 'Install dependencies',
+              status: 'completed',
+              startedAt: 1_100,
+              completedAt: 1_500,
+              revision: 3,
+              outputTail: 'Installed dependencies',
+            },
+          ],
+        },
+      ]);
     });
   });
 

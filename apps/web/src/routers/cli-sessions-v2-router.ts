@@ -28,10 +28,16 @@ import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-c
 import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
 import {
   fetchSessionSnapshot,
+  fetchSessionMessagesPage,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
 } from '@/lib/session-ingest-client';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import {
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  validateKiloSdkMessagesCursor,
+} from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
@@ -271,6 +277,35 @@ const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
 
 /**
+ * Input for the paginated `getSessionMessagesPage` endpoint. Mirrors the
+ * worker-bound contract in `@kilocode/session-ingest-contracts` so tRPC-level
+ * input validation matches the worker's access-checked RPC and HTTP route.
+ * The `limit` default is applied here so the procedure body always sees a
+ * positive page size and the client receives a bounded request.
+ */
+const GetSessionMessagesPageInputSchema = z
+  .object({
+    session_id: sessionIdField,
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
+      .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
+    cursor: z.string().min(1).optional(),
+  })
+  .superRefine((params, ctx) => {
+    if (params.cursor === undefined) return;
+    if (!validateKiloSdkMessagesCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid message cursor',
+      });
+    }
+  });
+
+/**
  * Verify the user owns the session and still has access to its organization.
  */
 async function getSessionWithAccessCheck(
@@ -318,6 +353,7 @@ const SearchInputSchema = z.object({
   search_string: z.string().min(1),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   offset: z.number().min(0).optional().default(0),
+  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
@@ -534,11 +570,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       search_string,
       limit,
       offset,
+      orderBy,
       createdOnPlatform,
       organizationId,
       includeChildren,
       gitUrl,
     } = input;
+
+    const orderColumn =
+      orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
 
     const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
 
@@ -569,7 +609,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         .from(cli_sessions_v2)
         .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
         .where(baseWhere)
-        .orderBy(desc(cli_sessions_v2.updated_at))
+        .orderBy(desc(orderColumn))
         .limit(limit)
         .offset(offset),
       db
@@ -710,6 +750,57 @@ export const cliSessionsV2Router = createTRPCRouter({
           cause: error,
         });
       }
+    }),
+
+  /**
+   * Paginated access-checked session-message history for any V2 Kilo session
+   * the user owns. Mobile uses the default page size of 50; callers may pass a
+   * `cursor` returned by a previous page to walk older history one bounded
+   * page at a time. Typed failure outcomes (`retryable_failure`, `too_large`,
+   * `invalid_data`) are returned verbatim so the UI can distinguish
+   * retryable from non-retryable failures without inferring retry semantics.
+   */
+  getSessionMessagesPage: baseProcedure
+    .input(GetSessionMessagesPageInputSchema)
+    .query(async ({ ctx, input }) => {
+      await getSessionWithAccessCheck(input.session_id, ctx);
+
+      let result;
+      try {
+        result = await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
+          limit: input.limit,
+          ...(input.cursor !== undefined ? { before: input.cursor } : {}),
+        });
+      } catch (error) {
+        // Match the existing `getSessionMessages` error contract: surface a
+        // stable INTERNAL_SERVER_ERROR so the mobile client can map the
+        // outcome without inferring retry semantics from the worker's
+        // text. The client already calls `captureException`; we do not
+        // double-capture here.
+        console.error(
+          `Failed to fetch session messages page for session ${input.session_id}:`,
+          error instanceof Error ? error.message : error
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session messages page',
+          cause: error,
+        });
+      }
+
+      // The worker returns `null` only for sessions the user cannot read; the
+      // router's own access check above already enforces this, so the only
+      // remaining `null` is an unexpected worker state. Surface it as a
+      // NOT_FOUND rather than letting the tRPC caller see `null` in the middle
+      // of a valid access-checked path.
+      if (result === null) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Session not found',
+        });
+      }
+
+      return result;
     }),
 
   /**

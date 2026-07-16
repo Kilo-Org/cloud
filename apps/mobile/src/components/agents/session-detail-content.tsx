@@ -1,13 +1,14 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import { type CloudStatus, type KiloSessionId } from 'cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteCliWithFeedback } from '@/components/agents/exit-remote-cli-with-feedback';
@@ -28,19 +29,31 @@ import {
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
+import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
 } from '@/components/agents/session-working-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import {
+  resolveLoadedCliSessionPresenceId,
+  useCliSessionPresence,
+} from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
-import { useSessionAutoScroll } from '@/components/agents/use-session-auto-scroll';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { SessionMessageList } from '@/components/agents/session-message-list';
+import {
+  getSessionTranscriptItemKey,
+  mergeSessionTranscript,
+  type SessionTranscriptItem,
+} from '@/components/agents/session-transcript';
+import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -68,6 +81,7 @@ import {
   type ModelPickerSelection,
   type ModelPickerSelectionScope,
 } from '@/lib/picker-bridge';
+import { cn } from '@/lib/utils';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -98,6 +112,7 @@ export function SessionDetailContent({
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
+  const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
@@ -114,6 +129,10 @@ export function SessionDetailContent({
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
+  const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
+  const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
+  const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
+  const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
 
@@ -138,6 +157,12 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  const presenceSessionId = resolveLoadedCliSessionPresenceId(
+    sessionId,
+    fetchedData?.kiloSessionId
+  );
+  useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
@@ -237,17 +262,6 @@ export function SessionDetailContent({
     selectedVariant: sessionModels.selectedVariant,
   });
 
-  const {
-    flatListRef,
-    handleContentSizeChange,
-    handleListLayout,
-    handleScroll,
-    handleScrollBeginDrag,
-    handleScrollEndDrag,
-    handleMomentumScrollBegin,
-    handleMomentumScrollEnd,
-  } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
-
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
     if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
@@ -301,13 +315,13 @@ export function SessionDetailContent({
     sessionId,
   ]);
 
-  const lastAssistantIndex = useMemo(() => {
+  const lastAssistantMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i]?.info.role === 'assistant') {
-        return i;
+        return messages[i]?.info.id ?? null;
       }
     }
-    return -1;
+    return null;
   }, [messages]);
 
   const handleOpenChildSession = useCallback(
@@ -318,19 +332,27 @@ export function SessionDetailContent({
     [manager]
   );
 
+  const transcript = useMemo(
+    () => mergeSessionTranscript(messages, preparationAttempts),
+    [messages, preparationAttempts]
+  );
+
   const renderItem = useCallback(
-    ({ item, index }: { item: StoredMessage; index: number }) => (
-      <MessageBubble
-        message={item}
-        isLastAssistantMessage={index === lastAssistantIndex}
-        isSessionStreaming={isStreaming}
-        getChildMessages={getChildMessages}
-        defaultReasoningExpanded={reasoningDefaultExpanded}
-        onOpenChildSession={handleOpenChildSession}
-      />
-    ),
+    ({ item }: { item: SessionTranscriptItem }) =>
+      item.type === 'preparation' ? (
+        <PreparationGroup attempt={item.attempt} />
+      ) : (
+        <MessageBubble
+          message={item.message}
+          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
+          isSessionStreaming={isStreaming}
+          getChildMessages={getChildMessages}
+          defaultReasoningExpanded={reasoningDefaultExpanded}
+          onOpenChildSession={handleOpenChildSession}
+        />
+      ),
     [
-      lastAssistantIndex,
+      lastAssistantMessageId,
       isStreaming,
       getChildMessages,
       reasoningDefaultExpanded,
@@ -403,17 +425,26 @@ export function SessionDetailContent({
 
   const emptyStateText = statusIndicator ? null : 'No messages yet';
 
-  const title =
-    fetchedData?.kiloSessionId === sessionId ? (fetchedData.title ?? 'Session') : 'Session';
+  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  const rename = useSessionDetailRename({
+    sessionId,
+    isLoaded: isSessionLoaded,
+    serverTitle,
+    fallbackTitle: 'Session',
+  });
+  const handleRenameSave = rename.submit;
+  const handleRenameClose = rename.closeModal;
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
+  const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
+  const hasBlockingInteraction = blockingInteraction !== 'none';
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
     shouldShowLoading ||
     Boolean(error) ||
-    Boolean(activeQuestion) ||
+    hasBlockingInteraction ||
     (requiresModel && !currentModel);
-  const showInteractionCards = activeQuestion ?? activePermission;
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
@@ -514,7 +545,16 @@ export function SessionDetailContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} headerRight={headerRight} />
+      <ScreenHeader
+        title={rename.title}
+        headerRight={headerRight}
+        {...(rename.isTitleInteractive
+          ? {
+              onTitlePress: rename.openModal,
+              onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+            }
+          : {})}
+      />
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -559,6 +599,16 @@ export function SessionDetailContent({
           }}
         />
       ) : null}
+
+      {rename.isTitleInteractive && rename.isModalOpen ? (
+        <RenameModal
+          title="Rename session"
+          placeholder="Session name"
+          initialValue={rename.modalInitialValue}
+          onSave={handleRenameSave}
+          onClose={handleRenameClose}
+        />
+      ) : null}
     </View>
   );
 
@@ -567,7 +617,7 @@ export function SessionDetailContent({
       <>
         <View className="flex-1">{renderContent()}</View>
 
-        {activeQuestion ? (
+        {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
             questions={activeQuestion.questions}
             onAnswer={answers => {
@@ -580,7 +630,7 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {activePermission ? (
+        {blockingInteraction === 'permission' && activePermission ? (
           <PermissionCard
             permission={activePermission.permission}
             patterns={activePermission.patterns}
@@ -592,43 +642,48 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {!showInteractionCards &&
-          (isReadOnly && messages.length > 0 ? (
-            <View className="border-t border-border bg-secondary px-4 py-3">
-              <Text className="text-center text-sm text-muted-foreground">
-                This is a read-only session
-              </Text>
-            </View>
-          ) : (
-            <>
-              <ModelPickerSelectionScopeProvider
-                selectionScope={modelPickerSelectionScope}
-                isSelectionCurrent={isModelPickerSelectionCurrent}
-              >
-                <ChatComposer
-                  onSend={handleSend}
-                  onSendCommand={handleSendCommand}
-                  onCreateSession={handleCreateSession}
-                  onExitCli={handleExitCli}
-                  onStop={handleStop}
-                  disabled={isComposerDisabled}
-                  isStreaming={isStreaming}
-                  placeholder={composerPlaceholder}
-                  mode={currentMode}
-                  onModeChange={setCurrentMode}
-                  model={currentModel}
-                  variant={currentVariant}
-                  modelOptions={modelOptions}
-                  onModelSelect={handleModelSelect}
-                  organizationId={organizationId}
-                  attachmentsEnabled={supportsAttachments}
-                  activeSessionType={activeSessionType}
-                  commands={availableCommands}
-                  commandState={remoteCommandState}
-                />
-              </ModelPickerSelectionScopeProvider>
-            </>
-          ))}
+        {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
+          <View className="border-t border-border bg-secondary px-4 py-3">
+            <Text className="text-center text-sm text-muted-foreground">
+              This is a read-only session
+            </Text>
+          </View>
+        ) : null}
+
+        {!isReadOnly || messages.length === 0 ? (
+          <View
+            className={cn(hasBlockingInteraction && 'hidden')}
+            accessibilityElementsHidden={hasBlockingInteraction}
+            importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
+          >
+            <ModelPickerSelectionScopeProvider
+              selectionScope={modelPickerSelectionScope}
+              isSelectionCurrent={isModelPickerSelectionCurrent}
+            >
+              <ChatComposer
+                onSend={handleSend}
+                onSendCommand={handleSendCommand}
+                onCreateSession={handleCreateSession}
+                onExitCli={handleExitCli}
+                onStop={handleStop}
+                disabled={isComposerDisabled}
+                isStreaming={isStreaming}
+                placeholder={composerPlaceholder}
+                mode={currentMode}
+                onModeChange={setCurrentMode}
+                model={currentModel}
+                variant={currentVariant}
+                modelOptions={modelOptions}
+                onModelSelect={handleModelSelect}
+                organizationId={organizationId}
+                attachmentsEnabled={supportsAttachments}
+                activeSessionType={activeSessionType}
+                commands={availableCommands}
+                commandState={remoteCommandState}
+              />
+            </ModelPickerSelectionScopeProvider>
+          </View>
+        ) : null}
       </>
     );
   }
@@ -671,28 +726,24 @@ export function SessionDetailContent({
       );
     }
     return (
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={item => item.info.id}
+      <SessionMessageList
+        sessionId={sessionId}
+        items={transcript}
+        keyExtractor={getSessionTranscriptItemKey}
+        hasOlderMessages={hasOlderMessages}
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onLoadOlderMessages={() => {
+          void manager.loadOlderMessages();
+        }}
         renderItem={renderItem}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        onMomentumScrollBegin={handleMomentumScrollBegin}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        onContentSizeChange={handleContentSizeChange}
-        onLayout={handleListLayout}
-        scrollEventThrottle={16}
         ListFooterComponent={
           <>
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
           </>
         }
-        contentContainerClassName="py-2"
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
       />
     );
   }

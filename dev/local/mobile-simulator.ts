@@ -6,7 +6,12 @@ import path from 'node:path';
 
 import { withProcessLock } from './process-lock';
 
-type SimulatorDevice = { id: string; name: string; state: string };
+type SimulatorDevice = {
+  id: string;
+  name: string;
+  state: string;
+  deviceTypeIdentifier?: string;
+};
 type ExecFn = (
   command: string,
   args: readonly string[],
@@ -558,7 +563,13 @@ function claimSimulator(args: ClaimArgs): { device: SimulatorDevice; alreadyOwne
   fs.mkdirSync(lockRoot, { recursive: true });
   const candidates = requestedId
     ? devices.filter(device => device.id === requestedId)
-    : [...devices].sort((a, b) => Number(a.state === 'Booted') - Number(b.state === 'Booted'));
+    : devices
+        .filter(
+          device =>
+            typeof device.deviceTypeIdentifier === 'string' &&
+            device.deviceTypeIdentifier.startsWith('com.apple.CoreSimulator.SimDeviceType.iPhone-')
+        )
+        .sort((a, b) => Number(a.state === 'Booted') - Number(b.state === 'Booted'));
   if (candidates.length === 0)
     throw new Error(`Simulator ${requestedId ?? ''} is not available`.trim());
 
@@ -955,16 +966,44 @@ function releaseSimulator(args: {
   });
 }
 
-function listIosDevices(): SimulatorDevice[] {
-  const raw = JSON.parse(
-    execFileSync('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], {
+function listIosDevices(exec: ExecFn = execFileSync): SimulatorDevice[] {
+  const parsed: unknown = JSON.parse(
+    exec('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], {
       encoding: 'utf8',
-    })
-  ) as { devices: Record<string, Array<{ udid: string; name: string; state: string }>> };
-  return Object.entries(raw.devices)
+    }).toString()
+  );
+  if (typeof parsed !== 'object' || parsed === null) return [];
+  const devicesByRuntime = (parsed as Record<string, unknown>).devices;
+  if (typeof devicesByRuntime !== 'object' || devicesByRuntime === null) return [];
+
+  return Object.entries(devicesByRuntime)
     .filter(([runtime]) => runtime.includes('.iOS-'))
-    .flatMap(([, devices]) => devices)
-    .map(device => ({ id: device.udid, name: device.name, state: device.state }));
+    .flatMap(([, devices]) => (Array.isArray(devices) ? devices : []))
+    .flatMap(device => {
+      if (typeof device !== 'object' || device === null) return [];
+      const record = device as Record<string, unknown>;
+      if (
+        typeof record.udid !== 'string' ||
+        record.udid.length === 0 ||
+        typeof record.name !== 'string' ||
+        record.name.length === 0 ||
+        typeof record.state !== 'string' ||
+        record.state.length === 0
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: record.udid,
+          name: record.name,
+          state: record.state,
+          deviceTypeIdentifier:
+            typeof record.deviceTypeIdentifier === 'string'
+              ? record.deviceTypeIdentifier
+              : undefined,
+        },
+      ];
+    });
 }
 
 // Production rename: `xcrun simctl rename <device> <name>`. Throws on
@@ -1043,5 +1082,12 @@ if (isMain) {
   }
 }
 
-export { bootSimulator, buildSimulatorLabel, claimSimulator, parseClaimArgs, releaseSimulator };
+export {
+  bootSimulator,
+  buildSimulatorLabel,
+  claimSimulator,
+  listIosDevices,
+  parseClaimArgs,
+  releaseSimulator,
+};
 export type { ClaimRecord, ClaimStatus, RenameFn, SimulatorDevice, SimulatorPhase };

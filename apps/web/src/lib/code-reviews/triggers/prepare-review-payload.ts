@@ -26,6 +26,12 @@ import type {
   ReviewAgentSelection,
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
+import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
+import {
+  buildCouncilOrchestratorPrompt,
+  buildCouncilRuntimeAgents,
+} from '@/lib/code-reviews/prompts/council-prompt';
 import {
   findKiloReviewNote,
   fetchMRInlineComments,
@@ -124,6 +130,8 @@ export type SessionInput = {
   bitbucketExpectedHeadSha?: string;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  /** Council runs only: one inline sub-agent per specialist, each pinned to its own model. */
+  runtimeAgents?: RuntimeAgentInput[];
 };
 
 /**
@@ -702,6 +710,14 @@ export async function prepareReviewPayload(
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });
 
+    // A council run replaces the standard sub-agent sharding policy with a coordinator
+    // contract (one sub-agent per specialist, no self-review), so the base prompt must OMIT
+    // that policy — otherwise the two sets of sub-agent instructions contradict and a small
+    // PR could skip specialists and fail closed. Determined here so the prompt is generated
+    // without the policy; reused by the council fork below.
+    const councilConfig = config.council;
+    const councilActive = review.review_type === 'council' && isCouncilActive(councilConfig);
+
     // 6. Generate dynamic review prompt
     const { prompt, version } = await generateReviewPrompt(
       config,
@@ -717,6 +733,7 @@ export async function prepareReviewPayload(
         manualInstructions: manualConfig?.instructions ?? null,
         outputMode,
         expectedHeadSha: review.head_sha,
+        omitSubAgentGuidance: councilActive,
       }
     );
 
@@ -781,19 +798,52 @@ export async function prepareReviewPayload(
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
             };
 
-    // Forward-shaped agent selections. Today this is always a single 'standard' agent
-    // mirroring the session's model/effort; council mode will populate one entry per
-    // specialist. agents[0].model is kept identical to sessionInput.model above.
-    const reviewAgents: ReviewAgentsConfig = {
-      reviewType: 'standard',
-      agents: [
-        {
-          role: 'standard',
-          model: standardModel,
-          thinkingEffort: config.thinking_effort ?? null,
-        },
-      ],
-    };
+    // Council fork: a council run delegates to one sub-agent per specialist (each on its
+    // own model) in a single session. We build `reviewAgents` (domain contract) and the
+    // cloud-agent-next `runtimeAgents` (execution), and swap the prompt to the coordinator
+    // prompt. `councilActive` (computed above, gating `omitSubAgentGuidance`) guarantees the
+    // config is enabled with >= the minimum specialists.
+    const councilMembers = councilActive && councilConfig ? enabledSpecialists(councilConfig) : [];
+    const aggregationStrategy = councilConfig?.aggregation_strategy ?? 'any_blocking_member';
+
+    // Forward-shaped agent selections. Standard = a single 'standard' agent mirroring the
+    // session's model/effort; council = one entry per enabled specialist.
+    const reviewAgents: ReviewAgentsConfig = councilActive
+      ? {
+          reviewType: 'council',
+          aggregationStrategy,
+          agents: councilMembers.map(specialist => ({
+            role: specialist.role,
+            model: specialist.model_slug ?? standardModel,
+            thinkingEffort: specialist.thinking_effort ?? null,
+          })),
+        }
+      : {
+          reviewType: 'standard',
+          agents: [
+            {
+              role: 'standard',
+              model: standardModel,
+              thinkingEffort: config.thinking_effort ?? null,
+            },
+          ],
+        };
+
+    if (councilActive) {
+      // The primary agent coordinates; specialists run as inline sub-agents on their own
+      // models. Override the prompt and attach runtimeAgents on whichever sessionInput
+      // variant was built above.
+      sessionInput.prompt = buildCouncilOrchestratorPrompt({
+        basePrompt: prompt,
+        specialists: councilMembers,
+        aggregationStrategy,
+      });
+      sessionInput.runtimeAgents = buildCouncilRuntimeAgents({
+        specialists: councilMembers,
+        defaultModel: standardModel,
+        defaultVariant: variant,
+      });
+    }
 
     // Log the session input for GitLab
     if (platform === 'gitlab') {

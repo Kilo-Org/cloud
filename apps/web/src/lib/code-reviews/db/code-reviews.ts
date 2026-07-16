@@ -14,9 +14,23 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, lte, isNull } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  asc,
+  desc,
+  count,
+  ne,
+  inArray,
+  sql,
+  sum,
+  gte,
+  lte,
+  isNull,
+  getTableColumns,
+} from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { CreateReviewParamsSchema } from '../core';
+import { CreateReviewParamsSchema, type CodeReviewListItem } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import type {
   CodeReviewPlatform,
@@ -26,7 +40,7 @@ import type {
   Owner,
 } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
-import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import type { CodeReviewCouncilResult, CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
@@ -219,7 +233,10 @@ function codeReviewInsertValues(
 export async function createCodeReview(params: CreateReviewParams): Promise<string> {
   try {
     CreateReviewParamsSchema.parse(params);
-    await assertCouncilCreationAllowed({ owner: params.owner, reviewType: params.reviewType });
+    await assertCouncilCreationAllowed({
+      owner: params.owner,
+      reviewType: params.reviewType,
+    });
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(codeReviewInsertValues(params))
@@ -241,13 +258,20 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
  */
 export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCodeReview | null> {
   try {
+    // Do NOT select the heavy `council_result` JSONB: this getter feeds many hot, non-detail
+    // callers (status/usage callbacks, CLI, dispatch, cancel/retrigger) that never read it.
+    // The column is kept off the wire and returned as null; the one consumer that needs it —
+    // the review-detail `get` procedure — loads it explicitly via `getCodeReviewCouncilResult`.
+    // Returning the full row type (with council_result: null) avoids churning every caller.
+    const { council_result: _councilResult, ...columns } =
+      getTableColumns(cloud_agent_code_reviews);
     const [review] = await db
-      .select()
+      .select(columns)
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, reviewId))
       .limit(1);
 
-    return review || null;
+    return review ? { ...review, council_result: null } : null;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'getCodeReviewById' },
@@ -255,6 +279,23 @@ export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCod
     });
     throw error;
   }
+}
+
+/**
+ * Fetches ONLY the persisted `council_result` for a review (council runs). Kept separate
+ * from `getCodeReviewById` so the heavy JSONB is loaded solely by the review-detail path
+ * that renders it, not by every full-row read.
+ */
+export async function getCodeReviewCouncilResult(
+  reviewId: string
+): Promise<CodeReviewCouncilResult | null> {
+  const [row] = await db
+    .select({ council_result: cloud_agent_code_reviews.council_result })
+    .from(cloud_agent_code_reviews)
+    .where(eq(cloud_agent_code_reviews.id, reviewId))
+    .limit(1);
+
+  return row?.council_result ?? null;
 }
 
 export async function listDispatchableCodeReviewOwnerCandidates(
@@ -273,7 +314,10 @@ export async function listDispatchableCodeReviewOwnerCandidates(
     : sql``;
 
   try {
-    const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
+    const result = await db.execute<{
+      owner_type: 'user' | 'org';
+      owner_id: string;
+    }>(sql`
       WITH reconsiderable_work AS (
         SELECT
           CASE
@@ -338,13 +382,17 @@ export async function listDispatchableCodeReviewOwnerCandidates(
     `);
 
     const hasMore = result.rows.length > limit;
-    const owners = result.rows
-      .slice(0, limit)
-      .map(row =>
-        row.owner_type === 'org'
-          ? ({ type: 'org', id: row.owner_id } satisfies DispatchableCodeReviewOwnerCandidate)
-          : ({ type: 'user', id: row.owner_id } satisfies DispatchableCodeReviewOwnerCandidate)
-      );
+    const owners = result.rows.slice(0, limit).map(row =>
+      row.owner_type === 'org'
+        ? ({
+            type: 'org',
+            id: row.owner_id,
+          } satisfies DispatchableCodeReviewOwnerCandidate)
+        : ({
+            type: 'user',
+            id: row.owner_id,
+          } satisfies DispatchableCodeReviewOwnerCandidate)
+    );
 
     return { owners, hasMore };
   } catch (error) {
@@ -445,7 +493,9 @@ export async function createCodeReviewAttempt(params: {
         .limit(1);
 
       const [latest] = await tx
-        .select({ attempt_number: cloud_agent_code_review_attempts.attempt_number })
+        .select({
+          attempt_number: cloud_agent_code_review_attempts.attempt_number,
+        })
         .from(cloud_agent_code_review_attempts)
         .where(eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId))
         .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
@@ -575,7 +625,9 @@ export async function createInfraRetryAttemptIfMissing(params: {
       }
 
       const [latest] = await tx
-        .select({ attempt_number: cloud_agent_code_review_attempts.attempt_number })
+        .select({
+          attempt_number: cloud_agent_code_review_attempts.attempt_number,
+        })
         .from(cloud_agent_code_review_attempts)
         .where(eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId))
         .orderBy(desc(cloud_agent_code_review_attempts.attempt_number))
@@ -887,6 +939,23 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
  * Updates code review status
  * Can optionally update session_id, cli_session_id, error_message, started_at, completed_at
  */
+/**
+ * Persists the captured council outcome (decision + per-specialist votes/findings) on the
+ * review so the cloud UI job-runs screen can render it. Council runs only.
+ */
+export async function setCodeReviewCouncilResult(
+  reviewId: string,
+  councilResult: CodeReviewCouncilResult
+): Promise<void> {
+  await db
+    .update(cloud_agent_code_reviews)
+    .set({
+      council_result: councilResult,
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(cloud_agent_code_reviews.id, reviewId));
+}
+
 export async function updateCodeReviewStatus(
   reviewId: string,
   status: CodeReviewStatus,
@@ -1240,7 +1309,11 @@ export async function updatePreviousReviewSummary(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updatePreviousReviewSummary' },
-      extra: { reviewId, hasBody: summary.body !== null, headSha: summary.headSha },
+      extra: {
+        reviewId,
+        hasBody: summary.body !== null,
+        headSha: summary.headSha,
+      },
     });
     throw error;
   }
@@ -1281,7 +1354,7 @@ export async function updateRepositoryReviewInstructionsMetadata(
  * Supports filtering by status and repository
  * Returns reviews sorted by creation date (newest first)
  */
-export async function listCodeReviews(params: ListReviewsParams): Promise<CloudAgentCodeReview[]> {
+export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListItem[]> {
   try {
     const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
@@ -1317,8 +1390,11 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CloudA
       conditions.push(eq(cloud_agent_code_reviews.platform, platform));
     }
 
+    // Select every column except the heavy `council_result` (see CodeReviewListItem).
+    const { council_result: _councilResult, ...listColumns } =
+      getTableColumns(cloud_agent_code_reviews);
     const reviews = await db
-      .select()
+      .select(listColumns)
       .from(cloud_agent_code_reviews)
       .where(and(...conditions))
       .orderBy(desc(cloud_agent_code_reviews.created_at))
@@ -1452,7 +1528,10 @@ export async function createCodeReviewIfAbsentInTransaction(
   params: CreateReviewParams
 ): Promise<{ reviewId: string; created: boolean }> {
   CreateReviewParamsSchema.parse(params);
-  await assertCouncilCreationAllowed({ owner: params.owner, reviewType: params.reviewType });
+  await assertCouncilCreationAllowed({
+    owner: params.owner,
+    reviewType: params.reviewType,
+  });
   const [created] = await tx
     .insert(cloud_agent_code_reviews)
     .values(codeReviewInsertValues(params))
@@ -1503,6 +1582,9 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
         check_run_id: null,
         started_at: null,
         completed_at: null,
+        // Clear the prior attempt's council outcome so a retry doesn't show stale
+        // specialist votes/findings as current (the finalizer re-populates it on completion).
+        council_result: null,
         model: null,
         total_tokens_in: null,
         total_tokens_out: null,

@@ -24,7 +24,10 @@ const mockedIap = vi.hoisted(() => ({
   } | null,
   requestPurchase: vi.fn(),
   restorePurchases: vi.fn(),
+  useIAP: vi.fn(),
 }));
+
+const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
 
 const mockedReactQuery = vi.hoisted(() => ({
   completeAppStorePurchase: vi.fn(),
@@ -34,7 +37,12 @@ const mockedReactQuery = vi.hoisted(() => ({
     appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
     products: [{ appleProductId: 'com.kilo.pass.tier19.monthly' }],
   },
+  useMutation: vi.fn(),
+  useQuery: vi.fn(),
+  useQueryClient: vi.fn(),
 }));
+
+const mockedTrpc = vi.hoisted(() => ({ useTRPC: vi.fn() }));
 
 vi.mock('expo-iap', () => ({
   ErrorCode: {
@@ -45,33 +53,42 @@ vi.mock('expo-iap', () => ({
   useIAP: (handlers: {
     onPurchaseError: (error: Error) => void;
     onPurchaseSuccess: (purchase: Purchase) => void;
-  }) => ({
-    availablePurchases: mockedIap.availablePurchases,
-    connected: mockedIap.connected,
-    finishTransaction: mockedIap.finishTransaction,
-    getAvailablePurchases: mockedIap.getAvailablePurchases,
-    requestPurchase: mockedIap.requestPurchase,
-    restorePurchases: mockedIap.restorePurchases,
-    ...(() => {
-      mockedIap.handlers = handlers;
-      return {};
-    })(),
-  }),
+  }) => {
+    mockedIap.useIAP(handlers);
+    mockedIap.handlers = handlers;
+    return {
+      availablePurchases: mockedIap.availablePurchases,
+      connected: mockedIap.connected,
+      finishTransaction: mockedIap.finishTransaction,
+      getAvailablePurchases: mockedIap.getAvailablePurchases,
+      requestPurchase: mockedIap.requestPurchase,
+      restorePurchases: mockedIap.restorePurchases,
+    };
+  },
 }));
 
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: mockedPlatform,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({
-    isPending: mockedReactQuery.completeAppStorePurchaseIsPending,
-    mutateAsync: mockedReactQuery.completeAppStorePurchase,
-  }),
-  useQuery: () => ({
-    data: mockedReactQuery.mobileStoreProductsData,
-  }),
-  useQueryClient: () => ({ invalidateQueries: mockedReactQuery.invalidateQueries }),
+  useMutation: () => {
+    mockedReactQuery.useMutation();
+    return {
+      isPending: mockedReactQuery.completeAppStorePurchaseIsPending,
+      mutateAsync: mockedReactQuery.completeAppStorePurchase,
+    };
+  },
+  useQuery: () => {
+    mockedReactQuery.useQuery();
+    return {
+      data: mockedReactQuery.mobileStoreProductsData,
+    };
+  },
+  useQueryClient: () => {
+    mockedReactQuery.useQueryClient();
+    return { invalidateQueries: mockedReactQuery.invalidateQueries };
+  },
 }));
 
 vi.mock('sonner-native', () => ({
@@ -86,18 +103,21 @@ vi.mock('@/lib/analytics/posthog', () => ({
 }));
 
 vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    kiloPass: {
-      completeAppStorePurchase: { mutationOptions: () => ({}) },
-      getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
-      getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
-      getState: { pathFilter: () => ({ queryKey: ['state'] }) },
-    },
-    user: {
-      getContextBalance: { pathFilter: () => ({ queryKey: ['balance'] }) },
-      getCreditBlocks: { pathFilter: () => ({ queryKey: ['credits'] }) },
-    },
-  }),
+  useTRPC: () => {
+    mockedTrpc.useTRPC();
+    return {
+      kiloPass: {
+        completeAppStorePurchase: { mutationOptions: () => ({}) },
+        getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
+        getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
+        getState: { pathFilter: () => ({ queryKey: ['state'] }) },
+      },
+      user: {
+        getContextBalance: { pathFilter: () => ({ queryKey: ['balance'] }) },
+        getCreditBlocks: { pathFilter: () => ({ queryKey: ['credits'] }) },
+      },
+    };
+  },
 }));
 
 type StoreKiloPassPurchaseContextValue = {
@@ -110,6 +130,7 @@ type StoreKiloPassPurchaseContextValue = {
   isPending: boolean;
   isRestoringPurchases: boolean;
   errorMessage: string | null;
+  clearError: () => void;
 };
 
 type ReactInternals = {
@@ -186,7 +207,13 @@ function renderStoreKiloPassPurchaseProvider() {
     try {
       const renderProviderElement = StoreKiloPassPurchaseProvider;
       const providerElement = renderProviderElement({ children: null });
-      return providerElement.props.value as StoreKiloPassPurchaseContextValue;
+      const contextProviderElement =
+        'value' in providerElement.props
+          ? providerElement
+          : (providerElement.type as (props: { children: React.ReactNode }) => React.ReactElement)(
+              providerElement.props
+            );
+      return (contextProviderElement.props as { value: StoreKiloPassPurchaseContextValue }).value;
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
         previousDispatcher;
@@ -307,6 +334,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetPurchaseErrorToastDedup();
   resetInlinePurchaseErrorOwnership();
+  mockedPlatform.OS = 'ios';
   mockedIap.availablePurchases = [];
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
@@ -792,6 +820,28 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 });
 
 describe('StoreKiloPassPurchaseProvider', () => {
+  it('provides inert purchase state without initializing expo-iap on Android', async () => {
+    mockedPlatform.OS = 'android';
+    const provider = renderStoreKiloPassPurchaseProvider();
+
+    const value = provider.render();
+
+    expect(mockedIap.useIAP).not.toHaveBeenCalled();
+    expect(mockedTrpc.useTRPC).not.toHaveBeenCalled();
+    expect(mockedReactQuery.useQueryClient).not.toHaveBeenCalled();
+    expect(mockedReactQuery.useMutation).not.toHaveBeenCalled();
+    expect(mockedReactQuery.useQuery).not.toHaveBeenCalled();
+    expect(value.appStoreOwnershipPreflight).toBeNull();
+    expect(value.isPending).toBe(false);
+    expect(value.isRestoringPurchases).toBe(false);
+    expect(value.errorMessage).toBeNull();
+    await expect(value.purchase(product)).resolves.toBeUndefined();
+    await expect(value.restorePurchases()).resolves.toBe('failed');
+    expect(() => {
+      value.clearError();
+    }).not.toThrow();
+  });
+
   it('exposes an App Store ownership mismatch preflight from available purchases', () => {
     mockedIap.availablePurchases = [
       createPurchase({ appAccountToken: '550e8400-e29b-41d4-a716-446655440001' }),

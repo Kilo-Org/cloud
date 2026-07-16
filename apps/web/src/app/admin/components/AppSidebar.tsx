@@ -29,7 +29,6 @@ import {
   Coins,
   Scale,
   Route,
-  ScrollText,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -53,6 +52,7 @@ import {
 import Link from 'next/link';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 type MenuItem = {
   title: (session: Session | null) => string;
@@ -252,16 +252,6 @@ const analyticsObservabilityItems: MenuItem[] = [
     url: '/admin/alerting',
     icon: () => <Bell />,
   },
-  {
-    title: () => 'API Request Log',
-    url: '/admin/api-request-log',
-    icon: () => <Database />,
-  },
-  {
-    title: () => 'Request Logging Opt-ins',
-    url: '/admin/request-logging-opt-ins',
-    icon: () => <ScrollText />,
-  },
 ];
 
 const menuSections: MenuSection[] = [
@@ -302,6 +292,7 @@ type AppSidebarViewProps = {
   pathname: string;
   session: Session | null;
   pendingDisputesCount?: number;
+  canViewSessions?: boolean;
 } & React.ComponentProps<typeof Sidebar>;
 
 export function AppSidebarView({
@@ -309,6 +300,7 @@ export function AppSidebarView({
   pathname,
   session,
   pendingDisputesCount = 0,
+  canViewSessions = false,
   ...props
 }: AppSidebarViewProps) {
   return (
@@ -341,35 +333,37 @@ export function AppSidebarView({
             <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {section.items.map(item => {
-                  const isActive = isAdminMenuItemActive(pathname, item.url);
+                {section.items
+                  .filter(item => item.url !== '/admin/session-traces' || canViewSessions)
+                  .map(item => {
+                    const isActive = isAdminMenuItemActive(pathname, item.url);
 
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        className={cn(
-                          item.url === '/admin/disputes' && pendingDisputesCount > 0 && 'pr-10'
-                        )}
-                      >
-                        <Link
-                          href={item.url}
-                          prefetch={false}
-                          aria-current={isActive ? 'page' : undefined}
+                    return (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          className={cn(
+                            item.url === '/admin/disputes' && pendingDisputesCount > 0 && 'pr-10'
+                          )}
                         >
-                          {item.icon(session)}
-                          <span>{item.title(session)}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                      {item.url === '/admin/disputes' && pendingDisputesCount > 0 ? (
-                        <SidebarMenuBadge className="bg-destructive/15 text-destructive ring-1 ring-destructive/30">
-                          {pendingDisputesCount}
-                        </SidebarMenuBadge>
-                      ) : null}
-                    </SidebarMenuItem>
-                  );
-                })}
+                          <Link
+                            href={item.url}
+                            prefetch={false}
+                            aria-current={isActive ? 'page' : undefined}
+                          >
+                            {item.icon(session)}
+                            <span>{item.title(session)}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                        {item.url === '/admin/disputes' && pendingDisputesCount > 0 ? (
+                          <SidebarMenuBadge className="bg-destructive/15 text-destructive ring-1 ring-destructive/30">
+                            {pendingDisputesCount}
+                          </SidebarMenuBadge>
+                        ) : null}
+                      </SidebarMenuItem>
+                    );
+                  })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -390,6 +384,7 @@ export function AppSidebar({
   const session = useSession();
   const pathname = usePathname();
   const trpc = useTRPC();
+  const { canViewSessions } = useAdminPermissions();
   const disputesSummaryQuery = useQuery({
     ...trpc.admin.disputes.summary.queryOptions(),
     staleTime: DISPUTES_SUMMARY_STALE_TIME_MS,
@@ -402,6 +397,7 @@ export function AppSidebar({
       pathname={pathname}
       session={session.data}
       pendingDisputesCount={pendingDisputesCount}
+      canViewSessions={canViewSessions}
     >
       {children}
     </AppSidebarView>

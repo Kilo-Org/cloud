@@ -4,6 +4,7 @@ import type { SessionSnapshot } from './session-ingest-client';
 import {
   fetchSessionSnapshot,
   fetchSessionMessages,
+  fetchSessionMessagesPage,
   deleteSession,
   shareSession,
 } from './session-ingest-client';
@@ -438,5 +439,180 @@ describe('fetchSessionMessages', () => {
 
     const result = await fetchSessionMessages('ses_abc123', fakeUser);
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchSessionMessagesPage (paginated authorized history)
+// ---------------------------------------------------------------------------
+
+describe('fetchSessionMessagesPage', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+  });
+
+  const validSessionId = 'ses_12345678901234567890123456';
+  const storedMessage = {
+    info: {
+      id: 'msg_user_01',
+      sessionID: validSessionId,
+      role: 'user',
+      time: { created: 1761000000100 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+    },
+    parts: [
+      {
+        id: 'prt_user_01',
+        sessionID: validSessionId,
+        messageID: 'msg_user_01',
+        type: 'text',
+        text: 'hello',
+      },
+    ],
+  };
+
+  it('returns the bounded page and the opaque next cursor', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          kiloSessionId: validSessionId,
+          history: {
+            messages: [storedMessage],
+            nextCursor: 'opaque-cursor',
+            omittedItemCount: 0,
+          },
+        }),
+    });
+
+    const result = await fetchSessionMessagesPage(validSessionId, 'user_123', {
+      limit: 50,
+    });
+    expect(result).toEqual({
+      kiloSessionId: validSessionId,
+      history: {
+        messages: [storedMessage],
+        nextCursor: 'opaque-cursor',
+        omittedItemCount: 0,
+      },
+    });
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe(
+      `https://ingest.test.example.com/api/session/${validSessionId}/messages?limit=50`
+    );
+    expect(init.headers.Authorization).toBe('Bearer mock-jwt-token');
+  });
+
+  it('forwards a continuation cursor in the query string', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          kiloSessionId: validSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        }),
+    });
+
+    await fetchSessionMessagesPage(validSessionId, 'user_123', {
+      limit: 25,
+      before: 'opaque-cursor',
+    });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe(
+      `https://ingest.test.example.com/api/session/${validSessionId}/messages?limit=25&before=opaque-cursor`
+    );
+  });
+
+  it('preserves retryable_failure, too_large, and invalid_data outcomes from the worker', async () => {
+    for (const history of [
+      { kind: 'retryable_failure', phase: 'page_parts' },
+      { kind: 'too_large', maximumBytes: 8 * 1024 * 1024, phase: 'message_scan' },
+      { kind: 'invalid_data' },
+    ]) {
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true, kiloSessionId: validSessionId, history }),
+      });
+      const result = await fetchSessionMessagesPage(validSessionId, 'user_123', { limit: 10 });
+      expect(result).toEqual({ kiloSessionId: validSessionId, history });
+    }
+  });
+
+  it('returns null history for an empty page and treats missing history as null', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          kiloSessionId: validSessionId,
+          history: null,
+        }),
+    });
+    await expect(
+      fetchSessionMessagesPage(validSessionId, 'user_123', { limit: 50 })
+    ).resolves.toEqual({ kiloSessionId: validSessionId, history: null });
+  });
+
+  it('returns null when the worker reports session_not_found', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: () => Promise.resolve({ success: false, error: 'session_not_found' }),
+    });
+
+    await expect(
+      fetchSessionMessagesPage(validSessionId, 'user_123', { limit: 50 })
+    ).resolves.toBeNull();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('throws and calls captureException on non-404 worker errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('boom'),
+    });
+
+    await expect(
+      fetchSessionMessagesPage(validSessionId, 'user_123', { limit: 50 })
+    ).rejects.toThrow(/Session ingest messages page failed/);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'messagesPage' },
+      })
+    );
+  });
+
+  it('encodes the session ID and uses the configured worker URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          kiloSessionId: validSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        }),
+    });
+
+    await fetchSessionMessagesPage('ses_with spaces', 'user_123', { limit: 50 });
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe(
+      'https://ingest.test.example.com/api/session/ses_with%20spaces/messages?limit=50'
+    );
   });
 });

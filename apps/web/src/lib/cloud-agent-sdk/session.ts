@@ -38,6 +38,8 @@ import type {
   ResolvedSession,
   SessionInfo,
   SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
 } from './types';
 
 const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
@@ -127,6 +129,20 @@ type CloudAgentSessionTransport = {
 
   // Shared
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  /**
+   * Page-aware root snapshot fetch. The transport uses this for its initial
+   * bounded read and any reconnect snapshot replays. After a successful
+   * initial fetch the transport calls `onInitialPageLoaded` so the manager
+   * can record the cursor and `omittedItemCount`; reconnect replays do NOT
+   * fire that callback so the user's already-advanced older-messages cursor
+   * isn't reset to the latest 50 on every reconnect.
+   */
+  fetchSnapshotPage?: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<SessionSnapshotPageOutcome | null>;
+  /** Called by the transport after a successful initial bounded page read. */
+  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
 
@@ -266,6 +282,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           kiloSessionId: resolved.kiloSessionId,
           userWebConnection: config.transport.userWebConnection,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          onInitialPageLoaded: config.transport.onInitialPageLoaded,
           onError: config.onError,
           onRemoteModelStateChange: config.onRemoteModelStateChange,
           onRemoteCommandStateChange: config.onRemoteCommandStateChange,
@@ -297,6 +315,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          onInitialPageLoaded: config.transport.onInitialPageLoaded,
           websocketBaseUrl: config.websocketBaseUrl,
           onError: config.onError,
           lifecycleHooks: config.transport.lifecycleHooks,
@@ -312,6 +332,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         return createCliHistoricalTransport({
           kiloSessionId: resolved.kiloSessionId,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          onInitialPageLoaded: config.transport.onInitialPageLoaded,
           onError: config.onError,
         });
       }

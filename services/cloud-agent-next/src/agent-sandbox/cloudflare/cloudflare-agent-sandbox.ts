@@ -524,6 +524,9 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     const { sessionId, userId, orgId } = plan.scope;
     this.sandboxIdPromise = Promise.resolve(plan.workspace.sandboxId as SandboxId);
     const sandboxId = await this.resolveSandboxId();
+    // Surface sandbox acquisition — often the longest silent stretch of a cold
+    // start — as the first step of the preparation attempt.
+    request.onProgress?.('sandbox_provision', 'Provisioning sandbox…');
     const sandbox = await this.getSandbox({ sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS });
     if (requiresContainmentSandbox(this.metadata)) {
       if (sandboxId.startsWith('dind-')) {
@@ -630,7 +633,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
         inspectContainers: sandboxId.startsWith('dind-'),
       });
     }
-    request.onProgress?.('kilo_server', 'Starting Kilo...');
+    // Not 'kilo_server': this step boots the wrapper process inside the
+    // sandbox; the wrapper reports the real "Starting Kilo" phase itself at
+    // the end of its bootstrap.
+    request.onProgress?.('sandbox_boot', 'Starting sandbox agent...');
     const bootstrapSession = await sandbox.createSession({
       name: `${sessionId}-bootstrap`,
       env: {},

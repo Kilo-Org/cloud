@@ -81,9 +81,13 @@ describe('trpc tests', () => {
       const creditManagerCaller = await createCallerForUser(creditManagerUser.id);
 
       await expect(adminCaller.admin.getPermissions()).resolves.toEqual({
+        isSuperadmin: false,
+        canViewSessions: false,
         canManageCredits: false,
       });
       await expect(creditManagerCaller.admin.getPermissions()).resolves.toEqual({
+        isSuperadmin: false,
+        canViewSessions: false,
         canManageCredits: true,
       });
     });

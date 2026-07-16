@@ -187,7 +187,7 @@ function injectExtraUserByokModels(
     }
   }
   for (const model of openRouterModels.values()) {
-    const vercelModel = vercelModels[mapModelIdToVercel(model.slug, false)];
+    const vercelModel = vercelModels[mapModelIdToVercel(model.slug)];
     if (!vercelModel) continue;
 
     const vercelInferenceProviders = new Set(

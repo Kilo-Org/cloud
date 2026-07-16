@@ -28,6 +28,7 @@ import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
@@ -316,8 +317,16 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           modelSlug: input.modelSlug,
           thinkingEffort: input.thinkingEffort,
           instructions: input.instructions,
+          council: input.council,
         },
       });
+    }),
+
+  getCouncilEntitlement: baseProcedure
+    .input(OrganizationIdInputSchema)
+    .query(async ({ input, ctx }) => {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+      return { entitled: await isCouncilEntitledForOrganization(input.organizationId) };
     }),
 
   getBitbucketReadiness: baseProcedure

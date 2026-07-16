@@ -146,16 +146,19 @@ export function convertProviderOptions(
   vercelInferenceProviders: string[] | null
 ): VercelProviderConfig {
   const provider = requestToMutate.body.provider;
-  if (provider?.ignore?.length && !vercelInferenceProviders) {
-    throw new Error('Vercel inference provider data became unavailable during request transform');
-  }
-  const only = provider?.ignore?.length
-    ? getVercelInferenceProvidersExcludingIgnored(
-        provider.ignore,
-        provider.only,
-        vercelInferenceProviders
-      )
-    : provider?.only?.map(openRouterToVercelInferenceProviderId);
+  const only = (() => {
+    if (!provider?.ignore?.length) {
+      return provider?.only?.map(openRouterToVercelInferenceProviderId);
+    }
+    if (!vercelInferenceProviders) {
+      throw new Error('Vercel inference provider data became unavailable during request transform');
+    }
+    return getVercelInferenceProvidersExcludingIgnored(
+      provider.ignore,
+      provider.only,
+      vercelInferenceProviders
+    );
+  })();
 
   return {
     gateway: {

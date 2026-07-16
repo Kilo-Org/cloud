@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -45,6 +46,7 @@ type AgentSessionListContentProps = {
   isSearching: boolean;
   onClearQuery: () => void;
   onCreateSession: () => void;
+  sortBy: AgentSessionSortBy;
 };
 
 export function AgentSessionListContent({
@@ -64,6 +66,7 @@ export function AgentSessionListContent({
   isSearching,
   onClearQuery,
   onCreateSession,
+  sortBy,
 }: Readonly<AgentSessionListContentProps>) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
@@ -204,6 +207,7 @@ export function AgentSessionListContent({
           <StoredSessionRow
             session={item.session}
             isLive={item.isLive}
+            sortBy={sortBy}
             onPress={() => {
               onSessionPress(item.session.session_id, item.session.organization_id);
             }}
@@ -225,7 +229,7 @@ export function AgentSessionListContent({
         />
       );
     },
-    [onSessionPress, deleteSession, renameSession, organizationIdBySessionId]
+    [onSessionPress, deleteSession, renameSession, organizationIdBySessionId, sortBy]
   );
 
   const renderSectionHeader = useCallback(

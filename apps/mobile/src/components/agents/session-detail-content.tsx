@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
@@ -32,6 +33,10 @@ import {
 } from '@/components/agents/session-working-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import {
+  resolveLoadedCliSessionPresenceId,
+  useCliSessionPresence,
+} from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionMessageList } from '@/components/agents/session-message-list';
@@ -66,6 +71,7 @@ import {
   type ModelPickerSelection,
   type ModelPickerSelectionScope,
 } from '@/lib/picker-bridge';
+import { cn } from '@/lib/utils';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -138,6 +144,12 @@ export function SessionDetailContent({
   });
 
   const organizationId = fetchedData?.organizationId ?? undefined;
+
+  const presenceSessionId = resolveLoadedCliSessionPresenceId(
+    sessionId,
+    fetchedData?.kiloSessionId
+  );
+  useCliSessionPresence(presenceSessionId);
 
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
@@ -395,14 +407,15 @@ export function SessionDetailContent({
   const title =
     fetchedData?.kiloSessionId === sessionId ? (fetchedData.title ?? 'Session') : 'Session';
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
+  const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
+  const hasBlockingInteraction = blockingInteraction !== 'none';
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
     shouldShowLoading ||
     Boolean(error) ||
-    Boolean(activeQuestion) ||
+    hasBlockingInteraction ||
     (requiresModel && !currentModel);
-  const showInteractionCards = activeQuestion ?? activePermission;
   const composerPlaceholder =
     (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
@@ -499,7 +512,7 @@ export function SessionDetailContent({
       <>
         <View className="flex-1">{renderContent()}</View>
 
-        {activeQuestion ? (
+        {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
             questions={activeQuestion.questions}
             onAnswer={answers => {
@@ -512,7 +525,7 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {activePermission ? (
+        {blockingInteraction === 'permission' && activePermission ? (
           <PermissionCard
             permission={activePermission.permission}
             patterns={activePermission.patterns}
@@ -524,37 +537,42 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {!showInteractionCards &&
-          (isReadOnly && messages.length > 0 ? (
-            <View className="border-t border-border bg-secondary px-4 py-3">
-              <Text className="text-center text-sm text-muted-foreground">
-                This is a read-only session
-              </Text>
-            </View>
-          ) : (
-            <>
-              <ModelPickerSelectionScopeProvider
-                selectionScope={modelPickerSelectionScope}
-                isSelectionCurrent={isModelPickerSelectionCurrent}
-              >
-                <ChatComposer
-                  onSend={handleSend}
-                  onStop={handleStop}
-                  disabled={isComposerDisabled}
-                  isStreaming={isStreaming}
-                  placeholder={composerPlaceholder}
-                  mode={currentMode}
-                  onModeChange={setCurrentMode}
-                  model={currentModel}
-                  variant={currentVariant}
-                  modelOptions={modelOptions}
-                  onModelSelect={handleModelSelect}
-                  organizationId={organizationId}
-                  attachmentsEnabled={supportsAttachments}
-                />
-              </ModelPickerSelectionScopeProvider>
-            </>
-          ))}
+        {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
+          <View className="border-t border-border bg-secondary px-4 py-3">
+            <Text className="text-center text-sm text-muted-foreground">
+              This is a read-only session
+            </Text>
+          </View>
+        ) : null}
+
+        {!isReadOnly || messages.length === 0 ? (
+          <View
+            className={cn(hasBlockingInteraction && 'hidden')}
+            accessibilityElementsHidden={hasBlockingInteraction}
+            importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
+          >
+            <ModelPickerSelectionScopeProvider
+              selectionScope={modelPickerSelectionScope}
+              isSelectionCurrent={isModelPickerSelectionCurrent}
+            >
+              <ChatComposer
+                onSend={handleSend}
+                onStop={handleStop}
+                disabled={isComposerDisabled}
+                isStreaming={isStreaming}
+                placeholder={composerPlaceholder}
+                mode={currentMode}
+                onModeChange={setCurrentMode}
+                model={currentModel}
+                variant={currentVariant}
+                modelOptions={modelOptions}
+                onModelSelect={handleModelSelect}
+                organizationId={organizationId}
+                attachmentsEnabled={supportsAttachments}
+              />
+            </ModelPickerSelectionScopeProvider>
+          </View>
+        ) : null}
       </>
     );
   }

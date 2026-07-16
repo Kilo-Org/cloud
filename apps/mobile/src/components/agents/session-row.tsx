@@ -4,6 +4,7 @@ import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } fr
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
+import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -14,11 +15,18 @@ type StoredSessionRowProps = {
     git_url: string | null;
     cloud_agent_session_id: string | null;
     created_on_platform: string;
+    created_at: string;
     updated_at: string;
     git_branch: string | null;
     status: string | null;
   };
   isLive: boolean;
+  /**
+   * Which timestamp drives the row's relative meta label. The list
+   * section the session lands in and the timestamp shown here are
+   * both computed from this same field, so the two never contradict.
+   */
+  sortBy: AgentSessionSortBy;
   onPress: () => void;
   onDelete: () => void;
   onRename: (newTitle: string) => void;
@@ -60,8 +68,8 @@ function platformLabel(platform: string): string {
   }
 }
 
-function formatMeta(updatedAt: string): string {
-  return timeAgo(parseTimestamp(updatedAt)).toUpperCase();
+function formatMeta(timestamp: string): string {
+  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
 }
 
 function showDeleteConfirm(onDelete: () => void) {
@@ -96,6 +104,7 @@ function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => 
 export function StoredSessionRow({
   session,
   isLive,
+  sortBy,
   onPress,
   onDelete,
   onRename,
@@ -165,7 +174,7 @@ export function StoredSessionRow({
           agentLabel={agentLabel}
           title={title}
           subtitle={session.git_branch}
-          meta={formatMeta(session.updated_at)}
+          meta={formatMeta(getAgentSessionTimestamp(session, sortBy))}
           live={isLive}
           stripMode="inline"
           className="pl-[22px] pr-[22px]"

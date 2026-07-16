@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   getAnthropicProviderOptionsForVercel,
+  getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
@@ -70,6 +71,37 @@ describe('hasCompatibleVercelInferenceProvider', () => {
 
   it('accepts when the model has no cached provider entry', () => {
     expect(hasCompatibleVercelInferenceProvider(['google-vertex'], null)).toBe(true);
+  });
+});
+
+describe('getVercelInferenceProvidersExcludingIgnored', () => {
+  it('returns available providers minus translated ignored providers', () => {
+    expect(
+      getVercelInferenceProvidersExcludingIgnored(['amazon-bedrock'], undefined, [
+        'anthropic',
+        'bedrock',
+        'vertex',
+      ])
+    ).toEqual(['anthropic', 'vertex']);
+  });
+
+  it('intersects the available providers with only before excluding ignored providers', () => {
+    expect(
+      getVercelInferenceProvidersExcludingIgnored(
+        ['google-vertex'],
+        ['amazon-bedrock', 'google-vertex', 'openai'],
+        ['anthropic', 'bedrock', 'vertex']
+      )
+    ).toEqual(['bedrock']);
+  });
+
+  it('returns an empty list when all available providers are ignored', () => {
+    expect(
+      getVercelInferenceProvidersExcludingIgnored(['anthropic', 'amazon-bedrock'], undefined, [
+        'anthropic',
+        'bedrock',
+      ])
+    ).toEqual([]);
   });
 });
 

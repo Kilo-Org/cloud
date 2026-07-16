@@ -52,6 +52,21 @@ export function hasCompatibleVercelInferenceProvider(
   );
 }
 
+export function getVercelInferenceProvidersExcludingIgnored(
+  ignoredProviders: string[],
+  onlyProviders: string[] | undefined,
+  vercelInferenceProviders: string[]
+) {
+  const ignored = new Set(ignoredProviders.map(openRouterToVercelInferenceProviderId));
+  const only = onlyProviders
+    ? new Set(onlyProviders.map(openRouterToVercelInferenceProviderId))
+    : null;
+
+  return vercelInferenceProviders.filter(
+    provider => !ignored.has(provider) && (!only || only.has(provider))
+  );
+}
+
 export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
   const routingSeed = 'vercel_routing_' + randomSeed;
   const wholePercentageBucket = getRandomNumber(routingSeed, 100);
@@ -66,13 +81,6 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
-    console.debug(
-      '[shouldRouteToVercel] not routing to Vercel because of unsupported provider options'
-    );
-    return false;
-  }
-
   if (!kiloExclusiveModel?.flags.includes('vercel-routing') && isDeepseekModel(requestedModel)) {
     // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
     console.debug(
@@ -97,11 +105,35 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const only = request.body.provider?.only;
-  if (only) {
+  const provider = request.body.provider;
+  const only = provider?.only;
+  const ignore = provider?.ignore;
+  if (only || ignore?.length) {
     const vercelInferenceProviders =
       await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
-    if (!hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
+
+    if (ignore?.length) {
+      if (!vercelInferenceProviders) {
+        console.debug(
+          '[shouldRouteToVercel] not routing to Vercel because inference provider data is unavailable'
+        );
+        return false;
+      }
+
+      const effectiveOnly = getVercelInferenceProvidersExcludingIgnored(
+        ignore,
+        only,
+        vercelInferenceProviders
+      );
+      if (effectiveOnly.length === 0) {
+        console.debug(
+          '[shouldRouteToVercel] no inference providers remain after applying provider preferences'
+        );
+        return false;
+      }
+
+      provider.only = effectiveOnly;
+    } else if (only && !hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
       console.debug(
         '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
       );

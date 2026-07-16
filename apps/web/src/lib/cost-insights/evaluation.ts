@@ -38,7 +38,6 @@ import {
   type CostInsightThresholdAlertKind,
 } from './repository';
 import { dispatchPendingCostInsightNotifications } from './notifications';
-import { isCodingPlanSuggestionEligible } from './suggestion-eligibility';
 
 const SUGGESTION_MIN_VARIABLE_MICRODOLLARS = 50 * MICRODOLLARS_PER_USD;
 const SUGGESTION_MIN_TOTAL_MICRODOLLARS = 100 * MICRODOLLARS_PER_USD;
@@ -364,11 +363,10 @@ async function maybeCreateCostSuggestion(params: {
 
   const topDriver = params.topDrivers[0];
 
-  const codingPlanCandidate = isCodingPlanSuggestionEligible(
-    params.owner,
-    topDriver,
-    SUGGESTION_MIN_VARIABLE_MICRODOLLARS
-  );
+  const codingPlanCandidate =
+    topDriver &&
+    topDriver.category === 'variable' &&
+    topDriver.totalMicrodollars >= SUGGESTION_MIN_VARIABLE_MICRODOLLARS;
   const kiloPassCandidate =
     params.owner.type === 'user' &&
     params.observedMicrodollars >= SUGGESTION_MIN_TOTAL_MICRODOLLARS;
@@ -393,7 +391,10 @@ async function maybeCreateCostSuggestion(params: {
           title: `Consider a Coding Plan for ${driverLabel}`,
           description: `A Coding Plan may improve cost efficiency for recurring ${driverLabel} usage.`,
           ctaLabel: 'View subscriptions',
-          ctaHref: '/subscriptions',
+          ctaHref:
+            params.owner.type === 'organization'
+              ? `/organizations/${params.owner.id}/subscriptions`
+              : '/subscriptions',
           observedMicrodollars: topDriver.totalMicrodollars,
           benefitLabel: 'Plan option',
           benefitDetail: 'Compare Coding Plans',

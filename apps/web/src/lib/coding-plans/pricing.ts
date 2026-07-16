@@ -1,5 +1,3 @@
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
-
 export const CODING_PLAN_IDS = [
   'minimax-token-plan-plus',
   'minimax-token-plan-max',
@@ -15,7 +13,6 @@ export type CodingPlanCatalogEntry = {
   providerName: string;
   name: string;
   providerId: CodingPlanProviderId;
-  coveredModelIds: readonly string[];
   costMicrodollars: number;
   billingPeriodDays: number;
   features: readonly string[];
@@ -41,7 +38,6 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Plus',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
     costMicrodollars: 20_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~1.7B tokens per month of M3 usage.', 'Run 3-4 concurrent agents.'),
@@ -51,7 +47,6 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Max',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
     costMicrodollars: 50_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~5.1B tokens per month of M3 usage.', 'Run 4-5 concurrent agents.'),
@@ -61,7 +56,6 @@ export const CODING_PLAN_CATALOG = {
     providerName: 'MiniMax',
     name: 'Token Plan Ultra',
     providerId: 'minimax',
-    coveredModelIds: [MINIMAX_CURRENT_MODEL_ID],
     costMicrodollars: 120_000_000,
     billingPeriodDays: 30,
     features: minimaxFeatures('~12.5B tokens per month of M3 usage.', 'Run 6-7 concurrent agents.'),
@@ -84,10 +78,8 @@ export function isCodingPlanId(planId: string): planId is CodingPlanId {
   return CODING_PLAN_IDS.some(candidate => candidate === planId);
 }
 
-export function hasCodingPlanForModel(providerId: string, modelId: string): boolean {
-  return getCodingPlanCatalog().some(
-    plan => plan.providerId === providerId && plan.coveredModelIds.includes(modelId)
-  );
+export function isCodingPlanProviderId(providerId: string): providerId is CodingPlanProviderId {
+  return CODING_PLAN_PROVIDER_IDS.some(candidate => candidate === providerId);
 }
 
 export function isMonthlyCodingPlan(planId?: string): boolean {

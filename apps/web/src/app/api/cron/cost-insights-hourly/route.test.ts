@@ -30,11 +30,6 @@ function summary(
       repaired: 0,
       failed: [],
     },
-    dailyUsageRollupRepairs: {
-      claimed: 0,
-      repaired: 0,
-      failed: [],
-    },
     notifications: {
       claimed: 1,
       sent: 1,
@@ -143,31 +138,6 @@ describe('GET /api/cron/cost-insights-hourly', () => {
     expect(mockSentryLog).toHaveBeenCalledWith(
       'Cost Insights hourly sweep completed with partial failures',
       expect.objectContaining({ failedRollupRepairCount: 1 })
-    );
-  });
-
-  test('returns failure status and telemetry when a daily usage rollup repair fails', async () => {
-    const result = summary();
-    result.dailyUsageRollupRepairs.failed.push({
-      usageId: '00000000-0000-4000-8000-000000000001',
-      kiloUserId: 'user-3',
-      organizationId: null,
-      usageDate: '2026-07-13',
-      error: 'postgres:55P03',
-    });
-    mockRunCostInsightHourlySweep.mockResolvedValue(result);
-
-    const response = await GET(
-      new NextRequest('http://localhost:3000/api/cron/cost-insights-hourly', {
-        headers: { authorization: 'Bearer cron-secret' },
-      })
-    );
-
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toMatchObject({ success: false, partialFailure: true });
-    expect(mockSentryLog).toHaveBeenCalledWith(
-      'Cost Insights hourly sweep completed with partial failures',
-      expect.objectContaining({ failedDailyUsageRollupRepairCount: 1 })
     );
   });
 

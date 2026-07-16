@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   applyVercelSettings,
   getAnthropicProviderOptionsForVercel,
@@ -8,6 +8,16 @@ import {
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { getCachedVercelInferenceProviderIdsForModel } from '@/lib/ai-gateway/providers/gateway-models-cache';
+
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getCachedVercelInferenceProviderIdsForModel: jest.fn(),
+  getVercelModelsFromRedis: jest.fn(),
+}));
+
+const mockGetCachedVercelInferenceProviderIdsForModel = jest.mocked(
+  getCachedVercelInferenceProviderIdsForModel
+);
 
 describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
@@ -107,7 +117,12 @@ describe('getVercelInferenceProvidersExcludingIgnored', () => {
 });
 
 describe('applyVercelSettings', () => {
-  it('emits only non-ignored providers in the Vercel gateway options', () => {
+  it('emits only available non-ignored providers without changing provider.only', async () => {
+    mockGetCachedVercelInferenceProviderIdsForModel.mockResolvedValue([
+      'anthropic',
+      'bedrock',
+      'vertex',
+    ]);
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
@@ -120,9 +135,12 @@ describe('applyVercelSettings', () => {
       },
     };
 
-    applyVercelSettings('anthropic/claude-sonnet-4.5', request, null);
+    const provider = request.body.provider;
+
+    await applyVercelSettings('anthropic/claude-sonnet-4.5', request, null);
 
     expect(request.body.providerOptions?.gateway?.only).toEqual(['anthropic']);
+    expect(provider?.only).toEqual(['anthropic', 'amazon-bedrock']);
     expect(request.body.provider).toBeUndefined();
   });
 });

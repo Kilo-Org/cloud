@@ -130,8 +130,6 @@ export async function shouldRouteToVercel(
         );
         return false;
       }
-
-      provider.only = effectiveOnly;
     } else if (only && !hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
       console.debug(
         '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
@@ -143,14 +141,29 @@ export async function shouldRouteToVercel(
   return true;
 }
 
-function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig {
+async function convertProviderOptions(
+  requestToMutate: GatewayRequest
+): Promise<VercelProviderConfig> {
   const provider = requestToMutate.body.provider;
-  const ignored = new Set(provider?.ignore?.map(openRouterToVercelInferenceProviderId));
+  let only = provider?.only?.map(openRouterToVercelInferenceProviderId);
+
+  if (provider?.ignore?.length) {
+    const vercelInferenceProviders = await getCachedVercelInferenceProviderIdsForModel(
+      requestToMutate.body.model
+    );
+    if (!vercelInferenceProviders) {
+      throw new Error('Vercel inference provider data became unavailable during request transform');
+    }
+    only = getVercelInferenceProvidersExcludingIgnored(
+      provider.ignore,
+      provider.only,
+      vercelInferenceProviders
+    );
+  }
+
   return {
     gateway: {
-      only: provider?.only
-        ?.map(openRouterToVercelInferenceProviderId)
-        .filter(providerId => !ignored.has(providerId)),
+      only,
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
       disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
@@ -214,7 +227,7 @@ export function getVercelInferenceProviderConfigForUserByok(
   return [key, list];
 }
 
-export function applyVercelSettings(
+export async function applyVercelSettings(
   requestedModel: string,
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
@@ -241,7 +254,7 @@ export function applyVercelSettings(
       },
     };
   } else {
-    requestToMutate.body.providerOptions = convertProviderOptions(requestToMutate);
+    requestToMutate.body.providerOptions = await convertProviderOptions(requestToMutate);
   }
 
   if (requestToMutate.body.providerOptions) {

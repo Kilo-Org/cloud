@@ -124,6 +124,10 @@ describe('buildCouncilOrchestratorPrompt', () => {
     // section goes right after — so the summary-identification contract stays intact.
     expect(prompt).toContain('the standard summary heading come FIRST');
     expect(prompt).toContain('Immediately AFTER that standard heading');
+    // Must neutralize the base "Recommendation" field so the model can't publish a merge
+    // verdict (Merge / Address before merge) that contradicts the code-owned decision.
+    expect(prompt).toContain('must NOT assert a merge verdict');
+    expect(prompt).toContain('determined by council governance');
   });
 
   it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {

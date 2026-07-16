@@ -19,6 +19,20 @@ export function isSessionListAtBottom({
 }
 
 /**
+ * Initial (and per-session-reset) visibility state for the
+ * scroll-to-bottom affordance. The user is considered at the bottom at
+ * the start of every session — a fresh transcript is rendered anchored
+ * to the latest message, so the floating "scroll to bottom" button
+ * must never be visible until the user has actually scrolled away.
+ */
+export function getInitialSessionListAutoScrollVisibility(): {
+  shouldAutoScroll: boolean;
+  isAtBottom: boolean;
+} {
+  return { shouldAutoScroll: true, isAtBottom: true };
+}
+
+/**
  * Decide whether a programmatic scroll-to-latest should be scheduled.
  *
  * Mirrors the four guards inside `useSessionAutoScroll`'s `scheduleScrollToLatestMessage`:

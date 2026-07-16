@@ -51,6 +51,9 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels,
+  ...(kat_coder_pro_v2_5_free_model.status === 'public'
+    ? [kat_coder_pro_v2_5_free_model.public_id]
+    : []),
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,

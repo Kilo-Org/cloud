@@ -181,7 +181,9 @@ describe('GET /internal/runtime-control/runtimes', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { runtimes: Array<{ capabilities: string[]; projectName: string }> };
+    const body = (await res.json()) as {
+      runtimes: Array<{ capabilities: string[]; projectName: string }>;
+    };
     expect(body.runtimes).toHaveLength(2);
     // Capability-missing entry is still present so the mobile client can
     // surface a precise recovery state.
@@ -203,7 +205,11 @@ describe('GET /internal/runtime-control/runtimes', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    const doInstance = { getRuntimePresence: vi.fn(async () => { throw new Error('boom with secret-secret-secret'); }) };
+    const doInstance = {
+      getRuntimePresence: vi.fn(async () => {
+        throw new Error('boom with secret-secret-secret');
+      }),
+    };
     vi.mocked(mockGetUserConnectionDO).mockReturnValue(doInstance as never);
 
     const res = await makeApp().request(
@@ -213,7 +219,11 @@ describe('GET /internal/runtime-control/runtimes', () => {
     );
 
     expect(res.status).toBe(500);
-    const dumped = JSON.stringify({ warns: warn.mock.calls, errors: error.mock.calls, res: await res.clone().text() });
+    const dumped = JSON.stringify({
+      warns: warn.mock.calls,
+      errors: error.mock.calls,
+      res: await res.clone().text(),
+    });
     expect(dumped).not.toContain('secret-secret-secret');
     expect(dumped).not.toContain(token);
   });

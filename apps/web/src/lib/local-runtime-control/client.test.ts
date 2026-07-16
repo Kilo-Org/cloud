@@ -38,14 +38,12 @@ describe('LocalRuntimeControlClient.list', () => {
   });
 
   it('mints a five-minute audience-bound internal token for the user', async () => {
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ runtimes: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ runtimes: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await LocalRuntimeControlClient.list('usr_alice');
 
@@ -70,14 +68,12 @@ describe('LocalRuntimeControlClient.list', () => {
   });
 
   it('returns the strict-parsed empty list when the upstream returns zero runtimes', async () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ runtimes: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ runtimes: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     const result: LocalRuntimeList = await LocalRuntimeControlClient.list('usr_alice');
 
@@ -150,14 +146,12 @@ describe('LocalRuntimeControlClient.list', () => {
   });
 
   it('throws a typed error on a malformed response body without returning an empty list', async () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ runtimes: [{ runtimeId: 'not-a-uuid' }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ runtimes: [{ runtimeId: 'not-a-uuid' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await expect(LocalRuntimeControlClient.list('usr_alice')).rejects.toBeInstanceOf(
       LocalRuntimeControlRequestError
@@ -246,14 +240,12 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
   });
 
   it('mints a five-minute audience-bound internal token and POSTs the exact body', async () => {
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(validCatalogEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(validCatalogEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await LocalRuntimeControlClient.getCatalog('usr_alice', fence);
 
@@ -281,14 +273,12 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
   });
 
   it('returns the parsed typed catalog with parsed models and agents/default', async () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(validCatalogEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(validCatalogEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     const result = await LocalRuntimeControlClient.getCatalog('usr_alice', fence);
 
@@ -304,14 +294,12 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
   });
 
   it('uses a 5s AbortSignal timeout', async () => {
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(validCatalogEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(validCatalogEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await LocalRuntimeControlClient.getCatalog('usr_alice', fence);
 
@@ -337,9 +325,7 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
       )
     );
 
-    await expect(
-      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
-    ).rejects.toMatchObject({
+    await expect(LocalRuntimeControlClient.getCatalog('usr_alice', fence)).rejects.toMatchObject({
       name: 'LocalRuntimeCatalogError',
       upstreamCode: 'RUNTIME_NOT_CONNECTED',
     });
@@ -360,9 +346,9 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
       )
     );
 
-    await expect(
-      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
-    ).rejects.toBeInstanceOf(Error);
+    await expect(LocalRuntimeControlClient.getCatalog('usr_alice', fence)).rejects.toBeInstanceOf(
+      Error
+    );
   });
 
   it('throws a typed error on a malformed envelope', async () => {
@@ -373,17 +359,17 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
       })
     );
 
-    await expect(
-      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
-    ).rejects.toBeInstanceOf(Error);
+    await expect(LocalRuntimeControlClient.getCatalog('usr_alice', fence)).rejects.toBeInstanceOf(
+      Error
+    );
   });
 
   it('throws a typed error on a network failure', async () => {
     jest.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('socket reset'));
 
-    await expect(
-      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
-    ).rejects.toMatchObject({ name: 'LocalRuntimeCatalogError' });
+    await expect(LocalRuntimeControlClient.getCatalog('usr_alice', fence)).rejects.toMatchObject({
+      name: 'LocalRuntimeCatalogError',
+    });
   });
 
   it.each([401, 403, 409, 412, 429, 500, 504])(
@@ -393,9 +379,9 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
         .spyOn(global, 'fetch')
         .mockResolvedValueOnce(new Response('upstream blew up', { status }));
 
-      await expect(
-        LocalRuntimeControlClient.getCatalog('usr_alice', fence)
-      ).rejects.toMatchObject({ name: 'LocalRuntimeCatalogError' });
+      await expect(LocalRuntimeControlClient.getCatalog('usr_alice', fence)).rejects.toMatchObject({
+        name: 'LocalRuntimeCatalogError',
+      });
     }
   );
 
@@ -403,9 +389,9 @@ describe('LocalRuntimeControlClient.getCatalog', () => {
     mockConfig.sessionIngestWorkerUrl = '';
     const fetchMock = jest.spyOn(global, 'fetch');
 
-    await expect(
-      LocalRuntimeControlClient.getCatalog('usr_alice', fence)
-    ).rejects.toBeInstanceOf(Error);
+    await expect(LocalRuntimeControlClient.getCatalog('usr_alice', fence)).rejects.toBeInstanceOf(
+      Error
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -437,14 +423,12 @@ describe('LocalRuntimeControlClient.createAndRun', () => {
   });
 
   it('mints a five-minute audience-bound internal token and POSTs the exact body', async () => {
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(successEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(successEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest);
 
@@ -472,20 +456,14 @@ describe('LocalRuntimeControlClient.createAndRun', () => {
   });
 
   it('returns the strict-parsed success result', async () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(successEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
-
-    const result = await LocalRuntimeControlClient.createAndRun(
-      'usr_alice',
-      fence,
-      validRequest
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(successEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
     );
+
+    const result = await LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest);
 
     expect(result.result.sessionId).toBe('ses_a1b2c3d4e5f67890123456789a');
     expect(result.result.promptStarted).toBe(true);
@@ -503,20 +481,14 @@ describe('LocalRuntimeControlClient.createAndRun', () => {
         },
       },
     };
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(partialEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
-
-    const result = await LocalRuntimeControlClient.createAndRun(
-      'usr_alice',
-      fence,
-      validRequest
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(partialEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
     );
+
+    const result = await LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest);
 
     expect(result.result.promptStarted).toBe(false);
     if (result.result.promptStarted === false) {
@@ -525,14 +497,12 @@ describe('LocalRuntimeControlClient.createAndRun', () => {
   });
 
   it('uses a 30s AbortSignal timeout', async () => {
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(successEnvelope), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(successEnvelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest);
 
@@ -565,14 +535,12 @@ describe('LocalRuntimeControlClient.createAndRun', () => {
   });
 
   it('throws a typed error on a malformed envelope', async () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ not: 'a result' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-      );
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ not: 'a result' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
 
     await expect(
       LocalRuntimeControlClient.createAndRun('usr_alice', fence, validRequest)

@@ -401,7 +401,14 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'heartbeat':
-        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion, msg.runtime, msg.sequence);
+        this.handleHeartbeat(
+          ws,
+          attachment,
+          msg.sessions,
+          msg.protocolVersion,
+          msg.runtime,
+          msg.sequence
+        );
         break;
       case 'event':
         this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
@@ -580,7 +587,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       this.broadcastToWeb(runtimeEvent);
     }
 
-    this.sendToCli(ws, sequence !== undefined ? { type: 'heartbeat_ack', sequence } : { type: 'heartbeat_ack' });
+    this.sendToCli(
+      ws,
+      sequence !== undefined ? { type: 'heartbeat_ack', sequence } : { type: 'heartbeat_ack' }
+    );
   }
 
   /**
@@ -666,18 +676,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     if (entry.command === CREATE_AND_RUN_COMMAND) {
       if (entry.pending) {
-        this.settlePendingWithResult<CreateAndRunLocalSessionResult>(
-          entry.pending,
-          result,
-          error,
-          {
-            parse: value => createAndRunLocalSessionResultSchema.parse(value),
-            maxBytes: MAX_CREATE_AND_RUN_RESULT_BYTES,
-            tooLargeCode: 'RESULT_TOO_LARGE',
-            tooLargeMessage: 'Create-and-run response is too large',
-            classifyError: err => this.classifyCreateAndRunError(err),
-          }
-        );
+        this.settlePendingWithResult<CreateAndRunLocalSessionResult>(entry.pending, result, error, {
+          parse: value => createAndRunLocalSessionResultSchema.parse(value),
+          maxBytes: MAX_CREATE_AND_RUN_RESULT_BYTES,
+          tooLargeCode: 'RESULT_TOO_LARGE',
+          tooLargeMessage: 'Create-and-run response is too large',
+          classifyError: err => this.classifyCreateAndRunError(err),
+        });
         return;
       }
     }
@@ -1276,19 +1281,14 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
 
     if (this.pendingCommands.size >= UserConnectionDO.MAX_PENDING_COMMANDS) {
-      throw new LocalRuntimeCommandError(
-        'PENDING_COMMAND_LIMIT',
-        'Too many pending commands'
-      );
+      throw new LocalRuntimeCommandError('PENDING_COMMAND_LIMIT', 'Too many pending commands');
     }
 
     const correlationId = crypto.randomUUID();
     const promise = new Promise<T>((resolve, reject) => {
       this.pendingCommands.set(correlationId, {
         pending: {
-          resolve: resolve as (
-            value: LocalRuntimeCatalog | CreateAndRunLocalSessionResult
-          ) => void,
+          resolve: resolve as (value: LocalRuntimeCatalog | CreateAndRunLocalSessionResult) => void,
           reject,
         },
         command: options.command,

@@ -173,7 +173,9 @@ runtimeControlApi.post('/catalog', async c => {
   const kiloUserId = c.get('user_id');
   try {
     const stub = getUserConnectionDO(c.env, { kiloUserId });
-    const catalog = await (stub.getRuntimeCatalog(fenceParsed.data) as Promise<LocalRuntimeCatalog>);
+    const catalog = await (stub.getRuntimeCatalog(
+      fenceParsed.data
+    ) as Promise<LocalRuntimeCatalog>);
     const response = localRuntimeCatalogResponseSchema.parse({ catalog });
     return c.json(response, 200);
   } catch (err) {

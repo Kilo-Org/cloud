@@ -2596,7 +2596,13 @@ describe('UserConnectionDO', () => {
       // Session-list still surfaces sessions from the live socket.
       const sessions = doInstance.getActiveSessions();
       expect(sessions).toEqual([
-        { id: 'ses_main', status: 'busy', title: 'Test', connectionId: 'cli-1', protocolVersion: '1' },
+        {
+          id: 'ses_main',
+          status: 'busy',
+          title: 'Test',
+          connectionId: 'cli-1',
+          protocolVersion: '1',
+        },
       ]);
       // And the runtime list is independent.
       expect(doInstance.getRuntimePresence()).toHaveLength(1);
@@ -2729,13 +2735,7 @@ describe('UserConnectionDO', () => {
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
       sendHeartbeat(doInstance, cli1, [], undefined, validRuntime);
-      sendHeartbeat(
-        doInstance,
-        cli2,
-        [],
-        undefined,
-        { ...otherRuntime, connectionId: 'cli-2' }
-      );
+      sendHeartbeat(doInstance, cli2, [], undefined, { ...otherRuntime, connectionId: 'cli-2' });
       cli1.send.mockClear();
       cli2.send.mockClear();
 
@@ -2792,13 +2792,10 @@ describe('UserConnectionDO', () => {
 
       // A new socket takes the same runtimeId under a new connectionId.
       const secondCli = addCliSocket(mockCtx, 'cli-2');
-      sendHeartbeat(
-        doInstance,
-        secondCli,
-        [],
-        undefined,
-        { ...validRuntime, connectionId: 'cli-2' }
-      );
+      sendHeartbeat(doInstance, secondCli, [], undefined, {
+        ...validRuntime,
+        connectionId: 'cli-2',
+      });
 
       // The old fence no longer matches the live owner; a refresh would be
       // required before retrying.
@@ -2957,13 +2954,10 @@ describe('UserConnectionDO', () => {
       const targetCli = addCliSocket(mockCtx, 'cli-1');
       const otherCli = addCliSocket(mockCtx, 'cli-2');
       sendHeartbeat(doInstance, targetCli, [], undefined, validRuntime);
-      sendHeartbeat(
-        doInstance,
-        otherCli,
-        [],
-        undefined,
-        { ...otherRuntime, connectionId: 'cli-2' }
-      );
+      sendHeartbeat(doInstance, otherCli, [], undefined, {
+        ...otherRuntime,
+        connectionId: 'cli-2',
+      });
       targetCli.send.mockClear();
 
       const promise = doInstance.getRuntimeCatalog(fence);
@@ -3144,13 +3138,11 @@ describe('UserConnectionDO', () => {
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
       sendHeartbeat(doInstance, cli1, [], undefined, runtime);
-      sendHeartbeat(
-        doInstance,
-        cli2,
-        [],
-        undefined,
-        { ...runtime, runtimeId: 'aaaaaaaa-1111-4111-8111-111111111111', connectionId: 'cli-2' }
-      );
+      sendHeartbeat(doInstance, cli2, [], undefined, {
+        ...runtime,
+        runtimeId: 'aaaaaaaa-1111-4111-8111-111111111111',
+        connectionId: 'cli-2',
+      });
       cli1.send.mockClear();
       cli2.send.mockClear();
 
@@ -3204,17 +3196,11 @@ describe('UserConnectionDO', () => {
       disconnectCli(doInstance, firstCli);
 
       const secondCli = addCliSocket(mockCtx, 'cli-2');
-      sendHeartbeat(
-        doInstance,
-        secondCli,
-        [],
-        undefined,
-        { ...runtime, connectionId: 'cli-2' }
-      );
+      sendHeartbeat(doInstance, secondCli, [], undefined, { ...runtime, connectionId: 'cli-2' });
 
-      await expect(
-        doInstance.createAndRunLocalSession(fence, validRequest)
-      ).rejects.toMatchObject({ code: 'RUNTIME_FENCE_MISMATCH' });
+      await expect(doInstance.createAndRunLocalSession(fence, validRequest)).rejects.toMatchObject({
+        code: 'RUNTIME_FENCE_MISMATCH',
+      });
     });
 
     it('rejects when the runtime does not advertise the create-and-run.v1 capability', async () => {
@@ -3420,17 +3406,11 @@ describe('UserConnectionDO', () => {
       const targetCli = addCliSocket(mockCtx, 'cli-1');
       const otherCli = addCliSocket(mockCtx, 'cli-2');
       sendHeartbeat(doInstance, targetCli, [], undefined, runtime);
-      sendHeartbeat(
-        doInstance,
-        otherCli,
-        [],
-        undefined,
-        {
-          ...runtime,
-          runtimeId: 'aaaaaaaa-1111-4111-8111-111111111111',
-          connectionId: 'cli-2',
-        }
-      );
+      sendHeartbeat(doInstance, otherCli, [], undefined, {
+        ...runtime,
+        runtimeId: 'aaaaaaaa-1111-4111-8111-111111111111',
+        connectionId: 'cli-2',
+      });
       targetCli.send.mockClear();
 
       const promise = doInstance.createAndRunLocalSession(fence, validRequest);

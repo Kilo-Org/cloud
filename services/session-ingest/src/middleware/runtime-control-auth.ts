@@ -1,8 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import {
-  extractBearerToken,
-  verifyKiloToken,
-} from '@kilocode/worker-utils';
+import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
 import { SESSION_INGEST_RUNTIME_CONTROL_AUDIENCE } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';

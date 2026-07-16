@@ -17,7 +17,10 @@ import {
   type LocalRuntimeFence,
   type LocalRuntimeListResponse,
 } from '@kilocode/session-ingest-contracts';
-import { remoteModelCatalogV1Schema, type RemoteModelCatalogV1 } from '@/lib/cloud-agent-sdk/schemas';
+import {
+  remoteModelCatalogV1Schema,
+  type RemoteModelCatalogV1,
+} from '@/lib/cloud-agent-sdk/schemas';
 
 const RUNTIME_LIST_TIMEOUT_MS = 5_000;
 const RUNTIME_CATALOG_TIMEOUT_MS = 5_000;
@@ -69,7 +72,13 @@ export type LocalRuntimeList = LocalRuntimeListResponse;
 export type LocalRuntimeCatalog = {
   protocolVersion: 1;
   models: RemoteModelCatalogV1;
-  agents: Array<{ slug: string; name: string; description?: string; model?: unknown; variant?: string }>;
+  agents: Array<{
+    slug: string;
+    name: string;
+    description?: string;
+    model?: unknown;
+    variant?: string;
+  }>;
   defaultAgent: string;
 };
 
@@ -112,14 +121,11 @@ export const LocalRuntimeControlClient = {
 
     let response: Response;
     try {
-      response = await fetch(
-        `${SESSION_INGEST_WORKER_URL}/internal/runtime-control/runtimes`,
-        {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(RUNTIME_LIST_TIMEOUT_MS),
-        }
-      );
+      response = await fetch(`${SESSION_INGEST_WORKER_URL}/internal/runtime-control/runtimes`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(RUNTIME_LIST_TIMEOUT_MS),
+      });
     } catch {
       throw new LocalRuntimeControlRequestError('Local runtime list request failed');
     }
@@ -167,18 +173,15 @@ export const LocalRuntimeControlClient = {
 
     let response: Response;
     try {
-      response = await fetch(
-        `${SESSION_INGEST_WORKER_URL}/internal/runtime-control/catalog`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'content-type': 'application/json',
-          },
-          body,
-          signal: AbortSignal.timeout(RUNTIME_CATALOG_TIMEOUT_MS),
-        }
-      );
+      response = await fetch(`${SESSION_INGEST_WORKER_URL}/internal/runtime-control/catalog`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body,
+        signal: AbortSignal.timeout(RUNTIME_CATALOG_TIMEOUT_MS),
+      });
     } catch {
       throw new LocalRuntimeCatalogError('UNKNOWN', 'Local runtime catalog request failed');
     }
@@ -192,9 +195,7 @@ export const LocalRuntimeControlClient = {
       try {
         const envelope = localRuntimeErrorResponseSchema.safeParse(JSON.parse(raw));
         if (envelope.success) {
-          const codeParse = localRuntimeControlErrorCodeSchema.safeParse(
-            envelope.data.error.code
-          );
+          const codeParse = localRuntimeControlErrorCodeSchema.safeParse(envelope.data.error.code);
           if (codeParse.success) upstreamCode = codeParse.data;
         }
       } catch {
@@ -210,7 +211,10 @@ export const LocalRuntimeControlClient = {
     try {
       parsedBody = JSON.parse(await response.text());
     } catch {
-      throw new LocalRuntimeCatalogError('UNKNOWN', 'Local runtime catalog response was not valid JSON');
+      throw new LocalRuntimeCatalogError(
+        'UNKNOWN',
+        'Local runtime catalog response was not valid JSON'
+      );
     }
 
     const envelope = localRuntimeCatalogResponseSchema.safeParse(parsedBody);
@@ -220,15 +224,9 @@ export const LocalRuntimeControlClient = {
       // if the body has a recognizable error code, otherwise UNKNOWN.
       const fallback = localRuntimeErrorResponseSchema.safeParse(parsedBody);
       if (fallback.success) {
-        throw new LocalRuntimeCatalogError(
-          fallback.data.error.code,
-          fallback.data.error.message
-        );
+        throw new LocalRuntimeCatalogError(fallback.data.error.code, fallback.data.error.message);
       }
-      throw new LocalRuntimeCatalogError(
-        'UNKNOWN',
-        'Local runtime catalog response was malformed'
-      );
+      throw new LocalRuntimeCatalogError('UNKNOWN', 'Local runtime catalog response was malformed');
     }
 
     const modelsParse = remoteModelCatalogV1Schema.safeParse(envelope.data.catalog.models);
@@ -316,9 +314,7 @@ export const LocalRuntimeControlClient = {
       try {
         const envelope = localRuntimeErrorResponseSchema.safeParse(JSON.parse(raw));
         if (envelope.success) {
-          const codeParse = localRuntimeControlErrorCodeSchema.safeParse(
-            envelope.data.error.code
-          );
+          const codeParse = localRuntimeControlErrorCodeSchema.safeParse(envelope.data.error.code);
           if (codeParse.success) upstreamCode = codeParse.data;
         }
       } catch {

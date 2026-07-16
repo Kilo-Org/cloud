@@ -146,19 +146,13 @@ describe('POST /internal/runtime-control/catalog', () => {
   it.each([
     ['malformed JSON', '{not-json'],
     ['extra fields', { fence: validFence(), request: validRequest(), extra: true }],
+    ['missing fence', { request: validRequest() }],
+    ['missing request', { fence: validFence() }],
     [
-      'missing fence',
-      { request: validRequest() },
+      'wrong-shape fence',
+      { fence: { runtimeId: 'not-a-uuid', connectionId: 'cli-1' }, request: validRequest() },
     ],
-    [
-      'missing request',
-      { fence: validFence() },
-    ],
-    ['wrong-shape fence', { fence: { runtimeId: 'not-a-uuid', connectionId: 'cli-1' }, request: validRequest() }],
-    [
-      'wrong-shape request',
-      { fence: validFence(), request: { protocolVersion: 2 } },
-    ],
+    ['wrong-shape request', { fence: validFence(), request: { protocolVersion: 2 } }],
   ])('rejects %s with 400', async (_label, body) => {
     const getRuntimeCatalog = vi.fn();
     vi.mocked(getUserConnectionDO).mockReturnValue(makeDoStub({ getRuntimeCatalog }) as never);
@@ -352,43 +346,42 @@ describe('POST /internal/runtime-control/catalog', () => {
     });
   });
 
-  it.each([
-    'RESULT_TOO_LARGE',
-    'INVALID_RUNTIME_RESPONSE',
-    'RUNTIME_COMMAND_FAILED',
-  ])('maps %s to 500 with safe envelope', async code => {
-    const getRuntimeCatalog = vi.fn(async () => {
-      throw Object.assign(new Error(`secret-do-message-for-${code}-leak-marker`), {
-        code,
-        name: 'LocalRuntimeCommandError',
+  it.each(['RESULT_TOO_LARGE', 'INVALID_RUNTIME_RESPONSE', 'RUNTIME_COMMAND_FAILED'])(
+    'maps %s to 500 with safe envelope',
+    async code => {
+      const getRuntimeCatalog = vi.fn(async () => {
+        throw Object.assign(new Error(`secret-do-message-for-${code}-leak-marker`), {
+          code,
+          name: 'LocalRuntimeCommandError',
+        });
       });
-    });
-    vi.mocked(getUserConnectionDO).mockReturnValue(makeDoStub({ getRuntimeCatalog }) as never);
+      vi.mocked(getUserConnectionDO).mockReturnValue(makeDoStub({ getRuntimeCatalog }) as never);
 
-    const app = makeApp();
-    const res = await app.fetch(
-      new Request('http://local/internal/runtime-control/catalog', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ fence: validFence(), request: validRequest() }),
-      }),
-      {}
-    );
+      const app = makeApp();
+      const res = await app.fetch(
+        new Request('http://local/internal/runtime-control/catalog', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ fence: validFence(), request: validRequest() }),
+        }),
+        {}
+      );
 
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body).toEqual({
-      error: {
-        source: 'relay',
-        code,
-        message: 'Internal error',
-      },
-    });
-    // No leak of the original error message
-    const dumped = JSON.stringify(body);
-    expect(dumped).not.toContain('secret-do-message-for-');
-    expect(dumped).not.toContain('leak-marker');
-  });
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body).toEqual({
+        error: {
+          source: 'relay',
+          code,
+          message: 'Internal error',
+        },
+      });
+      // No leak of the original error message
+      const dumped = JSON.stringify(body);
+      expect(dumped).not.toContain('secret-do-message-for-');
+      expect(dumped).not.toContain('leak-marker');
+    }
+  );
 
   it('returns 500 with safe envelope on a thrown non-typed error', async () => {
     const getRuntimeCatalog = vi.fn(async () => {
@@ -408,7 +401,9 @@ describe('POST /internal/runtime-control/catalog', () => {
 
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: { source: 'relay', code: 'INTERNAL', message: 'Internal error' } });
+    expect(body).toEqual({
+      error: { source: 'relay', code: 'INTERNAL', message: 'Internal error' },
+    });
     const dumped = JSON.stringify(body);
     expect(dumped).not.toContain('super-secret-do-internal-leak-marker');
   });
@@ -464,8 +459,7 @@ describe('POST /internal/runtime-control/create-and-run', () => {
     overrides: Partial<{ createAndRunLocalSession: ReturnType<typeof vi.fn> }> = {}
   ) {
     return {
-      createAndRunLocalSession:
-        overrides.createAndRunLocalSession ?? vi.fn(async () => undefined),
+      createAndRunLocalSession: overrides.createAndRunLocalSession ?? vi.fn(async () => undefined),
     };
   }
 
@@ -573,7 +567,10 @@ describe('POST /internal/runtime-control/create-and-run', () => {
     ['missing request', { fence: validFence() }],
     [
       'wrong-shape fence',
-      { fence: { runtimeId: 'not-a-uuid', connectionId: 'cli-1' }, request: validCreateAndRunRequest() },
+      {
+        fence: { runtimeId: 'not-a-uuid', connectionId: 'cli-1' },
+        request: validCreateAndRunRequest(),
+      },
     ],
     [
       'wrong-shape request',

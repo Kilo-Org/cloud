@@ -134,9 +134,7 @@ export const localRuntimeControlRouter = createTRPCRouter({
             return { organizationId: row.organizationId ?? null };
           },
           ensureOrganizationAccess: async organizationId => {
-            const { ensureOrganizationAccess } = await import(
-              '@/routers/organizations/utils'
-            );
+            const { ensureOrganizationAccess } = await import('@/routers/organizations/utils');
             try {
               await ensureOrganizationAccess(ctx, organizationId);
             } catch (err) {

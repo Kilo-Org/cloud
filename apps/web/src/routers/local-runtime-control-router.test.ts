@@ -10,8 +10,13 @@ import type { User } from '@kilocode/db/schema';
 import type { LocalRuntimeControlErrorCode } from '@kilocode/session-ingest-contracts';
 
 jest.mock('@/lib/local-runtime-control/client', () => {
-  const { LocalRuntimeControlRequestError, LocalRuntimeCatalogError, LocalRuntimeCreateAndRunError } =
-    jest.requireActual<typeof LocalRuntimeControlClientModule>('@/lib/local-runtime-control/client');
+  const {
+    LocalRuntimeControlRequestError,
+    LocalRuntimeCatalogError,
+    LocalRuntimeCreateAndRunError,
+  } = jest.requireActual<typeof LocalRuntimeControlClientModule>(
+    '@/lib/local-runtime-control/client'
+  );
   return {
     LocalRuntimeControlRequestError,
     LocalRuntimeCatalogError,
@@ -50,9 +55,8 @@ const mockedCreateAndRun = jest.mocked(
 );
 
 const mockedWaitForOwnedCliSession = jest.mocked(
-  jest.requireMock<typeof ReadinessModule>(
-    '@/lib/local-runtime-control/readiness'
-  ).waitForOwnedCliSession
+  jest.requireMock<typeof ReadinessModule>('@/lib/local-runtime-control/readiness')
+    .waitForOwnedCliSession
 );
 
 const { LocalRuntimeControlRequestError, LocalRuntimeCatalogError, LocalRuntimeCreateAndRunError } =
@@ -499,7 +503,10 @@ describe('localRuntimeControl.createAndRun', () => {
     // by spying on a representative global that the cloud-agent SDK touches
     // (a `fetch` call to /api/cloud-agent-next) and verifying it is never made.
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({}), { status: 200, headers: { 'content-type': 'application/json' } })
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
     );
     mockedCreateAndRun.mockResolvedValueOnce({ result: successResult });
     mockedWaitForOwnedCliSession.mockResolvedValueOnce({ organizationId: null });

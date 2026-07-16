@@ -27,6 +27,7 @@ import {
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -133,23 +134,44 @@ function parseAwsCredentials(input: string) {
   }
 }
 
-export function getAnthropicProviderOptionsForVercel(
+export function getAnthropicProviderOptions(
+  requestedModel: string,
   request: GatewayRequest
 ): AnthropicProviderOptions | undefined {
-  const anthropicOptions: AnthropicProviderOptions = {};
+  const options: AnthropicProviderOptions = {};
 
   if (request.kind === 'chat_completions' && request.body.verbosity) {
-    anthropicOptions.effort = request.body.verbosity;
+    options.effort = request.body.verbosity;
   }
   if (request.kind === 'responses' && request.body.text?.verbosity) {
-    anthropicOptions.effort = request.body.text.verbosity;
+    options.effort = request.body.text.verbosity;
   }
 
-  if (Object.keys(anthropicOptions).length === 0) {
+  if (requestedModel.includes('opus') && requestedModel.includes('fast')) {
+    options.speed = 'fast';
+  }
+
+  if (Object.keys(options).length === 0) {
     return undefined;
   }
 
-  return anthropicOptions;
+  return options;
+}
+
+export function getOpenAIProviderOptions(
+  requestedModel: string
+): OpenAILanguageModelResponsesOptions | undefined {
+  const options: OpenAILanguageModelResponsesOptions = {};
+
+  if (requestedModel.includes('gpt') && requestedModel.includes('pro')) {
+    options.reasoningMode = 'pro';
+  }
+
+  if (Object.keys(options).length === 0) {
+    return undefined;
+  }
+
+  return options;
 }
 
 export function getVercelInferenceProviderConfigForUserByok(
@@ -211,10 +233,11 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestToMutate);
-    if (anthropicOptions) {
-      requestToMutate.body.providerOptions.anthropic = anthropicOptions;
-    }
+    requestToMutate.body.providerOptions.anthropic = getAnthropicProviderOptions(
+      requestedModel,
+      requestToMutate
+    );
+    requestToMutate.body.providerOptions.openai = getOpenAIProviderOptions(requestedModel);
   }
 
   delete requestToMutate.body.provider;

@@ -1,13 +1,14 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-  getAnthropicProviderOptionsForVercel,
+  getAnthropicProviderOptions,
+  getOpenAIProviderOptions,
   hasCompatibleVercelInferenceProvider,
   passesVercelRoutingPercentage,
 } from '@/lib/ai-gateway/providers/vercel';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
-describe('getAnthropicProviderOptionsForVercel', () => {
+describe('getAnthropicProviderOptions', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -18,7 +19,7 @@ describe('getAnthropicProviderOptionsForVercel', () => {
       },
     };
 
-    expect(getAnthropicProviderOptionsForVercel(request)).toEqual({
+    expect(getAnthropicProviderOptions(request.body.model, request)).toEqual({
       effort: 'high',
     });
   });
@@ -33,7 +34,7 @@ describe('getAnthropicProviderOptionsForVercel', () => {
       },
     };
 
-    expect(getAnthropicProviderOptionsForVercel(request)).toEqual({
+    expect(getAnthropicProviderOptions('anthropic/claude-sonnet-4.5', request)).toEqual({
       effort: 'low',
     });
   });
@@ -47,7 +48,33 @@ describe('getAnthropicProviderOptionsForVercel', () => {
       },
     };
 
-    expect(getAnthropicProviderOptionsForVercel(request)).toBe(undefined);
+    expect(getAnthropicProviderOptions(request.body.model, request)).toBe(undefined);
+  });
+
+  it('enables fast mode for fast Opus models', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-opus-4.6-fast',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    expect(getAnthropicProviderOptions(request.body.model, request)).toEqual({
+      speed: 'fast',
+    });
+  });
+});
+
+describe('getOpenAIProviderOptions', () => {
+  it('enables pro reasoning mode for GPT Pro models', () => {
+    expect(getOpenAIProviderOptions('openai/gpt-5.4-pro')).toEqual({
+      reasoningMode: 'pro',
+    });
+  });
+
+  it('returns undefined for other models', () => {
+    expect(getOpenAIProviderOptions('openai/gpt-5.4')).toBe(undefined);
   });
 });
 

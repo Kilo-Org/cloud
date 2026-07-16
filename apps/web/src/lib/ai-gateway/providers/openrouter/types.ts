@@ -4,6 +4,7 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type { AwsCredentials } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
+import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 
 // Base types for OpenRouter API that don't depend on other lib files
 // This breaks circular dependencies with mistral.ts, minimax.ts, etc.
@@ -28,6 +29,7 @@ export type VercelProviderConfig = {
     byok?: Record<string, VercelInferenceProviderConfig[]>;
   };
   anthropic?: AnthropicProviderOptions;
+  openai?: OpenAILanguageModelResponsesOptions;
 };
 
 export function isDataCollectionExplicitlyDisallowed(

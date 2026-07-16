@@ -40,7 +40,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'liquid',
   'mancer',
   'mara',
-  'meta', // not yet on OpenRouter
+  'meta',
   'minimax',
   'mistral',
   'modelrun',

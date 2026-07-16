@@ -7,7 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IDLE_STATE, useLocalSessionCreate } from './use-local-session-create';
 import { type LocalRuntimeCatalog, type LocalRuntimeFence } from './local-runtime-catalog-types';
-import { type LocalSessionCreateOrchestratorState } from './local-session-create-orchestrator-shared';
+import {
+  type LocalSessionCreateOrchestrator,
+  type LocalSessionCreateOrchestratorState,
+} from './local-session-create-orchestrator-shared';
 
 const mockedTrpc = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
@@ -285,6 +288,20 @@ function runCleanups(dispatcherState: DispatcherState) {
       (entry.cleanup as () => void)();
     }
   }
+}
+
+function getActiveOrchestratorFromRefs(
+  dispatcherState: DispatcherState
+): LocalSessionCreateOrchestrator | null {
+  for (const ref of dispatcherState.refs.values()) {
+    const maybe = ref.current as {
+      orchestrator?: LocalSessionCreateOrchestrator;
+    } | null;
+    if (maybe?.orchestrator) {
+      return maybe.orchestrator;
+    }
+  }
+  return null;
 }
 
 function assertDefined<T>(value: T | null | undefined): asserts value is T {
@@ -776,6 +793,80 @@ describe('useLocalSessionCreate — error and recovery wiring', () => {
       await checkAgainPromise;
       const createCountAfter = mockedTrpc.mutateAsync.mock.calls.length;
       expect(createCountAfter).toBe(createCountBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the submitting state across a rerender that does not change the orchestrator identity', () => {
+    const pending = new Promise<unknown>(() => {
+      // Intentionally never resolves so the test can observe the submitting state.
+    });
+    mockedTrpc.mutateAsync.mockReturnValue(pending);
+    const result = renderHook({
+      fence: FENCE_A,
+      catalog: CATALOG,
+      selectedAgentSlug: 'build',
+      selectedModel: { providerID: 'kilo', modelID: 'claude-opus-4-7', variant: 'max' },
+      prompt: 'Build me a thing',
+    });
+
+    const submitPromise = result.state.submit();
+    result.rerender({ prompt: 'Build me a different thing' });
+    result.refresh();
+
+    expect(result.state.phase).toBe('submitting');
+    expect(result.state.isSubmitting).toBe(true);
+    void submitPromise;
+  });
+
+  it('unsubscribes from the old orchestrator when the catalog identity changes', async () => {
+    vi.useFakeTimers();
+    try {
+      // Force a readiness-timeout so the orchestrator lands in recovery and we
+      // can capture a reference to it before changing the catalog identity.
+      mockedTrpc.mutateAsync.mockResolvedValueOnce({
+        status: 'session_not_ready',
+        code: 'SESSION_NOT_READY',
+        result: { protocolVersion: 1, sessionId: SESSION_ID, promptStarted: true },
+      });
+      mockedTrpc.query.mockResolvedValue({ status: 'pending' });
+
+      const result = renderHook({
+        fence: FENCE_A,
+        catalog: CATALOG,
+        selectedAgentSlug: 'build',
+        selectedModel: { providerID: 'kilo', modelID: 'claude-opus-4-7', variant: 'max' },
+        prompt: 'Build me a thing',
+      });
+
+      const submitPromise = result.state.submit();
+      await vi.runAllTimersAsync();
+      await submitPromise;
+      result.refresh();
+
+      expect(result.state.phase).toBe('recovery');
+      const oldOrchestrator = getActiveOrchestratorFromRefs(result.dispatcherState);
+      expect(oldOrchestrator).not.toBeNull();
+
+      const CATALOG_B: LocalRuntimeCatalog = {
+        ...CATALOG,
+        agents: [{ slug: 'review', name: 'Review' }],
+      };
+      result.rerender({ catalog: CATALOG_B });
+      result.refresh();
+
+      expect(result.state.phase).toBe('idle');
+      expect(result.state.recovery).toBeNull();
+
+      // Trigger a state change on the old orchestrator. If the subscription
+      // cleanup did not run, the hook state would leak back to recovery.
+      mockedTrpc.query.mockResolvedValueOnce({ status: 'pending' });
+      await oldOrchestrator?.checkAgain();
+      result.refresh();
+
+      expect(result.state.phase).toBe('idle');
+      expect(result.state.recovery).toBeNull();
     } finally {
       vi.useRealTimers();
     }

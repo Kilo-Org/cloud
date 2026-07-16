@@ -85,6 +85,11 @@ export type LocalSessionCreateRecovery =
       ctaLabel: null;
     }
   | {
+      kind: 'non-retryable-access-lost';
+      message: string;
+      ctaLabel: null;
+    }
+  | {
       kind: 'readiness-timeout';
       message: string;
       ctaLabel: 'Check again';
@@ -100,6 +105,7 @@ const LIMIT_MESSAGE = 'This runtime is handling too many requests. Try again in 
 const CLI_UPGRADE_MESSAGE = 'Update Kilo CLI and reconnect.';
 const MALFORMED_MESSAGE =
   'This runtime returned an unsupported response. Update Kilo CLI and reconnect.';
+const ACCESS_LOST_MESSAGE = 'You no longer have access to this session.';
 const READINESS_TIMEOUT_MESSAGE = "Session created, but it isn't ready in the app yet.";
 
 /**
@@ -115,6 +121,13 @@ const READINESS_TIMEOUT_MESSAGE = "Session created, but it isn't ready in the ap
  */
 export function classifyLocalSessionCreateError(error: unknown): LocalSessionCreateRecovery {
   const upstreamCode = readUpstreamCode(error);
+  if (upstreamCode === 'UNKNOWN' && readTrpcErrorCode(error) === 'FORBIDDEN') {
+    return {
+      kind: 'non-retryable-access-lost',
+      message: ACCESS_LOST_MESSAGE,
+      ctaLabel: null,
+    };
+  }
   switch (upstreamCode) {
     case 'RUNTIME_NOT_CONNECTED':
     case 'RUNTIME_FENCE_MISMATCH': {
@@ -174,6 +187,21 @@ export function classifyLocalSessionCreateError(error: unknown): LocalSessionCre
  *   but the response was not a typed create failure).
  * - Every entry of the union.
  */
+function readTrpcErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const data = (error as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') {
+    return undefined;
+  }
+  const code = (data as { code?: unknown }).code;
+  if (typeof code !== 'string') {
+    return undefined;
+  }
+  return code;
+}
+
 function readUpstreamCode(error: unknown): LocalSessionCreateUpstreamCode {
   if (!error || typeof error !== 'object') {
     return 'UNKNOWN';

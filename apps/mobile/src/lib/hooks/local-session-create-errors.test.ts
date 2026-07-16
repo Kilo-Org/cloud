@@ -111,6 +111,18 @@ describe('classifyLocalSessionCreateError', () => {
     expect(result.kind).toBe('transient');
   });
 
+  it('classifies a tRPC FORBIDDEN error with no upstream code as terminal access-lost with no CTA', () => {
+    const result = classifyLocalSessionCreateError({
+      data: { code: 'FORBIDDEN' },
+    });
+    expect(result.kind).toBe('non-retryable-access-lost');
+    if (result.kind !== 'non-retryable-access-lost') {
+      throw new Error('expected non-retryable-access-lost');
+    }
+    expect(result.message).toBe('You no longer have access to this session.');
+    expect(result.ctaLabel).toBeNull();
+  });
+
   it('classifies a plain Error (no tRPC envelope) as transient retryable', () => {
     const result = classifyLocalSessionCreateError(new Error('network down'));
     expect(result.kind).toBe('transient');

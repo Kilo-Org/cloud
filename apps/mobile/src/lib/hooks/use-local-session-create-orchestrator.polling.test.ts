@@ -161,6 +161,34 @@ describe('useLocalSessionCreateOrchestrator — polling and check-again', () => 
     expect(createAndRunImpl.mock.calls.length).toBe(createAndRunCallsBefore);
   });
 
+  it('Check again handles a thrown FORBIDDEN by entering terminal access-lost recovery with no CTA', async () => {
+    const { deps, createAndRunImpl, pollReadinessImpl } = makeDeps({
+      requestIds: [REQUEST_ID_1],
+      pollMaxMs: 1500,
+      pollIntervalMs: 500,
+    });
+    createAndRunImpl.mockResolvedValueOnce(NOT_READY_HAPPY);
+    pollReadinessImpl.mockResolvedValue({ status: 'pending' });
+
+    const orchestrator = makeOrchestrator(deps);
+    await orchestrator.submit();
+    expect(orchestrator.getState().phase).toBe('recovery');
+
+    pollReadinessImpl.mockRejectedValueOnce({
+      data: { code: 'FORBIDDEN' },
+      message: 'You no longer have access to this organization',
+    });
+    await orchestrator.checkAgain();
+
+    const state = orchestrator.getState();
+    expect(state.phase).toBe('recovery');
+    if (state.phase !== 'recovery') {
+      throw new Error('expected recovery');
+    }
+    expect(state.recovery.kind).toBe('non-retryable-access-lost');
+    expect(state.recovery.ctaLabel).toBeNull();
+  });
+
   it('uses a bounded attempt count derived from pollMaxMs / pollIntervalMs (30 attempts at default budget)', async () => {
     const { deps, createAndRunImpl, pollReadinessImpl } = makeDeps({ requestIds: [REQUEST_ID_1] });
     createAndRunImpl.mockResolvedValue(NOT_READY_HAPPY);
@@ -170,5 +198,34 @@ describe('useLocalSessionCreateOrchestrator — polling and check-again', () => 
     await orchestrator.submit();
 
     expect(pollReadinessImpl.mock.calls.length).toBeLessThanOrEqual(30);
+  });
+
+  it('Check again propagates a cache-invalidation failure after ready without converting it to a recovery state', async () => {
+    const { deps, createAndRunImpl, pollReadinessImpl, invalidateCachesImpl, trace } = makeDeps({
+      requestIds: [REQUEST_ID_1],
+      pollMaxMs: 1500,
+      pollIntervalMs: 500,
+    });
+    createAndRunImpl.mockResolvedValueOnce(NOT_READY_HAPPY);
+    pollReadinessImpl.mockResolvedValue({ status: 'pending' });
+
+    const orchestrator = makeOrchestrator(deps);
+    await orchestrator.submit();
+    expect(orchestrator.getState().phase).toBe('recovery');
+
+    const sentinel = new Error('invalidateCaches failed');
+    invalidateCachesImpl.mockRejectedValueOnce(sentinel);
+    pollReadinessImpl.mockResolvedValueOnce({ status: 'ready', organizationId: null });
+
+    const pollCallsBefore = trace.pollReadiness.length;
+    const createCallsBefore = createAndRunImpl.mock.calls.length;
+
+    await expect(orchestrator.checkAgain()).rejects.toBe(sentinel);
+
+    expect(trace.pollReadiness).toHaveLength(pollCallsBefore + 1);
+    expect(createAndRunImpl.mock.calls.length).toBe(createCallsBefore);
+
+    const state = orchestrator.getState();
+    expect(state.phase).toBe('submitting');
   });
 });

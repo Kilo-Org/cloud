@@ -168,6 +168,25 @@ describe('useLocalSessionCreateOrchestrator — recovery, retry, fence-change', 
     expect(state.recovery.ctaLabel).toBeNull();
   });
 
+  it('tRPC FORBIDDEN from createAndRun surfaces terminal access-lost with no Retry CTA', async () => {
+    const { deps, createAndRunImpl } = makeDeps({ requestIds: [REQUEST_ID_1] });
+    createAndRunImpl.mockRejectedValueOnce({
+      data: { code: 'FORBIDDEN' },
+      message: 'You no longer have access to this organization',
+    });
+
+    const orchestrator = makeOrchestrator(deps);
+    await orchestrator.submit();
+
+    const state = orchestrator.getState();
+    if (state.phase !== 'recovery') {
+      throw new Error('expected recovery');
+    }
+    expect(state.recovery.kind).toBe('non-retryable-access-lost');
+    expect(state.recovery.message).toBe('You no longer have access to this session.');
+    expect(state.recovery.ctaLabel).toBeNull();
+  });
+
   it('catalog-changed keeps the requestId while the fence is unchanged (so a Retry can carry the same id)', async () => {
     const { deps, createAndRunImpl } = makeDeps({ requestIds: [REQUEST_ID_1] });
     createAndRunImpl.mockRejectedValueOnce({ data: { upstreamCode: 'CATALOG_CHANGED' } });

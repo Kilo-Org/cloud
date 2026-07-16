@@ -145,6 +145,11 @@ export function useLocalSessionCreate(input: UseLocalSessionCreateInput): LocalS
   const [orchestratorState, setOrchestratorState] =
     useState<LocalSessionCreateOrchestratorState>(IDLE_STATE);
 
+  // Keep the current orchestrator identity in React state so the subscription
+  // effect below depends on a stable, explicit value instead of a mutable ref.
+  const [activeOrchestrator, setActiveOrchestrator] =
+    useState<LocalSessionCreateOrchestrator | null>(null);
+
   const deps = useMemo(
     () => ({
       requestIdStore: requestIdStoreRef.current,
@@ -217,6 +222,7 @@ export function useLocalSessionCreate(input: UseLocalSessionCreateInput): LocalS
     if (fenceChanged) {
       requestIdStoreRef.current.clearByFence(stored.fence);
       orchestratorRef.current = null;
+      setActiveOrchestrator(null);
       setOrchestratorState(IDLE_STATE);
       return;
     }
@@ -228,20 +234,21 @@ export function useLocalSessionCreate(input: UseLocalSessionCreateInput): LocalS
       stored.selectedModel.variant !== selectedModel.variant
     ) {
       orchestratorRef.current = null;
+      setActiveOrchestrator(null);
       setOrchestratorState(IDLE_STATE);
     }
   }, [fence, catalog, selectedAgentSlug, selectedModel]);
 
   // Subscribe to the active orchestrator's state. The orchestrator is
   // created lazily on the first submit, so the effect is a no-op before
-  // the user attempts anything.
+  // the user attempts anything. The dependency is the orchestrator identity
+  // kept in React state, not a mutable ref.
   useEffect(() => {
-    const current = orchestratorRef.current;
-    if (current === null) {
+    if (activeOrchestrator === null) {
       return noOpCleanup;
     }
-    return current.orchestrator.subscribe(setOrchestratorState);
-  }, [orchestratorRef.current?.orchestrator]);
+    return activeOrchestrator.subscribe(setOrchestratorState);
+  }, [activeOrchestrator]);
 
   const ensureOrchestrator = useCallback(() => {
     if (!fence || !catalog || !selectedAgentSlug || !selectedModel) {
@@ -275,6 +282,7 @@ export function useLocalSessionCreate(input: UseLocalSessionCreateInput): LocalS
       selectedAgentSlug,
       selectedModel,
     };
+    setActiveOrchestrator(orchestrator);
     // Re-subscribe to the new orchestrator's state.
     setOrchestratorState(orchestrator.getState());
     return orchestrator;

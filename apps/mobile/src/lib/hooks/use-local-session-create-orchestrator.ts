@@ -4,7 +4,7 @@ import {
   type CreateAndRunResult,
   handlePromptPartial,
 } from './local-session-create-effects';
-import { pollReadinessUntilReady } from './local-session-create-polling';
+import { pollReadinessUntilReady, type ReadinessResult } from './local-session-create-polling';
 import {
   type BuiltLocalSessionCreateRequest,
   LocalSessionCreateRequestError,
@@ -257,7 +257,12 @@ function createLocalSessionCreateOrchestrator(
     sessionId: string,
     requestId: string
   ): Promise<LocalSessionCreateOrchestratorState> {
-    const probe = await deps.pollReadiness({ sessionId });
+    let probe: ReadinessResult | undefined = undefined;
+    try {
+      probe = await deps.pollReadiness({ sessionId });
+    } catch (error) {
+      return reportErrorAndRecovery(error, requestId);
+    }
     if (probe.status === 'ready') {
       await completeHappySafe(sessionId);
       return publishNavigated();

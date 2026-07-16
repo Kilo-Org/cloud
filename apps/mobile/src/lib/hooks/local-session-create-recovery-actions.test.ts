@@ -50,6 +50,16 @@ describe('resolveRecoveryCtaAction', () => {
     expect(result.kind).toBe('none');
   });
 
+  it('returns none for the non-retryable access-lost branch (ctaLabel null)', () => {
+    const recovery = makeRecovery({
+      kind: 'non-retryable-access-lost',
+      message: 'You no longer have access to this session.',
+      ctaLabel: null,
+    });
+    const result = resolveRecoveryCtaAction({ ...baseInput, recovery });
+    expect(result.kind).toBe('none');
+  });
+
   it('maps a Retry CTA exactly to the retry handler with the verbatim label', () => {
     const handlers = makeHandlers();
     const recovery = makeRecovery({

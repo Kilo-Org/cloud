@@ -15,8 +15,8 @@ test('login waits for the delayed Expo developer menu after launching Kilo', () 
   assert.ok(launchIndex >= 0);
   assert.ok(developerMenuWaitIndex > launchIndex);
   assert.ok(continueIndex > developerMenuWaitIndex);
-  assert.match(flow.slice(optionalWaitIndex, continueIndex), /timeout: 2000/);
-  assert.match(flow.slice(optionalWaitIndex, continueIndex), /optional: true/);
+  assert.match(flow.slice(optionalWaitIndex, continueIndex), /timeout: 5000/);
+  assert.doesNotMatch(flow.slice(optionalWaitIndex, continueIndex), /optional: true/);
 });
 
 test('shared launch flows close the Expo developer menu after its introduction', () => {
@@ -98,15 +98,129 @@ test('login polls the local outbox without one-second latency', () => {
 });
 
 test('shared launch prompt grace periods total at most five seconds', () => {
-  const flow = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
-  const optionalWaits = [...flow.matchAll(/timeout: (\d+)\n\s+optional: true/g)].map(match =>
-    Number(match[1])
-  );
+  for (const flowPath of [
+    'apps/mobile/e2e/flows/open-app.yaml',
+    'apps/mobile/e2e/flows/settle-app.yaml',
+  ]) {
+    const flow = fs.readFileSync(flowPath, 'utf8');
+    const optionalWaits = [...flow.matchAll(/timeout: (\d+)\n\s+optional: true/g)].map(match =>
+      Number(match[1])
+    );
 
-  assert.equal(
-    optionalWaits.reduce((total, timeout) => total + timeout, 0),
-    5000
-  );
+    assert.deepEqual(optionalWaits, [3000]);
+    assert.ok(optionalWaits.reduce((total, timeout) => total + timeout, 0) <= 5000);
+  }
+});
+
+test('shared launch flows handle the exact iOS external-app prompt within existing waits', () => {
+  const flowContracts = [
+    {
+      path: 'apps/mobile/e2e/flows/open-app.yaml',
+      timeouts: [30000, 3000, 5000, 5000, 5000, 5000, 30000],
+    },
+    {
+      path: 'apps/mobile/e2e/flows/settle-app.yaml',
+      timeouts: [15000, 3000, 5000, 5000, 5000, 5000, 15000],
+    },
+  ];
+
+  for (const contract of flowContracts) {
+    const flow = fs.readFileSync(contract.path, 'utf8');
+    const promptGuardIndex = flow.indexOf(`visible: 'Open this page in "Kilo"\\?'`);
+    const openActionIndex = flow.indexOf("tapOn: 'Open'", promptGuardIndex);
+    const finalReadyWaitIndex = flow.lastIndexOf('- extendedWaitUntil:');
+    const waitBlocks = [...flow.matchAll(/- extendedWaitUntil:\n[\s\S]*?(?=\n- |$)/g)].map(
+      match => match[0]
+    );
+    const timeouts = [...flow.matchAll(/timeout: (\d+)/g)].map(match => Number(match[1]));
+
+    assert.match(
+      waitBlocks[0],
+      /Open this page in "Kilo"\\\?/,
+      `${contract.path} should recognize the prompt as its initial visible state`
+    );
+    assert.match(
+      waitBlocks[1],
+      /Open this page in "Kilo"\\\?/,
+      `${contract.path} should recognize the prompt inside its optional wait`
+    );
+    assert.match(waitBlocks[1], /timeout: 3000\n\s+optional: true/);
+    assert.ok(
+      promptGuardIndex > flow.indexOf(waitBlocks[1]),
+      `${contract.path} should guard the Open action`
+    );
+    assert.ok(
+      openActionIndex > promptGuardIndex,
+      `${contract.path} should tap the exact Open action`
+    );
+    const promptChain = [
+      {
+        action: "tapOn: 'Open'",
+        nextGuard: 'Ask App Not to Track',
+        visible:
+          'Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
+      },
+      {
+        action: "tapOn: 'Ask App Not to Track'",
+        nextGuard: 'This is the developer menu.*',
+        visible:
+          'This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
+      },
+      {
+        action: "tapOn: 'Continue'",
+        nextGuard: 'Fast Refresh|Element Inspector',
+        visible:
+          'Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
+      },
+      {
+        action: "tapOn: 'Close'",
+        nextGuard: '“Kilo” Would Like to Send You Notifications',
+        visible:
+          '“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
+      },
+    ];
+
+    let searchFrom = openActionIndex;
+    for (const step of promptChain) {
+      const actionIndex = flow.indexOf(step.action, searchFrom);
+      const nextGuardIndex = flow.indexOf(
+        `- runFlow:\n    when:\n      visible: '${step.nextGuard}'`,
+        actionIndex
+      );
+      const betweenActionAndGuard = flow.slice(actionIndex, nextGuardIndex);
+
+      assert.ok(actionIndex >= searchFrom, `${contract.path} should include ${step.action}`);
+      assert.ok(
+        nextGuardIndex > actionIndex,
+        `${contract.path} should guard ${step.nextGuard} after ${step.action}`
+      );
+      assert.match(
+        betweenActionAndGuard,
+        new RegExp(
+          `- extendedWaitUntil:\\n    visible: '${step.visible.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\n    timeout: 5000`
+        ),
+        `${contract.path} should poll for the next state immediately after ${step.action}`
+      );
+      assert.doesNotMatch(
+        betweenActionAndGuard,
+        /timeout: (?:500|1000)\n|optional: true/,
+        `${contract.path} should use a robust non-optional state gate after ${step.action}`
+      );
+      assert.doesNotMatch(
+        betweenActionAndGuard.replace(/^- runFlow:[\s\S]*?commands:\n\s+- tapOn: '[^']+'/, ''),
+        /- runFlow:/,
+        `${contract.path} should not insert another one-shot guard before polling`
+      );
+      searchFrom = nextGuardIndex;
+    }
+    assert.ok(
+      finalReadyWaitIndex > openActionIndex,
+      `${contract.path} should still wait for its final ready state`
+    );
+    assert.deepEqual(timeouts, contract.timeouts, `${contract.path} should not add a fixed wait`);
+    assert.doesNotMatch(flow, /visible: '(?:Allow|Open)'/);
+    assert.doesNotMatch(flow, /tapOn: '(?:Allow\|Open|Open\|Allow)'/);
+  }
 });
 
 test('helper-driven logout settles the app already launched by preflight', () => {
@@ -116,7 +230,6 @@ test('helper-driven logout settles the app already launched by preflight', () =>
   assert.match(logout, /settle-app\.yaml/);
   assert.doesNotMatch(logout, /open-app\.yaml/);
   assert.doesNotMatch(settle, /stopApp|text: 'Kilo'/);
-  assert.match(settle, /timeout: 3000/);
 });
 
 test('logout skips prompt settling for stable signed-in and signed-out states', () => {

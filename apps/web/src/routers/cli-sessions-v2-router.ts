@@ -1298,8 +1298,8 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-    return { share_id: body.public_id, session_id: input.kilo_session_id };
-  }),
+      return { share_id: body.public_id, session_id: input.kilo_session_id };
+    }),
 
   /**
    * Public readiness probe for a single session owned by the caller. Used by
@@ -1326,6 +1326,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         sessionId: input.session_id,
         userId: ctx.user.id,
         deps: {
+          maxAttempts: 1,
           query: async (sessionId, kiloUserId) => {
             const [row] = await db
               .select({ organizationId: cli_sessions_v2.organization_id })

@@ -1350,6 +1350,10 @@ describe('cli-sessions-v2-router', () => {
   });
 
   describe('readiness', () => {
+    let mockedWaitForOwnedCliSession: jest.MockedFunction<
+      typeof ReadinessModule.waitForOwnedCliSession
+    >;
+
     // sessionIdSchema enforces a 30-character `ses_…` ID.
     const SESSION_ID = 'ses_readiness_query_owned_30ch';
     const OTHER_SESSION_ID = 'ses_readiness_query_other_30ch';
@@ -1359,9 +1363,8 @@ describe('cli-sessions-v2-router', () => {
 
     function makeReadinessMock() {
       const mocked = jest.mocked(
-        jest.requireMock<typeof ReadinessModule>(
-          '@/lib/local-runtime-control/readiness'
-        ).waitForOwnedCliSession
+        jest.requireMock<typeof ReadinessModule>('@/lib/local-runtime-control/readiness')
+          .waitForOwnedCliSession
       );
       // Mirror the production probe exactly: read the owned row, then run
       // ensureOrganizationAccess on the resolved organizationId. We honor the
@@ -1398,7 +1401,7 @@ describe('cli-sessions-v2-router', () => {
         kilo_user_id: otherUser.id,
         created_on_platform: 'cloud-agent',
       });
-      makeReadinessMock();
+      mockedWaitForOwnedCliSession = makeReadinessMock();
     });
 
     afterEach(async () => {
@@ -1413,9 +1416,9 @@ describe('cli-sessions-v2-router', () => {
 
     it('rejects an invalid session_id shape', async () => {
       const caller = await createCallerForUser(regularUser.id);
-      await expect(
-        caller.cliSessionsV2.readiness({ session_id: 'bad' })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(caller.cliSessionsV2.readiness({ session_id: 'bad' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
     });
 
     it('returns pending for a session that does not exist (no leak of existence)', async () => {
@@ -1490,6 +1493,26 @@ describe('cli-sessions-v2-router', () => {
           .set({ organization_id: null })
           .where(eq(cli_sessions_v2.session_id, SESSION_ID));
       }
+    });
+
+    it('uses a single-shot wait with maxAttempts:1 so the public query does not poll the DB', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await caller.cliSessionsV2.readiness({ session_id: MISSING_SESSION_ID });
+      expect(mockedWaitForOwnedCliSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: MISSING_SESSION_ID,
+          userId: regularUser.id,
+          deps: expect.objectContaining({ maxAttempts: 1 }),
+        })
+      );
+    });
+
+    it('returns pending after a single DB attempt and resolves without waiting the full 10s budget', async () => {
+      const start = Date.now();
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.readiness({ session_id: MISSING_SESSION_ID });
+      expect(result).toEqual({ status: 'pending' });
+      expect(Date.now() - start).toBeLessThan(500);
     });
 
     it('does not call Cloud Agent (no cloud-agent SDK import in the readiness path)', async () => {

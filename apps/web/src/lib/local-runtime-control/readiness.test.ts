@@ -71,12 +71,7 @@ describe('waitForOwnedCliSession', () => {
   });
 
   it('polls at the injected interval and returns on attempt N (sleep count = N-1, query count = N)', async () => {
-    const { query, calls } = makeQuery([
-      null,
-      null,
-      null,
-      { organizationId: null },
-    ]);
+    const { query, calls } = makeQuery([null, null, null, { organizationId: null }]);
     const ensureOrganizationAccess = makePassThroughAccess();
     const sleep = jest.fn(async () => undefined);
 
@@ -95,7 +90,10 @@ describe('waitForOwnedCliSession', () => {
   });
 
   it('uses the production defaults (250ms interval, 40 attempts) when no override is provided', async () => {
-    const rows: Array<{ organizationId: string | null } | null> = Array.from({ length: 39 }, () => null);
+    const rows: Array<{ organizationId: string | null } | null> = Array.from(
+      { length: 39 },
+      () => null
+    );
     rows.push({ organizationId: null });
     const { query, calls } = makeQuery(rows);
     const ensureOrganizationAccess = makePassThroughAccess();
@@ -178,6 +176,26 @@ describe('waitForOwnedCliSession', () => {
       })
     ).rejects.toBe(accessError);
     expect(ensureOrganizationAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns after one query and no sleep when maxAttempts is 1', async () => {
+    const { query, calls } = makeQuery([null]);
+    const sleep = jest.fn(async () => undefined);
+
+    const result = await waitForOwnedCliSession({
+      sessionId: SESSION_ID,
+      userId: USER_ID,
+      deps: {
+        query,
+        ensureOrganizationAccess: makePassThroughAccess(),
+        sleep,
+        maxAttempts: 1,
+      },
+    });
+
+    expect(result).toBeNull();
+    expect(calls).toHaveLength(1);
+    expect(sleep).not.toHaveBeenCalled();
   });
 
   it('propagates a query failure rather than retrying', async () => {

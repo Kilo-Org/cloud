@@ -142,15 +142,15 @@ export async function shouldRouteToVercel(
 }
 
 async function convertProviderOptions(
-  requestToMutate: GatewayRequest
+  requestToMutate: GatewayRequest,
+  vercelModelId: string
 ): Promise<VercelProviderConfig> {
   const provider = requestToMutate.body.provider;
   let only = provider?.only?.map(openRouterToVercelInferenceProviderId);
 
   if (provider?.ignore?.length) {
-    const vercelInferenceProviders = await getCachedVercelInferenceProviderIdsForModel(
-      requestToMutate.body.model
-    );
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
     if (!vercelInferenceProviders) {
       throw new Error('Vercel inference provider data became unavailable during request transform');
     }
@@ -232,7 +232,8 @@ export async function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  requestToMutate.body.model = mapModelIdToVercel(requestedModel);
+  const vercelModelId = mapModelIdToVercel(requestedModel);
+  requestToMutate.body.model = vercelModelId;
 
   if (userByok) {
     if (userByok.length === 0) {
@@ -254,7 +255,10 @@ export async function applyVercelSettings(
       },
     };
   } else {
-    requestToMutate.body.providerOptions = await convertProviderOptions(requestToMutate);
+    requestToMutate.body.providerOptions = await convertProviderOptions(
+      requestToMutate,
+      vercelModelId
+    );
   }
 
   if (requestToMutate.body.providerOptions) {

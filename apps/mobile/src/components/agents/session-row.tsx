@@ -68,8 +68,8 @@ function platformLabel(platform: string): string {
   }
 }
 
-function formatMeta(updatedAt: string): string {
-  return timeAgo(parseTimestamp(updatedAt)).toUpperCase();
+function formatMeta(timestamp: string): string {
+  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
 }
 
 function showDeleteConfirm(onDelete: () => void) {

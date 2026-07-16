@@ -11,7 +11,6 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
-      isStreaming: false,
       voiceInputActive: false,
     });
 
@@ -26,11 +25,10 @@ describe('resolveChatComposerControlState', () => {
     });
   });
 
-  it('collapses send, voice, and toolbar when disabled, streaming, or sending', () => {
+  it('collapses send, voice, and toolbar when disabled or sending', () => {
     for (const override of [
-      { disabled: true, isStreaming: false, isSending: false },
-      { disabled: false, isStreaming: true, isSending: false },
-      { disabled: false, isStreaming: false, isSending: true },
+      { disabled: true, isSending: false },
+      { disabled: false, isSending: true },
     ]) {
       const state = resolveChatComposerControlState({
         attachmentsCount: 0,
@@ -39,7 +37,6 @@ describe('resolveChatComposerControlState', () => {
         hasText: true,
         isFocused: false,
         isSending: override.isSending,
-        isStreaming: override.isStreaming,
         voiceInputActive: false,
       });
 
@@ -51,6 +48,57 @@ describe('resolveChatComposerControlState', () => {
     }
   });
 
+  it('keeps the input editable and toolbar enabled while streaming when text is present', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 0,
+      attachmentMax: 5,
+      disabled: false,
+      hasText: true,
+      isFocused: false,
+      isSending: false,
+      voiceInputActive: false,
+    });
+
+    expect(state.inputEditable).toBe(true);
+    expect(state.inputAccessibilityDisabled).toBe(false);
+    expect(state.toolbarDisabled).toBe(false);
+    expect(state.voiceDisabled).toBe(false);
+    expect(state.canSend).toBe(true);
+  });
+
+  it('keeps the input editable while streaming with an empty draft (canSend stays false)', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 0,
+      attachmentMax: 5,
+      disabled: false,
+      hasText: false,
+      isFocused: false,
+      isSending: false,
+      voiceInputActive: false,
+    });
+
+    expect(state.inputEditable).toBe(true);
+    expect(state.inputAccessibilityDisabled).toBe(false);
+    expect(state.toolbarDisabled).toBe(false);
+    expect(state.canSend).toBe(false);
+  });
+
+  it('still blocks send mid-stream when the parent disabled flag is on (e.g. read-only or capability gate)', () => {
+    const state = resolveChatComposerControlState({
+      attachmentsCount: 0,
+      attachmentMax: 5,
+      disabled: true,
+      hasText: true,
+      isFocused: false,
+      isSending: false,
+      voiceInputActive: false,
+    });
+
+    expect(state.canSend).toBe(false);
+    expect(state.inputEditable).toBe(false);
+    expect(state.toolbarDisabled).toBe(true);
+  });
+
   it('does not allow send when the draft is empty even with attachments and no overrides', () => {
     const state = resolveChatComposerControlState({
       attachmentsCount: 2,
@@ -59,7 +107,6 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
-      isStreaming: false,
       voiceInputActive: false,
     });
 
@@ -76,7 +123,6 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
-      isStreaming: false,
       voiceInputActive: false,
     };
 
@@ -99,7 +145,6 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
-      isStreaming: false,
       voiceInputActive: false,
     });
 
@@ -113,8 +158,7 @@ describe('resolveChatComposerControlState', () => {
       disabled: false,
       hasText: true,
       isFocused: false,
-      isSending: false,
-      isStreaming: true,
+      isSending: true,
       voiceInputActive: false,
     });
 
@@ -129,7 +173,6 @@ describe('resolveChatComposerControlState', () => {
       hasText: true,
       isFocused: false,
       isSending: false,
-      isStreaming: false,
       voiceInputActive: true,
     });
 
@@ -146,7 +189,6 @@ describe('resolveChatComposerControlState', () => {
       hasText: false,
       isFocused: false,
       isSending: false,
-      isStreaming: false,
       voiceInputActive: false,
     });
 

@@ -5,7 +5,6 @@ type ChatComposerControlInput = {
   hasText: boolean;
   isFocused: boolean;
   isSending: boolean;
-  isStreaming: boolean;
   voiceInputActive: boolean;
 };
 
@@ -44,17 +43,21 @@ export function resolveChatComposerControlState(
     hasText,
     isFocused,
     isSending,
-    isStreaming,
     voiceInputActive,
   } = input;
-  const toolbarDisabled = disabled || isStreaming || isSending;
+  // Streaming is intentionally NOT a composer gate. The user must be able to
+  // type and send while the agent runs (plan §3.3): the row component chooses
+  // Stop vs Send based on `isStreaming` + `hasText`. The session manager, the
+  // parent, and `disabled` already cover every other lock (read-only, missing
+  // model, blocking interaction, upload-in-progress, interrupt-in-flight).
+  const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
   const paperclipDisabled =
     toolbarDisabled || voiceInputActive || attachmentsCount >= attachmentMax;
   const inputEditable = !toolbarDisabled && !voiceInputActive;
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
   return {
-    canSend: hasText && !disabled && !isStreaming && !isSending,
+    canSend: hasText && !disabled && !isSending,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,
     paperclipDisabled,

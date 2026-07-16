@@ -10,6 +10,8 @@ import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
 import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
+import ApiRequestLogPage from '@/app/admin/api-request-log/page';
+import RequestLoggingOptInsPage from '@/app/admin/request-logging-opt-ins/page';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -17,13 +19,17 @@ const VALID_TABS: readonly string[] = [
   'routing',
   'model-experiments',
   'experiment-requests',
+  'api-request-log',
+  'request-logging-opt-ins',
 ];
 type Tab =
   | 'sync-providers'
   | 'custom-llms'
   | 'routing'
   | 'model-experiments'
-  | 'experiment-requests';
+  | 'experiment-requests'
+  | 'api-request-log'
+  | 'request-logging-opt-ins';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -86,6 +92,12 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="experiment-requests" className={tabTriggerClass}>
               Experiment Requests
             </TabsTrigger>
+            <TabsTrigger value="api-request-log" className={tabTriggerClass}>
+              API Request Log
+            </TabsTrigger>
+            <TabsTrigger value="request-logging-opt-ins" className={tabTriggerClass}>
+              Request Logging Opt-ins
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -101,6 +113,18 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="experiment-requests" className="mt-4">
             <ModelExperimentRequestsContent />
+          </TabsContent>
+          <TabsContent
+            value="api-request-log"
+            className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
+          >
+            <ApiRequestLogPage />
+          </TabsContent>
+          <TabsContent
+            value="request-logging-opt-ins"
+            className="mt-4 [&>div]:mx-0 [&>div]:py-0 [&>header]:hidden"
+          >
+            <RequestLoggingOptInsPage />
           </TabsContent>
         </Tabs>
       </div>

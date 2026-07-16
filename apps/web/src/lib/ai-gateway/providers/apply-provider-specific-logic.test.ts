@@ -51,6 +51,14 @@ describe('applyGatewayModelsFallback', () => {
 });
 
 describe('applyPreferredProvider', () => {
+  it('does not set a provider order for Fable', () => {
+    const request = makeRequest('anthropic/claude-fable-5');
+
+    applyPreferredProvider('anthropic/claude-fable-5', request.body);
+
+    expect(request.body.provider).toBeUndefined();
+  });
+
   it('preserves valid provider options when adding order', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     request.body.provider = { zdr: true };

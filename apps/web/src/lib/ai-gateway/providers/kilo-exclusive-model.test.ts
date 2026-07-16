@@ -26,7 +26,6 @@ function makeModel(
     flags: [],
     gateway: 'openrouter',
     pricing: null,
-    exclusive_to: [],
     inference_provider_restriction: [],
     ...overrides,
   };

@@ -1,4 +1,3 @@
-import type { FeatureValue } from '@/lib/feature-detection';
 import {
   OpenRouterInferenceProviderIdSchema,
   type OpenRouterInferenceProviderId,
@@ -76,8 +75,6 @@ export type KiloExclusiveModel = {
   gateway: ProviderId;
   internal_id: string;
   pricing: PricingTiers | null;
-  /** Features allowed to use this model. Empty array means no restriction. */
-  exclusive_to: ReadonlyArray<FeatureValue>;
   /**
    * Upstream inference providers this model may be routed to; empty means no
    * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.

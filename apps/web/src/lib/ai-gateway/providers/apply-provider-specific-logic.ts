@@ -44,7 +44,9 @@ import {
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
-  if (isClaudeModel(requestedModel)) {
+  if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
+    // fable is not available on bedrock on vercel
+    // and specifying bedrock breaks the opus fallback
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,

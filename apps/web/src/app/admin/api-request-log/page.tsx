@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format, formatDistanceToNow, subDays } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import AdminPage from '@/app/admin/components/AdminPage';
@@ -13,36 +13,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
 
 export default function ApiRequestLogPage() {
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const weekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
-
   const [userId, setUserId] = useState('');
-  const [startDate, setStartDate] = useState(weekAgo);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [model, setModel] = useState('');
   const [sessionId, setSessionId] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const trpc = useTRPC();
   const oldestEntryQuery = useQuery(trpc.admin.apiRequestLog.getOldestEntry.queryOptions());
 
   function handleDownload() {
-    if (!userId.trim()) {
-      setError('User ID is required');
-      return;
+    const params = new URLSearchParams();
+    if (userId.trim()) {
+      params.set('userId', userId.trim());
     }
-    if (!startDate || !endDate) {
-      setError('Both start and end dates are required');
-      return;
+    if (startDate) {
+      params.set('startDate', startDate);
     }
-
-    setError(null);
-
-    const params = new URLSearchParams({
-      userId: userId.trim(),
-      startDate,
-      endDate,
-    });
+    if (endDate) {
+      params.set('endDate', endDate);
+    }
     if (model.trim()) {
       params.set('model', model.trim());
     }
@@ -76,7 +66,7 @@ export default function ApiRequestLogPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="userId">User ID</Label>
+              <Label htmlFor="userId">User ID (optional)</Label>
               <Input
                 id="userId"
                 placeholder="Enter user ID"
@@ -107,7 +97,7 @@ export default function ApiRequestLogPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
+                <Label htmlFor="startDate">Start Date (optional)</Label>
                 <Input
                   id="startDate"
                   type="date"
@@ -116,7 +106,7 @@ export default function ApiRequestLogPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date</Label>
+                <Label htmlFor="endDate">End Date (optional)</Label>
                 <Input
                   id="endDate"
                   type="date"
@@ -125,8 +115,6 @@ export default function ApiRequestLogPage() {
                 />
               </div>
             </div>
-
-            {error && <p className="text-sm text-red-500">{error}</p>}
 
             <Button onClick={handleDownload} className="w-full">
               <Download className="mr-2 h-4 w-4" />

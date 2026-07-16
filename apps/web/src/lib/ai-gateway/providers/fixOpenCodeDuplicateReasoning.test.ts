@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -22,6 +22,10 @@ function getReasoningDetails(request: OpenRouterChatCompletionRequest) {
 }
 
 describe('fixOpenCodeDuplicateReasoning', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('deduplicates reasoning items with empty text but identical signatures', () => {
     const signature = 'Eu8BClkIDRgCKkBlUUZG1kCXFO+sample+signature==';
     const request = makeRequest([
@@ -114,5 +118,48 @@ describe('fixOpenCodeDuplicateReasoning', () => {
     fixOpenCodeDuplicateReasoning('anthropic/claude-opus-4.7', request, 'test-session');
 
     expect(getReasoningDetails(request)).toHaveLength(0);
+  });
+
+  it('logs once after mutating a request', () => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const request = makeRequest([
+      { type: ReasoningDetailType.Encrypted, data: 'encrypted-blob' },
+      { type: ReasoningDetailType.Encrypted, data: 'encrypted-blob' },
+      {
+        text: 'hello',
+        type: ReasoningDetailType.Text,
+        format: 'anthropic-claude-v1',
+        signature: 'sig-a',
+      },
+      {
+        text: 'hello',
+        type: ReasoningDetailType.Text,
+        format: 'anthropic-claude-v1',
+        signature: 'sig-b',
+      },
+    ]);
+
+    fixOpenCodeDuplicateReasoning('anthropic/claude-opus-4.7', request, 'test-session');
+
+    expect(debugSpy).toHaveBeenCalledTimes(1);
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[fixOpenCodeDuplicateReasoning] removed duplicate or invalid reasoning, model: anthropic/claude-opus-4.7, session: test-session'
+    );
+  });
+
+  it('does not log when the request is unchanged', () => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const request = makeRequest([
+      {
+        text: 'hello',
+        type: ReasoningDetailType.Text,
+        format: 'anthropic-claude-v1',
+        signature: 'sig-a',
+      },
+    ]);
+
+    fixOpenCodeDuplicateReasoning('anthropic/claude-opus-4.7', request, 'test-session');
+
+    expect(debugSpy).not.toHaveBeenCalled();
   });
 });

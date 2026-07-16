@@ -2,7 +2,7 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 
@@ -63,17 +63,22 @@ function jsonError(message: string, status: number) {
 }
 
 function buildFilter(
-  userId: string,
-  parsedStart: Date,
-  parsedEnd: Date,
+  userId: string | null,
+  parsedStart: Date | null,
+  parsedEnd: Date | null,
   model: string | null,
   sessionId: string | null
 ) {
-  const conditions = [
-    eq(api_request_log.kilo_user_id, userId),
-    gte(api_request_log.created_at, parsedStart.toISOString()),
-    lte(api_request_log.created_at, parsedEnd.toISOString()),
-  ];
+  const conditions: SQL[] = [];
+  if (userId) {
+    conditions.push(eq(api_request_log.kilo_user_id, userId));
+  }
+  if (parsedStart) {
+    conditions.push(gte(api_request_log.created_at, parsedStart.toISOString()));
+  }
+  if (parsedEnd) {
+    conditions.push(lte(api_request_log.created_at, parsedEnd.toISOString()));
+  }
   if (model) {
     conditions.push(eq(api_request_log.model, model));
   }
@@ -98,13 +103,9 @@ export async function GET(request: NextRequest) {
   const model = searchParams.get('model');
   const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
 
-  if (!userId || !startDate || !endDate) {
-    return jsonError('userId, startDate, and endDate are required', 400);
-  }
-
-  const parsedStart = parseDate(startDate);
-  const parsedEnd = parseDate(endDate + 'T23:59:59.999Z');
-  if (!parsedStart || !parsedEnd) {
+  const parsedStart = startDate ? parseDate(startDate) : null;
+  const parsedEnd = endDate ? parseDate(endDate + 'T23:59:59.999Z') : null;
+  if ((startDate && !parsedStart) || (endDate && !parsedEnd)) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
@@ -178,11 +179,11 @@ export async function GET(request: NextRequest) {
   // but TypeScript treats them as distinct - hence the cast.
   const webStream = Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
 
-  const sanitize = (s: string) => s.replaceAll('/', '-').replaceAll(':', '-');
-  const safeUserId = sanitize(userId);
+  const sanitize = (value: string) => value.replaceAll(/[^a-zA-Z0-9._-]/g, '-');
+  const safeUserId = userId ? sanitize(userId) : 'all-users';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
-  const filename = `api-request-log_${safeUserId}_${startDate}_${endDate}${safeModel}${safeSessionId}.zip`;
+  const filename = `api-request-log_${safeUserId}_${startDate ?? 'any-start'}_${endDate ?? 'any-end'}${safeModel}${safeSessionId}.zip`;
 
   return new Response(webStream, {
     headers: {

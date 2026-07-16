@@ -142,5 +142,27 @@ describe('active-sessions-router', () => {
       expect(result.sessions[2]).not.toHaveProperty('createdOnPlatform');
       expect(result.sessions[2]).not.toHaveProperty('organizationId');
     });
+    it('returns un-enriched sessions when metadata enrichment fails', async () => {
+      const selectSpy = jest.spyOn(db, 'select').mockImplementation(() => {
+        throw new Error('Simulated DB transient error');
+      });
+
+      try {
+        const caller = await createCallerForUser(user.id);
+        const result = await caller.activeSessions.list();
+
+        expect(result.sessions).toHaveLength(3);
+        expect(result.sessions[0]).toEqual({
+          id: ACTIVE_STORED_ID,
+          status: 'busy',
+          title: 'Stored active',
+          connectionId: 'connection-1',
+          gitUrl: 'https://github.com/kilo/heartbeat.git',
+          gitBranch: 'heartbeat-branch',
+        });
+      } finally {
+        selectSpy.mockRestore();
+      }
+    });
   });
 });

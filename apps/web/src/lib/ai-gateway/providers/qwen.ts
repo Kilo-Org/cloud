@@ -82,7 +82,6 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
     ],
     KILO_STEALTH_DISCOUNT_FACTOR
   ),
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
 

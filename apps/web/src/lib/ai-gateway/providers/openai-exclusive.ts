@@ -31,6 +31,5 @@ export const gpt_5_6_sol_stealth_model: KiloExclusiveModel = {
       },
     },
   ],
-  exclusive_to: [],
   inference_provider_restriction: [],
 };

@@ -34,7 +34,7 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
+import { shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -338,15 +338,6 @@ export function organizationAutoConfigurationResponse(message: string) {
       message,
     },
     { status: 400 }
-  );
-}
-
-export function featureExclusiveModelResponse(modelId: string) {
-  const exclusiveTo = findKiloExclusiveModel(modelId)?.exclusive_to ?? [];
-  const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.feature_exclusive_model, message: error },
-    { status: 403 }
   );
 }
 

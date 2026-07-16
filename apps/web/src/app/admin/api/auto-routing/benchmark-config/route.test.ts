@@ -37,7 +37,6 @@ jest.mock('@/lib/ai-gateway/models', () => {
     gateway: 'alibaba',
     internal_id: 'stub-internal',
     pricing: null,
-    exclusive_to: [],
     inference_provider_restriction: [],
   };
   return {

@@ -16,6 +16,5 @@ export const stepfun_37_flash_free_model: KiloExclusiveModel = {
   gateway: 'openrouter',
   internal_id: 'stepfun/step-3.7-flash',
   pricing: null,
-  exclusive_to: [],
   inference_provider_restriction: ['stepfun'],
 };

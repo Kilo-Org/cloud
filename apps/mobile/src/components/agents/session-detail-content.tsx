@@ -46,10 +46,12 @@ import {
   mergeSessionTranscript,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
+import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
+import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -419,8 +421,16 @@ export function SessionDetailContent({
 
   const emptyStateText = statusIndicator ? null : 'No messages yet';
 
-  const title =
-    fetchedData?.kiloSessionId === sessionId ? (fetchedData.title ?? 'Session') : 'Session';
+  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  const rename = useSessionDetailRename({
+    sessionId,
+    isLoaded: isSessionLoaded,
+    serverTitle,
+    fallbackTitle: 'Session',
+  });
+  const handleRenameSave = rename.submit;
+  const handleRenameClose = rename.closeModal;
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
@@ -474,7 +484,16 @@ export function SessionDetailContent({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} headerRight={headerRight} />
+      <ScreenHeader
+        title={rename.title}
+        headerRight={headerRight}
+        {...(rename.isTitleInteractive
+          ? {
+              onTitlePress: rename.openModal,
+              onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+            }
+          : {})}
+      />
 
       {!isConnected && <ConnectivityBanner />}
 
@@ -517,6 +536,16 @@ export function SessionDetailContent({
           onClose={() => {
             setChildSession(undefined);
           }}
+        />
+      ) : null}
+
+      {rename.isTitleInteractive && rename.isModalOpen ? (
+        <RenameModal
+          title="Rename session"
+          placeholder="Session name"
+          initialValue={rename.modalInitialValue}
+          onSave={handleRenameSave}
+          onClose={handleRenameClose}
         />
       ) : null}
     </View>

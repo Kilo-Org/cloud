@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { type AccessibilityActionInfo } from 'react-native';
 
 const URL_HOST_PATTERN = /^[a-z][a-z\d+.-]*:\/\/([^/?#]+)/i;
 
@@ -19,4 +20,12 @@ export function resolveLinkAccessibilityLabel(
     return children.trim();
   }
   return getUrlHost(href) ?? href;
+}
+
+export const LINK_ACCESSIBILITY_HINT = 'Opens in browser';
+
+export function getLinkAccessibilityActions(
+  enabled: boolean
+): AccessibilityActionInfo[] | undefined {
+  return enabled ? [{ name: 'showLinkActions', label: 'Show link actions' }] : undefined;
 }

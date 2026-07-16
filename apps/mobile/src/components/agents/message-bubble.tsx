@@ -3,9 +3,9 @@ import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 
 import { Bubble } from '@/components/ui/bubble';
 
+import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
-import { MarkdownText } from './markdown-text';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
@@ -74,7 +74,7 @@ export function MessageBubble({
       >
         <Bubble side="user">
           {textContent ? (
-            <MarkdownText value={textContent} variant="user" selectable={false} />
+            <ChatMarkdownText value={textContent} variant="user" selectable={false} />
           ) : null}
           {fileParts.map(part => (
             <FilePartRenderer key={part.id} part={part} />

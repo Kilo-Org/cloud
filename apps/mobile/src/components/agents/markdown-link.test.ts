@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveLinkAccessibilityLabel } from './markdown-link';
+import {
+  getLinkAccessibilityActions,
+  LINK_ACCESSIBILITY_HINT,
+  resolveLinkAccessibilityLabel,
+} from './markdown-link';
 
 describe('resolveLinkAccessibilityLabel', () => {
   it('prefers an explicit title', () => {
@@ -23,5 +27,18 @@ describe('resolveLinkAccessibilityLabel', () => {
 
   it('falls back to the raw href when no host can be parsed', () => {
     expect(resolveLinkAccessibilityLabel([], 'mailto:hello@kilo.ai')).toBe('mailto:hello@kilo.ai');
+  });
+});
+
+describe('link action accessibility', () => {
+  it('describes the existing in-app browser behavior', () => {
+    expect(LINK_ACCESSIBILITY_HINT).toBe('Opens in browser');
+  });
+
+  it('exposes link actions only when the chat callback is enabled', () => {
+    expect(getLinkAccessibilityActions(false)).toBeUndefined();
+    expect(getLinkAccessibilityActions(true)).toEqual([
+      { name: 'showLinkActions', label: 'Show link actions' },
+    ]);
   });
 });

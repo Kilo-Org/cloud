@@ -95,8 +95,9 @@ describe('buildCouncilOrchestratorPrompt', () => {
     expect(prompt).toContain('subagent_type "security"');
     expect(prompt).toContain('subagent_type "performance"');
     expect(prompt).toContain('BASE REVIEW CONTEXT');
-    // Coordinator must not put a decision in the MACHINE-READABLE manifest (our code owns it).
-    expect(prompt.toLowerCase()).toContain('do not put an overall decision in the');
+    // Coordinator must not author an overall decision anywhere — code owns it (avoids the
+    // model-derived PR decision diverging from the fail-closed, coverage-checked one).
+    expect(prompt).toContain('Do NOT compute or render an overall');
   });
 
   it('instructs the coordinator to publish the aggregated review + a council voting table', () => {
@@ -119,6 +120,10 @@ describe('buildCouncilOrchestratorPrompt', () => {
     expect(prompt).toContain('⚠️ Warn');
     expect(prompt).toContain('⛔ Block');
     expect(prompt).toContain('➖ Abstain');
+    // Must NOT displace the required marker/standard heading (they come first); council
+    // section goes right after — so the summary-identification contract stays intact.
+    expect(prompt).toContain('the standard summary heading come FIRST');
+    expect(prompt).toContain('Immediately AFTER that standard heading');
   });
 
   it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {

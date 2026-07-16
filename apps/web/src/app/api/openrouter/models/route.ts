@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
@@ -24,9 +23,9 @@ async function tryGetUserFromAuth() {
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
+export async function GET(): Promise<
+  NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
+> {
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId

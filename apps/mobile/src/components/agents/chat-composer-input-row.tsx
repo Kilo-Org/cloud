@@ -129,6 +129,7 @@ export function ChatComposerInputRow({
         <View className="ml-1">
           <VoiceInputButton
             disabled={voiceDisabled}
+            size="sm"
             status={voiceInputStatus}
             onPress={onToggleVoice}
           />

@@ -895,7 +895,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const organizationThresholdEventId = randomUUID();
   const personalCodingPlanSuggestionId = randomUUID();
   const personalKiloPassSuggestionId = randomUUID();
-  const organizationCodingPlanSuggestionId = randomUUID();
   const personalThresholdMicrodollars = 150_000_000;
   const organizationThresholdMicrodollars = 90_000_000;
   const costInsightSuggestionRows = [
@@ -934,23 +933,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       benefit_detail: '$199/mo + up to $79.60 bonus',
       created_at: timestampAtHourOffset(currentHour, 1),
       updated_at: timestampAtHourOffset(currentHour, 1),
-    },
-    {
-      id: organizationCodingPlanSuggestionId,
-      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
-      suggestion_kind: 'coding_plan',
-      suggestion_key: suggestionKey(`organization:coding-plan:${currentHourIso}`),
-      title: 'Consider a Coding Plan for team runs',
-      description: 'A Coding Plan may improve cost efficiency for recurring team workflows.',
-      cta_label: 'View subscriptions',
-      cta_href: `/organizations/${ORGANIZATION_ID}/subscriptions`,
-      evidence_window_start: suggestionWindowStart,
-      evidence_window_end: suggestionWindowEnd,
-      observed_microdollars: 318_000_000,
-      benefit_label: 'Plan option',
-      benefit_detail: 'Compare Coding Plans',
-      created_at: timestampAtHourOffset(currentHour, 2),
-      updated_at: timestampAtHourOffset(currentHour, 2),
     },
   ] satisfies (typeof cost_insight_active_suggestions.$inferInsert)[];
   const costInsightEventRows = [
@@ -1134,26 +1116,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       },
       dedupe_key: `dev-seed:organization:threshold:${currentHourIso}`,
       occurred_at: timestampAtHourOffset(currentHour, 1),
-    },
-    {
-      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
-      event_type: 'suggestion_created',
-      suggestion_kind: 'coding_plan',
-      active_suggestion_id: organizationCodingPlanSuggestionId,
-      actor_user_id: null,
-      title: 'Cost Suggestion created',
-      description: 'Consider a Coding Plan for team runs',
-      snapshot: {
-        suggestion: {
-          suggestionKey: suggestionKey(`organization:coding-plan:${currentHourIso}`),
-          evidenceWindowStart: suggestionWindowStart,
-          evidenceWindowEnd: suggestionWindowEnd,
-          observedMicrodollars: 318_000_000,
-          ctaHref: `/organizations/${ORGANIZATION_ID}/subscriptions`,
-        },
-      },
-      dedupe_key: `dev-seed:organization:suggestion:coding-plan:${currentHourIso}`,
-      occurred_at: timestampAtHourOffset(currentHour, 2),
     },
     {
       ...costInsightOwnerColumns(ORGANIZATION_OWNER),

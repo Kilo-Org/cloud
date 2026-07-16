@@ -10,6 +10,7 @@ import {
   releaseCostInsightHourlySweepLease,
 } from './hourly-sweep-repository';
 import { dispatchPendingCostInsightNotifications } from './notifications';
+import { processPendingDailyUsageRollupRepairs } from '../ai-gateway/usage-daily-rollup-repairs';
 import {
   listPendingCostInsightRepairOwnerKeys,
   processPendingCostInsightRollupRepairs,
@@ -26,6 +27,7 @@ const OWNER_PAGE_SIZE = 20;
 const OWNER_CONCURRENCY = 4;
 const DIRTY_OWNER_LIMIT = 20;
 const ROLLUP_REPAIR_LIMIT = 2;
+const DAILY_USAGE_ROLLUP_REPAIR_LIMIT = 20;
 const NOTIFICATION_LIMIT = 25;
 const CHECKPOINT_LEASE_SECONDS = 5 * 60;
 
@@ -34,6 +36,7 @@ export type CostInsightHourlySweepSummary = {
   failedOwners: Array<{ owner: CostInsightSpendOwner; error: string }>;
   dirtyEvaluations: Awaited<ReturnType<typeof processPendingCostInsightEvaluations>>;
   rollupRepairs: Awaited<ReturnType<typeof processPendingCostInsightRollupRepairs>>;
+  dailyUsageRollupRepairs: Awaited<ReturnType<typeof processPendingDailyUsageRollupRepairs>>;
   notifications: Awaited<ReturnType<typeof dispatchPendingCostInsightNotifications>>;
   dirtyQueueDepthBefore: number;
   dirtyQueueDepthAfter: number;
@@ -56,6 +59,7 @@ export async function runCostInsightHourlySweep(
     asOf?: string;
     dirtyOwnerLimit?: number;
     rollupRepairLimit?: number;
+    dailyUsageRollupRepairLimit?: number;
     timeBudgetMs?: number;
     ownerPageSize?: number;
     ownerConcurrency?: number;
@@ -79,6 +83,11 @@ export async function runCostInsightHourlySweep(
     rawCanonicalFallbackCount: 0,
     rollupDegradedIntervalCount: 0,
   };
+  let dailyUsageRollupRepairs: Awaited<ReturnType<typeof processPendingDailyUsageRollupRepairs>> = {
+    claimed: 0,
+    repaired: 0,
+    failed: [],
+  };
   const lease = await acquireCostInsightHourlySweepLease(database, {
     asOf,
     leaseSeconds: CHECKPOINT_LEASE_SECONDS,
@@ -87,6 +96,9 @@ export async function runCostInsightHourlySweep(
     try {
       rollupRepairs = await processPendingCostInsightRollupRepairs(database, {
         limit: options.rollupRepairLimit ?? ROLLUP_REPAIR_LIMIT,
+      });
+      dailyUsageRollupRepairs = await processPendingDailyUsageRollupRepairs(database, {
+        limit: options.dailyUsageRollupRepairLimit ?? DAILY_USAGE_ROLLUP_REPAIR_LIMIT,
       });
       dirtyEvaluations = await processPendingCostInsightEvaluations(database, {
         limit: options.dirtyOwnerLimit ?? DIRTY_OWNER_LIMIT,
@@ -199,6 +211,7 @@ export async function runCostInsightHourlySweep(
     failedOwners,
     dirtyEvaluations,
     rollupRepairs,
+    dailyUsageRollupRepairs,
     notifications: await dispatchPendingCostInsightNotifications(
       database,
       options.notificationLimit ?? NOTIFICATION_LIMIT

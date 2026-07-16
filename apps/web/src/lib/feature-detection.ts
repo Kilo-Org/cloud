@@ -18,6 +18,7 @@ export const FEATURE_VALUES = [
   'managed-indexing',
   'cli',
   'cloud-agent',
+  'cloud-agent-web',
   'code-review',
   'auto-triage',
   'autofix',

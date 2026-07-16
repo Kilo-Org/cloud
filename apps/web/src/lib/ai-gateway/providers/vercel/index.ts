@@ -11,7 +11,6 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { redisClient } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
@@ -92,7 +91,7 @@ export async function shouldRouteToVercel(
   }
 
   const vercelModels = await getVercelModelsFromRedis();
-  const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
+  const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
@@ -186,10 +185,7 @@ export function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  requestToMutate.body.model = mapModelIdToVercel(
-    requestedModel,
-    isReasoningExplicitlyDisabled(requestToMutate)
-  );
+  requestToMutate.body.model = mapModelIdToVercel(requestedModel);
 
   if (userByok) {
     if (userByok.length === 0) {

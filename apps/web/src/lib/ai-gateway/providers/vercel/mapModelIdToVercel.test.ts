@@ -31,11 +31,11 @@ describe('mapModelIdToVercel', () => {
       ['~google/gemini-flash-latest', GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
       ['~x-ai/grok-latest', GROK_CURRENT_VERCEL_MODEL_ID],
     ])('maps %s to the current Vercel model id', (input, expected) => {
-      expect(mapModelIdToVercel(input, false)).toBe(expected);
+      expect(mapModelIdToVercel(input)).toBe(expected);
     });
 
     it('does not map a latest alias that is missing the leading tilde', () => {
-      expect(mapModelIdToVercel('anthropic/claude-opus-latest', false)).toBe(
+      expect(mapModelIdToVercel('anthropic/claude-opus-latest')).toBe(
         'anthropic/claude-opus-latest'
       );
     });
@@ -59,83 +59,54 @@ describe('mapModelIdToVercel', () => {
       ['qwen/qwen3-30b-a3b', 'alibaba/qwen-3-30b'],
       ['qwen/qwen3-32b', 'alibaba/qwen-3-32b'],
     ])('maps %s to %s', (input, expected) => {
-      expect(mapModelIdToVercel(input, false)).toBe(expected);
-    });
-  });
-
-  describe('grok 4.20 reasoning/non-reasoning toggle', () => {
-    it('maps x-ai/grok-4.20 to the reasoning variant when reasoning is not explicitly disabled', () => {
-      expect(mapModelIdToVercel('x-ai/grok-4.20', false)).toBe('xai/grok-4.20-reasoning');
-    });
-
-    it('maps x-ai/grok-4.20 to the non-reasoning variant when reasoning is explicitly disabled', () => {
-      expect(mapModelIdToVercel('x-ai/grok-4.20', true)).toBe('xai/grok-4.20-non-reasoning');
-    });
-
-    it('does not rewrite other hardcoded mapping targets when reasoning is disabled', () => {
-      // Only grok-4.20 has a reasoning/non-reasoning split; other hardcoded
-      // mappings must pass through unchanged regardless of the flag.
-      expect(mapModelIdToVercel('mistralai/codestral-2508', true)).toBe('mistral/codestral');
-      expect(mapModelIdToVercel('qwen/qwen3-32b', true)).toBe('alibaba/qwen-3-32b');
-    });
-
-    it('does not apply the reasoning toggle to grok models outside the hardcoded mapping', () => {
-      // A grok id that is not in vercelModelIdMapping should fall through to
-      // the generic prefix rewrite even when reasoning is explicitly disabled.
-      expect(mapModelIdToVercel('x-ai/grok-4.20-reasoning', true)).toBe('xai/grok-4.20-reasoning');
+      expect(mapModelIdToVercel(input)).toBe(expected);
     });
   });
 
   describe('first-party inference provider inference', () => {
     it('rewrites the anthropic/ prefix unchanged', () => {
-      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.5', false)).toBe(
-        'anthropic/claude-sonnet-4.5'
-      );
+      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.5')).toBe('anthropic/claude-sonnet-4.5');
     });
 
     it('rewrites the mistralai/ prefix to mistral/', () => {
       // not covered by the hardcoded mapping
-      expect(mapModelIdToVercel('mistralai/some-new-model', false)).toBe('mistral/some-new-model');
+      expect(mapModelIdToVercel('mistralai/some-new-model')).toBe('mistral/some-new-model');
     });
 
     it('rewrites the qwen/ prefix to alibaba/', () => {
-      expect(mapModelIdToVercel('qwen/some-new-qwen-model', false)).toBe(
-        'alibaba/some-new-qwen-model'
-      );
+      expect(mapModelIdToVercel('qwen/some-new-qwen-model')).toBe('alibaba/some-new-qwen-model');
     });
 
     it('rewrites x-ai/ to xai/', () => {
-      expect(mapModelIdToVercel('x-ai/some-new-grok', false)).toBe('xai/some-new-grok');
+      expect(mapModelIdToVercel('x-ai/some-new-grok')).toBe('xai/some-new-grok');
     });
 
     it('rewrites z-ai/ to zai/', () => {
-      expect(mapModelIdToVercel('z-ai/glm-5.1', false)).toBe('zai/glm-5.1');
+      expect(mapModelIdToVercel('z-ai/glm-5.1')).toBe('zai/glm-5.1');
     });
 
     it('leaves gpt-oss models unchanged', () => {
-      expect(mapModelIdToVercel('openai/gpt-oss-20b', false)).toBe('openai/gpt-oss-20b');
+      expect(mapModelIdToVercel('openai/gpt-oss-20b')).toBe('openai/gpt-oss-20b');
     });
 
     it('leaves a model with an unknown provider prefix unchanged', () => {
-      expect(mapModelIdToVercel('deepseek/deepseek-v3.2', false)).toBe('deepseek/deepseek-v3.2');
+      expect(mapModelIdToVercel('deepseek/deepseek-v3.2')).toBe('deepseek/deepseek-v3.2');
     });
 
     it('returns the model id as-is when it contains no slash', () => {
-      expect(mapModelIdToVercel('some-model-without-slash', false)).toBe(
-        'some-model-without-slash'
-      );
+      expect(mapModelIdToVercel('some-model-without-slash')).toBe('some-model-without-slash');
     });
   });
 
   describe('kilo-exclusive models', () => {
     it('maps a Vercel-exclusive model to its internal id', () => {
-      expect(mapModelIdToVercel('meta/muse-spark-1.1', false)).toBe('meta/muse-spark-1.1');
+      expect(mapModelIdToVercel('meta/muse-spark-1.1')).toBe('meta/muse-spark-1.1');
     });
 
     it('maps an exclusive flagged with vercel-routing to its internal id', () => {
       // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
       // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
-      expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free', false)).toBe(
+      expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).toBe(
         'google/gemma-4-26b-a4b-it'
       );
     });
@@ -144,7 +115,7 @@ describe('mapModelIdToVercel', () => {
       // claude_sonnet_clawsetup_model has gateway 'openrouter' and no
       // 'vercel-routing' flag, so the mapping must pass the public id through
       // the generic prefix rewrite instead of substituting internal_id.
-      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.6:clawsetup', false)).toBe(
+      expect(mapModelIdToVercel('anthropic/claude-sonnet-4.6:clawsetup')).toBe(
         'anthropic/claude-sonnet-4.6:clawsetup'
       );
     });
@@ -153,9 +124,7 @@ describe('mapModelIdToVercel', () => {
       // minimax_m25_free_model has the 'vercel-routing' flag but status
       // 'disabled', so it must not be substituted by internal_id and instead
       // pass the public id through the generic prefix rewrite.
-      expect(mapModelIdToVercel('minimax/minimax-m2.5:free', false)).toBe(
-        'minimax/minimax-m2.5:free'
-      );
+      expect(mapModelIdToVercel('minimax/minimax-m2.5:free')).toBe('minimax/minimax-m2.5:free');
     });
   });
 });

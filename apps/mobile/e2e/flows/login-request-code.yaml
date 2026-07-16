@@ -11,7 +11,7 @@
 # default silently overrides the -e value in this Maestro version.
 #
 # Prefer the one-shot wrapper e2e/login.sh, which runs both steps and pulls the
-# code for you. See e2e/AGENTS.md ("Login / logout helper flows").
+# code for you. See e2e/AGENTS.md ("Sign In and Out").
 appId: com.kilocode.kiloapp
 ---
 - runFlow: logout.yaml

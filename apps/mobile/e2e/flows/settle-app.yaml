@@ -1,3 +1,7 @@
+# Settles an already-running app: handles the Safari external-app prompt,
+# tracking prompt, Expo developer-menu introduction and menu, and notification
+# permission, ending on Home, the login page, or the consent gate. Never
+# restarts the app; open-app.yaml is the cold-launch wrapper around this flow.
 appId: com.kilocode.kiloapp
 ---
 - extendedWaitUntil:

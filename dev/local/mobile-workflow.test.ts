@@ -2,56 +2,40 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-test('login waits for the delayed Expo developer menu after launching Kilo', () => {
+test('cold launch clears leftover prompts, relaunches, then settles via the shared flow', () => {
   const flow = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
+  const trackingGuardIndex = flow.indexOf("visible: 'Ask App Not to Track'");
+  const stopIndex = flow.indexOf('- stopApp');
   const launchIndex = flow.indexOf("text: 'Kilo'");
-  const developerMenuWaitIndex = flow.indexOf(
-    "visible: 'This is the developer menu.*'",
-    launchIndex
-  );
-  const optionalWaitIndex = flow.lastIndexOf('- extendedWaitUntil:', developerMenuWaitIndex);
-  const continueIndex = flow.indexOf("tapOn: 'Continue'", developerMenuWaitIndex);
+  const readyWaitIndex = flow.indexOf('- extendedWaitUntil:', launchIndex);
+  const settleIndex = flow.indexOf('- runFlow: settle-app.yaml');
 
-  assert.ok(launchIndex >= 0);
-  assert.ok(developerMenuWaitIndex > launchIndex);
-  assert.ok(continueIndex > developerMenuWaitIndex);
-  assert.match(flow.slice(optionalWaitIndex, continueIndex), /timeout: 5000/);
-  assert.doesNotMatch(flow.slice(optionalWaitIndex, continueIndex), /optional: true/);
+  assert.ok(trackingGuardIndex >= 0 && trackingGuardIndex < stopIndex);
+  assert.ok(stopIndex < launchIndex);
+  assert.ok(launchIndex < readyWaitIndex);
+  assert.ok(readyWaitIndex < settleIndex);
+  assert.match(flow.slice(readyWaitIndex, settleIndex), /timeout: 30000/);
+  assert.doesNotMatch(flow.slice(readyWaitIndex), /optional: true/);
 });
 
-test('shared launch flows close the Expo developer menu after its introduction', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+test('settle flow closes the Expo developer menu after its introduction', () => {
+  const flow = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
+  const continueIndex = flow.indexOf("tapOn: 'Continue'");
+  const closeGuardIndex = flow.indexOf("visible: 'Fast Refresh|Element Inspector'", continueIndex);
+  const closeIndex = flow.indexOf("tapOn: 'Close'", closeGuardIndex);
 
-  for (const flowPath of [
-    'apps/mobile/e2e/flows/open-app.yaml',
-    'apps/mobile/e2e/flows/settle-app.yaml',
-  ]) {
-    const flow = fs.readFileSync(flowPath, 'utf8');
-    const continueIndex = flow.indexOf("tapOn: 'Continue'");
-    const closeGuardIndex = flow.indexOf(
-      "visible: 'Fast Refresh|Element Inspector'",
-      continueIndex
-    );
-    const closeIndex = flow.indexOf("tapOn: 'Close'", closeGuardIndex);
-
-    assert.ok(continueIndex >= 0, `${flowPath} should accept the developer-menu introduction`);
-    assert.ok(closeGuardIndex > continueIndex, `${flowPath} should detect the opened menu`);
-    assert.ok(closeIndex > closeGuardIndex, `${flowPath} should close the opened menu`);
-    assert.doesNotMatch(flow, /when:\n\s+visible: 'Close'/);
-  }
-
-  assert.match(
-    runbook,
-    /developer menu containing Fast Refresh and Element Inspector with its `Close` accessibility action/
-  );
+  assert.ok(continueIndex >= 0, 'settle-app should accept the developer-menu introduction');
+  assert.ok(closeGuardIndex > continueIndex, 'settle-app should detect the opened menu');
+  assert.ok(closeIndex > closeGuardIndex, 'settle-app should close the opened menu');
+  assert.doesNotMatch(flow, /when:\n\s+visible: 'Close'/);
 });
 
-test('login flows never use an unidentified generic Allow selector', () => {
+test('launch flows never use an unidentified generic Allow selector', () => {
   const request = fs.readFileSync('apps/mobile/e2e/flows/login-request-code.yaml', 'utf8');
-  const openApp = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
+  const settle = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
 
   assert.doesNotMatch(request, /visible: 'Allow'/);
-  assert.match(openApp, /“Kilo” Would Like to Send You Notifications/);
+  assert.match(settle, /“Kilo” Would Like to Send You Notifications/);
 });
 
 test('login verification does not pay a fixed optional notification wait', () => {
@@ -98,129 +82,111 @@ test('login polls the local outbox without one-second latency', () => {
 });
 
 test('shared launch prompt grace periods total at most five seconds', () => {
-  for (const flowPath of [
-    'apps/mobile/e2e/flows/open-app.yaml',
-    'apps/mobile/e2e/flows/settle-app.yaml',
-  ]) {
-    const flow = fs.readFileSync(flowPath, 'utf8');
-    const optionalWaits = [...flow.matchAll(/timeout: (\d+)\n\s+optional: true/g)].map(match =>
-      Number(match[1])
-    );
+  const settle = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
+  const openApp = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
+  const optionalWaits = [...settle.matchAll(/timeout: (\d+)\n\s+optional: true/g)].map(match =>
+    Number(match[1])
+  );
 
-    assert.deepEqual(optionalWaits, [3000]);
-    assert.ok(optionalWaits.reduce((total, timeout) => total + timeout, 0) <= 5000);
-  }
+  assert.deepEqual(optionalWaits, [3000]);
+  assert.doesNotMatch(openApp, /optional: true/);
 });
 
-test('shared launch flows handle the exact iOS external-app prompt within existing waits', () => {
-  const flowContracts = [
+test('settle flow handles the exact iOS external-app prompt within existing waits', () => {
+  const flow = fs.readFileSync('apps/mobile/e2e/flows/settle-app.yaml', 'utf8');
+  const promptGuardIndex = flow.indexOf(`visible: 'Open this page in "Kilo"\\?'`);
+  const openActionIndex = flow.indexOf("tapOn: 'Open'", promptGuardIndex);
+  const finalReadyWaitIndex = flow.lastIndexOf('- extendedWaitUntil:');
+  const waitBlocks = [...flow.matchAll(/- extendedWaitUntil:\n[\s\S]*?(?=\n- |$)/g)].map(
+    match => match[0]
+  );
+  const timeouts = [...flow.matchAll(/timeout: (\d+)/g)].map(match => Number(match[1]));
+
+  assert.match(
+    waitBlocks[0],
+    /Open this page in "Kilo"\\\?/,
+    'settle-app should recognize the prompt as its initial visible state'
+  );
+  assert.match(
+    waitBlocks[1],
+    /Open this page in "Kilo"\\\?/,
+    'settle-app should recognize the prompt inside its optional wait'
+  );
+  assert.match(waitBlocks[1], /timeout: 3000\n\s+optional: true/);
+  assert.ok(promptGuardIndex > flow.indexOf(waitBlocks[1]), 'settle-app should guard Open');
+  assert.ok(openActionIndex > promptGuardIndex, 'settle-app should tap the exact Open action');
+
+  const promptChain = [
     {
-      path: 'apps/mobile/e2e/flows/open-app.yaml',
-      timeouts: [30000, 3000, 5000, 5000, 5000, 5000, 30000],
+      action: "tapOn: 'Open'",
+      nextGuard: 'Ask App Not to Track',
+      visible:
+        'Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
     },
     {
-      path: 'apps/mobile/e2e/flows/settle-app.yaml',
-      timeouts: [15000, 3000, 5000, 5000, 5000, 5000, 15000],
+      action: "tapOn: 'Ask App Not to Track'",
+      nextGuard: 'This is the developer menu.*',
+      visible:
+        'This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
+    },
+    {
+      action: "tapOn: 'Continue'",
+      nextGuard: 'Fast Refresh|Element Inspector',
+      visible:
+        'Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
+    },
+    {
+      action: "tapOn: 'Close'",
+      nextGuard: '“Kilo” Would Like to Send You Notifications',
+      visible:
+        '“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
     },
   ];
 
-  for (const contract of flowContracts) {
-    const flow = fs.readFileSync(contract.path, 'utf8');
-    const promptGuardIndex = flow.indexOf(`visible: 'Open this page in "Kilo"\\?'`);
-    const openActionIndex = flow.indexOf("tapOn: 'Open'", promptGuardIndex);
-    const finalReadyWaitIndex = flow.lastIndexOf('- extendedWaitUntil:');
-    const waitBlocks = [...flow.matchAll(/- extendedWaitUntil:\n[\s\S]*?(?=\n- |$)/g)].map(
-      match => match[0]
+  let searchFrom = openActionIndex;
+  for (const step of promptChain) {
+    const actionIndex = flow.indexOf(step.action, searchFrom);
+    const nextGuardIndex = flow.indexOf(
+      `- runFlow:\n    when:\n      visible: '${step.nextGuard}'`,
+      actionIndex
     );
-    const timeouts = [...flow.matchAll(/timeout: (\d+)/g)].map(match => Number(match[1]));
+    const betweenActionAndGuard = flow.slice(actionIndex, nextGuardIndex);
 
+    assert.ok(actionIndex >= searchFrom, `settle-app should include ${step.action}`);
+    assert.ok(
+      nextGuardIndex > actionIndex,
+      `settle-app should guard ${step.nextGuard} after ${step.action}`
+    );
     assert.match(
-      waitBlocks[0],
-      /Open this page in "Kilo"\\\?/,
-      `${contract.path} should recognize the prompt as its initial visible state`
+      betweenActionAndGuard,
+      new RegExp(
+        `- extendedWaitUntil:\\n    visible: '${step.visible.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\n    timeout: 5000`
+      ),
+      `settle-app should poll for the next state immediately after ${step.action}`
     );
-    assert.match(
-      waitBlocks[1],
-      /Open this page in "Kilo"\\\?/,
-      `${contract.path} should recognize the prompt inside its optional wait`
+    assert.doesNotMatch(
+      betweenActionAndGuard,
+      /timeout: (?:500|1000)\n|optional: true/,
+      `settle-app should use a robust non-optional state gate after ${step.action}`
     );
-    assert.match(waitBlocks[1], /timeout: 3000\n\s+optional: true/);
-    assert.ok(
-      promptGuardIndex > flow.indexOf(waitBlocks[1]),
-      `${contract.path} should guard the Open action`
+    assert.doesNotMatch(
+      betweenActionAndGuard.replace(/^- runFlow:[\s\S]*?commands:\n\s+- tapOn: '[^']+'/, ''),
+      /- runFlow:/,
+      `settle-app should not insert another one-shot guard before polling`
     );
-    assert.ok(
-      openActionIndex > promptGuardIndex,
-      `${contract.path} should tap the exact Open action`
-    );
-    const promptChain = [
-      {
-        action: "tapOn: 'Open'",
-        nextGuard: 'Ask App Not to Track',
-        visible:
-          'Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
-      },
-      {
-        action: "tapOn: 'Ask App Not to Track'",
-        nextGuard: 'This is the developer menu.*',
-        visible:
-          'This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
-      },
-      {
-        action: "tapOn: 'Continue'",
-        nextGuard: 'Fast Refresh|Element Inspector',
-        visible:
-          'Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
-      },
-      {
-        action: "tapOn: 'Close'",
-        nextGuard: '“Kilo” Would Like to Send You Notifications',
-        visible:
-          '“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue',
-      },
-    ];
-
-    let searchFrom = openActionIndex;
-    for (const step of promptChain) {
-      const actionIndex = flow.indexOf(step.action, searchFrom);
-      const nextGuardIndex = flow.indexOf(
-        `- runFlow:\n    when:\n      visible: '${step.nextGuard}'`,
-        actionIndex
-      );
-      const betweenActionAndGuard = flow.slice(actionIndex, nextGuardIndex);
-
-      assert.ok(actionIndex >= searchFrom, `${contract.path} should include ${step.action}`);
-      assert.ok(
-        nextGuardIndex > actionIndex,
-        `${contract.path} should guard ${step.nextGuard} after ${step.action}`
-      );
-      assert.match(
-        betweenActionAndGuard,
-        new RegExp(
-          `- extendedWaitUntil:\\n    visible: '${step.visible.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\n    timeout: 5000`
-        ),
-        `${contract.path} should poll for the next state immediately after ${step.action}`
-      );
-      assert.doesNotMatch(
-        betweenActionAndGuard,
-        /timeout: (?:500|1000)\n|optional: true/,
-        `${contract.path} should use a robust non-optional state gate after ${step.action}`
-      );
-      assert.doesNotMatch(
-        betweenActionAndGuard.replace(/^- runFlow:[\s\S]*?commands:\n\s+- tapOn: '[^']+'/, ''),
-        /- runFlow:/,
-        `${contract.path} should not insert another one-shot guard before polling`
-      );
-      searchFrom = nextGuardIndex;
-    }
-    assert.ok(
-      finalReadyWaitIndex > openActionIndex,
-      `${contract.path} should still wait for its final ready state`
-    );
-    assert.deepEqual(timeouts, contract.timeouts, `${contract.path} should not add a fixed wait`);
-    assert.doesNotMatch(flow, /visible: '(?:Allow|Open)'/);
-    assert.doesNotMatch(flow, /tapOn: '(?:Allow\|Open|Open\|Allow)'/);
+    searchFrom = nextGuardIndex;
   }
+  assert.ok(
+    finalReadyWaitIndex > openActionIndex,
+    'settle-app should still wait for its final ready state'
+  );
+  assert.deepEqual(
+    timeouts,
+    [15000, 3000, 5000, 5000, 5000, 5000, 15000],
+    'settle-app should not add a fixed wait'
+  );
+  assert.doesNotMatch(flow, /visible: '(?:Allow|Open)'/);
+  assert.doesNotMatch(flow, /tapOn: '(?:Allow\|Open|Open\|Allow)'/);
 });
 
 test('helper-driven logout settles the app already launched by preflight', () => {
@@ -238,20 +204,6 @@ test('logout skips prompt settling for stable signed-in and signed-out states', 
 
   assert.ok(logout.indexOf("notVisible: 'Welcome to Kilo Code'") < settleIndex);
   assert.ok(logout.indexOf("notVisible: 'HOME|Home, tab, 1 of 4'") < settleIndex);
-});
-
-test('shared launch clears an already-visible tracking prompt before tapping the app icon', () => {
-  const flow = fs.readFileSync('apps/mobile/e2e/flows/open-app.yaml', 'utf8');
-  assert.ok(flow.indexOf("visible: 'Ask App Not to Track'") < flow.indexOf("visible: 'Kilo'"));
-});
-
-test('mobile workflow documents hierarchy-derived tab selectors', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(runbook, /Agents, tab, 3 of 4/);
-  assert.match(runbook, /Never guess a selector from the visible label/);
-  assert.match(runbook, /pnpm dev:capture mobile/);
-  assert.match(runbook, /dev:mobile:simulator claim/);
 });
 
 test('tab layout exposes the exact documented accessibility labels', () => {
@@ -299,24 +251,14 @@ test('Android tooling is resolved independently of the agent PATH', async () => 
   assert.match(env.path, /android-commandlinetools\/platform-tools/);
 });
 
-test('Android workflow uses Maestro first and applies resolved tooling to cached native builds', () => {
+test('Android cached native builds apply resolved tooling', () => {
   const android = fs.readFileSync('dev/local/mobile-android.ts', 'utf8');
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
 
   assert.match(android, /'build'/);
   assert.match(android, /runAndroidBuild/);
   assert.match(android, /withNativeBuildSemaphore/);
   assert.match(android, /app:assembleDebug/);
   assert.match(android, /path\.join\(worktreeRoot, 'apps\/mobile'\)/);
-  assert.match(runbook, /Use Maestro as the primary Android automation driver/);
-  assert.match(runbook, /Fall back to repository-wrapped ADB/);
-});
-
-test('iOS workflow uses Maestro first with simctl as the low-level fallback', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(runbook, /Use Maestro as the primary iOS automation driver/);
-  assert.match(runbook, /Fall back to `xcrun simctl`/);
 });
 
 test('Android tooling rejects a non-Java-17 JAVA_HOME', async () => {
@@ -353,49 +295,11 @@ test('env sync refreshes source-backed Wrangler secrets through completed stdin 
   assert.match(envOutput, /Failed to create Secrets Store secret/);
 });
 
-test('workflow documents the shared Docker proxy exception without weakening backend isolation', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
+test('dev CLI shares only the Docker proxy port between worktrees', () => {
   const cli = fs.readFileSync('dev/local/cli.ts', 'utf8');
 
-  assert.match(runbook, /sole intentional host-wide exception/);
-  assert.match(runbook, /Never kill a `socat` process owned by another worktree/);
   assert.match(cli, /name === 'kiloclaw-docker-tcp'/);
   assert.match(cli, /Refusing to share occupied worktree service ports/);
-});
-
-test('mobile runbook prohibits host-global Metro proxies', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(runbook, /must never map.*8081.*worktree.*Metro/is);
-  assert.match(runbook, /sole intentional host-wide proxy exception.*23750/is);
-  assert.match(runbook, /test-environment failure/i);
-  assert.match(runbook, /PID.*parent PID.*bind address.*port/is);
-});
-
-test('mobile runbook uses ownership-aware simulator phase labels', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(runbook, /Kilo E2E - <sanitized-worktree-basename> - <phase>/);
-  assert.match(runbook, /must not call.*simctl rename/i);
-  assert.match(runbook, /restores the original simulator name/i);
-});
-
-test('mobile runbook installs validated cached native builds', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(runbook, /dev:mobile:ios build <udid>/);
-  assert.match(runbook, /dev:mobile:android build <serial>/);
-  assert.match(runbook, /validated cached/i);
-  assert.doesNotMatch(runbook, /npx expo run:ios --device/);
-});
-
-test('mobile runbook handles the exact Safari external-app prompt within the shared budget', () => {
-  const runbook = fs.readFileSync('apps/mobile/e2e/AGENTS.md', 'utf8');
-
-  assert.match(runbook, /Open this page in [“"]Kilo[”"]\?/);
-  assert.match(runbook, /exact.*Open.*accessibility/is);
-  assert.match(runbook, /five-second optional-prompt/i);
-  assert.match(runbook, /prefer.*simctl openurl.*avoid.*confirmation/is);
 });
 
 test('remote CLI runbook is secret-free and defers credential-bearing setup to the orchestrator', () => {

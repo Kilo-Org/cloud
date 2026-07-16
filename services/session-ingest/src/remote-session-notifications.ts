@@ -16,8 +16,7 @@ export function isEligibleForRemoteSessionAttention(session: RemoteSessionInfo):
 const NEEDS_INPUT_BODY = 'Kilo needs your input.';
 const DEFAULT_COMPLETED_BODY = 'Task completed';
 
-// Temporary until the CLI's session-presence reporting is released.
-const REMOTE_SESSION_ATTENTION_PUSH_ENABLED = false;
+const REMOTE_SESSION_ATTENTION_PUSH_ENABLED = true;
 
 export function buildRemoteSessionAttentionPushBody(
   signal: Pick<AttentionSignal, 'kind' | 'messageExcerpt'>

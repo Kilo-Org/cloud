@@ -7,7 +7,11 @@ import {
   type FetchedSessionData,
   type StoredMessage,
 } from './session-manager';
-import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
+import {
+  createCloudAgentSession,
+  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+} from './session';
 import type {
   CloudAgentSession,
   CloudAgentSessionSendInput,
@@ -46,6 +50,7 @@ type MockSession = Omit<
   | 'respondToPermission'
   | 'acceptSuggestion'
   | 'dismissSuggestion'
+  | 'exitRemoteCli'
 > & {
   state: jest.Mocked<CloudAgentSession['state']>;
   storage: JotaiSessionStorage | null;
@@ -56,6 +61,7 @@ type MockSession = Omit<
   respondToPermission: jest.Mock<Promise<unknown>, [CloudAgentSessionRespondToPermissionInput]>;
   acceptSuggestion: jest.Mock<Promise<unknown>, [CloudAgentSessionAcceptSuggestionInput]>;
   dismissSuggestion: jest.Mock<Promise<unknown>, [CloudAgentSessionDismissSuggestionInput]>;
+  exitRemoteCli: jest.Mock<Promise<void>, []>;
 };
 
 const mockSession = {
@@ -72,6 +78,7 @@ const mockSession = {
   retryRemoteModels: jest.fn(),
   retryRemoteCommands: jest.fn(),
   createRemoteSession: jest.fn(() => Promise.resolve(kiloId('ses_12345678901234567890123456'))),
+  exitRemoteCli: jest.fn(() => Promise.resolve()),
   canSend: true,
   canInterrupt: true,
   state: {
@@ -119,6 +126,9 @@ const mockSessionCallbacks: {
 let latestStorage: JotaiSessionStorage | null = null;
 
 jest.mock('./session', () => ({
+  REMOTE_CLI_EXIT_NOT_SUPPORTED: 'Remote CLI exit is not supported for the current session',
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED:
+    'Remote session creation is not supported for the current session',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       kiloSessionId: string;
@@ -343,6 +353,8 @@ describe('createSessionManager', () => {
     mockSession.destroy.mockClear();
     mockSession.send.mockClear();
     mockSession.interrupt.mockClear();
+    mockSession.exitRemoteCli.mockClear();
+    mockSession.exitRemoteCli.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
@@ -2969,6 +2981,45 @@ describe('createSessionManager', () => {
       await expect(mgr.createRemoteSession()).rejects.toThrow(
         REMOTE_SESSION_CREATION_NOT_SUPPORTED
       );
+    });
+  });
+
+  describe('exitRemoteCli', () => {
+    it('forwards only for the active remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      await expect(mgr.exitRemoteCli()).resolves.toBeUndefined();
+      expect(mockSession.exitRemoteCli).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects before forwarding when there is no active session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      expect(mockSession.exitRemoteCli).not.toHaveBeenCalled();
+    });
+
+    it('rejects before forwarding for a non-remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      expect(mockSession.exitRemoteCli).not.toHaveBeenCalled();
+    });
+
+    it('propagates the session unsupported error when transport capability is absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.exitRemoteCli.mockRejectedValue(new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED));
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
     });
   });
 

@@ -5,6 +5,7 @@
 import { normalizeCliEvent, isChatEvent } from './normalizer';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import { parseCreateSessionResponse } from './create-session';
+import { parseExitCliResponse } from './exit-cli';
 import {
   cliConnectionDataSchema,
   heartbeatDataSchema,
@@ -35,6 +36,7 @@ type CliLiveTransportConfig = {
 // the session store's persistence lag behind the live stream; bump if holes
 // still appear after long backgrounding.
 const RECONNECT_RESYNC_DELAY_MS = 5000;
+const REMOTE_CLI_EXIT_UNAVAILABLE = 'Remote CLI exit is unavailable for the current session';
 
 /**
  * Deep-copy a list of validated remote slash commands.
@@ -74,6 +76,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       protocol: 'unknown',
       refresh: 'idle',
     };
+    let remoteCommandState: RemoteCommandState = {
+      ownerConnectionId: null,
+      refresh: 'idle',
+      commands: [],
+    };
     // Last successfully parsed remote command catalog, deep-copied on
     // every publish so later mutation of consumer-held arrays, command
     // objects, or nested hints cannot corrupt prior state history.
@@ -84,7 +91,24 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function publishRemoteCommandState(next: RemoteCommandState): void {
+      remoteCommandState = { ...next, commands: deepCopyCommands(next.commands) };
       config.onRemoteCommandStateChange?.(next);
+    }
+
+    function canExitCli(): boolean {
+      return (
+        remoteCommandState.ownerConnectionId !== null &&
+        remoteCommandState.commands.some(
+          command =>
+            command.name === 'exit' &&
+            command.description === 'Exit the CLI' &&
+            command.hints.length === 0 &&
+            command.agent === undefined &&
+            command.model === undefined &&
+            command.source === undefined &&
+            command.subtask === undefined
+        )
+      );
     }
 
     function publishCommands(commands: SlashCommandInfo[]): void {
@@ -717,6 +741,22 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           throw new Error('Invalid create_session response');
         }
         return parsed.kiloSessionId;
+      },
+      exitCli: async () => {
+        if (remoteCommandState.refresh === 'upgrade-required') {
+          throw new Error(
+            remoteCommandState.message ??
+              'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.'
+          );
+        }
+        if (!canExitCli()) {
+          throw new Error(REMOTE_CLI_EXIT_UNAVAILABLE);
+        }
+
+        const result = await sendCommand('exit_cli', { protocolVersion: 1 });
+        if (!parseExitCliResponse(result).ok) {
+          throw new Error('Invalid exit_cli response');
+        }
       },
       send: async (input: TransportSendInput) => {
         if (input.payload.type === 'command') {

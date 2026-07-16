@@ -191,7 +191,7 @@ describe('parseChatComposerSubmission — argument errors', () => {
         sessionType: 'remote',
         remoteCommandState: remoteState(),
       })
-    ).toEqual({ type: 'argument-error' });
+    ).toEqual({ type: 'argument-error', message: '/new does not take arguments.' });
   });
 });
 

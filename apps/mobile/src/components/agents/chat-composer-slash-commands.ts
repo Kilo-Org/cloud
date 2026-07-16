@@ -13,7 +13,15 @@ export const LOCAL_NEW_SLASH_COMMAND: SlashCommandInfo = {
   hints: [],
 };
 
-const SLASH_NAME = 'new';
+export const LOCAL_EXIT_SLASH_COMMAND: SlashCommandInfo = {
+  name: 'exit',
+  description: 'Exit the CLI',
+  hints: [],
+};
+
+const NEW_COMMAND_NAME = 'new';
+const EXIT_COMMAND_NAME = 'exit';
+const LOCAL_COMMAND_NAMES = new Set([NEW_COMMAND_NAME, EXIT_COMMAND_NAME, 'quit', 'q']);
 const SLASH_PREFIX_PATTERN = /^\/[\w.-]*$/;
 const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
 
@@ -25,7 +33,11 @@ const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
  * explicit mobile promise: any new mobile-reserved slash commands must be
  * added here; do not refactor the SDK to assume this list.
  */
-const RESERVED_UPGRADE_REQUIRED_COMMANDS = new Set(['compact', SLASH_NAME]);
+const RESERVED_UPGRADE_REQUIRED_COMMANDS = new Set([
+  'compact',
+  NEW_COMMAND_NAME,
+  EXIT_COMMAND_NAME,
+]);
 
 type ChatComposerParseContext = {
   hasAttachments: boolean;
@@ -37,8 +49,9 @@ export type ChatComposerParseResult =
   | { type: 'prompt'; prompt: string }
   | { type: 'command'; command: string; arguments: string }
   | { type: 'create-session' }
+  | { type: 'exit-cli' }
   | { type: 'attachment-error' }
-  | { type: 'argument-error' }
+  | { type: 'argument-error'; message: string }
   | { type: 'upgrade-required'; message: string };
 
 const UPGRADE_REQUIRED_FALLBACK_MESSAGE = 'Please upgrade your CLI to use this command.';
@@ -48,14 +61,13 @@ const UPGRADE_REQUIRED_FALLBACK_MESSAGE = 'Please upgrade your CLI to use this c
  *
  * - `cloud-agent` sessions use the live reported catalog verbatim — empty
  *   stays empty and the Cloud Agent defaults live in the worker, not here.
- * - `remote` sessions use the exact live CLI catalog, plus the locally
- *   reserved `/new` command that maps to `createRemoteSession()`. Any
- *   CLI-reported `/new` is stripped first so we never double-list it.
+ * - `remote` sessions strip CLI-reported `new`, `exit`, `quit`, and `q`, then
+ *   append the locally reserved `/new` and capability-gated local `/exit` when
+ *   the live catalog includes canonical `exit`.
  * - `read-only` and `null` (unresolved) sessions expose no commands.
  *
- * We expose the reserved `/new` even when the remote catalog is empty so
- * users with a freshly-connected remote session can still trigger a new
- * session from the composer.
+ * We expose reserved `/new` even when the remote catalog is empty; `/exit` is
+ * exposed only when the current live catalog advertises canonical `exit`.
  */
 export function createMobileSlashCommandList(
   sessionType: ActiveSessionType | null,
@@ -68,8 +80,17 @@ export function createMobileSlashCommandList(
   if (sessionType !== 'remote' || !remoteCommandState) {
     return [];
   }
-  const remoteCommands = remoteCommandState.commands.filter(command => command.name !== SLASH_NAME);
-  return [...remoteCommands, LOCAL_NEW_SLASH_COMMAND];
+  const supportsExit = remoteCommandState.commands.some(
+    command => command.name === EXIT_COMMAND_NAME
+  );
+  const remoteCommands = remoteCommandState.commands.filter(
+    command => !LOCAL_COMMAND_NAMES.has(command.name)
+  );
+  return [
+    ...remoteCommands,
+    LOCAL_NEW_SLASH_COMMAND,
+    ...(supportsExit ? [LOCAL_EXIT_SLASH_COMMAND] : []),
+  ];
 }
 
 /**
@@ -105,7 +126,7 @@ function findCommand(commands: SlashCommandInfo[], name: string): SlashCommandIn
  * Classify a composer input into the action the composer should take.
  *
  * Order matters: the upgrade-required short-circuit runs before recognition so
- * that the reserved commands mobile promises to handle (`compact` and `new`)
+ * that the reserved commands mobile promises to handle (`compact`, `new`, and `exit`)
  * are surfaced to the user when the remote CLI requires an upgrade, instead of
  * silently falling through as ordinary prompts. Unknown slash inputs (`/foo`)
  * still fall through to `prompt` so the user can send arbitrary text the CLI
@@ -134,17 +155,27 @@ export function parseChatComposerSubmission(
     return { type: 'prompt', prompt: trimmed };
   }
 
-  if (commandName === SLASH_NAME && context.sessionType === 'remote') {
+  if (commandName === NEW_COMMAND_NAME && context.sessionType === 'remote') {
     // /new is reserved for remote sessions only.
     if (context.hasAttachments) {
       return { type: 'attachment-error' };
     }
     if (argumentsText.length > 0) {
-      return { type: 'argument-error' };
+      return { type: 'argument-error', message: '/new does not take arguments.' };
     }
     return { type: 'create-session' };
   }
   // Non-remote /new falls through to the command-or-prompt logic below.
+
+  if (commandName === EXIT_COMMAND_NAME && context.sessionType === 'remote') {
+    if (context.hasAttachments) {
+      return { type: 'attachment-error' };
+    }
+    if (argumentsText.length > 0) {
+      return { type: 'argument-error', message: '/exit does not take arguments.' };
+    }
+    return { type: 'exit-cli' };
+  }
 
   if (commandName && findCommand(commands, commandName)) {
     if (context.hasAttachments) {

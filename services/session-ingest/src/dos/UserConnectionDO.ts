@@ -51,18 +51,20 @@ export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
   'list_commands',
   'send_command',
   'create_session',
+  'exit_cli',
 ]);
 
 // In-flight dedupe and 512 KiB response cap apply to these catalog-style reads.
 const CATALOG_DEDUPE_COMMANDS: ReadonlySet<string> = new Set(['list_models', 'list_commands']);
 
 // Operations that older CLIs reject with a precise "unknown command: <op>"
-// string. Only these three get mapped to a structured CLI_UPGRADE_REQUIRED
+// string. Only these commands get mapped to a structured CLI_UPGRADE_REQUIRED
 // response; any other CLI error is preserved verbatim.
 const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
   'list_commands',
   'send_command',
   'create_session',
+  'exit_cli',
 ]);
 
 const SESSION_OWNER_CHANGED_ERROR = {
@@ -99,6 +101,12 @@ const COMMAND_NOT_ALLOWED_ERROR = {
   source: 'relay',
   code: 'COMMAND_NOT_ALLOWED',
   message: 'Command is not allowed',
+};
+
+const INVALID_COMMAND_ERROR = {
+  source: 'relay',
+  code: 'INVALID_COMMAND',
+  message: 'Invalid command',
 };
 
 const CLI_UPGRADE_REQUIRED_SLASH_ERROR = {
@@ -678,6 +686,24 @@ export class UserConnectionDO extends DurableObject<Env> {
         type: 'response',
         id: msg.id,
         error: COMMAND_NOT_ALLOWED_ERROR,
+      });
+      return;
+    }
+
+    if (
+      msg.command === 'exit_cli' &&
+      (!msg.sessionId ||
+        typeof msg.data !== 'object' ||
+        msg.data === null ||
+        Array.isArray(msg.data) ||
+        Object.keys(msg.data).length !== 1 ||
+        !Object.hasOwn(msg.data, 'protocolVersion') ||
+        Reflect.get(msg.data, 'protocolVersion') !== 1)
+    ) {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: INVALID_COMMAND_ERROR,
       });
       return;
     }

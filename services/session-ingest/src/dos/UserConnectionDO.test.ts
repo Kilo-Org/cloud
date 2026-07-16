@@ -1722,6 +1722,7 @@ describe('UserConnectionDO', () => {
       'list_commands',
       'send_command',
       'create_session',
+      'exit_cli',
     ];
 
     it('forwards every allowed viewer command to the owning CLI', () => {
@@ -1737,7 +1738,7 @@ describe('UserConnectionDO', () => {
           id: 'cmd-1',
           command,
           sessionId: 's1',
-          data: { hello: 'world' },
+          data: command === 'exit_cli' ? { protocolVersion: 1 } : { hello: 'world' },
         });
 
         expect(cliWs.send).toHaveBeenCalledTimes(1);
@@ -2090,6 +2091,39 @@ describe('UserConnectionDO', () => {
       });
     });
 
+    it('maps "unknown command: exit_cli" to CLI_UPGRADE_REQUIRED with slash message', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: exit_cli',
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'CLI_UPGRADE_REQUIRED',
+          message: 'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.',
+        },
+      });
+    });
+
     it('maps "unknown command: create_session" to CLI_UPGRADE_REQUIRED with create_session message', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
@@ -2200,6 +2234,35 @@ describe('UserConnectionDO', () => {
         type: 'response',
         id: 'cmd-1',
         error: 'unknown command: list_commands: try again',
+      });
+    });
+
+    it('preserves a longer exit_cli unknown-command error', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      webWs.send.mockClear();
+
+      sendCliResponse(doInstance, cliWs, {
+        id: correlationId,
+        error: 'unknown command: exit_cli: session not ready',
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: 'unknown command: exit_cli: session not ready',
       });
     });
   });
@@ -2338,6 +2401,179 @@ describe('UserConnectionDO', () => {
         id: 'cmd-1',
         result,
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // exit_cli routing and relay policy
+  // -------------------------------------------------------------------------
+
+  describe('exit_cli routing and relay policy', () => {
+    it.each([
+      { label: 'missing sessionId', input: { data: { protocolVersion: 1 } } },
+      { label: 'missing data', input: { sessionId: 's1' } },
+      { label: 'wrong protocol version', input: { sessionId: 's1', data: { protocolVersion: 2 } } },
+      {
+        label: 'extra data field',
+        input: { sessionId: 's1', data: { protocolVersion: 1, extra: true } },
+      },
+      { label: 'null data', input: { sessionId: 's1', data: null } },
+      { label: 'array data', input: { sessionId: 's1', data: [{ protocolVersion: 1 }] } },
+      { label: 'primitive data', input: { sessionId: 's1', data: 'protocolVersion=1' } },
+    ])('rejects $label before routing or pending allocation', ({ input }) => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        ...input,
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'INVALID_COMMAND',
+          message: 'Invalid command',
+        },
+      });
+      expect(cliWs.send).not.toHaveBeenCalled();
+      expect(Reflect.get(doInstance, 'pendingCommands')).toEqual(new Map());
+    });
+
+    it('routes exit_cli to the selected session owner with its data unchanged', () => {
+      const { doInstance, mockCtx } = setup();
+      const selectedOwner = addCliSocket(mockCtx, 'cli-1');
+      const otherCli = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, selectedOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, otherCli, [makeSession('s2')]);
+      selectedOwner.send.mockClear();
+      otherCli.send.mockClear();
+
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+
+      expect(allSent(selectedOwner).filter(message => message.type === 'command')).toEqual([
+        expect.objectContaining({
+          type: 'command',
+          command: 'exit_cli',
+          sessionId: 's1',
+          data: { protocolVersion: 1 },
+        }),
+      ]);
+      expect(otherCli.send).not.toHaveBeenCalled();
+    });
+
+    it('rejects exit_cli when the selected owner snapshot is stale', () => {
+      const { doInstance, mockCtx } = setup();
+      const currentOwner = addCliSocket(mockCtx, 'cli-1');
+      const staleOwner = addCliSocket(mockCtx, 'cli-2');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, currentOwner, [makeSession('s1')]);
+      sendHeartbeat(doInstance, staleOwner, []);
+      currentOwner.send.mockClear();
+      staleOwner.send.mockClear();
+
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-2',
+        data: { protocolVersion: 1 },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+      expect(currentOwner.send).not.toHaveBeenCalled();
+      expect(staleOwner.send).not.toHaveBeenCalled();
+    });
+
+    it('rejects exit_cli when the session has no owner', () => {
+      const { doInstance, mockCtx } = setup();
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        data: { protocolVersion: 1 },
+      });
+
+      expect(parseSent(webWs)).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: 'Session owner not found',
+      });
+    });
+
+    it('does not dedupe concurrent exit_cli requests', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-2',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+
+      const commands = allSent(cliWs).filter(message => message.type === 'command');
+      expect(commands).toHaveLength(2);
+      expect(commands[0].id).not.toBe(commands[1].id);
+      expect(webWs.send).not.toHaveBeenCalled();
+    });
+
+    it('relays an exit_cli result over 512 KiB unchanged', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      cliWs.send.mockClear();
+      sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'exit_cli',
+        sessionId: 's1',
+        connectionId: 'cli-1',
+        data: { protocolVersion: 1 },
+      });
+      const correlationId = getCorrelationId(cliWs);
+      const result = createResultWithSerializedBytes(MAX_CATALOG_RESULT_BYTES + 1);
+
+      sendCliResponse(doInstance, cliWs, { id: correlationId, result });
+
+      expect(parseSent(webWs)).toEqual({ type: 'response', id: 'cmd-1', result });
     });
   });
 

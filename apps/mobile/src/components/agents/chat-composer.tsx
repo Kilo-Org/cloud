@@ -29,6 +29,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { showRemoteCliExitConfirmation } from '@/components/agents/remote-cli-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
@@ -61,6 +62,7 @@ type ChatComposerProps = {
   onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
+  onExitCli: (onAccepted: () => void) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -76,7 +78,7 @@ type ChatComposerProps = {
   attachmentsEnabled?: boolean;
   /** Active resolved session type — drives slash command selection. */
   activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
-  /** Slash commands reported by the wrapper, plus the local /new reserved for remote sessions. */
+  /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
   commands?: SlashCommandInfo[];
   /** Remote command state — empty for non-remote sessions. */
   commandState?: RemoteCommandState | null;
@@ -86,6 +88,7 @@ export function ChatComposer({
   onSend,
   onSendCommand,
   onCreateSession,
+  onExitCli,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -221,7 +224,7 @@ export function ChatComposer({
       return;
     }
     if (submission.type === 'argument-error') {
-      toast.error('/new does not take arguments.');
+      toast.error(submission.message);
       return;
     }
     if (submission.type === 'upgrade-required') {
@@ -241,6 +244,8 @@ export function ChatComposer({
         {
           onSendCommand,
           onCreateSession,
+          onExitCli,
+          confirmExitCli: showRemoteCliExitConfirmation,
           onSendPrompt: async prompt => {
             await onSend(prompt, upload.toWirePayload());
           },

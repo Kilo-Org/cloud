@@ -42,6 +42,7 @@ import type {
 
 const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
   'Remote session creation is not supported for the current session';
+const REMOTE_CLI_EXIT_NOT_SUPPORTED = 'Remote CLI exit is not supported for the current session';
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -152,6 +153,7 @@ type CloudAgentSession = {
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
   createRemoteSession: () => Promise<KiloSessionId>;
+  exitRemoteCli: () => Promise<void>;
 
   // Capability checks
   canSend: boolean;
@@ -438,6 +440,12 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       return transport.createSession();
     },
+    exitRemoteCli: async () => {
+      if (!transport?.exitCli) {
+        throw new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      }
+      return transport.exitCli();
+    },
     get canSend() {
       return transport?.send !== undefined && (transport.canSend?.() ?? true);
     },
@@ -470,7 +478,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   };
 }
 
-export { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED };
+export {
+  createCloudAgentSession,
+  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+};
 export type {
   CloudAgentSession,
   CloudAgentSessionAcceptSuggestionInput,

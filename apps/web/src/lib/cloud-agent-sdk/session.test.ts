@@ -5,7 +5,7 @@
  * we wire the same components directly — mirroring session.ts's event routing logic.
  */
 import { createTestSession, kiloId } from './test-helpers';
-import { createCloudAgentSession } from './session';
+import { createCloudAgentSession, REMOTE_CLI_EXIT_NOT_SUPPORTED } from './session';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { KiloSessionId } from './types';
 import { UserWebCommandError, type UserWebSystemEvent } from './user-web-connection';
@@ -580,4 +580,83 @@ describe('remote session create and retry commands', () => {
     ).toHaveLength(initialListCommands + 1);
     session.destroy();
   });
+
+  it('exitRemoteCli forwards through the remote transport', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+    jest.mocked(userWebConnection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') {
+        return Promise.resolve({
+          all: [],
+          default: {},
+          connected: [],
+          failed: [],
+          protocolVersion: 1,
+          truncated: false,
+        });
+      }
+      if (command === 'list_commands') {
+        return Promise.resolve({
+          protocolVersion: 1,
+          commands: [{ name: 'exit', description: 'Exit the CLI', hints: [] }],
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(session.exitRemoteCli()).resolves.toBeUndefined();
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      kiloId('ses-remote'),
+      'exit_cli',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    session.destroy();
+  });
+
+  it.each(['cloud-agent', 'read-only'] as const)(
+    'exitRemoteCli rejects with the stable unsupported error for %s sessions',
+    async type => {
+      const kiloSessionId = kiloId('ses-unsupported');
+      const session = createCloudAgentSession({
+        kiloSessionId,
+        resolveSession: () =>
+          Promise.resolve(
+            type === 'cloud-agent'
+              ? {
+                  type,
+                  kiloSessionId,
+                  cloudAgentSessionId: 'agent-unsupported' as never,
+                }
+              : { type, kiloSessionId }
+          ),
+        websocketBaseUrl: 'ws://example.test',
+        transport: {
+          getTicket: () => 'ticket',
+          api: {
+            send: jest.fn(),
+            interrupt: jest.fn(),
+            answer: jest.fn(),
+            reject: jest.fn(),
+            respondToPermission: jest.fn(),
+          },
+          fetchSnapshot: () => Promise.resolve({ info: { id: kiloSessionId }, messages: [] }),
+        },
+      });
+
+      session.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await expect(session.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      session.destroy();
+    }
+  );
 });

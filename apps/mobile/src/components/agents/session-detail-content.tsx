@@ -10,6 +10,7 @@ import { toast } from 'sonner-native';
 
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
+import { exitRemoteCliWithFeedback } from '@/components/agents/exit-remote-cli-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -494,6 +495,23 @@ export function SessionDetailContent({
     return result.success;
   }, [manager, router, organizationId]);
 
+  const handleExitCli = useCallback(
+    async (onAccepted: () => void) => {
+      await exitRemoteCliWithFeedback({
+        exit: manager.exitRemoteCli.bind(manager),
+        onAccepted,
+        onSuccess: message => {
+          toast.success(message);
+        },
+        onError: message => {
+          toast.error(message);
+        },
+        router,
+      });
+    },
+    [manager, router]
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} headerRight={headerRight} />
@@ -591,6 +609,7 @@ export function SessionDetailContent({
                   onSend={handleSend}
                   onSendCommand={handleSendCommand}
                   onCreateSession={handleCreateSession}
+                  onExitCli={handleExitCli}
                   onStop={handleStop}
                   disabled={isComposerDisabled}
                   isStreaming={isStreaming}

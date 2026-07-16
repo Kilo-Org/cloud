@@ -409,6 +409,8 @@ export const kilocode_users = pgTable(
       .notNull()
       .unique(),
     is_admin: boolean().default(false).notNull(),
+    is_super_admin: boolean().default(false).notNull(),
+    can_view_sessions: boolean().default(false).notNull(),
     can_manage_credits: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
@@ -465,6 +467,14 @@ export const kilocode_users = pgTable(
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
+    check(
+      'kilocode_users_is_super_admin_requires_admin_check',
+      sql`NOT ${table.is_super_admin} OR ${table.is_admin}`
+    ),
+    check(
+      'kilocode_users_can_view_sessions_requires_admin_check',
+      sql`NOT ${table.can_view_sessions} OR ${table.is_admin}`
+    ),
     check(
       'kilocode_users_can_manage_credits_requires_admin_check',
       sql`NOT ${table.can_manage_credits} OR ${table.is_admin}`
@@ -2124,10 +2134,10 @@ export const microdollar_usage = pgTable(
 );
 
 // Per-day rollup of microdollar_usage.cost, keyed by (kilo_user_id, organization_id,
-// usage_date). Maintained by the same CTE that inserts into microdollar_usage so it
-// is updated atomically with the source row. Powers the hot 3-month-rolling-sum
-// query in kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw
-// 800M-row microdollar_usage table.
+// usage_date). Asynchronously maintained through durable per-usage repair work, so
+// it can temporarily lag source usage. Powers the hot 3-month-rolling-sum query in
+// kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw 800M-row
+// microdollar_usage table.
 export const microdollar_usage_daily = pgTable(
   'microdollar_usage_daily',
   {
@@ -2157,6 +2167,48 @@ export const microdollar_usage_daily = pgTable(
 );
 
 export type MicrodollarUsageDaily = typeof microdollar_usage_daily.$inferSelect;
+
+// Durable repair work for asynchronously maintaining microdollar_usage_daily.
+// One row per source usage avoids contending on a shared user/org/day key during
+// source request inserts.
+export const microdollar_usage_daily_repairs = pgTable(
+  'microdollar_usage_daily_repairs',
+  {
+    usage_id: uuid()
+      .notNull()
+      .primaryKey()
+      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    usage_date: date({ mode: 'string' }).notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
+    attempt_count: integer().default(0).notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_microdollar_usage_daily_repairs_claim').on(
+      table.attempt_count,
+      table.next_attempt_at,
+      table.claimed_at,
+      table.usage_date,
+      table.usage_id
+    ),
+    check('microdollar_usage_daily_repairs_attempt_count_check', sql`${table.attempt_count} >= 0`),
+    check(
+      'microdollar_usage_daily_repairs_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type MicrodollarUsageDailyRepair = typeof microdollar_usage_daily_repairs.$inferSelect;
 
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',

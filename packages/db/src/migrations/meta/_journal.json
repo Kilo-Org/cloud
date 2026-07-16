@@ -1310,6 +1310,20 @@
       "when": 1784154394674,
       "tag": "0186_council_result",
       "breakpoints": true
+    },
+    {
+      "idx": 187,
+      "version": "7",
+      "when": 1784211445901,
+      "tag": "0187_modern_colonel_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1784213741489,
+      "tag": "0188_unusual_titanium_man",
+      "breakpoints": true
     }
   ]
 }

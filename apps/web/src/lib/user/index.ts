@@ -986,6 +986,8 @@ export async function softDeleteUser(userId: string) {
         completed_welcome_form: false,
         cohorts: {},
         is_admin: false,
+        is_super_admin: false,
+        can_view_sessions: false,
         can_manage_credits: false,
         customer_source: null,
         signup_ip: null,

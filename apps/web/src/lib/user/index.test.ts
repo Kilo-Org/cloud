@@ -1019,6 +1019,8 @@ describe('User', () => {
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
+        is_super_admin: true,
+        can_view_sessions: true,
         can_manage_credits: true,
       });
 
@@ -1057,6 +1059,8 @@ describe('User', () => {
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
+      expect(softDeleted!.is_super_admin).toBe(false);
+      expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);

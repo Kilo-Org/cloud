@@ -1,6 +1,6 @@
 import { Text } from '@/components/ui/text';
 
-import { MarkdownText } from '../agents/markdown-text';
+import { ChatMarkdownText } from '../agents/chat-markdown-text';
 import { isMessageTextSelectionEnabled } from './message-presentation';
 
 type MessageMarkdownProps = {
@@ -15,7 +15,7 @@ export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProp
 
   try {
     return (
-      <MarkdownText
+      <ChatMarkdownText
         value={text}
         variant={isFromMe ? 'kilo-chat-user' : 'assistant'}
         selectable={isMessageTextSelectionEnabled()}

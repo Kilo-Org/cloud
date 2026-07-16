@@ -21,6 +21,8 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     kilo_pass_threshold: null,
     total_microdollars_acquired: 0,
     is_admin: false,
+    is_super_admin: false,
+    can_view_sessions: false,
     can_manage_credits: false,
     blocked_reason: null,
     blocked_at: null,

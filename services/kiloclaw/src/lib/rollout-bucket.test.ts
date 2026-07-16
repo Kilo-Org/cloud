@@ -35,6 +35,26 @@ describe('rolloutBucket', () => {
     expect(ratio).toBeLessThan(0.55);
   });
 
+  it('handles an empty key', async () => {
+    const v = await rolloutBucket('');
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(99);
+  });
+
+  it('handles non-ASCII keys', async () => {
+    const v = await rolloutBucket('instance:café-日本語-🦀');
+    expect(v).toBeGreaterThanOrEqual(0);
+    expect(v).toBeLessThanOrEqual(99);
+  });
+
+  it('is sensitive to key ordering, not just content', async () => {
+    // Guards against a keying scheme where concatenation could collide, e.g.
+    // `tag:ab` + `instance:c` landing in the same bucket as `tag:a` + `instance:bc`.
+    const a = await rolloutBucket('tag:ab:instance:c');
+    const b = await rolloutBucket('tag:a:instance:bc');
+    expect(a).not.toBe(b);
+  });
+
   it('changes the bucket for a fixed instanceId when the salt (imageTag) changes', async () => {
     const instanceId = '550e8400-e29b-41d4-a716-446655440001';
     const a = await rolloutBucket(`tag:kiloclaw-2026.4.23-aaa:instance:${instanceId}`);

@@ -1303,6 +1303,13 @@
       "when": 1784129617576,
       "tag": "0185_lowly_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 186,
+      "version": "7",
+      "when": 1784154394674,
+      "tag": "0186_council_result",
+      "breakpoints": true
     }
   ]
 }

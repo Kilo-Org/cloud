@@ -47,6 +47,7 @@ const mockSession = {
     getActivity: jest.fn((): SessionActivity => ({ type: 'idle' })),
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
+    getSetupLog: jest.fn<readonly string[], []>(() => []),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -314,6 +315,7 @@ describe('createSessionManager', () => {
     });
     mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
     mockSession.state.getCloudStatus.mockReturnValue(null);
+    mockSession.state.getSetupLog.mockReturnValue([]);
     mockSession.state.getPendingMessages.mockReturnValue(new Map());
     mockSession.storage = latestStorage;
     latestStorage = null;
@@ -537,6 +539,27 @@ describe('createSessionManager', () => {
           message: 'Setting up environment…',
         })
       );
+    });
+
+    it('exposes setup output and clears it when the manager is destroyed', async () => {
+      mockSession.state.getSetupLog.mockReturnValue([
+        'Running setup command 1 of 1: pnpm install',
+        'Packages: +42',
+      ]);
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(atomValue<readonly string[]>(config.store, mgr.atoms.setupLog)).toEqual([
+        'Running setup command 1 of 1: pnpm install',
+        'Packages: +42',
+      ]);
+
+      mgr.destroy();
+
+      expect(atomValue<readonly string[]>(config.store, mgr.atoms.setupLog)).toEqual([]);
     });
 
     it('clears cloud status indicator when cloud status returns to ready', async () => {

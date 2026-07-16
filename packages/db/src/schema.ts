@@ -146,6 +146,7 @@ import type {
   ManualCodeReviewConfig,
   CodeReviewType,
   CodeReviewTriggerSource,
+  CodeReviewCouncilResult,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -5011,6 +5012,9 @@ export const cloud_agent_code_reviews = pgTable(
     review_type: text().$type<CodeReviewType>().notNull().default('standard'),
     // How this run was requested (its origin): 'manual' | 'webhook'. Null for legacy rows.
     trigger_source: text().$type<CodeReviewTriggerSource>(),
+    // Persisted council outcome (decision + per-specialist votes/findings) for the cloud
+    // UI job-runs screen. Null for standard runs or before a council run completes.
+    council_result: jsonb('council_result').$type<CodeReviewCouncilResult>(),
 
     // PR information
     repo_full_name: text().notNull(), // e.g., "owner/repo"

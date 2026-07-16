@@ -1,5 +1,10 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import {
+  type CloudStatus,
+  type KiloSessionId,
+  type PreparationAttempt,
+  type StoredMessage,
+} from 'cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
@@ -27,6 +32,7 @@ import {
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
+import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
@@ -78,6 +84,10 @@ type SessionDetailContentProps = {
   openedVia?: 'push' | 'app';
 };
 
+type TranscriptItem =
+  | { type: 'message'; message: StoredMessage }
+  | { type: 'preparation'; attempt: PreparationAttempt };
+
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
   preparing: 'Setting up environment...',
   finalizing: 'Wrapping up...',
@@ -102,6 +112,7 @@ export function SessionDetailContent({
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
+  const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
@@ -254,7 +265,10 @@ export function SessionDetailContent({
     handleScrollEndDrag,
     handleMomentumScrollBegin,
     handleMomentumScrollEnd,
-  } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
+  } = useSessionAutoScroll<TranscriptItem>({
+    itemCount: messages.length + preparationAttempts.length,
+    resetKey: sessionId,
+  });
 
   const viewTrackedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -309,13 +323,13 @@ export function SessionDetailContent({
     sessionId,
   ]);
 
-  const lastAssistantIndex = useMemo(() => {
+  const lastAssistantMessageId = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
       if (messages[i]?.info.role === 'assistant') {
-        return i;
+        return messages[i]?.info.id ?? null;
       }
     }
-    return -1;
+    return null;
   }, [messages]);
 
   const handleOpenChildSession = useCallback(
@@ -326,19 +340,46 @@ export function SessionDetailContent({
     [manager]
   );
 
+  const transcript = useMemo<TranscriptItem[]>(() => {
+    const byMessageId = new Map<string, PreparationAttempt[]>();
+    for (const attempt of preparationAttempts) {
+      const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
+      byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
+    }
+    const items: TranscriptItem[] = [];
+    for (const message of messages) {
+      items.push({ type: 'message', message });
+      for (const attempt of byMessageId.get(message.info.id) ?? []) {
+        items.push({ type: 'preparation', attempt });
+      }
+    }
+    for (const attempt of preparationAttempts) {
+      if (
+        !byMessageId.has(attempt.triggerMessageId) ||
+        !messages.some(message => message.info.id === attempt.triggerMessageId)
+      ) {
+        items.push({ type: 'preparation', attempt });
+      }
+    }
+    return items;
+  }, [messages, preparationAttempts]);
+
   const renderItem = useCallback(
-    ({ item, index }: { item: StoredMessage; index: number }) => (
-      <MessageBubble
-        message={item}
-        isLastAssistantMessage={index === lastAssistantIndex}
-        isSessionStreaming={isStreaming}
-        getChildMessages={getChildMessages}
-        defaultReasoningExpanded={reasoningDefaultExpanded}
-        onOpenChildSession={handleOpenChildSession}
-      />
-    ),
+    ({ item }: { item: TranscriptItem }) =>
+      item.type === 'preparation' ? (
+        <PreparationGroup attempt={item.attempt} />
+      ) : (
+        <MessageBubble
+          message={item.message}
+          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
+          isSessionStreaming={isStreaming}
+          getChildMessages={getChildMessages}
+          defaultReasoningExpanded={reasoningDefaultExpanded}
+          onOpenChildSession={handleOpenChildSession}
+        />
+      ),
     [
-      lastAssistantIndex,
+      lastAssistantMessageId,
       isStreaming,
       getChildMessages,
       reasoningDefaultExpanded,
@@ -624,8 +665,10 @@ export function SessionDetailContent({
     return (
       <FlatList
         ref={flatListRef}
-        data={messages}
-        keyExtractor={item => item.info.id}
+        data={transcript}
+        keyExtractor={item =>
+          item.type === 'message' ? item.message.info.id : `preparation:${item.attempt.id}`
+        }
         renderItem={renderItem}
         onScroll={handleScroll}
         onScrollBeginDrag={handleScrollBeginDrag}

@@ -17,6 +17,7 @@ import {
   listCodeReviews,
   countCodeReviews,
   getCodeReviewById,
+  getCodeReviewCouncilResult,
   cancelCodeReview,
   resetCodeReviewForRetry,
   updateCheckRunId,
@@ -343,10 +344,16 @@ export const codeReviewRouter = createTRPCRouter({
       }
 
       const cliSessionId = review.cli_session_id;
-      const shouldLoadBillingUsage =
-        ['completed', 'failed', 'cancelled', 'interrupted'].includes(review.status) &&
-        cliSessionId !== null;
-      const [attempts, billingUsage] = await Promise.all([
+      const isTerminal = ['completed', 'failed', 'cancelled', 'interrupted'].includes(
+        review.status
+      );
+      const shouldLoadBillingUsage = isTerminal && cliSessionId !== null;
+      // `council_result` is written only once, at terminal completion (no streaming), so
+      // there's nothing to load while a council review is in flight — skip the query on the
+      // 5s in-flight polls. `getCodeReviewById` omits the heavy JSONB, so the detail screen
+      // (the one consumer) loads it explicitly here, in parallel with attempts/billing.
+      const shouldLoadCouncilResult = review.review_type === 'council' && isTerminal;
+      const [attempts, billingUsage, council_result] = await Promise.all([
         listCodeReviewAttempts(input.reviewId),
         shouldLoadBillingUsage
           ? getSessionUsageFromBilling(
@@ -354,6 +361,9 @@ export const codeReviewRouter = createTRPCRouter({
               review.created_at,
               review.completed_at ?? undefined
             )
+          : Promise.resolve(null),
+        shouldLoadCouncilResult
+          ? getCodeReviewCouncilResult(input.reviewId)
           : Promise.resolve(null),
       ]);
       const tokenUsage = billingUsage
@@ -368,7 +378,7 @@ export const codeReviewRouter = createTRPCRouter({
             cached: 0,
           };
 
-      return successResult({ review, attempts, tokenUsage });
+      return successResult({ review: { ...review, council_result }, attempts, tokenUsage });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;

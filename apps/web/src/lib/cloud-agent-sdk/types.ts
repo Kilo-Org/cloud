@@ -138,11 +138,48 @@ export type MessageDeliveryState =
       attempts?: number;
     };
 
+export type PreparationAttemptStatus = 'running' | 'completed' | 'failed';
+export type PreparationStepKind = 'phase' | 'setup_command';
+export type PreparationStepStatus = 'running' | 'completed' | 'failed';
+
+export type PreparationStepSnapshot = {
+  id: string;
+  key: string;
+  kind: PreparationStepKind;
+  label: string;
+  status: PreparationStepStatus;
+  startedAt: number;
+  completedAt?: number;
+  revision: number;
+  latestDetail?: string;
+  safeError?: string;
+  command?: string;
+  commandIndex?: number;
+  commandCount?: number;
+  outputTail?: string;
+  outputTruncated?: boolean;
+  exitCode?: number;
+};
+
+export type PreparationAttempt = {
+  id: string;
+  triggerMessageId: string;
+  status: PreparationAttemptStatus;
+  startedAt: number;
+  completedAt?: number;
+  safeError?: string;
+  revision: number;
+  steps: PreparationStepSnapshot[];
+};
+
 /** Full service state — all non-chat state in one place. */
 export type ServiceStateSnapshot = {
   activity: SessionActivity;
   status: AgentStatus;
   cloudStatus: CloudStatus | null;
+  /** @deprecated Legacy transient setup output. v2 preparation uses preparationAttempts. */
+  setupLog: readonly string[];
+  preparationAttempts: readonly PreparationAttempt[];
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;

@@ -1556,6 +1556,72 @@ describe('SessionMessageQueue', () => {
     });
   });
 
+  it('terminalizes a non-retryable setup command failure on its first attempt', async () => {
+    const error = 'Setup command failed: sh -lc "[REDACTED]" (exit code 1)';
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.workspaceSetupFailed(error, undefined, {
+            subtype: 'setup_command_failed',
+            safeFailureMessage: `${error}\noutput: authentication failed for [REDACTED]`,
+            retryable: false,
+          })
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'prepare the workspace' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(harness.terminalizations).toHaveLength(1);
+    expect(harness.terminalizations[0]?.params).toMatchObject({
+      kind: 'failed',
+      error,
+      attempts: 1,
+      failureStage: 'pre_dispatch',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'setup_command_failed',
+      safeFailureMessage: `${error}\noutput: authentication failed for [REDACTED]`,
+    });
+  });
+
+  it('keeps a setup command timeout retryable after its first attempt', async () => {
+    const error = 'Setup command timed out after 300 seconds';
+    const harness = createQueueHarness({
+      deliver: async () =>
+        Promise.reject(
+          ExecutionError.workspaceSetupFailed(error, undefined, {
+            subtype: 'setup_command_timeout',
+            safeFailureMessage: error,
+            retryable: true,
+          })
+        ),
+    });
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'prepare the workspace' },
+    });
+
+    await harness.queue.drainNextPendingMessage();
+
+    expect(harness.deliver).toHaveBeenCalledOnce();
+    const [pending] = await listPendingSessionMessages(harness.storage);
+    expect(pending).toMatchObject({
+      flushAttempts: 1,
+      lastFlushError: error,
+      lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
+      lastFlushFailureSubtype: 'setup_command_timeout',
+      safeFailureMessage: error,
+    });
+    expect(pending?.nextFlushAttemptAt).toBeDefined();
+    expect(pending?.deliveryDisposition).toBeUndefined();
+    expect(harness.terminalizations).toHaveLength(0);
+  });
+
   it('preserves a thrown workspace setup failure through retry exhaustion', async () => {
     const error = 'Git clone failed: No space left on device';
     const harness = createQueueHarness({

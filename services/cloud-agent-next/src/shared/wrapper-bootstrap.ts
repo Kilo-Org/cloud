@@ -129,6 +129,10 @@ export type WrapperSessionReadyRequest = {
   devcontainer?: WrapperBootstrapDevContainer;
   materialized: WrapperBootstrapMaterializedConfig;
   session: WrapperSessionBinding;
+  preparation?: {
+    attemptId: string;
+    triggerMessageId: string;
+  };
 };
 
 export type WrapperWorkspaceReady = {
@@ -237,6 +241,13 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
   if (!hasString(session, 'wrapperRunId')) return false;
   if (typeof session.wrapperGeneration !== 'number') return false;
   if (!hasString(session, 'wrapperConnectionId')) return false;
+
+  const preparation = value.preparation;
+  if (preparation !== undefined) {
+    if (!isRecord(preparation)) return false;
+    if (!hasString(preparation, 'attemptId')) return false;
+    if (!hasString(preparation, 'triggerMessageId')) return false;
+  }
 
   return true;
 }

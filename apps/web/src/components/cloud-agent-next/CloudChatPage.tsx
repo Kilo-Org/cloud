@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,8 @@ import { MessageBubble } from './MessageBubble';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
+import { PreparationRow } from './PreparationRow';
+import { PreparationDrawer } from './PreparationDrawer';
 import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
@@ -52,7 +54,11 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
-import type { MessageDeliveryState, StoredMessage } from '@/lib/cloud-agent-sdk';
+import type {
+  MessageDeliveryState,
+  PreparationAttempt,
+  StoredMessage,
+} from '@/lib/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
 
@@ -63,13 +69,17 @@ const StaticMessages = memo(
   ({
     messages,
     pendingMessages,
+    preparationByMessageId,
     getChildMessages,
     onOpenChildSession,
+    onOpenPreparationDetails,
   }: {
     messages: StoredMessage[];
     pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
+    preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
     getChildMessages?: (sessionId: string) => StoredMessage[];
     onOpenChildSession?: OpenChildSession;
+    onOpenPreparationDetails: (attemptId: string) => void;
   }) => (
     <>
       {messages.map(msg => (
@@ -80,6 +90,13 @@ const StaticMessages = memo(
             getChildMessages={getChildMessages}
             onOpenChildSession={onOpenChildSession}
           />
+          {preparationByMessageId.get(msg.info.id)?.map(attempt => (
+            <PreparationRow
+              key={attempt.id}
+              attempt={attempt}
+              onOpenDetails={onOpenPreparationDetails}
+            />
+          ))}
         </MessageErrorBoundary>
       ))}
     </>
@@ -94,16 +111,20 @@ type DynamicMessagesProps = {
   active: boolean;
   messages: StoredMessage[];
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
+  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  onOpenPreparationDetails: (attemptId: string) => void;
 };
 
 const DynamicMessages = memo(
   function DynamicMessages({
     messages,
     pendingMessages,
+    preparationByMessageId,
     getChildMessages,
     onOpenChildSession,
+    onOpenPreparationDetails,
   }: DynamicMessagesProps) {
     return (
       <>
@@ -118,6 +139,13 @@ const DynamicMessages = memo(
                 getChildMessages={getChildMessages}
                 onOpenChildSession={onOpenChildSession}
               />
+              {preparationByMessageId.get(msg.info.id)?.map(attempt => (
+                <PreparationRow
+                  key={attempt.id}
+                  attempt={attempt}
+                  onOpenDetails={onOpenPreparationDetails}
+                />
+              ))}
             </MessageErrorBoundary>
           );
         })}
@@ -131,8 +159,10 @@ const DynamicMessages = memo(
       previous.active === next.active &&
       previous.messages === next.messages &&
       previous.pendingMessages === next.pendingMessages &&
+      previous.preparationByMessageId === next.preparationByMessageId &&
       previous.getChildMessages === next.getChildMessages &&
-      previous.onOpenChildSession === next.onOpenChildSession
+      previous.onOpenChildSession === next.onOpenChildSession &&
+      previous.onOpenPreparationDetails === next.onOpenPreparationDetails
     );
   }
 );
@@ -194,6 +224,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const [childSessionDrawerContainer, setChildSessionDrawerContainer] =
     useState<HTMLDivElement | null>(null);
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
+  const [preparationDrawerAttemptId, setPreparationDrawerAttemptId] = useState<string | null>(null);
+  const preparationDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
 
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
@@ -201,6 +233,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     if (sessionIdFromParams) {
       childSessionDrawerFocusTargetRef.current = null;
       setChildSessionStack([]);
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
     }
   }, [sessionIdFromParams, manager]);
@@ -216,6 +250,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const sessionId = useAtomValue(manager.atoms.sessionId);
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
+  const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
@@ -557,6 +592,9 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     const activeElement = document.activeElement;
     childSessionDrawerFocusTargetRef.current =
       activeElement instanceof HTMLElement ? activeElement : null;
+    // The two drawers overlay the same chat pane — only one may be open.
+    preparationDrawerFocusTargetRef.current = null;
+    setPreparationDrawerAttemptId(null);
     setChildSessionStack([entry]);
   }, []);
 
@@ -575,6 +613,28 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const handleChildSessionDrawerCloseAutoFocus = useCallback((event: Event) => {
     const focusTarget = childSessionDrawerFocusTargetRef.current;
     childSessionDrawerFocusTargetRef.current = null;
+    if (!focusTarget?.isConnected) return;
+    event.preventDefault();
+    focusTarget.focus();
+  }, []);
+
+  const handleOpenPreparationDetails = useCallback((attemptId: string) => {
+    const activeElement = document.activeElement;
+    preparationDrawerFocusTargetRef.current =
+      activeElement instanceof HTMLElement ? activeElement : null;
+    // The two drawers overlay the same chat pane — only one may be open.
+    childSessionDrawerFocusTargetRef.current = null;
+    setChildSessionStack([]);
+    setPreparationDrawerAttemptId(attemptId);
+  }, []);
+
+  const handlePreparationDrawerOpenChange = useCallback((open: boolean) => {
+    if (!open) setPreparationDrawerAttemptId(null);
+  }, []);
+
+  const handlePreparationDrawerCloseAutoFocus = useCallback((event: Event) => {
+    const focusTarget = preparationDrawerFocusTargetRef.current;
+    preparationDrawerFocusTargetRef.current = null;
     if (!focusTarget?.isConnected) return;
     event.preventDefault();
     focusTarget.focus();
@@ -698,6 +758,21 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // free to pick their own model.
   const displayVariant = modelPickerLocked ? agentVariantOverride : sessionModels.selectedVariant;
   const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
+  const preparationByMessageId = useMemo(() => {
+    const byMessageId = new Map<string, readonly PreparationAttempt[]>();
+    for (const attempt of preparationAttempts) {
+      const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
+      byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
+    }
+    return byMessageId;
+  }, [preparationAttempts]);
+  // A running preparation row already shows live progress inline, so the
+  // trailing progress row would repeat the same message beneath it.
+  const visibleStatusIndicator =
+    statusIndicator?.type === 'progress' &&
+    preparationAttempts.some(attempt => attempt.status === 'running')
+      ? null
+      : statusIndicator;
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -778,7 +853,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                   className="relative flex min-h-0 flex-1 flex-col"
                 >
                   <div
-                    inert={childSessionStack.length > 0}
+                    inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
                     className="flex min-h-0 flex-1 flex-col"
                   >
                     <div className="relative min-h-0 flex-1">
@@ -793,15 +868,19 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                             <StaticMessages
                               messages={staticMessages}
                               pendingMessages={pendingMessages}
+                              preparationByMessageId={preparationByMessageId}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
+                              onOpenPreparationDetails={handleOpenPreparationDetails}
                             />
                             <DynamicMessages
                               active={chatTabActive}
                               messages={dynamicMessages}
                               pendingMessages={pendingMessages}
+                              preparationByMessageId={preparationByMessageId}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
+                              onOpenPreparationDetails={handleOpenPreparationDetails}
                             />
 
                             {chatTabActive && (
@@ -810,8 +889,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 isStreaming={isStreaming}
                               />
                             )}
-                            {statusIndicator && (
-                              <SessionStatusIndicator indicator={statusIndicator} />
+                            {visibleStatusIndicator && (
+                              <SessionStatusIndicator indicator={visibleStatusIndicator} />
                             )}
 
                             <div ref={messagesEndRef} />
@@ -957,6 +1036,12 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
               onOpenChange={handleChildSessionDrawerOpenChange}
               onOpenChildSession={handleOpenNestedChildSession}
               onCloseAutoFocus={handleChildSessionDrawerCloseAutoFocus}
+              portalContainer={childSessionDrawerContainer}
+            />
+            <PreparationDrawer
+              attemptId={preparationDrawerAttemptId}
+              onOpenChange={handlePreparationDrawerOpenChange}
+              onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
               portalContainer={childSessionDrawerContainer}
             />
           </div>

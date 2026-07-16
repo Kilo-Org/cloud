@@ -252,6 +252,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     manual_config: null,
     review_type: 'standard',
     trigger_source: null,
+    council_result: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,

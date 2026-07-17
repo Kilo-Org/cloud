@@ -270,7 +270,6 @@ export default function NewSessionScreen() {
           isSpawningRemote={remoteSpawn.isSpawningRemote}
           isStartDisabled={isStartDisabled}
           onStart={handleStartSession}
-          showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
         />
       ) : (
         <ScrollView

@@ -4,7 +4,6 @@ import { InstanceSelector } from '@/components/agents/instance-selector';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type RemoteSpawnComposerProps = {
@@ -15,7 +14,6 @@ type RemoteSpawnComposerProps = {
   isSpawningRemote: boolean;
   isStartDisabled: boolean;
   onStart: () => void;
-  showInstanceDisconnectedNote: boolean;
 };
 
 /**
@@ -26,10 +24,12 @@ type RemoteSpawnComposerProps = {
  * back to Cloud Agent or pick a different instance) and a single
  * "Start session" CTA drives the spawn.
  *
- * The inline "disconnected" note under the selector is shown
- * after a retryable spawn failure that reset the selection
- * because the previously-selected `connectionId` was no longer
- * present in the refetched instance list.
+ * kilocode_change - the inline "disconnected" note lives in the FULL
+ * (Cloud Agent) composer in `new.tsx`, not here: a retryable spawn
+ * failure resets the selection to `null` in the SAME state update that
+ * sets the note, which immediately swaps the screen away from this
+ * component (`isRemoteTargetSelected` becomes `false`) — a note prop on
+ * this component could never actually render.
  */
 export function RemoteSpawnComposer({
   runOnInstance,
@@ -39,7 +39,6 @@ export function RemoteSpawnComposer({
   isSpawningRemote,
   isStartDisabled,
   onStart,
-  showInstanceDisconnectedNote,
 }: Readonly<RemoteSpawnComposerProps>) {
   const colors = useThemeColors();
   return (
@@ -58,11 +57,6 @@ export function RemoteSpawnComposer({
           onChange={onChangeRunOnInstance}
           disabled={isSpawningRemote}
         />
-        {showInstanceDisconnectedNote ? (
-          <Text className="mt-2 text-sm text-muted-foreground">
-            {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
-          </Text>
-        ) : null}
       </View>
 
       <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStart}>

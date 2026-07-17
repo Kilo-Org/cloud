@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
@@ -103,6 +103,20 @@ export function useRemoteSpawnDispatch({
   } = useRemoteInstanceSpawn();
   const [showInstanceDisconnectedNote, setShowInstanceDisconnectedNote] = useState(false);
 
+  // kilocode_change - `onStart`'s async tail (spawn + refetch + classify)
+  // outlives a single render; a plain closure over `runOnInstance` would
+  // only ever see the value from the render that started this dispatch,
+  // not whatever the user picks while it's still in flight (which can
+  // happen: `isSpawningRemote` already flips back to `false` as soon as
+  // `remoteSpawn.spawn()` resolves, well before the refetch+classify tail
+  // finishes). A ref always reflects the latest selection so the tail can
+  // check "is my selection still the current one?" against real current
+  // state, not a stale snapshot.
+  const runOnInstanceRef = useRef(runOnInstance);
+  useEffect(() => {
+    runOnInstanceRef.current = runOnInstance;
+  }, [runOnInstance]);
+
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
       return;
@@ -141,7 +155,15 @@ export function useRemoteSpawnDispatch({
         // retryable action. If this ever changes we'll want to know.
         return;
       }
-      if (action.shouldResetSelectionToCloudAgent) {
+      // kilocode_change - only apply the reset if the selection this
+      // dispatch was FOR is still the CURRENT one (read from the ref, not
+      // the closure-captured `runOnInstance` — see the ref's comment
+      // above). Without this check, a stale tail's reset could clobber a
+      // newer, unrelated selection the user already made.
+      if (
+        action.shouldResetSelectionToCloudAgent &&
+        runOnInstanceRef.current?.connectionId === selectedConnectionId
+      ) {
         setRunOnInstance(null);
         setShowInstanceDisconnectedNote(action.showInstanceDisconnectedNote);
       }

@@ -4,6 +4,7 @@ import type {
   AutoRoutingDecisionResponse,
   MirrorPayload,
   NormalizedClassifierInput,
+  RoutingConstraints,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
@@ -24,13 +25,44 @@ import {
   putCachedClassification,
   putStickyDecision,
 } from './decision-cache';
-import { computeDecision } from './decision-engine';
+import { computeDecision, ENFORCED_MODALITIES } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { getRoutingTable } from './routing-table';
 import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
+import { getModelCapabilities } from './model-capabilities';
+import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
+
+// Check whether the coding-plan default model satisfies a constrained
+// request. Mirrors the same `fail-closed when required` policy used in
+// `decision-engine.ts`:
+//   * Unknown capability metadata fails when a required+enforced modality
+//     is set (the model might or might not support it, so we do not trust
+//     the short-circuit).
+//   * Unknown context length is treated as "still fits" (consistent with
+//     the unknown-keeps-rank policy in the engine).
+//   * A known context that is provably smaller than the estimate fails
+//     the check.
+function codingPlanSatisfiesConstraints(
+  caps: ModelCapabilities | undefined,
+  constraints: RoutingConstraints
+): boolean {
+  const required = constraints.requiredInputModalities ?? [];
+  const enforcedAndRequired = required.filter(m => ENFORCED_MODALITIES.includes(m));
+  if (enforcedAndRequired.length > 0) {
+    if (!caps) return false;
+    for (const modality of enforcedAndRequired) {
+      if (!caps.inputModalities.has(modality)) return false;
+    }
+  }
+  const estimate = constraints.promptTokensEstimate;
+  if (typeof estimate === 'number' && caps && typeof caps.contextLength === 'number') {
+    if (caps.contextLength < estimate) return false;
+  }
+  return true;
+}
 
 // Isolate-scoped request counter, used to correlate latency with isolate
 // warm-up in logs.
@@ -286,17 +318,53 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const startedAt = performance.now();
   const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   const codingPlanPreference = await getCodingPlanPreference(c.env, payload.userId);
-  if (codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId)) {
-    const decision = codingPlanDefaultDecision(codingPlanPreference);
-    writeClassifierMetricsDataPoint(c.env, {
-      status: 'coding_plan_default',
-      classifierModel: 'coding_plan_default',
-      requestedModel: payload.input.requestedModel,
-      classifierDurationMs: performance.now() - startedAt,
-      classifierCostCredits: 0,
-      cacheHit: false,
+  const codingPlanActive =
+    codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId);
+  // Narrow once: `constraints` is only non-undefined inside the branches
+  // that already checked `hasConstraints`. This avoids a `!` non-null
+  // assertion across the closure.
+  const hasConstraints = payload.constraints !== undefined;
+  const constraints: RoutingConstraints | undefined = payload.constraints;
+
+  // Capability-aware path: when the gateway attached a `constraints` field,
+  // we must consult capability data before either (a) taking the coding-
+  // plan short-circuit or (b) making a benchmark decision. The lookup has
+  // its own 500ms sub-budget; on failure we treat it as "no capability
+  // data" and the decision-engine fails closed on required modalities.
+  //
+  // When `constraints` is absent we MUST stay byte-identical to today: no
+  // capability fetch, no routing-table fetch, no benchmark hop on the
+  // coding-plan path.
+  let capabilities: ModelCapabilitiesMap = new Map();
+  if (hasConstraints && constraints) {
+    capabilities = await getModelCapabilities(c.env, {
+      codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
     });
-    return c.json({ cost: 0, decision, classifierResult: null });
+  }
+
+  if (codingPlanActive) {
+    const canTakeShortCircuit =
+      hasConstraints && constraints
+        ? codingPlanSatisfiesConstraints(
+            capabilities.get(codingPlanPreference.modelId),
+            constraints
+          )
+        : true;
+    if (canTakeShortCircuit) {
+      const decision = codingPlanDefaultDecision(codingPlanPreference);
+      writeClassifierMetricsDataPoint(c.env, {
+        status: 'coding_plan_default',
+        classifierModel: 'coding_plan_default',
+        requestedModel: payload.input.requestedModel,
+        classifierDurationMs: performance.now() - startedAt,
+        classifierCostCredits: 0,
+        cacheHit: false,
+      });
+      return c.json({ cost: 0, decision, classifierResult: null });
+    }
+    // Fall through to the normal benchmark flow because the coding-plan
+    // model cannot satisfy the constrained request. This moves the request
+    // from subscription-billed to credit-billed benchmark routing.
   }
 
   const [hashes, userIdHash, classifierModel, successSampleRate, routingTable, routingMode] =
@@ -332,7 +400,11 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       routingTable,
       stickyModel,
       deniedModelIds,
-      routingMode
+      routingMode,
+      {
+        constraints: payload.constraints,
+        capabilityMap: hasConstraints ? capabilities : undefined,
+      }
     );
     if (decision) {
       c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
@@ -368,7 +440,11 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       routingTable,
       stickyModel,
       deniedModelIds,
-      routingMode
+      routingMode,
+      {
+        constraints: payload.constraints,
+        capabilityMap: hasConstraints ? capabilities : undefined,
+      }
     );
     // Like the classification cache, sticky state only trusts real classifier
     // output: a heuristic fallback must not re-anchor the session's model.

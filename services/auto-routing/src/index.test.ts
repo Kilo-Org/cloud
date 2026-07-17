@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearClassifierConfigCache } from './classifier-config';
 import { clearRoutingTableCache } from './routing-table';
+import { clearModelCapabilitiesCache } from './model-capabilities';
 import { app } from './index';
 import { ClassifierRunError } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
@@ -13,6 +14,8 @@ const dbFrom = vi.hoisted(() => vi.fn());
 const dbInnerJoin = vi.hoisted(() => vi.fn());
 const dbWhere = vi.hoisted(() => vi.fn());
 const dbLimit = vi.hoisted(() => vi.fn());
+// Model-capabilities mock chain (select -> from -> where, no innerJoin/limit).
+const dbWhereCaps = vi.hoisted(() => vi.fn());
 
 vi.mock('./model-classifier', async importOriginal => {
   const actual = await importOriginal<typeof ModelClassifierModule>();
@@ -192,6 +195,7 @@ describe('auto routing worker', () => {
   beforeEach(() => {
     clearClassifierConfigCache();
     clearRoutingTableCache();
+    clearModelCapabilitiesCache();
     classifyNormalizedInput.mockReset();
     classifyNormalizedInput.mockResolvedValue(mockClassifierResult);
     getWorkerDb.mockReset();
@@ -199,13 +203,19 @@ describe('auto routing worker', () => {
     dbSelect.mockReset();
     dbSelect.mockReturnValue({ from: dbFrom });
     dbFrom.mockReset();
-    dbFrom.mockReturnValue({ innerJoin: dbInnerJoin });
+    // The coding-plan path goes through `innerJoin -> where -> limit`; the
+    // model-capabilities path goes straight to `where` and awaits a plain
+    // promise. Both are mounted on the same `from()` so a single test can
+    // exercise either chain without a separate mock harness.
+    dbFrom.mockReturnValue({ innerJoin: dbInnerJoin, where: dbWhereCaps });
     dbInnerJoin.mockReset();
     dbInnerJoin.mockReturnValue({ where: dbWhere });
     dbWhere.mockReset();
     dbWhere.mockReturnValue({ limit: dbLimit });
     dbLimit.mockReset();
     dbLimit.mockResolvedValue([]);
+    dbWhereCaps.mockReset();
+    dbWhereCaps.mockResolvedValue([]);
     writeDataPoint.mockReset();
     configGet.mockReset();
     // Real KV returns null for missing keys; an undefined here would send the
@@ -249,6 +259,298 @@ describe('auto routing worker', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+  });
+
+  describe('capability-aware routing', () => {
+    // A two-candidate route where the cheaper model is text-only and the
+    // second is image-capable. This lets a single fixture exercise both
+    // the fresh, cached, and fallback code paths in decide.ts.
+    const visionTable = {
+      ...benchmarkRoutingTable,
+      routes: {
+        ...benchmarkRoutingTable.routes,
+        'implementation/feature_development': [
+          {
+            model: 'text-only/chat',
+            accuracy: 0.95,
+            avgCostUsd: 0.001,
+            meetsThreshold: true,
+            reasoningEffort: null,
+          },
+          {
+            model: 'vision/chat',
+            accuracy: 0.85,
+            avgCostUsd: 0.002,
+            meetsThreshold: true,
+            reasoningEffort: null,
+          },
+        ],
+      },
+    };
+
+    function setVisionBenchmark() {
+      benchmarkFetch.mockImplementation(async (url: string) => {
+        if (String(url).includes('/admin/classifier-winner')) {
+          return { ok: true, status: 200, json: async () => ({ winner: null }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            table: visionTable,
+            publishedAt: visionTable.generatedAt,
+          }),
+        };
+      });
+    }
+
+    function setVisionCaps() {
+      dbWhereCaps.mockResolvedValue([
+        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
+        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
+      ]);
+    }
+
+    it('skips a non-vision top candidate on the fresh-classification path', async () => {
+      setVisionBenchmark();
+      setVisionCaps();
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'vision/chat', sticky: false },
+      });
+    });
+
+    it('skips a non-vision top candidate on the cached-classification-hit path', async () => {
+      setVisionBenchmark();
+      setVisionCaps();
+      cacheGetEntry.mockResolvedValueOnce(mockClassification);
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'vision/chat', sticky: false },
+        classifierResult: { classification: mockClassification },
+      });
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    });
+
+    it('skips a non-vision top candidate on the heuristic-fallback-classification path', async () => {
+      setVisionBenchmark();
+      setVisionCaps();
+      classifyNormalizedInput.mockResolvedValueOnce({
+        ...mockClassifierResult,
+        classification: { ...mockClassification, confidence: 0 },
+        fallback: { reason: 'invalid_output' },
+      });
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'vision/chat', sticky: false },
+      });
+      // A fallback classification must not re-anchor the sticky model.
+      expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
+    });
+
+    it('is byte-identical for an old-gateway payload (no constraints field)', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      const response = await decideRequest(mirrorPayload());
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'google/gemini-2.5-flash-lite', sticky: false },
+      });
+      // No capability fetch on the old-gateway path: the DB chain is not
+      // touched by the capability lookup.
+      expect(dbWhereCaps).not.toHaveBeenCalled();
+    });
+
+    it('proceeds unfiltered when capability lookup fails and constraints only carry an estimate', async () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      dbWhereCaps.mockRejectedValue(new Error('db down'));
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { promptTokensEstimate: 1_000 } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'google/gemini-2.5-flash-lite', sticky: false },
+      });
+    });
+
+    it('returns null when capability lookup fails and constraints require an image', async () => {
+      dbWhereCaps.mockRejectedValue(new Error('db down'));
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: null,
+        classifierResult: { classification: mockClassification },
+      });
+    });
+
+    it('falls through the coding-plan short-circuit when the model lacks a required modality', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'minimax-token-plan-plus',
+              providerId: 'minimax',
+              modelId: 'minimax/minimax-m3',
+            })
+          : null
+      );
+      // The coding-plan default model has no image modality → short-
+      // circuit guard rejects it and the request falls through to a
+      // benchmark candidate. The benchmark table's top candidate is
+      // also text-only, so we need a vision-capable candidate to be
+      // available in the route.
+      setVisionBenchmark();
+      dbWhereCaps.mockResolvedValue([
+        {
+          openrouterId: 'minimax/minimax-m3',
+          inputModalities: ['text'],
+          contextLength: 1_000_000,
+        },
+        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 1_000_000 },
+        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
+      ]);
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: {
+          model: 'vision/chat',
+          source: 'benchmark',
+          sticky: false,
+        },
+      });
+      // The coding-plan short-circuit did not fire: the benchmark path ran.
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls through the coding-plan short-circuit when the estimate exceeds the model context', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'minimax-token-plan-plus',
+              providerId: 'minimax',
+              modelId: 'minimax/minimax-m3',
+            })
+          : null
+      );
+      setVisionBenchmark();
+      dbWhereCaps.mockResolvedValue([
+        {
+          openrouterId: 'minimax/minimax-m3',
+          inputModalities: ['image'],
+          contextLength: 8_000,
+        },
+        { openrouterId: 'text-only/chat', inputModalities: [], contextLength: 4_000 },
+        { openrouterId: 'vision/chat', inputModalities: ['image'], contextLength: 1_000_000 },
+      ]);
+      const response = await decideRequest(
+        mirrorPayload({
+          constraints: { promptTokensEstimate: 50_000 },
+        })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: {
+          model: 'vision/chat',
+          source: 'benchmark',
+          sticky: false,
+        },
+      });
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes the coding-plan short-circuit when the model context is unknown', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'minimax-token-plan-plus',
+              providerId: 'minimax',
+              modelId: 'minimax/minimax-m3',
+            })
+          : null
+      );
+      // No image requirement; estimate present but context is null. The
+      // unknown-keeps-rank policy applies: short-circuit is still taken.
+      dbWhereCaps.mockResolvedValue([
+        {
+          openrouterId: 'minimax/minimax-m3',
+          inputModalities: ['text'],
+          contextLength: null,
+        },
+      ]);
+      const response = await decideRequest(
+        mirrorPayload({
+          constraints: { promptTokensEstimate: 50_000 },
+        })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'minimax/minimax-m3', source: 'coding_plan_default' },
+      });
+      expect(classifyNormalizedInput).not.toHaveBeenCalled();
+    });
+
+    it('returns null when capability lookup fails on the coding-plan path with an image requirement', async () => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'minimax-token-plan-plus',
+              providerId: 'minimax',
+              modelId: 'minimax/minimax-m3',
+            })
+          : null
+      );
+      // Lookup fails → no capability data for the coding-plan model → the
+      // short-circuit guard cannot confirm the model supports image, so
+      // it must fail closed rather than take the possibly-incapable
+      // short-circuit.
+      dbWhereCaps.mockRejectedValue(new Error('db down'));
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: null,
+        classifierResult: { classification: mockClassification },
+      });
+      expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('enforces file modality the same way it enforces image', async () => {
+      // 'file' is a first-class modality in the gateway's request-side
+      // detector and is in ENFORCED_MODALITIES. A candidate without
+      // 'file' in its known input_modalities must be excluded.
+      setVisionBenchmark();
+      dbWhereCaps.mockResolvedValue([
+        { openrouterId: 'text-only/chat', inputModalities: ['image'], contextLength: 1_000_000 },
+        {
+          openrouterId: 'vision/chat',
+          inputModalities: ['image', 'file'],
+          contextLength: 1_000_000,
+        },
+      ]);
+      const response = await decideRequest(
+        mirrorPayload({ constraints: { requiredInputModalities: ['file'] } })
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        decision: { model: 'vision/chat', sticky: false },
+      });
+    });
   });
 
   it('returns health without requiring classifier payload fields', async () => {

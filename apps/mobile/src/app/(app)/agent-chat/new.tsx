@@ -12,6 +12,7 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { RemoteSpawnComposer } from '@/components/agents/remote-spawn-composer';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import { useRemoteSpawnDispatch } from '@/components/agents/use-remote-spawn-dispatch';
+import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { Button } from '@/components/ui/button';
@@ -333,6 +334,11 @@ export default function NewSessionScreen() {
                 onChange={handleRunOnInstanceChange}
                 disabled={isCreating}
               />
+              {remoteSpawn.showInstanceDisconnectedNote ? (
+                <Text className="mt-2 text-sm text-muted-foreground">
+                  {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
+                </Text>
+              ) : null}
             </View>
           ) : null}
 

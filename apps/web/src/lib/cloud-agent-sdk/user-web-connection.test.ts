@@ -1,5 +1,6 @@
 import { configureCloudAgentSdkRuntime, resetCloudAgentSdkRuntime } from './runtime';
 import {
+  CommandDeliveredError,
   createUserWebConnection,
   UserWebCommandError,
   VIEWER_PING_INTERVAL_MS,
@@ -1206,8 +1207,9 @@ describe('createUserWebConnection', () => {
     inbound({ type: 'response', id: 'uuid-2', error: 'CLI disconnected' });
 
     await expect(promise).rejects.toEqual(
-      expect.objectContaining({ name: 'Error', message: 'CLI disconnected' })
+      expect.objectContaining({ name: 'CommandDeliveredError', message: 'CLI disconnected' })
     );
+    await expect(promise).rejects.toBeInstanceOf(CommandDeliveredError);
     await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
     client.destroy();
   });
@@ -1629,5 +1631,78 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     });
     await promise;
     client.destroy();
+  });
+
+  it('wraps a delivered bare-string error in CommandDeliveredError on a connection-scoped command', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+    inbound({ type: 'response', id: 'uuid-2', error: 'Session owner not found' });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({
+        name: 'CommandDeliveredError',
+        message: 'Session owner not found',
+      })
+    );
+    await expect(promise).rejects.toBeInstanceOf(CommandDeliveredError);
+    await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
+    client.destroy();
+  });
+
+  it('leaves structured UserWebCommandError unaffected on a connection-scoped command', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      error: {
+        source: 'relay',
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'upgrade',
+      },
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(UserWebCommandError);
+    await expect(promise).rejects.not.toBeInstanceOf(CommandDeliveredError);
+    client.destroy();
+  });
+
+  it('leaves a transport-level timeout as a plain (non-CommandDeliveredError) Error', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+    // No inbound response: the SDK's 30s client-side timer will reject the
+    // command. To avoid making the suite 30s, advance fake timers if jest's
+    // fake timers are installed; otherwise rely on the real timer being
+    // overridden via the COMMAND_TIMEOUT_MS export — for this test we
+    // simulate a transport-level rejection by destroying the client.
+    client.destroy();
+
+    await expect(promise).rejects.toBeInstanceOf(Error);
+    await expect(promise).rejects.not.toBeInstanceOf(CommandDeliveredError);
+    await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
   });
 });

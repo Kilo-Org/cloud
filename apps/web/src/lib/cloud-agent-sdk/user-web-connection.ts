@@ -36,6 +36,24 @@ class UserWebCommandError extends Error {
   }
 }
 
+/**
+ * Error class used to wrap a *delivered* (non-structured, bare-string) command
+ * error response. The message is preserved verbatim so generic `catch (e)`
+ * consumers see the same string the relay/CLI emitted; the new class only
+ * lets downstream callers distinguish a delivered error from a transport-level
+ * failure (timeout, connection destroyed, socket gone — those stay plain
+ * `Error`).
+ *
+ * Structured `UserWebCommandError` responses (relay envelopes with a `.code`)
+ * are NOT wrapped — they already carry enough info.
+ */
+class CommandDeliveredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CommandDeliveredError';
+  }
+}
+
 type UserWebConnectionConfig = {
   websocketUrl: string;
   getAuthToken: () => string | Promise<string>;
@@ -82,8 +100,20 @@ type UserWebConnection = {
   ) => () => void;
 };
 
+/**
+ * Resolve a delivered command-error payload into an `Error` subclass.
+ *
+ * - A bare-string delivered error is wrapped in `CommandDeliveredError` so
+ *   downstream consumers can distinguish it from transport-level failures
+ *   (which stay plain `Error`).
+ * - A structured relay envelope that matches `userWebCommandErrorDataSchema`
+ *   becomes a `UserWebCommandError` (already has a `.code`).
+ * - A malformed structured payload collapses to a plain `Error('Command failed')`
+ *   — the relay envelope wasn't trustworthy so this is not a real "delivered"
+ *   message.
+ */
 function parseCommandError(error: unknown): Error {
-  if (typeof error === 'string') return new Error(error);
+  if (typeof error === 'string') return new CommandDeliveredError(error);
 
   const parsed = userWebCommandErrorDataSchema.safeParse(error);
   if (parsed.success) return new UserWebCommandError(parsed.data);
@@ -628,7 +658,7 @@ function createUserWebConnection(
   };
 }
 
-export { createUserWebConnection, UserWebCommandError };
+export { createUserWebConnection, CommandDeliveredError, UserWebCommandError };
 export type {
   SendCommandToConnectionInput,
   UserWebConnection,

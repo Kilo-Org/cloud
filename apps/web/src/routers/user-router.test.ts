@@ -161,7 +161,7 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
     await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
       enabled: true,
       amountCents: 5000,
-      thresholdCents: 500,
+      thresholdDollars: 5,
       paymentMethod: null,
     });
     expect(mockRetrievePaymentMethodInfo).toHaveBeenCalledWith(undefined);
@@ -181,7 +181,7 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
     await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
       enabled: false,
       amountCents: 10000,
-      thresholdCents: 500,
+      thresholdDollars: 5,
       paymentMethod: null,
     });
   });
@@ -206,7 +206,7 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
     await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
       enabled: true,
       amountCents: 2000,
-      thresholdCents: 500,
+      thresholdDollars: 5,
       paymentMethod: {
         type: 'card',
         last4: '4242',

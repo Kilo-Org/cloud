@@ -666,7 +666,7 @@ export const userRouter = createTRPCRouter({
     return {
       enabled: ctx.user.auto_top_up_enabled,
       amountCents,
-      thresholdCents: AUTO_TOP_UP_THRESHOLD_DOLLARS * 100,
+      thresholdDollars: AUTO_TOP_UP_THRESHOLD_DOLLARS,
       paymentMethod,
     };
   }),

@@ -37,7 +37,7 @@ import {
   getOwnerHourDriverEvidence,
   getOwnerHourlySpend,
   getOwnerRolling24HourSpendExact,
-  getOwnerTopSpendDrivers,
+  getOwnerTopSpendDriversByRange,
   type OwnerHourlySpend,
   type OwnerTopSpendDriver,
 } from './spend-repository';
@@ -384,26 +384,21 @@ async function loadTopDriversByRange(
   owner: CostInsightSpendOwner,
   endHourExclusive: string
 ): Promise<Record<SpendRange, OwnerTopSpendDriver[]>> {
-  const loadRange = (range: SpendRange) =>
-    getOwnerTopSpendDrivers(database, {
-      owner,
+  const driversByRange = await getOwnerTopSpendDriversByRange(database, {
+    owner,
+    ranges: (Object.keys(rangeHours) as SpendRange[]).map(range => ({
+      key: range,
       startHour: spendRangeStartHour(range, endHourExclusive),
-      endHourExclusive,
-      limit: 5,
-    });
-  const [thisHour, last24Hours, last7Days, last30Days, last90Days] = await Promise.all([
-    loadRange('1h'),
-    loadRange('24h'),
-    loadRange('7d'),
-    loadRange('30d'),
-    loadRange('90d'),
-  ]);
+    })),
+    endHourExclusive,
+    limit: 5,
+  });
   return {
-    '1h': thisHour,
-    '24h': last24Hours,
-    '7d': last7Days,
-    '30d': last30Days,
-    '90d': last90Days,
+    '1h': driversByRange.get('1h') ?? [],
+    '24h': driversByRange.get('24h') ?? [],
+    '7d': driversByRange.get('7d') ?? [],
+    '30d': driversByRange.get('30d') ?? [],
+    '90d': driversByRange.get('90d') ?? [],
   };
 }
 

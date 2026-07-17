@@ -18,6 +18,7 @@ import {
   getOwnerRolling24HourDriverEvidenceExact,
   getOwnerRolling24HourSpendExact,
   getOwnerTopSpendDrivers,
+  getOwnerTopSpendDriversByRange,
 } from './spend-repository';
 
 const testUserIds = new Set<string>();
@@ -75,6 +76,59 @@ afterEach(async () => {
 });
 
 describe('Cost Insights spend repository integration', () => {
+  test('ranks each nested dashboard range independently from one 90-day bucket scan', async () => {
+    const userId = await createUser();
+    const recentDriver = await aiGatewayDriver('recent-winner', userId);
+    const dayDriver = await aiGatewayDriver('day-winner', userId);
+    await db.insert(cost_insight_owner_hour_driver_buckets).values([
+      {
+        owned_by_user_id: userId,
+        hour_start: '2026-06-01T01:00:00.000Z',
+        spend_category: 'variable',
+        driver_key: recentDriver.driverKey,
+        source: recentDriver.source,
+        product_key: recentDriver.productKey,
+        feature_key: recentDriver.featureKey,
+        model_or_plan_key: recentDriver.modelOrPlanKey,
+        provider_key: recentDriver.providerKey,
+        actor_user_id: recentDriver.actorUserId,
+        total_microdollars: 30,
+        spend_record_count: 3,
+      },
+      {
+        owned_by_user_id: userId,
+        hour_start: '2026-05-31T02:00:00.000Z',
+        spend_category: 'variable',
+        driver_key: dayDriver.driverKey,
+        source: dayDriver.source,
+        product_key: dayDriver.productKey,
+        feature_key: dayDriver.featureKey,
+        model_or_plan_key: dayDriver.modelOrPlanKey,
+        provider_key: dayDriver.providerKey,
+        actor_user_id: dayDriver.actorUserId,
+        total_microdollars: 100,
+        spend_record_count: 1,
+      },
+    ]);
+
+    const driversByRange = await getOwnerTopSpendDriversByRange(db, {
+      owner: { type: 'user', id: userId },
+      ranges: [
+        { key: '1h', startHour: '2026-06-01T01:00:00.000Z' },
+        { key: '24h', startHour: '2026-05-31T02:00:00.000Z' },
+      ],
+      endHourExclusive: '2026-06-01T02:00:00.000Z',
+      limit: 1,
+    });
+
+    expect(driversByRange.get('1h')).toEqual([
+      expect.objectContaining({ modelOrPlanKey: 'recent-winner', totalMicrodollars: 30 }),
+    ]);
+    expect(driversByRange.get('24h')).toEqual([
+      expect.objectContaining({ modelOrPlanKey: 'day-winner', totalMicrodollars: 100 }),
+    ]);
+  });
+
   test('zero-fills covered sparse hours, isolates owners, and suppresses degraded hours', async () => {
     const userId = await createUser();
     const otherUserId = await createUser();

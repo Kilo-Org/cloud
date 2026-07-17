@@ -3,6 +3,7 @@ import {
   getCostInsightRollupCoverage,
   getOwnerCurrentHourSpend,
   getOwnerHourlySpend,
+  getOwnerTopSpendDriversByRange,
   getRolling24HourFragments,
   getRollingWindowFragments,
 } from './spend-repository';
@@ -124,6 +125,52 @@ describe('Cost Insights spend repository', () => {
       variableRecordCount: 2,
       scheduledRecordCount: 1,
     });
+  });
+
+  test('returns independently ranked drivers for all ranges in one query', async () => {
+    const executor = executorReturning([
+      {
+        range_key: '1h',
+        spend_category: 'variable',
+        source: 'ai_gateway',
+        product_key: 'recent-winner',
+        feature_key: 'other',
+        model_or_plan_key: 'other',
+        provider_key: 'other',
+        actor_user_id: 'user-1',
+        total_microdollars: '30',
+        spend_record_count: '3',
+      },
+      {
+        range_key: '24h',
+        spend_category: 'scheduled',
+        source: 'kiloclaw',
+        product_key: 'day-winner',
+        feature_key: 'other',
+        model_or_plan_key: 'other',
+        provider_key: 'other',
+        actor_user_id: 'user-1',
+        total_microdollars: '100',
+        spend_record_count: '1',
+      },
+    ]);
+
+    const driversByRange = await getOwnerTopSpendDriversByRange(executor, {
+      owner,
+      ranges: [
+        { key: '1h', startHour: '2026-06-01T01:00:00.000Z' },
+        { key: '24h', startHour: '2026-05-31T02:00:00.000Z' },
+      ],
+      endHourExclusive: '2026-06-01T02:00:00.000Z',
+    });
+
+    expect(executor.execute).toHaveBeenCalledTimes(1);
+    expect(driversByRange.get('1h')).toEqual([
+      expect.objectContaining({ productKey: 'recent-winner', totalMicrodollars: 30 }),
+    ]);
+    expect(driversByRange.get('24h')).toEqual([
+      expect.objectContaining({ productKey: 'day-winner', totalMicrodollars: 100 }),
+    ]);
   });
 
   test('marks range incomplete when unresolved degraded interval overlaps it', async () => {

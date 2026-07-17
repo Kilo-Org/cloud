@@ -59,8 +59,18 @@ jobs:
           # deployment reports READY instead of failing on the first check.
           deployment=""
           for attempt in 1 2 3 4 5; do
-            inspection=$(vercel inspect "$DEPLOYMENT_URL" --json --scope=kilocode --token="$VERCEL_TOKEN" 2>&1)
-            deployment_id=$(jq -r '.id // empty' <<<"$inspection" 2>/dev/null)
+            inspection_error=$(mktemp)
+            if ! inspection=$(vercel inspect "$DEPLOYMENT_URL" --json --scope=kilocode --token="$VERCEL_TOKEN" 2>"$inspection_error"); then
+              echo "::warning::vercel inspect failed (attempt $attempt): $(<"$inspection_error")"
+              rm "$inspection_error"
+              if [ "$attempt" != "5" ]; then
+                sleep 5
+              fi
+              continue
+            fi
+            rm "$inspection_error"
+
+            deployment_id=$(jq -r '.id // empty' <<<"$inspection" 2>/dev/null || true)
             if [ -z "$deployment_id" ]; then
               echo "::warning::vercel inspect did not return a deployment id (attempt $attempt): $inspection"
               if [ "$attempt" != "5" ]; then

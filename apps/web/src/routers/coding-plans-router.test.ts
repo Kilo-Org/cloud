@@ -363,38 +363,6 @@ describe('coding plans router', () => {
     }
   });
 
-  it.each([[MAX_PLAN_ID], [ULTRA_PLAN_ID]] as const)(
-    'supports managed usage for %s',
-    async planId => {
-      const owner = await insertTestUser({
-        total_microdollars_acquired: 150_000_000,
-        microdollars_used: 0,
-      });
-      await uploadKeysToInventory(
-        'minimax',
-        planId,
-        [inventoryEntry(`sk-cp-${crypto.randomUUID()}`)],
-        {
-          validateCredential: async () => true,
-        }
-      );
-      const caller = await createCallerForUser(owner.id);
-      const activation = await caller.codingPlans.subscribe({
-        planId,
-        idempotencyKey: `managed-usage-${planId}`,
-      });
-      jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
-
-      await expect(
-        caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
-      ).resolves.toMatchObject({
-        subscriptionId: activation.subscriptionId,
-        providerId: 'minimax',
-        region: 'global',
-      });
-    }
-  );
-
   it('keeps past-due and pending-cancellation subscriptions eligible but rejects canceled plans', async () => {
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,

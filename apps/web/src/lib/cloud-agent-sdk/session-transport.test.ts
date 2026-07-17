@@ -1,4 +1,5 @@
-import { createCloudAgentSession, type CloudAgentSession } from './session';
+import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
+import type { CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
 import type { KiloSessionId } from './types';
 import type { UserWebSystemEvent } from './user-web-connection';
@@ -104,6 +105,7 @@ function createUserWebConnection() {
           : { ok: true }
       )
     ),
+    sendCommandToConnection: jest.fn(),
     onCliEvent: jest.fn(() => jest.fn()),
     onSystemEvent: jest.fn((listener: (event: UserWebSystemEvent) => void) => {
       systemListener = listener;
@@ -257,6 +259,18 @@ describe('session transport delegation (cloud agent)', () => {
       requestId: 'req-3',
       response: 'once',
     });
+
+    session.destroy();
+  });
+
+  it('session.createRemoteSession() rejects for cloud-agent sessions', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
+
+    await connectSession(session);
+    await expect(session.createRemoteSession()).rejects.toThrow(
+      REMOTE_SESSION_CREATION_NOT_SUPPORTED
+    );
 
     session.destroy();
   });

@@ -18,6 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogClose,
@@ -29,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { UserAvatarLink } from './UserAvatarLink';
 import { UserSearchInput } from './UserSearchInput';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 // Both procedures share the same server-side column projection
@@ -41,6 +43,12 @@ type ConfirmAction =
   | { type: 'grant'; user: PlatformAdminUser }
   | { type: 'revoke'; user: PlatformAdminUser };
 
+type PermissionValues = {
+  isSuperadmin: boolean;
+  canViewSessions: boolean;
+  canManageCredits: boolean;
+};
+
 function AccountStatusBadge({ user }: { user: PlatformAdminUser }) {
   if (user.blocked_reason) {
     return <Badge variant="destructive">Blocked</Badge>;
@@ -51,8 +59,11 @@ function AccountStatusBadge({ user }: { user: PlatformAdminUser }) {
 export function PlatformAdminsContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const permissions = useAdminPermissions();
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [permissionTarget, setPermissionTarget] = useState<PlatformAdminUser | null>(null);
+  const [permissionValues, setPermissionValues] = useState<PermissionValues | null>(null);
   // The dialog is controlled and has no DialogTrigger, so Radix has no trigger
   // ref to restore focus to on close and would leave focus on <body>. We track
   // the element that opened the dialog (the clicked Grant/Revoke button) and
@@ -69,6 +80,7 @@ export function PlatformAdminsContent() {
   const contentRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const redirectFocusToContainerRef = useRef(false);
+  const transitioningToConfirmRef = useRef(false);
 
   const trimmedSearchTerm = searchTerm.trim();
 
@@ -78,7 +90,7 @@ export function PlatformAdminsContent() {
     error: rosterError,
   } = useQuery(trpc.admin.users.listPlatformAdmins.queryOptions());
 
-  const canGrantAdmins = rosterData?.canGrantAdmins ?? false;
+  const canManageAdmins = permissions.isPermissionResolved && permissions.isSuperadmin;
 
   const {
     data: candidates,
@@ -87,7 +99,7 @@ export function PlatformAdminsContent() {
     error: searchError,
   } = useQuery({
     ...trpc.admin.users.searchPlatformAdminCandidates.queryOptions({ query: trimmedSearchTerm }),
-    enabled: canGrantAdmins && trimmedSearchTerm.length > 0,
+    enabled: canManageAdmins && trimmedSearchTerm.length > 0,
   });
 
   function invalidateAfterChange() {
@@ -96,6 +108,9 @@ export function PlatformAdminsContent() {
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.admin.users.searchPlatformAdminCandidates.queryKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.getPermissions.queryKey(),
     });
   }
 
@@ -129,6 +144,27 @@ export function PlatformAdminsContent() {
     })
   );
 
+  const setPermissionsMutation = useMutation(
+    trpc.admin.users.setAdminPermissions.mutationOptions({
+      onSuccess: (result, variables) => {
+        invalidateAfterChange();
+        setPermissionTarget(null);
+        setPermissionValues(null);
+        if (!result.changed) {
+          toast.message(`Permissions for ${result.user.google_user_email} are already up to date.`);
+          return;
+        }
+        toast.success(`Updated permissions for ${result.user.google_user_email}.`);
+        if (variables.userId === currentUserId) {
+          toast.message('Sign in again to use your updated permissions.');
+        }
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to update admin permissions');
+      },
+    })
+  );
+
   const pendingUserId =
     setAccessMutation.isPending && setAccessMutation.variables
       ? setAccessMutation.variables.userId
@@ -139,14 +175,54 @@ export function PlatformAdminsContent() {
 
   const candidateRows = useMemo(() => candidates ?? [], [candidates]);
 
-  function requestRevoke(user: PlatformAdminUser, event: React.MouseEvent<HTMLButtonElement>) {
-    openerRef.current = event.currentTarget;
-    setConfirmAction({ type: 'revoke', user });
-  }
-
   function requestGrant(user: PlatformAdminUser, event: React.MouseEvent<HTMLButtonElement>) {
     openerRef.current = event.currentTarget;
     setConfirmAction({ type: 'grant', user });
+  }
+
+  function requestPermissionManagement(
+    user: PlatformAdminUser,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) {
+    openerRef.current = event.currentTarget;
+    setPermissionTarget(user);
+    setPermissionValues({
+      isSuperadmin: user.is_super_admin,
+      canViewSessions: user.can_view_sessions,
+      canManageCredits: user.can_manage_credits,
+    });
+  }
+
+  function savePermissions() {
+    if (!permissionTarget || !permissionValues) return;
+
+    const permissions = {
+      ...(permissionValues.isSuperadmin !== permissionTarget.is_super_admin && {
+        isSuperadmin: permissionValues.isSuperadmin,
+      }),
+      ...(permissionValues.canViewSessions !== permissionTarget.can_view_sessions && {
+        canViewSessions: permissionValues.canViewSessions,
+      }),
+      ...(permissionValues.canManageCredits !== permissionTarget.can_manage_credits && {
+        canManageCredits: permissionValues.canManageCredits,
+      }),
+    };
+
+    if (Object.keys(permissions).length === 0) {
+      setPermissionTarget(null);
+      setPermissionValues(null);
+      return;
+    }
+
+    setPermissionsMutation.mutate({ userId: permissionTarget.id, permissions });
+  }
+
+  function requestRevokeFromPermissionDialog() {
+    if (!permissionTarget) return;
+    transitioningToConfirmRef.current = true;
+    setConfirmAction({ type: 'revoke', user: permissionTarget });
+    setPermissionTarget(null);
+    setPermissionValues(null);
   }
 
   function confirmPendingAction() {
@@ -163,8 +239,8 @@ export function PlatformAdminsContent() {
         <CardHeader>
           <CardTitle>Current admins</CardTitle>
           <CardDescription>
-            Everyone with platform admin access today. Revoking a credit manager also removes
-            credit-management permission.
+            Everyone with platform admin access and their subordinate permissions. Revoking platform
+            admin access clears every permission and signs the user out.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -179,14 +255,14 @@ export function PlatformAdminsContent() {
               No platform admins found.
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Hosted domain</TableHead>
                     <TableHead>Account status</TableHead>
-                    <TableHead>Credit management</TableHead>
+                    <TableHead>Permissions</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -197,31 +273,44 @@ export function PlatformAdminsContent() {
                         <UserAvatarLink user={admin} displayFormat="email-name" className="flex" />
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {admin.hosted_domain ?? '—'}
+                        {admin.hosted_domain ?? 'None'}
                       </TableCell>
                       <TableCell>
                         <AccountStatusBadge user={admin} />
                       </TableCell>
                       <TableCell>
-                        {admin.can_manage_credits ? (
-                          <Badge variant="secondary">Credit manager</Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">—</span>
-                        )}
+                        <div className="flex min-w-40 flex-wrap gap-1.5">
+                          {admin.is_super_admin && <Badge variant="secondary">Superadmin</Badge>}
+                          {admin.can_view_sessions && (
+                            <Badge variant="secondary">Session viewer</Badge>
+                          )}
+                          {admin.can_manage_credits && (
+                            <Badge variant="secondary">Credit manager</Badge>
+                          )}
+                          {!admin.is_super_admin &&
+                            !admin.can_view_sessions &&
+                            !admin.can_manage_credits && (
+                              <span className="text-muted-foreground text-sm">None</span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {admin.id === currentUserId ? (
-                          <span className="text-muted-foreground text-sm">You</span>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={pendingUserId === admin.id}
-                            onClick={event => requestRevoke(admin, event)}
-                          >
-                            Revoke
-                          </Button>
-                        )}
+                        <div className="flex min-h-11 items-center justify-end gap-2">
+                          {admin.id === currentUserId && (
+                            <span className="text-muted-foreground text-sm">You</span>
+                          )}
+                          {canManageAdmins && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-11"
+                              disabled={pendingUserId === admin.id}
+                              onClick={event => requestPermissionManagement(admin, event)}
+                            >
+                              Manage
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -236,16 +325,16 @@ export function PlatformAdminsContent() {
         <CardHeader>
           <CardTitle>Grant admin access</CardTitle>
           <CardDescription>
-            {isRosterLoading
+            {isRosterLoading || (!permissions.isPermissionResolved && !permissions.isError)
               ? 'Checking your permissions…'
-              : rosterError
+              : rosterError || permissions.isError
                 ? 'Could not determine your permissions. Reload to try again.'
-                : canGrantAdmins
-                  ? 'Search registered kilocode.ai users who are not already admins.'
-                  : 'Only a qualifying kilocode.ai admin can grant platform admin access. You can still revoke other admins from the roster above.'}
+                : canManageAdmins
+                  ? 'Search registered kilocode.ai users who are not already admins. New admins receive no subordinate permissions.'
+                  : 'Superadmin access is required to grant platform admin access or manage permissions.'}
           </CardDescription>
         </CardHeader>
-        {!isRosterLoading && !rosterError && canGrantAdmins && (
+        {!isRosterLoading && !rosterError && canManageAdmins && (
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="platform-admin-candidate-search">Search for a user to grant</Label>
@@ -301,7 +390,7 @@ export function PlatformAdminsContent() {
                           />
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {candidate.hosted_domain ?? '—'}
+                          {candidate.hosted_domain ?? 'None'}
                         </TableCell>
                         <TableCell>
                           <AccountStatusBadge user={candidate} />
@@ -309,6 +398,7 @@ export function PlatformAdminsContent() {
                         <TableCell className="text-right">
                           <Button
                             size="sm"
+                            className="h-11"
                             disabled={pendingUserId === candidate.id}
                             onClick={event => requestGrant(candidate, event)}
                           >
@@ -372,17 +462,15 @@ export function PlatformAdminsContent() {
                 <>
                   Are you sure you want to grant platform admin access to{' '}
                   <span className="font-medium">{confirmAction.user.google_user_email}</span>? This
-                  will not grant credit-management permission. Their current browser sessions will
-                  be signed out.
+                  grants no superadmin, session-viewer, or credit-manager permissions. Their current
+                  credentials will be rotated.
                 </>
               ) : confirmAction ? (
                 <>
                   Are you sure you want to revoke platform admin access from{' '}
                   <span className="font-medium">{confirmAction.user.google_user_email}</span>? Their
-                  current browser sessions will be signed out.
-                  {confirmAction.user.can_manage_credits && (
-                    <> Credit-management permission will also be removed.</>
-                  )}
+                  current credentials will be rotated. Every subordinate permission will also be
+                  removed.
                 </>
               ) : null}
             </DialogDescription>
@@ -391,7 +479,7 @@ export function PlatformAdminsContent() {
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" disabled={setAccessMutation.isPending}>
-                Cancel
+                Keep admin
               </Button>
             </DialogClose>
             <Button
@@ -402,8 +490,137 @@ export function PlatformAdminsContent() {
               {setAccessMutation.isPending
                 ? 'Saving...'
                 : confirmAction?.type === 'grant'
-                  ? 'Grant Access'
-                  : 'Revoke Access'}
+                  ? 'Grant admin access'
+                  : 'Revoke admin access'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={permissionTarget !== null}
+        onOpenChange={open => {
+          if (!open && !setPermissionsMutation.isPending) {
+            setPermissionTarget(null);
+            setPermissionValues(null);
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={!setPermissionsMutation.isPending}
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            if (transitioningToConfirmRef.current) {
+              transitioningToConfirmRef.current = false;
+              return;
+            }
+            openerRef.current?.focus();
+            openerRef.current = null;
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Manage admin permissions</DialogTitle>
+            <DialogDescription>{permissionTarget?.google_user_email}</DialogDescription>
+          </DialogHeader>
+
+          {permissionTarget && permissionValues && (
+            <div className="flex flex-col gap-5 py-2">
+              <div className="flex min-h-11 items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="permission-superadmin">Superadmin</Label>
+                  <p id="permission-superadmin-help" className="text-muted-foreground text-sm">
+                    Can manage platform admins and subordinate permissions.
+                  </p>
+                  {permissionTarget.id === currentUserId && (
+                    <p className="text-muted-foreground text-xs">
+                      Another superadmin must change this permission.
+                    </p>
+                  )}
+                </div>
+                <Label
+                  htmlFor="permission-superadmin"
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                >
+                  <Switch
+                    id="permission-superadmin"
+                    aria-describedby="permission-superadmin-help"
+                    checked={permissionValues.isSuperadmin}
+                    disabled={
+                      setPermissionsMutation.isPending || permissionTarget.id === currentUserId
+                    }
+                    onCheckedChange={isSuperadmin =>
+                      setPermissionValues(values => values && { ...values, isSuperadmin })
+                    }
+                  />
+                </Label>
+              </div>
+
+              <div className="flex min-h-11 items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="permission-session-viewer">Session viewer</Label>
+                  <p id="permission-session-viewer-help" className="text-muted-foreground text-sm">
+                    Can inspect customer Session Traces and raw conversation history.
+                  </p>
+                </div>
+                <Label
+                  htmlFor="permission-session-viewer"
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                >
+                  <Switch
+                    id="permission-session-viewer"
+                    aria-describedby="permission-session-viewer-help"
+                    checked={permissionValues.canViewSessions}
+                    disabled={setPermissionsMutation.isPending}
+                    onCheckedChange={canViewSessions =>
+                      setPermissionValues(values => values && { ...values, canViewSessions })
+                    }
+                  />
+                </Label>
+              </div>
+
+              <div className="flex min-h-11 items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="permission-credit-manager">Credit manager</Label>
+                  <p id="permission-credit-manager-help" className="text-muted-foreground text-sm">
+                    Can grant, nullify, and otherwise manage customer credits.
+                  </p>
+                </div>
+                <Label
+                  htmlFor="permission-credit-manager"
+                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center"
+                >
+                  <Switch
+                    id="permission-credit-manager"
+                    aria-describedby="permission-credit-manager-help"
+                    checked={permissionValues.canManageCredits}
+                    disabled={setPermissionsMutation.isPending}
+                    onCheckedChange={canManageCredits =>
+                      setPermissionValues(values => values && { ...values, canManageCredits })
+                    }
+                  />
+                </Label>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {permissionTarget && permissionTarget.id !== currentUserId && (
+              <Button
+                variant="destructive"
+                disabled={setPermissionsMutation.isPending}
+                className="h-11 sm:mr-auto"
+                onClick={requestRevokeFromPermissionDialog}
+              >
+                Revoke admin access
+              </Button>
+            )}
+            <DialogClose asChild>
+              <Button variant="outline" disabled={setPermissionsMutation.isPending}>
+                Keep editing
+              </Button>
+            </DialogClose>
+            <Button onClick={savePermissions} disabled={setPermissionsMutation.isPending}>
+              {setPermissionsMutation.isPending ? 'Saving...' : 'Save permissions'}
             </Button>
           </DialogFooter>
         </DialogContent>

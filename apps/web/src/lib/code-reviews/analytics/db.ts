@@ -8,6 +8,7 @@ import {
 import type {
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsComplexityLevel,
+  CodeReviewCouncilResult,
   CodeReviewFindingCategory,
   CodeReviewFindingSecurityClass,
 } from '@kilocode/db/schema-types';
@@ -39,6 +40,10 @@ export async function finalizeCompletedCodeReviewWithAnalytics(input: {
   executionId?: string;
   completedAt: Date;
   capture: CodeReviewAnalyticsManifestParseResult;
+  // Council runs only: the captured council outcome, persisted ATOMICALLY with the parent
+  // completion so a completed council review can never be left without a result (redelivery
+  // would otherwise short-circuit on the already-terminal parent).
+  councilResult?: CodeReviewCouncilResult | null;
 }): Promise<FinalizeCompletedCodeReviewAnalyticsResult> {
   return db.transaction(async tx => {
     const [review] = await tx
@@ -192,6 +197,9 @@ export async function finalizeCompletedCodeReviewWithAnalytics(input: {
           session_id: review.session_id ?? input.sessionId ?? null,
           cli_session_id: review.cli_session_id ?? input.cliSessionId ?? null,
           completed_at: review.completed_at ?? completedAt,
+          // Persist council_result in the SAME transaction that claims completion (council
+          // runs only; undefined for standard runs leaves the column untouched).
+          ...(input.councilResult ? { council_result: input.councilResult } : {}),
           updated_at: new Date().toISOString(),
         })
         .where(

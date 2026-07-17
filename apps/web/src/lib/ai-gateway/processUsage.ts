@@ -93,6 +93,7 @@ import {
   getAiGatewayCostInsightProductKey,
 } from '@/lib/cost-insights/canonical-sources';
 import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
+import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 
 const posthogClient = PostHogClient();
 
@@ -443,11 +444,29 @@ type UsageTransactionResult = {
   inserted: UsageStatementResult;
 };
 
+export const USAGE_TRANSACTION_IDLE_TIMEOUT_MS = 60_000;
+
+export function usageTransactionIdleTimeoutQuery(): SQL {
+  return sql`
+    SELECT pg_catalog.set_config(
+      'idle_in_transaction_session_timeout',
+      ${`${USAGE_TRANSACTION_IDLE_TIMEOUT_MS}ms`},
+      true
+    )
+  `;
+}
+
+export async function setUsageTransactionIdleTimeout(tx: UsageStatementExecutor): Promise<void> {
+  // This only bounds idle time between statements while the transaction is open.
+  await tx.execute(usageTransactionIdleTimeoutQuery());
+}
+
 async function insertUsageTransaction(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
+    await setUsageTransactionIdleTimeout(tx);
     if (coreUsageFields.cost > 0) {
       const owner = coreUsageFields.organization_id
         ? { type: 'organization' as const, id: coreUsageFields.organization_id }
@@ -463,6 +482,14 @@ async function insertUsageTransaction(
       coreUsageFields,
       metadataFields
     );
+    if (coreUsageFields.cost !== 0) {
+      await enqueueDailyUsageRollupRepair(tx, {
+        usageId: coreUsageFields.id,
+        kiloUserId: coreUsageFields.kilo_user_id,
+        organizationId: coreUsageFields.organization_id,
+        createdAt: coreUsageFields.created_at,
+      });
+    }
     if (coreUsageFields.cost > 0) {
       const owner = coreUsageFields.organization_id
         ? { type: 'organization' as const, id: coreUsageFields.organization_id }
@@ -715,15 +742,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
 ): Promise<UsageStatementResult> {
-  // Pick the matching partial unique index for the daily-rollup upsert. The
-  // microdollar_usage_daily table has two partial unique indexes; the upsert
-  // must target the one corresponding to this row's scope.
-  const dailyConflictTarget =
-    coreUsageFields.organization_id === null
-      ? sql`(kilo_user_id, usage_date) WHERE organization_id IS NULL`
-      : sql`(kilo_user_id, organization_id, usage_date) WHERE organization_id IS NOT NULL`;
-
-  // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip
+  // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip.
+  // The contended daily rollup is deliberately maintained after this transaction commits.
   // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
   const result = await executor.execute<{
     usage_id: string;
@@ -850,22 +870,6 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
               (SELECT auto_model_id FROM auto_model_cte)
-          )
-          , microdollar_usage_daily_upsert AS (
-            INSERT INTO microdollar_usage_daily (
-              kilo_user_id, organization_id, usage_date, total_cost_microdollars
-            )
-            SELECT
-              ${coreUsageFields.kilo_user_id},
-              ${coreUsageFields.organization_id}::uuid,
-              date_trunc('day', ${coreUsageFields.created_at}::timestamptz)::date,
-              ${coreUsageFields.cost}::bigint
-            WHERE ${coreUsageFields.cost} <> 0
-            ON CONFLICT ${dailyConflictTarget}
-            DO UPDATE SET
-              total_cost_microdollars =
-                microdollar_usage_daily.total_cost_microdollars + EXCLUDED.total_cost_microdollars,
-              updated_at = NOW()
           )
           , balance_update AS (
             UPDATE kilocode_users

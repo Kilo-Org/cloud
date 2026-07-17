@@ -8,6 +8,7 @@ import type {
   ReviewAgentSelection,
   ReviewAgentsConfig,
 } from '@kilocode/worker-utils/review-agents';
+import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
 import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
@@ -51,6 +52,8 @@ export interface SessionInput {
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  /** Council runs only: inline sub-agents (one per specialist), forwarded to cloud-agent-next. */
+  runtimeAgents?: RuntimeAgentInput[];
 }
 
 export interface CodeReview {

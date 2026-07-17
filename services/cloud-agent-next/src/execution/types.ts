@@ -317,6 +317,12 @@ type DeliveryRequestBase = {
   agent: AgentSelection;
   finalization?: TurnFinalization;
   workspace: WorkspaceDeliveryPlan;
+  /**
+   * Identity of the preparation attempt for this delivery. The DO allocates
+   * it so that its own early progress (sandbox provisioning, disk checks) and
+   * the wrapper's bootstrap steps land on one shared attempt.
+   */
+  preparation?: { attemptId: string };
 };
 
 /** Durable queued message handed to AgentRuntime before runtime identity allocation. */

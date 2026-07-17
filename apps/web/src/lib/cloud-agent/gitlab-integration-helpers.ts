@@ -59,7 +59,8 @@ type GitLabMetadata = {
  * Automatically refreshes the token if expired
  */
 export async function getGitLabTokenForOrganization(
-  organizationId: string
+  organizationId: string,
+  actorUserId: string
 ): Promise<string | undefined> {
   const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
 
@@ -68,7 +69,10 @@ export async function getGitLabTokenForOrganization(
   }
 
   try {
-    const token = await getValidGitLabToken(integration);
+    const token = await getValidGitLabToken(integration, {
+      userId: actorUserId,
+      organizationId,
+    });
     return token;
   } catch (_error) {
     throw new TRPCError({
@@ -90,7 +94,7 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
   }
 
   try {
-    const token = await getValidGitLabToken(integration);
+    const token = await getValidGitLabToken(integration, { userId });
     return token;
   } catch (_error) {
     throw new TRPCError({
@@ -106,6 +110,7 @@ export async function getGitLabTokenForUser(userId: string): Promise<string | un
  */
 export async function fetchGitLabRepositoriesForOrganization(
   organizationId: string,
+  actorUserId: string,
   forceRefresh: boolean = false
 ): Promise<GitLabRepositoriesResult> {
   const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
@@ -121,7 +126,10 @@ export async function fetchGitLabRepositoriesForOrganization(
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitLab and update cache
     if (forceRefresh || !cachedRepositories?.length) {
-      const accessToken = await getValidGitLabToken(integration);
+      const accessToken = await getValidGitLabToken(integration, {
+        userId: actorUserId,
+        organizationId,
+      });
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
@@ -168,7 +176,7 @@ export async function fetchGitLabRepositoriesForUser(
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitLab and update cache
     if (forceRefresh || !cachedRepositories?.length) {
-      const accessToken = await getValidGitLabToken(integration);
+      const accessToken = await getValidGitLabToken(integration, { userId });
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
@@ -228,10 +236,11 @@ export async function validateGitLabRepoAccessForUser(
  */
 export async function validateGitLabRepoAccessForOrganization(
   organizationId: string,
+  actorUserId: string,
   projectPath: string
 ): Promise<boolean> {
   try {
-    const result = await fetchGitLabRepositoriesForOrganization(organizationId, false);
+    const result = await fetchGitLabRepositoriesForOrganization(organizationId, actorUserId, false);
 
     if (!result.integrationInstalled || !result.repositories.length) {
       return false;

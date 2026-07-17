@@ -13,7 +13,12 @@ import type { User } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
 
-// Claude rejects these constraints at the provider boundary; the source Zod schema still validates output locally.
+// These JSON Schema keywords are stripped from the wire schema because Claude rejects
+// them at the provider boundary. IMPORTANT: the model therefore never receives these
+// constraints, so callers must NOT enforce them in the schema used to validate output
+// (e.g. Zod .min()/.max()). Doing so rejects complete, valid responses with
+// "No object generated: response did not match schema". Apply length limits in the
+// caller's `validate` callback instead (see review-md-integration.ts).
 const UNSUPPORTED_WIRE_SCHEMA_KEYWORDS = new Set([
   'minimum',
   'maximum',
@@ -87,7 +92,9 @@ export function createReviewMemoryGatewayProvider(input: {
 }) {
   const headers: Record<string, string> = {
     'User-Agent': input.userAgent,
-    [FEATURE_HEADER]: 'code-review-memory',
+    // Must be a value in FEATURE_VALUES or the gateway stores NULL (unattributed usage).
+    // 'code-review-memory' is not in the allow-list; reuse the 'code-review' feature.
+    [FEATURE_HEADER]: 'code-review',
   };
   if (input.owner.type === 'org') {
     headers['X-KiloCode-OrganizationId'] = input.owner.id;

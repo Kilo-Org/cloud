@@ -41,6 +41,19 @@ describe('generateReviewPrompt', () => {
     expect(result.prompt).not.toContain('glab api');
   });
 
+  it('includes the sub-agent sharding policy by default but omits it when requested (council)', async () => {
+    const standard = await generateReviewPrompt(baseConfig, 'owner/repo', 42);
+    expect(standard.prompt).toContain('SUB-AGENT USAGE');
+
+    const council = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      omitSubAgentGuidance: true,
+    });
+    expect(council.prompt).not.toContain('SUB-AGENT USAGE');
+    // The rest of the base prompt (diff context, publication instructions) is preserved.
+    expect(council.prompt).toContain('gh pr diff 42');
+    expect(council.prompt).toContain('gh api repos/owner/repo/pulls/42/reviews');
+  });
+
   it('always uses the checked-in GitLab template version and commands', async () => {
     const result = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       platform: 'gitlab',

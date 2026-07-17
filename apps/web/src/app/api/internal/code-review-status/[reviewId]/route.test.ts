@@ -146,7 +146,9 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: jest.fn<() => Promise<string>>().mockResolvedValue('mock-token'),
-  getStoredProjectAccessToken: jest.fn<() => null>().mockReturnValue(null),
+  getValidGitLabProjectAccessToken: jest
+    .fn<() => Promise<string>>()
+    .mockResolvedValue('mock-token'),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -252,6 +254,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     manual_config: null,
     review_type: 'standard',
     trigger_source: null,
+    council_result: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,

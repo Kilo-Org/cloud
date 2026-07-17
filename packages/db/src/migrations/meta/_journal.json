@@ -1303,6 +1303,34 @@
       "when": 1784129617576,
       "tag": "0185_lowly_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 186,
+      "version": "7",
+      "when": 1784154394674,
+      "tag": "0186_council_result",
+      "breakpoints": true
+    },
+    {
+      "idx": 187,
+      "version": "7",
+      "when": 1784211445901,
+      "tag": "0187_modern_colonel_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1784213741489,
+      "tag": "0188_unusual_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1784224821060,
+      "tag": "0189_elite_patriot",
+      "breakpoints": true
     }
   ]
 }

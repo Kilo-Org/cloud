@@ -1,5 +1,6 @@
 import { signKiloToken } from '@kilocode/worker-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as GitLabCredentialBrokerHandlerModule from './gitlab-credential-broker-handler.js';
 import type * as GitLabLookupServiceModule from './gitlab-lookup-service.js';
 
 const serviceMocks = vi.hoisted(() => ({
@@ -14,8 +15,11 @@ const serviceMocks = vi.hoisted(() => ({
   findGitLabIntegration: vi.fn(),
   findAuthorizedGitLabIntegrations: vi.fn(),
   getGitLabToken: vi.fn(),
+  resolveGitLabCredential: vi.fn(),
+  hasGitLabProjectCredentialCandidates: vi.fn(),
   listBitbucketRepositories: vi.fn(),
   resolveBitbucketToken: vi.fn(),
+  runGitLabCredentialAudit: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -68,14 +72,100 @@ vi.mock('./gitlab-token-service.js', () => ({
   },
 }));
 
+vi.mock('./gitlab-credential-broker-handler.js', async importOriginal => {
+  const actual = await importOriginal<typeof GitLabCredentialBrokerHandlerModule>();
+  return {
+    ...actual,
+    createGitLabCredentialBroker: () => ({
+      resolveCredential: serviceMocks.resolveGitLabCredential,
+      hasProjectCredentialCandidates: serviceMocks.hasGitLabProjectCredentialCandidates,
+    }),
+    handleGitLabCredentialBrokerRequest: async (
+      _env: CloudflareEnv,
+      actor: { userId: string; orgId?: string },
+      selector: { credential: 'integration' | 'project-exact'; integrationId: string }
+    ) => {
+      const result = await serviceMocks.resolveGitLabCredential(actor, selector);
+      if (result.status !== 'available') return result;
+      return {
+        status: 'available',
+        token: result.token,
+        instanceUrl: result.instanceUrl,
+        glabIsOAuth2: result.glabIsOAuth2,
+      };
+    },
+  };
+});
+
 vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
   listBitbucketRepositories: serviceMocks.listBitbucketRepositories,
   resolveBitbucketToken: serviceMocks.resolveBitbucketToken,
 }));
 
-import type { AuthorizedGitLabIntegration } from './gitlab-lookup-service.js';
-import { resolveGitLabRuntimeToken } from './gitlab-runtime-token-resolver.js';
+vi.mock('./gitlab-credential-audit-handler.js', () => ({
+  runGitLabCredentialAudit: serviceMocks.runGitLabCredentialAudit,
+}));
+
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
+
+beforeEach(() => {
+  serviceMocks.hasGitLabProjectCredentialCandidates.mockReset().mockResolvedValue(false);
+  serviceMocks.resolveGitLabCredential.mockReset().mockImplementation(async (actor, selector) => {
+    const latestIntegrationLookup = serviceMocks.findGitLabIntegration.mock.results.at(-1)?.value;
+    const latestAuthorizedLookup =
+      serviceMocks.findAuthorizedGitLabIntegrations.mock.results.at(-1)?.value;
+    let integration = latestIntegrationLookup ? await latestIntegrationLookup : undefined;
+    if (!integration?.success && latestAuthorizedLookup) {
+      const authorized = await latestAuthorizedLookup;
+      integration = authorized.success
+        ? authorized.integrations.find(
+            (candidate: { integrationId: string }) =>
+              candidate.integrationId === selector.integrationId
+          )
+        : undefined;
+    }
+    if (!integration?.success && !integration?.integrationId) {
+      integration = await serviceMocks.findGitLabIntegration(actor, selector.integrationId);
+    }
+    if (!integration?.success && !integration?.integrationId) {
+      return { status: 'not_connected' };
+    }
+    const metadata = integration.metadata ?? {};
+    const instanceUrl = metadata.gitlab_instance_url ?? 'https://gitlab.com';
+    if (selector.credential === 'project-exact') {
+      const token = metadata.project_tokens?.[selector.projectId]?.token;
+      return token
+        ? {
+            status: 'available',
+            token,
+            instanceUrl,
+            glabIsOAuth2: false,
+            integrationId: integration.integrationId,
+            source: { type: 'project', projectId: selector.projectId },
+          }
+        : { status: 'reconnect_required' };
+    }
+    const token = await serviceMocks.getGitLabToken(selector.integrationId, metadata, actor);
+    if (!token.success) {
+      return {
+        status:
+          token.reason === 'token_refresh_failed'
+            ? 'temporarily_unavailable'
+            : 'reconnect_required',
+      };
+    }
+    return {
+      status: 'available',
+      token: token.token,
+      instanceUrl: token.instanceUrl,
+      glabIsOAuth2:
+        integration.integrationType === 'oauth' ||
+        (integration.integrationType !== 'pat' && metadata.auth_type === 'oauth'),
+      integrationId: integration.integrationId,
+      source: { type: 'integration' },
+    };
+  });
+});
 
 describe('Bitbucket repository-list HTTP authorization', () => {
   const jwtSecret = 'test-secret-that-is-at-least-32-characters';
@@ -158,35 +248,222 @@ describe('Bitbucket repository-list HTTP authorization', () => {
   });
 });
 
-const integration: AuthorizedGitLabIntegration = {
-  integrationId: '123e4567-e89b-12d3-a456-426614174011',
-  integrationType: 'oauth',
-  accountId: '42',
-  accountLogin: 'octocat',
-  metadata: {
-    access_token: 'human-integration-token',
-    gitlab_instance_url: 'https://gitlab.example.com/gitlab',
-    project_tokens: { '42': { token: 'project-bot-token' } },
-  },
-};
+describe('GitLab credential broker HTTP authorization', () => {
+  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
+  const integrationId = '123e4567-e89b-12d3-a456-426614174012';
 
-function createDependencies(options: { integrations?: AuthorizedGitLabIntegration[] } = {}) {
-  const lookupService = {
-    findGitLabIntegration: vi.fn().mockResolvedValue({ success: true, ...integration }),
-    findAuthorizedGitLabIntegrations: vi.fn().mockResolvedValue({
+  beforeEach(() => {
+    serviceMocks.findGitLabIntegration.mockReset().mockResolvedValue({
       success: true,
-      integrations: options.integrations ?? [integration],
-    }),
-  };
-  const tokenService = {
-    getToken: vi.fn().mockResolvedValue({
+      integrationId,
+      integrationType: 'pat',
+      accountId: '42',
+      accountLogin: 'octocat',
+      metadata: {
+        access_token: 'legacy-gitlab-token',
+        auth_type: 'pat',
+        gitlab_instance_url: 'https://gitlab.example.com',
+      },
+    });
+    serviceMocks.getGitLabToken.mockReset().mockResolvedValue({
       success: true,
-      token: 'human-integration-token',
-      instanceUrl: 'https://gitlab.example.com/gitlab',
-    }),
-  };
-  return { lookupService, tokenService };
-}
+      token: 'legacy-gitlab-token',
+      instanceUrl: 'https://gitlab.example.com',
+    });
+  });
+
+  it('derives the actor from a purpose-bound JWT and disables response caching', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      audience: 'git-token-service:gitlab-credentials',
+    });
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/gitlab/credentials', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential: 'integration', integrationId }),
+      }),
+      {
+        NEXTAUTH_SECRET: jwtSecret,
+      } as unknown as CloudflareEnv
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      status: 'available',
+      token: 'legacy-gitlab-token',
+      instanceUrl: 'https://gitlab.example.com',
+      glabIsOAuth2: false,
+    });
+    expect(serviceMocks.findGitLabIntegration).toHaveBeenCalledWith(
+      { userId: 'user-1' },
+      integrationId
+    );
+  });
+
+  it('rejects a token without the GitLab broker audience', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+    });
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/gitlab/credentials', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential: 'integration', integrationId }),
+      }),
+      {
+        NEXTAUTH_SECRET: jwtSecret,
+      } as unknown as CloudflareEnv
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitLab credential audit HTTP authorization', () => {
+  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
+  const path = 'https://git-token-service.test/internal/gitlab/credential-audit';
+
+  beforeEach(() => {
+    serviceMocks.runGitLabCredentialAudit.mockReset().mockResolvedValue({
+      authorized: true,
+      result: {
+        activeKey: { keyId: 'active', publicKeySha256: 'a'.repeat(64) },
+        counts: {
+          credentials: 1,
+          secrets: 1,
+          passedCredentials: 1,
+          profileFailures: 0,
+          configurationFailures: 0,
+          parseFailures: 0,
+          unknownKeyFailures: 0,
+          decryptOrAadFailures: 0,
+        },
+        failingCredentials: {
+          profile: [],
+          configuration: [],
+          parse: [],
+          unknownKey: [],
+          decryptOrAad: [],
+        },
+        nextCursor: null,
+      },
+    });
+  });
+
+  async function authorization(audience?: string) {
+    return signKiloToken({
+      userId: 'admin-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      ...(audience ? { audience } : {}),
+    });
+  }
+
+  it('requires its dedicated audience and returns only the no-store audit result', async () => {
+    const { token } = await authorization('git-token-service:gitlab-credential-audit');
+    const response = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ limit: 10 }),
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const result = await response.json();
+    expect(result).toEqual(expect.objectContaining({ nextCursor: null }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        activeKey: { keyId: 'active', publicKeySha256: 'a'.repeat(64) },
+      })
+    );
+    expect(JSON.stringify(result)).not.toMatch(/plaintext|ciphertext|token_encrypted/i);
+    expect(serviceMocks.runGitLabCredentialAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      'admin-1',
+      { limit: 10 }
+    );
+  });
+
+  it('rejects a token without the audit audience before the admin lookup', async () => {
+    const { token } = await authorization();
+    const response = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.runGitLabCredentialAudit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-admin after the database-backed authorization check', async () => {
+    serviceMocks.runGitLabCredentialAudit.mockResolvedValue({ authorized: false });
+    const { token } = await authorization('git-token-service:gitlab-credential-audit');
+    const response = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ error: 'forbidden' });
+  });
+
+  it('rejects unknown or oversized request fields before database access', async () => {
+    const { token } = await authorization('git-token-service:gitlab-credential-audit');
+    const response = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ limit: 101, unknown: true }),
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(serviceMocks.runGitLabCredentialAudit).not.toHaveBeenCalled();
+  });
+});
 
 function createService(): GitTokenRPCEntrypoint {
   return new GitTokenRPCEntrypoint(
@@ -242,288 +519,6 @@ describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-});
-
-describe('resolveGitLabRuntimeToken', () => {
-  it('preserves ordinary integration token behavior and OAuth CLI mode', async () => {
-    const dependencies = createDependencies();
-
-    await expect(resolveGitLabRuntimeToken({ userId: 'user_123' }, dependencies)).resolves.toEqual({
-      success: true,
-      token: 'human-integration-token',
-      instanceUrl: 'https://gitlab.example.com/gitlab',
-      integrationId: integration.integrationId,
-      source: { type: 'integration' },
-      glabIsOAuth2: true,
-    });
-    expect(dependencies.lookupService.findGitLabIntegration).toHaveBeenCalledWith({
-      userId: 'user_123',
-    });
-    expect(dependencies.lookupService.findAuthorizedGitLabIntegrations).not.toHaveBeenCalled();
-    expect(dependencies.tokenService.getToken).toHaveBeenCalledOnce();
-  });
-
-  it('returns the stored project token for an exact review-origin repository match', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 42 }));
-    vi.stubGlobal('fetch', fetchMock);
-    const dependencies = createDependencies();
-
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-          createdOnPlatform: 'code-review',
-        },
-        dependencies
-      )
-    ).resolves.toEqual({
-      success: true,
-      token: 'project-bot-token',
-      instanceUrl: 'https://gitlab.example.com/gitlab',
-      integrationId: integration.integrationId,
-      source: {
-        type: 'project',
-        projectId: 42,
-        tokenDigest: '3f4dff81e5f3e75d64343bfe237db23397715d8fbccbb1e035fb20a6d15f4603',
-      },
-      glabIsOAuth2: false,
-    });
-    expect(dependencies.tokenService.getToken).toHaveBeenCalledWith(
-      integration.integrationId,
-      integration.metadata
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://gitlab.example.com/gitlab/api/v4/projects/team%2Frepo',
-      { headers: { Authorization: 'Bearer human-integration-token' } }
-    );
-  });
-
-  it('fails closed when review-origin repository context is missing or malformed', async () => {
-    const dependencies = createDependencies();
-
-    await expect(
-      resolveGitLabRuntimeToken(
-        { userId: 'user_123', createdOnPlatform: 'code-review' },
-        dependencies
-      )
-    ).resolves.toEqual({ success: false, reason: 'repository_url_required' });
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'not-a-url',
-          createdOnPlatform: 'code-review',
-        },
-        dependencies
-      )
-    ).resolves.toEqual({ success: false, reason: 'invalid_repository_url' });
-    expect(dependencies.lookupService.findAuthorizedGitLabIntegrations).not.toHaveBeenCalled();
-    expect(dependencies.tokenService.getToken).not.toHaveBeenCalled();
-  });
-
-  it('fails closed for unmatched authorized instance candidates', async () => {
-    const unmatched = createDependencies({
-      integrations: [
-        {
-          ...integration,
-          metadata: { ...integration.metadata, gitlab_instance_url: 'https://other.example.com' },
-        },
-      ],
-    });
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-          createdOnPlatform: 'code-review',
-        },
-        unmatched
-      )
-    ).resolves.toEqual({ success: false, reason: 'no_matching_integration' });
-    expect(unmatched.tokenService.getToken).not.toHaveBeenCalled();
-  });
-
-  it('returns the unique project token when multiple integrations match but only one owns the project', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })));
-    vi.stubGlobal('fetch', fetchMock);
-    const integrationWithoutProjectToken: AuthorizedGitLabIntegration = {
-      ...integration,
-      integrationId: 'another-integration',
-      metadata: {
-        ...integration.metadata,
-        project_tokens: { '99': { token: 'other-project-token' } },
-      },
-    };
-    const dependencies = createDependencies({
-      integrations: [integrationWithoutProjectToken, integration],
-    });
-
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-          createdOnPlatform: 'code-review',
-        },
-        dependencies
-      )
-    ).resolves.toEqual({
-      success: true,
-      token: 'project-bot-token',
-      instanceUrl: 'https://gitlab.example.com/gitlab',
-      integrationId: integration.integrationId,
-      source: {
-        type: 'project',
-        projectId: 42,
-        tokenDigest: '3f4dff81e5f3e75d64343bfe237db23397715d8fbccbb1e035fb20a6d15f4603',
-      },
-      glabIsOAuth2: false,
-    });
-    expect(dependencies.tokenService.getToken).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('uses a matched project token when another matching integration token fails', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })))
-    );
-    const failingIntegration: AuthorizedGitLabIntegration = {
-      ...integration,
-      integrationId: 'failing-integration',
-      metadata: {
-        ...integration.metadata,
-        project_tokens: { '42': { token: 'failing-project-token' } },
-      },
-    };
-    const dependencies = createDependencies({
-      integrations: [failingIntegration, integration],
-    });
-    dependencies.tokenService.getToken.mockImplementation(integrationId =>
-      integrationId === failingIntegration.integrationId
-        ? Promise.resolve({ success: false, reason: 'token_expired_no_refresh' })
-        : Promise.resolve({
-            success: true,
-            token: 'human-integration-token',
-            instanceUrl: 'https://gitlab.example.com/gitlab',
-          })
-    );
-
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-          createdOnPlatform: 'code-review',
-        },
-        dependencies
-      )
-    ).resolves.toEqual({
-      success: true,
-      token: 'project-bot-token',
-      instanceUrl: 'https://gitlab.example.com/gitlab',
-      integrationId: integration.integrationId,
-      source: {
-        type: 'project',
-        projectId: 42,
-        tokenDigest: '3f4dff81e5f3e75d64343bfe237db23397715d8fbccbb1e035fb20a6d15f4603',
-      },
-      glabIsOAuth2: false,
-    });
-  });
-
-  it('skips project lookup for matching integrations without stored project tokens', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })));
-    vi.stubGlobal('fetch', fetchMock);
-    const integrationWithoutProjectTokens: AuthorizedGitLabIntegration = {
-      ...integration,
-      integrationId: 'another-integration',
-      metadata: {
-        access_token: integration.metadata.access_token,
-        gitlab_instance_url: integration.metadata.gitlab_instance_url,
-      },
-    };
-    const dependencies = createDependencies({
-      integrations: [integrationWithoutProjectTokens, integration],
-    });
-
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-          createdOnPlatform: 'code-review',
-        },
-        dependencies
-      )
-    ).resolves.toEqual({
-      success: true,
-      token: 'project-bot-token',
-      instanceUrl: 'https://gitlab.example.com/gitlab',
-      integrationId: integration.integrationId,
-      source: {
-        type: 'project',
-        projectId: 42,
-        tokenDigest: '3f4dff81e5f3e75d64343bfe237db23397715d8fbccbb1e035fb20a6d15f4603',
-      },
-      glabIsOAuth2: false,
-    });
-    expect(dependencies.tokenService.getToken).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledOnce();
-  });
-
-  it('fails closed when multiple matching integrations own the resolved project token', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(() => Promise.resolve(Response.json({ id: 42 })))
-    );
-    const ambiguous = createDependencies({
-      integrations: [
-        integration,
-        {
-          ...integration,
-          integrationId: 'another-integration',
-          metadata: {
-            ...integration.metadata,
-            project_tokens: { '42': { token: 'duplicate-project-bot-token' } },
-          },
-        },
-      ],
-    });
-    await expect(
-      resolveGitLabRuntimeToken(
-        {
-          userId: 'user_123',
-          repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-          createdOnPlatform: 'code-review',
-        },
-        ambiguous
-      )
-    ).resolves.toEqual({ success: false, reason: 'ambiguous_integration' });
-    expect(ambiguous.tokenService.getToken).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not fall back to the integration token when project resolution or storage fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ id: 99 })));
-    const dependencies = createDependencies();
-    const reviewContext = {
-      userId: 'user_123',
-      repositoryUrl: 'https://gitlab.example.com/gitlab/team/repo.git',
-      createdOnPlatform: 'code-review',
-    };
-
-    await expect(resolveGitLabRuntimeToken(reviewContext, dependencies)).resolves.toEqual({
-      success: false,
-      reason: 'no_project_token',
-    });
-
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
-    await expect(resolveGitLabRuntimeToken(reviewContext, dependencies)).resolves.toEqual({
-      success: false,
-      reason: 'project_lookup_failed',
-    });
-  });
 });
 
 describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
@@ -1631,6 +1626,71 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
   });
 
+  it('keeps OAuth capabilities valid across refresh and rejects credential replacement', async () => {
+    const getCredential = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 'available',
+        token: 'issued-encrypted-token',
+        instanceUrl: 'https://gitlab.com',
+        integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+        glabIsOAuth2: true,
+        credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145d',
+        credentialVersion: 4,
+        source: { type: 'integration' },
+      })
+      .mockResolvedValueOnce({
+        status: 'available',
+        token: 'refreshed-same-generation-token',
+        instanceUrl: 'https://gitlab.com',
+        integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+        glabIsOAuth2: true,
+        credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145d',
+        credentialVersion: 3,
+        source: { type: 'integration' },
+      })
+      .mockResolvedValueOnce({
+        status: 'available',
+        token: 'rotated-encrypted-token',
+        instanceUrl: 'https://gitlab.com',
+        integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+        glabIsOAuth2: true,
+        credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145e',
+        credentialVersion: 1,
+        source: { type: 'integration' },
+      });
+    const service = createService();
+    Object.assign(service, {
+      gitlabCredentialResolver: {
+        resolveCredential: getCredential,
+        hasProjectCredentialCandidates: vi.fn().mockResolvedValue(false),
+      },
+    });
+    const issued = await service.issueGitLabSessionCapability({
+      gitUrl: 'https://gitlab.com/acme/widgets.git',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    const redemption = {
+      capability: issued.capability,
+      outboundContainerId,
+      requestMethod: 'GET',
+      requestUrl: 'https://gitlab.com/api/v4/projects/acme%2Fwidgets/issues',
+    };
+    await expect(service.redeemGitLabSessionCapability(redemption)).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer refreshed-same-generation-token' },
+    });
+    await expect(
+      service.redeemGitLabSessionCapability({
+        ...redemption,
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
+  });
+
   it('temporarily issues and redeems a legacy unbound GitLab capability for an old caller', async () => {
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({
@@ -1720,7 +1780,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
         },
       ],
     });
-    serviceMocks.findGitLabIntegration.mockResolvedValueOnce({
+    serviceMocks.findGitLabIntegration.mockResolvedValue({
       success: true,
       integrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
       integrationType: 'oauth',
@@ -1848,7 +1908,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       success: true,
       integrations: [projectIntegration],
     });
-    serviceMocks.findGitLabIntegration.mockResolvedValueOnce(projectIntegration);
+    serviceMocks.findGitLabIntegration.mockResolvedValue(projectIntegration);
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',

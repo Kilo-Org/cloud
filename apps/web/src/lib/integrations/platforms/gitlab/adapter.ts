@@ -404,60 +404,6 @@ export async function exchangeGitLabOAuthCode(
 }
 
 /**
- * Refreshes an expired OAuth access token using the refresh token
- *
- * @param refreshToken - The refresh token
- * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
- * @param customCredentials - Optional custom OAuth credentials for self-hosted instances
- */
-export async function refreshGitLabOAuthToken(
-  refreshToken: string,
-  instanceUrl: string = DEFAULT_GITLAB_URL,
-  customCredentials?: GitLabOAuthCredentials
-): Promise<GitLabOAuthTokens> {
-  const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
-  if (!isDefaultGitLabInstanceUrl(normalizedInstanceUrl) && !customCredentials) {
-    throw new Error('Custom GitLab OAuth credentials are required for self-hosted instances');
-  }
-
-  const clientId = customCredentials?.clientId || GITLAB_CLIENT_ID;
-  const clientSecret = customCredentials?.clientSecret || GITLAB_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error('GitLab OAuth credentials not configured');
-  }
-
-  const response = await fetchGitLab(buildGitLabUrl(normalizedInstanceUrl, '/oauth/token'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab OAuth token refresh failed:', { status: response.status, error });
-    throw new Error(`GitLab OAuth token refresh failed: ${response.status}`);
-  }
-
-  const tokens = (await response.json()) as GitLabOAuthTokens;
-
-  logExceptInTest('GitLab OAuth tokens refreshed', {
-    hasAccessToken: !!tokens.access_token,
-    hasRefreshToken: !!tokens.refresh_token,
-    expiresIn: tokens.expires_in,
-  });
-
-  return tokens;
-}
-
-/**
  * Fetches the authenticated GitLab user's information
  *
  * @param accessToken - OAuth access token
@@ -646,21 +592,6 @@ export async function fetchGitLabRootTextFileAtRef(
 export function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
   const expiresAtMs = (createdAt + expiresIn) * 1000;
   return new Date(expiresAtMs).toISOString();
-}
-
-/**
- * Checks if a token is expired or about to expire (within 5 minutes)
- *
- * @param expiresAt - ISO timestamp of token expiration
- */
-export function isTokenExpired(expiresAt: string | null): boolean {
-  if (!expiresAt) return true;
-
-  const expiryTime = new Date(expiresAt).getTime();
-  const now = Date.now();
-  const bufferMs = 5 * 60 * 1000; // 5 minutes buffer
-
-  return now >= expiryTime - bufferMs;
 }
 
 // ============================================================================

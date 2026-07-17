@@ -26,7 +26,6 @@ export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
       },
     },
   ],
-  exclusive_to: [],
   inference_provider_restriction: ['deepseek'],
 };
 
@@ -52,7 +51,6 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
       },
     },
   ],
-  exclusive_to: [],
   inference_provider_restriction: ['deepseek'],
 };
 

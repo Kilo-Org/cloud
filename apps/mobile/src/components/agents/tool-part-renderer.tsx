@@ -19,6 +19,7 @@ import {
   WebSearchToolCard,
   WriteToolCard,
 } from './tool-cards';
+import { SuggestToolCard } from './suggest-tool-card';
 
 type ToolPartRendererProps = {
   part: ToolPart;
@@ -83,6 +84,9 @@ export function ToolPartRenderer({
     }
     case 'task': {
       return <TaskToolCard part={part} />;
+    }
+    case 'suggest': {
+      return <SuggestToolCard part={part} />;
     }
     default: {
       return <GenericToolCard part={part} />;

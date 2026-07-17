@@ -665,9 +665,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         errorMessage: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const result = await fetchGitLabRepositoriesForOrganization(
         input.organizationId,
+        ctx.user.id,
         input.forceRefresh
       );
       return {

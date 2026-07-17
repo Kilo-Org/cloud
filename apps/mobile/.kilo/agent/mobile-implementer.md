@@ -21,7 +21,7 @@ Before editing:
 1. Read the applicable `AGENTS.md` files for every directory and repository you will touch.
 2. Inspect the existing implementation and tests. Do not infer APIs or conventions from the task alone.
 3. Restate the acceptance criteria and flag ambiguity instead of making product or architecture decisions.
-4. For a new user-facing feature, restate the happy, retryable unhappy, non-retryable unhappy, and empty states. Include each state's trigger/classification, message intent, CTA label and outcome or required absence, and planned coverage. Do not proceed if a state is underdefined or omitted without an orchestrator-accepted rationale that it is structurally impossible.
+4. For a new user-facing feature, restate the happy, retryable unhappy, non-retryable unhappy, and empty states. Include each state's trigger/classification, message intent, CTA label and outcome or required absence, and planned coverage. If a state is underdefined, or missing without an orchestrator-accepted rationale that it is structurally impossible, stop and report instead of proceeding.
 5. Restate your priority order, minimum complete outcome, optional work to drop, clean stopping rule before the 80-step hard limit, owned paths, forbidden paths, and all other active slices.
 
 While implementing:

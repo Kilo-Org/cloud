@@ -17,6 +17,24 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+/**
+ * One runtime (inline) agent for a single session, aligned with cloud-agent-next's
+ * `RuntimeAgentSchema`. Used to pin a distinct model/effort per sub-agent in ONE session
+ * (e.g. council specialists). `slug` must not collide with a built-in agent mode; if
+ * `config.variant` is set, `config.model` must be set too.
+ */
+export type RuntimeAgentInput = {
+  slug: string;
+  name: string;
+  config: {
+    mode?: 'subagent' | 'primary' | 'all';
+    model?: string | null;
+    variant?: string;
+    prompt?: string;
+    description?: string;
+  };
+};
+
 export type CloudAgentPrepareSessionInput = {
   prompt: string;
   mode: string;
@@ -46,6 +64,9 @@ export type CloudAgentPrepareSessionInput = {
     rawMarkdown: string;
     files?: Record<string, string>;
   }>;
+  // Inline per-session agents. For council runs, one subagent per specialist, each pinned
+  // to its own model/effort; cloud-agent-next materializes these into KILO_CONFIG agents.
+  runtimeAgents?: RuntimeAgentInput[];
 };
 
 export type CloudAgentPrepareSessionOutput = {

@@ -2,8 +2,6 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
-import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { filterByFeature } from '@/lib/ai-gateway/models';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
@@ -29,13 +27,9 @@ export async function POST(
   }
 
   const organizationId = (await params).id;
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
-
   return handleTRPCRequest<ValidationResult>(request, async caller => {
     const result = await caller.organizations.settings.listAvailableModels({ organizationId });
-    const available = filterByFeature(result.data, feature).some(
-      model => model.id === bodyResult.data.modelId
-    );
+    const available = result.data.some(model => model.id === bodyResult.data.modelId);
     return available ? { valid: true } : { valid: false, reason: 'unavailable' };
   });
 }

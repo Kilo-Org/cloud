@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
+import type { KiloSessionId } from './types';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -333,6 +334,71 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
 });
 export type RemoteModelCatalogV1 = z.output<typeof remoteModelCatalogV1Schema>;
 
+// ---------------------------------------------------------------------------
+// Remote CLI command catalog
+// ---------------------------------------------------------------------------
+
+export const REMOTE_COMMAND_MAX_COMMANDS = 256;
+export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
+export const REMOTE_COMMAND_MAX_HINTS = 32;
+export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
+
+const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
+const remoteSlashCommandInfoSchema = z
+  .object({
+    name: remoteCommandStringSchema.min(1),
+    description: remoteCommandStringSchema.optional(),
+    agent: remoteCommandStringSchema.optional(),
+    model: remoteCommandStringSchema.optional(),
+    source: z.enum(['command', 'mcp', 'skill']).optional(),
+    // `hints` is optional on the wire: older CLI versions omit it entirely.
+    // SlashCommandInfo requires a non-nullable array, so missing entries
+    // normalize to an empty array instead of fail-closing the catalog.
+    hints: z.array(remoteCommandStringSchema).max(REMOTE_COMMAND_MAX_HINTS).optional().default([]),
+    subtask: z.boolean().optional(),
+  })
+  .strict();
+
+export const remoteCommandCatalogV1Schema = z
+  .object({
+    protocolVersion: z.literal(1),
+    commands: z.array(remoteSlashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const seenNames = new Set<string>();
+    for (const [commandIndex, command] of catalog.commands.entries()) {
+      if (seenNames.has(command.name)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Command name must be unique',
+          path: ['commands', commandIndex, 'name'],
+        });
+        continue;
+      }
+      seenNames.add(command.name);
+    }
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(catalog)).byteLength;
+    if (serializedBytes > REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES) {
+      context.addIssue({
+        code: 'custom',
+        message: `Catalog cannot exceed ${REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES} serialized bytes`,
+      });
+    }
+  })
+  .transform(catalog => ({
+    protocolVersion: 1 as const,
+    commands: catalog.commands
+      .filter(command => command.source !== 'skill')
+      // SlashCommandInfo requires a `hints` array; remote commands with no
+      // hints still have an empty array after the strict shape parse above.
+      .map(command => ({
+        ...command,
+        hints: command.hints,
+      })),
+  }));
+export type RemoteCommandCatalogV1 = z.output<typeof remoteCommandCatalogV1Schema>;
+
 export const userWebCommandErrorDataSchema = z
   .object({
     source: z.literal('relay'),
@@ -401,6 +467,32 @@ export const cliConnectionDataSchema = z.object({
   connectionId: z.string(),
 });
 export type CliConnectionData = z.infer<typeof cliConnectionDataSchema>;
+
+export const kiloSessionIdSchema = z
+  .string()
+  .startsWith('ses_')
+  .length(30)
+  .transform(id => id as KiloSessionId);
+export type KiloSessionIdInput = z.input<typeof kiloSessionIdSchema>;
+
+/**
+ * Strict create-session response (protocol v1).
+ *
+ * `create_session` is a session-scoped viewer command (the current Kilo
+ * sessionId is sent on the wire so the CLI can select the workspace; an
+ * optional owner connectionId fences the request to the active CLI). Its only
+ * valid success body is exactly this shape. Anything else — extra fields,
+ * missing fields, the wrong protocol version, or an invalid `sessionID` — is
+ * rejected; the relay is the source of truth for this envelope and any drift
+ * should fail closed.
+ */
+export const createSessionResponseV1Schema = z
+  .object({
+    protocolVersion: z.literal(1),
+    sessionID: kiloSessionIdSchema,
+  })
+  .strict();
+export type CreateSessionResponseV1 = z.infer<typeof createSessionResponseV1Schema>;
 
 // ---------------------------------------------------------------------------
 // V2 session system events
@@ -634,11 +726,73 @@ export type ErrorData = z.infer<typeof errorDataSchema>;
 export const wrapperDisconnectedDataSchema = z.unknown();
 export type WrapperDisconnectedData = z.infer<typeof wrapperDisconnectedDataSchema>;
 
-export const preparingDataSchema = z.object({
-  step: z.string(),
-  message: z.string(),
-  branch: z.string().optional(),
+const preparationStepSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  kind: z.enum(['phase', 'setup_command']),
+  label: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  completedAt: z.number().optional(),
+  revision: z.number(),
+  latestDetail: z.string().optional(),
+  safeError: z.string().optional(),
+  command: z.string().optional(),
+  commandIndex: z.number().optional(),
+  commandCount: z.number().optional(),
+  outputTail: z.string().optional(),
+  outputTruncated: z.boolean().optional(),
+  exitCode: z.number().optional(),
 });
+
+const preparationAttemptSchema = z.object({
+  id: z.string(),
+  triggerMessageId: z.string(),
+  status: z.enum(['running', 'completed', 'failed']),
+  startedAt: z.number(),
+  completedAt: z.number().optional(),
+  safeError: z.string().optional(),
+  revision: z.number(),
+});
+
+export const preparingDataSchema = z
+  .object({
+    step: z.string(),
+    message: z.string(),
+    branch: z.string().optional(),
+    version: z.literal(2).optional(),
+    attemptId: z.string().optional(),
+    triggerMessageId: z.string().optional(),
+    revision: z.number().optional(),
+    timestamp: z.number().optional(),
+    action: z
+      .enum([
+        'attempt_started',
+        'step_started',
+        'step_progress',
+        'step_output',
+        'step_completed',
+        'step_failed',
+        'attempt_completed',
+        'attempt_failed',
+        'attempt_snapshot',
+        'step_snapshot',
+      ])
+      .optional(),
+    stepId: z.string().optional(),
+    kind: z.enum(['phase', 'setup_command']).optional(),
+    label: z.string().optional(),
+    command: z.string().optional(),
+    commandIndex: z.number().optional(),
+    commandCount: z.number().optional(),
+    detail: z.string().optional(),
+    output: z.string().optional(),
+    safeError: z.string().optional(),
+    exitCode: z.number().optional(),
+    attempt: preparationAttemptSchema.optional(),
+    stepSnapshot: preparationStepSchema.optional(),
+  })
+  .passthrough();
 export type PreparingData = z.infer<typeof preparingDataSchema>;
 
 export const autocommitStartedDataSchema = z.object({

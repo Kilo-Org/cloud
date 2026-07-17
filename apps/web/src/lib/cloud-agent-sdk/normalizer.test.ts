@@ -1005,6 +1005,27 @@ describe('normalize', () => {
       });
     });
 
+    it('carries v2 attempt_started events through', () => {
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'workspace_setup',
+          message: 'Preparing environment',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'msg-1',
+          revision: 1,
+          timestamp: 1000,
+          action: 'attempt_started',
+        })
+      );
+      expect(result).toMatchObject({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        action: 'attempt_started',
+      });
+    });
+
     it('returns null when step is missing', () => {
       expect(normalize(createRaw('preparing', { message: 'Cloning repository...' }))).toBeNull();
     });

@@ -1,4 +1,4 @@
-import { count, max, eq, and, gt, gte, lte, lt, inArray, asc } from 'drizzle-orm';
+import { count, max, eq, and, gt, gte, lte, lt, inArray, asc, like } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import * as z from 'zod';
 import type { StoredEvent } from '../../websocket/types.js';
@@ -288,6 +288,38 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       }
 
       return query.all() satisfies StoredEvent[];
+    },
+
+    findByEntityId(entityId: string): StoredEvent | null {
+      const row = db
+        .select({
+          id: events.id,
+          execution_id: events.execution_id,
+          session_id: events.session_id,
+          stream_event_type: events.stream_event_type,
+          payload: events.payload,
+          timestamp: events.timestamp,
+        })
+        .from(events)
+        .where(eq(events.entity_id, entityId))
+        .get();
+      return row ?? null;
+    },
+
+    findByEntityPrefix(prefix: string): StoredEvent[] {
+      return db
+        .select({
+          id: events.id,
+          execution_id: events.execution_id,
+          session_id: events.session_id,
+          stream_event_type: events.stream_event_type,
+          payload: events.payload,
+          timestamp: events.timestamp,
+        })
+        .from(events)
+        .where(like(events.entity_id, `${prefix}%`))
+        .orderBy(asc(events.timestamp), asc(events.id))
+        .all() satisfies StoredEvent[];
     },
 
     getLatestAssistantMessage(

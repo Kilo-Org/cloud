@@ -43,6 +43,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
   decodeKiloSdkMessagesCursor,
+  DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   messageIdSchema,
@@ -84,7 +85,7 @@ const sdkStoredMessageFixture = { info: sdkUserMessageFixture, parts: [sdkTextPa
 
 type MappingRow = {
   kiloSessionId?: string;
-  cloudAgentSessionId: string | null;
+  cloudAgentSessionId?: string | null;
   title?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -920,5 +921,282 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       rpc.listCloudAgentRootSessions({ kiloUserId: 'usr_owner', limit: 101 })
     ).rejects.toThrow();
     expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionIngestRPC.getSessionMessages (authorized generic history)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns the bounded latest page for an owned Kilo session with the default limit', async () => {
+    const { db } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [sdkStoredMessageFixture],
+      nextCursor: 'eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MTc2MTAwMDAwMDEwMH0',
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({ kiloUserId: 'usr_owner', kiloSessionId: sdkSessionInfoFixture.id })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: {
+        messages: [sdkStoredMessageFixture],
+        nextCursor: 'eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MTc2MTAwMDAwMDEwMH0',
+        omittedItemCount: 0,
+      },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({
+      limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+      before: undefined,
+    });
+  });
+
+  it('defaults omitted limit to the shared page size and pairs it with a continuation cursor', async () => {
+    const { db } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [sdkStoredMessageFixture],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+    const rpc = makeRpc(db);
+    const cursor = encodeKiloSdkMessagesCursor({ id: 'msg_user_01', time: 1761000000100 });
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        before: cursor,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: {
+        messages: [sdkStoredMessageFixture],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({
+      limit: DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
+      before: cursor,
+    });
+  });
+
+  it('forwards an explicit limit and a decoded cursor to the DO bounded reader', async () => {
+    const { db } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [sdkStoredMessageFixture],
+      nextCursor: null,
+      omittedItemCount: 1,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+    const rpc = makeRpc(db);
+    const cursor = encodeKiloSdkMessagesCursor({ id: 'msg_user_01', time: 1761000000100 });
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 50,
+        before: cursor,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: {
+        messages: [sdkStoredMessageFixture],
+        nextCursor: null,
+        omittedItemCount: 1,
+      },
+    });
+    expect(readKiloSdkMessages).toHaveBeenCalledWith({ limit: 50, before: cursor });
+  });
+
+  it('returns null when the session is not owned by the requesting user', async () => {
+    const { db } = makeDbFakes([]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toBeNull();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the org-scoped session has lost its organization membership', async () => {
+    const { db } = makeDbFakes([]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toBeNull();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty page for a valid session with no persisted messages', async () => {
+    const { db } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [],
+        nextCursor: null,
+        omittedItemCount: 0,
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+    });
+  });
+
+  it('preserves the durable retryable_failure outcome for bounded requests', async () => {
+    const { db } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        kind: 'retryable_failure',
+        phase: 'message_scan',
+      })),
+    } as never);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: { kind: 'retryable_failure', phase: 'message_scan' },
+    });
+  });
+
+  it('preserves the durable too_large and invalid_data outcomes for bounded requests', async () => {
+    const { db: dbTooLarge } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        kind: 'too_large',
+        maximumBytes: 8 * 1024 * 1024,
+        phase: 'page_parts',
+      })),
+    } as never);
+    const rpc = makeRpc(dbTooLarge);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: {
+        kind: 'too_large',
+        maximumBytes: 8 * 1024 * 1024,
+        phase: 'page_parts',
+      },
+    });
+
+    const { db: dbInvalid } = makeDbFakes([{ kiloSessionId: sdkSessionInfoFixture.id }]);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({ kind: 'invalid_data' })),
+    } as never);
+    const invalidRpc = makeRpc(dbInvalid);
+
+    await expect(
+      invalidRpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+      })
+    ).resolves.toEqual({
+      kiloSessionId: sdkSessionInfoFixture.id,
+      history: { kind: 'invalid_data' },
+    });
+  });
+
+  it('rejects invalid Kilo session IDs, missing limits with cursors, and unknown cursors', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({ kiloUserId: 'usr_owner', kiloSessionId: 'not-a-session' })
+    ).rejects.toThrow();
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        before: 'not-valid',
+      })
+    ).rejects.toThrow();
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 0,
+        before: 'not-valid',
+      })
+    ).rejects.toThrow();
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('rejects positive limits above the shared maximum before authorizing the request', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE + 1,
+      })
+    ).rejects.toThrow();
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('rejects limit=0 (with or without a cursor) before authorizing the request', async () => {
+    const { db } = makeDbFakes([]);
+    const rpc = makeRpc(db);
+
+    // limit=0 alone — the generic endpoint must always be bounded.
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 0,
+      })
+    ).rejects.toThrow();
+    expect(db.select).not.toHaveBeenCalled();
+
+    // limit=0 with a cursor — same rejection, no DB or DO access.
+    await expect(
+      rpc.getSessionMessages({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 0,
+        before: 'eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MTc2MTAwMDAwMDEwMH0',
+      })
+    ).rejects.toThrow();
+    expect(db.select).not.toHaveBeenCalled();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 });

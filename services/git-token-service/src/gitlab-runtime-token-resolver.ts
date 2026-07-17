@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { GitLabCredentialBroker } from './gitlab-credential-broker.js';
 import {
   isValidGitLabRepositoryUrl,
   matchGitLabRepositoryToIntegration,
@@ -9,7 +10,6 @@ import {
   sha256Digest,
   type GitLabCapabilityCredentialSource,
 } from './gitlab-session-capability.js';
-import type { GitLabTokenService } from './gitlab-token-service.js';
 
 export type GetGitLabTokenParams = {
   userId: string;
@@ -47,12 +47,19 @@ export type GetGitLabTokenFailure = {
 
 export type GetGitLabTokenResult = GetGitLabTokenSuccess | GetGitLabTokenFailure;
 
+type GitLabCredentialResolver = Pick<GitLabCredentialBroker, 'resolveCredential'> & {
+  hasProjectCredentialCandidates?(
+    actor: { userId: string; orgId?: string },
+    integrationId: string
+  ): Promise<boolean>;
+};
+
 type GitLabRuntimeTokenDependencies = {
   lookupService: Pick<
     GitLabLookupService,
     'findGitLabIntegration' | 'findAuthorizedGitLabIntegrations'
   >;
-  tokenService: Pick<GitLabTokenService, 'getToken'>;
+  credentialResolver: GitLabCredentialResolver;
 };
 
 type GitLabProjectTokenCandidate = {
@@ -60,6 +67,8 @@ type GitLabProjectTokenCandidate = {
   instanceUrl: string;
   integrationId: string;
   projectId: number;
+  credentialId?: string;
+  credentialVersion?: number;
 };
 
 type GitLabCandidateEvaluation =
@@ -68,9 +77,66 @@ type GitLabCandidateEvaluation =
   | { status: 'lookup_failed' }
   | { status: 'token_failed'; failure: GetGitLabTokenFailure };
 
-const GitLabProjectIdentitySchema = z.object({
-  id: z.number().int().positive(),
-});
+const GitLabProjectIdentitySchema = z.object({ id: z.number().int().positive() }).strict();
+const MAX_PROJECT_LOOKUP_RESPONSE_BYTES = 16_000;
+
+function mapCredentialFailure(status: string, project = false): GetGitLabTokenFailure {
+  return {
+    success: false,
+    reason:
+      status === 'temporarily_unavailable'
+        ? 'token_refresh_failed'
+        : status === 'invalid_request'
+          ? 'invalid_org_id'
+          : project
+            ? 'no_project_token'
+            : 'no_token',
+  };
+}
+
+async function readBoundedProjectIdentity(response: Response): Promise<number | null> {
+  if (!response.body) return null;
+  const contentLength = response.headers.get('Content-Length');
+  if (
+    contentLength &&
+    (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > MAX_PROJECT_LOOKUP_RESPONSE_BYTES)
+  ) {
+    return null;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      const value: unknown = chunk.value;
+      if (!(value instanceof Uint8Array)) return null;
+      total += value.byteLength;
+      if (total > MAX_PROJECT_LOOKUP_RESPONSE_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed = GitLabProjectIdentitySchema.safeParse(
+      JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body))
+    );
+    return parsed.success ? parsed.data.id : null;
+  } catch {
+    return null;
+  }
+}
 
 async function lookupGitLabProjectId(
   match: GitLabRepositoryMatch,
@@ -79,51 +145,89 @@ async function lookupGitLabProjectId(
   try {
     const response = await fetch(
       `${match.instanceUrl}/api/v4/projects/${encodeURIComponent(match.projectPath)}`,
-      { headers: { Authorization: `Bearer ${integrationToken}` } }
+      {
+        redirect: 'manual',
+        headers: { Authorization: `Bearer ${integrationToken}` },
+      }
     );
-    if (!response.ok) {
-      return null;
-    }
-
-    const parsed = GitLabProjectIdentitySchema.safeParse(await response.json());
-    return parsed.success ? parsed.data.id : null;
+    return response.ok ? readBoundedProjectIdentity(response) : null;
   } catch {
     return null;
   }
 }
 
 async function evaluateGitLabProjectTokenCandidate(
+  params: GetGitLabTokenParams,
   match: GitLabRepositoryMatch,
-  tokenService: Pick<GitLabTokenService, 'getToken'>
+  resolver: GitLabCredentialResolver
 ): Promise<GitLabCandidateEvaluation> {
-  const projectTokens = match.metadata.project_tokens;
-  if (!projectTokens || Object.keys(projectTokens).length === 0) {
-    return { status: 'ruled_out' };
+  if (
+    (!match.metadata.project_tokens || Object.keys(match.metadata.project_tokens).length === 0) &&
+    resolver.hasProjectCredentialCandidates
+  ) {
+    try {
+      if (!(await resolver.hasProjectCredentialCandidates(params, match.integrationId))) {
+        return { status: 'ruled_out' };
+      }
+    } catch {
+      return {
+        status: 'token_failed',
+        failure: { success: false, reason: 'token_refresh_failed' },
+      };
+    }
   }
 
-  const integrationToken = await tokenService.getToken(match.integrationId, match.metadata);
-  if (!integrationToken.success) {
-    return { status: 'token_failed', failure: integrationToken };
+  const integrationCredential = await resolver.resolveCredential(params, {
+    credential: 'integration',
+    integrationId: match.integrationId,
+  });
+  if (integrationCredential.status !== 'available') {
+    return { status: 'token_failed', failure: mapCredentialFailure(integrationCredential.status) };
   }
+  if (integrationCredential.instanceUrl !== match.instanceUrl) return { status: 'ruled_out' };
 
-  const projectId = await lookupGitLabProjectId(match, integrationToken.token);
-  if (projectId === null) {
-    return { status: 'lookup_failed' };
+  const projectId = await lookupGitLabProjectId(match, integrationCredential.token);
+  if (projectId === null) return { status: 'lookup_failed' };
+
+  const projectCredential = await resolver.resolveCredential(params, {
+    credential: 'project-exact',
+    integrationId: match.integrationId,
+    projectId: String(projectId),
+  });
+  if (projectCredential.status !== 'available') {
+    return projectCredential.status === 'not_connected'
+      ? { status: 'ruled_out' }
+      : { status: 'token_failed', failure: mapCredentialFailure(projectCredential.status, true) };
   }
-
-  const projectToken = projectTokens[String(projectId)];
-  if (!projectToken) {
-    return { status: 'ruled_out' };
-  }
-
   return {
     status: 'qualified',
     candidate: {
-      token: projectToken.token,
-      instanceUrl: match.instanceUrl,
-      integrationId: match.integrationId,
+      token: projectCredential.token,
+      instanceUrl: projectCredential.instanceUrl,
+      integrationId: projectCredential.integrationId,
       projectId,
+      ...(projectCredential.credentialId
+        ? {
+            credentialId: projectCredential.credentialId,
+            credentialVersion: projectCredential.credentialVersion,
+          }
+        : {}),
     },
+  };
+}
+
+function integrationSource(input: {
+  glabIsOAuth2: boolean;
+  credentialId?: string;
+  credentialVersion?: number;
+}): GitLabCapabilityCredentialSource {
+  if (!input.credentialId) return { type: 'integration' };
+  if (input.glabIsOAuth2) return { type: 'integration', credentialId: input.credentialId };
+  if (!input.credentialVersion) throw new Error('PAT credential version is missing');
+  return {
+    type: 'integration',
+    credentialId: input.credentialId,
+    credentialVersion: input.credentialVersion,
   };
 }
 
@@ -133,85 +237,72 @@ export async function resolveGitLabRuntimeToken(
 ): Promise<GetGitLabTokenResult> {
   if (params.createdOnPlatform !== 'code-review') {
     const integration = await dependencies.lookupService.findGitLabIntegration(params);
-    if (!integration.success) {
-      return integration;
-    }
-
-    const tokenResult = await dependencies.tokenService.getToken(
-      integration.integrationId,
-      integration.metadata
-    );
-    if (!tokenResult.success) {
-      return tokenResult;
-    }
-
-    return {
-      ...tokenResult,
-      glabIsOAuth2: true,
+    if (!integration.success) return integration;
+    const credential = await dependencies.credentialResolver.resolveCredential(params, {
+      credential: 'integration',
       integrationId: integration.integrationId,
-      source: { type: 'integration' },
+    });
+    if (credential.status !== 'available') return mapCredentialFailure(credential.status);
+    return {
+      success: true,
+      token: credential.token,
+      instanceUrl: credential.instanceUrl,
+      glabIsOAuth2: credential.glabIsOAuth2,
+      integrationId: credential.integrationId,
+      source: integrationSource(credential),
     };
   }
 
-  if (!params.repositoryUrl) {
-    return { success: false, reason: 'repository_url_required' };
-  }
   const repositoryUrl = params.repositoryUrl;
+  if (!repositoryUrl) return { success: false, reason: 'repository_url_required' };
   if (!isValidGitLabRepositoryUrl(repositoryUrl)) {
     return { success: false, reason: 'invalid_repository_url' };
   }
-
-  const authorizedIntegrations =
-    await dependencies.lookupService.findAuthorizedGitLabIntegrations(params);
-  if (!authorizedIntegrations.success) {
-    return authorizedIntegrations;
-  }
-
-  const matches = authorizedIntegrations.integrations
+  const authorized = await dependencies.lookupService.findAuthorizedGitLabIntegrations(params);
+  if (!authorized.success) return authorized;
+  const matches = authorized.integrations
     .map(integration => matchGitLabRepositoryToIntegration(repositoryUrl, integration))
     .filter((match): match is GitLabRepositoryMatch => match !== null);
-
-  if (matches.length === 0) {
-    return { success: false, reason: 'no_matching_integration' };
-  }
+  if (matches.length === 0) return { success: false, reason: 'no_matching_integration' };
 
   const evaluations = await Promise.all(
-    matches.map(match => evaluateGitLabProjectTokenCandidate(match, dependencies.tokenService))
+    matches.map(match =>
+      evaluateGitLabProjectTokenCandidate(params, match, dependencies.credentialResolver)
+    )
   );
-  const qualifiedCandidates = evaluations.flatMap(evaluation =>
+  const qualified = evaluations.flatMap(evaluation =>
     evaluation.status === 'qualified' ? [evaluation.candidate] : []
   );
-
-  if (qualifiedCandidates.length > 1) {
-    return { success: false, reason: 'ambiguous_integration' };
-  }
-
-  if (qualifiedCandidates.length === 0) {
+  if (qualified.length > 1) return { success: false, reason: 'ambiguous_integration' };
+  if (qualified.length === 0) {
     const tokenFailure = evaluations.find(evaluation => evaluation.status === 'token_failed');
-    if (tokenFailure?.status === 'token_failed') {
-      return tokenFailure.failure;
-    }
+    if (tokenFailure?.status === 'token_failed') return tokenFailure.failure;
   }
-
   if (evaluations.some(evaluation => evaluation.status === 'lookup_failed')) {
     return { success: false, reason: 'project_lookup_failed' };
   }
+  const candidate = qualified[0];
+  if (!candidate) return { success: false, reason: 'no_project_token' };
 
-  const candidate = qualifiedCandidates[0];
-  if (!candidate) {
-    return { success: false, reason: 'no_project_token' };
-  }
-
+  const source: GitLabCapabilityCredentialSource =
+    candidate.credentialId && candidate.credentialVersion
+      ? {
+          type: 'project',
+          projectId: candidate.projectId,
+          credentialId: candidate.credentialId,
+          credentialVersion: candidate.credentialVersion,
+        }
+      : {
+          type: 'project',
+          projectId: candidate.projectId,
+          tokenDigest: await sha256Digest(candidate.token),
+        };
   return {
     success: true,
     token: candidate.token,
     instanceUrl: candidate.instanceUrl,
     glabIsOAuth2: false,
     integrationId: candidate.integrationId,
-    source: {
-      type: 'project',
-      projectId: candidate.projectId,
-      tokenDigest: await sha256Digest(candidate.token),
-    },
+    source,
   };
 }

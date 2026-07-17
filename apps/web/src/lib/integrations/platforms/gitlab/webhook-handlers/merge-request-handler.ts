@@ -38,6 +38,7 @@ import {
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
 import { APP_URL } from '@/lib/constants';
+import type { GitLabCredentialActor } from '../credential-broker-client';
 
 const SUPERSEDED_BY_NEW_PUSH_REASON = 'Superseded by new push';
 const DUPLICATE_MERGE_CONTINUATION_REASON = 'Superseded by duplicate merge-commit continuation';
@@ -107,6 +108,10 @@ export async function handleMergeRequestCodeReview(
       });
       return NextResponse.json({ message: 'Integration missing user context' }, { status: 500 });
     }
+    const credentialActor: GitLabCredentialActor = {
+      userId: owner.userId,
+      ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+    };
 
     // 2. Check if code review agent is enabled for this owner (GitLab platform)
     const agentConfig = await getAgentConfigForOwner(owner, 'code_review', PLATFORM.GITLAB);
@@ -184,7 +189,7 @@ export async function handleMergeRequestCodeReview(
             gitlab_instance_url?: string;
           } | null;
           const checkInstanceUrl = checkMetadata?.gitlab_instance_url || 'https://gitlab.com';
-          const accessToken = await getValidGitLabToken(integrationForCheck);
+          const accessToken = await getValidGitLabToken(integrationForCheck, credentialActor);
           return isMergeCommit(accessToken, mr.source_project_id, headSha, checkInstanceUrl);
         },
       })
@@ -206,6 +211,7 @@ export async function handleMergeRequestCodeReview(
         projectId: project.id,
         newHeadSha: headSha,
         reviewScope,
+        credentialActor,
       });
 
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
@@ -248,6 +254,7 @@ export async function handleMergeRequestCodeReview(
         fullIntegration,
         instanceUrl,
         description: SUPERSEDED_BY_NEW_PUSH_REASON,
+        credentialActor,
       });
     }
 
@@ -293,7 +300,11 @@ export async function handleMergeRequestCodeReview(
     // 10. Post 👀 reaction and set commit status (using PrAT for bot identity)
     if (fullIntegration) {
       try {
-        const pratToken = await getOrCreateProjectAccessToken(fullIntegration, project.id);
+        const pratToken = await getOrCreateProjectAccessToken(
+          fullIntegration,
+          project.id,
+          credentialActor
+        );
         logExceptInTest(`Got PrAT for project ${project.path_with_namespace}`, {
           projectId: project.id,
         });
@@ -448,6 +459,7 @@ async function setCancelledGitLabStatuses(args: {
   fullIntegration: PlatformIntegration;
   instanceUrl: string;
   description: string;
+  credentialActor: GitLabCredentialActor;
 }) {
   const gitlabCancelledReviews = args.cancelledReviews.flatMap(review => {
     if (
@@ -464,7 +476,11 @@ async function setCancelledGitLabStatuses(args: {
   const getProjectAccessToken = (platformProjectId: number) => {
     let token = projectAccessTokens.get(platformProjectId);
     if (!token) {
-      token = getOrCreateProjectAccessToken(args.fullIntegration, platformProjectId);
+      token = getOrCreateProjectAccessToken(
+        args.fullIntegration,
+        platformProjectId,
+        args.credentialActor
+      );
       projectAccessTokens.set(platformProjectId, token);
     }
     return token;
@@ -505,6 +521,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   projectId: number;
   newHeadSha: string;
   reviewScope: ReviewScope;
+  credentialActor: GitLabCredentialActor;
 }) {
   try {
     const activeReviewIds = await findActiveReviewsForPR(args.reviewScope, args.newHeadSha);
@@ -551,6 +568,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
             fullIntegration,
             instanceUrl,
             description: DUPLICATE_MERGE_CONTINUATION_REASON,
+            credentialActor: args.credentialActor,
           });
         }
       } catch (duplicateCancelError) {
@@ -562,7 +580,11 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     }
 
     try {
-      const pratToken = await getOrCreateProjectAccessToken(fullIntegration, args.projectId);
+      const pratToken = await getOrCreateProjectAccessToken(
+        fullIntegration,
+        args.projectId,
+        args.credentialActor
+      );
       const detailsUrl = `${APP_URL}/code-reviews/${reviewIdToContinue}`;
       await setCommitStatus(
         pratToken,

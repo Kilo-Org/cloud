@@ -11,18 +11,12 @@ jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
 jest.mock('@/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/models', () => ({
-  ...jest.requireActual('@/lib/ai-gateway/models'),
-  filterByFeature: jest.fn(),
-}));
 
 const mockedHandleTRPCRequest = jest.mocked(handleTRPCRequest);
 const { getCachedRoutingTable } = jest.requireMock('@/lib/ai-gateway/auto-routing-table-cache');
 const { getAutoFreeCandidates } = jest.requireMock('@/lib/ai-gateway/auto-model/resolution');
-const { filterByFeature } = jest.requireMock('@/lib/ai-gateway/models');
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
-const mockedFilterByFeature = jest.mocked(filterByFeature);
 const listAvailableModels = jest.fn();
 
 function makeModel(id: string): OpenRouterModel {
@@ -50,10 +44,6 @@ function request(headers?: Record<string, string>) {
 describe('GET /api/organizations/[id]/models', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockedFilterByFeature.mockImplementation(
-      (models: Array<{ id: string }>, feature: string | null) =>
-        feature === 'code-review' ? models.filter(model => model.id !== 'feature/excluded') : models
-    );
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
     mockedHandleTRPCRequest.mockImplementation(async (request, handler) => {
@@ -85,30 +75,6 @@ describe('GET /api/organizations/[id]/models', () => {
     expect(listAvailableModels).toHaveBeenCalledWith({
       organizationId: 'org-1',
     });
-    await expect(response.json()).resolves.toEqual({
-      data: [{ ...efficientModel, autoRouting: { models: [allowedModel.id] } }, allowedModel],
-    });
-  });
-
-  test('builds auto-routing choices from the feature-filtered catalog', async () => {
-    const efficientModel = makeModel('kilo-auto/efficient');
-    const allowedModel = makeModel('openai/gpt-5.4-mini');
-    const excludedModel = makeModel('feature/excluded');
-    listAvailableModels.mockResolvedValue({
-      data: [efficientModel, allowedModel, excludedModel],
-    });
-    mockedGetCachedRoutingTable.mockResolvedValue({
-      routes: {
-        'implementation/code_generation': [{ model: allowedModel.id }, { model: excludedModel.id }],
-      },
-    } as never);
-
-    const response = await GET(request({ 'x-kilocode-feature': 'code-review' }), {
-      params: Promise.resolve({ id: 'org-1' }),
-    });
-
-    // The feature-excluded model must appear in neither the top-level list nor
-    // the Auto Efficient choices — enrichment runs after filterByFeature.
     await expect(response.json()).resolves.toEqual({
       data: [{ ...efficientModel, autoRouting: { models: [allowedModel.id] } }, allowedModel],
     });

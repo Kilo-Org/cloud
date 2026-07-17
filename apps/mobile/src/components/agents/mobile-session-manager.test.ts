@@ -23,6 +23,7 @@ const userWebConnection: UserWebConnection = {
   destroy: vi.fn(() => undefined),
   subscribeToCliSession: vi.fn(() => noCleanup),
   sendCommand: vi.fn(),
+  sendCommandToConnection: vi.fn(),
   onCliEvent: vi.fn(() => noCleanup),
   onSystemEvent: vi.fn(() => noCleanup),
   onReconnect: vi.fn(() => noCleanup),
@@ -95,6 +96,7 @@ type CapturedSessionManagerConfig = {
   lifecycleHooks?: unknown;
   fetchSession: (kiloSessionId: string) => Promise<{ associatedPr: unknown }>;
   fetchSnapshot: (kiloSessionId: string) => Promise<{ info: unknown; messages: unknown[] }>;
+  fetchSnapshotPage: (kiloSessionId: string, options: { cursor?: string }) => Promise<unknown>;
   prepare: (input: {
     prompt: string;
     mode: string;

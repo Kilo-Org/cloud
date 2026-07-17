@@ -97,6 +97,9 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GOOGLE_SHEETS_SPREADSHEET_ID` - ID of the Google Sheet used for specific app integrations. [SERVER]
 - `GITLAB_CLIENT_ID` - GitLab OAuth app client ID. `[PUBLIC]`
 - `GITLAB_CLIENT_SECRET` - GitLab OAuth app client secret. `[SECRET]`
+- `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID` - Active platform-credential envelope key ID. The legacy name is shared by Bitbucket and encrypted GitLab credentials. [SERVER]
+- `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY` - Base64-encoded active platform-credential RSA public key; available to web and `git-token-service`. The legacy name is shared by Bitbucket and GitLab. `[SECRET]`
+- `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY` - Base64-encoded active platform-credential RSA private key; available only to `git-token-service`. The legacy name is shared by Bitbucket and GitLab. `[SECRET]`
 - `LINKEDIN_CLIENT_ID` - LinkedIn OAuth app client ID. `[PUBLIC]`
 - `LINKEDIN_CLIENT_SECRET` - LinkedIn OAuth app client secret. `[SECRET]`
 - `DISCORD_CLIENT_ID` - Discord OAuth app client ID. `[PUBLIC]`

@@ -18,10 +18,12 @@
 
 import * as z from 'zod';
 import {
+  CouncilFindingSchema,
   CouncilVoteSchema,
   type CodeReviewCouncilConfig,
   type CodeReviewType,
   type CouncilAggregationStrategy,
+  type CouncilFinding,
   type CouncilSpecialist,
   type CouncilSpecialistRole,
   type CouncilVote,
@@ -114,17 +116,12 @@ export function describeAggregationStrategy(strategy: CouncilAggregationStrategy
 // ============================================================================
 
 /**
- * One finding reported by a specialist. Lenient by design: `severity` is a free-form
- * display label (severity vocabularies vary), `line` is optional/nullable, and
- * `rationale`/`path` are length-bounded but not otherwise constrained.
+ * One finding reported by a specialist. The shape is the shared `CouncilFindingSchema`
+ * from `@kilocode/db/schema-types` (single source of truth for parse + storage);
+ * re-exported here under the council-manifest name for callers of this module.
  */
-export const CouncilSpecialistFindingSchema = z.object({
-  path: z.string().max(1024),
-  line: z.number().int().nonnegative().nullable().optional(),
-  severity: z.string().max(64),
-  rationale: z.string().max(4000),
-});
-export type CouncilSpecialistFinding = z.infer<typeof CouncilSpecialistFindingSchema>;
+export { CouncilFindingSchema as CouncilSpecialistFindingSchema } from '@kilocode/db/schema-types';
+export type CouncilSpecialistFinding = CouncilFinding;
 
 /**
  * One specialist's structured result. STRICT only on `vote` (the load-bearing value
@@ -135,7 +132,13 @@ export const CouncilSpecialistResultSchema = z.object({
   specialistId: z.string().min(1).max(64),
   vote: CouncilVoteSchema,
   highestSeverity: z.string().max(64).nullable().optional(),
-  findings: z.array(CouncilSpecialistFindingSchema).max(200).default([]),
+  findings: z.array(CouncilFindingSchema).max(200).default([]),
+  // Best-effort: the concrete model this specialist actually ran on, as reported back by
+  // the specialist itself. We assign a model per specialist, but an "auto" slug (e.g.
+  // `kilo-auto/...`) resolves to a concrete model at runtime inside cloud-agent-next, which
+  // the web side never sees otherwise. Lenient/optional (a missing model must NOT invalidate
+  // the manifest); capture falls back to the configured per-specialist model when absent.
+  model: z.string().max(200).nullable().optional(),
 });
 export type CouncilSpecialistResult = z.infer<typeof CouncilSpecialistResultSchema>;
 
@@ -452,7 +455,11 @@ export function decideCouncilFromManifest(
   if (missingSpecialistIds.length > 0) {
     return { decision: 'block', votes, missingSpecialistIds };
   }
-  return { decision: computeCouncilDecision(votes, strategy), votes, missingSpecialistIds };
+  return {
+    decision: computeCouncilDecision(votes, strategy),
+    votes,
+    missingSpecialistIds,
+  };
 }
 
 // ============================================================================

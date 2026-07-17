@@ -169,11 +169,19 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
     if (!opened) throw new Error('Failed to mark proposal change request opened.');
     return opened;
   } catch (error) {
-    await markProposalChangeRequestFailed({ proposalId: proposal.id });
-    throw new ReviewMemoryChangeRequestError(
-      'BAD_REQUEST',
-      redactSensitiveErrorMessage(error instanceof Error ? error.message : String(error))
+    const message = redactSensitiveErrorMessage(
+      error instanceof Error ? error.message : String(error)
     );
+    // Log before collapsing into BAD_REQUEST so failures are diagnosable from the log
+    // drain instead of requiring a DB dive (the error is otherwise never surfaced).
+    console.error('[review-memory] approveAndOpenChangeRequest failed', {
+      proposalId: proposal.id,
+      ownerType: input.owner.type,
+      repoFullName: proposal.repo_full_name,
+      message,
+    });
+    await markProposalChangeRequestFailed({ proposalId: proposal.id });
+    throw new ReviewMemoryChangeRequestError('BAD_REQUEST', message);
   }
 }
 

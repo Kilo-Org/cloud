@@ -2,7 +2,6 @@
  * Utility functions for working with AI models
  */
 
-import type { FeatureValue } from '@/lib/feature-detection';
 import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -29,7 +28,6 @@ import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_stealth_model } from '@/lib/ai-gateway/providers/openai-exclusive';
-import { muse_spark_1_1_model } from '@/lib/ai-gateway/providers/meta';
 import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import {
@@ -87,7 +85,6 @@ export const kiloExclusiveModels = [
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_stealth_model,
-  muse_spark_1_1_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
@@ -131,25 +128,4 @@ export function isDeadFreeModel(model: string): boolean {
 
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
   return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
-}
-
-/**
- * Returns true if the model should be excluded for the given feature.
- * A model is excluded when its `exclusive_to` list is non-empty, the feature is known,
- * and the feature is not in `exclusive_to`.
- * When feature is null (no header sent), the model is always included.
- */
-export function isExcludedForFeature(modelId: string, feature: FeatureValue | null): boolean {
-  const model = kiloExclusiveModels.find(m => m.public_id === modelId);
-  if (!model?.exclusive_to.length) return false;
-  if (!feature) return false;
-  return !model.exclusive_to.includes(feature);
-}
-
-/** Filters out models that are not available for the given feature. */
-export function filterByFeature<T extends { id: string }>(
-  models: T[],
-  feature: FeatureValue | null
-): T[] {
-  return models.filter(m => !isExcludedForFeature(m.id, feature));
 }

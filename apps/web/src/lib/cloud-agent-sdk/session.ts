@@ -11,6 +11,7 @@ import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
 import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
+import type { RemoteCommandState } from './remote-command-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
@@ -37,7 +38,13 @@ import type {
   ResolvedSession,
   SessionInfo,
   SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
 } from './types';
+
+const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
+  'Remote session creation is not supported for the current session';
+const REMOTE_CLI_EXIT_NOT_SUPPORTED = 'Remote CLI exit is not supported for the current session';
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -66,6 +73,7 @@ type CloudAgentSessionConfig = {
   onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
@@ -121,6 +129,20 @@ type CloudAgentSessionTransport = {
 
   // Shared
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  /**
+   * Page-aware root snapshot fetch. The transport uses this for its initial
+   * bounded read and any reconnect snapshot replays. After a successful
+   * initial fetch the transport calls `onInitialPageLoaded` so the manager
+   * can record the cursor and `omittedItemCount`; reconnect replays do NOT
+   * fire that callback so the user's already-advanced older-messages cursor
+   * isn't reset to the latest 50 on every reconnect.
+   */
+  fetchSnapshotPage?: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<SessionSnapshotPageOutcome | null>;
+  /** Called by the transport after a successful initial bounded page read. */
+  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
   websocketHeaders?: WebSocketHeaders;
 
@@ -145,6 +167,9 @@ type CloudAgentSession = {
     payload: CloudAgentSessionDismissSuggestionInput
   ) => unknown | Promise<unknown>;
   retryRemoteModels: () => void;
+  retryRemoteCommands: () => void;
+  createRemoteSession: () => Promise<KiloSessionId>;
+  exitRemoteCli: () => Promise<void>;
 
   // Capability checks
   canSend: boolean;
@@ -257,8 +282,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           kiloSessionId: resolved.kiloSessionId,
           userWebConnection: config.transport.userWebConnection,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          onInitialPageLoaded: config.transport.onInitialPageLoaded,
           onError: config.onError,
           onRemoteModelStateChange: config.onRemoteModelStateChange,
+          onRemoteCommandStateChange: config.onRemoteCommandStateChange,
           onCapabilityChange: config.onTransportCapabilityChange,
         });
       }
@@ -287,6 +315,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           api: config.transport.api,
           getTicket: config.transport.getTicket,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          onInitialPageLoaded: config.transport.onInitialPageLoaded,
           websocketBaseUrl: config.websocketBaseUrl,
           onError: config.onError,
           lifecycleHooks: config.transport.lifecycleHooks,
@@ -302,6 +332,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         return createCliHistoricalTransport({
           kiloSessionId: resolved.kiloSessionId,
           fetchSnapshot: config.transport.fetchSnapshot,
+          fetchSnapshotPage: config.transport.fetchSnapshotPage,
+          onInitialPageLoaded: config.transport.onInitialPageLoaded,
           onError: config.onError,
         });
       }
@@ -421,6 +453,21 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     retryRemoteModels() {
       transport?.retryRemoteModels?.();
     },
+    retryRemoteCommands() {
+      transport?.retryRemoteCommands?.();
+    },
+    createRemoteSession: async () => {
+      if (!transport?.createSession) {
+        throw new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED);
+      }
+      return transport.createSession();
+    },
+    exitRemoteCli: async () => {
+      if (!transport?.exitCli) {
+        throw new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      }
+      return transport.exitCli();
+    },
     get canSend() {
       return transport?.send !== undefined && (transport.canSend?.() ?? true);
     },
@@ -453,7 +500,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   };
 }
 
-export { createCloudAgentSession };
+export {
+  createCloudAgentSession,
+  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+};
 export type {
   CloudAgentSession,
   CloudAgentSessionAcceptSuggestionInput,

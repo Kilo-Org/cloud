@@ -44,6 +44,12 @@ type UserWebConnectionConfig = {
   lifecycleHooks?: ConnectionLifecycleHooks;
 };
 
+type SendCommandToConnectionInput = {
+  command: string;
+  data: unknown;
+  expectedConnectionId: string;
+};
+
 type UserWebConnection = {
   /** New connection owners use this lease; optional on injected legacy clients until they migrate. */
   retain?: () => () => void;
@@ -59,6 +65,14 @@ type UserWebConnection = {
     data: unknown,
     expectedOwnerConnectionId?: string
   ) => Promise<unknown>;
+  /**
+   * Send a viewer command that is scoped to a specific CLI connection and has
+   * no associated session (e.g. a connection-scoped runtime probe). The wire
+   * frame includes `connectionId` and omits `sessionId`. Shares the existing
+   * correlated command lifecycle: timeout, open/disconnect handling, and
+   * structured `UserWebCommandError` errors.
+   */
+  sendCommandToConnection: (input: SendCommandToConnectionInput) => Promise<unknown>;
   onCliEvent: (sessionId: string, listener: (event: CliEvent) => void) => () => void;
   onSystemEvent: (listener: (event: SystemEvent) => void) => () => void;
   onReconnect: (listener: () => void) => () => void;
@@ -455,6 +469,76 @@ function createUserWebConnection(
     retainConnection();
   }
 
+  type RawCommandWire = {
+    command: string;
+    data: unknown;
+    connectionId?: string;
+    sessionId?: string;
+  };
+
+  /**
+   * Shared private sender for both `sendCommand` and `sendCommandToConnection`.
+   * Owns the command-scoped connection retain, the pending-commands map
+   * entry, and the 30s timeout — so the two public entry points only differ in
+   * the wire shape (`sessionId` present vs omitted). `connectionId` is always
+   * serialized; the relay tolerates it without a `sessionId`.
+   */
+  function sendRawCommand(wire: RawCommandWire): Promise<unknown> {
+    const hasOwnerLifetime = retainCount > commandRetainCount;
+    const releaseCommandLifetime = hasOwnerLifetime ? null : retainConnection();
+    if (releaseCommandLifetime) commandRetainCount += 1;
+    let commandLifetimeReleased = false;
+    const releaseLifetime = () => {
+      if (commandLifetimeReleased) return;
+      commandLifetimeReleased = true;
+      if (releaseCommandLifetime) {
+        commandRetainCount -= 1;
+        releaseCommandLifetime();
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      const resolveCommand = (value: unknown) => {
+        releaseLifetime();
+        resolve(value);
+      };
+      const rejectCommand = (reason: Error) => {
+        releaseLifetime();
+        reject(reason);
+      };
+      void waitForOpen().then(
+        ws => {
+          if (destroyed || !hasLifetime() || ws.readyState !== WebSocket.OPEN) {
+            rejectCommand(
+              new Error(destroyed ? 'Connection destroyed' : 'Connection disconnected')
+            );
+            return;
+          }
+
+          const id = cloudAgentSdkRuntime.randomUUID();
+          const timer = setTimeout(() => {
+            pendingCommands.delete(id);
+            rejectCommand(new Error('Command timed out'));
+          }, COMMAND_TIMEOUT_MS);
+          pendingCommands.set(id, { resolve: resolveCommand, reject: rejectCommand, timer });
+          ws.send(
+            JSON.stringify({
+              type: 'command',
+              id,
+              command: wire.command,
+              ...(wire.sessionId ? { sessionId: wire.sessionId } : {}),
+              ...(wire.connectionId ? { connectionId: wire.connectionId } : {}),
+              data: wire.data,
+            })
+          );
+        },
+        reason => {
+          rejectCommand(reason instanceof Error ? reason : new Error('WebSocket is not connected'));
+        }
+      );
+    });
+  }
+
   return {
     retain: retainConnection,
     connect,
@@ -498,60 +582,21 @@ function createUserWebConnection(
       };
     },
     sendCommand(sessionId, command, data, expectedOwnerConnectionId) {
-      const hasOwnerLifetime = retainCount > commandRetainCount;
-      const releaseCommandLifetime = hasOwnerLifetime ? null : retainConnection();
-      if (releaseCommandLifetime) commandRetainCount += 1;
-      let commandLifetimeReleased = false;
-      const releaseLifetime = () => {
-        if (commandLifetimeReleased) return;
-        commandLifetimeReleased = true;
-        if (releaseCommandLifetime) {
-          commandRetainCount -= 1;
-          releaseCommandLifetime();
-        }
-      };
-
-      return new Promise((resolve, reject) => {
-        const resolveCommand = (value: unknown) => {
-          releaseLifetime();
-          resolve(value);
-        };
-        const rejectCommand = (reason: Error) => {
-          releaseLifetime();
-          reject(reason);
-        };
-        void waitForOpen().then(
-          ws => {
-            if (destroyed || !hasLifetime() || ws.readyState !== WebSocket.OPEN) {
-              rejectCommand(
-                new Error(destroyed ? 'Connection destroyed' : 'Connection disconnected')
-              );
-              return;
-            }
-
-            const id = cloudAgentSdkRuntime.randomUUID();
-            const timer = setTimeout(() => {
-              pendingCommands.delete(id);
-              rejectCommand(new Error('Command timed out'));
-            }, COMMAND_TIMEOUT_MS);
-            pendingCommands.set(id, { resolve: resolveCommand, reject: rejectCommand, timer });
-            ws.send(
-              JSON.stringify({
-                type: 'command',
-                id,
-                command,
-                sessionId,
-                connectionId: expectedOwnerConnectionId,
-                data,
-              })
-            );
-          },
-          reason => {
-            rejectCommand(
-              reason instanceof Error ? reason : new Error('WebSocket is not connected')
-            );
-          }
-        );
+      return sendRawCommand({
+        command,
+        // `expectedOwnerConnectionId` undefined still flows through `connectionId`
+        // as a top-level field on the wire (the relay tolerates a `connectionId`
+        // without a `sessionId`), so reuse the shared sender.
+        ...(expectedOwnerConnectionId ? { connectionId: expectedOwnerConnectionId } : {}),
+        sessionId,
+        data,
+      });
+    },
+    sendCommandToConnection(input) {
+      return sendRawCommand({
+        command: input.command,
+        connectionId: input.expectedConnectionId,
+        data: input.data,
       });
     },
     onCliEvent(sessionId, listener) {
@@ -585,6 +630,7 @@ function createUserWebConnection(
 
 export { createUserWebConnection, UserWebCommandError };
 export type {
+  SendCommandToConnectionInput,
   UserWebConnection,
   UserWebConnectionConfig,
   UserWebSessionEventName,

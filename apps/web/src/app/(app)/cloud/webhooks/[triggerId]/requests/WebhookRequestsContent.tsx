@@ -8,6 +8,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 import { Button } from '@/components/ui/button';
 import { CopyTextButton } from '@/components/admin/CopyEmailButton';
@@ -131,6 +132,7 @@ export function WebhookRequestsContent({
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
   const isAdminView = !!adminPathBase;
+  const { canViewSessions } = useAdminPermissions(isAdminView);
   const adminRoutes = adminPathBase
     ? {
         list: adminPathBase,
@@ -520,7 +522,7 @@ export function WebhookRequestsContent({
                           (() => {
                             const sessionId = request.kiloSessionId;
                             if (isAdminView) {
-                              return (
+                              return canViewSessions ? (
                                 <div className="flex items-center gap-2">
                                   <Button
                                     variant="link"
@@ -538,6 +540,10 @@ export function WebhookRequestsContent({
                                     <CopyTextButton text={sessionId} />
                                   </span>
                                 </div>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">
+                                  Session viewer access required
+                                </span>
                               );
                             }
 

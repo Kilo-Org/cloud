@@ -688,6 +688,9 @@ importers:
       '@kilocode/organization-entitlement':
         specifier: workspace:*
         version: link:../../packages/organization-entitlement
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../../packages/session-ingest-contracts
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

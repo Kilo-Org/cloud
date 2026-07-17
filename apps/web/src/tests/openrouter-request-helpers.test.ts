@@ -207,7 +207,7 @@ describe('addCacheBreakpoints', () => {
     });
   });
 
-  test('adds top-level cache_control on messages request when none is present', () => {
+  test('adds cache_control to the last content block of a messages request', () => {
     const request: GatewayRequest = {
       kind: 'messages',
       body: {
@@ -223,7 +223,71 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    expect(request.body.cache_control).toEqual({ type: 'ephemeral' });
+    expect(request.body.cache_control).toBeUndefined();
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Latest prompt', cache_control: { type: 'ephemeral' } },
+    ]);
+  });
+
+  test('adds nested cache_control when an unhonored top-level value is present', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Latest prompt' },
+              { type: 'text', text: 'Latest detail' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.cache_control).toBeUndefined();
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Latest prompt' },
+      {
+        type: 'text',
+        text: 'Latest detail',
+        cache_control: { type: 'ephemeral', ttl: '1h' },
+      },
+    ]);
+  });
+
+  test('adds cache_control to the last cacheable content block', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [
+          { role: 'user', content: 'Prompt' },
+          {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Response' },
+              { type: 'thinking', thinking: 'Reasoning', signature: 'signature' },
+            ],
+          },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    expect(request.body.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'Response', cache_control: { type: 'ephemeral' } },
+      { type: 'thinking', thinking: 'Reasoning', signature: 'signature' },
+    ]);
   });
 
   test('does nothing for messages request when any cache_control is already present', () => {

@@ -1,4 +1,3 @@
-import type { FeatureValue } from '@/lib/feature-detection';
 import {
   OpenRouterInferenceProviderIdSchema,
   type OpenRouterInferenceProviderId,
@@ -76,8 +75,6 @@ export type KiloExclusiveModel = {
   gateway: ProviderId;
   internal_id: string;
   pricing: PricingTiers | null;
-  /** Features allowed to use this model. Empty array means no restriction. */
-  exclusive_to: ReadonlyArray<FeatureValue>;
   /**
    * Upstream inference providers this model may be routed to; empty means no
    * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.
@@ -189,9 +186,6 @@ type InferenceProvider = {
 export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvider | null {
   if (model.flags.includes('stealth')) {
     return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
-  }
-  if (model.public_id.includes('muse-')) {
-    return { slug: 'meta', name: 'Meta', training: false, retainsPrompts: true };
   }
   if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
     return null;

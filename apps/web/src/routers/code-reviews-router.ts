@@ -322,7 +322,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
             if (webhookSecret) {
               try {
                 // Get a valid access token (handles refresh if expired)
-                const accessToken = await getValidGitLabToken(integration);
+                const accessToken = await getValidGitLabToken(integration, {
+                  userId: ctx.user.id,
+                });
 
                 const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
                   (repositoryId): repositoryId is number => typeof repositoryId === 'number'

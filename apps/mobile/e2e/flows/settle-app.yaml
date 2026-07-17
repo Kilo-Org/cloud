@@ -1,27 +1,48 @@
+# Settles an already-running app: handles the Safari external-app prompt,
+# tracking prompt, Expo developer-menu introduction and menu, and notification
+# permission, ending on Home, the login page, or the consent gate. Never
+# restarts the app; open-app.yaml is the cold-launch wrapper around this flow.
 appId: com.kilocode.kiloapp
 ---
 - extendedWaitUntil:
-    visible: 'Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    visible: 'Open this page in "Kilo"\?|Allow “Kilo” to track your activity across other companies’ apps and websites\?|Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
     timeout: 15000
 - extendedWaitUntil:
-    visible: 'Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications'
+    visible: 'Open this page in "Kilo"\?|Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications'
     timeout: 3000
     optional: true
+- runFlow:
+    when:
+      visible: 'Open this page in "Kilo"\?'
+    commands:
+      - tapOn: 'Open'
+- extendedWaitUntil:
+    visible: 'Ask App Not to Track|This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    timeout: 5000
 - runFlow:
     when:
       visible: 'Ask App Not to Track'
     commands:
       - tapOn: 'Ask App Not to Track'
+- extendedWaitUntil:
+    visible: 'This is the developer menu.*|Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    timeout: 5000
 - runFlow:
     when:
       visible: 'This is the developer menu.*'
     commands:
       - tapOn: 'Continue'
+- extendedWaitUntil:
+    visible: 'Fast Refresh|Element Inspector|“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    timeout: 5000
 - runFlow:
     when:
       visible: 'Fast Refresh|Element Inspector'
     commands:
       - tapOn: 'Close'
+- extendedWaitUntil:
+    visible: '“Kilo” Would Like to Send You Notifications|HOME|Home, tab, 1 of 4|Welcome to Kilo Code|Accept and continue'
+    timeout: 5000
 - runFlow:
     when:
       visible: '“Kilo” Would Like to Send You Notifications'

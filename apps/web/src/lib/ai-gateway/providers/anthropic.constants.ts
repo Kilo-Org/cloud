@@ -41,7 +41,6 @@ export const claude_opus_4_8_stealth_model: KiloExclusiveModel = {
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: CLAUDE_OPUS_STEALTH_PRICING,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
 
@@ -57,7 +56,6 @@ export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: CLAUDE_OPUS_STEALTH_PRICING,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
 
@@ -85,7 +83,6 @@ export const claude_sonnet_4_6_stealth_model: KiloExclusiveModel = {
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: CLAUDE_SONNET_STEALTH_PRICING,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
 
@@ -101,7 +98,6 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   gateway: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: CLAUDE_OPUS_STEALTH_PRICING,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
 
@@ -116,7 +112,6 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   gateway: 'openrouter',
   flags: ['reasoning', 'vision', 'vercel-routing'],
   pricing: null,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
 

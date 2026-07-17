@@ -1,4 +1,4 @@
-import { createStore } from 'jotai';
+import { createStore, atom } from 'jotai';
 import {
   cliModelLabel,
   createSessionManager,
@@ -7,7 +7,20 @@ import {
   type FetchedSessionData,
   type StoredMessage,
 } from './session-manager';
-import { createCloudAgentSession } from './session';
+import {
+  createCloudAgentSession,
+  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+} from './session';
+import type {
+  CloudAgentSession,
+  CloudAgentSessionSendInput,
+  CloudAgentSessionAnswerInput,
+  CloudAgentSessionRejectInput,
+  CloudAgentSessionRespondToPermissionInput,
+  CloudAgentSessionAcceptSuggestionInput,
+  CloudAgentSessionDismissSuggestionInput,
+} from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
@@ -17,13 +30,41 @@ import type {
   ResolvedSession,
   SessionActivity,
   SessionInfo,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
+import type { RemoteCommandState } from './remote-command-catalog';
 import type { NormalizedEvent } from './normalizer';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
 // ---------------------------------------------------------------------------
+
+type MockSession = Omit<
+  jest.Mocked<CloudAgentSession>,
+  | 'state'
+  | 'storage'
+  | 'send'
+  | 'interrupt'
+  | 'answer'
+  | 'reject'
+  | 'respondToPermission'
+  | 'acceptSuggestion'
+  | 'dismissSuggestion'
+  | 'exitRemoteCli'
+> & {
+  state: jest.Mocked<CloudAgentSession['state']>;
+  storage: JotaiSessionStorage | null;
+  send: jest.Mock<Promise<unknown>, [CloudAgentSessionSendInput]>;
+  interrupt: jest.Mock<Promise<unknown>, []>;
+  answer: jest.Mock<Promise<unknown>, [CloudAgentSessionAnswerInput]>;
+  reject: jest.Mock<Promise<unknown>, [CloudAgentSessionRejectInput]>;
+  respondToPermission: jest.Mock<Promise<unknown>, [CloudAgentSessionRespondToPermissionInput]>;
+  acceptSuggestion: jest.Mock<Promise<unknown>, [CloudAgentSessionAcceptSuggestionInput]>;
+  dismissSuggestion: jest.Mock<Promise<unknown>, [CloudAgentSessionDismissSuggestionInput]>;
+  exitRemoteCli: jest.Mock<Promise<void>, []>;
+};
 
 const mockSession = {
   connect: jest.fn(),
@@ -37,6 +78,9 @@ const mockSession = {
   acceptSuggestion: jest.fn(),
   dismissSuggestion: jest.fn(),
   retryRemoteModels: jest.fn(),
+  retryRemoteCommands: jest.fn(),
+  createRemoteSession: jest.fn(() => Promise.resolve(kiloId('ses_12345678901234567890123456'))),
+  exitRemoteCli: jest.fn(() => Promise.resolve()),
   canSend: true,
   canInterrupt: true,
   state: {
@@ -47,6 +91,7 @@ const mockSession = {
     getActivity: jest.fn((): SessionActivity => ({ type: 'idle' })),
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
+    getSetupLog: jest.fn<readonly string[], []>(() => []),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -54,7 +99,7 @@ const mockSession = {
     getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
   },
   storage: null as JotaiSessionStorage | null,
-};
+} as unknown as MockSession;
 
 const mockSessionCallbacks: {
   onSessionCreated?: (info: SessionInfo) => void;
@@ -69,6 +114,7 @@ const mockSessionCallbacks: {
   onSuggestionResolved?: (...args: unknown[]) => void;
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
@@ -83,6 +129,9 @@ const mockSessionCallbacks: {
 let latestStorage: JotaiSessionStorage | null = null;
 
 jest.mock('./session', () => ({
+  REMOTE_CLI_EXIT_NOT_SUPPORTED: 'Remote CLI exit is not supported for the current session',
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED:
+    'Remote session creation is not supported for the current session',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       kiloSessionId: string;
@@ -99,6 +148,7 @@ jest.mock('./session', () => ({
       onSuggestionResolved?: (...args: unknown[]) => void;
       onResolved?: (resolved: ResolvedSession) => void;
       onRemoteModelStateChange?: (state: RemoteModelState) => void;
+      onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
       onTransportCapabilityChange?: () => void;
       onEvent?: (event: NormalizedEvent) => void;
       onMessageQueued?: (messageId: string) => void;
@@ -108,7 +158,14 @@ jest.mock('./session', () => ({
         state: Extract<MessageDeliveryState, { status: 'failed' }>
       ) => void;
       onError?: (message: string) => void;
-      transport?: { userWebConnection?: unknown };
+      transport?: {
+        userWebConnection?: unknown;
+        fetchSnapshotPage?: (
+          kiloSessionId: string,
+          options: { cursor?: string }
+        ) => Promise<unknown>;
+        onInitialPageLoaded?: (page: unknown) => void;
+      };
     }) => {
       latestStorage = sessionConfig.storage;
       mockSession.storage = sessionConfig.storage;
@@ -120,6 +177,34 @@ jest.mock('./session', () => ({
           kiloSessionId: kiloId(sessionConfig.kiloSessionId),
           cloudAgentSessionId: cloudAgentId('agent-1'),
         });
+        // Simulate the transport's initial bounded read so the manager's
+        // pagination state is populated. The real transport would call
+        // `fetchSnapshotPage` and then `onInitialPageLoaded` with the page,
+        // or surface a typed failure via `onError`.
+        const transport = sessionConfig.transport;
+        if (transport?.fetchSnapshotPage) {
+          void Promise.resolve(transport.fetchSnapshotPage(sessionConfig.kiloSessionId, {})).then(
+            page => {
+              if (page && typeof page === 'object' && 'kind' in page) {
+                if (page.kind === 'success' && transport.onInitialPageLoaded) {
+                  transport.onInitialPageLoaded(page);
+                } else if (page.kind !== 'success' && sessionConfig.onError) {
+                  // Mirror the real transport's typed-failure handling:
+                  // it surfaces a stable error message via the manager's
+                  // `onError` channel so the standard session-error UI
+                  // shows the failure.
+                  const message =
+                    page.kind === 'retryable_failure'
+                      ? 'Session history temporarily unavailable'
+                      : page.kind === 'too_large'
+                        ? 'Session history too large to load'
+                        : 'Session history is unavailable';
+                  sessionConfig.onError(message);
+                }
+              }
+            }
+          );
+        }
         sessionConfig.onSessionCreated?.({ id: sessionConfig.kiloSessionId });
       });
       mockSessionCallbacks.onSessionCreated = sessionConfig.onSessionCreated;
@@ -133,6 +218,7 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onSuggestionResolved = sessionConfig.onSuggestionResolved;
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
       mockSessionCallbacks.onRemoteModelStateChange = sessionConfig.onRemoteModelStateChange;
+      mockSessionCallbacks.onRemoteCommandStateChange = sessionConfig.onRemoteCommandStateChange;
       mockSessionCallbacks.onTransportCapabilityChange = sessionConfig.onTransportCapabilityChange;
       mockSessionCallbacks.onEvent = sessionConfig.onEvent;
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
@@ -305,6 +391,8 @@ describe('createSessionManager', () => {
     mockSession.destroy.mockClear();
     mockSession.send.mockClear();
     mockSession.interrupt.mockClear();
+    mockSession.exitRemoteCli.mockClear();
+    mockSession.exitRemoteCli.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
@@ -314,6 +402,7 @@ describe('createSessionManager', () => {
     });
     mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
     mockSession.state.getCloudStatus.mockReturnValue(null);
+    mockSession.state.getSetupLog.mockReturnValue([]);
     mockSession.state.getPendingMessages.mockReturnValue(new Map());
     mockSession.storage = latestStorage;
     latestStorage = null;
@@ -537,6 +626,27 @@ describe('createSessionManager', () => {
           message: 'Setting up environment…',
         })
       );
+    });
+
+    it('exposes setup output and clears it when the manager is destroyed', async () => {
+      mockSession.state.getSetupLog.mockReturnValue([
+        'Running setup command 1 of 1: pnpm install',
+        'Packages: +42',
+      ]);
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(atomValue<readonly string[]>(config.store, mgr.atoms.setupLog)).toEqual([
+        'Running setup command 1 of 1: pnpm install',
+        'Packages: +42',
+      ]);
+
+      mgr.destroy();
+
+      expect(atomValue<readonly string[]>(config.store, mgr.atoms.setupLog)).toEqual([]);
     });
 
     it('clears cloud status indicator when cloud status returns to ready', async () => {
@@ -2879,38 +2989,344 @@ describe('createSessionManager', () => {
   });
 
   // -------------------------------------------------------------------------
-  // delivery failure indicator
+  // createRemoteSession
+  // -------------------------------------------------------------------------
+
+  describe('createRemoteSession', () => {
+    it('returns a branded KiloSessionId and leaves current session/atoms unchanged', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const newId = kiloId('ses_99999999999999999999999999');
+      mockSession.createRemoteSession.mockResolvedValue(newId);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      const beforeSessionId = atomValue<string | null>(config.store, mgr.atoms.sessionId);
+      const result = await mgr.createRemoteSession();
+
+      expect(result).toBe(newId);
+      expect(mockSession.createRemoteSession).toHaveBeenCalledTimes(1);
+      expect(atomValue<string | null>(config.store, mgr.atoms.sessionId)).toBe(beforeSessionId);
+    });
+
+    it('rejects before traffic with a stable error when there is no active session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic with a stable error for a non-remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // default mock resolves to cloud-agent
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic with a stable error when the transport lacks createSession capability', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.createRemoteSession.mockRejectedValue(
+        new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED)
+      );
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+    });
+  });
+
+  describe('exitRemoteCli', () => {
+    it('forwards only for the active remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      await expect(mgr.exitRemoteCli()).resolves.toBeUndefined();
+      expect(mockSession.exitRemoteCli).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects before forwarding when there is no active session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      expect(mockSession.exitRemoteCli).not.toHaveBeenCalled();
+    });
+
+    it('rejects before forwarding for a non-remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      expect(mockSession.exitRemoteCli).not.toHaveBeenCalled();
+    });
+
+    it('propagates the session unsupported error when transport capability is absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.exitRemoteCli.mockRejectedValue(new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED));
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // retryRemoteCommands
+  // -------------------------------------------------------------------------
+
+  describe('retryRemoteCommands', () => {
+    it('delegates to the active session when a remote session is resolved', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.retryRemoteCommands();
+      expect(mockSession.retryRemoteCommands).toHaveBeenCalledTimes(1);
+    });
+
+    it('is a no-op when there is no active session', () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      expect(() => mgr.retryRemoteCommands()).not.toThrow();
+      expect(mockSession.retryRemoteCommands).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // remote command state atom
+  // -------------------------------------------------------------------------
+
+  describe('remote command state atom', () => {
+    it('starts empty after resolving to a remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+    });
+
+    it('updates when the remote command state callback fires', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const nextState: RemoteCommandState = {
+        ownerConnectionId: 'owner',
+        refresh: 'idle',
+        commands: [{ name: 'review', description: 'Review changes', hints: [] }],
+      };
+      mockSessionCallbacks.onRemoteCommandStateChange?.(nextState);
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual(nextState);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // switchSession clears remote command state immediately
+  // -------------------------------------------------------------------------
+
+  describe('switchSession remote command state clearing', () => {
+    it('clears availableCommands and remoteCommandState before the new fetch resolves', async () => {
+      let resolveFetch: (val: FetchedSessionData) => void;
+      const slowFetch = new Promise<FetchedSessionData>(resolve => {
+        resolveFetch = resolve;
+      });
+      const config = createMockConfig({
+        fetchSession: jest
+          .fn()
+          .mockResolvedValueOnce(defaultFetchedSession)
+          .mockReturnValueOnce(slowFetch),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-a',
+        refresh: 'idle',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual(
+        expect.objectContaining({
+          ownerConnectionId: 'owner-a',
+          commands: [{ name: 'review', hints: [] }],
+        })
+      );
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(1);
+
+      const switchPromise = mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+
+      resolveFetch!(defaultFetchedSession);
+      await switchPromise;
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // generation gating for remote command callbacks
+  // -------------------------------------------------------------------------
+
+  describe('generation gating for remote command callbacks', () => {
+    it('ignores late callbacks from a previous session after a new switch begins', async () => {
+      let resolveFetch: (val: FetchedSessionData) => void;
+      const slowFetch = new Promise<FetchedSessionData>(resolve => {
+        resolveFetch = resolve;
+      });
+      const config = createMockConfig({
+        fetchSession: jest
+          .fn()
+          .mockResolvedValueOnce(defaultFetchedSession)
+          .mockReturnValueOnce(slowFetch),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const firstCallbacks = { ...mockSessionCallbacks };
+      firstCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      firstCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-a',
+        refresh: 'idle',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      firstCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+
+      const switchPromise = mgr.switchSession(kiloId('ses-2'));
+      firstCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'stale-owner',
+        refresh: 'idle',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      firstCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+
+      resolveFetch!(defaultFetchedSession);
+      await switchPromise;
+
+      // New session callbacks can still update state.
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-2') });
+      mockSessionCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-b',
+        refresh: 'idle',
+        commands: [{ name: 'new', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: 'owner-b',
+        refresh: 'idle',
+        commands: [{ name: 'new', hints: [] }],
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // destroy + late callback suppression
+  // -------------------------------------------------------------------------
+
+  describe('destroy', () => {
+    it('clears remote command state and availableCommands and ignores late callbacks', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const firstCallbacks = { ...mockSessionCallbacks };
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-a',
+        refresh: 'idle',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      expect(
+        atomValue<RemoteCommandState>(config.store, mgr.atoms.remoteCommandState).commands
+      ).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(1);
+
+      mgr.destroy();
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+
+      firstCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'stale',
+        refresh: 'idle',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      firstCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // clearAllAtoms behavior
+  // -------------------------------------------------------------------------
+
+  describe('clearAllAtoms', () => {
+    it('resets session atoms without touching unrelated store atoms', () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const externalAtom = atom(42);
+      config.store.set(externalAtom, 99);
+      config.store.set(mgr.atoms.chatUI, { shouldAutoScroll: false });
+
+      mgr.destroy();
+
+      expect(atomValue(config.store, externalAtom)).toBe(99);
+      expect(atomValue(config.store, mgr.atoms.chatUI)).toEqual({ shouldAutoScroll: true });
+    });
+  });
+  // -------------------------------------------------------------------------
+  // delivery failure status indicator
   // -------------------------------------------------------------------------
 
   describe('delivery failure status indicator', () => {
     it('exhausted-retry failure sets an error indicator and leaves failedPrompt null', async () => {
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      const onMessageFailed = mockSessionCallbacks.onMessageFailed;
-      if (!onMessageFailed) {
-        throw new Error('Expected onMessageFailed to be plumbed through');
-      }
-      onMessageFailed('m1', {
-        status: 'failed',
-        error: 'flush failed',
-        reason: 'exhausted',
-        attempts: 5,
-      });
-
-      const indicator = atomValue<{ type: string; message: string } | null>(
-        config.store,
-        mgr.atoms.statusIndicator
-      );
-      expect(indicator).toEqual(
-        expect.objectContaining({ type: 'error', message: 'Message failed to deliver' })
-      );
-      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
-    });
-
-    it('interrupted queued failure sets an error indicator with the interrupted wording', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -3214,5 +3630,478 @@ describe('isReadOnly during connecting phase', () => {
     subscriberCallbackRef.current?.();
 
     expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bounded initial snapshot + loadOlderMessages
+// ---------------------------------------------------------------------------
+
+type SessionSnapshotPageFetch = NonNullable<SessionManagerConfig['fetchSnapshotPage']>;
+
+function makePageMessage(
+  id: string,
+  sessionID: string,
+  text: string
+): SessionSnapshotPage['messages'][number] {
+  return {
+    info: stubUserMessage({ id, sessionID }),
+    parts: [stubTextPart({ id: `${id}-text`, sessionID, messageID: id, text })],
+  };
+}
+
+function makePage(
+  options: {
+    kiloSessionId?: string;
+    messages?: SessionSnapshotPage['messages'];
+    nextCursor?: string | null;
+    omittedItemCount?: number;
+  } = {}
+): SessionSnapshotPageOutcome {
+  return {
+    kind: 'success',
+    info: { id: options.kiloSessionId ?? 'ses-1' },
+    messages: options.messages ?? [],
+    nextCursor: options.nextCursor ?? null,
+    omittedItemCount: options.omittedItemCount ?? 0,
+  };
+}
+
+function createPageFetchMock(
+  impl: SessionSnapshotPageFetch
+): jest.MockedFunction<SessionSnapshotPageFetch> {
+  return jest.fn(impl) as jest.MockedFunction<SessionSnapshotPageFetch>;
+}
+
+describe('createSessionManager — paginated initial snapshot + loadOlderMessages', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+    mockSession.connect.mockClear();
+    mockSession.disconnect.mockClear();
+    mockSession.destroy.mockClear();
+    mockSession.send.mockClear();
+    mockSession.interrupt.mockClear();
+    mockSession.respondToPermission.mockClear();
+    mockSession.canSend = true;
+    mockSession.canInterrupt = true;
+    mockSession.state.subscribe.mockImplementation(callback => {
+      callback();
+      return () => {};
+    });
+    mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+    mockSession.state.getCloudStatus.mockReturnValue(null);
+    mockSession.state.getPendingMessages.mockReturnValue(new Map());
+    mockSession.storage = latestStorage;
+    latestStorage = null;
+    mockSessionCallbacks.onSessionCreated = undefined;
+    mockSessionCallbacks.onSessionUpdated = undefined;
+    mockSessionCallbacks.onQuestionAsked = undefined;
+    mockSessionCallbacks.onQuestionResolved = undefined;
+    mockSessionCallbacks.onPermissionAsked = undefined;
+    mockSessionCallbacks.onPermissionResolved = undefined;
+    mockSessionCallbacks.onResolved = undefined;
+  });
+
+  it('loads the initial bounded page on switchSession and stores the cursor', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A', omittedItemCount: 2 })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(fetchSnapshotPage).toHaveBeenCalledWith('ses-1', {});
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(2);
+  });
+
+  it('does not set hasOlderMessages when the initial page has no cursor', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: null })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+  });
+
+  it('loadOlderMessages fetches the next page with the stored cursor and merges messages', async () => {
+    const callArgs: Array<{ cursor?: string }> = [];
+    const fetchSnapshotPage = createPageFetchMock(async (_id, options) => {
+      callArgs.push({ ...options });
+      if (!options.cursor) {
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-2', 'ses-1', 'newer')],
+          nextCursor: 'cursor-A',
+        });
+      }
+      if (options.cursor === 'cursor-A') {
+        return makePage({
+          kiloSessionId: 'ses-1',
+          messages: [makePageMessage('msg-1', 'ses-1', 'older')],
+          nextCursor: null,
+          omittedItemCount: 3,
+        });
+      }
+      return makePage({ kiloSessionId: 'ses-1' });
+    });
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+    await mgr.loadOlderMessages();
+    expect(callArgs).toEqual([{}, { cursor: 'cursor-A' }]);
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(3);
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+
+    const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+    expect(messages.map(m => m.info.id)).toEqual(['msg-1', 'msg-2']);
+  });
+
+  it('loadOlderMessages is a no-op when there is no cursor', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () =>
+      makePage({ kiloSessionId: 'ses-1', nextCursor: null })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    // Only the initial call
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates concurrent loadOlderMessages calls', async () => {
+    let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolvePage = resolve;
+    });
+
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockReturnValueOnce(slowPage);
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    const first = mgr.loadOlderMessages();
+    const second = mgr.loadOlderMessages();
+
+    resolvePage(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }));
+
+    await Promise.all([first, second]);
+
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(2);
+  });
+
+  it('does not run loadOlderMessages again after a switchSession', async () => {
+    // Set up the slow promise and the one-time mocks in the order the
+    // session-manager will consume them: initial → older load → next initial.
+    let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolvePage = resolve;
+    });
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockReturnValueOnce(slowPage)
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-2', nextCursor: null }))
+      .mockResolvedValue(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    // Start loadOlder, but switch before it resolves.
+    const older = mgr.loadOlderMessages();
+    const switching = mgr.switchSession(kiloId('ses-2'));
+    resolvePage(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }));
+    await Promise.all([older, switching]);
+
+    // After the switch, hasOlderMessages reflects the new session (no cursor).
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+  });
+
+  it('surfaces retryable_failure on initial load via the standard error atom', async () => {
+    const fetchSnapshotPage = createPageFetchMock(async () => ({
+      kind: 'retryable_failure' as const,
+    }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).not.toBeNull();
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+  });
+
+  it('surfaces non-retryable failure on initial load and disables further older loads', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce({ kind: 'too_large' as const })
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    expect(atomValue<string | null>(config.store, mgr.atoms.error)).not.toBeNull();
+    // No cursor was set, so hasOlderMessages must remain false and the
+    // backend must not be hit again.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(1);
+  });
+
+  it('keeps existing messages and exposes retryable older error when loadOlderMessages fails retryably', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce({ kind: 'retryable_failure' as const });
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    const messageCountBefore = atomValue<StoredMessage[]>(
+      config.store,
+      mgr.atoms.messagesList
+    ).length;
+    expect(messageCountBefore).toBe(0);
+
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      kind: 'retryable',
+    });
+    // Cursor must remain so a retry can pick it up.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+
+    // Retryable retry — backend should be hit again and succeed.
+    fetchSnapshotPage.mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+  });
+
+  it('treats a null older page outcome as terminal invalid_data and stops hitting the backend', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      kind: 'invalid_data',
+    });
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+    // A second call should be a no-op (no backend hit).
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects an older page whose session id does not match the active session', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce(
+        makePage({
+          kiloSessionId: 'ses-other',
+          messages: [makePageMessage('msg-other', 'ses-1', 'other')],
+          nextCursor: null,
+          omittedItemCount: 5,
+        })
+      );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+    expect(messages.map(m => m.info.id)).not.toContain('msg-other');
+    // The cursor must stay at the previously known value so a later valid page can continue.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+    ).toBeNull();
+  });
+
+  it('marks non-retryable older failures as terminal and stops hitting the backend', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce({ kind: 'invalid_data' as const })
+      .mockResolvedValue(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    await mgr.loadOlderMessages();
+
+    expect(atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)).toEqual({
+      kind: 'invalid_data',
+    });
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+    // A second call should be a no-op (no backend hit).
+    await mgr.loadOlderMessages();
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(2);
+  });
+
+  it('advances the cursor on an empty older page with a non-null continuation', async () => {
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockResolvedValueOnce(
+        makePage({ kiloSessionId: 'ses-1', messages: [], nextCursor: 'cursor-B' })
+      )
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+    await mgr.loadOlderMessages();
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+
+    await mgr.loadOlderMessages();
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(false);
+
+    // The empty-with-cursor page must not have caused an infinite loop — we
+    // made forward progress (3 calls total: initial, empty, final).
+    expect(fetchSnapshotPage.mock.calls).toHaveLength(3);
+  });
+
+  it('exposes isLoadingOlderMessages while a load is in flight', async () => {
+    let resolvePage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const slowPage = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolvePage = resolve;
+    });
+
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage
+      .mockResolvedValueOnce(makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-A' }))
+      .mockReturnValueOnce(slowPage);
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    await mgr.switchSession(kiloId('ses-1'));
+
+    const loading = mgr.loadOlderMessages();
+    expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(true);
+
+    resolvePage(makePage({ kiloSessionId: 'ses-1', nextCursor: null }));
+    await loading;
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+  });
+
+  it('does not let a late initial page from an earlier switchSession clobber the active session when both target the same session id', async () => {
+    // Regression: the initial-page callback used to read `loadOlderGeneration`
+    // at invocation time. A second `switchSession` to the same session id
+    // advances the generation in `clearAllAtoms()` before the first
+    // switch's `onInitialPageLoaded` callback runs, so the stale page
+    // passed the generation check (equal to the new generation) and
+    // overwrote the active session's cursor / messages / omitted-item
+    // count. The fix captures the generation synchronously when the
+    // callback is created.
+    let resolveFirstPage: (value: SessionSnapshotPageOutcome) => void = () => undefined;
+    const firstPagePromise = new Promise<SessionSnapshotPageOutcome>(resolve => {
+      resolveFirstPage = resolve;
+    });
+    const fetchSnapshotPage = jest.fn() as jest.MockedFunction<SessionSnapshotPageFetch>;
+    fetchSnapshotPage.mockReturnValueOnce(firstPagePromise).mockResolvedValueOnce(
+      makePage({
+        kiloSessionId: 'ses-1',
+        nextCursor: 'current-cursor',
+        messages: [makePageMessage('msg-current', 'ses-1', 'current')],
+        omittedItemCount: 0,
+      })
+    );
+
+    const config = createMockConfig({ fetchSnapshotPage });
+    const mgr = createSessionManager(config);
+
+    // Wait for the first switchSession to fully set up: the first
+    // session.connect() must have kicked off the slow fetchSnapshotPage
+    // and wired its `onInitialPageLoaded` callback before the second
+    // switchSession advances `switchGeneration` and tears the first
+    // switchSession's setup down.
+    const first = mgr.switchSession(kiloId('ses-1'));
+    await first;
+
+    const second = mgr.switchSession(kiloId('ses-1'));
+    await second;
+    // Flush microtasks so the second switch's page is delivered through
+    // `onInitialPageLoaded` and the active session's pagination state is
+    // settled before we resolve the stale first page.
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    // The active session's pagination state reflects the second switch.
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+    ).toEqual(['msg-current']);
+
+    // The first switch's slow page eventually resolves. Its stale
+    // cursor, messages, and omitted count must not overwrite the
+    // active session's pagination state.
+    resolveFirstPage(
+      makePage({
+        kiloSessionId: 'ses-1',
+        nextCursor: 'stale-cursor',
+        messages: [makePageMessage('msg-stale', 'ses-1', 'stale')],
+        omittedItemCount: 99,
+      })
+    );
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+    expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(0);
+    expect(
+      atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+    ).toEqual(['msg-current']);
   });
 });

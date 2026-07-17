@@ -3,6 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { platform_integrations, platform_oauth_credentials } from '@kilocode/db/schema';
+import { BitbucketOAuthCredentialRowSchema } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { after } from 'next/server';
 import { db } from '@/lib/drizzle';
@@ -104,16 +105,12 @@ export async function listBitbucketRepositories({
       metadata: platform_integrations.metadata,
       repositories: platform_integrations.repositories,
       repositoriesSyncedAt: platform_integrations.repositories_synced_at,
-      credentialId: platform_oauth_credentials.id,
-      revokedAt: platform_oauth_credentials.revoked_at,
+      credential: platform_oauth_credentials,
     })
     .from(platform_integrations)
     .leftJoin(
       platform_oauth_credentials,
-      and(
-        eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_oauth_credentials.platform, PLATFORM.BITBUCKET)
-      )
+      eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
     )
     .where(and(ownerCondition(owner), eq(platform_integrations.platform, PLATFORM.BITBUCKET)))
     .limit(1);
@@ -122,7 +119,10 @@ export async function listBitbucketRepositories({
   if (expectedIntegrationId && row.integrationId !== expectedIntegrationId) {
     return { status: 'temporarily_unavailable' };
   }
-  if (!row.credentialId || row.revokedAt) return { status: 'reconnect_required' };
+  const credential = BitbucketOAuthCredentialRowSchema.safeParse(row.credential);
+  if (!credential.success || credential.data.revoked_at) {
+    return { status: 'reconnect_required' };
+  }
 
   const metadata = BitbucketIntegrationMetadataSchema.safeParse(row.metadata);
   if (!metadata.success) return { status: 'reconnect_required' };

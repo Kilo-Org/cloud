@@ -1461,3 +1461,173 @@ describe('createUserWebConnection', () => {
     await expect(promise).rejects.toThrow('Connection destroyed');
   });
 });
+
+describe('createUserWebConnection sendCommandToConnection', () => {
+  it('sends a connection-scoped wire frame with connectionId and no sessionId', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'runtime_status',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+
+    expect(sockets[0].send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'command',
+        id: 'uuid-2',
+        command: 'runtime_status',
+        connectionId: 'cli-owner-1',
+        data: { protocolVersion: 1 },
+      })
+    );
+    expect(JSON.parse(jest.mocked(sockets[0].send).mock.calls[0][0] as string)).not.toHaveProperty(
+      'sessionId'
+    );
+
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      result: { ok: true },
+    });
+    await expect(promise).resolves.toEqual({ ok: true });
+    client.destroy();
+  });
+
+  it('correlates response by command id even when no sessionId is on the wire', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'runtime_status',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+
+    // An unrelated response with a different id should not settle ours.
+    inbound({ type: 'response', id: 'uuid-other', result: { unrelated: true } });
+    await Promise.resolve();
+    // Promise is still pending — we can only check via race against a timeout.
+    let settled = false;
+    void promise.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      result: { ok: true },
+    });
+    await expect(promise).resolves.toEqual({ ok: true });
+    client.destroy();
+  });
+
+  it('times out a connection-scoped command that never gets a response', async () => {
+    jest.useFakeTimers();
+    try {
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+      client.connect();
+      open();
+
+      const promise = client.sendCommandToConnection({
+        command: 'runtime_status',
+        data: { protocolVersion: 1 },
+        expectedConnectionId: 'cli-owner-1',
+      });
+      // Wait for the send to dispatch.
+      await jest.advanceTimersByTimeAsync(0);
+
+      jest.advanceTimersByTime(30_000);
+      await expect(promise).rejects.toThrow('Command timed out');
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rejects a connection-scoped command on auth-close refresh', async () => {
+    const getAuthToken = jest.fn().mockReturnValueOnce('old-token').mockResolvedValue('new-token');
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+    const release = client.subscribeToCliSession('ses-1');
+    open();
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+
+    const promise = client.sendCommandToConnection({
+      command: 'runtime_status',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+    sockets[0].onclose?.({ code: 4001 } as CloseEvent);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(promise).rejects.toThrow('Connection lost during reconnect');
+    release();
+    client.destroy();
+  });
+
+  it('returns structured UserWebCommandError for relay errors on a connection-scoped command', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'runtime_status',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      error: {
+        source: 'relay',
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
+      },
+    });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({
+        name: 'UserWebCommandError',
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
+      })
+    );
+    await expect(promise).rejects.toBeInstanceOf(UserWebCommandError);
+    client.destroy();
+  });
+
+  it('does not subscribe to a CLI session as a side effect of sendCommandToConnection', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommandToConnection({
+      command: 'runtime_status',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    await Promise.resolve();
+
+    const sentFrames = sockets[0].send.mock.calls.map(call => JSON.parse(call[0] as string));
+    expect(sentFrames).not.toContainEqual(expect.objectContaining({ type: 'subscribe' }));
+
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      result: { ok: true },
+    });
+    await promise;
+    client.destroy();
+  });
+});

@@ -6,6 +6,7 @@ import type { CloudAgentEvent } from '@/lib/cloud-agent-next/event-types';
 import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import { createCloudAgentTransport } from './cloud-agent-transport';
+import type { SessionSnapshotPageOutcome } from './types';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -697,5 +698,225 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
     expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(1);
 
     transport.destroy();
+  });
+});
+
+describe('CloudAgentTransport page-seam', () => {
+  function createTransportWithPageFetch(
+    page: SessionSnapshotPageOutcome | null,
+    onError?: (message: string) => void
+  ) {
+    const chatEvents: ChatEvent[] = [];
+    const serviceEvents: ServiceEvent[] = [];
+    const fetchSnapshotPage = jest.fn(() => Promise.resolve(page));
+    const onInitialPageLoaded = jest.fn();
+
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot: () => Promise.reject(new Error('legacy fetchSnapshot should not be called')),
+      fetchSnapshotPage,
+      onInitialPageLoaded,
+      websocketBaseUrl: 'ws://localhost:9999',
+      onError,
+    });
+
+    const transport = factory({
+      onChatEvent: event => chatEvents.push(event),
+      onServiceEvent: event => serviceEvents.push(event),
+    });
+
+    return { transport, chatEvents, serviceEvents, fetchSnapshotPage, onInitialPageLoaded };
+  }
+
+  it('uses fetchSnapshotPage for the initial bounded read and reports the page via onInitialPageLoaded', async () => {
+    const page = {
+      kind: 'success' as const,
+      info: { id: 'ses-1' },
+      messages: [],
+      nextCursor: 'cursor-A',
+      omittedItemCount: 2,
+    };
+    const { transport, fetchSnapshotPage, onInitialPageLoaded } =
+      createTransportWithPageFetch(page);
+
+    transport.connect();
+    await flushPromises();
+
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+    expect(fetchSnapshotPage).toHaveBeenCalledWith('ses-1', {});
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+
+    transport.destroy();
+  });
+
+  it('surfaces typed failures on the initial read via onError', async () => {
+    const { transport, serviceEvents } = createTransportWithPageFetch({
+      kind: 'retryable_failure',
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(0);
+    // The transport still connects the websocket so the user can recover
+    // via live events.
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+    transport.destroy();
+  });
+
+  it('surfaces invalid_data on the initial read via onError and still connects the websocket', async () => {
+    const errors: string[] = [];
+    const { transport, chatEvents, serviceEvents, onInitialPageLoaded } =
+      createTransportWithPageFetch({ kind: 'invalid_data' }, message => errors.push(message));
+
+    transport.connect();
+    await flushPromises();
+
+    expect(errors).toEqual(['Session history is unavailable']);
+    expect(onInitialPageLoaded).not.toHaveBeenCalled();
+    expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(0);
+    expect(chatEvents).toHaveLength(0);
+    // Terminal typed failures still leave the websocket available so the user
+    // can recover via live events; this is the intended transport behavior.
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+    transport.destroy();
+  });
+
+  it('surfaces too_large on the initial read via onError and still connects the websocket', async () => {
+    const errors: string[] = [];
+    const { transport, chatEvents, serviceEvents, onInitialPageLoaded } =
+      createTransportWithPageFetch({ kind: 'too_large' }, message => errors.push(message));
+
+    transport.connect();
+    await flushPromises();
+
+    expect(errors).toEqual(['Session history too large to load']);
+    expect(onInitialPageLoaded).not.toHaveBeenCalled();
+    expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(0);
+    expect(chatEvents).toHaveLength(0);
+    // Terminal typed failures still leave the websocket available so the user
+    // can recover via live events; this is the intended transport behavior.
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+    transport.destroy();
+  });
+
+  it('falls back to fetchSnapshot when fetchSnapshotPage is not provided', async () => {
+    const chatEvents: ChatEvent[] = [];
+    const serviceEvents: ServiceEvent[] = [];
+    const fetchSnapshot = jest.fn(() => Promise.resolve(emptySnapshot));
+
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot,
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+
+    const transport = factory({
+      onChatEvent: event => chatEvents.push(event),
+      onServiceEvent: event => serviceEvents.push(event),
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(1);
+
+    transport.destroy();
+  });
+
+  it('reconnect (no eventId) uses fetchSnapshotPage and does NOT fire onInitialPageLoaded', async () => {
+    jest.useFakeTimers();
+    try {
+      // Microtask-based flush that works under jest.useFakeTimers()
+      // (the top-level flushPromises uses setTimeout and hangs).
+      async function flushMicrotasks(): Promise<void> {
+        for (let i = 0; i < 10; i++) {
+          await Promise.resolve();
+        }
+      }
+
+      const page = {
+        kind: 'success' as const,
+        info: { id: 'ses-1' },
+        messages: [],
+        nextCursor: 'cursor-A',
+        omittedItemCount: 0,
+      };
+      const fetchSnapshotPage = jest.fn().mockResolvedValue(page);
+      const onInitialPageLoaded = jest.fn();
+      const chatEvents: ChatEvent[] = [];
+      const serviceEvents: ServiceEvent[] = [];
+
+      const factory = createCloudAgentTransport({
+        sessionId: cloudAgentId('ses-1'),
+        kiloSessionId: kiloId('ses-1'),
+        api: createMockApi(),
+        getTicket: () => 'test-ticket',
+        fetchSnapshot: () => Promise.reject(new Error('should not be called')),
+        fetchSnapshotPage,
+        onInitialPageLoaded,
+        websocketBaseUrl: 'ws://localhost:9999',
+      });
+
+      const transport = factory({
+        onChatEvent: event => chatEvents.push(event),
+        onServiceEvent: event => serviceEvents.push(event),
+      });
+
+      transport.connect();
+      await flushMicrotasks();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      // Establish the first connection with a sentinel (eventId: 0) so the
+      // connection marks itself `connected` without advancing the replay
+      // cursor. That is what the production path looks like when the very
+      // first frame on a fresh socket is a status heartbeat.
+      const sentinel: CloudAgentEvent = {
+        eventId: 0,
+        executionId: null,
+        sessionId: 'ses-1',
+        streamEventType: 'kilocode',
+        timestamp: new Date().toISOString(),
+        data: {
+          type: 'session.status',
+          properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+        },
+      };
+      sendRaw(sentinel);
+
+      // Trigger an unexpected disconnect on the first socket.
+      mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+      jest.advanceTimersByTime(2000);
+      await flushMicrotasks();
+
+      const newMockWs = webSocketConstructor.mock.results.at(-1)?.value as MockWebSocket;
+      newMockWs.onopen?.(new Event('open'));
+      // Send a sentinel on the new socket: the connection marks itself
+      // reconnected, then `onReconnected` falls back to `fetchSnapshotPage`
+      // because `lastEventId` is still null.
+      newMockWs.onmessage?.({ data: JSON.stringify(sentinel) } as MessageEvent);
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      // fetchSnapshotPage was called again (initial + reconnect), but
+      // onInitialPageLoaded is still 1 — reconnect must never reset the
+      // user's older-pages cursor back to the latest 50.
+      expect(fetchSnapshotPage.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

@@ -11,13 +11,19 @@ import {
 } from './llm';
 
 const MAX_REVIEW_MD_CHARS = 30_000;
+export const MAX_INTEGRATION_SUMMARY_CHARS = 1_000;
 const REVIEW_MEMORY_BRANDING_PATTERN = /\b(?:kilo\s+)?review\s+memory\b/i;
 const REVIEW_MEMORY_HEADING_PATTERN = /^#{1,6}\s+(?:kilo\s+)?review\s+memory\b/im;
 
-const ReviewMdIntegrationOutputSchema = z.object({
+// Structural constraints only. transformReviewMemoryWireSchema (llm.ts) strips
+// minLength/maxLength from the wire schema the model receives, so the model is never
+// told about length limits. Enforcing .min()/.max() here would reject complete, usable
+// responses with "No object generated: response did not match schema" (the plug-and-pay
+// failure). Length limits are applied in validateReviewMdIntegrationOutput below.
+export const ReviewMdIntegrationOutputSchema = z.object({
   status: z.enum(['updated', 'already_present']),
-  updatedReviewMd: z.string().min(1).max(MAX_REVIEW_MD_CHARS).nullable(),
-  integrationSummary: z.string().min(1).max(1_000),
+  updatedReviewMd: z.string().nullable(),
+  integrationSummary: z.string(),
 });
 
 export type ReviewMdIntegrationResult = {
@@ -68,19 +74,27 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
   };
 }
 
-function validateReviewMdIntegrationOutput(
+export function validateReviewMdIntegrationOutput(
   output: z.infer<typeof ReviewMdIntegrationOutputSchema>
 ): ReviewMdIntegrationResult {
+  // integrationSummary is advisory and has no downstream consumer, so clamp it to the
+  // limit rather than failing the whole change request over a summary that ran long.
+  const integrationSummary =
+    output.integrationSummary.trim().slice(0, MAX_INTEGRATION_SUMMARY_CHARS) ||
+    'Updated REVIEW.md guidance.';
+
   if (output.status === 'already_present') {
-    return output;
+    return { status: output.status, updatedReviewMd: output.updatedReviewMd, integrationSummary };
   }
 
-  if (!output.updatedReviewMd) {
+  if (!output.updatedReviewMd || !output.updatedReviewMd.trim()) {
     throw new Error('Integration model returned updated status without updatedReviewMd.');
   }
 
-  if (!output.updatedReviewMd.trim()) {
-    throw new Error('Integration model returned empty REVIEW.md content.');
+  if (output.updatedReviewMd.length > MAX_REVIEW_MD_CHARS) {
+    throw new Error(
+      `Integrated REVIEW.md exceeds ${MAX_REVIEW_MD_CHARS} characters (${output.updatedReviewMd.length}).`
+    );
   }
 
   if (
@@ -90,7 +104,7 @@ function validateReviewMdIntegrationOutput(
     throw new Error('Integrated REVIEW.md must not mention Review Memory.');
   }
 
-  return output;
+  return { status: output.status, updatedReviewMd: output.updatedReviewMd, integrationSummary };
 }
 
 function buildReviewMdIntegrationPrompt(input: {

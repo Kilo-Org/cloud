@@ -5,7 +5,13 @@
  */
 import { z } from 'zod';
 import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
-import type { SessionInfo, CloudStatus, SuggestionAction, SlashCommandInfo } from './types';
+import type {
+  SessionInfo,
+  CloudStatus,
+  SuggestionAction,
+  SlashCommandInfo,
+  PreparationStepSnapshot,
+} from './types';
 import {
   cloudAgentEventSchema,
   kilocodePayloadSchema,
@@ -101,7 +107,38 @@ export type ServiceEvent =
       branch?: string;
     }
   | { type: 'warning' }
-  | { type: 'preparing'; step: string; message: string; branch?: string }
+  | {
+      type: 'preparing';
+      step: string;
+      message: string;
+      branch?: string;
+      version?: 2;
+      attemptId?: string;
+      triggerMessageId?: string;
+      revision?: number;
+      timestamp?: number;
+      action?: string;
+      stepId?: string;
+      kind?: 'phase' | 'setup_command';
+      label?: string;
+      command?: string;
+      commandIndex?: number;
+      commandCount?: number;
+      detail?: string;
+      output?: string;
+      safeError?: string;
+      exitCode?: number;
+      attempt?: {
+        id: string;
+        triggerMessageId: string;
+        status: 'running' | 'completed' | 'failed';
+        startedAt: number;
+        completedAt?: number;
+        safeError?: string;
+        revision: number;
+      };
+      stepSnapshot?: PreparationStepSnapshot;
+    }
   | { type: 'autocommit_started'; messageId: string; message?: string }
   | {
       type: 'autocommit_completed';
@@ -379,6 +416,33 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         step: r.data.step,
         message: r.data.message,
         branch: r.data.branch,
+        ...(r.data.version === 2 &&
+        r.data.attemptId &&
+        r.data.triggerMessageId &&
+        r.data.revision !== undefined &&
+        r.data.timestamp !== undefined &&
+        r.data.action
+          ? {
+              version: 2 as const,
+              attemptId: r.data.attemptId,
+              triggerMessageId: r.data.triggerMessageId,
+              revision: r.data.revision,
+              timestamp: r.data.timestamp,
+              action: r.data.action,
+              ...(r.data.stepId === undefined ? {} : { stepId: r.data.stepId }),
+              ...(r.data.kind === undefined ? {} : { kind: r.data.kind }),
+              ...(r.data.label === undefined ? {} : { label: r.data.label }),
+              ...(r.data.command === undefined ? {} : { command: r.data.command }),
+              ...(r.data.commandIndex === undefined ? {} : { commandIndex: r.data.commandIndex }),
+              ...(r.data.commandCount === undefined ? {} : { commandCount: r.data.commandCount }),
+              ...(r.data.detail === undefined ? {} : { detail: r.data.detail }),
+              ...(r.data.output === undefined ? {} : { output: r.data.output }),
+              ...(r.data.safeError === undefined ? {} : { safeError: r.data.safeError }),
+              ...(r.data.exitCode === undefined ? {} : { exitCode: r.data.exitCode }),
+              ...(r.data.attempt === undefined ? {} : { attempt: r.data.attempt }),
+              ...(r.data.stepSnapshot === undefined ? {} : { stepSnapshot: r.data.stepSnapshot }),
+            }
+          : {}),
       };
     }
 

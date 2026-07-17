@@ -590,7 +590,7 @@ export function ChatInput({
           )}
           {slashCommands.length > 0 && (
             <div className="hidden xl:block">
-              <BrowseCommandsDialog />
+              <BrowseCommandsDialog commands={slashCommands} />
             </div>
           )}
           <div className="flex-1" />

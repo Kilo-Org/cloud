@@ -12,7 +12,6 @@ import { PassThrough } from 'stream';
 import {
   buildGitLabOAuthUrl,
   exchangeGitLabOAuthCode,
-  refreshGitLabOAuthToken,
   validateGitLabInstance,
   validatePersonalAccessToken,
   createProjectWebhook,
@@ -150,13 +149,6 @@ describe('GitLab OAuth endpoint safety', () => {
   it('refuses to send default OAuth credentials to self-hosted token endpoints', async () => {
     await expect(
       exchangeGitLabOAuthCode('authorization-code', 'https://attacker.example')
-    ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('refuses to refresh self-hosted OAuth tokens without custom credentials', async () => {
-    await expect(
-      refreshGitLabOAuthToken('refresh-token', 'https://attacker.example')
     ).rejects.toThrow('Custom GitLab OAuth credentials are required for self-hosted instances');
     expect(mockFetch).not.toHaveBeenCalled();
   });

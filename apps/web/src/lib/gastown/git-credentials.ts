@@ -38,7 +38,8 @@ export type ResolvedGitCredentials = {
  * Returns null if the integration is missing, inactive, or has no usable credentials.
  */
 export async function resolveGitCredentialsFromIntegration(
-  platformIntegrationId: string
+  platformIntegrationId: string,
+  actorUserId: string
 ): Promise<ResolvedGitCredentials | null> {
   const [integration] = await db
     .select()
@@ -77,7 +78,7 @@ export async function resolveGitCredentialsFromIntegration(
 
   if (integration.platform === 'gitlab') {
     try {
-      const token = await getValidGitLabToken(integration);
+      const token = await getValidGitLabToken(integration, { userId: actorUserId });
       const metadata = integration.metadata as GitLabMetadata | null;
       const instanceUrl = metadata?.gitlab_instance_url;
 
@@ -169,8 +170,9 @@ function detectPlatformFromGitUrl(gitUrl: string): string | undefined {
  * meaning the existing town config credentials should be used as-is.
  */
 export async function refreshGitCredentials(
-  platformIntegrationId: string | undefined | null
+  platformIntegrationId: string | undefined | null,
+  actorUserId: string
 ): Promise<ResolvedGitCredentials | null> {
   if (!platformIntegrationId) return null;
-  return resolveGitCredentialsFromIntegration(platformIntegrationId);
+  return resolveGitCredentialsFromIntegration(platformIntegrationId, actorUserId);
 }

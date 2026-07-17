@@ -1,4 +1,8 @@
-import { BITBUCKET_REPOSITORY_LIST_AUDIENCE, signKiloToken } from '@kilocode/worker-utils';
+import {
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
+  signKiloToken,
+} from '@kilocode/worker-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const serviceMocks = vi.hoisted(() => ({
@@ -6,6 +10,7 @@ const serviceMocks = vi.hoisted(() => ({
   getTokenForRepo: vi.fn(),
   selectUserAuthorization: vi.fn(),
   disconnectUserAuthorization: vi.fn(),
+  getUserAccessToken: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -34,6 +39,7 @@ vi.mock('./github-user-authorization-service.js', () => ({
   GitHubUserAuthorizationService: class GitHubUserAuthorizationService {
     selectUserAuthorization = serviceMocks.selectUserAuthorization;
     disconnectUserAuthorization = serviceMocks.disconnectUserAuthorization;
+    getUserAccessToken = serviceMocks.getUserAccessToken;
   },
 }));
 
@@ -306,5 +312,286 @@ describe('fetch disconnect endpoint', () => {
 
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({ error: 'disconnect_failed' });
+  });
+});
+
+describe('fetch user-access-token endpoint', () => {
+  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
+  const env = {
+    NEXTAUTH_SECRET: { get: async () => jwtSecret } as SecretsStoreSecret,
+  } as CloudflareEnv;
+  const tokenFor = async (userId: string, audience?: string): Promise<string> => {
+    const { token } = await signKiloToken({
+      userId,
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 60 * 60,
+      ...(audience ? { audience } : {}),
+    });
+    return `Bearer ${token}`;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    serviceMocks.getUserAccessToken.mockResolvedValue({
+      connected: false,
+      reason: 'not_connected',
+    });
+  });
+
+  it.each([new Headers({ Authorization: 'Bearer invalid' }), new Headers()])(
+    'does not run getUserAccessToken before user authentication succeeds (%s)',
+    async headers => {
+      const response = await handler.fetch(
+        new Request(
+          'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+          { method: 'POST', headers }
+        ),
+        env
+      );
+
+      expect(response.status).toBe(401);
+      expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a generic Kilo token without the user-access-token audience', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: { Authorization: await tokenFor('user_1') },
+          body: JSON.stringify({ op: 'fetch' }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token issued for a different internal audience', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', BITBUCKET_REPOSITORY_LIST_AUDIENCE),
+          },
+          body: JSON.stringify({ op: 'fetch' }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('derives the actor from the verified JWT and ignores a body user id for fetch', async () => {
+    serviceMocks.getUserAccessToken.mockResolvedValueOnce({
+      connected: true,
+      token: 'plaintext-user-token',
+      expiresAtEpochMs: 1_700_000_000_000,
+      githubLogin: 'octocat',
+      authorizationId: 'authorization_1',
+      credentialVersion: 2,
+    });
+
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ op: 'fetch', userId: 'user_2' }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      connected: true,
+      token: 'plaintext-user-token',
+      expiresAtEpochMs: 1_700_000_000_000,
+      githubLogin: 'octocat',
+      authorizationId: 'authorization_1',
+      credentialVersion: 2,
+    });
+    expect(serviceMocks.getUserAccessToken).toHaveBeenCalledWith('user_1', { op: 'fetch' });
+  });
+
+  it('returns 400 when the request body is not valid JSON', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+            'Content-Type': 'application/json',
+          },
+          body: '{not-json',
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed discriminated union bodies', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ op: 'rotate' }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-POST methods', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(405);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for unrelated paths even with the user-access-token audience', async () => {
+    const response = await handler.fetch(
+      new Request('https://git-token-service.kilosessions.ai/getTokenForRepo', {
+        method: 'POST',
+        headers: {
+          Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+        },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(404);
+    expect(serviceMocks.getUserAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('forwards rotate op and revokes generation via service when matching', async () => {
+    serviceMocks.getUserAccessToken.mockResolvedValueOnce({
+      connected: false,
+      reason: 'revoked',
+    });
+
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            op: 'rotate',
+            staleAuthorizationId: 'authorization_1',
+            staleCredentialVersion: 1,
+          }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ connected: false, reason: 'revoked' });
+    expect(serviceMocks.getUserAccessToken).toHaveBeenCalledWith('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'authorization_1',
+      staleCredentialVersion: 1,
+    });
+  });
+
+  it('forwards reportRejected op and reports the matching credential version as revoked', async () => {
+    serviceMocks.getUserAccessToken.mockResolvedValueOnce({
+      connected: false,
+      reason: 'revoked',
+    });
+
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            op: 'reportRejected',
+            authorizationId: 'authorization_1',
+            credentialVersion: 3,
+          }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ connected: false, reason: 'revoked' });
+    expect(serviceMocks.getUserAccessToken).toHaveBeenCalledWith('user_1', {
+      op: 'reportRejected',
+      authorizationId: 'authorization_1',
+      credentialVersion: 3,
+    });
+  });
+
+  it('maps a temporarily-unavailable service failure to a 503 response', async () => {
+    serviceMocks.getUserAccessToken.mockRejectedValueOnce(
+      Object.assign(new Error('temporarily_unavailable'), {})
+    );
+
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/token',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await tokenFor('user_1', GITHUB_USER_ACCESS_TOKEN_AUDIENCE),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ op: 'fetch' }),
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ error: 'temporarily_unavailable' });
   });
 });

@@ -51,7 +51,15 @@ describe('active-sessions-router', () => {
       kilo_user_id: regularUser.id,
       role: 'owner',
     });
-  });
+    // kilocode_change - the dynamic `import()` above (needed so
+    // `process.env.SESSION_INGEST_WORKER_URL` is set before
+    // `config.server.ts` evaluates it — see the comment above the env
+    // assignment) resolves a module graph on its first hit rather than
+    // reusing a build-time-hoisted static import, which can push this
+    // hook past Jest's default 5s under full-suite parallel load even
+    // though it is comfortably fast in isolation. Give it real headroom
+    // rather than a fragile default.
+  }, 15_000);
 
   afterEach(() => {
     jest.restoreAllMocks();

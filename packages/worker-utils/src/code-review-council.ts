@@ -23,6 +23,7 @@ import {
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   CouncilFindingSchema,
   type CodeReviewCouncilConfig,
+  type CodeReviewCouncilResult,
   type CodeReviewType,
   type CouncilAggregationStrategy,
   type CouncilFinding,
@@ -517,6 +518,124 @@ const AGGREGATION_STRATEGY_LABELS: Record<CouncilAggregationStrategy, string> = 
 export function formatAggregationStrategy(strategy: string | null | undefined): string {
   if (!strategy) return AGGREGATION_STRATEGY_LABELS[DEFAULT_COUNCIL_AGGREGATION_STRATEGY];
   return AGGREGATION_STRATEGY_LABELS[strategy as CouncilAggregationStrategy] ?? strategy;
+}
+
+// ============================================================================
+// PR summary Council Review section (code-owned, injected into the review comment)
+// ============================================================================
+
+/** Delimiters for the code-owned Council Review section injected into the PR summary comment. */
+export const COUNCIL_VERDICT_BLOCK_START = '<!-- kilo-council-verdict:start -->';
+export const COUNCIL_VERDICT_BLOCK_END = '<!-- kilo-council-verdict:end -->';
+
+/** Leading marker every Kilo review summary comment carries; the section is inserted after it. */
+const KILO_REVIEW_COMMENT_MARKER = '<!-- kilo-review -->';
+
+/** One-line explanation of what each governance mode does, shown as an info line in the section. */
+const GOVERNANCE_EXPLANATIONS: Record<CouncilAggregationStrategy, string> = {
+  advisory: 'the council reports findings but does not decide a merge verdict',
+  unanimous: 'every specialist must pass; a single blocking vote blocks the merge',
+  majority: 'the merge is blocked when blocking votes outnumber passing votes',
+};
+
+/** Escapes a value for safe use inside a single markdown table cell. */
+function escapeTableCell(value: string): string {
+  return value.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+/**
+ * The full, code-owned `## Council Review` section injected into the PR summary comment: the
+ * governance decision, a per-specialist table, and a governance-mode info line. Everything here
+ * is derived from `council_result` — the model never authors any of it, so the decision on the
+ * PR always matches the stored result.
+ *
+ * `options.gates` states whether this review actually enforces a merge gate. Manual runs report
+ * the decision but do NOT block merge (no check run), so a blocking decision is phrased as
+ * "would block merge" with an explicit caveat; automated runs (a gate check carries the verdict)
+ * are phrased as "merge blocked".
+ */
+export function buildCouncilReviewSection(
+  result: CodeReviewCouncilResult,
+  options: { gates: boolean }
+): string {
+  const blockVotes = result.specialists.filter(s => s.vote === 'block').length;
+  const passVotes = result.specialists.filter(s => s.vote === 'pass').length;
+  const noResult = result.specialists.filter(s => s.vote === null).length;
+
+  const tally = [
+    `${blockVotes} block`,
+    `${passVotes} pass`,
+    ...(noResult > 0 ? [`${noResult} no result`] : []),
+  ].join(', ');
+
+  const governanceLabel = formatAggregationStrategy(result.aggregationStrategy);
+
+  let decisionLine: string;
+  let detailLine: string;
+  if (result.decision === 'block') {
+    decisionLine = `**Decision: ${options.gates ? 'Merge blocked' : 'Would block merge'}** (${governanceLabel} governance)`;
+    detailLine = options.gates
+      ? 'Merge is blocked until the blocking findings are addressed.'
+      : 'This manual review reports the decision but does not block merge. An automated review with this decision would block merge until the blocking findings are addressed.';
+  } else if (result.decision === 'pass') {
+    decisionLine = `**Decision: Approved** (${governanceLabel} governance)`;
+    detailLine = 'No specialist raised a blocking finding.';
+  } else {
+    // Advisory: the governance label already reads "Advisory (report only)", so don't repeat it
+    // in the decision line — the governance-mode line below states it once.
+    decisionLine = '**Advisory review** — findings reported, no merge decision';
+    detailLine = 'Advisory mode records these votes but does not aggregate them into a decision.';
+  }
+
+  const tableRows = result.specialists
+    .map(
+      s =>
+        `| ${escapeTableCell(s.name)} | ${s.model ? escapeTableCell(s.model) : '—'} | ${s.highestSeverity ?? '—'} | ${s.findings.length} |`
+    )
+    .join('\n');
+
+  return [
+    '## Council Review',
+    '',
+    decisionLine,
+    '',
+    `Specialist votes: ${tally}. ${detailLine}`,
+    '',
+    '| Specialist | Model | Highest severity | Findings |',
+    '|------------|-------|------------------|----------|',
+    tableRows,
+    '',
+    `_Governance mode: ${governanceLabel} — ${GOVERNANCE_EXPLANATIONS[result.aggregationStrategy]}._`,
+  ].join('\n');
+}
+
+/**
+ * Idempotently inserts (or replaces) the code-owned Council Review section in a PR summary
+ * comment body. On re-runs the delimited block is replaced in place; otherwise it is inserted
+ * right after the leading `<!-- kilo-review -->` marker line (or prepended if that marker is
+ * absent). `section` is the block body from `buildCouncilReviewSection`.
+ */
+export function upsertCouncilVerdictInBody(body: string, section: string): string {
+  const block = `${COUNCIL_VERDICT_BLOCK_START}\n${section}\n${COUNCIL_VERDICT_BLOCK_END}`;
+
+  const startIdx = body.indexOf(COUNCIL_VERDICT_BLOCK_START);
+  if (startIdx !== -1) {
+    const endIdx = body.indexOf(COUNCIL_VERDICT_BLOCK_END, startIdx);
+    if (endIdx !== -1) {
+      const after = body.slice(endIdx + COUNCIL_VERDICT_BLOCK_END.length);
+      return `${body.slice(0, startIdx)}${block}${after}`;
+    }
+    // Start marker without a matching end (corrupted) — fall through and insert fresh.
+  }
+
+  const markerIdx = body.indexOf(KILO_REVIEW_COMMENT_MARKER);
+  if (markerIdx !== -1) {
+    const lineEnd = body.indexOf('\n', markerIdx);
+    const insertAt = lineEnd === -1 ? body.length : lineEnd;
+    return `${body.slice(0, insertAt)}\n\n${block}${body.slice(insertAt)}`;
+  }
+
+  return `${block}\n\n${body}`;
 }
 
 // ============================================================================

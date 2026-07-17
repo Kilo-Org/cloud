@@ -100,7 +100,7 @@ describe('buildCouncilOrchestratorPrompt', () => {
     expect(prompt).toContain('any vote, decision, or verdict');
   });
 
-  it('instructs the coordinator to publish a facts-only council table (no vote/decision)', () => {
+  it('tells the coordinator NOT to author the council table/verdict (code owns that section)', () => {
     const prompt = buildCouncilOrchestratorPrompt({
       basePrompt: 'BASE',
       specialists: [
@@ -113,16 +113,13 @@ describe('buildCouncilOrchestratorPrompt', () => {
     // Owns publishing (specialists are read-only), following the base publication instructions.
     expect(prompt).toContain('YOU publish the review');
     expect(prompt.toLowerCase()).toContain('publication instructions');
-    // v2 council table is FACTS only — severity + counts, no vote/decision column.
-    expect(prompt).toContain('## Council review');
-    expect(prompt).toContain('Specialist | Model | Highest severity | Findings');
-    expect(prompt).toContain('Do NOT include a vote or decision column');
-    // Must NOT displace the required marker/standard heading (they come first).
-    expect(prompt).toContain('the standard summary heading come FIRST');
-    expect(prompt).toContain('Immediately AFTER that standard heading');
+    // v2: our code injects the authoritative "## Council Review" section — the model must NOT
+    // write its own table or verdict (it could contradict the computed result).
+    expect(prompt).toContain('Do NOT write a "Council Review" section');
+    expect(prompt).toContain('our system injects the authoritative "## Council Review" section');
     // Must neutralize the base "Recommendation" so the model publishes no merge verdict.
     expect(prompt).toContain('must NOT assert a merge verdict');
-    expect(prompt).toContain('determined by council governance');
+    expect(prompt).toContain('see the Council Review decision above');
   });
 
   it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {

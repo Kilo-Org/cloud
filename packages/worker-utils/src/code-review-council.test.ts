@@ -3,6 +3,9 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_RESULT_MARKER_TAG,
   COUNCIL_SPECIALIST_PRESETS,
+  COUNCIL_VERDICT_BLOCK_END,
+  COUNCIL_VERDICT_BLOCK_START,
+  buildCouncilReviewSection,
   computeCouncilDecision,
   councilDecisionBlocksMerge,
   decideCouncilFromManifest,
@@ -17,11 +20,12 @@ import {
   presetToSpecialist,
   reconcileCouncilVotes,
   summarizeCouncilManifest,
+  upsertCouncilVerdictInBody,
   type SpecialistVote,
 } from './code-review-council.js';
 import type { CouncilResultManifest } from './code-review-council.js';
 import { CodeReviewCouncilConfigSchema } from '@kilocode/db/schema-types';
-import type { CodeReviewCouncilConfig } from '@kilocode/db/schema-types';
+import type { CodeReviewCouncilConfig, CodeReviewCouncilResult } from '@kilocode/db/schema-types';
 
 const votes = (...vs: Array<[string, SpecialistVote['vote']]>): SpecialistVote[] =>
   vs.map(([specialistId, vote]) => ({ specialistId, vote }));
@@ -555,5 +559,117 @@ describe('determineAutomatedReviewType', () => {
         { councilAvailable: true }
       )
     ).toBe('standard');
+  });
+});
+
+const councilResult = (
+  decision: CodeReviewCouncilResult['decision'],
+  votes: Array<CodeReviewCouncilResult['specialists'][number]['vote']>,
+  aggregationStrategy: CodeReviewCouncilResult['aggregationStrategy'] = 'unanimous'
+): CodeReviewCouncilResult => ({
+  decision,
+  aggregationStrategy,
+  specialists: votes.map((vote, i) => ({
+    id: `s${i}`,
+    role: 'security',
+    name: `S${i}`,
+    model: null,
+    thinkingEffort: null,
+    vote,
+    highestSeverity: vote === 'block' ? 'critical' : vote === 'pass' ? 'nitpick' : null,
+    findings: [],
+  })),
+});
+
+describe('buildCouncilReviewSection', () => {
+  it('renders a title-cased heading, per-specialist table, and governance info line', () => {
+    const section = buildCouncilReviewSection(councilResult('block', ['block', 'pass']), {
+      gates: true,
+    });
+    expect(section).toContain('## Council Review');
+    expect(section).toContain('| Specialist | Model | Highest severity | Findings |');
+    expect(section).toContain('_Governance mode: Unanimous —');
+    expect(section).toContain('a single blocking vote blocks the merge');
+  });
+
+  it('phrases a gating (automated) block decision as a hard merge block', () => {
+    const section = buildCouncilReviewSection(councilResult('block', ['block', 'block', 'pass']), {
+      gates: true,
+    });
+    expect(section).toContain('**Decision: Merge blocked** (Unanimous governance)');
+    expect(section).toContain('2 block, 1 pass');
+    expect(section).toContain('Merge is blocked until the blocking findings are addressed.');
+  });
+
+  it('phrases a non-gating (manual) block decision as "would block" with a caveat', () => {
+    const section = buildCouncilReviewSection(councilResult('block', ['block', 'pass']), {
+      gates: false,
+    });
+    expect(section).toContain('**Decision: Would block merge** (Unanimous governance)');
+    expect(section).toContain('does not block merge');
+    expect(section).toContain('An automated review with this decision would block merge');
+  });
+
+  it('renders a pass decision and includes a no-result count when present', () => {
+    const section = buildCouncilReviewSection(councilResult('pass', ['pass', null], 'majority'), {
+      gates: true,
+    });
+    expect(section).toContain('**Decision: Approved** (Majority governance)');
+    expect(section).toContain('1 pass, 1 no result');
+    expect(section).toContain('No specialist raised a blocking finding');
+  });
+
+  it('renders an advisory section with governance info but no merge decision', () => {
+    const section = buildCouncilReviewSection(councilResult(null, ['pass', 'block'], 'advisory'), {
+      gates: false,
+    });
+    expect(section).toContain('**Advisory review** — findings reported, no merge decision');
+    expect(section).toContain('does not decide a merge verdict');
+    expect(section).not.toContain('Merge blocked');
+    // The governance label already says "(report only)" — the info line must not repeat it.
+    expect(section).not.toContain('report only — report only');
+  });
+
+  it('escapes pipe characters in specialist model/name cells', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = 'vendor|weird';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).toContain('vendor\\|weird');
+  });
+});
+
+describe('upsertCouncilVerdictInBody', () => {
+  const section = '> **Council decision: Merge blocked** (Unanimous governance)';
+
+  it('inserts the block right after the leading kilo-review marker', () => {
+    const body = '<!-- kilo-review -->\n## Code Review Summary\nbody';
+    const out = upsertCouncilVerdictInBody(body, section);
+    expect(out.indexOf(COUNCIL_VERDICT_BLOCK_START)).toBeGreaterThan(
+      out.indexOf('<!-- kilo-review -->')
+    );
+    expect(out.indexOf(COUNCIL_VERDICT_BLOCK_START)).toBeLessThan(
+      out.indexOf('## Code Review Summary')
+    );
+    expect(out).toContain(
+      `${COUNCIL_VERDICT_BLOCK_START}\n${section}\n${COUNCIL_VERDICT_BLOCK_END}`
+    );
+  });
+
+  it('replaces an existing verdict block in place (idempotent re-runs)', () => {
+    const body = '<!-- kilo-review -->\n## Code Review Summary\nbody';
+    const once = upsertCouncilVerdictInBody(body, section);
+    const twice = upsertCouncilVerdictInBody(
+      once,
+      '> **Council decision: Approved** (Majority governance)'
+    );
+    expect(twice.match(new RegExp(COUNCIL_VERDICT_BLOCK_START, 'g'))).toHaveLength(1);
+    expect(twice).toContain('Approved');
+    expect(twice).not.toContain('Merge blocked');
+  });
+
+  it('prepends the block when no kilo-review marker is present', () => {
+    const out = upsertCouncilVerdictInBody('plain body', section);
+    expect(out.startsWith(COUNCIL_VERDICT_BLOCK_START)).toBe(true);
+    expect(out).toContain('plain body');
   });
 });

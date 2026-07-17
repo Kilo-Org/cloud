@@ -2,10 +2,10 @@ import { and, count, desc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
-import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import {
   cancelCodingPlanSubscription,
   getAvailableCodingPlanIds,
+  getAssignedCodingPlanApiKey,
   getCodingPlanAvailabilityIntentPlanIds,
   getKeyInventoryCounts,
   requestCodingPlanAvailabilityNotification,
@@ -30,14 +30,12 @@ import {
   getCodingPlanCatalog,
   getCodingPlanPrice,
 } from '@/lib/coding-plans/pricing';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   coding_plan_availability_intents,
-  coding_plan_key_inventory,
   coding_plan_subscriptions,
   coding_plan_terms,
   credit_transactions,
@@ -50,11 +48,6 @@ const SubscriptionIdSchema = z.string().uuid();
 const BillingHistoryInputSchema = z.object({
   subscriptionId: SubscriptionIdSchema,
   cursor: z.string().optional(),
-});
-const EncryptedApiKeySchema = z.object({
-  iv: z.string().min(1),
-  data: z.string().min(1),
-  authTag: z.string().min(1),
 });
 const CodingPlanUsageOutputSchema = z.object({
   subscriptionId: SubscriptionIdSchema,
@@ -241,42 +234,18 @@ export const codingPlansRouter = createTRPCRouter({
         });
       }
 
-      const [assignment] = await db
-        .select({
-          planId: coding_plan_key_inventory.plan_id,
-          providerId: coding_plan_key_inventory.provider_id,
-          status: coding_plan_key_inventory.status,
-          assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
-          encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
-        })
-        .from(coding_plan_key_inventory)
-        .where(eq(coding_plan_key_inventory.id, subscription.keyInventoryId))
-        .limit(1);
-      const encrypted = EncryptedApiKeySchema.safeParse(assignment?.encryptedApiKey);
-      if (
-        !assignment ||
-        assignment.status !== 'assigned' ||
-        assignment.assignedToUserId !== ctx.user.id ||
-        assignment.planId !== subscription.planId ||
-        assignment.providerId !== subscription.providerId ||
-        !encrypted.success
-      ) {
+      const apiKey = await getAssignedCodingPlanApiKey({
+        inventoryId: subscription.keyInventoryId,
+        userId: ctx.user.id,
+        planId: subscription.planId,
+        providerId: subscription.providerId,
+      });
+      if (!apiKey) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Coding Plan usage is unavailable.',
         });
       }
-
-      const apiKey = (() => {
-        try {
-          return decryptApiKey(encrypted.data, BYOK_ENCRYPTION_KEY);
-        } catch {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Coding Plan usage is unavailable.',
-          });
-        }
-      })();
 
       const native = await getMiniMaxUsage(apiKey).catch(error => {
         if (error instanceof MiniMaxUsageError) {

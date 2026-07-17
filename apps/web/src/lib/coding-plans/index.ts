@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { addDays } from 'date-fns';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
+import * as z from 'zod';
 
 import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -37,6 +38,11 @@ const logError = sentryLogger('coding-plans', 'error');
 // large inventory uploads finish within the request budget without overwhelming
 // the upstream provider with one unbounded burst of requests.
 const INVENTORY_VALIDATION_CONCURRENCY = 10;
+const EncryptedApiKeySchema = z.object({
+  iv: z.string().min(1),
+  data: z.string().min(1),
+  authTag: z.string().min(1),
+});
 
 type CancellationReason =
   | 'user_canceled'
@@ -48,6 +54,42 @@ type SubscriptionOutcome = {
   subscriptionId: string;
   charged: boolean;
 };
+
+export async function getAssignedCodingPlanApiKey(input: {
+  inventoryId: string;
+  userId: string;
+  planId: string;
+  providerId: string;
+}) {
+  const [assignment] = await db
+    .select({
+      planId: coding_plan_key_inventory.plan_id,
+      providerId: coding_plan_key_inventory.provider_id,
+      status: coding_plan_key_inventory.status,
+      assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
+      encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
+    })
+    .from(coding_plan_key_inventory)
+    .where(eq(coding_plan_key_inventory.id, input.inventoryId))
+    .limit(1);
+  const encrypted = EncryptedApiKeySchema.safeParse(assignment?.encryptedApiKey);
+  if (
+    !assignment ||
+    assignment.status !== 'assigned' ||
+    assignment.assignedToUserId !== input.userId ||
+    assignment.planId !== input.planId ||
+    assignment.providerId !== input.providerId ||
+    !encrypted.success
+  ) {
+    return null;
+  }
+
+  try {
+    return decryptApiKey(encrypted.data, BYOK_ENCRYPTION_KEY);
+  } catch {
+    return null;
+  }
+}
 
 function idempotencyFingerprint(idempotencyKey: string): string {
   return createHash('sha256').update(idempotencyKey).digest('hex');

@@ -1259,6 +1259,10 @@ export const COUNCIL_FINDING_SEVERITIES = ['critical', 'warning', 'suggestion', 
 export const CouncilFindingSeveritySchema = z.enum(COUNCIL_FINDING_SEVERITIES);
 export type CouncilFindingSeverity = (typeof COUNCIL_FINDING_SEVERITIES)[number];
 
+// The single blocking severity: a finding at this level makes the specialist's derived vote
+// `block`. Referenced by `isBlockingSeverity` so the blocking rule lives in exactly one place.
+export const COUNCIL_BLOCKING_SEVERITY: CouncilFindingSeverity = 'critical';
+
 /**
  * Review type for a run. 'standard' is the existing single-reviewer scan; 'council'
  * is a multi-specialist run. Extensible to future types.
@@ -1282,6 +1286,11 @@ export type CodeReviewTriggerSource = z.infer<typeof CodeReviewTriggerSourceSche
 export const COUNCIL_AGGREGATION_STRATEGIES = ['advisory', 'unanimous', 'majority'] as const;
 export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRATEGIES);
 export type CouncilAggregationStrategy = z.infer<typeof CouncilAggregationStrategySchema>;
+
+// The safe default governance mode: report only, never gate a merge unasked. Single source of
+// truth — referenced by the schema default, the manual-job UI state, dispatch, and the label
+// fallback, so the default can't drift between the backend and what the UI initializes to.
+export const DEFAULT_COUNCIL_AGGREGATION_STRATEGY: CouncilAggregationStrategy = 'advisory';
 
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
@@ -1364,7 +1373,7 @@ export const CodeReviewCouncilConfigSchema = z.object({
         value === 'any_blocking_member' || value === 'unanimous_required' ? 'unanimous' : value,
       CouncilAggregationStrategySchema
     )
-    .default('advisory'),
+    .default(DEFAULT_COUNCIL_AGGREGATION_STRATEGY),
   // Specialist ids must be unique: a specialist must not appear (and therefore vote)
   // more than once, or vote aggregation could be skewed by a duplicate.
   specialists: z

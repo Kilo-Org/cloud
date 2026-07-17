@@ -18,6 +18,9 @@
 
 import * as z from 'zod';
 import {
+  COUNCIL_BLOCKING_SEVERITY,
+  COUNCIL_FINDING_SEVERITIES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   CouncilFindingSchema,
   type CodeReviewCouncilConfig,
   type CodeReviewType,
@@ -35,21 +38,24 @@ import {
 /** A specialist's BINARY vote as seen by aggregation (code-derived, never model-authored). */
 export type SpecialistVote = { specialistId: string; vote: CouncilVote };
 
-/** Ranking of the canonical severity scale; higher = more severe. Off-scale labels rank 0. */
-const SEVERITY_RANK: Record<string, number> = {
-  critical: 4,
-  warning: 3,
-  suggestion: 2,
-  nitpick: 1,
-};
+// Ranking derived from the canonical scale (index 0 = most severe) so it can never drift from
+// COUNCIL_FINDING_SEVERITIES: extend/reorder the scale and the ranking follows automatically.
+// Off-scale labels rank 0 (below the whole scale).
+const SEVERITY_RANK: Record<string, number> = Object.fromEntries(
+  COUNCIL_FINDING_SEVERITIES.map((severity, index) => [
+    severity,
+    COUNCIL_FINDING_SEVERITIES.length - index,
+  ])
+);
 
 function severityRank(severity: string): number {
   return SEVERITY_RANK[severity.trim().toLowerCase()] ?? 0;
 }
 
-/** Whether a finding severity counts as BLOCKING (v2: only `critical`). Case/space-insensitive. */
+/** Whether a finding severity counts as BLOCKING (the canonical `COUNCIL_BLOCKING_SEVERITY`).
+ * Case/space-insensitive. */
 export function isBlockingSeverity(severity: string | null | undefined): boolean {
-  return (severity ?? '').trim().toLowerCase() === 'critical';
+  return (severity ?? '').trim().toLowerCase() === COUNCIL_BLOCKING_SEVERITY;
 }
 
 /**
@@ -129,8 +135,9 @@ export type CouncilSpecialistFinding = CouncilFinding;
 /**
  * One specialist's structured result (v2). The model reports ONLY facts: `findings` (each
  * with a severity from the canonical scale). It does NOT report a vote — the vote is
- * code-derived from the findings (`deriveSpecialistVote`). `highestSeverity` is likewise
- * derived, not reported. Lenient throughout so an off-scale label never rejects the manifest.
+ * code-derived from the findings (`deriveSpecialistVote`), as is `highestSeverity`. `findings`
+ * is required and severities must be on-scale (both fail closed if not); only `model` is
+ * lenient (a missing model does not invalidate the manifest).
  */
 export const CouncilSpecialistResultSchema = z.object({
   specialistId: z.string().min(1).max(64),
@@ -506,9 +513,9 @@ const AGGREGATION_STRATEGY_LABELS: Record<CouncilAggregationStrategy, string> = 
   majority: 'Majority',
 };
 
-/** Display label for a governance mode (falls back to the safe-default advisory label). */
+/** Display label for a governance mode (falls back to the safe-default label). */
 export function formatAggregationStrategy(strategy: string | null | undefined): string {
-  if (!strategy) return AGGREGATION_STRATEGY_LABELS.advisory;
+  if (!strategy) return AGGREGATION_STRATEGY_LABELS[DEFAULT_COUNCIL_AGGREGATION_STRATEGY];
   return AGGREGATION_STRATEGY_LABELS[strategy as CouncilAggregationStrategy] ?? strategy;
 }
 

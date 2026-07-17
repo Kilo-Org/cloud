@@ -9,6 +9,10 @@ import type {
   PlatformIntegration,
 } from '@kilocode/db/schema';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
+import {
+  COUNCIL_RESULT_MARKER_TAG,
+  COUNCIL_VERDICT_BLOCK_START,
+} from '@kilocode/worker-utils/code-review-council';
 
 // --- Mock functions ---
 
@@ -35,6 +39,9 @@ const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
 >;
 const mockCreateInfraRetryAttemptIfMissing = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.createInfraRetryAttemptIfMissing
+>;
+const mockSetCodeReviewCouncilResult = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.setCodeReviewCouncilResult
 >;
 const mockFinalizeCompletedCodeReviewWithAnalytics = jest.fn() as jest.MockedFunction<
   typeof analyticsDbModule.finalizeCompletedCodeReviewWithAnalytics
@@ -102,6 +109,7 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing: mockCreateInfraRetryAttemptIfMissing,
+  setCodeReviewCouncilResult: mockSetCodeReviewCouncilResult,
 }));
 
 jest.mock('@/lib/code-reviews/analytics/db', () => ({
@@ -410,6 +418,7 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
+  mockSetCodeReviewCouncilResult.mockResolvedValue(undefined);
   mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'applied' });
   mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
   mockBuildReviewSummaryFooter.mockImplementation(
@@ -2609,6 +2618,204 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.any(Error),
         expect.objectContaining({ tags: { source: 'code-review-status-gate-check' } })
       );
+    });
+  });
+
+  describe('council decision gate', () => {
+    const crit = [{ path: 'a.ts', line: 1, severity: 'critical', rationale: 'x' }];
+
+    const councilManifest = (specialists: unknown[]): string =>
+      `Council review complete.\n<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify({ specialists })} -->`;
+
+    const makeCouncilReview = (
+      aggregationStrategy: 'advisory' | 'unanimous' | 'majority',
+      overrides: Partial<CloudAgentCodeReview> = {}
+    ): CloudAgentCodeReview =>
+      makeReview({
+        review_type: 'council',
+        manual_config: {
+          instructions: null,
+          outputMode: 'provider',
+          agentConfig: {
+            review_style: 'balanced',
+            focus_areas: [],
+            model_slug: 'base/model',
+            council: {
+              enabled: true,
+              aggregation_strategy: aggregationStrategy,
+              specialists: [
+                {
+                  id: 'security',
+                  role: 'security',
+                  name: 'Security',
+                  enabled: true,
+                  required: false,
+                  lens: 'security',
+                },
+                {
+                  id: 'performance',
+                  role: 'performance',
+                  name: 'Performance',
+                  enabled: true,
+                  required: false,
+                  lens: 'performance',
+                },
+              ],
+            },
+          },
+        },
+        ...overrides,
+      });
+
+    const findCheckRunConclusion = (): string | undefined => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const call = mockUpdateCheckRun.mock.calls.at(-1) as any[] | undefined;
+      return call?.[4]?.conclusion as string | undefined;
+    };
+
+    it('reports a block decision but does NOT gate a manual council run (check stays green)', async () => {
+      // Council is manual-only today, so a council review is always a manual run. Manual runs never
+      // enforce a merge gate (they report the decision only), so a block decision must NOT fail the
+      // check — matching the "does not block merge" copy in the injected Council Review section.
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      // The decision is still computed and persisted as block...
+      expect(mockSetCodeReviewCouncilResult).toHaveBeenCalledWith(
+        REVIEW_ID,
+        expect.objectContaining({ decision: 'block' })
+      );
+      // ...but a manual run does not enforce it, so the check is not failed.
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    it('does NOT post a blocking GitLab commit status for a manual council block', async () => {
+      // Finding: without a single gate flag, GitLab's branch would setCommitStatus('failed') on a
+      // manual block (which can block MR merge) while the comment says it does not block. The gate
+      // must resolve to a non-blocking status for a manual run on GitLab too.
+      mockGetCodeReviewById.mockResolvedValue(
+        makeCouncilReview('unanimous', {
+          platform: 'gitlab',
+          platform_project_id: 42,
+          check_run_id: null,
+        })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = mockSetCommitStatus.mock.calls.at(-1);
+      expect(call?.[3]).toBe('success'); // NOT 'failed'
+    });
+
+    it('passes the check when every specialist passes under unanimous governance', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: [] },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    it('never gates in advisory mode even with a blocking finding', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('advisory'));
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockSetCodeReviewCouncilResult).toHaveBeenCalledWith(
+        REVIEW_ID,
+        expect.objectContaining({ decision: null })
+      );
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    const findCouncilSectionCall = () =>
+      mockUpdateKiloReviewComment.mock.calls.find(
+        call => typeof call[4] === 'string' && call[4].includes(COUNCIL_VERDICT_BLOCK_START)
+      );
+
+    it('injects the code-owned Council Review section, phrased as "would block" for a manual run', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = findCouncilSectionCall();
+      expect(call).toBeDefined();
+      // Manual jobs never create a check run, so the decision is reported but does not block.
+      expect(call?.[4]).toContain('## Council Review');
+      expect(call?.[4]).toContain('Would block merge');
+      expect(call?.[4]).toContain('does not block merge');
+      // Efficiency: the council section is folded into the summary footer update — one fetch,
+      // one update, not a separate find+patch pass.
+      expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledTimes(1);
+    });
+
+    it('injects an advisory Council Review section (governance info, no merge decision)', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('advisory'));
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = findCouncilSectionCall();
+      expect(call).toBeDefined();
+      expect(call?.[4]).toContain('Advisory review');
+      expect(call?.[4]).not.toContain('Would block merge');
     });
   });
 

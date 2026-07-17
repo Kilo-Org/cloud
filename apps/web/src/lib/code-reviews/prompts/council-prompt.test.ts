@@ -95,12 +95,12 @@ describe('buildCouncilOrchestratorPrompt', () => {
     expect(prompt).toContain('subagent_type "security"');
     expect(prompt).toContain('subagent_type "performance"');
     expect(prompt).toContain('BASE REVIEW CONTEXT');
-    // Coordinator must not author an overall decision anywhere — code owns it (avoids the
-    // model-derived PR decision diverging from the fail-closed, coverage-checked one).
-    expect(prompt).toContain('Do NOT compute or render an overall');
+    // Coordinator must not author a vote, decision, or verdict anywhere — code owns them
+    // (v2: votes derived from severities, decision from votes with coverage checks).
+    expect(prompt).toContain('any vote, decision, or verdict');
   });
 
-  it('instructs the coordinator to publish the aggregated review + a council voting table', () => {
+  it('tells the coordinator NOT to author the council table/verdict (code owns that section)', () => {
     const prompt = buildCouncilOrchestratorPrompt({
       basePrompt: 'BASE',
       specialists: [
@@ -113,21 +113,13 @@ describe('buildCouncilOrchestratorPrompt', () => {
     // Owns publishing (specialists are read-only), following the base publication instructions.
     expect(prompt).toContain('YOU publish the review');
     expect(prompt.toLowerCase()).toContain('publication instructions');
-    // Council voting table in the summary, with vote icons.
-    expect(prompt).toContain('## Council review');
-    expect(prompt).toContain('Specialist | Model | Vote | Findings');
-    expect(prompt).toContain('✅ Pass');
-    expect(prompt).toContain('⚠️ Warn');
-    expect(prompt).toContain('⛔ Block');
-    expect(prompt).toContain('➖ Abstain');
-    // Must NOT displace the required marker/standard heading (they come first); council
-    // section goes right after — so the summary-identification contract stays intact.
-    expect(prompt).toContain('the standard summary heading come FIRST');
-    expect(prompt).toContain('Immediately AFTER that standard heading');
-    // Must neutralize the base "Recommendation" field so the model can't publish a merge
-    // verdict (Merge / Address before merge) that contradicts the code-owned decision.
+    // v2: our code injects the authoritative "## Council Review" section — the model must NOT
+    // write its own table or verdict (it could contradict the computed result).
+    expect(prompt).toContain('Do NOT write a "Council Review" section');
+    expect(prompt).toContain('our system injects the authoritative "## Council Review" section');
+    // Must neutralize the base "Recommendation" so the model publishes no merge verdict.
     expect(prompt).toContain('must NOT assert a merge verdict');
-    expect(prompt).toContain('determined by council governance');
+    expect(prompt).toContain('see the Council Review decision above');
   });
 
   it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {
@@ -140,8 +132,7 @@ describe('buildCouncilOrchestratorPrompt', () => {
       aggregationStrategy: 'majority',
     });
 
-    // 1. Startup line names the specialists AND the formatted governance label — assert the
-    // full fragment so it isn't satisfied by the separate `describeAggregationStrategy` text.
+    // 1. Startup line names the specialists AND the formatted governance label.
     expect(prompt).toContain(
       'Starting council review with 2 specialists (Security, Performance) using Majority governance.'
     );
@@ -153,11 +144,14 @@ describe('buildCouncilOrchestratorPrompt', () => {
 });
 
 describe('buildSpecialistAgentPrompt', () => {
-  it('scopes the specialist to its lens and asks for a structured vote + findings', () => {
+  it('scopes the specialist to its lens and asks for findings + fixed severity, NO vote (v2)', () => {
     const prompt = buildSpecialistAgentPrompt(specialist({ id: 'security', name: 'Security' }));
     expect(prompt).toContain('security concerns');
-    expect(prompt).toContain('"vote"');
-    expect(prompt).toContain('findings');
+    expect(prompt).toContain('"findings"');
+    expect(prompt).toContain('critical|warning|suggestion|nitpick');
+    // The specialist must NOT vote — the vote is code-derived from severities.
+    expect(prompt).toContain('Do NOT cast a vote');
+    expect(prompt).not.toContain('"vote"');
   });
 
   it('bounds the specialist: read-only, diff-scoped, and convergent (no runaway loop)', () => {

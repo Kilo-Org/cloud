@@ -22,7 +22,6 @@ import {
   microdollarsToUsd,
   MICRODOLLARS_PER_USD,
 } from './policy';
-import { loadCanonicalCostInsightAggregationsByHour } from './canonical-sources';
 import { getCostInsightAnomalyPolicy } from './evaluation';
 import {
   countCostInsightEvents,
@@ -35,9 +34,9 @@ import {
 } from './repository';
 import {
   getOwnerHourDriverEvidence,
-  getOwnerHourlySpend,
+  loadOwnerDashboardHourlySpend,
   getOwnerRolling24HourSpendExact,
-  getOwnerTopSpendDrivers,
+  getOwnerTopSpendDriversByRange,
   type OwnerHourlySpend,
   type OwnerTopSpendDriver,
 } from './spend-repository';
@@ -312,64 +311,18 @@ function hourlyEvidenceRange(
   return points.filter(point => point.hourStart >= startHour);
 }
 
-function canonicalHourlySpend(
-  hourly: Awaited<ReturnType<typeof loadCanonicalCostInsightAggregationsByHour>>,
-  startHour: string,
-  endHourExclusive: string
-): OwnerHourlySpend[] {
-  const byHour = new Map(hourly.map(hour => [hour.hourStart, hour]));
-  const points: OwnerHourlySpend[] = [];
-  for (
-    let hourStart = startHour;
-    hourStart < endHourExclusive;
-    hourStart = addHours(hourStart, 1)
-  ) {
-    const aggregation = byHour.get(hourStart);
-    const variable = aggregation?.totals.find(total => total.category === 'variable');
-    const scheduled = aggregation?.totals.find(total => total.category === 'scheduled');
-    const variableMicrodollars = variable?.totalMicrodollars ?? 0;
-    const scheduledMicrodollars = scheduled?.totalMicrodollars ?? 0;
-    const totalMicrodollars = variableMicrodollars + scheduledMicrodollars;
-    if (!Number.isSafeInteger(totalMicrodollars)) {
-      throw new Error('Canonical Cost Insights hourly total exceeds the safe-integer range.');
-    }
-    points.push({
-      hourStart,
-      variableMicrodollars,
-      scheduledMicrodollars,
-      totalMicrodollars,
-      variableRecordCount: variable?.spendRecordCount ?? 0,
-      scheduledRecordCount: scheduled?.spendRecordCount ?? 0,
-      isCovered: true,
-    });
-  }
-  return points;
-}
-
 async function loadEvidenceByRange(
   database: CostInsightDatabase,
   owner: CostInsightSpendOwner,
   endHourExclusive: string,
-  asOf: string,
   currentHour: OwnerHourlySpend
 ): Promise<Record<SpendRange, SpendEvidencePoint[]>> {
   const startHour = spendRangeStartHour('90d', endHourExclusive);
-  const rollupPoints = await getOwnerHourlySpend(database, {
+  const points = await loadOwnerDashboardHourlySpend(database, {
     owner,
     startHour,
     endHourExclusive,
   });
-  const points = rollupPoints.some(point => !point.isCovered)
-    ? canonicalHourlySpend(
-        await loadCanonicalCostInsightAggregationsByHour(database, {
-          owner,
-          startInclusive: startHour,
-          endExclusive: asOf,
-        }),
-        startHour,
-        endHourExclusive
-      )
-    : rollupPoints;
 
   return Object.fromEntries(
     (Object.keys(rangeHours) as SpendRange[]).map(range => [
@@ -384,26 +337,21 @@ async function loadTopDriversByRange(
   owner: CostInsightSpendOwner,
   endHourExclusive: string
 ): Promise<Record<SpendRange, OwnerTopSpendDriver[]>> {
-  const loadRange = (range: SpendRange) =>
-    getOwnerTopSpendDrivers(database, {
-      owner,
+  const driversByRange = await getOwnerTopSpendDriversByRange(database, {
+    owner,
+    ranges: (Object.keys(rangeHours) as SpendRange[]).map(range => ({
+      key: range,
       startHour: spendRangeStartHour(range, endHourExclusive),
-      endHourExclusive,
-      limit: 5,
-    });
-  const [thisHour, last24Hours, last7Days, last30Days, last90Days] = await Promise.all([
-    loadRange('1h'),
-    loadRange('24h'),
-    loadRange('7d'),
-    loadRange('30d'),
-    loadRange('90d'),
-  ]);
+    })),
+    endHourExclusive,
+    limit: 5,
+  });
   return {
-    '1h': thisHour,
-    '24h': last24Hours,
-    '7d': last7Days,
-    '30d': last30Days,
-    '90d': last90Days,
+    '1h': driversByRange.get('1h') ?? [],
+    '24h': driversByRange.get('24h') ?? [],
+    '7d': driversByRange.get('7d') ?? [],
+    '30d': driversByRange.get('30d') ?? [],
+    '90d': driversByRange.get('90d') ?? [],
   };
 }
 
@@ -877,7 +825,7 @@ export async function buildCostInsightsDashboardData(params: {
   };
   const [evidenceByRange, actorLabels, activeSuggestions, eventPreview, memberLimitsHref] =
     await Promise.all([
-      loadEvidenceByRange(params.database, params.owner, endHourExclusive, asOf, currentHourSpend),
+      loadEvidenceByRange(params.database, params.owner, endHourExclusive, currentHourSpend),
       loadActorLabels(params.database, [
         ...Object.values(topDriversByRange).flatMap(drivers =>
           drivers.map(driver => driver.actorUserId)

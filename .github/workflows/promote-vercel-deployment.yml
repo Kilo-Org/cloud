@@ -7,6 +7,16 @@ on:
         description: 'Vercel deployment URL to promote'
         required: true
         type: string
+      axiom_annotation_dataset:
+        description: 'Optional Axiom dataset used to scope deployment annotations'
+        required: false
+        type: string
+        default: ''
+      axiom_expected_project:
+        description: 'Vercel project name the promoted deployment must match before annotating'
+        required: false
+        type: string
+        default: 'kilocode-app'
 
 permissions:
   contents: read
@@ -26,3 +36,109 @@ jobs:
 
       - name: Promote Vercel deployment
         run: vercel promote "${{ inputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Annotate production deployment in Axiom
+        if: inputs.axiom_annotation_dataset != ''
+        # Annotation is best-effort observability, not a deploy gate: never fail
+        # a successful promotion because Axiom/Vercel is flaky or slow to update.
+        continue-on-error: true
+        env:
+          AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+          AXIOM_DATASET: ${{ inputs.axiom_annotation_dataset }}
+          AXIOM_ORG_ID: kilo-code-nvjh
+          DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+          EXPECTED_PROJECT: ${{ inputs.axiom_expected_project }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$AXIOM_ANNOTATION_TOKEN" ]; then
+            echo "::warning::Skipping deployment annotation because AXIOM_ANNOTATION_TOKEN is not configured"
+            exit 0
+          fi
+
+          # Vercel's API can briefly lag behind a promotion, so retry until the
+          # deployment reports READY instead of failing on the first check.
+          deployment=""
+          for attempt in 1 2 3 4 5; do
+            inspection_error=$(mktemp)
+            if ! inspection=$(vercel inspect "$DEPLOYMENT_URL" --json --scope=kilocode --token="$VERCEL_TOKEN" 2>"$inspection_error"); then
+              echo "::warning::vercel inspect failed (attempt $attempt): $(<"$inspection_error")"
+              rm "$inspection_error"
+              if [ "$attempt" != "5" ]; then
+                sleep 5
+              fi
+              continue
+            fi
+            rm "$inspection_error"
+
+            deployment_id=$(jq -r '.id // empty' <<<"$inspection" 2>/dev/null || true)
+            if [ -z "$deployment_id" ]; then
+              echo "::warning::vercel inspect did not return a deployment id (attempt $attempt): $inspection"
+              if [ "$attempt" != "5" ]; then
+                sleep 5
+              fi
+              continue
+            fi
+
+            deployment=$(vercel api "/v13/deployments/$deployment_id" --raw --scope=kilocode --token="$VERCEL_TOKEN" 2>&1)
+            ready_state=$(jq -r '.readyState // empty' <<<"$deployment" 2>/dev/null)
+            if [ "$ready_state" = "READY" ]; then
+              break
+            fi
+
+            echo "::warning::Deployment not READY yet (attempt $attempt, state=$ready_state)"
+            if [ "$attempt" != "5" ]; then
+              sleep 5
+            fi
+          done
+
+          project=$(jq -r '.name // empty' <<<"$deployment" 2>/dev/null)
+          target=$(jq -r '.target // empty' <<<"$deployment" 2>/dev/null)
+          ready_state=$(jq -r '.readyState // empty' <<<"$deployment" 2>/dev/null)
+
+          if [ "$project" != "$EXPECTED_PROJECT" ] || [ "$target" != "production" ] || [ "$ready_state" != "READY" ]; then
+            echo "::warning::Skipping annotation for unexpected deployment: project=$project target=$target state=$ready_state"
+            exit 0
+          fi
+
+          deployment_time=$(jq -r '((.ready // .createdAt) / 1000) | todateiso8601' <<<"$deployment")
+          commit_sha=$(jq -r '.meta.githubCommitSha // "unknown"' <<<"$deployment")
+          short_sha=${commit_sha:0:8}
+          commit_message=$(jq -r '(.meta.githubCommitMessage // "Commit message unavailable" | split("\n")[0])[0:360]' <<<"$deployment")
+          commit_ref=$(jq -r '.meta.githubCommitRef // "unknown"' <<<"$deployment")
+          commit_author=$(jq -r '.meta.githubCommitAuthorName // .creator.username // "unknown"' <<<"$deployment")
+          deployment_link="https://vercel.com/kilocode/$project/${deployment_id#dpl_}"
+
+          payload=$(jq -n \
+            --arg dataset "$AXIOM_DATASET" \
+            --arg time "$deployment_time" \
+            --arg title "$project · $short_sha" \
+            --arg description "$commit_message · $commit_ref · $commit_author" \
+            --arg url "$deployment_link" \
+            --arg type "$project-production-deployment" \
+            '{datasets:[$dataset], type:$type, time:$time, title:$title, description:$description, url:$url}')
+
+          for attempt in 1 2 3; do
+            if axiom_response=$(curl --fail-with-body --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --request POST \
+              --header "Authorization: Bearer $AXIOM_ANNOTATION_TOKEN" \
+              --header "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+              --header "Content-Type: application/json" \
+              --data "$payload" \
+              https://api.axiom.co/v2/annotations 2>&1); then
+              echo "Created Axiom annotation for Vercel deployment $deployment_id"
+              exit 0
+            else
+              curl_exit=$?
+            fi
+
+            axiom_error=${axiom_response//$'\n'/ }
+            echo "Axiom annotation attempt $attempt/3 failed (curl exit $curl_exit): ${axiom_error:0:1000}"
+            if [ "$attempt" != "3" ]; then
+              sleep 2
+            fi
+          done
+
+          echo "::warning::Failed to create Axiom annotation after 3 attempts (last curl exit $curl_exit)"
+          exit "$curl_exit"

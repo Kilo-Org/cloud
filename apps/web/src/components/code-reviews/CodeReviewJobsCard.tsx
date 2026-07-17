@@ -51,6 +51,7 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Switch } from '@/components/ui/switch';
 import {
   COUNCIL_AGGREGATION_STRATEGIES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   type CouncilAggregationStrategy,
 } from '@kilocode/db/schema-types';
 import {
@@ -202,7 +203,7 @@ export function CodeReviewJobsCard({
   const [manualJobInstructions, setManualJobInstructions] = useState('');
   const [manualJobCouncilEnabled, setManualJobCouncilEnabled] = useState(false);
   const [manualJobCouncilAggregation, setManualJobCouncilAggregation] =
-    useState<CouncilAggregationStrategy>('any_blocking_member');
+    useState<CouncilAggregationStrategy>(DEFAULT_COUNCIL_AGGREGATION_STRATEGY);
   const [manualJobCouncilSelections, setManualJobCouncilSelections] = useState<
     Record<string, CouncilSpecialistSelection>
   >(() => defaultCouncilSelections());
@@ -351,7 +352,7 @@ export function CodeReviewJobsCard({
     );
     setManualJobInstructions('');
     setManualJobCouncilEnabled(false);
-    setManualJobCouncilAggregation('any_blocking_member');
+    setManualJobCouncilAggregation(DEFAULT_COUNCIL_AGGREGATION_STRATEGY);
     setManualJobCouncilSelections(defaultCouncilSelections());
     setManualJobSubmitted(false);
     setManualJobSubmitError(null);

@@ -6,19 +6,16 @@ import { Loader2, Users } from 'lucide-react';
 import type { CodeReviewCouncilResult, CouncilVote } from '@kilocode/db/schema-types';
 import { formatAggregationStrategy } from '@kilocode/worker-utils/code-review-council';
 
+// v2: votes are binary. `pass` = approve, `block` = reject (any critical finding).
 const VOTE_LABELS: Record<CouncilVote, string> = {
   pass: 'Pass',
-  warn: 'Warn',
   block: 'Block',
-  abstain: 'Abstain',
 };
 
 // Map council votes onto the app's status-domain surface/border/foreground tokens.
 const VOTE_CLASSES: Record<CouncilVote, string> = {
   pass: 'bg-status-success-surface text-status-success border-status-success-border',
-  warn: 'bg-status-warning-surface text-status-warning border-status-warning-border',
   block: 'bg-status-destructive-surface text-status-destructive border-status-destructive-border',
-  abstain: 'bg-status-neutral-surface text-status-neutral border-status-neutral-border',
 };
 
 function VoteBadge({ vote }: { vote: CouncilVote }) {
@@ -55,7 +52,13 @@ export function CouncilGovernancePanel({
           <Users className="h-5 w-5" />
           Council review
         </CardTitle>
-        {councilResult ? <VoteBadge vote={councilResult.decision} /> : null}
+        {councilResult?.decision ? (
+          <VoteBadge vote={councilResult.decision} />
+        ) : councilResult ? (
+          <Badge className="bg-status-neutral-surface text-status-neutral border-status-neutral-border">
+            Advisory
+          </Badge>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {!councilResult ? (
@@ -76,12 +79,14 @@ export function CouncilGovernancePanel({
             </div>
 
             {/*
-              PR4: the decision above is an advisory pass/fail score only — it is surfaced
-              here but does not (yet) block the pull request merge. Keep in sync with the
-              TODO(council) note in finalize-council-result.ts.
+              v2: votes are code-derived (any critical finding → block). In `advisory` mode
+              there is no aggregate decision; in unanimous/majority the decision is code-owned.
+              Neither blocks the merge yet — the gate wiring is follow-up #10.
             */}
             <p className="text-muted-foreground text-xs">
-              This is an advisory pass/fail score and does not block the pull request yet.
+              {councilResult.decision === null
+                ? 'Advisory mode — specialist votes are shown, but no overall decision is computed and the merge is not gated.'
+                : 'Decision is computed by Kilo from the specialist votes; it does not block the pull request yet.'}
             </p>
 
             <ul className="divide-border divide-y">
@@ -91,7 +96,13 @@ export function CouncilGovernancePanel({
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{specialist.name}</span>
-                        <VoteBadge vote={specialist.vote} />
+                        {specialist.vote ? (
+                          <VoteBadge vote={specialist.vote} />
+                        ) : (
+                          <Badge className="bg-status-neutral-surface text-status-neutral border-status-neutral-border">
+                            No result
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-muted-foreground text-xs">
                         {specialist.model ?? 'Default model'}

@@ -113,7 +113,7 @@ async function fetchGatewayModels(gateway: Provider) {
 async function fetchProviders(): Promise<OpenRouterProvider[]> {
   console.log('Fetching OpenRouter providers from frontend endpoint...');
 
-  const response = await fetch(`https://openrouter.ai/api/frontend/all-providers`, {
+  const response = await fetch(`https://openrouter.ai/api/frontend/v1/all-providers`, {
     method: 'GET',
     headers: ATTRIBUTION_HEADERS,
   });

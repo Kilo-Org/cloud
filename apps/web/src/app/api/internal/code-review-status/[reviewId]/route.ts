@@ -874,84 +874,6 @@ async function upsertModelNotFoundSummary(
 }
 
 /**
- * Injects the code-owned council verdict into the review summary comment the coordinator
- * already posted. The council decision is computed by our code (never the model), so we patch
- * the authoritative verdict block into the existing comment rather than trusting model prose.
- *
- * Only patches an EXISTING comment/note (the coordinator posts the review; if there is none,
- * there is nothing to annotate). Idempotent: re-runs replace the delimited block in place.
- * No-op for Bitbucket (consistent with the other summary upserts) and advisory mode (caller
- * passes a `null` section — no verdict to assert).
- */
-async function upsertCouncilVerdictComment(
-  review: CloudAgentCodeReview,
-  integration: PlatformIntegration,
-  section: string,
-  gitlabAccessToken?: string
-): Promise<void> {
-  const platform = parseCodeReviewPlatform(review.platform);
-  if (platform === PLATFORM.BITBUCKET) return;
-
-  if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
-    const [repoOwner, repoName] = review.repo_full_name.split('/');
-    const appType: GitHubAppType = integration.github_app_type || 'standard';
-    const existing = await findKiloReviewComment(
-      integration.platform_installation_id,
-      repoOwner,
-      repoName,
-      review.pr_number,
-      appType
-    );
-    if (!existing) return;
-
-    const nextBody = upsertCouncilVerdictInBody(existing.body, section);
-    if (nextBody === existing.body) return;
-
-    await updateKiloReviewComment(
-      integration.platform_installation_id,
-      repoOwner,
-      repoName,
-      existing.commentId,
-      nextBody,
-      appType
-    );
-    logExceptInTest(
-      `[code-review-status] Injected council verdict on ${review.repo_full_name}#${review.pr_number}`
-    );
-    return;
-  }
-
-  if (platform === PLATFORM.GITLAB) {
-    const instanceUrl = getGitLabInstanceUrl(integration);
-    const accessToken =
-      gitlabAccessToken ??
-      (await resolveGitLabAccessToken(integration, review.platform_project_id));
-    const existing = await findKiloReviewNote(
-      accessToken,
-      review.repo_full_name,
-      review.pr_number,
-      instanceUrl
-    );
-    if (!existing) return;
-
-    const nextBody = upsertCouncilVerdictInBody(existing.body, section);
-    if (nextBody === existing.body) return;
-
-    await updateKiloReviewNote(
-      accessToken,
-      review.repo_full_name,
-      review.pr_number,
-      existing.noteId,
-      nextBody,
-      instanceUrl
-    );
-    logExceptInTest(
-      `[code-review-status] Injected council verdict on GitLab MR ${review.repo_full_name}!${review.pr_number}`
-    );
-  }
-}
-
-/**
  * Resolves a GitLab access token for a review's project.
  * Uses the exact project credential when a project ID is present.
  */
@@ -1547,15 +1469,25 @@ export async function POST(
           )
         : undefined;
 
-    // Council decisions are code-owned: the LLM never reports a `gateResult`, so derive the
-    // gate from the computed decision. Advisory (decision `null`) never gates; under Unanimous
-    // or Majority a code-`block` fails the check and blocks merge via branch protection.
-    const effectiveGateResult =
-      status === 'completed' && review.review_type === 'council'
-        ? councilResult && councilDecisionBlocksMerge(councilResult.decision)
-          ? 'fail'
-          : 'pass'
-        : validGateResult;
+    // Council decisions are code-owned (the LLM never reports a `gateResult`), so derive the gate
+    // from the computed decision. `councilGates` is the SINGLE source of truth for whether this
+    // review actually enforces a merge gate: manual runs report the decision but never block merge
+    // (GitHub has no check run; GitLab must not post a blocking commit status either). It drives
+    // BOTH the gate result and the injected section's wording, so they can never disagree.
+    // Advisory (decision `null`) never gates; a code-`block` under Unanimous/Majority fails the check.
+    const isCompletedCouncil = status === 'completed' && review.review_type === 'council';
+    const councilGates = isCompletedCouncil && !isManualReview;
+    const effectiveGateResult = isCompletedCouncil
+      ? councilGates && councilResult && councilDecisionBlocksMerge(councilResult.decision)
+        ? 'fail'
+        : 'pass'
+      : validGateResult;
+    // Code-owned Council Review section (decision, governance, per-specialist table), injected into
+    // the summary comment below alongside the footer/history update (one fetch + one update).
+    const councilSection =
+      isCompletedCouncil && councilResult
+        ? buildCouncilReviewSection(councilResult, { gates: councilGates })
+        : null;
 
     if (integration) {
       try {
@@ -1594,27 +1526,6 @@ export async function POST(
         );
         captureException(summaryError, {
           tags: { source: 'code-review-status-model-not-found-summary' },
-          extra: { reviewId, platform: reviewPlatform },
-        });
-      }
-    }
-
-    // Inject the code-owned Council Review section (decision, governance, per-specialist table)
-    // into the posted review comment. `gates` reflects whether this review enforces a merge gate:
-    // manual runs report the decision but never block merge (no check run), so the section says so.
-    // Non-blocking: a failure to annotate must not fail the callback (the gate check above already
-    // carries the outcome).
-    if (integration && status === 'completed' && councilResult) {
-      const councilSection = buildCouncilReviewSection(councilResult, { gates: !isManualReview });
-      try {
-        await upsertCouncilVerdictComment(review, integration, councilSection, gitlabAccessToken);
-      } catch (verdictError) {
-        logExceptInTest(
-          '[code-review-status] Failed to inject Council Review section into review comment:',
-          verdictError
-        );
-        captureException(verdictError, {
-          tags: { source: 'code-review-status-council-verdict' },
           extra: { reviewId, platform: reviewPlatform },
         });
       }
@@ -1719,8 +1630,13 @@ export async function POST(
                   appType
                 );
                 if (existing) {
+                  // Inject the code-owned Council Review section first (no-op for non-council),
+                  // then history + footer, so the whole comment updates in a single PATCH.
+                  const baseBody = councilSection
+                    ? upsertCouncilVerdictInBody(existing.body, councilSection)
+                    : existing.body;
                   const bodyWithHistory = appendPreviousReviewSummaryHistory(
-                    existing.body,
+                    baseBody,
                     review.previous_summary_body,
                     review.previous_summary_head_sha,
                     {
@@ -1807,8 +1723,13 @@ export async function POST(
                   instanceUrl
                 );
                 if (existing) {
+                  // Inject the code-owned Council Review section first (no-op for non-council),
+                  // then history + footer, so the whole note updates in a single PUT.
+                  const baseBody = councilSection
+                    ? upsertCouncilVerdictInBody(existing.body, councilSection)
+                    : existing.body;
                   const bodyWithHistory = appendPreviousReviewSummaryHistory(
-                    existing.body,
+                    baseBody,
                     review.previous_summary_body,
                     review.previous_summary_head_sha
                   );

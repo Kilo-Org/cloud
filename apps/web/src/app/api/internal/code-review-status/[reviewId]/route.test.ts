@@ -2673,7 +2673,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       return call?.[4]?.conclusion as string | undefined;
     };
 
-    it('fails the check when a code-derived block decision under unanimous governance is reached (no LLM gateResult)', async () => {
+    it('reports a block decision but does NOT gate a manual council run (check stays green)', async () => {
+      // Council is manual-only today, so a council review is always a manual run. Manual runs never
+      // enforce a merge gate (they report the decision only), so a block decision must NOT fail the
+      // check — matching the "does not block merge" copy in the injected Council Review section.
       mockGetCodeReviewById.mockResolvedValue(makeCouncilReview('unanimous'));
 
       const response = await POST(
@@ -2688,11 +2691,40 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
+      // The decision is still computed and persisted as block...
       expect(mockSetCodeReviewCouncilResult).toHaveBeenCalledWith(
         REVIEW_ID,
         expect.objectContaining({ decision: 'block' })
       );
-      expect(findCheckRunConclusion()).toBe('failure');
+      // ...but a manual run does not enforce it, so the check is not failed.
+      expect(findCheckRunConclusion()).toBe('success');
+    });
+
+    it('does NOT post a blocking GitLab commit status for a manual council block', async () => {
+      // Finding: without a single gate flag, GitLab's branch would setCommitStatus('failed') on a
+      // manual block (which can block MR merge) while the comment says it does not block. The gate
+      // must resolve to a non-blocking status for a manual run on GitLab too.
+      mockGetCodeReviewById.mockResolvedValue(
+        makeCouncilReview('unanimous', {
+          platform: 'gitlab',
+          platform_project_id: 42,
+          check_run_id: null,
+        })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'completed',
+          lastAssistantMessageText: councilManifest([
+            { specialistId: 'security', findings: crit },
+            { specialistId: 'performance', findings: [] },
+          ]),
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      const call = mockSetCommitStatus.mock.calls.at(-1);
+      expect(call?.[3]).toBe('success'); // NOT 'failed'
     });
 
     it('passes the check when every specialist passes under unanimous governance', async () => {
@@ -2760,6 +2792,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(call?.[4]).toContain('## Council Review');
       expect(call?.[4]).toContain('Would block merge');
       expect(call?.[4]).toContain('does not block merge');
+      // Efficiency: the council section is folded into the summary footer update — one fetch,
+      // one update, not a separate find+patch pass.
+      expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledTimes(1);
     });
 
     it('injects an advisory Council Review section (governance info, no merge decision)', async () => {

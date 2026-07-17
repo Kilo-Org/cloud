@@ -4,29 +4,33 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
 
 // `.env.test` sets SESSION_INGEST_WORKER_URL to '' (shared fixture used by
 // other test files too — do not change it here). `createCallerForUser`'s
 // import chain (test-utils -> trpc/init -> ...) transitively loads
 // `@/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
-// `const` computed once, the first time that module is evaluated.
-// `import` statements are always hoisted above every other statement by the
-// CJS transform, so a statically-imported `createCallerForUser` would pull
+// `const` computed once, the first time that module is evaluated. Static
+// ES `import` statements are always hoisted above every other statement by
+// the transform, so a statically-imported `createCallerForUser` would pull
 // in the real ('') value before any `process.env` assignment written below
 // it could run — and a `jest.mock('@/lib/config.server', ...)` registered
 // after that first (real) load cannot retroactively change the value
-// active-sessions-router.ts already captured. Deferring this one import to a
-// plain `require()`, which executes exactly where it is written, lets us set
-// the env var first so `config.server.ts` picks up the test value on its one
-// evaluation.
+// active-sessions-router.ts already captured. A dynamic `import()` executes
+// exactly where it is awaited (not hoisted), so resolving it in `beforeAll`
+// — after the env var is set below — lets `config.server.ts` pick up the
+// test value on its one evaluation, without the repo-lint-forbidden
+// `require()`.
 process.env.SESSION_INGEST_WORKER_URL = 'https://test-ingest.example.com';
-const { createCallerForUser } = require('@/routers/test-utils') as typeof import('@/routers/test-utils');
+let createCallerForUser: typeof CreateCallerForUser;
 
 let regularUser: User;
 let testOrganization: Organization;
 
 describe('active-sessions-router', () => {
   beforeAll(async () => {
+    ({ createCallerForUser } = await import('@/routers/test-utils'));
+
     regularUser = await insertTestUser({
       google_user_email: 'active-sessions-user@example.com',
       google_user_name: 'Active Sessions User',

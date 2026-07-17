@@ -81,10 +81,10 @@ Launch the orchestrator in the current tmux session with a unique, descriptive w
 tmux new-window -t <planner-tmux-session> \
   -n <feature>-orchestrator \
   -c <dedicated-worktree>/apps/mobile \
-  'kilo run --interactive --model kilo/kilo-auto/frontier --title "<feature> orchestrator" --file <sanitized-handoff-file> "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate."'
+  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/anthropic/claude-sonnet-5 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
 ```
 
-Use `kilo run --interactive` exactly as shown: no `--continue`, `--session`, or `--variant`, because the orchestrator must be a fresh session on Kilo Auto Frontier with its default reasoning setting. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
+Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Sonnet 5 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
 
 ## Roles
 

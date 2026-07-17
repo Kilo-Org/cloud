@@ -18,7 +18,7 @@ export type {
   PrepareInput,
 } from './session-manager';
 
-export { createCloudAgentSession } from './session';
+export { createCloudAgentSession, REMOTE_CLI_EXIT_NOT_SUPPORTED } from './session';
 export type {
   CloudAgentSession,
   CloudAgentSessionAcceptSuggestionInput,

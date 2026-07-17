@@ -2,6 +2,7 @@ import {
   aggregateCanonicalCostInsightDrivers,
   aggregateNormalizedCanonicalCostInsightDrivers,
   loadCanonicalCostInsightAggregationsByHour,
+  loadCanonicalCostInsightAggregationsByIntervals,
   mapAiGatewayCanonicalDriver,
   mapCodingPlanCanonicalDriver,
   mapExaCanonicalDriver,
@@ -264,6 +265,105 @@ describe('Cost Insights canonical source mapping', () => {
         totals: [expect.objectContaining({ totalMicrodollars: 6, spendRecordCount: 2 })],
       }),
     ]);
+  });
+
+  test('loads separated intervals with four source queries and excludes envelope-only rows', async () => {
+    const row = (hour_start: string, total_microdollars: string) => ({
+      hour_start,
+      owned_by_user_id: 'user-1',
+      owned_by_organization_id: null,
+      actor_user_id: 'user-1',
+      raw_product_key: null,
+      raw_feature_key: null,
+      requested_model: 'model',
+      resolved_model: null,
+      inference_provider: 'provider',
+      gateway_provider: null,
+      total_microdollars,
+      spend_record_count: '1',
+    });
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          row('2026-06-01 00:00:00+00', '4'),
+          row('2026-06-01 01:00:00+00', '99'),
+          row('2026-06-01 02:00:00+00', '6'),
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const hourly = await loadCanonicalCostInsightAggregationsByIntervals(
+      { execute } as unknown as CostInsightQueryExecutor,
+      {
+        owner: userOwner,
+        intervals: [
+          {
+            startInclusive: '2026-06-01T00:00:00.000Z',
+            endExclusive: '2026-06-01T01:00:00.000Z',
+          },
+          {
+            startInclusive: '2026-06-01T02:00:00.000Z',
+            endExclusive: '2026-06-01T03:00:00.000Z',
+          },
+        ],
+      }
+    );
+
+    expect(execute).toHaveBeenCalledTimes(4);
+    expect(hourly).toEqual([
+      expect.objectContaining({
+        hourStart: '2026-06-01T00:00:00.000Z',
+        totals: [expect.objectContaining({ totalMicrodollars: 4 })],
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T02:00:00.000Z',
+        totals: [expect.objectContaining({ totalMicrodollars: 6 })],
+      }),
+    ]);
+  });
+
+  test('normalizes touching intervals and rejects invalid interval timestamps', async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    await loadCanonicalCostInsightAggregationsByIntervals(
+      { execute } as unknown as CostInsightQueryExecutor,
+      {
+        owner: userOwner,
+        intervals: [
+          {
+            startInclusive: '2026-06-01T01:00:00.000Z',
+            endExclusive: '2026-06-01T02:00:00.000Z',
+          },
+          {
+            startInclusive: '2026-06-01T00:00:00.000Z',
+            endExclusive: '2026-06-01T01:00:00.000Z',
+          },
+        ],
+      }
+    );
+    expect(execute).toHaveBeenCalledTimes(4);
+
+    await expect(
+      loadCanonicalCostInsightAggregationsByIntervals(
+        { execute } as unknown as CostInsightQueryExecutor,
+        {
+          owner: userOwner,
+          intervals: [
+            {
+              startInclusive: 'invalid',
+              endExclusive: '2026-06-01T01:00:00.000Z',
+            },
+          ],
+        }
+      )
+    ).rejects.toThrow('startInclusive must be a valid timestamp');
   });
 
   test('rejects unsafe database integers instead of rounding them', () => {

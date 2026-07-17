@@ -86,6 +86,8 @@ type CanonicalRange = {
   endExclusive: string;
 };
 
+export type CanonicalCostInsightInterval = CanonicalRange;
+
 type RawAiAggregate = {
   hour_start: string | Date;
   owned_by_user_id: string | null;
@@ -146,6 +148,63 @@ function requireCanonicalRange(range: CanonicalRange): void {
   if (start >= end) {
     throw new Error('Cost Insights canonical source range must be a non-empty half-open range.');
   }
+}
+
+function normalizeCanonicalIntervals(
+  intervals: readonly [CanonicalCostInsightInterval, ...CanonicalCostInsightInterval[]]
+): CanonicalCostInsightInterval[] {
+  const normalized = intervals
+    .map(interval => {
+      requireCanonicalRange(interval);
+      return {
+        startInclusive: requireUtcTimestamp(interval.startInclusive, 'startInclusive'),
+        endExclusive: requireUtcTimestamp(interval.endExclusive, 'endExclusive'),
+      };
+    })
+    .sort((left, right) => Date.parse(left.startInclusive) - Date.parse(right.startInclusive));
+  const merged: CanonicalCostInsightInterval[] = [];
+  for (const interval of normalized) {
+    const previous = merged.at(-1);
+    if (!previous || Date.parse(previous.endExclusive) < Date.parse(interval.startInclusive)) {
+      merged.push(interval);
+      continue;
+    }
+    if (Date.parse(interval.endExclusive) > Date.parse(previous.endExclusive)) {
+      merged[merged.length - 1] = { ...previous, endExclusive: interval.endExclusive };
+    }
+  }
+  return merged;
+}
+
+function intervalMembershipPredicate(
+  timestampColumn: SQL,
+  intervals: readonly CanonicalCostInsightInterval[]
+): SQL {
+  const values = sql.join(
+    intervals.map(
+      interval =>
+        sql`(${interval.startInclusive}::timestamptz, ${interval.endExclusive}::timestamptz)`
+    ),
+    sql`, `
+  );
+  return sql`EXISTS (
+    SELECT 1
+    FROM (VALUES ${values}) AS canonical_intervals(start_inclusive, end_exclusive)
+    WHERE ${timestampColumn} >= canonical_intervals.start_inclusive
+      AND ${timestampColumn} < canonical_intervals.end_exclusive
+  )`;
+}
+
+function canonicalHourIntersectsIntervals(
+  rawHourStart: string | Date,
+  intervals: readonly CanonicalCostInsightInterval[]
+): boolean {
+  const hourStart = Date.parse(normalizeCanonicalHour(rawHourStart));
+  const hourEnd = hourStart + HOUR_MS;
+  return intervals.some(
+    interval =>
+      Date.parse(interval.startInclusive) < hourEnd && Date.parse(interval.endExclusive) > hourStart
+  );
 }
 
 export function requireUtcTimestamp(value: string, fieldName: string): string {
@@ -545,7 +604,8 @@ function compareCanonicalDrivers(
 async function loadAiAggregates(
   executor: CostInsightQueryExecutor,
   range: CanonicalRange,
-  owner: CostInsightSpendOwner | undefined
+  owner: CostInsightSpendOwner | undefined,
+  intervalPredicate: SQL = sql`TRUE`
 ): Promise<RawAiAggregate[]> {
   const result = await executor.execute<RawAiAggregate>(sql`
     SELECT
@@ -571,6 +631,7 @@ async function loadAiAggregates(
       ON ${api_kind.api_kind_id} = ${microdollar_usage_metadata.api_kind_id}
     WHERE ${microdollar_usage.created_at} >= ${range.startInclusive}
       AND ${microdollar_usage.created_at} < ${range.endExclusive}
+      AND ${intervalPredicate}
       AND ${microdollar_usage.cost} > 0
       AND ${ownerPredicate({
         owner,
@@ -585,7 +646,8 @@ async function loadAiAggregates(
 async function loadExaAggregates(
   executor: CostInsightQueryExecutor,
   range: CanonicalRange,
-  owner: CostInsightSpendOwner | undefined
+  owner: CostInsightSpendOwner | undefined,
+  intervalPredicate: SQL = sql`TRUE`
 ): Promise<RawExaAggregate[]> {
   const result = await executor.execute<RawExaAggregate>(sql`
     SELECT
@@ -600,6 +662,7 @@ async function loadExaAggregates(
     FROM ${exa_usage_log}
     WHERE ${exa_usage_log.created_at} >= ${range.startInclusive}
       AND ${exa_usage_log.created_at} < ${range.endExclusive}
+      AND ${intervalPredicate}
       AND ${exa_usage_log.charged_to_balance} = TRUE
       AND ${exa_usage_log.cost_microdollars} > 0
       AND ${ownerPredicate({
@@ -615,7 +678,8 @@ async function loadExaAggregates(
 async function loadCodingPlanAggregates(
   executor: CostInsightQueryExecutor,
   range: CanonicalRange,
-  owner: CostInsightSpendOwner | undefined
+  owner: CostInsightSpendOwner | undefined,
+  intervalPredicate: SQL = sql`TRUE`
 ): Promise<RawCodingPlanAggregate[]> {
   const result = await executor.execute<RawCodingPlanAggregate>(sql`
     SELECT
@@ -636,6 +700,7 @@ async function loadCodingPlanAggregates(
       ON ${coding_plan_subscriptions.id} = ${coding_plan_terms.subscription_id}
     WHERE ${credit_transactions.created_at} >= ${range.startInclusive}
       AND ${credit_transactions.created_at} < ${range.endExclusive}
+      AND ${intervalPredicate}
       AND ${credit_transactions.amount_microdollars} < 0
       AND ${ownerPredicate({
         owner,
@@ -650,7 +715,8 @@ async function loadCodingPlanAggregates(
 async function loadKiloClawAggregates(
   executor: CostInsightQueryExecutor,
   range: CanonicalRange,
-  owner: CostInsightSpendOwner | undefined
+  owner: CostInsightSpendOwner | undefined,
+  intervalPredicate: SQL = sql`TRUE`
 ): Promise<RawKiloClawAggregate[]> {
   const transactionAlias = sql.raw('ct');
   const result = await executor.execute<RawKiloClawAggregate>(sql`
@@ -678,6 +744,7 @@ async function loadKiloClawAggregates(
       FROM ${credit_transactions} ct
       WHERE ct.created_at >= ${range.startInclusive}
         AND ct.created_at < ${range.endExclusive}
+        AND ${intervalPredicate}
         AND ct.amount_microdollars < 0
         AND ${pureCreditKiloClawPredicate(transactionAlias)}
         AND ${ownerPredicate({
@@ -733,13 +800,25 @@ function appendMappedCanonicalDriver(
 
 export async function loadCanonicalCostInsightAggregationsByHour(
   executor: CostInsightQueryExecutor,
-  params: CanonicalRange & { owner?: CostInsightSpendOwner }
+  params: CanonicalRange & {
+    owner?: CostInsightSpendOwner;
+    intervals?: readonly CanonicalCostInsightInterval[];
+  }
 ): Promise<CanonicalCostInsightHourAggregation[]> {
   requireCanonicalRange(params);
+  const intervals = params.intervals;
   const accumulators = new Map<string, CanonicalHourAccumulator>();
 
-  const aiRows = await loadAiAggregates(executor, params, params.owner);
+  const aiRows = await loadAiAggregates(
+    executor,
+    params,
+    params.owner,
+    intervals
+      ? intervalMembershipPredicate(sql`${microdollar_usage.created_at}`, intervals)
+      : undefined
+  );
   for (const row of aiRows) {
+    if (intervals && !canonicalHourIntersectsIntervals(row.hour_start, intervals)) continue;
     appendMappedCanonicalDriver(
       getCanonicalHourAccumulator(accumulators, row.hour_start),
       mapAiGatewayCanonicalDriver({
@@ -763,8 +842,14 @@ export async function loadCanonicalCostInsightAggregationsByHour(
     );
   }
 
-  const exaRows = await loadExaAggregates(executor, params, params.owner);
+  const exaRows = await loadExaAggregates(
+    executor,
+    params,
+    params.owner,
+    intervals ? intervalMembershipPredicate(sql`${exa_usage_log.created_at}`, intervals) : undefined
+  );
   for (const row of exaRows) {
+    if (intervals && !canonicalHourIntersectsIntervals(row.hour_start, intervals)) continue;
     appendMappedCanonicalDriver(
       getCanonicalHourAccumulator(accumulators, row.hour_start),
       mapExaCanonicalDriver({
@@ -783,8 +868,16 @@ export async function loadCanonicalCostInsightAggregationsByHour(
     );
   }
 
-  const codingPlanRows = await loadCodingPlanAggregates(executor, params, params.owner);
+  const codingPlanRows = await loadCodingPlanAggregates(
+    executor,
+    params,
+    params.owner,
+    intervals
+      ? intervalMembershipPredicate(sql`${credit_transactions.created_at}`, intervals)
+      : undefined
+  );
   for (const row of codingPlanRows) {
+    if (intervals && !canonicalHourIntersectsIntervals(row.hour_start, intervals)) continue;
     appendMappedCanonicalDriver(
       getCanonicalHourAccumulator(accumulators, row.hour_start),
       mapCodingPlanCanonicalDriver({
@@ -805,8 +898,14 @@ export async function loadCanonicalCostInsightAggregationsByHour(
     );
   }
 
-  const kiloClawRows = await loadKiloClawAggregates(executor, params, params.owner);
+  const kiloClawRows = await loadKiloClawAggregates(
+    executor,
+    params,
+    params.owner,
+    intervals ? intervalMembershipPredicate(sql.raw('ct.created_at'), intervals) : undefined
+  );
   for (const row of kiloClawRows) {
+    if (intervals && !canonicalHourIntersectsIntervals(row.hour_start, intervals)) continue;
     getCanonicalHourAccumulator(accumulators, row.hour_start).inputs.push(
       mapKiloClawCanonicalDriver({
         owner: ownerFromColumns(row.owned_by_user_id, row.owned_by_organization_id),
@@ -836,6 +935,27 @@ export async function loadCanonicalCostInsightAggregationsByHour(
     });
   }
   return hourly;
+}
+
+export async function loadCanonicalCostInsightAggregationsByIntervals(
+  executor: CostInsightQueryExecutor,
+  params: {
+    owner: CostInsightSpendOwner;
+    intervals: readonly [CanonicalCostInsightInterval, ...CanonicalCostInsightInterval[]];
+  }
+): Promise<CanonicalCostInsightHourAggregation[]> {
+  const intervals = normalizeCanonicalIntervals(params.intervals);
+  const first = intervals[0];
+  const last = intervals.at(-1);
+  if (!first || !last) {
+    throw new Error('Cost Insights canonical source intervals must not be empty.');
+  }
+  return await loadCanonicalCostInsightAggregationsByHour(executor, {
+    owner: params.owner,
+    startInclusive: first.startInclusive,
+    endExclusive: last.endExclusive,
+    intervals,
+  });
 }
 
 export async function loadCanonicalCostInsightAggregation(

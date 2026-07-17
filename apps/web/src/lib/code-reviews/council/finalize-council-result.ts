@@ -8,7 +8,9 @@ import type {
 } from '@kilocode/db/schema-types';
 import {
   decideCouncilFromManifest,
+  deriveSpecialistVote,
   enabledSpecialists,
+  highestSeverityOf,
   parseCouncilResultManifest,
 } from '@kilocode/worker-utils/code-review-council';
 import { getManualCodeReviewConfig } from '../manual-config';
@@ -16,19 +18,22 @@ import { setCodeReviewCouncilResult } from '../db/code-reviews';
 import { logExceptInTest } from '@/lib/utils.server';
 
 /**
- * Pure mapping: captures the council manifest from the final assistant message, computes
- * the code-owned decision, and joins each configured specialist with its reported
- * vote/findings into the persisted `CodeReviewCouncilResult`.
+ * Pure mapping: captures the council manifest from the final assistant message and joins each
+ * configured specialist with its reported findings into the persisted `CodeReviewCouncilResult`.
+ * The model reports findings only; this DERIVES each specialist's binary vote
+ * (`deriveSpecialistVote`) and computes the aggregate decision.
  *
- * Fails CLOSED: a missing/invalid manifest → `decision: 'block'`; a configured specialist
- * absent from the manifest → `abstain` (and, via `decideCouncilFromManifest`, blocks).
+ * Decision semantics (v2):
+ * - `advisory` governance always returns `decision: null` (no aggregate verdict, no gate),
+ *   independent of whether the manifest was captured.
+ * - `unanimous`/`majority` defer to `decideCouncilFromManifest`, which FAILS CLOSED to `block`
+ *   on a missing/invalid manifest or on any missing specialist coverage.
  *
- * TODO(council): the `decision` here is ADVISORY for PR4 — a pass/fail score surfaced in the
- * cloud UI only. It is NOT yet wired into the PR merge gate (`gateResult`), so a council
- * `block` does not hard-block the PR. Threading the code-owned decision into `gateResult`
- * (so `block` actually fails the merge check) is deferred to a later PR — see the council
- * plan's beta-readiness gate ("Validate the council PR output in a deployed run"). Keep the
- * UI copy in `CouncilGovernancePanel` in sync with this advisory-only status.
+ * A specialist that did not return a reliable result is shown as `vote: null` ("no result"),
+ * which is distinct from a `block` vote (a `block` vote means the specialist reported a critical).
+ *
+ * NOTE: the decision is not yet wired into the PR merge gate (`gateResult`), so a `block` does
+ * not hard-block the PR today. Injecting the decision into the gate + PR summary is a follow-up.
  */
 export function buildCouncilResult(params: {
   council: CodeReviewCouncilConfig;
@@ -65,16 +70,25 @@ export function buildCouncilResult(params: {
       // also inherited the base model (variants are model-specific). A specialist on its own
       // model shows no effort unless it set one.
       thinkingEffort: member.thinking_effort ?? (member.model_slug ? null : baseThinkingEffort),
-      vote: reported?.vote ?? 'abstain',
-      highestSeverity: reported?.highestSeverity ?? null,
+      // v2: vote + highest severity are DERIVED from the reported findings, never model-authored.
+      // A specialist that did NOT report shows `vote: null` ("no result") — distinct from a
+      // `block` vote (which means it reported a critical). The aggregate decision below still
+      // fails closed on this missing coverage for enforcing modes.
+      vote: reported ? deriveSpecialistVote(reported.findings) : null,
+      highestSeverity: reported ? highestSeverityOf(reported.findings) : null,
       findings: reported?.findings ?? [],
     };
   });
 
+  // Advisory → no aggregate verdict (null). Otherwise: a captured manifest decides via
+  // `decideCouncilFromManifest` (coverage-checked, fail-closed); a missing/invalid manifest
+  // (no coverage) fails closed to `block`.
   const decision =
-    capture.status === 'captured'
-      ? decideCouncilFromManifest(configuredIds, capture.manifest, strategy).decision
-      : 'block';
+    strategy === 'advisory'
+      ? null
+      : capture.status === 'captured'
+        ? decideCouncilFromManifest(configuredIds, capture.manifest, strategy).decision
+        : 'block';
 
   return { decision, aggregationStrategy: strategy, specialists };
 }
@@ -120,9 +134,9 @@ export function computeCouncilResultForReview(params: {
 export async function finalizeCouncilResultForReview(params: {
   review: CloudAgentCodeReview;
   lastAssistantMessageText: string | null | undefined;
-}): Promise<void> {
+}): Promise<CodeReviewCouncilResult | null> {
   const councilResult = computeCouncilResultForReview(params);
-  if (!councilResult) return;
+  if (!councilResult) return null;
 
   await setCodeReviewCouncilResult(params.review.id, councilResult);
 
@@ -131,4 +145,6 @@ export async function finalizeCouncilResultForReview(params: {
     decision: councilResult.decision,
     specialistCount: councilResult.specialists.length,
   });
+
+  return councilResult;
 }

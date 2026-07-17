@@ -10,6 +10,8 @@ import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
 import { ChatComposer } from '@/components/agents/chat-composer';
+import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
+import { exitRemoteCliWithFeedback } from '@/components/agents/exit-remote-cli-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -124,6 +126,8 @@ export function SessionDetailContent({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
   const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
@@ -482,6 +486,63 @@ export function SessionDetailContent({
     ]
   );
 
+  const handleSendCommand = useCallback(
+    async (command: string, argumentsText: string) => {
+      // Slash commands ride the same manager.send() pipeline. The manager
+      // resolves the active remoteModelOverride from its own store and is
+      // the sole transport-toast owner; we throw a stable error on a
+      // false return purely so the composer preserves the draft, and never
+      // emit a duplicate toast of our own.
+      const sent = await manager.send({
+        payload: { type: 'command', command, arguments: argumentsText },
+      });
+      if (!sent) {
+        throw new Error('Failed to send slash command');
+      }
+      return true;
+    },
+    [manager]
+  );
+
+  const handleCreateSession = useCallback(async () => {
+    // The orchestrator surfaces exactly one actionable toast on failure and
+    // calls `router.replace` to the new session route on success — the
+    // route-keyed `AgentSessionProvider` creates a fresh manager for the new
+    // id, so we deliberately do not `manager.switchSession()` here. The
+    // resolve order (replace → resolve) is what makes the composer's
+    // "accepted" signal fire only after navigation has been initiated, so
+    // the draft is cleared exactly when the new route is being pushed.
+    // No cache mutation: the destination route fetches its own session
+    // via trpc, the active-sessions poll picks up the new id on its next
+    // tick, and the agents tab refetches on focus.
+    const result = await createAndNavigateAgentSession({
+      create: manager.createRemoteSession.bind(manager),
+      router,
+      organizationId,
+      onError: message => {
+        toast.error(message);
+      },
+    });
+    return result.success;
+  }, [manager, router, organizationId]);
+
+  const handleExitCli = useCallback(
+    async (onAccepted: () => void) => {
+      await exitRemoteCliWithFeedback({
+        exit: manager.exitRemoteCli.bind(manager),
+        onAccepted,
+        onSuccess: message => {
+          toast.success(message);
+        },
+        onError: message => {
+          toast.error(message);
+        },
+        router,
+      });
+    },
+    [manager, router]
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -601,6 +662,9 @@ export function SessionDetailContent({
             >
               <ChatComposer
                 onSend={handleSend}
+                onSendCommand={handleSendCommand}
+                onCreateSession={handleCreateSession}
+                onExitCli={handleExitCli}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
                 isStreaming={isStreaming}
@@ -613,6 +677,9 @@ export function SessionDetailContent({
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}
+                activeSessionType={activeSessionType}
+                commands={availableCommands}
+                commandState={remoteCommandState}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

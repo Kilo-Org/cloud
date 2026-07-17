@@ -1445,7 +1445,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
 
             {slashCommands.length > 0 && (
               <div className="hidden xl:block">
-                <BrowseCommandsDialog />
+                <BrowseCommandsDialog commands={slashCommands} />
               </div>
             )}
 

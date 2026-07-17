@@ -1,4 +1,4 @@
-import { createStore } from 'jotai';
+import { createStore, atom } from 'jotai';
 import {
   cliModelLabel,
   createSessionManager,
@@ -7,7 +7,20 @@ import {
   type FetchedSessionData,
   type StoredMessage,
 } from './session-manager';
-import { createCloudAgentSession } from './session';
+import {
+  createCloudAgentSession,
+  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED,
+} from './session';
+import type {
+  CloudAgentSession,
+  CloudAgentSessionSendInput,
+  CloudAgentSessionAnswerInput,
+  CloudAgentSessionRejectInput,
+  CloudAgentSessionRespondToPermissionInput,
+  CloudAgentSessionAcceptSuggestionInput,
+  CloudAgentSessionDismissSuggestionInput,
+} from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
@@ -21,11 +34,37 @@ import type {
   SessionSnapshotPageOutcome,
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
+import type { RemoteCommandState } from './remote-command-catalog';
 import type { NormalizedEvent } from './normalizer';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
 // ---------------------------------------------------------------------------
+
+type MockSession = Omit<
+  jest.Mocked<CloudAgentSession>,
+  | 'state'
+  | 'storage'
+  | 'send'
+  | 'interrupt'
+  | 'answer'
+  | 'reject'
+  | 'respondToPermission'
+  | 'acceptSuggestion'
+  | 'dismissSuggestion'
+  | 'exitRemoteCli'
+> & {
+  state: jest.Mocked<CloudAgentSession['state']>;
+  storage: JotaiSessionStorage | null;
+  send: jest.Mock<Promise<unknown>, [CloudAgentSessionSendInput]>;
+  interrupt: jest.Mock<Promise<unknown>, []>;
+  answer: jest.Mock<Promise<unknown>, [CloudAgentSessionAnswerInput]>;
+  reject: jest.Mock<Promise<unknown>, [CloudAgentSessionRejectInput]>;
+  respondToPermission: jest.Mock<Promise<unknown>, [CloudAgentSessionRespondToPermissionInput]>;
+  acceptSuggestion: jest.Mock<Promise<unknown>, [CloudAgentSessionAcceptSuggestionInput]>;
+  dismissSuggestion: jest.Mock<Promise<unknown>, [CloudAgentSessionDismissSuggestionInput]>;
+  exitRemoteCli: jest.Mock<Promise<void>, []>;
+};
 
 const mockSession = {
   connect: jest.fn(),
@@ -39,6 +78,9 @@ const mockSession = {
   acceptSuggestion: jest.fn(),
   dismissSuggestion: jest.fn(),
   retryRemoteModels: jest.fn(),
+  retryRemoteCommands: jest.fn(),
+  createRemoteSession: jest.fn(() => Promise.resolve(kiloId('ses_12345678901234567890123456'))),
+  exitRemoteCli: jest.fn(() => Promise.resolve()),
   canSend: true,
   canInterrupt: true,
   state: {
@@ -57,7 +99,7 @@ const mockSession = {
     getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
   },
   storage: null as JotaiSessionStorage | null,
-};
+} as unknown as MockSession;
 
 const mockSessionCallbacks: {
   onSessionCreated?: (info: SessionInfo) => void;
@@ -72,6 +114,7 @@ const mockSessionCallbacks: {
   onSuggestionResolved?: (...args: unknown[]) => void;
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
@@ -86,6 +129,9 @@ const mockSessionCallbacks: {
 let latestStorage: JotaiSessionStorage | null = null;
 
 jest.mock('./session', () => ({
+  REMOTE_CLI_EXIT_NOT_SUPPORTED: 'Remote CLI exit is not supported for the current session',
+  REMOTE_SESSION_CREATION_NOT_SUPPORTED:
+    'Remote session creation is not supported for the current session',
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       kiloSessionId: string;
@@ -102,6 +148,7 @@ jest.mock('./session', () => ({
       onSuggestionResolved?: (...args: unknown[]) => void;
       onResolved?: (resolved: ResolvedSession) => void;
       onRemoteModelStateChange?: (state: RemoteModelState) => void;
+      onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
       onTransportCapabilityChange?: () => void;
       onEvent?: (event: NormalizedEvent) => void;
       onMessageQueued?: (messageId: string) => void;
@@ -171,6 +218,7 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onSuggestionResolved = sessionConfig.onSuggestionResolved;
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
       mockSessionCallbacks.onRemoteModelStateChange = sessionConfig.onRemoteModelStateChange;
+      mockSessionCallbacks.onRemoteCommandStateChange = sessionConfig.onRemoteCommandStateChange;
       mockSessionCallbacks.onTransportCapabilityChange = sessionConfig.onTransportCapabilityChange;
       mockSessionCallbacks.onEvent = sessionConfig.onEvent;
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
@@ -343,6 +391,8 @@ describe('createSessionManager', () => {
     mockSession.destroy.mockClear();
     mockSession.send.mockClear();
     mockSession.interrupt.mockClear();
+    mockSession.exitRemoteCli.mockClear();
+    mockSession.exitRemoteCli.mockResolvedValue();
     mockSession.respondToPermission.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
@@ -2939,38 +2989,344 @@ describe('createSessionManager', () => {
   });
 
   // -------------------------------------------------------------------------
-  // delivery failure indicator
+  // createRemoteSession
+  // -------------------------------------------------------------------------
+
+  describe('createRemoteSession', () => {
+    it('returns a branded KiloSessionId and leaves current session/atoms unchanged', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const newId = kiloId('ses_99999999999999999999999999');
+      mockSession.createRemoteSession.mockResolvedValue(newId);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      const beforeSessionId = atomValue<string | null>(config.store, mgr.atoms.sessionId);
+      const result = await mgr.createRemoteSession();
+
+      expect(result).toBe(newId);
+      expect(mockSession.createRemoteSession).toHaveBeenCalledTimes(1);
+      expect(atomValue<string | null>(config.store, mgr.atoms.sessionId)).toBe(beforeSessionId);
+    });
+
+    it('rejects before traffic with a stable error when there is no active session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic with a stable error for a non-remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      // default mock resolves to cloud-agent
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+      expect(mockSession.createRemoteSession).not.toHaveBeenCalled();
+    });
+
+    it('rejects before traffic with a stable error when the transport lacks createSession capability', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.createRemoteSession.mockRejectedValue(
+        new Error(REMOTE_SESSION_CREATION_NOT_SUPPORTED)
+      );
+      await expect(mgr.createRemoteSession()).rejects.toThrow(
+        REMOTE_SESSION_CREATION_NOT_SUPPORTED
+      );
+    });
+  });
+
+  describe('exitRemoteCli', () => {
+    it('forwards only for the active remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      await expect(mgr.exitRemoteCli()).resolves.toBeUndefined();
+      expect(mockSession.exitRemoteCli).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects before forwarding when there is no active session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      expect(mockSession.exitRemoteCli).not.toHaveBeenCalled();
+    });
+
+    it('rejects before forwarding for a non-remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      expect(mockSession.exitRemoteCli).not.toHaveBeenCalled();
+    });
+
+    it('propagates the session unsupported error when transport capability is absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.exitRemoteCli.mockRejectedValue(new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED));
+
+      await expect(mgr.exitRemoteCli()).rejects.toThrow(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // retryRemoteCommands
+  // -------------------------------------------------------------------------
+
+  describe('retryRemoteCommands', () => {
+    it('delegates to the active session when a remote session is resolved', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.retryRemoteCommands();
+      expect(mockSession.retryRemoteCommands).toHaveBeenCalledTimes(1);
+    });
+
+    it('is a no-op when there is no active session', () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      expect(() => mgr.retryRemoteCommands()).not.toThrow();
+      expect(mockSession.retryRemoteCommands).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // remote command state atom
+  // -------------------------------------------------------------------------
+
+  describe('remote command state atom', () => {
+    it('starts empty after resolving to a remote session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+    });
+
+    it('updates when the remote command state callback fires', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const nextState: RemoteCommandState = {
+        ownerConnectionId: 'owner',
+        refresh: 'idle',
+        commands: [{ name: 'review', description: 'Review changes', hints: [] }],
+      };
+      mockSessionCallbacks.onRemoteCommandStateChange?.(nextState);
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual(nextState);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // switchSession clears remote command state immediately
+  // -------------------------------------------------------------------------
+
+  describe('switchSession remote command state clearing', () => {
+    it('clears availableCommands and remoteCommandState before the new fetch resolves', async () => {
+      let resolveFetch: (val: FetchedSessionData) => void;
+      const slowFetch = new Promise<FetchedSessionData>(resolve => {
+        resolveFetch = resolve;
+      });
+      const config = createMockConfig({
+        fetchSession: jest
+          .fn()
+          .mockResolvedValueOnce(defaultFetchedSession)
+          .mockReturnValueOnce(slowFetch),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-a',
+        refresh: 'idle',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual(
+        expect.objectContaining({
+          ownerConnectionId: 'owner-a',
+          commands: [{ name: 'review', hints: [] }],
+        })
+      );
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(1);
+
+      const switchPromise = mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+
+      resolveFetch!(defaultFetchedSession);
+      await switchPromise;
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // generation gating for remote command callbacks
+  // -------------------------------------------------------------------------
+
+  describe('generation gating for remote command callbacks', () => {
+    it('ignores late callbacks from a previous session after a new switch begins', async () => {
+      let resolveFetch: (val: FetchedSessionData) => void;
+      const slowFetch = new Promise<FetchedSessionData>(resolve => {
+        resolveFetch = resolve;
+      });
+      const config = createMockConfig({
+        fetchSession: jest
+          .fn()
+          .mockResolvedValueOnce(defaultFetchedSession)
+          .mockReturnValueOnce(slowFetch),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const firstCallbacks = { ...mockSessionCallbacks };
+      firstCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      firstCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-a',
+        refresh: 'idle',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      firstCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+
+      const switchPromise = mgr.switchSession(kiloId('ses-2'));
+      firstCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'stale-owner',
+        refresh: 'idle',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      firstCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+
+      resolveFetch!(defaultFetchedSession);
+      await switchPromise;
+
+      // New session callbacks can still update state.
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-2') });
+      mockSessionCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-b',
+        refresh: 'idle',
+        commands: [{ name: 'new', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: 'owner-b',
+        refresh: 'idle',
+        commands: [{ name: 'new', hints: [] }],
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // destroy + late callback suppression
+  // -------------------------------------------------------------------------
+
+  describe('destroy', () => {
+    it('clears remote command state and availableCommands and ignores late callbacks', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const firstCallbacks = { ...mockSessionCallbacks };
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'owner-a',
+        refresh: 'idle',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      mockSessionCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'review', hints: [] }],
+      });
+      expect(
+        atomValue<RemoteCommandState>(config.store, mgr.atoms.remoteCommandState).commands
+      ).toHaveLength(1);
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(1);
+
+      mgr.destroy();
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+
+      firstCallbacks.onRemoteCommandStateChange?.({
+        ownerConnectionId: 'stale',
+        refresh: 'idle',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      firstCallbacks.onEvent?.({
+        type: 'commands.available',
+        commands: [{ name: 'stale', hints: [] }],
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteCommandState)).toEqual({
+        ownerConnectionId: null,
+        refresh: 'idle',
+        commands: [],
+      });
+      expect(atomValue(config.store, mgr.atoms.availableCommands)).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // clearAllAtoms behavior
+  // -------------------------------------------------------------------------
+
+  describe('clearAllAtoms', () => {
+    it('resets session atoms without touching unrelated store atoms', () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const externalAtom = atom(42);
+      config.store.set(externalAtom, 99);
+      config.store.set(mgr.atoms.chatUI, { shouldAutoScroll: false });
+
+      mgr.destroy();
+
+      expect(atomValue(config.store, externalAtom)).toBe(99);
+      expect(atomValue(config.store, mgr.atoms.chatUI)).toEqual({ shouldAutoScroll: true });
+    });
+  });
+  // -------------------------------------------------------------------------
+  // delivery failure status indicator
   // -------------------------------------------------------------------------
 
   describe('delivery failure status indicator', () => {
     it('exhausted-retry failure sets an error indicator and leaves failedPrompt null', async () => {
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      const onMessageFailed = mockSessionCallbacks.onMessageFailed;
-      if (!onMessageFailed) {
-        throw new Error('Expected onMessageFailed to be plumbed through');
-      }
-      onMessageFailed('m1', {
-        status: 'failed',
-        error: 'flush failed',
-        reason: 'exhausted',
-        attempts: 5,
-      });
-
-      const indicator = atomValue<{ type: string; message: string } | null>(
-        config.store,
-        mgr.atoms.statusIndicator
-      );
-      expect(indicator).toEqual(
-        expect.objectContaining({ type: 'error', message: 'Message failed to deliver' })
-      );
-      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBeNull();
-    });
-
-    it('interrupted queued failure sets an error indicator with the interrupted wording', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 

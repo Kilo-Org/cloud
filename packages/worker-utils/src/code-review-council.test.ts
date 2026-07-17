@@ -3,140 +3,111 @@ import {
   COUNCIL_MIN_SPECIALISTS,
   COUNCIL_RESULT_MARKER_TAG,
   COUNCIL_SPECIALIST_PRESETS,
+  COUNCIL_VERDICT_BLOCK_END,
+  COUNCIL_VERDICT_BLOCK_START,
+  buildCouncilReviewSection,
   computeCouncilDecision,
   councilDecisionBlocksMerge,
   decideCouncilFromManifest,
-  describeAggregationStrategy,
+  deriveSpecialistVote,
   determineAutomatedReviewType,
   enabledSpecialists,
   formatAggregationStrategy,
+  highestSeverityOf,
+  isBlockingSeverity,
   isCouncilActive,
   parseCouncilResultManifest,
-  parseGovernanceMarker,
   presetToSpecialist,
   reconcileCouncilVotes,
   summarizeCouncilManifest,
+  upsertCouncilVerdictInBody,
   type SpecialistVote,
 } from './code-review-council.js';
 import type { CouncilResultManifest } from './code-review-council.js';
-import type {
-  CodeReviewCouncilConfig,
-  CouncilAggregationStrategy,
-} from '@kilocode/db/schema-types';
+import { CodeReviewCouncilConfigSchema } from '@kilocode/db/schema-types';
+import type { CodeReviewCouncilConfig, CodeReviewCouncilResult } from '@kilocode/db/schema-types';
 
 const votes = (...vs: Array<[string, SpecialistVote['vote']]>): SpecialistVote[] =>
   vs.map(([specialistId, vote]) => ({ specialistId, vote }));
 
-describe('computeCouncilDecision', () => {
-  it('blocks on empty coverage for every strategy (never pass)', () => {
-    const strategies: CouncilAggregationStrategy[] = [
-      'any_blocking_member',
-      'majority',
-      'unanimous_required',
-    ];
-    for (const strategy of strategies) {
-      expect(computeCouncilDecision([], strategy)).toBe('block');
-      // All-abstain is also "no usable coverage".
-      expect(computeCouncilDecision(votes(['a', 'abstain'], ['b', 'abstain']), strategy)).toBe(
-        'block'
-      );
-    }
+// v2: a specialist's vote is DERIVED from its findings — a critical finding → block, else pass.
+const crit = (path = 'a.ts') => [{ path, line: 1, severity: 'critical', rationale: 'x' }];
+const nit = (path = 'a.ts') => [{ path, line: 1, severity: 'nitpick', rationale: 'x' }];
+
+describe('severity → vote derivation (v2)', () => {
+  it('isBlockingSeverity is true only for critical (case/space-insensitive)', () => {
+    expect(isBlockingSeverity('critical')).toBe(true);
+    expect(isBlockingSeverity(' Critical ')).toBe(true);
+    expect(isBlockingSeverity('warning')).toBe(false);
+    expect(isBlockingSeverity('')).toBe(false);
+    expect(isBlockingSeverity(null)).toBe(false);
   });
 
-  describe('any_blocking_member', () => {
+  it('deriveSpecialistVote: block iff any finding is critical (no findings = pass)', () => {
+    expect(deriveSpecialistVote([])).toBe('pass');
+    expect(deriveSpecialistVote(nit())).toBe('pass');
+    expect(deriveSpecialistVote([...nit(), ...crit()])).toBe('block');
+  });
+
+  it('highestSeverityOf returns the worst label present (original casing), or null', () => {
+    expect(highestSeverityOf([])).toBeNull();
+    expect(
+      highestSeverityOf([
+        { path: 'a', severity: 'warning', rationale: 'x' },
+        { path: 'b', severity: 'critical', rationale: 'y' },
+      ])
+    ).toBe('critical');
+    expect(highestSeverityOf([{ path: 'a', severity: 'nitpick', rationale: 'x' }])).toBe('nitpick');
+    // Off-scale labels rank lowest but are still surfaced when nothing else is present.
+    expect(highestSeverityOf([{ path: 'a', severity: 'weird', rationale: 'x' }])).toBe('weird');
+  });
+});
+
+describe('computeCouncilDecision (binary)', () => {
+  it('blocks on empty coverage for every enforcing strategy (never pass)', () => {
+    expect(computeCouncilDecision([], 'unanimous')).toBe('block');
+    expect(computeCouncilDecision([], 'majority')).toBe('block');
+  });
+
+  describe('unanimous', () => {
     it('blocks if any specialist blocks', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'block']), 'any_blocking_member')
-      ).toBe('block');
+      expect(computeCouncilDecision(votes(['a', 'pass'], ['b', 'block']), 'unanimous')).toBe(
+        'block'
+      );
     });
-    it('warns if any warn and none block', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'warn']), 'any_blocking_member')
-      ).toBe('warn');
-    });
-    it('passes when all pass', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'pass']), 'any_blocking_member')
-      ).toBe('pass');
+    it('passes only when every specialist passes', () => {
+      expect(computeCouncilDecision(votes(['a', 'pass'], ['b', 'pass']), 'unanimous')).toBe('pass');
     });
   });
 
   describe('majority', () => {
-    it('blocks only when block votes outnumber pass votes', () => {
+    it('blocks only when block votes outnumber pass votes; ties pass', () => {
       expect(
         computeCouncilDecision(votes(['a', 'block'], ['b', 'block'], ['c', 'pass']), 'majority')
       ).toBe('block');
-      // Tie (1 block, 1 pass) is not a block majority → warn/pass by remaining votes.
+      // 1 block, 1 pass → tie → pass.
       expect(computeCouncilDecision(votes(['a', 'block'], ['b', 'pass']), 'majority')).toBe('pass');
-    });
-    it('warns when not out-blocked but a warn exists', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'pass'], ['c', 'warn']), 'majority')
-      ).toBe('warn');
-    });
-  });
-
-  describe('unanimous_required', () => {
-    it('blocks if any block or abstain', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'abstain']), 'unanimous_required')
-      ).toBe('block');
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'block']), 'unanimous_required')
-      ).toBe('block');
-    });
-    it('warns if all non-block/non-abstain but a warn exists', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'warn']), 'unanimous_required')
-      ).toBe('warn');
-    });
-    it('passes only when every specialist passes', () => {
-      expect(
-        computeCouncilDecision(votes(['a', 'pass'], ['b', 'pass']), 'unanimous_required')
-      ).toBe('pass');
     });
   });
 });
 
 describe('councilDecisionBlocksMerge', () => {
-  it('blocks only on block', () => {
+  it('blocks only on block; pass and null (advisory) do not', () => {
     expect(councilDecisionBlocksMerge('block')).toBe(true);
-    expect(councilDecisionBlocksMerge('warn')).toBe(false);
     expect(councilDecisionBlocksMerge('pass')).toBe(false);
-    expect(councilDecisionBlocksMerge('abstain')).toBe(false);
-  });
-});
-
-describe('describeAggregationStrategy', () => {
-  it('returns distinct wording per strategy', () => {
-    const a = describeAggregationStrategy('any_blocking_member');
-    const m = describeAggregationStrategy('majority');
-    const u = describeAggregationStrategy('unanimous_required');
-    expect(new Set([a, m, u]).size).toBe(3);
-    expect(m.toLowerCase()).toContain('majority');
-    expect(u.toLowerCase()).toContain('unanimous');
-  });
-
-  it('documents the no-usable-coverage → block rule for every strategy (lockstep with computeCouncilDecision)', () => {
-    const strategies = ['any_blocking_member', 'majority', 'unanimous_required'] as const;
-    for (const strategy of strategies) {
-      const text = describeAggregationStrategy(strategy).toLowerCase();
-      expect(text).toContain('all abstained');
-      expect(text).toContain('block');
-    }
+    expect(councilDecisionBlocksMerge(null)).toBe(false);
   });
 });
 
 describe('parseCouncilResultManifest', () => {
+  // v2 manifest: specialists report findings only (no vote/highestSeverity — code derives them).
   const manifest = {
     specialists: [
       {
         specialistId: 'security',
-        vote: 'block',
-        highestSeverity: 'critical',
         findings: [{ path: 'a.ts', line: 3, severity: 'critical', rationale: 'sqli' }],
       },
-      { specialistId: 'performance', vote: 'pass', findings: [] },
+      { specialistId: 'performance', findings: [] },
     ],
   };
 
@@ -147,7 +118,7 @@ describe('parseCouncilResultManifest', () => {
     if (capture.status !== 'captured') throw new Error('unreachable');
     expect(capture.manifest.specialists).toHaveLength(2);
     expect(capture.manifest.specialists[0].findings).toHaveLength(1);
-    // findings defaults to [] when omitted.
+    // An explicit empty findings array is valid (= "reviewed, nothing blocking").
     expect(capture.manifest.specialists[1].findings).toEqual([]);
   });
 
@@ -157,10 +128,45 @@ describe('parseCouncilResultManifest', () => {
     expect(parseCouncilResultManifest(null).status).toBe('missing');
   });
 
-  it('returns invalid when a specialist vote is missing/invalid', () => {
-    const bad = { specialists: [{ specialistId: 'security', findings: [] }] };
+  it('returns invalid when a specialist entry is missing its id', () => {
+    const bad = { specialists: [{ findings: [] }] };
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(bad)} -->`;
     expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('fails closed: a specialist entry with NO findings key is invalid (not a silent pass)', () => {
+    const bad = { specialists: [{ specialistId: 'security' }] };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(bad)} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('fails closed: an off-scale severity is invalid (a mislabeled critical cannot derive to pass)', () => {
+    const bad = {
+      specialists: [
+        {
+          specialistId: 'security',
+          findings: [{ path: 'a.ts', severity: 'high', rationale: 'x' }],
+        },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(bad)} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('tolerates casing/whitespace on canonical severities', () => {
+    const ok = {
+      specialists: [
+        {
+          specialistId: 'security',
+          findings: [{ path: 'a.ts', severity: ' Critical ', rationale: 'x' }],
+        },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(ok)} -->`;
+    const capture = parseCouncilResultManifest(text);
+    expect(capture.status).toBe('captured');
+    if (capture.status !== 'captured') throw new Error('unreachable');
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
   it('returns invalid on non-JSON payload', () => {
@@ -170,13 +176,14 @@ describe('parseCouncilResultManifest', () => {
   });
 
   it('uses the last marker when several are present (trailing prose safe)', () => {
-    const first = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
-    const last = { specialists: [{ specialistId: 'security', vote: 'block', findings: [] }] };
+    const first = { specialists: [{ specialistId: 'security', findings: [] }] };
+    const last = { specialists: [{ specialistId: 'security', findings: crit() }] };
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(first)} -->\nthen\n<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(last)} -->\ntrailing note`;
     const capture = parseCouncilResultManifest(text);
     expect(capture.status).toBe('captured');
     if (capture.status !== 'captured') throw new Error('unreachable');
-    expect(capture.manifest.specialists[0].vote).toBe('block');
+    // The LAST marker wins — its security finding is critical (→ derived block).
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
   it('captures a manifest whose finding text contains --> and braces (no false invalid)', () => {
@@ -184,13 +191,11 @@ describe('parseCouncilResultManifest', () => {
       specialists: [
         {
           specialistId: 'correctness',
-          vote: 'warn',
-          highestSeverity: 'medium',
           findings: [
             {
               path: 'src/loop.ts',
               line: 12,
-              severity: 'medium',
+              severity: 'warning',
               rationale: 'Confusing "goes to" operator: while (i --> 0) {} reads like an arrow.',
             },
           ],
@@ -209,26 +214,23 @@ describe('parseCouncilResultManifest', () => {
       specialists: [
         {
           specialistId: 'security',
-          vote: 'pass',
-          findings: [{ path: 'a.ts', line: 1, severity: 'low', rationale: 'note --> here' }],
+          findings: [{ path: 'a.ts', line: 1, severity: 'nitpick', rationale: 'note --> here' }],
         },
       ],
     };
-    const last = {
-      specialists: [{ specialistId: 'security', vote: 'block', findings: [] }],
-    };
+    const last = { specialists: [{ specialistId: 'security', findings: crit() }] };
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(first)} -->\n<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(last)} -->`;
     const capture = parseCouncilResultManifest(text);
     expect(capture.status).toBe('captured');
     if (capture.status !== 'captured') throw new Error('unreachable');
-    expect(capture.manifest.specialists[0].vote).toBe('block');
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
-  it('treats a duplicate specialistId as invalid (a later entry cannot override an earlier vote)', () => {
+  it('treats a duplicate specialistId as invalid (a later entry cannot override an earlier one)', () => {
     const dup = {
       specialists: [
-        { specialistId: 'security', vote: 'block', findings: [] },
-        { specialistId: 'security', vote: 'pass', findings: [] },
+        { specialistId: 'security', findings: crit() },
+        { specialistId: 'security', findings: [] },
       ],
     };
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(dup)} -->`;
@@ -237,39 +239,34 @@ describe('parseCouncilResultManifest', () => {
     const decision = decideCouncilFromManifest(
       ['security'],
       dup as unknown as CouncilResultManifest,
-      'any_blocking_member'
+      'unanimous'
     );
     expect(decision.decision).toBe('block');
     expect(decision.missingSpecialistIds).toEqual(['security']);
   });
 
-  it('does not treat a longer version tag (v10 / v1junk) as a v1 marker', () => {
-    const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
+  it('does not treat a longer version tag (v20 / v2junk) as the marker', () => {
+    const m = { specialists: [{ specialistId: 'security', findings: [] }] };
     expect(
-      parseCouncilResultManifest(
-        `<!-- ${COUNCIL_RESULT_MARKER_TAG}0 ${JSON.stringify(manifest)} -->`
-      ).status
+      parseCouncilResultManifest(`<!-- ${COUNCIL_RESULT_MARKER_TAG}0 ${JSON.stringify(m)} -->`)
+        .status
     ).toBe('missing');
     expect(
-      parseCouncilResultManifest(
-        `<!-- ${COUNCIL_RESULT_MARKER_TAG}junk ${JSON.stringify(manifest)} -->`
-      ).status
+      parseCouncilResultManifest(`<!-- ${COUNCIL_RESULT_MARKER_TAG}junk ${JSON.stringify(m)} -->`)
+        .status
     ).toBe('missing');
   });
 
   it('ignores marker text embedded inside a finding and captures the real manifest', () => {
-    // A specialist quotes the marker in its rationale. JSON.stringify does not escape it,
-    // so the serialized message contains a second, embedded marker occurrence.
     const real = {
       specialists: [
         {
           specialistId: 'security',
-          vote: 'block',
           findings: [
             {
               path: 'a.ts',
               line: 1,
-              severity: 'high',
+              severity: 'critical',
               rationale: `Do not emit <!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[]} --> in code.`,
             },
           ],
@@ -281,13 +278,13 @@ describe('parseCouncilResultManifest', () => {
     expect(capture.status).toBe('captured');
     if (capture.status !== 'captured') throw new Error('unreachable');
     expect(capture.manifest.specialists).toHaveLength(1);
-    expect(capture.manifest.specialists[0].vote).toBe('block');
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
   it('a malformed LATEST top-level marker stays invalid and does not fall back to an earlier valid one', () => {
-    const earlierPass = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
-    // Later top-level marker is malformed (missing vote) — must fail closed, not reuse the earlier pass.
-    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(earlierPass)} -->\n<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"specialistId":"security"}]} -->`;
+    const earlier = { specialists: [{ specialistId: 'security', findings: [] }] };
+    // Later top-level marker is malformed (entry missing specialistId) — must fail closed.
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(earlier)} -->\n<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"findings":[]}]} -->`;
     expect(parseCouncilResultManifest(text).status).toBe('invalid');
   });
 
@@ -297,8 +294,7 @@ describe('parseCouncilResultManifest', () => {
       specialists: [
         {
           specialistId: 'security',
-          vote: 'block',
-          findings: [{ path: 'a.ts', line: 1, severity: 'high', rationale: noise }],
+          findings: [{ path: 'a.ts', line: 1, severity: 'critical', rationale: noise }],
         },
       ],
     };
@@ -306,71 +302,57 @@ describe('parseCouncilResultManifest', () => {
     const capture = parseCouncilResultManifest(text);
     expect(capture.status).toBe('captured');
     if (capture.status !== 'captured') throw new Error('unreachable');
-    expect(capture.manifest.specialists[0].vote).toBe('block');
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
   it('does not swallow unrelated JSON when the marker has no immediate payload', () => {
-    // Marker with no `{` on its line, followed later by manifest-shaped JSON that is NOT
-    // framed by this marker. Must not be captured.
-    const stray = JSON.stringify({
-      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
-    });
+    const stray = JSON.stringify({ specialists: [{ specialistId: 'security', findings: [] }] });
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} -->\nHere is some JSON: ${stray}`;
     expect(parseCouncilResultManifest(text).status).toBe('invalid');
   });
 
   it('requires the closing --> frame after the JSON object', () => {
-    const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
-    // Object present after the tag but not framed by a closing `-->`.
-    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(manifest)} and then prose`;
+    const m = { specialists: [{ specialistId: 'security', findings: [] }] };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(m)} and then prose`;
     expect(parseCouncilResultManifest(text).status).toBe('invalid');
   });
 
   it('ignores an embedded marker preceded by a Unicode line separator (U+2028/U+2029)', () => {
-    // JS `^m` treats U+2028/U+2029 as line starts, and JSON.stringify leaves them
-    // unescaped — so a finding containing one before the marker must NOT be treated as a
-    // top-level marker.
     const real = {
       specialists: [
         {
           specialistId: 'security',
-          vote: 'block',
           findings: [
             {
               path: 'a.ts',
               line: 1,
-              severity: 'high',
-              rationale: `line1\u2028<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[]} -->\u2029end`,
+              severity: 'critical',
+              rationale: `line1 <!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[]} --> end`,
             },
           ],
         },
       ],
     };
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(real)} -->`;
-    // Sanity: the serialized text really contains a raw U+2028 (unescaped by JSON.stringify).
-    expect(text).toContain('\u2028');
+    expect(text).toContain(' ');
     const capture = parseCouncilResultManifest(text);
     expect(capture.status).toBe('captured');
     if (capture.status !== 'captured') throw new Error('unreachable');
-    expect(capture.manifest.specialists[0].vote).toBe('block');
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
   it('enforces the byte cap for unpaired surrogates (cannot undercount past 128 KiB)', () => {
-    // `\uD800\u0800` = an unpaired high surrogate + a BMP char = 6 UTF-8 bytes (3-byte
-    // replacement char + 3-byte char), NOT 4. 25k of them is ~150 KiB, over the cap.
-    // Character count (~50k) stays under the scan bound, so the byte cap must catch it.
-    const seq = '\uD800\u0800'.repeat(25_000);
+    const seq = '\uD800ࠀ'.repeat(25_000);
     const payload = `{"specialists":[],"x":"${seq}"}`;
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${payload} -->`;
     expect(parseCouncilResultManifest(text).status).toBe('invalid');
   });
 
   it('does not treat a mid-line (non-line-anchored) marker as top-level', () => {
-    const manifest = { specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }] };
-    // Marker preceded by non-whitespace on the same line is not a top-level marker.
+    const m = { specialists: [{ specialistId: 'security', findings: [] }] };
     expect(
       parseCouncilResultManifest(
-        `prefix <!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(manifest)} -->`
+        `prefix <!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(m)} -->`
       ).status
     ).toBe('missing');
   });
@@ -380,8 +362,9 @@ describe('parseCouncilResultManifest', () => {
       specialists: [
         {
           specialistId: 'security',
-          vote: 'pass',
-          findings: [{ path: 'a.ts', line: 1, severity: 'x', rationale: 'y'.repeat(200_000) }],
+          findings: [
+            { path: 'a.ts', line: 1, severity: 'warning', rationale: 'y'.repeat(200_000) },
+          ],
         },
       ],
     };
@@ -391,19 +374,17 @@ describe('parseCouncilResultManifest', () => {
 });
 
 describe('summarizeCouncilManifest', () => {
-  it('rolls up vote, highest severity, and findings count per specialist', () => {
+  it('derives vote + highest severity from findings (model reports neither)', () => {
     const summary = summarizeCouncilManifest({
       specialists: [
         {
           specialistId: 'security',
-          vote: 'block',
-          highestSeverity: 'critical',
           findings: [
             { path: 'a.ts', line: 1, severity: 'critical', rationale: 'x' },
-            { path: 'b.ts', line: 2, severity: 'high', rationale: 'y' },
+            { path: 'b.ts', line: 2, severity: 'warning', rationale: 'y' },
           ],
         },
-        { specialistId: 'performance', vote: 'pass', findings: [] },
+        { specialistId: 'performance', findings: [] },
       ],
     });
     expect(summary).toEqual([
@@ -416,12 +397,12 @@ describe('summarizeCouncilManifest', () => {
 describe('reconcileCouncilVotes', () => {
   const manifest: CouncilResultManifest = {
     specialists: [
-      { specialistId: 'security', vote: 'block', findings: [] },
-      { specialistId: 'unknown', vote: 'pass', findings: [] },
+      { specialistId: 'security', findings: crit() },
+      { specialistId: 'unknown', findings: [] },
     ],
   };
 
-  it('surfaces a configured specialist absent from the manifest as missing (not abstain)', () => {
+  it('surfaces a configured specialist absent from the manifest as missing', () => {
     const coverage = reconcileCouncilVotes(['security', 'performance'], manifest);
     expect(coverage.votes).toEqual([{ specialistId: 'security', vote: 'block' }]);
     expect(coverage.missingSpecialistIds).toEqual(['performance']);
@@ -433,66 +414,62 @@ describe('reconcileCouncilVotes', () => {
     expect(coverage.missingSpecialistIds).toEqual([]);
   });
 
-  it('keeps a legitimately returned abstain vote as abstain', () => {
+  it('derives pass for a reported specialist with no critical findings', () => {
     const coverage = reconcileCouncilVotes(['security'], {
-      specialists: [{ specialistId: 'security', vote: 'abstain', findings: [] }],
+      specialists: [{ specialistId: 'security', findings: nit() }],
     });
-    expect(coverage.votes).toEqual([{ specialistId: 'security', vote: 'abstain' }]);
-    expect(coverage.missingSpecialistIds).toEqual([]);
+    expect(coverage.votes).toEqual([{ specialistId: 'security', vote: 'pass' }]);
   });
 });
 
 describe('decideCouncilFromManifest (coverage-aware)', () => {
-  const strategies = ['any_blocking_member', 'majority', 'unanimous_required'] as const;
-
-  it('blocks under EVERY strategy when a configured specialist is missing (fail closed)', () => {
+  it('advisory: computes NO aggregate decision (null), regardless of votes', () => {
     const manifest: CouncilResultManifest = {
-      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
+      specialists: [{ specialistId: 'security', findings: crit() }],
     };
-    for (const strategy of strategies) {
+    const result = decideCouncilFromManifest(['security'], manifest, 'advisory');
+    expect(result.decision).toBeNull();
+    expect(result.votes).toEqual([{ specialistId: 'security', vote: 'block' }]);
+  });
+
+  it('blocks under enforcing strategies when a configured specialist is missing (fail closed)', () => {
+    const manifest: CouncilResultManifest = {
+      specialists: [{ specialistId: 'security', findings: [] }],
+    };
+    for (const strategy of ['unanimous', 'majority'] as const) {
       const result = decideCouncilFromManifest(['security', 'performance'], manifest, strategy);
       expect(result.decision).toBe('block');
       expect(result.missingSpecialistIds).toEqual(['performance']);
     }
   });
 
-  it('passes when every configured specialist reported and all pass', () => {
+  it('passes when every configured specialist reported and none is critical', () => {
     const manifest: CouncilResultManifest = {
       specialists: [
-        { specialistId: 'security', vote: 'pass', findings: [] },
-        { specialistId: 'performance', vote: 'pass', findings: [] },
+        { specialistId: 'security', findings: [] },
+        { specialistId: 'performance', findings: nit() },
       ],
     };
-    const result = decideCouncilFromManifest(
-      ['security', 'performance'],
-      manifest,
-      'any_blocking_member'
-    );
+    const result = decideCouncilFromManifest(['security', 'performance'], manifest, 'unanimous');
     expect(result.decision).toBe('pass');
     expect(result.missingSpecialistIds).toEqual([]);
   });
 
-  it('does not block on a legitimately returned abstain under any_blocking_member (strategy A)', () => {
+  it('blocks under unanimous when one specialist has a critical finding', () => {
     const manifest: CouncilResultManifest = {
       specialists: [
-        { specialistId: 'security', vote: 'abstain', findings: [] },
-        { specialistId: 'performance', vote: 'pass', findings: [] },
+        { specialistId: 'security', findings: crit() },
+        { specialistId: 'performance', findings: [] },
       ],
     };
-    const result = decideCouncilFromManifest(
-      ['security', 'performance'],
-      manifest,
-      'any_blocking_member'
-    );
-    expect(result.decision).toBe('pass');
+    const result = decideCouncilFromManifest(['security', 'performance'], manifest, 'unanimous');
+    expect(result.decision).toBe('block');
   });
 
   it('fails closed on a duplicate configured id (a specialist cannot be counted twice)', () => {
     const manifest: CouncilResultManifest = {
-      specialists: [{ specialistId: 'security', vote: 'pass', findings: [] }],
+      specialists: [{ specialistId: 'security', findings: [] }],
     };
-    // Without the guard, ['security','security'] would append security's pass vote twice
-    // and could flip a majority. It is counted once and treated as unreliable coverage.
     const result = decideCouncilFromManifest(['security', 'security'], manifest, 'majority');
     expect(result.decision).toBe('block');
     expect(result.missingSpecialistIds).toEqual(['security']);
@@ -500,59 +477,18 @@ describe('decideCouncilFromManifest (coverage-aware)', () => {
   });
 });
 
-describe('parseGovernanceMarker', () => {
-  it('parses member votes and strips any model-authored overall decision', () => {
-    // The model emits `decision`, but it is code-owned — the parsed result must not carry
-    // it (it could contradict computeCouncilDecision in the UI).
-    const gov = { members: [{ id: 'security', vote: 'pass' }], decision: 'pass' };
-    const parsed = parseGovernanceMarker(
-      `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
-    );
-    expect(parsed).toEqual({ members: [{ id: 'security', vote: 'pass', highestSeverity: null }] });
-    expect(parsed as unknown as Record<string, unknown>).not.toHaveProperty('decision');
-  });
-
-  it('returns null when absent or malformed', () => {
-    expect(parseGovernanceMarker('nothing')).toBeNull();
-    expect(parseGovernanceMarker(null)).toBeNull();
-    expect(parseGovernanceMarker('<!-- kilo-review-governance:v1 {bad} -->')).toBeNull();
-  });
-
-  it('normalizes a "none" severity label to null', () => {
-    const gov = { members: [{ id: 'a', vote: 'pass', highestSeverity: 'none' }], decision: 'pass' };
-    const parsed = parseGovernanceMarker(
-      `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
-    );
-    expect(parsed?.members[0].highestSeverity).toBeNull();
-  });
-
-  it('parses when a member reason contains --> and braces', () => {
-    const gov = {
-      members: [{ id: 'security', vote: 'warn', reason: 'template `${x}` and --> in code' }],
-      decision: 'warn',
-    };
-    const parsed = parseGovernanceMarker(
-      `<!-- kilo-review-governance:v1 ${JSON.stringify(gov)} -->`
-    );
-    expect(parsed?.members[0].vote).toBe('warn');
-    expect(parsed?.members[0].reason).toContain('-->');
-  });
-});
-
 describe('council config helpers', () => {
-  // One enabled (security) + one disabled (performance).
   const council: CodeReviewCouncilConfig = {
     enabled: true,
-    aggregation_strategy: 'any_blocking_member',
+    aggregation_strategy: 'unanimous',
     specialists: [
       presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[0]),
       { ...presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[1]), enabled: false },
     ],
   };
-  // Two enabled specialists (meets COUNCIL_MIN_SPECIALISTS).
   const activeCouncil: CodeReviewCouncilConfig = {
     enabled: true,
-    aggregation_strategy: 'any_blocking_member',
+    aggregation_strategy: 'advisory',
     specialists: [
       presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[0]),
       presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[1]),
@@ -565,17 +501,39 @@ describe('council config helpers', () => {
 
   it('isCouncilActive requires enabled + at least COUNCIL_MIN_SPECIALISTS enabled specialists', () => {
     expect(isCouncilActive(activeCouncil)).toBe(true);
-    // Below the minimum (only one enabled) must NOT be active.
     expect(isCouncilActive(council)).toBe(false);
     expect(isCouncilActive({ ...activeCouncil, enabled: false })).toBe(false);
     expect(isCouncilActive({ ...activeCouncil, specialists: [] })).toBe(false);
     expect(isCouncilActive(null)).toBe(false);
   });
 
-  it('formatAggregationStrategy labels known strategies and falls back', () => {
+  it('formatAggregationStrategy labels the governance modes and falls back', () => {
     expect(formatAggregationStrategy('majority')).toBe('Majority');
-    expect(formatAggregationStrategy(null)).toBe('Any blocking member');
+    expect(formatAggregationStrategy('unanimous')).toBe('Unanimous');
+    expect(formatAggregationStrategy(null)).toBe('Advisory (report only)');
     expect(formatAggregationStrategy('weird')).toBe('weird');
+  });
+
+  it('normalizes legacy v1 aggregation_strategy values when parsing a persisted config', () => {
+    const base = {
+      enabled: true,
+      specialists: [presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[0])],
+    };
+    // Pre-v2 configs used any_blocking_member / unanimous_required — both → v2 unanimous.
+    expect(
+      CodeReviewCouncilConfigSchema.parse({ ...base, aggregation_strategy: 'any_blocking_member' })
+        .aggregation_strategy
+    ).toBe('unanimous');
+    expect(
+      CodeReviewCouncilConfigSchema.parse({ ...base, aggregation_strategy: 'unanimous_required' })
+        .aggregation_strategy
+    ).toBe('unanimous');
+    // New values + omitted (→ default advisory) pass through.
+    expect(
+      CodeReviewCouncilConfigSchema.parse({ ...base, aggregation_strategy: 'majority' })
+        .aggregation_strategy
+    ).toBe('majority');
+    expect(CodeReviewCouncilConfigSchema.parse(base).aggregation_strategy).toBe('advisory');
   });
 });
 
@@ -601,5 +559,126 @@ describe('determineAutomatedReviewType', () => {
         { councilAvailable: true }
       )
     ).toBe('standard');
+  });
+});
+
+const councilResult = (
+  decision: CodeReviewCouncilResult['decision'],
+  votes: Array<CodeReviewCouncilResult['specialists'][number]['vote']>,
+  aggregationStrategy: CodeReviewCouncilResult['aggregationStrategy'] = 'unanimous'
+): CodeReviewCouncilResult => ({
+  decision,
+  aggregationStrategy,
+  specialists: votes.map((vote, i) => ({
+    id: `s${i}`,
+    role: 'security',
+    name: `S${i}`,
+    model: null,
+    thinkingEffort: null,
+    vote,
+    highestSeverity: vote === 'block' ? 'critical' : vote === 'pass' ? 'nitpick' : null,
+    findings: [],
+  })),
+});
+
+describe('buildCouncilReviewSection', () => {
+  it('renders a title-cased heading, per-specialist table, and governance info line', () => {
+    const section = buildCouncilReviewSection(councilResult('block', ['block', 'pass']), {
+      gates: true,
+    });
+    expect(section).toContain('## Council Review');
+    expect(section).toContain('| Specialist | Model | Highest severity | Findings |');
+    expect(section).toContain('_Governance mode: Unanimous —');
+    expect(section).toContain('a single blocking vote blocks the merge');
+  });
+
+  it('phrases a gating (automated) block decision as a hard merge block', () => {
+    const section = buildCouncilReviewSection(councilResult('block', ['block', 'block', 'pass']), {
+      gates: true,
+    });
+    expect(section).toContain('**Decision: Merge blocked** (Unanimous governance)');
+    expect(section).toContain('2 block, 1 pass');
+    expect(section).toContain('Merge is blocked until the blocking findings are addressed.');
+  });
+
+  it('phrases a non-gating (manual) block decision as "would block" with a caveat', () => {
+    const section = buildCouncilReviewSection(councilResult('block', ['block', 'pass']), {
+      gates: false,
+    });
+    expect(section).toContain('**Decision: Would block merge** (Unanimous governance)');
+    expect(section).toContain('does not block merge');
+    expect(section).toContain('An automated review with this decision would block merge');
+  });
+
+  it('renders a pass decision and includes a no-result count when present', () => {
+    const section = buildCouncilReviewSection(councilResult('pass', ['pass', null], 'majority'), {
+      gates: true,
+    });
+    expect(section).toContain('**Decision: Approved** (Majority governance)');
+    expect(section).toContain('1 pass, 1 no result');
+    expect(section).toContain('No specialist raised a blocking finding');
+  });
+
+  it('renders an advisory section with governance info but no merge decision', () => {
+    const section = buildCouncilReviewSection(councilResult(null, ['pass', 'block'], 'advisory'), {
+      gates: false,
+    });
+    expect(section).toContain('**Advisory review** — findings reported, no merge decision');
+    expect(section).toContain('does not decide a merge verdict');
+    expect(section).not.toContain('Merge blocked');
+    // The governance label already says "(report only)" — the info line must not repeat it.
+    expect(section).not.toContain('report only — report only');
+  });
+
+  it('escapes pipe characters in specialist model/name cells', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = 'vendor|weird';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).toContain('vendor\\|weird');
+  });
+
+  it('escapes backslashes before pipes so a pre-existing backslash cannot break the cell', () => {
+    const result = councilResult('pass', ['pass']);
+    // Raw `a\|b`: the `\` must be escaped first (→ `\\`) so the `|` we escape stays escaped.
+    result.specialists[0].model = 'a\\|b';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).toContain('a\\\\\\|b'); // `\\` (literal backslash) + `\|` (escaped pipe)
+    expect(section).not.toContain('a\\\\|b'); // the broken form (backslash + bare pipe)
+  });
+});
+
+describe('upsertCouncilVerdictInBody', () => {
+  const section = '> **Council decision: Merge blocked** (Unanimous governance)';
+
+  it('inserts the block right after the leading kilo-review marker', () => {
+    const body = '<!-- kilo-review -->\n## Code Review Summary\nbody';
+    const out = upsertCouncilVerdictInBody(body, section);
+    expect(out.indexOf(COUNCIL_VERDICT_BLOCK_START)).toBeGreaterThan(
+      out.indexOf('<!-- kilo-review -->')
+    );
+    expect(out.indexOf(COUNCIL_VERDICT_BLOCK_START)).toBeLessThan(
+      out.indexOf('## Code Review Summary')
+    );
+    expect(out).toContain(
+      `${COUNCIL_VERDICT_BLOCK_START}\n${section}\n${COUNCIL_VERDICT_BLOCK_END}`
+    );
+  });
+
+  it('replaces an existing verdict block in place (idempotent re-runs)', () => {
+    const body = '<!-- kilo-review -->\n## Code Review Summary\nbody';
+    const once = upsertCouncilVerdictInBody(body, section);
+    const twice = upsertCouncilVerdictInBody(
+      once,
+      '> **Council decision: Approved** (Majority governance)'
+    );
+    expect(twice.match(new RegExp(COUNCIL_VERDICT_BLOCK_START, 'g'))).toHaveLength(1);
+    expect(twice).toContain('Approved');
+    expect(twice).not.toContain('Merge blocked');
+  });
+
+  it('prepends the block when no kilo-review marker is present', () => {
+    const out = upsertCouncilVerdictInBody('plain body', section);
+    expect(out.startsWith(COUNCIL_VERDICT_BLOCK_START)).toBe(true);
+    expect(out).toContain('plain body');
   });
 });

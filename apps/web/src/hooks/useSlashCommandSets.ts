@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import { useManager } from '@/components/cloud-agent-next/CloudAgentProvider';
-import type { SlashCommandInfo } from '@/lib/cloud-agent-sdk';
-import { commandsOrDefault } from '@cloud-agent-shared';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
+import { selectSlashCommands } from './slash-command-selection';
 
 /**
  * Source of slash commands for the chat composer.
@@ -11,10 +10,15 @@ import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
  * The list comes from the cloud-agent session manager's `availableCommands`
  * Jotai atom, which is hydrated by `commands.available` events sent by the
  * cloud-agent worker on every /stream connect (and any time the wrapper
- * re-pushes the catalog). When the live list is empty (no wrapper connection
- * yet, or wrapper reported no commands), this hook falls back to the pinned
- * default catalog so the new-session screen and empty-wrapper cases still
- * get autocomplete.
+ * re-pushes the catalog). The active session type, also exposed by the
+ * manager, drives which slice of the catalog (or fallbacks) the composer
+ * should surface:
+ *
+ * - Cloud Agent sessions keep the historical pinned-default fallback so the
+ *   new-session screen and empty-wrapper cases still get autocomplete.
+ * - Remote sessions use only the exact live CLI catalog — empty stays empty
+ *   and the Cloud Agent defaults are not substituted in.
+ * - Read-only and unresolved (null) sessions expose no commands.
  *
  * `expansion` is vestigial — kept for type compatibility with the existing
  * `SlashCommand` UI shape, but unused now that ChatInput invokes the
@@ -23,10 +27,11 @@ import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 export function useSlashCommandSets() {
   const manager = useManager();
   const commands = useAtomValue(manager.atoms.availableCommands);
+  const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
 
   const availableCommands: SlashCommand[] = useMemo(
-    () => commandsOrDefault(commands).map(toSlashCommand),
-    [commands]
+    () => selectSlashCommands(activeSessionType, commands),
+    [activeSessionType, commands]
   );
 
   return {
@@ -37,21 +42,12 @@ export function useSlashCommandSets() {
         {
           id: 'kilo',
           name: 'Kilo',
-          description: 'Project, MCP, and skill commands available in this session',
+          description: 'Project and MCP commands available in this session',
           prefix: '',
           commands: availableCommands,
         },
       ],
       [availableCommands]
     ),
-  };
-}
-
-function toSlashCommand(info: SlashCommandInfo): SlashCommand {
-  return {
-    trigger: info.name,
-    label: info.name,
-    description: info.description ?? '',
-    expansion: '',
   };
 }

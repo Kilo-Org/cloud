@@ -4,7 +4,6 @@ import type { CouncilAggregationStrategy, CouncilSpecialist } from '@kilocode/db
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
 import {
   COUNCIL_RESULT_MARKER_TAG,
-  describeAggregationStrategy,
   formatAggregationStrategy,
 } from '@kilocode/worker-utils/code-review-council';
 
@@ -12,9 +11,9 @@ import {
  * Council execution prompts (single-session, multi-model).
  *
  * The primary agent acts as the COORDINATOR: it delegates to one sub-agent per specialist
- * (each pinned to its own model via `runtimeAgents`), collects their structured results,
- * and emits ONE combined `kilo-code-review-council:v1` manifest. Our code — never the
- * model — computes the governance decision from that manifest.
+ * (each pinned to its own model via `runtimeAgents`), collects their findings, and emits ONE
+ * combined `kilo-code-review-council:v2` manifest. Our code — never the model — derives each
+ * specialist's binary vote from its findings and computes the governance decision.
  *
  * NOTE: these prompts are a first cut and are expected to be tuned against real inference
  * in local development. The machine-readable manifest contract below is the load-bearing
@@ -39,14 +38,22 @@ export function buildSpecialistAgentPrompt(specialist: CouncilSpecialist): strin
     '  re-analyze — once you have reviewed the changes through your lens, report and STOP.',
     '',
     'Report back to the coordinator with a single JSON object (no prose) of the form:',
-    '{"model":"<the exact model slug you are running as>","vote":"pass|warn|block|abstain","highestSeverity":"<label or null>","findings":[{"path":"...","line":<number|null>,"severity":"<label>","rationale":"..."}]}',
+    '{"model":"<the exact model slug you are running as>","findings":[{"path":"...","line":<number|null>,"severity":"critical|warning|suggestion|nitpick","rationale":"..."}]}',
     '',
-    'Set "model" to the concrete model you are actually running as (not an "auto" alias).',
-    'If you cannot determine it, omit the "model" field entirely.',
+    'Set "model" to the concrete model you are actually running as (not an "auto" alias);',
+    'omit the field if you cannot determine it.',
     '',
-    'Voting guidance: "block" for issues that should stop merge, "warn" for non-blocking',
-    'concerns, "pass" if nothing in your lens is wrong, "abstain" only if your lens does',
-    'not apply to these changes. Report findings only within your lens.',
+    'Severity — assign EXACTLY one per finding from this fixed scale:',
+    '- critical — a genuinely blocking problem in your lens. This is the ONLY severity that',
+    '  blocks a merge, so use it only for issues that should truly stop the change.',
+    '- warning — a real but non-blocking concern.',
+    '- suggestion — an optional improvement.',
+    '- nitpick — trivial or stylistic.',
+    '',
+    'Report ONLY issues within your lens. Do NOT cast a vote or state any overall verdict —',
+    'our system computes the vote and decision from your findings. ALWAYS include the',
+    '"findings" array — use [] when you found nothing (that means "reviewed, good to go").',
+    'There is no "abstain": if you were asked to run, you review and report findings-or-none.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -78,8 +85,6 @@ export function buildCouncilOrchestratorPrompt(params: {
     'Specialists:',
     roster,
     '',
-    `Governance (for context only — our system computes the final decision): ${describeAggregationStrategy(aggregationStrategy)}`,
-    '',
     // A council coordinator is mostly quiet (it delegates and waits), so the live session log
     // looks empty and the run appears stuck. Narrate progress so the operator sees it working.
     'Progress updates — print each of the following as a plain-text status line on its own',
@@ -98,31 +103,30 @@ export function buildCouncilOrchestratorPrompt(params: {
     '  (in provider mode: post the inline comments AND the summary to the PR; in kilo mode:',
     '  return them). Merge duplicate findings that land on the same file and line.',
     '- Keep the summary body EXACTLY as the base instructions require: the required leading',
-    '  marker (e.g. `<!-- kilo-review -->`) and the standard summary heading come FIRST,',
-    '  unchanged — do not put anything before them. Immediately AFTER that standard heading,',
-    '  insert a "## Council review" section: a markdown table with one row per specialist,',
-    '  columns `Specialist | Model | Vote | Findings`. Render each vote with these icons:',
-    '  ✅ Pass, ⚠️ Warn, ⛔ Block, ➖ Abstain.',
-    '- The summary must NOT assert a merge verdict of its own — this includes any',
-    '  "Recommendation" field the base format asks for (e.g. "Merge" / "Address before merge").',
-    '  Wherever the base format wants a recommendation or merge/no-merge statement, write the',
-    '  neutral placeholder `Recommendation: determined by council governance (computed by Kilo)`',
-    '  instead. The council pass/warn/block decision is code-owned and can differ from what the',
-    '  votes alone suggest (our coverage checks fail closed), so you must not recommend',
-    '  merging or blocking anywhere.',
+    '  marker (e.g. `<!-- kilo-review -->`) and the standard summary heading, unchanged.',
+    '- Do NOT write a "Council Review" section, a per-specialist table, or any votes/decision',
+    '  yourself — our system injects the authoritative "## Council Review" section (decision,',
+    '  governance mode, and the per-specialist table) into the summary from the computed result.',
+    '  A model-authored table or verdict could contradict it.',
+    '- The summary must NOT assert a merge verdict of ANY kind — no vote, no decision, and no',
+    '  "Recommendation" (the base format\'s "Merge" / "Address before merge"). Wherever the base',
+    '  format wants a recommendation or merge/no-merge statement, write the neutral placeholder',
+    '  `Recommendation: see the Council Review decision above` instead. The council decision is',
+    '  code-owned; a model-authored verdict could contradict it.',
     '',
     'When every specialist has reported, emit EXACTLY ONE machine-readable manifest on its',
     'own line in your final message, verbatim on a line by itself. It does NOT need to be',
     'the very last line — if any other trailing markers are required, they may follow it:',
     '',
-    `<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"specialistId":"<id>","model":"<model the specialist reported, or omit>","vote":"pass|warn|block|abstain","highestSeverity":"<label or null>","findings":[{"path":"<path>","line":<number|null>,"severity":"<label>","rationale":"<text>"}]}]} -->`,
+    `<!-- ${COUNCIL_RESULT_MARKER_TAG} {"specialists":[{"specialistId":"<id>","model":"<model the specialist reported, or omit>","findings":[{"path":"<path>","line":<number|null>,"severity":"critical|warning|suggestion|nitpick","rationale":"<text>"}]}]} -->`,
     '',
     'Include one entry per specialist, using the subagent_type as its specialistId, and',
-    "pass through each specialist's findings AND reported model verbatim. Omit the model",
-    'field for a specialist that did not report one. Do NOT compute or render an overall',
-    'pass/warn/block DECISION anywhere — not in the manifest and not in the PR summary. Our',
-    'system computes the authoritative decision from these votes (with coverage checks) and',
-    'surfaces it; a model-authored decision could contradict it.',
+    "pass through each specialist's findings (with their severity) AND reported model",
+    'verbatim. EVERY entry MUST include a "findings" array (use [] for a specialist that',
+    'found nothing), and each severity MUST be one of critical|warning|suggestion|nitpick.',
+    'Omit the model field for a specialist that did not report one. Do NOT include',
+    'any vote, decision, or verdict — our system derives the votes from the severities and',
+    'computes the decision (with coverage checks); a model-authored verdict could contradict it.',
     '',
     '---',
     '',

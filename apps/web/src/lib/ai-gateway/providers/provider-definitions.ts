@@ -75,7 +75,7 @@ export default {
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     async transformRequest(context) {
-      applyVercelSettings(context.model, context.request, context.userByok);
+      await applyVercelSettings(context.model, context.request, context.userByok);
     },
   },
 } as const satisfies Record<string, Provider>;

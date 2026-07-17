@@ -1,10 +1,14 @@
 import type { CostInsightQueryExecutor } from './canonical-sources';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   getCostInsightRollupCoverage,
   getOwnerCurrentHourSpend,
   getOwnerHourlySpend,
+  getOwnerTopSpendDriversByRange,
   getRolling24HourFragments,
   getRollingWindowFragments,
+  groupContiguousHourlyIntervals,
+  loadOwnerDashboardHourlySpend,
 } from './spend-repository';
 
 const owner = { type: 'user', id: 'user-1' } as const;
@@ -59,6 +63,32 @@ describe('Cost Insights spend repository', () => {
     expect(fragments.interiorEnd).toBe('2026-06-02T12:00:00.000Z');
   });
 
+  test('groups adjacent hours with the same coverage state into intervals', () => {
+    const points = [
+      { hourStart: '2026-06-01T00:00:00.000Z', isCovered: false },
+      { hourStart: '2026-06-01T01:00:00.000Z', isCovered: false },
+      { hourStart: '2026-06-01T02:00:00.000Z', isCovered: true },
+      { hourStart: '2026-06-01T03:00:00.000Z', isCovered: false },
+    ];
+
+    expect(groupContiguousHourlyIntervals(points, false)).toEqual([
+      {
+        startHour: '2026-06-01T00:00:00.000Z',
+        endHourExclusive: '2026-06-01T02:00:00.000Z',
+      },
+      {
+        startHour: '2026-06-01T03:00:00.000Z',
+        endHourExclusive: '2026-06-01T04:00:00.000Z',
+      },
+    ]);
+    expect(groupContiguousHourlyIntervals(points, true)).toEqual([
+      {
+        startHour: '2026-06-01T02:00:00.000Z',
+        endHourExclusive: '2026-06-01T03:00:00.000Z',
+      },
+    ]);
+  });
+
   test('returns covered sparse hours as zero and uncovered hours as null', async () => {
     const executor = executorReturning([
       {
@@ -107,6 +137,124 @@ describe('Cost Insights spend repository', () => {
     ]);
   });
 
+  test('leaves pre-coverage dashboard hours unavailable while replacing degraded covered hours', async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            hour_start: '2026-06-01 00:00:00+00',
+            variable_microdollars: null,
+            scheduled_microdollars: null,
+            variable_record_count: null,
+            scheduled_record_count: null,
+            is_covered: false,
+          },
+          {
+            hour_start: '2026-06-01 01:00:00+00',
+            variable_microdollars: null,
+            scheduled_microdollars: null,
+            variable_record_count: null,
+            scheduled_record_count: null,
+            is_covered: false,
+          },
+          {
+            hour_start: '2026-06-01 02:00:00+00',
+            variable_microdollars: '7',
+            scheduled_microdollars: '0',
+            variable_record_count: '1',
+            scheduled_record_count: '0',
+            is_covered: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            rollup_version: '1',
+            live_capture_start_hour: '2026-06-01 01:00:00+00',
+            coverage_start_hour: null,
+            last_reconciled_at: null,
+            database_now: '2026-06-01 03:00:00+00',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'degraded-1',
+            start_hour: '2026-06-01 01:00:00+00',
+            end_hour_exclusive: '2026-06-01 02:00:00+00',
+            source: null,
+            reason: 'capture_bypass',
+            detected_at: '2026-06-01 02:00:00+00',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            hour_start: '2026-06-01 01:00:00+00',
+            owned_by_user_id: 'user-1',
+            owned_by_organization_id: null,
+            actor_user_id: 'user-1',
+            raw_product_key: null,
+            raw_feature_key: null,
+            requested_model: 'model',
+            resolved_model: 'model',
+            inference_provider: 'provider',
+            gateway_provider: 'provider',
+            total_microdollars: '11',
+            spend_record_count: '1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const database = {
+      transaction: async (callback: (transaction: CostInsightQueryExecutor) => Promise<unknown>) =>
+        await callback({ execute } as unknown as CostInsightQueryExecutor),
+    };
+
+    await expect(
+      loadOwnerDashboardHourlySpend(database as never, {
+        owner,
+        startHour: '2026-06-01T00:00:00.000Z',
+        endHourExclusive: '2026-06-01T03:00:00.000Z',
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        hourStart: '2026-06-01T00:00:00.000Z',
+        totalMicrodollars: null,
+        isCovered: false,
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T01:00:00.000Z',
+        totalMicrodollars: 11,
+        isCovered: true,
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T02:00:00.000Z',
+        totalMicrodollars: 7,
+        isCovered: true,
+      }),
+    ]);
+
+    expect(execute).toHaveBeenCalledTimes(7);
+    const canonicalQueries = execute.mock.calls
+      .slice(3)
+      .map(([query]) => new PgDialect().sqlToQuery(query).params);
+    expect(canonicalQueries).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['2026-06-01T01:00:00.000Z', '2026-06-01T02:00:00.000Z']),
+      ])
+    );
+    for (const queryParameters of canonicalQueries) {
+      expect(queryParameters).not.toContain('2026-06-01T00:00:00.000Z');
+    }
+  });
+
   test('adds current-hour categories using safe integer conversion', async () => {
     const executor = executorReturning([
       {
@@ -124,6 +272,52 @@ describe('Cost Insights spend repository', () => {
       variableRecordCount: 2,
       scheduledRecordCount: 1,
     });
+  });
+
+  test('returns independently ranked drivers for all ranges in one query', async () => {
+    const executor = executorReturning([
+      {
+        range_key: '1h',
+        spend_category: 'variable',
+        source: 'ai_gateway',
+        product_key: 'recent-winner',
+        feature_key: 'other',
+        model_or_plan_key: 'other',
+        provider_key: 'other',
+        actor_user_id: 'user-1',
+        total_microdollars: '30',
+        spend_record_count: '3',
+      },
+      {
+        range_key: '24h',
+        spend_category: 'scheduled',
+        source: 'kiloclaw',
+        product_key: 'day-winner',
+        feature_key: 'other',
+        model_or_plan_key: 'other',
+        provider_key: 'other',
+        actor_user_id: 'user-1',
+        total_microdollars: '100',
+        spend_record_count: '1',
+      },
+    ]);
+
+    const driversByRange = await getOwnerTopSpendDriversByRange(executor, {
+      owner,
+      ranges: [
+        { key: '1h', startHour: '2026-06-01T01:00:00.000Z' },
+        { key: '24h', startHour: '2026-05-31T02:00:00.000Z' },
+      ],
+      endHourExclusive: '2026-06-01T02:00:00.000Z',
+    });
+
+    expect(executor.execute).toHaveBeenCalledTimes(1);
+    expect(driversByRange.get('1h')).toEqual([
+      expect.objectContaining({ productKey: 'recent-winner', totalMicrodollars: 30 }),
+    ]);
+    expect(driversByRange.get('24h')).toEqual([
+      expect.objectContaining({ productKey: 'day-winner', totalMicrodollars: 100 }),
+    ]);
   });
 
   test('marks range incomplete when unresolved degraded interval overlaps it', async () => {

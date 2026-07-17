@@ -1,6 +1,13 @@
+/* eslint-disable max-lines -- Composer owns its uncontrolled input, slash suggestions, and submission flow end-to-end.
+ * The wiring between the TextInput and SlashCommandSuggestions is covered by
+ * Maestro E2E; this app has no @testing-library/react-native dependency, so it
+ * is not expressed as a unit test.
+ */
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useCallback, useRef, useState } from 'react';
+import { type SlashCommandInfo } from 'cloud-agent-sdk';
+import { type RemoteCommandState } from 'cloud-agent-sdk/remote-command-catalog';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   type LayoutChangeEvent,
@@ -15,6 +22,15 @@ import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-s
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import {
+  createMobileSlashCommandList,
+  getSlashCommandCandidate,
+  getSlashCommandSuggestions,
+  parseChatComposerSubmission,
+} from '@/components/agents/chat-composer-slash-commands';
+import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
+import { showRemoteCliExitConfirmation } from '@/components/agents/remote-cli-exit-alert';
+import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
@@ -28,6 +44,7 @@ import {
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
@@ -43,6 +60,9 @@ const TEXT_INPUT_FONT_SIZE = 16;
 
 type ChatComposerProps = {
   onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
+  onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
+  onCreateSession: () => Promise<boolean>;
+  onExitCli: (onAccepted: () => void) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -56,10 +76,19 @@ type ChatComposerProps = {
   organizationId?: string;
   /** Only Cloud Agent sessions can receive attachments. */
   attachmentsEnabled?: boolean;
+  /** Active resolved session type — drives slash command selection. */
+  activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
+  /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
+  commands?: SlashCommandInfo[];
+  /** Remote command state — empty for non-remote sessions. */
+  commandState?: RemoteCommandState | null;
 };
 
 export function ChatComposer({
   onSend,
+  onSendCommand,
+  onCreateSession,
+  onExitCli,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -72,16 +101,43 @@ export function ChatComposer({
   onModelSelect,
   organizationId,
   attachmentsEnabled = true,
+  activeSessionType = null,
+  commands = [],
+  commandState = null,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
   const textRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [hasText, setHasText] = useState(false);
+  const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const submissionLockRef = useRef(false);
+
+  // Single send-admission authority. `settleVoiceInputBeforeSubmit` owns
+  // this lock for the full voice-settle + asynchronous send sequence, and
+  // `handleSelectSlashCommand` consults it synchronously so a suggestion tap
+  // cannot mutate the draft while a send is in flight. A second submit can
+  // never slip through the brief window where React has not yet committed
+  // `isSending=true`.
+  const sendLockRef = useRef<SubmitLock>(createSubmitLock());
+  // `settleVoiceInputBeforeSubmit` expects a `{ current: boolean }` ref-like
+  // and writes through it during settle. The adapter routes every read and
+  // write through the SubmitLock above, so the helper participates in the
+  // same admission gate without introducing a second, racing authority.
+  const submissionLockRef: { current: boolean } = {
+    get current() {
+      return sendLockRef.current.isLocked();
+    },
+    set current(next: boolean) {
+      if (next) {
+        sendLockRef.current.acquire();
+      } else {
+        sendLockRef.current.release();
+      }
+    },
+  };
   const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({
@@ -121,10 +177,26 @@ export function ChatComposer({
     voiceInputActive: voiceInput.isActive,
   });
 
+  const commandList = useMemo(
+    () => createMobileSlashCommandList(activeSessionType, commands, commandState),
+    [activeSessionType, commandState, commands]
+  );
+  const slashCommandSuggestions =
+    slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commandList);
+
   function handleChangeText(value: string) {
     textRef.current = value;
     measure.setText(value);
     setHasText(value.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(value));
+  }
+
+  function clearDraft() {
+    textRef.current = '';
+    setHasText(false);
+    setSlashCommandInput(null);
+    measure.reset();
+    inputRef.current?.clear();
   }
 
   async function handleSend() {
@@ -140,30 +212,86 @@ export function ChatComposer({
       toast.error('Remove or retry failed attachments first.');
       return;
     }
-    if (trimmed.startsWith('/') && upload.attachments.length > 0) {
+
+    const submission = parseChatComposerSubmission(trimmed, commandList, {
+      hasAttachments: upload.attachments.length > 0,
+      sessionType: activeSessionType,
+      remoteCommandState: commandState,
+    });
+
+    if (submission.type === 'attachment-error') {
       toast.error('Attachments cannot be sent with slash commands.');
       return;
     }
+    if (submission.type === 'argument-error') {
+      toast.error(submission.message);
+      return;
+    }
+    if (submission.type === 'upgrade-required') {
+      toast.error(submission.message);
+      return;
+    }
 
+    // The admission lock is owned by `settleVoiceInputBeforeSubmit` for the
+    // full settle + submit sequence, so `handleSend` performs validation and
+    // executes the submission without re-acquiring/releasing the lock or
+    // toggling pending state. That keeps one authority and lets the lock
+    // protect the entire asynchronous send.
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const payload = upload.toWirePayload();
     try {
-      // Only clear the draft once the send actually succeeds — a failed
-      // send must leave the text and attachments exactly as the user left
-      // them (the parent already surfaces the error toast).
-      await onSend(trimmed, payload);
-      textRef.current = '';
-      setHasText(false);
-      measure.reset();
-      inputRef.current?.clear();
-      upload.reset();
-      Keyboard.dismiss();
+      await executeChatComposerSubmission(
+        submission,
+        {
+          onSendCommand,
+          onCreateSession,
+          onExitCli,
+          confirmExitCli: showRemoteCliExitConfirmation,
+          onSendPrompt: async prompt => {
+            await onSend(prompt, upload.toWirePayload());
+          },
+        },
+        {
+          clearDraft,
+          resetAttachments: () => {
+            upload.reset();
+          },
+          dismiss: () => {
+            Keyboard.dismiss();
+          },
+        }
+      );
     } catch {
-      // Draft preserved; error already surfaced by the caller.
+      // Draft preserved; error already surfaced by the caller. The helper
+      // will release the lock and clear pending state in its finally block.
     }
   }
 
+  function handleSelectSlashCommand(command: SlashCommandInfo) {
+    // Same-render race guard: a suggestion row rendered before the send started
+    // can be tapped while the lock is held. Because the lock is the authority
+    // for admission to any composer mutation, bail synchronously instead of
+    // relying on a later render to hide the list.
+    if (sendLockRef.current.isLocked()) {
+      return;
+    }
+    const value = `/${command.name} `;
+    textRef.current = value;
+    measure.setText(value);
+    setHasText(true);
+    setSlashCommandInput(null);
+    inputRef.current?.setNativeProps({
+      text: value,
+      selection: { start: value.length, end: value.length },
+    });
+    inputRef.current?.focus();
+  }
+
   async function submit() {
+    // `settleVoiceInputBeforeSubmit` is the sole admission owner for the
+    // entire voice-settle + asynchronous send sequence. It acquires the
+    // SubmitLock, sets pending state, waits for the final transcript, runs
+    // `handleSend`, and releases the lock in its finally block. Because the
+    // lock is held throughout, `handleSend` does not acquire or release it.
     await settleVoiceInputBeforeSubmit({
       lock: submissionLockRef,
       onPendingChange: setIsSending,
@@ -224,6 +352,15 @@ export function ChatComposer({
           onRemove={removeAttachment}
           onRetry={retryAttachment}
         />
+      ) : null}
+
+      {slashCommandSuggestions.length > 0 && !isSending ? (
+        <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(100)}>
+          <SlashCommandSuggestions
+            commands={slashCommandSuggestions}
+            onSelect={handleSelectSlashCommand}
+          />
+        </Animated.View>
       ) : null}
 
       <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>

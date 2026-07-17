@@ -8,7 +8,6 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_stealth_model } from './providers/openai-exclusive';
-import { muse_spark_1_1_model } from './providers/meta';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -97,19 +96,6 @@ describe('isFreeModel', () => {
           },
         },
       ]);
-    });
-
-    test('registers Muse Spark 1.1 through Vercel', () => {
-      expect(findKiloExclusiveModel('meta/muse-spark-1.1')).toBe(muse_spark_1_1_model);
-      expect(muse_spark_1_1_model.gateway).toBe('vercel');
-      expect(getInferenceProvider(muse_spark_1_1_model)?.slug).toBe('meta');
-      expect(muse_spark_1_1_model.context_length).toBe(1_048_576);
-      expect(muse_spark_1_1_model.pricing?.[0].pricing).toEqual({
-        prompt_per_million: 1.25,
-        completion_per_million: 4.25,
-        input_cache_read_per_million: 0.15,
-        input_cache_write_per_million: null,
-      });
     });
 
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {

@@ -67,19 +67,17 @@ describe('active-sessions-router', () => {
 
   describe('listInstances', () => {
     it('returns the instances from the worker when the upstream call succeeds', async () => {
-      const fetchSpy = jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              instances: [
-                { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
-                { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
-              ],
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
-        );
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            instances: [
+              { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+              { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.activeSessions.listInstances();
@@ -96,14 +94,12 @@ describe('active-sessions-router', () => {
     });
 
     it('returns the empty `instances` array when the worker has no live CLIs', async () => {
-      jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(
-          new Response(JSON.stringify({ instances: [] }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        );
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.activeSessions.listInstances();
@@ -138,14 +134,12 @@ describe('active-sessions-router', () => {
     });
 
     it('throws a TRPCError when the worker returns an unexpected payload shape', async () => {
-      jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(
-          new Response(JSON.stringify({ wrong: 'shape' }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        );
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ wrong: 'shape' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
 
       const caller = await createCallerForUser(regularUser.id);
       await expect(caller.activeSessions.listInstances()).rejects.toBeInstanceOf(TRPCError);

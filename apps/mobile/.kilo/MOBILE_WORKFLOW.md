@@ -57,7 +57,7 @@ After the draft plan is complete and before approval, dispatch a fresh `mobile-p
 
 The reviewer has less context than the planner and may be wrong. Treat every finding as untrusted advice: verify each claim independently against the request, repository evidence, and applicable instructions. Fix only valid findings. Record rejected findings with a short technical rationale; a rejected finding must not reopen without new evidence. Never weaken or expand the plan merely to satisfy the reviewer.
 
-After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If three consecutive rounds stay stuck on the same issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.`
+After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If three consecutive rounds stay stuck on the same issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.` This count-based floor is a deadlock-breaker for plan-text disagreement between planner and reviewer — the planner edits its own plan here, so nothing is being taken over. Delegated implementation work follows the escalation ladder in Ground Rules instead.
 
 ### Planner Handoff
 

@@ -609,6 +609,7 @@ export function buildCouncilReviewSection(
     '|------------|-------|------------------|----------|',
     tableRows,
     '',
+    '_Findings are counted per specialist; when specialists flag the same line their findings are grouped into one inline comment, so the inline comment count is lower than this total._',
     `_Governance mode: ${governanceLabel} — ${GOVERNANCE_EXPLANATIONS[result.aggregationStrategy]}._`,
   ].join('\n');
 }

@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { Bot, Plus, Search, SearchX } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -24,6 +25,7 @@ import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSessionAttentionRevision } from '@/lib/session-attention';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
 // Height of the hidden-by-default search bar (mt-3 12 + border 1 + py-1.5 12 + line-20 + border 1 + mb-14 14 = 60).
@@ -189,6 +191,27 @@ export function AgentSessionListContent({
     [storedSessions]
   );
 
+  // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
+  // is pushed the Agents list is frozen. react-freeze reveals the previously
+  // rendered (cached) cells on return WITHOUT re-running them, so the attention
+  // store's `useSyncExternalStore` subscription does not re-render the list and
+  // the detail-screen mount ack is not reflected. `useFocusEffect` fires
+  // reliably on refocus (after unfreeze); bump a tick so the content re-renders
+  // and re-reads the current attention revision.
+  const attentionRevision = useSessionAttentionRevision();
+  const [, bumpFocusTick] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      bumpFocusTick(tick => tick + 1);
+    }, [])
+  );
+  // Remount the list only when the attention revision changed since it was last
+  // rendered — e.g. returning from a session that was just opened (acked). A
+  // remount is the only reliable way to force frozen cells to re-read the ack
+  // store; keying on the revision (re-read above on focus) leaves scroll intact
+  // during ordinary focus changes where no ack/reconcile occurred.
+  const attentionListKey = `${sortBy}:${attentionRevision}`;
+
   const handleRefresh = useCallback(() => {
     void (async () => {
       setRefreshing(true);
@@ -304,10 +327,12 @@ export function AgentSessionListContent({
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
       <SectionList<SessionItem, SessionSection>
+        key={attentionListKey}
         sections={sections}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
+        extraData={attentionListKey}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={

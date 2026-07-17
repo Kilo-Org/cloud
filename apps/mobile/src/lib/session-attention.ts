@@ -21,26 +21,36 @@ export function sessionNeedsInput(status: string | null | undefined): boolean {
 
 type AckEntry = { raiseId: string | null };
 
-const listeners = new Set<() => void>();
-const entries = new Map<string, AckEntry>();
-let revision = 0;
+type AttentionStore = {
+  listeners: Set<() => void>;
+  entries: Map<string, AckEntry>;
+  revision: number;
+};
+
+const STORE_KEY = '__kiloSessionAttentionStore__';
+const globalScope = globalThis as typeof globalThis & { [STORE_KEY]?: AttentionStore };
+const store: AttentionStore = (globalScope[STORE_KEY] ??= {
+  listeners: new Set<() => void>(),
+  entries: new Map<string, AckEntry>(),
+  revision: 0,
+});
 
 function bumpRevision(): void {
-  revision += 1;
-  for (const listener of listeners) {
+  store.revision += 1;
+  for (const listener of store.listeners) {
     listener();
   }
 }
 
 export function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
+  store.listeners.add(listener);
   return () => {
-    listeners.delete(listener);
+    store.listeners.delete(listener);
   };
 }
 
 export function getRevisionSnapshot(): number {
-  return revision;
+  return store.revision;
 }
 
 /**
@@ -55,10 +65,10 @@ export function ackSessionAttention(sessionId: string): void {
   // Opening a session always leaves the entry pending. If it is already
   // pending, nothing changes — skip the bump so we don't fire a redundant
   // global re-render (e.g. React Strict Mode's double effect invocation).
-  if (entries.get(sessionId)?.raiseId === null) {
+  if (store.entries.get(sessionId)?.raiseId === null) {
     return;
   }
-  entries.set(sessionId, { raiseId: null });
+  store.entries.set(sessionId, { raiseId: null });
   bumpRevision();
 }
 
@@ -77,21 +87,21 @@ export function reconcileSessionAttention(
   statusUpdatedAt: string | null | undefined
 ): void {
   if (!sessionNeedsInput(status)) {
-    if (entries.delete(sessionId)) {
+    if (store.entries.delete(sessionId)) {
       bumpRevision();
     }
     return;
   }
 
   const raiseId = statusUpdatedAt ?? status ?? null;
-  if (entries.get(sessionId)?.raiseId === null) {
-    entries.set(sessionId, { raiseId });
+  if (store.entries.get(sessionId)?.raiseId === null) {
+    store.entries.set(sessionId, { raiseId });
     bumpRevision();
   }
 }
 
 export function isAttentionAcked(sessionId: string, raiseId: string | null): boolean {
-  const entry = entries.get(sessionId);
+  const entry = store.entries.get(sessionId);
   if (!entry) {
     return false;
   }
@@ -134,8 +144,8 @@ export function useAckSessionAttentionOnOpen(sessionId: string): void {
  * test starts from a known state. Not for production use.
  */
 export function __resetSessionAttentionForTests(): void {
-  entries.clear();
-  revision = 0;
+  store.entries.clear();
+  store.revision = 0;
 }
 
 /**
@@ -144,5 +154,5 @@ export function __resetSessionAttentionForTests(): void {
  * exposing it on the production API.
  */
 export function __peekSessionAttentionForTests(sessionId: string): AckEntry | undefined {
-  return entries.get(sessionId);
+  return store.entries.get(sessionId);
 }

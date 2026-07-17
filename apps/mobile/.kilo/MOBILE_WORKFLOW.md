@@ -121,11 +121,11 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 
 ### Reviewer and CI Loop
 
-These steps apply to review comments from every reviewer — Kilobot, other bots, and humans alike.
+Kilobot is the only reviewer whose review is waited for. Comments that other reviewers — bots or humans — have already posted get exactly the same triage, repair, reply, and resolve flow, but never wait for another reviewer to review or re-review.
 
-9. Wait until Kilobot has reviewed the latest head. Fetch every unresolved review thread from every reviewer, including comments that arrive after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
+9. Wait until Kilobot has reviewed the latest head; do not wait for any other reviewer. Then fetch every unresolved review thread from every reviewer, including comments that arrived after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
 10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done.
-11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable comment from any reviewer is unresolved.
+11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable comment already posted by any reviewer is unresolved.
 12. Rerun local mobile E2E after any review-driven repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
 13. When the base branch advances, integrate the current base in the dedicated worktree and push the new head. Then apply exactly one of:
     - No conflicts: do not rerun checks, E2E, or review. The merged tree matches the verified head, and CI and Kilobot run on the new SHA anyway.
@@ -172,7 +172,7 @@ The orchestrator may declare the work complete only when every item holds:
 - Final automated checks pass in every changed repository
 - The orchestrator has reviewed the complete diff and performed all Git and PR actions itself
 - The PR is assigned to the requesting human
-- Kilobot has reviewed the latest head, no actionable comment from any reviewer is unresolved, and every addressed finding has an in-thread reply and a resolved thread
+- Kilobot has reviewed the latest head — Kilobot is the only reviewer waited for — no actionable comment already posted by any reviewer is unresolved, and every addressed finding has an in-thread reply and a resolved thread
 - GitHub reports the exact latest head as mergeable with no conflicts
 - All expected CI checks on the latest head are in a successful terminal state; failed, cancelled, timed-out, action-required, or pending checks block completion
 - No generated E2E fixture remains tracked or untracked in any repository

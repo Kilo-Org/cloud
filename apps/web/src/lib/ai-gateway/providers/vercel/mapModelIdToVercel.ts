@@ -43,12 +43,6 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'qwen/qwen3-235b-a22b': 'alibaba/qwen-3-235b',
   'qwen/qwen3-30b-a3b': 'alibaba/qwen-3-30b',
   'qwen/qwen3-32b': 'alibaba/qwen-3-32b',
-
-  // the OpenRouter => Vercel API adapter handles setting the required parameter
-  'anthropic/claude-opus-4.8-fast': 'anthropic/claude-opus-4.8',
-  'openai/gpt-5.6-sol-pro': 'openai/gpt-5.6-sol',
-  'openai/gpt-5.6-terra-pro': 'openai/gpt-5.6-terra',
-  'openai/gpt-5.6-luna-pro': 'openai/gpt-5.6-luna',
 };
 
 export function mapModelIdToVercel(modelId: string) {

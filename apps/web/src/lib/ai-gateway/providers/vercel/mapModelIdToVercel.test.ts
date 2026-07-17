@@ -58,10 +58,6 @@ describe('mapModelIdToVercel', () => {
       ['qwen/qwen3-235b-a22b', 'alibaba/qwen-3-235b'],
       ['qwen/qwen3-30b-a3b', 'alibaba/qwen-3-30b'],
       ['qwen/qwen3-32b', 'alibaba/qwen-3-32b'],
-      ['anthropic/claude-opus-4.8-fast', 'anthropic/claude-opus-4.8'],
-      ['openai/gpt-5.6-sol-pro', 'openai/gpt-5.6-sol'],
-      ['openai/gpt-5.6-terra-pro', 'openai/gpt-5.6-terra'],
-      ['openai/gpt-5.6-luna-pro', 'openai/gpt-5.6-luna'],
     ])('maps %s to %s', (input, expected) => {
       expect(mapModelIdToVercel(input)).toBe(expected);
     });

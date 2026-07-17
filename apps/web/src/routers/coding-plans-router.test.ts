@@ -308,7 +308,7 @@ describe('coding plans router', () => {
     ).rejects.toThrow('Coding Plan subscription not found.');
   });
 
-  it('authorizes managed usage through retained inventory without an installed BYOK reference', async () => {
+  it('authorizes managed usage through retained inventory for a legacy detached BYOK reference', async () => {
     const managedKey = `sk-cp-managed-${crypto.randomUUID()}`;
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
@@ -354,6 +354,7 @@ describe('coding plans router', () => {
       message: 'Coding Plan subscription not found.',
     });
 
+    // Represents a legacy pre-read-only or externally detached record, not a supported user mutation.
     await db
       .update(coding_plan_subscriptions)
       .set({ installed_byok_key_id: null })

@@ -120,7 +120,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 5.10. The initial pilot **MAY** leave an unchanged Kilo-installed BYOK configuration routable between its paid-period or grace deadline and the next scheduled billing lifecycle sweep. Once that sweep processes termination, local Kilo-installed access **MUST** be deleted regardless of whether manual upstream revocation is complete.
 
-5.11. An active or `past_due` Coding Plan, including one pending cancellation at period end, **MUST** remain eligible for current quota presentation until Effective Cancellation. Replacing, disabling, or deleting its Installed BYOK Configuration **MUST NOT** hide the subscription or prevent quota lookup through the originally assigned Managed Plan Credential.
+5.11. An active or `past_due` Coding Plan, including one pending cancellation at period end, **MUST** remain eligible for current quota presentation until Effective Cancellation. Quota lookup **MUST** use the subscription's retained assigned Managed Plan Credential and **MUST NOT** require its Installed BYOK Configuration to remain linked.
 
 ## 6. Traffic routing
 
@@ -130,7 +130,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 6.3. Purchase **MUST** reject an occupied personal MiniMax BYOK slot before a charge or issued credential assignment commits. Once subscribed, the Installed BYOK Configuration **MUST** remain read-only until Kilo removes it at Effective Cancellation.
 
-6.4. Current routing state **MUST** be reported separately from subscription and provider-quota state. Quota authorization **MUST NOT** depend on the existence, contents, or enabled state of the Installed BYOK Configuration.
+6.4. Current routing state **MUST** be reported separately from subscription and provider-quota state. Quota authorization **MUST** derive from the subscription's retained assigned Managed Plan Credential rather than its Installed BYOK Configuration.
 
 ## 7. User-facing behavior
 

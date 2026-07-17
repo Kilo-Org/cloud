@@ -308,10 +308,9 @@ historical Commit names, prices, invoices, and credit deductions.
       (see Billing History rules)
 
     Current quota state and Installed BYOK Configuration routing state MUST be
-    presented separately. An active or `past_due` Coding Plan remains visible
-    and billable, and its current quota remains queryable independently of the
-    current routing state and the existence, contents, or enabled state of its
-    Installed BYOK Configuration.
+    presented separately. For an active or `past_due` plan, quota lookup MUST be
+    authorized through the retained assigned Managed Plan Credential rather
+    than through the Installed BYOK Configuration.
 
     `/byok` MUST identify the Kilo-managed installed key as read-only and MUST
     NOT offer update, enable/disable, delete, saved raw-key view, or copy

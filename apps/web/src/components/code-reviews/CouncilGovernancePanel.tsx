@@ -96,7 +96,13 @@ export function CouncilGovernancePanel({
                     <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{specialist.name}</span>
-                        <VoteBadge vote={specialist.vote} />
+                        {specialist.vote ? (
+                          <VoteBadge vote={specialist.vote} />
+                        ) : (
+                          <Badge className="bg-status-neutral-surface text-status-neutral border-status-neutral-border">
+                            No result
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-muted-foreground text-xs">
                         {specialist.model ?? 'Default model'}

@@ -68,8 +68,10 @@ export function buildCouncilResult(params: {
       // model shows no effort unless it set one.
       thinkingEffort: member.thinking_effort ?? (member.model_slug ? null : baseThinkingEffort),
       // v2: vote + highest severity are DERIVED from the reported findings, never model-authored.
-      // A specialist that did NOT report is treated as `block` (fail closed) with no findings.
-      vote: reported ? deriveSpecialistVote(reported.findings) : 'block',
+      // A specialist that did NOT report shows `vote: null` ("no result") — distinct from a
+      // `block` vote (which means it reported a critical). The aggregate decision below still
+      // fails closed on this missing coverage for enforcing modes.
+      vote: reported ? deriveSpecialistVote(reported.findings) : null,
       highestSeverity: reported ? highestSeverityOf(reported.findings) : null,
       findings: reported?.findings ?? [],
     };

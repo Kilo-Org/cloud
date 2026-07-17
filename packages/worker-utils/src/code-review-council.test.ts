@@ -20,6 +20,7 @@ import {
   type SpecialistVote,
 } from './code-review-council.js';
 import type { CouncilResultManifest } from './code-review-council.js';
+import { CodeReviewCouncilConfigSchema } from '@kilocode/db/schema-types';
 import type { CodeReviewCouncilConfig } from '@kilocode/db/schema-types';
 
 const votes = (...vs: Array<[string, SpecialistVote['vote']]>): SpecialistVote[] =>
@@ -113,7 +114,7 @@ describe('parseCouncilResultManifest', () => {
     if (capture.status !== 'captured') throw new Error('unreachable');
     expect(capture.manifest.specialists).toHaveLength(2);
     expect(capture.manifest.specialists[0].findings).toHaveLength(1);
-    // findings defaults to [] when omitted.
+    // An explicit empty findings array is valid (= "reviewed, nothing blocking").
     expect(capture.manifest.specialists[1].findings).toEqual([]);
   });
 
@@ -127,6 +128,41 @@ describe('parseCouncilResultManifest', () => {
     const bad = { specialists: [{ findings: [] }] };
     const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(bad)} -->`;
     expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('fails closed: a specialist entry with NO findings key is invalid (not a silent pass)', () => {
+    const bad = { specialists: [{ specialistId: 'security' }] };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(bad)} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('fails closed: an off-scale severity is invalid (a mislabeled critical cannot derive to pass)', () => {
+    const bad = {
+      specialists: [
+        {
+          specialistId: 'security',
+          findings: [{ path: 'a.ts', severity: 'high', rationale: 'x' }],
+        },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(bad)} -->`;
+    expect(parseCouncilResultManifest(text).status).toBe('invalid');
+  });
+
+  it('tolerates casing/whitespace on canonical severities', () => {
+    const ok = {
+      specialists: [
+        {
+          specialistId: 'security',
+          findings: [{ path: 'a.ts', severity: ' Critical ', rationale: 'x' }],
+        },
+      ],
+    };
+    const text = `<!-- ${COUNCIL_RESULT_MARKER_TAG} ${JSON.stringify(ok)} -->`;
+    const capture = parseCouncilResultManifest(text);
+    expect(capture.status).toBe('captured');
+    if (capture.status !== 'captured') throw new Error('unreachable');
+    expect(deriveSpecialistVote(capture.manifest.specialists[0].findings)).toBe('block');
   });
 
   it('returns invalid on non-JSON payload', () => {
@@ -472,6 +508,28 @@ describe('council config helpers', () => {
     expect(formatAggregationStrategy('unanimous')).toBe('Unanimous');
     expect(formatAggregationStrategy(null)).toBe('Advisory (report only)');
     expect(formatAggregationStrategy('weird')).toBe('weird');
+  });
+
+  it('normalizes legacy v1 aggregation_strategy values when parsing a persisted config', () => {
+    const base = {
+      enabled: true,
+      specialists: [presetToSpecialist(COUNCIL_SPECIALIST_PRESETS[0])],
+    };
+    // Pre-v2 configs used any_blocking_member / unanimous_required — both → v2 unanimous.
+    expect(
+      CodeReviewCouncilConfigSchema.parse({ ...base, aggregation_strategy: 'any_blocking_member' })
+        .aggregation_strategy
+    ).toBe('unanimous');
+    expect(
+      CodeReviewCouncilConfigSchema.parse({ ...base, aggregation_strategy: 'unanimous_required' })
+        .aggregation_strategy
+    ).toBe('unanimous');
+    // New values + omitted (→ default advisory) pass through.
+    expect(
+      CodeReviewCouncilConfigSchema.parse({ ...base, aggregation_strategy: 'majority' })
+        .aggregation_strategy
+    ).toBe('majority');
+    expect(CodeReviewCouncilConfigSchema.parse(base).aggregation_strategy).toBe('advisory');
   });
 });
 

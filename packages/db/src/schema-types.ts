@@ -1352,7 +1352,19 @@ export const CodeReviewCouncilConfigSchema = z.object({
   enabled: z.boolean().default(true),
   // Default 'advisory' — the safety net: a council runs and reports, but never blocks a merge
   // until an org explicitly picks unanimous/majority.
-  aggregation_strategy: CouncilAggregationStrategySchema.default('advisory'),
+  //
+  // Backward-compat (read boundary): `aggregation_strategy` is a PERSISTED field, so configs
+  // written before the v2 rollout can hold the legacy v1 values `any_blocking_member` /
+  // `unanimous_required`. Both meant "block on any block", which is exactly v2 `unanimous`, so
+  // we normalize them here rather than throwing when a queued/completed pre-v2 council config
+  // is re-parsed (`getManualCodeReviewConfig`). New values pass through unchanged.
+  aggregation_strategy: z
+    .preprocess(
+      value =>
+        value === 'any_blocking_member' || value === 'unanimous_required' ? 'unanimous' : value,
+      CouncilAggregationStrategySchema
+    )
+    .default('advisory'),
   // Specialist ids must be unique: a specialist must not appear (and therefore vote)
   // more than once, or vote aggregation could be skewed by a duplicate.
   specialists: z
@@ -1377,10 +1389,19 @@ export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSche
 export const CouncilFindingSchema = z.object({
   path: z.string().max(1024),
   line: z.number().int().nonnegative().nullable().optional(),
-  // Canonical scale is COUNCIL_FINDING_SEVERITIES; kept a bounded string (not a strict enum)
-  // so an off-scale label from the model never rejects the whole manifest. Vote derivation
-  // normalizes and only treats `critical` as blocking (see `deriveSpecialistVote`).
-  severity: z.string().max(64),
+  // Severity MUST be one of the canonical scale (case/space-insensitive). Because the vote is
+  // DERIVED from severity, a loose label would be unsafe: a real critical issue mislabeled
+  // `high`/`sev1` would otherwise derive to `pass`. An off-scale label instead fails the
+  // finding → the manifest is invalid → the decision fails closed (block). Casing/whitespace
+  // is tolerated (normalized on read via `isBlockingSeverity`), but off-scale words are not.
+  severity: z
+    .string()
+    .max(64)
+    .refine(
+      value =>
+        (COUNCIL_FINDING_SEVERITIES as readonly string[]).includes(value.trim().toLowerCase()),
+      'severity must be one of: critical, warning, suggestion, nitpick'
+    ),
   rationale: z.string().max(4000),
 });
 export type CouncilFinding = z.infer<typeof CouncilFindingSchema>;
@@ -1392,8 +1413,11 @@ export const CouncilResultSpecialistSchema = z.object({
   // The model/effort that actually ran this specialist (we assign these), for display.
   model: z.string().max(512).nullable(),
   thinkingEffort: z.string().max(50).nullable(),
-  // Binary, CODE-DERIVED from this specialist's findings (any critical → block).
-  vote: CouncilVoteSchema,
+  // Binary, CODE-DERIVED from this specialist's findings (any critical → block). NULL when the
+  // specialist returned no reliable result (absent from / not captured in the manifest) — this
+  // is "no result", NOT a `block` vote. The fail-closed AGGREGATE decision (enforcing modes)
+  // is computed separately and still blocks on missing coverage.
+  vote: CouncilVoteSchema.nullable(),
   highestSeverity: z.string().max(64).nullable(),
   findings: z.array(CouncilFindingSchema).max(200),
 });

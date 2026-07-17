@@ -134,7 +134,11 @@ export type CouncilSpecialistFinding = CouncilFinding;
  */
 export const CouncilSpecialistResultSchema = z.object({
   specialistId: z.string().min(1).max(64),
-  findings: z.array(CouncilFindingSchema).max(200).default([]),
+  // REQUIRED (no default): an entry must explicitly carry its findings array — `[]` means
+  // "reviewed, nothing blocking" (→ pass). A missing `findings` key is ambiguous (truncated
+  // report vs. clean) and must NOT silently derive to pass, so it invalidates the manifest →
+  // the decision fails closed. The coordinator prompt requires `findings` on every entry.
+  findings: z.array(CouncilFindingSchema).max(200),
   // Best-effort: the concrete model this specialist actually ran on, as reported back by
   // the specialist itself. We assign a model per specialist, but an "auto" slug (e.g.
   // `kilo-auto/...`) resolves to a concrete model at runtime inside cloud-agent-next, which

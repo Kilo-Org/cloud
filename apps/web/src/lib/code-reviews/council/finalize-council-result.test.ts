@@ -156,12 +156,13 @@ describe('buildCouncilResult', () => {
       lastAssistantMessageText: manifestText([{ specialistId: 'security', findings: [] }]),
     });
     expect(result.decision).toBe('block'); // missing performance → no coverage → block
+    // The missing specialist shows "no result" (vote null), NOT a block vote.
     const performance = result.specialists.find(s => s.id === 'performance');
-    expect(performance).toMatchObject({ vote: 'block', highestSeverity: null });
+    expect(performance).toMatchObject({ vote: null, highestSeverity: null });
     expect(performance?.findings).toEqual([]);
   });
 
-  it('fails closed (block, all specialists block) when no manifest is present', () => {
+  it('fails closed (block) when no manifest is present; specialists show "no result"', () => {
     const result = buildCouncilResult({
       council,
       baseModel: 'base/model',
@@ -169,10 +170,11 @@ describe('buildCouncilResult', () => {
       lastAssistantMessageText: 'no marker here',
     });
     expect(result.decision).toBe('block');
-    expect(result.specialists.every(s => s.vote === 'block')).toBe(true);
+    // No specialist reported → all "no result" (vote null), none shown as a block vote.
+    expect(result.specialists.every(s => s.vote === null)).toBe(true);
   });
 
-  it('fails closed on an invalid manifest payload', () => {
+  it('fails closed on an invalid manifest payload; specialists show "no result"', () => {
     const result = buildCouncilResult({
       council,
       baseModel: null,
@@ -180,6 +182,6 @@ describe('buildCouncilResult', () => {
       lastAssistantMessageText: `<!-- ${COUNCIL_RESULT_MARKER_TAG} {not json} -->`,
     });
     expect(result.decision).toBe('block');
-    expect(result.specialists.every(s => s.vote === 'block')).toBe(true);
+    expect(result.specialists.every(s => s.vote === null)).toBe(true);
   });
 });

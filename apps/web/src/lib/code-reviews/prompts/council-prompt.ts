@@ -51,9 +51,9 @@ export function buildSpecialistAgentPrompt(specialist: CouncilSpecialist): strin
     '- nitpick — trivial or stylistic.',
     '',
     'Report ONLY issues within your lens. Do NOT cast a vote or state any overall verdict —',
-    'our system computes the vote and decision from your findings. Returning NO findings',
-    'means you reviewed and found nothing blocking (good to go). There is no "abstain": if',
-    'you were asked to run, you review and report findings-or-none.',
+    'our system computes the vote and decision from your findings. ALWAYS include the',
+    '"findings" array — use [] when you found nothing (that means "reviewed, good to go").',
+    'There is no "abstain": if you were asked to run, you review and report findings-or-none.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -123,7 +123,9 @@ export function buildCouncilOrchestratorPrompt(params: {
     '',
     'Include one entry per specialist, using the subagent_type as its specialistId, and',
     "pass through each specialist's findings (with their severity) AND reported model",
-    'verbatim. Omit the model field for a specialist that did not report one. Do NOT include',
+    'verbatim. EVERY entry MUST include a "findings" array (use [] for a specialist that',
+    'found nothing), and each severity MUST be one of critical|warning|suggestion|nitpick.',
+    'Omit the model field for a specialist that did not report one. Do NOT include',
     'any vote, decision, or verdict — our system derives the votes from the severities and',
     'computes the decision (with coverage checks); a model-authored verdict could contradict it.',
     '',

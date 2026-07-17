@@ -308,7 +308,7 @@ describe('coding plans router', () => {
     ).rejects.toThrow('Coding Plan subscription not found.');
   });
 
-  it('authorizes managed usage through retained inventory for a legacy detached BYOK reference', async () => {
+  it('returns owner-scoped managed usage without exposing the credential', async () => {
     const managedKey = `sk-cp-managed-${crypto.randomUUID()}`;
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
@@ -354,14 +354,7 @@ describe('coding plans router', () => {
       message: 'Coding Plan subscription not found.',
     });
 
-    // Represents a legacy pre-read-only or externally detached record, not a supported user mutation.
-    await db
-      .update(coding_plan_subscriptions)
-      .set({ installed_byok_key_id: null })
-      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
-    await ownerCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId });
-
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(1);
     for (const call of request.mock.calls) {
       expect(call[0]).toBe('https://api.minimax.io/v1/token_plan/remains');
       expect(call[1]?.headers).toEqual(

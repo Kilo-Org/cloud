@@ -87,8 +87,15 @@ function createMockCtx() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSession(id: string, status = 'busy', title = 'Test', parentSessionId?: string) {
-  return parentSessionId ? { id, status, title, parentSessionId } : { id, status, title };
+function makeSession(
+  id: string,
+  status = 'busy',
+  title = 'Test',
+  parentSessionId?: string,
+  platform?: string
+) {
+  const base = platform ? { id, status, title, platform } : { id, status, title };
+  return parentSessionId ? { ...base, parentSessionId } : base;
 }
 
 function parseSent(ws: MockWS, callIndex = 0): unknown {
@@ -186,9 +193,17 @@ function addCliSocket(
     id: string;
     status: string;
     title: string;
-  }> = []
+    platform?: string;
+  }> = [],
+  instance?: { name: string; projectName: string; version?: string }
 ): MockWS {
-  const attachment = { role: 'cli' as const, connectionId, sessions };
+  const attachment: {
+    role: 'cli';
+    connectionId: string;
+    sessions: typeof sessions;
+    instance?: typeof instance;
+  } = { role: 'cli', connectionId, sessions };
+  if (instance) attachment.instance = instance;
   const ws = createMockWs(['cli'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -214,13 +229,16 @@ function sendHeartbeat(
     id: string;
     status: string;
     title: string;
+    platform?: string;
   }>,
-  protocolVersion?: string
+  protocolVersion?: string,
+  instance?: { name: string; projectName: string; version?: string }
 ) {
   const msg = JSON.stringify({
     type: 'heartbeat',
     sessions,
     ...(protocolVersion ? { protocolVersion } : {}),
+    ...(instance ? { instance } : {}),
   });
   doInstance.webSocketMessage(cliWs as never, msg);
 }
@@ -2950,6 +2968,196 @@ describe('UserConnectionDO', () => {
       expect(result).toEqual([
         { id: 'root-1', status: 'idle', title: 'Root session', connectionId: 'cli-1' },
       ]);
+    });
+
+    it('forwards the per-session platform when the CLI reports it (newer CLIs)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('s1', 'busy', 'On a Mac', undefined, 'darwin'),
+        makeSession('s2', 'idle', 'Other'),
+      ]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'busy', title: 'On a Mac', connectionId: 'cli-1', platform: 'darwin' },
+        { id: 's2', status: 'idle', title: 'Other', connectionId: 'cli-1' },
+      ]);
+    });
+
+    it('omits the platform key entirely for legacy CLIs (byte-identical response)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // Legacy CLI heartbeat without platform.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Legacy')]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'busy', title: 'Legacy', connectionId: 'cli-1' },
+      ]);
+      expect(result[0]).not.toHaveProperty('platform');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getConnectedInstances RPC (W3)
+  // -------------------------------------------------------------------------
+
+  describe('getConnectedInstances', () => {
+    it('returns one row per CLI socket that has an `instance` attachment', () => {
+      const { doInstance, mockCtx } = setup();
+      // Use the hibernated-attachment pattern (no heartbeat) — the live
+      // scan reads the `instance` directly from the attachment, which is
+      // what the spec requires: a fresh value with no in-memory map.
+      addCliSocket(mockCtx, 'cli-A', [], {
+        name: 'laptop-A',
+        projectName: 'kilo',
+        version: '0.1.2',
+      });
+      addCliSocket(mockCtx, 'cli-B', [], { name: 'laptop-B', projectName: 'kilo' });
+      addWebSocket(mockCtx);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toHaveLength(2);
+      expect(instances).toEqual(
+        expect.arrayContaining([
+          { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+          { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+        ])
+      );
+    });
+
+    it('omits the `version` key when the CLI did not report one', () => {
+      const { doInstance, mockCtx } = setup();
+      addCliSocket(mockCtx, 'cli-1', [], { name: 'laptop-1', projectName: 'kilo' });
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([{ connectionId: 'cli-1', name: 'laptop-1', projectName: 'kilo' }]);
+      expect(instances[0]).not.toHaveProperty('version');
+    });
+
+    it('excludes legacy CLIs that never reported an `instance`', () => {
+      const { doInstance, mockCtx } = setup();
+      // Legacy CLI: pre-spawner heartbeat has no `instance`.
+      const cliWs = addCliSocket(mockCtx, 'legacy-1');
+      sendHeartbeat(doInstance, cliWs, []);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([]);
+    });
+
+    it('excludes web sockets', () => {
+      const { doInstance, mockCtx } = setup();
+      addWebSocket(mockCtx);
+      // A web socket with an `instance`-shaped attachment must still be skipped.
+      const webWithInstance = createMockWs(['web'], {
+        role: 'web',
+        connectionId: 'web-1',
+        subscribedSessions: [],
+      } as never);
+      mockCtx.addSocket(webWithInstance);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([]);
+    });
+
+    it('reads `instance` directly from the live socket (no in-memory map)', () => {
+      const { doInstance, mockCtx } = setup();
+      // Simulate a hibernated attach: socket exists, attachment has `instance`
+      // set, but no heartbeat has been processed through the in-memory state.
+      addCliSocket(mockCtx, 'cli-h', [], {
+        name: 'laptop-h',
+        projectName: 'kilo',
+        version: '1.0.0',
+      });
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toEqual([
+        { connectionId: 'cli-h', name: 'laptop-h', projectName: 'kilo', version: '1.0.0' },
+      ]);
+    });
+
+    it('persists `instance` in the WS attachment across heartbeats', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [], '1', {
+        name: 'laptop-1',
+        projectName: 'kilo',
+        version: '0.1.0',
+      });
+
+      const att = cliWs.deserializeAttachment() as { instance?: { name: string } };
+      expect(att.instance).toEqual({ name: 'laptop-1', projectName: 'kilo', version: '0.1.0' });
+    });
+
+    it('drops `instance` from the attachment on a subsequent heartbeat that omits it', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      // First heartbeat: with instance.
+      sendHeartbeat(doInstance, cliWs, [], undefined, {
+        name: 'laptop-1',
+        projectName: 'kilo',
+      });
+      // Second heartbeat: instance removed (legacy fallback). The DO must not
+      // keep a stale `instance` value in the attachment.
+      sendHeartbeat(doInstance, cliWs, []);
+
+      const att = cliWs.deserializeAttachment() as { instance?: unknown };
+      expect(att.instance).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // WS attachment size guardrail (W3)
+  // -------------------------------------------------------------------------
+
+  describe('WS attachment size', () => {
+    // The Cloudflare `serializeAttachment` budget is ~2 KiB. A bounded
+    // instance object (name+projectName+version, all max length) adds well
+    // under 200 bytes; this test pins that contract so a future schema
+    // change cannot silently push us over the budget.
+    const SERIALIZE_ATTACHMENT_BUDGET = 2048;
+    // Bounded `instance` = 64 + 64 + 32 chars content + JSON framing ≈ 200
+    // bytes; we allow a 25% safety margin so a future protocol bump to the
+    // instance shape (e.g. adding `pid`) cannot silently blow the 2 KiB
+    // attachment budget.
+    const INSTANCE_HEADROOM = 250;
+
+    it('keeps the combined CLI attachment comfortably under 2 KiB with a worst-case instance', () => {
+      const worstCaseInstance = {
+        name: 'x'.repeat(64),
+        projectName: 'x'.repeat(64),
+        version: 'x'.repeat(32),
+      };
+      // 4 sessions with realistic-but-large titles, git URLs, and branches.
+      // (4 is a generous upper bound for a single CLI owning a live session
+      // fleet; the actual HeartbeatSession shape imposes tighter per-field
+      // limits at the protocol layer.)
+      const sessions = Array.from({ length: 4 }, (_, i) => ({
+        id: `ses_${String(i).padStart(26, '0')}`,
+        status: 'busy',
+        title: 'T'.repeat(120),
+        gitUrl: 'https://github.com/org/' + 'x'.repeat(60) + '.git',
+        gitBranch: 'b'.repeat(40),
+      }));
+
+      const attachment = {
+        role: 'cli' as const,
+        connectionId: 'cli-1',
+        sessions,
+        protocolVersion: '255.255.65535',
+        kiloUserId: 'usr_' + 'x'.repeat(28),
+        instance: worstCaseInstance,
+      };
+
+      const serialized = new TextEncoder().encode(JSON.stringify(attachment)).byteLength;
+
+      expect(serialized).toBeLessThan(SERIALIZE_ATTACHMENT_BUDGET);
+      // Sanity: the bounded instance alone is far below the headroom.
+      const instanceBytes = new TextEncoder().encode(JSON.stringify(worstCaseInstance)).byteLength;
+      expect(instanceBytes).toBeLessThan(INSTANCE_HEADROOM);
     });
   });
 

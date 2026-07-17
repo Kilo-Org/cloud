@@ -5,6 +5,7 @@ import { getSessionIngestDO } from './SessionIngestDO';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
+  type Instance,
   type SessionEventPayload,
   SessionEventPayloadSchema,
   type WebInboundMessage,
@@ -18,6 +19,12 @@ type HeartbeatSession = {
   gitUrl?: string;
   gitBranch?: string;
   parentSessionId?: string;
+  // Platform the session is running on (e.g. "darwin", "linux", "vscode").
+  // Optional: legacy CLIs (predating the `kilo remote` spawner) do not
+  // report a platform; in that case this field is undefined and the
+  // `getActiveSessions()` response omits it (preserves byte-identical
+  // legacy responses).
+  platform?: string;
 };
 
 type WSAttachment =
@@ -32,8 +39,23 @@ type WSAttachment =
       // Set from the authenticated /user/cli route; undefined on sockets
       // accepted before this field existed. Needed for the session-ready push.
       kiloUserId?: string;
+      // Identity of the spawning CLI process (`kilo remote`). Undefined on
+      // legacy CLIs (no spawner). Persisted in the attachment so the live
+      // socket scan in `getConnectedInstances()` can read it without any
+      // in-memory map or hibernation reconstruction — keeps the response
+      // fresh and avoids stale instance rows on restart.
+      instance?: Instance;
     }
   | { role: 'web'; connectionId: string; subscribedSessions: string[]; replaced?: true };
+
+// Type re-export so test files and other internal callers can reference the
+// connection-row shape from a single place.
+export type ConnectedInstanceRow = {
+  connectionId: string;
+  name: string;
+  projectName: string;
+  version?: string;
+};
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 
@@ -376,7 +398,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'heartbeat':
-        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion);
+        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion, msg.instance);
         break;
       case 'event':
         this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
@@ -391,7 +413,8 @@ export class UserConnectionDO extends DurableObject<Env> {
     ws: WebSocket,
     attachment: WSAttachment & { role: 'cli' },
     sessions: HeartbeatSession[],
-    protocolVersion: string | undefined
+    protocolVersion: string | undefined,
+    instance: Instance | undefined
   ): void {
     const { connectionId } = attachment;
     const now = Date.now();
@@ -440,6 +463,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       sessions,
       protocolVersion,
       kiloUserId: attachment.kiloUserId,
+      ...(instance ? { instance } : {}),
     };
     ws.serializeAttachment(updatedAttachment);
 
@@ -893,6 +917,33 @@ export class UserConnectionDO extends DurableObject<Env> {
     return this.aggregateSessions();
   }
 
+  /**
+   * Live-socket scan of currently connected CLI WebSockets. Each socket whose
+   * attachment carries an `instance` (i.e. it is a `kilo remote` spawner)
+   * contributes one row; legacy CLIs that predate the spawner never report
+   * `instance` and are excluded by design.
+   *
+   * No in-memory map is consulted: hibernation/restart can never produce a
+   * stale row because we only read from sockets that are alive right now.
+   * The 2KB `serializeAttachment` budget comfortably accommodates a bounded
+   * instance object (well under 200 bytes).
+   */
+  getConnectedInstances(): { instances: ConnectedInstanceRow[] } {
+    this.ensureState();
+    const instances: ConnectedInstanceRow[] = [];
+    for (const ws of this.ctx.getWebSockets('cli')) {
+      const att = ws.deserializeAttachment() as WSAttachment | null;
+      if (att?.role !== 'cli' || !att.instance) continue;
+      instances.push({
+        connectionId: att.connectionId,
+        name: att.instance.name,
+        projectName: att.instance.projectName,
+        ...(att.instance.version ? { version: att.instance.version } : {}),
+      });
+    }
+    return { instances };
+  }
+
   async notifySessionEvent(event: SessionEventPayload): Promise<{ delivered: number }> {
     this.ensureState();
     const parsed = SessionEventPayloadSchema.parse(event);
@@ -1088,7 +1139,14 @@ export class UserConnectionDO extends DurableObject<Env> {
       const protocolVersion = this.connectionProtocolVersion.get(connectionId);
       for (const session of sessions) {
         if (session.parentSessionId) continue;
-        result.push({ ...session, connectionId, ...(protocolVersion ? { protocolVersion } : {}) });
+        result.push({
+          ...session,
+          connectionId,
+          ...(protocolVersion ? { protocolVersion } : {}),
+          // Preserve byte-identical responses for legacy senders that never
+          // include a `platform`: only forward the field when present.
+          ...(session.platform ? { platform: session.platform } : {}),
+        });
       }
     }
     return result;

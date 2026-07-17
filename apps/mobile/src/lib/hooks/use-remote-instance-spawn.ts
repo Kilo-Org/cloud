@@ -11,20 +11,11 @@ import { useUserWebConnection } from '@/components/agents/user-web-connection-pr
 // RN/Expo config transitively, which is why the split exists — see that
 // file's header comment for the full explanation.
 import {
-  classifyCreateSessionResult,
   type CreateSessionOutcome,
   createSessionSpawner,
-  type CreateSessionSpawner,
-  SESSION_OWNER_NOT_FOUND_LITERAL,
 } from './remote-instance-spawn-classifier';
 
-export {
-  classifyCreateSessionResult,
-  createSessionSpawner,
-  SESSION_OWNER_NOT_FOUND_LITERAL,
-  type CreateSessionOutcome,
-  type CreateSessionSpawner,
-};
+export type { CreateSessionOutcome };
 
 export type RemoteInstanceSpawnStatus =
   | { status: 'idle' }

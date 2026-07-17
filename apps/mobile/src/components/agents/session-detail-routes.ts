@@ -29,3 +29,29 @@ export function replaceWithAgentSession(
 ): void {
   router.replace(getAgentSessionPath(kiloSessionId, organizationId));
 }
+
+/**
+ * `Href` for the agent-chat detail when the parent route just spawned a
+ * remote `kilo remote` session. Appends `?spawned=1` to whatever
+ * `getAgentSessionPath` returns so the destination route can poll for
+ * the freshly-ingested session row with a short retry window — the
+ * parent's `Session.Event.Created` -> `IngestQueue` write is not
+ * synchronous with the mobile query's read, so the route needs to
+ * tolerate the transient NOT_FOUND that may show up before the row
+ * is queryable.
+ *
+ * The `spawned=1` suffix is intentionally append-only: it never
+ * replaces an existing query string. The optional `?organizationId=`
+ * already produced by `getAgentSessionPath` is preserved and `spawned=1`
+ * is joined with `&` in that case.
+ */
+export function getSpawnedAgentSessionPath(kiloSessionId: string, organizationId?: string): Href {
+  // `getAgentSessionPath` returns an `Href` (= `string | HrefObject`)
+  // but in this codebase every construction site uses the string
+  // branch. Narrow with `as string` so the `.includes('?')` check
+  // type-checks without forcing the helper to special-case
+  // HrefObject (which the rest of the app does not use).
+  const base = getAgentSessionPath(kiloSessionId, organizationId) as string;
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}spawned=1` as Href;
+}

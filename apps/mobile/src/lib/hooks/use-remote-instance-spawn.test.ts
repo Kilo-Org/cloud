@@ -14,6 +14,7 @@ import { CommandDeliveredError, UserWebCommandError } from 'cloud-agent-sdk/user
 import {
   classifyCreateSessionResult,
   createSessionSpawner,
+  type CreateSessionSpawner,
   SESSION_OWNER_NOT_FOUND_LITERAL,
 } from './remote-instance-spawn-classifier';
 
@@ -110,8 +111,10 @@ describe('classifyCreateSessionResult', () => {
 
 describe('createSessionSpawner', () => {
   it('exposes a stable creationKey and a spawn function', () => {
-    // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
-    const spawner = createSessionSpawner(makeConnection(async () => undefined));
+    const spawner: CreateSessionSpawner = createSessionSpawner(
+      // eslint-disable-next-line typescript-eslint/require-await -- no await needed; return value is the whole point
+      makeConnection(async () => undefined)
+    );
     expect(typeof spawner.creationKey).toBe('string');
     expect(spawner.creationKey.length).toBeGreaterThan(0);
     expect(typeof spawner.spawn).toBe('function');

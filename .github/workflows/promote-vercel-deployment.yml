@@ -4,19 +4,19 @@ on:
   workflow_call:
     inputs:
       deployment_url:
-        description: "Vercel deployment URL to promote"
+        description: 'Vercel deployment URL to promote'
         required: true
         type: string
       axiom_annotation_dataset:
-        description: "Optional Axiom dataset used to scope deployment annotations"
+        description: 'Optional Axiom dataset used to scope deployment annotations'
         required: false
         type: string
-        default: ""
+        default: ''
       axiom_expected_project:
-        description: "Vercel project name the promoted deployment must match before annotating"
+        description: 'Vercel project name the promoted deployment must match before annotating'
         required: false
         type: string
-        default: "kilocode-app"
+        default: 'kilocode-app'
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
     environment: production
 
     env:
-      VERCEL_VERSION: "53.3.1"
+      VERCEL_VERSION: '53.3.1'
 
     steps:
       - name: Install Vercel CLI
@@ -63,7 +63,9 @@ jobs:
             deployment_id=$(jq -r '.id // empty' <<<"$inspection" 2>/dev/null)
             if [ -z "$deployment_id" ]; then
               echo "::warning::vercel inspect did not return a deployment id (attempt $attempt): $inspection"
-              sleep 5
+              if [ "$attempt" != "5" ]; then
+                sleep 5
+              fi
               continue
             fi
 
@@ -74,7 +76,9 @@ jobs:
             fi
 
             echo "::warning::Deployment not READY yet (attempt $attempt, state=$ready_state)"
-            sleep 5
+            if [ "$attempt" != "5" ]; then
+              sleep 5
+            fi
           done
 
           project=$(jq -r '.name // empty' <<<"$deployment" 2>/dev/null)
@@ -92,15 +96,16 @@ jobs:
           commit_message=$(jq -r '(.meta.githubCommitMessage // "Commit message unavailable" | split("\n")[0])[0:360]' <<<"$deployment")
           commit_ref=$(jq -r '.meta.githubCommitRef // "unknown"' <<<"$deployment")
           commit_author=$(jq -r '.meta.githubCommitAuthorName // .creator.username // "unknown"' <<<"$deployment")
-          deployment_link="https://vercel.com/kilocode/kilocode-app/${deployment_id#dpl_}"
+          deployment_link="https://vercel.com/kilocode/$project/${deployment_id#dpl_}"
 
           payload=$(jq -n \
             --arg dataset "$AXIOM_DATASET" \
             --arg time "$deployment_time" \
-            --arg title "kilocode-app · $short_sha" \
+            --arg title "$project · $short_sha" \
             --arg description "$commit_message · $commit_ref · $commit_author" \
             --arg url "$deployment_link" \
-            '{datasets:[$dataset], type:"kilocode-app-production-deployment", time:$time, title:$title, description:$description, url:$url}')
+            --arg type "$project-production-deployment" \
+            '{datasets:[$dataset], type:$type, time:$time, title:$title, description:$description, url:$url}')
 
           curl --fail-with-body --silent --show-error \
             --request POST \

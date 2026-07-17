@@ -4,8 +4,12 @@ import {
   AutoRoutingClassifierModelResponseSchema,
   AutoRoutingDecisionResponseSchema,
   MirrorPayloadSchema,
+  RoutingConstraintsSchema,
   UpdateClassifierModelRequestSchema,
+  detectRequiredInputModalities,
+  estimateRoutingTokens,
 } from './index';
+import type { RoutingConstraints } from './index';
 import {
   BenchmarkConfigSchema,
   DEFAULT_BENCHMARK_ORG_ID,
@@ -316,5 +320,167 @@ describe('BenchmarkConfigSchema duplicate model ids', () => {
       deciderModels: [{ id: 'model/c' }, { id: 'model/d' }],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('RoutingConstraintsSchema', () => {
+  it('accepts a fully populated constraints object', () => {
+    const result = RoutingConstraintsSchema.parse({
+      requiredInputModalities: ['image', 'file'],
+      promptTokensEstimate: 12345,
+    });
+    expect(result).toEqual({
+      requiredInputModalities: ['image', 'file'],
+      promptTokensEstimate: 12345,
+    });
+  });
+
+  it('accepts an empty object (all fields optional)', () => {
+    expect(RoutingConstraintsSchema.parse({})).toEqual({});
+  });
+
+  it('rejects non-positive promptTokensEstimate', () => {
+    expect(() => RoutingConstraintsSchema.parse({ promptTokensEstimate: 0 })).toThrow();
+    expect(() => RoutingConstraintsSchema.parse({ promptTokensEstimate: -1 })).toThrow();
+    expect(() => RoutingConstraintsSchema.parse({ promptTokensEstimate: 1.5 })).toThrow();
+  });
+
+  it('rejects empty/whitespace modality strings', () => {
+    expect(() =>
+      RoutingConstraintsSchema.parse({ requiredInputModalities: ['image', ''] })
+    ).toThrow();
+    expect(() =>
+      RoutingConstraintsSchema.parse({ requiredInputModalities: ['image', '   '] })
+    ).toThrow();
+  });
+});
+
+describe('MirrorPayloadSchema with routing constraints', () => {
+  const baseNormalized = {
+    apiKind: 'chat_completions' as const,
+    requestedModel: 'kilo-auto/free',
+    systemPromptPrefix: 'You are Kilo Code.',
+    userPromptPrefix: 'Add parser tests.',
+    latestUserPromptPrefix: null,
+    messageCount: 2,
+    hasTools: false,
+    stream: true,
+    providerHints: { provider: null, providerOptions: null },
+  };
+
+  const basePayload = {
+    input: baseNormalized,
+    userId: 'user-1',
+    sessionId: 'session-123',
+    machineId: 'machine-1',
+    clientRequestId: 'req-1',
+    mode: 'code',
+    userAgent: 'Kilo-Code/4.106.0',
+    bodyBytes: 1234,
+  };
+
+  it('parses successfully without constraints (no behavior change)', () => {
+    const parsed = MirrorPayloadSchema.parse(basePayload);
+    expect(parsed.constraints).toBeUndefined();
+  });
+
+  it('parses successfully with constraints present', () => {
+    const parsed = MirrorPayloadSchema.parse({
+      ...basePayload,
+      constraints: {
+        requiredInputModalities: ['image'],
+        promptTokensEstimate: 8000,
+      },
+    });
+    expect(parsed.constraints).toEqual({
+      requiredInputModalities: ['image'],
+      promptTokensEstimate: 8000,
+    });
+  });
+
+  it('strips unknown keys for backward compatibility with older workers', () => {
+    const parsed = MirrorPayloadSchema.parse({
+      ...basePayload,
+      futureFlag: true,
+      nestedFuture: { a: 1 },
+    });
+    expect((parsed as Record<string, unknown>).futureFlag).toBeUndefined();
+    expect((parsed as Record<string, unknown>).nestedFuture).toBeUndefined();
+  });
+
+  it('accepts a payload whose promptTokensEstimate equals the estimator output', () => {
+    // Realistic multi-message body mixing text, a remote image URL, and a
+    // large base64 image — the estimator must exclude both image payloads
+    // and produce a positive integer that satisfies the schema.
+    const body = {
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: 'You are Kilo Code.' },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What do you see in this image?' },
+            {
+              type: 'image_url',
+              image_url: { url: 'https://example.com/' + 'x'.repeat(500) + '.png' },
+            },
+            {
+              type: 'image_url',
+              image_url: { url: 'data:image/png;base64,' + 'A'.repeat(20_000) },
+            },
+          ],
+        },
+        {
+          role: 'assistant',
+          tool_calls: [
+            {
+              id: 'call-1',
+              type: 'function',
+              function: { name: 'read_file', arguments: JSON.stringify({ path: '/tmp/a.ts' }) },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          content: JSON.stringify({ result: 'file contents ' + 'y'.repeat(800) }),
+        },
+      ],
+      max_tokens: 2000,
+    };
+
+    const estimate = estimateRoutingTokens(body);
+    expect(Number.isInteger(estimate)).toBe(true);
+    expect(estimate).toBeGreaterThanOrEqual(1);
+
+    // The mirror payload's constraints must accept this estimate verbatim.
+    const constraints: RoutingConstraints = {
+      requiredInputModalities: detectRequiredInputModalities(body),
+      promptTokensEstimate: estimate,
+    };
+
+    const parsed = MirrorPayloadSchema.parse({
+      ...basePayload,
+      constraints,
+    });
+
+    expect(parsed.constraints?.promptTokensEstimate).toBe(estimate);
+    expect(parsed.constraints?.requiredInputModalities).toEqual(['image']);
+  });
+});
+
+describe('package root re-exports', () => {
+  // These imports come from the package entry point (./index) — proves
+  // S2 (gateway) and S3 (worker) can import them from the package root
+  // without reaching into deep paths.
+  it('re-exports detectRequiredInputModalities from the package root', () => {
+    expect(typeof detectRequiredInputModalities).toBe('function');
+  });
+
+  it('re-exports estimateRoutingTokens from the package root', () => {
+    expect(typeof estimateRoutingTokens).toBe('function');
+  });
+
+  it('re-exports RoutingConstraintsSchema from the package root', () => {
+    expect(RoutingConstraintsSchema.safeParse({}).success).toBe(true);
   });
 });

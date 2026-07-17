@@ -18,6 +18,19 @@ export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy
 export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
 export const DEFAULT_AUTO_ROUTING_MODE: AutoRoutingMode = 'cost_per_accuracy';
 
+// Capability-aware routing hints attached to the mirrored request payload.
+// Absent `constraints` (or absent fields within it) means "no extra
+// constraint": the worker must not narrow the candidate set beyond what the
+// table says. Modality strings are intentionally unconstrained at the
+// contract boundary — the routing table owns the canonical vocabulary
+// (`image`, `file`, `audio`, ...) and this schema only guarantees they are
+// non-empty after trimming so a malformed caller cannot send whitespace.
+export const RoutingConstraintsSchema = z.object({
+  requiredInputModalities: z.array(z.string().trim().min(1)).optional(),
+  promptTokensEstimate: z.number().int().positive().optional(),
+});
+export type RoutingConstraints = z.infer<typeof RoutingConstraintsSchema>;
+
 export function isVirtualAutoModelId(model: string): boolean {
   return model.trim().toLowerCase().startsWith('kilo-auto/');
 }
@@ -48,6 +61,11 @@ export const MirrorPayloadSchema = z.object({
   // Size of the original request body, kept as an analytics dimension now
   // that the body itself is no longer mirrored.
   bodyBytes: z.number().int().nonnegative(),
+  // Capability-aware routing hints. Optional and intentionally absent-by-
+  // default so today's behavior is unchanged when the gateway does not yet
+  // supply them. The schema is non-strict (plain z.object above) so an old
+  // worker can safely ignore unknown keys added by a newer gateway.
+  constraints: RoutingConstraintsSchema.optional(),
 });
 export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
 
@@ -199,7 +217,13 @@ export type AutoRoutingClassifierAnalyticsResponse = z.infer<
   typeof AutoRoutingClassifierAnalyticsResponseSchema
 >;
 
-export { normalizeClassifierInput, redactProviderHints, type ClassifierApiKind } from './normalize';
+export {
+  normalizeClassifierInput,
+  redactProviderHints,
+  detectRequiredInputModalities,
+  estimateRoutingTokens,
+  type ClassifierApiKind,
+} from './normalize';
 
 export * from './reasoning';
 export * from './taxonomy';

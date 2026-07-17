@@ -41,6 +41,32 @@ cloud-agent-next refactor.
    Switching back to a real LLM later is just a `.dev.vars` edit plus a
    `pnpm dev:restart cloud-agent-next` — no flag toggles.
 
+## Credential containment (opt-in)
+
+Credential containment is **disabled by default** in the local `dev`
+environment: all three `*_TOKEN_CONTAINMENT_ORG_IDS` values in
+`wrangler.jsonc` `env.dev.vars` are empty, so new sessions use non-containment
+sandbox classes and receive raw development credentials.
+
+To exercise containment locally, opt in by setting one or more lists to `*`
+in `.dev.vars`:
+
+```bash
+# GitHub containment only:
+GITHUB_TOKEN_CONTAINMENT_ORG_IDS=*
+
+# All providers:
+GITHUB_TOKEN_CONTAINMENT_ORG_IDS=*
+GITLAB_TOKEN_CONTAINMENT_ORG_IDS=*
+KILOCODE_TOKEN_CONTAINMENT_ORG_IDS=*
+```
+
+`.dev.vars` overrides take precedence over the empty `wrangler.jsonc` dev
+defaults. Containment flags are persisted on the workspace at session
+creation, so changing these values requires a **new session** (or a normal
+local state reset) to take effect — existing sessions keep their original
+containment flags.
+
 ## Running
 
 Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.3.54`):

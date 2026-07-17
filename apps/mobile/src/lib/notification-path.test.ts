@@ -12,7 +12,7 @@ describe('notificationPathForData', () => {
         conversationId: 'conversation-1',
         messageId: 'message-1',
       })
-    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1');
+    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1?via=push');
   });
 
   it('keeps notifications on the tab-owned KiloClaw chat route', () => {
@@ -52,7 +52,7 @@ describe('notificationPathForData', () => {
         type: 'cloud_agent_session',
         cliSessionId: 'ses_1',
       })
-    ).toBe('/(app)/agent-chat/ses_1');
+    ).toBe('/(app)/agent-chat/ses_1?via=push');
   });
 });
 

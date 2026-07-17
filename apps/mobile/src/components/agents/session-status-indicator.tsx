@@ -5,8 +5,6 @@ import { type SessionStatusIndicator as SessionStatusIndicatorType } from 'cloud
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-const warningColor = 'hsl(38, 92%, 50%)';
-
 type SessionStatusIndicatorProps = {
   indicator: SessionStatusIndicatorType;
 };
@@ -34,8 +32,8 @@ function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) 
     case 'warning': {
       return (
         <View className="flex-row items-center gap-2">
-          <ActivityIndicator size="small" color={warningColor} />
-          <Text className="shrink text-sm text-amber-500">{indicator.message}</Text>
+          <ActivityIndicator size="small" color={colors.warn} />
+          <Text className="shrink text-sm text-warn">{indicator.message}</Text>
         </View>
       );
     }

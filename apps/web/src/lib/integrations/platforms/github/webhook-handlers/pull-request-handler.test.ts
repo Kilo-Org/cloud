@@ -392,6 +392,7 @@ describe('handlePullRequest', () => {
         platform: 'github',
         platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
         repoFullName: 'acme/widgets',
+        triggerSource: 'webhook',
       })
     );
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);

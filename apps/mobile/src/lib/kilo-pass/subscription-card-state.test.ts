@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { formatDate, parseTimestamp } from '@/lib/utils';
+
 import {
   getKiloPassSubscriptionCardAccessibility,
   getKiloPassSubscriptionCardState,
   shouldRenderKiloPassSubscriptionCard,
 } from './subscription-card-state';
+
+const endDate = formatDate(parseTimestamp('2026-06-08T15:21:05.000Z'));
 
 describe('getKiloPassSubscriptionCardState', () => {
   it('sends Stripe-managed Kilo Pass users to web management', () => {
@@ -59,7 +63,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'none',
       actionLabel: null,
-      description: '$49 monthly credits · Ends June 8, 2026 · This Kilo Pass is managed on web',
+      description: `$49 monthly credits · Ends ${endDate} · This Kilo Pass is managed on web`,
       title: 'Kilo Pass canceling',
     });
   });
@@ -108,7 +112,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'open-store-management',
       actionLabel: 'Manage',
-      description: '$19 monthly credits · Ends June 8, 2026',
+      description: `$19 monthly credits · Ends ${endDate}`,
       title: 'Kilo Pass canceling',
     });
   });
@@ -148,7 +152,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'none',
       actionLabel: null,
-      description: '$19 monthly credits · Ends June 8, 2026 · Managed in App Store',
+      description: `$19 monthly credits · Ends ${endDate} · Managed in App Store`,
       title: 'Kilo Pass canceling',
     });
   });
@@ -182,7 +186,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'none',
       actionLabel: null,
-      description: '$49 monthly credits · Ends June 8, 2026 · Managed on Google Play',
+      description: `$49 monthly credits · Ends ${endDate} · Managed on Google Play`,
       title: 'Kilo Pass canceling',
     });
   });
@@ -196,7 +200,7 @@ describe('getKiloPassSubscriptionCardState', () => {
         refillAt: '2026-06-08 15:21:05+00',
         status: 'active',
       }).description
-    ).toContain('June 8, 2026');
+    ).toContain(endDate);
   });
 
   it('treats canceled App Store-managed subscriptions as unsubscribed', () => {

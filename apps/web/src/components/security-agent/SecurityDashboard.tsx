@@ -28,6 +28,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { DashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import { useTRPC } from '@/lib/trpc/utils';
+import {
+  buildSecurityDashboardMetrics,
+  type DashboardMetricKey,
+  getAnalysisIncompleteCount as getSharedAnalysisIncompleteCount,
+} from '@kilocode/app-shared/security-agent';
 import { RepositoryFilter } from './RepositoryFilter';
 import { SecurityAgentActionBar, SecurityAgentActionBarField } from './SecurityAgentActionBar';
 import { SecurityAgentGitHubInstallCta } from './SecurityAgentGitHubInstallCta';
@@ -83,6 +88,7 @@ type Repository = {
 type MetricTone = 'danger' | 'warning' | 'neutral';
 
 type DashboardMetric = {
+  id: DashboardMetricKey;
   label: string;
   value: string;
   detail: string;
@@ -108,7 +114,7 @@ type SecurityDashboardViewProps = {
 type SummaryTone = 'danger' | 'warning' | 'success' | 'neutral';
 
 function getAnalysisIncompleteCount(analysis: DashboardStats['analysis']): number {
-  return analysis.triageComplete + analysis.analyzing + analysis.notAnalyzed + analysis.failed;
+  return getSharedAnalysisIncompleteCount(analysis);
 }
 
 function getNeedsActionCount(analysis: DashboardStats['analysis']): number {
@@ -257,7 +263,7 @@ export function SecurityDashboardView({
             aria-label="Security overview"
           >
             {metrics.map(metric => (
-              <DashboardMetricCard key={metric.label} {...metric} />
+              <DashboardMetricCard key={metric.id} {...metric} />
             ))}
           </section>
 
@@ -395,78 +401,23 @@ function DashboardSkeleton() {
   );
 }
 
+// Web-only presentation layered onto the shared label/value/detail/tone data.
+const metricIcons: Record<DashboardMetricKey, LucideIcon> = {
+  openFindings: ShieldAlert,
+  exploitable: TriangleAlert,
+  needsReview: CircleHelp,
+  analysisIncomplete: FileSearch,
+  slaCompliance: ShieldCheck,
+  deadlinePassed: AlertCircle,
+  dueSoon: CalendarClock,
+  noDeadline: CircleHelp,
+};
+
 function buildDashboardMetrics(data: DashboardStats, slaEnabled: boolean): DashboardMetric[] {
-  if (!slaEnabled) {
-    return [
-      {
-        label: 'Open findings',
-        value: String(data.analysis.total),
-        detail: `${data.severity.critical} critical, ${data.severity.high} high`,
-        icon: ShieldAlert,
-        tone: 'danger',
-      },
-      {
-        label: 'Confirmed exploitable',
-        value: String(data.analysis.exploitable),
-        detail: 'Project risk confirmed by analysis',
-        icon: TriangleAlert,
-        tone: 'danger',
-      },
-      {
-        label: 'Needs your review',
-        value: String(data.analysis.needsReview),
-        detail: 'Human decision required',
-        icon: CircleHelp,
-        tone: 'warning',
-      },
-      {
-        label: 'Analysis not complete',
-        value: String(getAnalysisIncompleteCount(data.analysis)),
-        detail: 'Project risk still unknown',
-        icon: FileSearch,
-        tone: 'neutral',
-      },
-    ];
-  }
-
-  const compliance =
-    data.sla.overall.total > 0
-      ? Math.round((data.sla.overall.withinSla / data.sla.overall.total) * 100)
-      : 100;
-
-  return [
-    {
-      label: 'SLA compliance',
-      value: `${compliance}%`,
-      detail:
-        data.sla.overall.total > 0
-          ? `${data.sla.overall.withinSla} of ${data.sla.overall.total} within deadline`
-          : 'No assigned deadlines',
-      icon: ShieldCheck,
-      tone: compliance < 70 ? 'danger' : compliance < 90 ? 'warning' : 'neutral',
-    },
-    {
-      label: 'Deadline passed',
-      value: String(data.sla.overall.overdue),
-      detail: `${data.sla.bySeverity.critical.overdue} critical, ${data.sla.bySeverity.high.overdue} high`,
-      icon: AlertCircle,
-      tone: data.sla.overall.overdue > 0 ? 'danger' : 'neutral',
-    },
-    {
-      label: 'Due this week',
-      value: String(data.sla.dueSoon.total),
-      detail: `${data.sla.dueSoon.exploitable} confirmed exploitable`,
-      icon: CalendarClock,
-      tone: data.sla.dueSoon.total > 0 ? 'warning' : 'neutral',
-    },
-    {
-      label: 'No deadline',
-      value: String(data.sla.untrackedCount),
-      detail: data.sla.untrackedCount > 0 ? 'Review SLA assignment' : 'All open findings tracked',
-      icon: CircleHelp,
-      tone: 'neutral',
-    },
-  ];
+  return buildSecurityDashboardMetrics(data, slaEnabled).map(metric => ({
+    ...metric,
+    icon: metricIcons[metric.id],
+  }));
 }
 
 function DashboardMetricCard({ label, value, detail, icon: Icon, tone }: DashboardMetric) {
@@ -1041,7 +992,13 @@ function RepositoryActionRow({
 }) {
   const needsActionPercentage =
     repository.open > 0 ? Math.round((repository.needsAction / repository.open) * 100) : 0;
-  const complianceTone = repository.slaCompliancePercent < 70 ? 'danger' : 'success';
+  const isSlaMeasured = repository.slaComplianceMeasured;
+  const complianceTone =
+    isSlaMeasured && repository.slaCompliancePercent < 70 ? 'danger' : 'success';
+  const slaComplianceLabel = isSlaMeasured ? `${repository.slaCompliancePercent}%` : 'Not measured';
+  const complianceTextClass = isSlaMeasured
+    ? toneTextClass(complianceTone)
+    : 'text-muted-foreground';
   const actionTone = repository.needsAction > 0 ? 'warning' : 'success';
 
   return (
@@ -1063,16 +1020,20 @@ function RepositoryActionRow({
           <span
             className={cn(
               'font-mono tabular-nums',
-              toneTextClass(slaEnabled ? complianceTone : actionTone)
+              slaEnabled ? complianceTextClass : toneTextClass(actionTone)
             )}
           >
-            {slaEnabled
-              ? `${repository.slaCompliancePercent}%`
-              : `${repository.needsAction} findings`}
+            {slaEnabled ? slaComplianceLabel : `${repository.needsAction} findings`}
           </span>
         </div>
         <Progress
-          value={slaEnabled ? repository.slaCompliancePercent : needsActionPercentage}
+          value={
+            slaEnabled
+              ? isSlaMeasured
+                ? repository.slaCompliancePercent
+                : undefined
+              : needsActionPercentage
+          }
           aria-label={
             slaEnabled
               ? `${repository.repoFullName} SLA compliance`

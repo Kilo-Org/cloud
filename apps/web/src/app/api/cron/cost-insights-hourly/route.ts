@@ -26,12 +26,19 @@ export async function GET(request: Request) {
   }
 
   const summary = await runCostInsightHourlySweep(db);
+  const dailyUsageRollupRepairs = summary.dailyUsageRollupRepairs;
   sentryLogger('cron', 'info')('Cost Insights hourly sweep completed', {
     evaluatedOwnerCount: summary.evaluatedOwners,
     failedOwnerCount: summary.failedOwners.length,
     dirtyQueueDepthBefore: summary.dirtyQueueDepthBefore,
     dirtyQueueDepthAfter: summary.dirtyQueueDepthAfter,
     dirtyClaimedCount: summary.dirtyEvaluations.claimed,
+    rollupRepairClaimedCount: summary.rollupRepairs.claimed,
+    rollupRepairCompletedCount: summary.rollupRepairs.repaired,
+    rollupRepairFailedCount: summary.rollupRepairs.failed.length,
+    dailyUsageRollupRepairClaimedCount: dailyUsageRollupRepairs.claimed,
+    dailyUsageRollupRepairCompletedCount: dailyUsageRollupRepairs.repaired,
+    dailyUsageRollupRepairFailedCount: dailyUsageRollupRepairs.failed.length,
     evaluationDurationMs: summary.evaluationDurationMs,
     rawCanonicalFallbackCount: summary.rawCanonicalFallbackCount,
     rollupDegradedIntervalCount: summary.rollupDegradedIntervalCount,
@@ -42,11 +49,15 @@ export async function GET(request: Request) {
   });
   const hasFailures =
     summary.failedOwners.length > 0 ||
+    summary.rollupRepairs.failed.length > 0 ||
+    dailyUsageRollupRepairs.failed.length > 0 ||
     summary.notifications.failed > 0 ||
     summary.notifications.terminalized > 0;
   if (hasFailures) {
     sentryLogger('cron', 'error')('Cost Insights hourly sweep completed with partial failures', {
       failedOwnerCount: summary.failedOwners.length,
+      failedRollupRepairCount: summary.rollupRepairs.failed.length,
+      failedDailyUsageRollupRepairCount: dailyUsageRollupRepairs.failed.length,
       failedNotificationCount: summary.notifications.failed,
       terminalizedNotificationCount: summary.notifications.terminalized,
     });

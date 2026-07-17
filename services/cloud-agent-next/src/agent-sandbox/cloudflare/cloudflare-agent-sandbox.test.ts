@@ -11,7 +11,7 @@ vi.mock('../../workspace-backup-observability.js', () => ({
 }));
 
 import type { Env, SandboxInstance } from '../../types.js';
-import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import type { CredentialContainment, SessionMetadata } from '../../persistence/session-metadata.js';
 import { WrapperClient, WrapperError } from '../../kilo/wrapper-client.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import type { EnsureWrapperRequest } from '../protocol.js';
@@ -37,6 +37,7 @@ function metadata(options?: {
   githubRepo?: string;
   sandboxId?: TestSandboxId;
   withProfile?: boolean;
+  credentialContainment?: CredentialContainment;
 }): SessionMetadata {
   const sandboxId = options?.sandboxId ?? (options?.devcontainer ? 'dind-abcdef' : 'ses-abcdef');
   return {
@@ -60,7 +61,9 @@ function metadata(options?: {
       : {}),
     workspace: {
       sandboxId,
-      ...(options?.githubRepo ? { managedScmContainment: true } : {}),
+      ...(options?.credentialContainment
+        ? { credentialContainment: options.credentialContainment }
+        : {}),
     },
     ...(options?.githubRepo
       ? { repository: { type: 'github' as const, repo: options.githubRepo } }
@@ -337,7 +340,7 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
-  it('activates containment before probing a managed SCM sandbox', async () => {
+  it('activates containment before probing a sandbox with Kilo-only containment', async () => {
     const bootstrapSession = {};
     const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
     const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' });
@@ -348,6 +351,7 @@ describe('CloudflareAgentSandbox', () => {
     const sessionMetadata = metadata({
       githubRepo: 'Kilo-Org/containment-canary',
       sandboxId: 'usr-shared',
+      credentialContainment: { github: false, gitlab: false, kilocode: true },
     });
     const env = {} as Env;
     const sandbox = new CloudflareAgentSandbox(env, sessionMetadata, {

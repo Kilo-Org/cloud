@@ -4,8 +4,8 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
-  BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
+  BitbucketWorkspaceAccessTokenCredentialRowSchema,
   getMissingBitbucketWorkspaceAccessTokenScopes,
   getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
@@ -126,28 +126,12 @@ async function loadIntegration(organizationId: string) {
       repositoriesSyncedAt: platform_integrations.repositories_synced_at,
       authInvalidAt: platform_integrations.auth_invalid_at,
       authInvalidReason: platform_integrations.auth_invalid_reason,
-      credentialId: platform_access_token_credentials.id,
-      credentialOrganizationId: platform_access_token_credentials.owned_by_organization_id,
-      credentialPlatform: platform_access_token_credentials.platform,
-      credentialIntegrationType: platform_access_token_credentials.integration_type,
-      providerCredentialType: platform_access_token_credentials.provider_credential_type,
-      providerScopes: platform_access_token_credentials.provider_scopes,
-      providerVerifiedAt: platform_access_token_credentials.provider_verified_at,
-      credentialVersion: platform_access_token_credentials.credential_version,
-      lastValidatedAt: platform_access_token_credentials.last_validated_at,
+      credential: platform_access_token_credentials,
     })
     .from(platform_integrations)
     .leftJoin(
       platform_access_token_credentials,
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
-        eq(platform_access_token_credentials.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
-        eq(
-          platform_access_token_credentials.integration_type,
-          BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
-        )
-      )
+      eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id)
     )
     .where(
       and(
@@ -217,7 +201,7 @@ function toIsoTimestamp(value: string | null): string | null {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
 }
 
-function parseIntegration(row: LoadedIntegration, organizationId: string) {
+function parseIntegration(row: LoadedIntegration) {
   const metadata = BitbucketWorkspaceAccessTokenMetadataSchema.safeParse(row.metadata);
   const workspaceUuid = z.uuid().safeParse(row.workspaceUuid);
   const workspaceSlug = WorkspaceSlugSchema.safeParse(row.workspaceSlug);
@@ -232,22 +216,20 @@ function parseIntegration(row: LoadedIntegration, organizationId: string) {
   const cache = workspace
     ? parseCachedRepositories(row.repositories, row.repositoriesSyncedAt, workspace)
     : null;
-  const credential =
-    row.credentialId !== null &&
-    row.credentialOrganizationId === organizationId &&
-    row.credentialPlatform === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM &&
-    row.credentialIntegrationType === BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE &&
-    row.credentialVersion !== null &&
-    row.credentialVersion > 0
-      ? { id: row.credentialId, version: row.credentialVersion }
+  const parsedCredential = BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse(
+    row.credential
+  );
+  const credentialProfile =
+    parsedCredential.success && parsedCredential.data.platform_integration_id === row.integrationId
+      ? parsedCredential.data
       : null;
+  const credential = credentialProfile
+    ? { id: credentialProfile.id, version: credentialProfile.credential_version }
+    : null;
   const hasValidCredentialEvidence =
     credential !== null &&
-    row.providerCredentialType === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE &&
-    row.providerScopes !== null &&
-    hasRequiredBitbucketWorkspaceAccessTokenScopes(row.providerScopes) &&
-    toIsoTimestamp(row.providerVerifiedAt) !== null &&
-    toIsoTimestamp(row.lastValidatedAt) !== null;
+    credentialProfile !== null &&
+    hasRequiredBitbucketWorkspaceAccessTokenScopes(credentialProfile.provider_scopes);
   const usable =
     workspace !== null &&
     row.installationId === null &&
@@ -267,6 +249,7 @@ function parseIntegration(row: LoadedIntegration, organizationId: string) {
     workspace,
     cache,
     credential,
+    credentialProfile,
     state: usable ? ('usable' as const) : ('reconnect_required' as const),
     recoveryAction: usable
       ? null
@@ -278,7 +261,7 @@ function parseIntegration(row: LoadedIntegration, organizationId: string) {
 
 async function loadParsedIntegration(organizationId: string) {
   const row = await loadIntegration(organizationId);
-  return row ? parseIntegration(row, organizationId) : null;
+  return row ? parseIntegration(row) : null;
 }
 
 function isRefreshableIntegration(
@@ -325,9 +308,9 @@ export async function getBitbucketWorkspaceAccessTokenStatus(organizationId: str
     workspace: integration.workspace,
     invalidatedAt: toIsoTimestamp(integration.row.authInvalidAt),
     invalidationReason: invalidationReason.success ? invalidationReason.data : null,
-    lastValidatedAt: toIsoTimestamp(integration.row.lastValidatedAt),
+    lastValidatedAt: toIsoTimestamp(integration.credentialProfile?.last_validated_at ?? null),
     unexpectedScopes: getUnexpectedBitbucketWorkspaceAccessTokenScopes(
-      integration.row.providerScopes ?? []
+      integration.credentialProfile?.provider_scopes ?? []
     ),
     repositoryCache: integration.cache ?? {
       status: 'uninitialized' as const,
@@ -402,7 +385,7 @@ export async function getBitbucketCodeReviewerReadiness(organizationId: string) 
   }
 
   const missingRequiredScopes = getMissingBitbucketWorkspaceAccessTokenScopes(
-    integration.row.providerScopes ?? []
+    integration.credentialProfile?.provider_scopes ?? []
   );
   const connected = integration.state === 'usable' && integration.workspace !== null;
   const cache = integration.cache ?? repositoryCache;
@@ -410,7 +393,9 @@ export async function getBitbucketCodeReviewerReadiness(organizationId: string) 
     connected,
     ready:
       connected &&
-      hasRequiredBitbucketWorkspaceAccessTokenScopes(integration.row.providerScopes ?? []) &&
+      hasRequiredBitbucketWorkspaceAccessTokenScopes(
+        integration.credentialProfile?.provider_scopes ?? []
+      ) &&
       cache.status === 'available',
     integrationId: integration.row.integrationId,
     workspace: integration.workspace,
@@ -456,15 +441,7 @@ async function isObservedCredentialGenerationCurrent(
     .from(platform_integrations)
     .innerJoin(
       platform_access_token_credentials,
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
-        eq(platform_access_token_credentials.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
-        eq(
-          platform_access_token_credentials.integration_type,
-          BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
-        )
-      )
+      eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id)
     )
     .where(
       and(
@@ -615,7 +592,6 @@ async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
               platform_access_token_credentials.platform_integration_id,
               integration.row.integrationId
             ),
-            eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
             eq(platform_access_token_credentials.credential_version, credential.version)
           )
         );

@@ -49,6 +49,16 @@ type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
   cost_details?: { upstream_inference_cost: number };
 };
 
+function getVercelResolvedModel(
+  providerMetadata: VercelProviderMetaData | null | undefined
+): string | undefined {
+  const routing = providerMetadata?.gateway?.routing;
+  return (
+    routing?.modelAttempts?.find(attempt => attempt.success)?.canonicalSlug ??
+    routing?.canonicalSlug
+  );
+}
+
 export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
@@ -184,6 +194,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
         const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
         if (meta) {
           providerMetadata = meta;
+          model = getVercelResolvedModel(meta) ?? model;
           inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
         }
       }
@@ -246,7 +257,7 @@ export function parseMessagesMicrodollarUsageFromString(
   const coreProps = {
     messageId: responseJson?.id ?? null,
     hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
-    model: responseJson?.model ?? null,
+    model: getVercelResolvedModel(providerMetadata) ?? responseJson?.model ?? null,
     responseContent,
     inference_provider,
     upstream_id: null,

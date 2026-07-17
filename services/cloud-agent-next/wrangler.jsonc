@@ -57,6 +57,10 @@
     "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    "TOOL_CGROUP_ORG_IDS": "*",
+    "TOOL_CGROUP_MODE": "enforce",
+    "TOOL_CGROUP_RESERVE_MB": "1024",
+    "TOOL_CGROUP_CPU_WEIGHT": "50",
   },
   "placement": { "mode": "smart" },
   /**
@@ -159,7 +163,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 400,
+      "max_instances": 200,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -173,7 +177,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 300,
+      "max_instances": 150,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -201,7 +205,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 1000,
+      "max_instances": 500,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -215,7 +219,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 400,
+      "max_instances": 750,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -243,7 +247,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
-      "max_instances": 1000,
+      "max_instances": 1500,
       "rollout_active_grace_period": 1800,
     },
   ],
@@ -406,7 +410,9 @@
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
-        "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
+        "GITHUB_TOKEN_CONTAINMENT_ORG_IDS": "",
+        "GITLAB_TOKEN_CONTAINMENT_ORG_IDS": "",
+        "KILOCODE_TOKEN_CONTAINMENT_ORG_IDS": "",
         "REPO_SNAPSHOT_ORG_IDS": "",
         "TOOL_CGROUP_ORG_IDS": "",
       },

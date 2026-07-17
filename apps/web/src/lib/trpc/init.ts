@@ -3,8 +3,12 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
+import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
-import { trpcErrorFormatter } from '@/lib/trpc/transport';
+import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
+import { db } from '@/lib/drizzle';
+import { kilocode_users } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
@@ -21,6 +25,10 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'User not authenticated - no user to set on context',
+      // Marks this as a genuine session failure (vs a procedure-level
+      // UNAUTHORIZED like org-access denial) so the mobile client signs out
+      // only here — see AuthContextError / data.authRequired.
+      cause: new AuthContextError(),
     });
   }
   setTag('userId', user.id);
@@ -96,6 +104,37 @@ export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) =
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Credit management access required',
+    });
+  }
+
+  return next();
+});
+
+async function getCurrentUserFromPrimary(userId: string) {
+  return db.query.kilocode_users.findFirst({
+    where: eq(kilocode_users.id, userId),
+  });
+}
+
+export const superadminProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
+  if (!currentUser || currentUser.blocked_reason !== null || !userIsSuperadmin(currentUser)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Superadmin access required',
+    });
+  }
+
+  return next();
+});
+
+export const sessionViewerProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
+
+  if (!currentUser || currentUser.blocked_reason !== null || !userCanViewSessions(currentUser)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Session viewing access required',
     });
   }
 

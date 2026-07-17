@@ -4,11 +4,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { sentryLogger } from '@/lib/utils.server';
-import {
-  byok_api_keys,
-  coding_plan_subscriptions,
-  MODELS_BY_PROVIDER_ADMIN_URL,
-} from '@kilocode/db/schema';
+import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -29,8 +25,8 @@ import {
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
-  getVercelModelsMetadata,
-  getOpenRouterModelsMetadata,
+  getVercelModelsMetadataFromDatabase,
+  getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -49,7 +45,18 @@ const CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
 const CODESTRAL_TEST_MODEL = 'codestral-2508';
 const GENERIC_TEST_FAILURE_MESSAGE =
   'API key test failed. Check the credential and supported models, then try again.';
+const MANAGED_KEY_READ_ONLY_MESSAGE =
+  'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
+
+function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
+  if (managementSource === 'coding_plan') {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: MANAGED_KEY_READ_ONLY_MESSAGE,
+    });
+  }
+}
 
 async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; message: string }> {
   try {
@@ -88,19 +95,20 @@ async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; 
 
 async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   const [vercelModelMetadata, openRouterModelMetadata] = await Promise.all([
-    getVercelModelsMetadata(),
-    getOpenRouterModelsMetadata(),
+    getVercelModelsMetadataFromDatabase(),
+    getOpenRouterModelsMetadataFromDatabase(),
   ]);
 
   if (Object.keys(vercelModelMetadata).length === 0) {
     throw new Error(
-      'No Vercel model metadata in Redis, use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
+      'No Vercel model metadata in the database, use the admin panel at ' +
+        MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
 
   if (Object.keys(openRouterModelMetadata).length === 0) {
     throw new Error(
-      'No OpenRouter model metadata in Redis, use the admin panel at ' +
+      'No OpenRouter model metadata in the database, use the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
@@ -111,7 +119,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
-    const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id, false)];
+    const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id)];
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
@@ -277,40 +285,26 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
+      rejectManagedKeyMutation(existingKey.management_source);
+
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
-      const transfersCodingPlanOwnership =
-        !organizationId && existingKey.management_source === 'coding_plan';
+      const [updatedKey] = await db
+        .update(byok_api_keys)
+        .set({ encrypted_api_key: encrypted })
+        .where(eq(byok_api_keys.id, id))
+        .returning({
+          id: byok_api_keys.id,
+          provider_id: byok_api_keys.provider_id,
+          created_at: byok_api_keys.created_at,
+          updated_at: byok_api_keys.updated_at,
+          created_by: byok_api_keys.created_by,
+          management_source: byok_api_keys.management_source,
+          is_enabled: byok_api_keys.is_enabled,
+        });
 
-      const updatedKey = await db.transaction(async tx => {
-        const [updated] = await tx
-          .update(byok_api_keys)
-          .set(
-            transfersCodingPlanOwnership
-              ? { encrypted_api_key: encrypted, management_source: 'user' }
-              : { encrypted_api_key: encrypted }
-          )
-          .where(eq(byok_api_keys.id, id))
-          .returning({
-            id: byok_api_keys.id,
-            provider_id: byok_api_keys.provider_id,
-            created_at: byok_api_keys.created_at,
-            updated_at: byok_api_keys.updated_at,
-            created_by: byok_api_keys.created_by,
-            management_source: byok_api_keys.management_source,
-            is_enabled: byok_api_keys.is_enabled,
-          });
-
-        if (!updated) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
-        }
-        if (transfersCodingPlanOwnership) {
-          await tx
-            .update(coding_plan_subscriptions)
-            .set({ installed_byok_key_id: null })
-            .where(eq(coding_plan_subscriptions.installed_byok_key_id, id));
-        }
-        return updated;
-      });
+      if (!updatedKey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+      }
 
       // Create audit log only for organization keys
       if (existingKey.organization_id) {
@@ -372,6 +366,8 @@ export const byokRouter = createTRPCRouter({
           });
         }
       }
+
+      rejectManagedKeyMutation(existingKey.management_source);
 
       const [updatedKey] = await db
         .update(byok_api_keys)
@@ -553,16 +549,7 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
-      // Coding-plan-managed keys are user-scoped and back a billed subscription.
-      // Deleting one here would orphan the subscription (FK is set-null) while it
-      // keeps billing. Require cancelling the coding plan instead.
-      if (!organizationId && existingKey.management_source === 'coding_plan') {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message:
-            "This key is managed by your coding plan and can't be deleted directly. Cancel the coding plan to remove it.",
-        });
-      }
+      rejectManagedKeyMutation(existingKey.management_source);
 
       // Delete from database
       await db.delete(byok_api_keys).where(eq(byok_api_keys.id, id));

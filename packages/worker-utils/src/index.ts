@@ -51,7 +51,11 @@ export type {
 } from './cloud-agent-next-client.js';
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
-export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from './internal-service-token-audiences.js';
+export {
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
+  GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+} from './internal-service-token-audiences.js';
 export {
   BITBUCKET_ACCESS_TOKEN_FAMILY_PREFIX,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_SCHEME,
@@ -71,6 +75,36 @@ export type {
   BitbucketWorkspaceAccessTokenInvalidationReason,
   BitbucketWorkspaceAccessTokenRequiredScope,
 } from './bitbucket-workspace-access-token.js';
+export {
+  GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
+  GITLAB_OAUTH_CREDENTIAL_ENVELOPE_VERSION,
+  GITLAB_PERSONAL_ACCESS_TOKEN_ENVELOPE_SCHEME,
+  GITLAB_PERSONAL_ACCESS_TOKEN_ENVELOPE_VERSION,
+  GITLAB_PROJECT_ACCESS_TOKEN_ENVELOPE_SCHEME,
+  GITLAB_PROJECT_ACCESS_TOKEN_ENVELOPE_VERSION,
+  GitLabOAuthCredentialRowSchema,
+  GitLabPersonalAccessTokenCredentialRowSchema,
+  GitLabPersonalAccessTokenMetadataSchema,
+  GitLabProjectAccessTokenCredentialRowSchema,
+  GitLabProjectAccessTokenMetadataSchema,
+  buildGitLabAccessTokenCredentialAad,
+  buildGitLabOAuthCredentialAad,
+  buildGitLabPersonalAccessTokenAad,
+  buildGitLabProjectAccessTokenAad,
+} from './gitlab-credential.js';
+export type {
+  GitLabAccessTokenCredentialAadInput,
+  GitLabCredentialOwner,
+  GitLabOAuthCredentialAadInput,
+  GitLabOAuthCredentialRow,
+  GitLabOAuthSecretKind,
+  GitLabPersonalAccessTokenAadInput,
+  GitLabPersonalAccessTokenCredentialRow,
+  GitLabPersonalAccessTokenMetadata,
+  GitLabProjectAccessTokenAadInput,
+  GitLabProjectAccessTokenCredentialRow,
+  GitLabProjectAccessTokenMetadata,
+} from './gitlab-credential.js';
 export {
   signKiloToken,
   verifyKiloToken,

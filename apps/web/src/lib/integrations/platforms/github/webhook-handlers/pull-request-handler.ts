@@ -311,6 +311,7 @@ export async function handlePullRequestCodeReview(
       headRef: checkoutRef.checkoutRef,
       headSha: pull_request.head.sha,
       platform: 'github',
+      triggerSource: 'webhook',
     });
 
     logExceptInTest(

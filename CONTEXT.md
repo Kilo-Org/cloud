@@ -4,12 +4,14 @@
 
 Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contract defines Code Reviewer, Security Agent, and Cost Insights language plus ownership boundaries used across review execution, analytics, sync, web, email, remediation, billing alerts, tests, and product documentation.
 
+Covered domains must use this contract's canonical terms in code, docs, task descriptions, tests, and agent outputs. Do not introduce a synonym for a governed concept without updating this contract. Scoped `AGENTS.md` files link to this contract instead of copying it.
+
 ## Contexts
 
 | Context | Owns | Location | Notes |
 |---|---|---|---|
-| **Code Reviewer** | Pull request and merge request review execution, Code Review Findings, review settings, and Review Analytics | `apps/web/src/lib/code-reviews/`, `apps/web/src/components/code-reviews/` | A Code Reviewer owner is either one user or one organization; Review Analytics collection is organization- and platform-scoped |
-| **Security Agent** | Security Findings, owner-scoped policy, settings, Auto Remediation, and user-visible outcomes | `apps/web/src/lib/security-agent/`, `apps/web/src/components/security-agent/`, `.specs/security-agent.md` | A Security Agent owner is either one user or one organization |
+| **Code Reviewer** | Pull request and merge request review execution, Code Review Findings, review settings, and Review Analytics | `packages/app-shared/src/code-review/`, `apps/web/src/lib/code-reviews/`, `apps/web/src/components/code-reviews/` | A Code Reviewer owner is either one user or one organization; Review Analytics collection is organization- and platform-scoped |
+| **Security Agent** | Security Findings, owner-scoped policy, settings, Auto Remediation, and user-visible outcomes | `packages/app-shared/src/security-agent/`, `apps/web/src/lib/security-agent/`, `apps/web/src/components/security-agent/`, `.specs/security-agent.md` | A Security Agent owner is either one user or one organization |
 | **Security Sync** | Dependabot synchronization, finding persistence, notification eligibility, recipient intent materialization, and durable notification state | `services/security-sync/` | Event state remains owner-scoped; email sending does not occur inside finding persistence transactions |
 | **Security Agent Email Delivery** | Dispatch-time revalidation, email rendering, owner-aware links, and Mailgun delivery | `apps/web/src/app/api/internal/security-agent/`, `apps/web/src/lib/email.ts`, `apps/web/src/emails/` | Accepts notification identity only and loads current data before sending |
 | **Shared Security Notification Policy** | Canonical config parsing, defaults, severity thresholds, and pure event eligibility rules | `packages/worker-utils/src/security-notification-policy.ts` | Web and Worker must use same policy contract |

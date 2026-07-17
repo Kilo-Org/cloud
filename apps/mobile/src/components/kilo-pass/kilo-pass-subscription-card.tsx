@@ -154,7 +154,9 @@ export function KiloPassSubscriptionCard() {
               <Text className="font-semibold">{contentState.title}</Text>
               <Text className="text-xs text-muted-foreground">{contentState.description}</Text>
             </View>
-            <Text className="text-xs font-medium text-primary">{contentState.actionLabel}</Text>
+            <Text className="shrink-0 text-xs font-medium text-primary">
+              {contentState.actionLabel}
+            </Text>
           </View>
         </Pressable>
       ) : null}
@@ -198,7 +200,7 @@ export function KiloPassSubscriptionCard() {
               </Text>
             </View>
             {contentState.state.actionLabel ? (
-              <Text className="text-xs font-medium text-primary">
+              <Text className="shrink-0 text-xs font-medium text-primary">
                 {contentState.state.actionLabel}
               </Text>
             ) : null}

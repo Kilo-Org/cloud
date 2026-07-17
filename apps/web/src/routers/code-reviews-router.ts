@@ -10,7 +10,7 @@ import {
   upsertAgentConfigForOwner,
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
-import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import type { CodeReviewAgentConfig, RepositoryModelOverride } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -40,6 +40,47 @@ const ManuallyAddedRepositoryInputSchema = z.object({
   private: z.boolean(),
 });
 
+// Personal integrations are GitHub/GitLab only, so override repo IDs are numeric.
+const RepositoryModelOverrideInputSchema = z.object({
+  repositoryId: z.number(),
+  repoFullName: z.string().max(511),
+  // Keep in sync with RepositoryModelOverrideSchema.model_slug (canonical storage),
+  // so an over-long slug is rejected at save time rather than failing the config's
+  // canonical parse on read.
+  modelSlug: z.string().max(512),
+  thinkingEffort: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .nullable()
+    .optional(),
+});
+
+// Bound the overrides array so a caller cannot grow the JSONB config unbounded, and
+// reject duplicate entries for the same repo (by id or full name) — dispatch resolves
+// via first-match, so duplicates would silently pick one. Mirrors the duplicate
+// rejection already applied to Bitbucket selectedRepositoryIds.
+const MAX_REPOSITORY_MODEL_OVERRIDES = 1000;
+
+function rejectDuplicateRepositoryModelOverrides(
+  overrides: Array<{ repositoryId: number | string; repoFullName: string }>,
+  ctx: z.RefinementCtx
+) {
+  const seenIds = new Set<number | string>();
+  const seenNames = new Set<string>();
+  for (const override of overrides) {
+    if (seenIds.has(override.repositoryId) || seenNames.has(override.repoFullName)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Duplicate repository model override for the same repository',
+      });
+      return;
+    }
+    seenIds.add(override.repositoryId);
+    seenNames.add(override.repoFullName);
+  }
+}
+
 const SaveReviewConfigInputSchema = z.object({
   platform: PlatformSchema,
   reviewStyle: z.enum(['strict', 'balanced', 'lenient', 'roast']),
@@ -55,6 +96,11 @@ const SaveReviewConfigInputSchema = z.object({
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
+  repositoryModelOverrides: z
+    .array(RepositoryModelOverrideInputSchema)
+    .max(MAX_REPOSITORY_MODEL_OVERRIDES)
+    .superRefine(rejectDuplicateRepositoryModelOverrides)
+    .optional(),
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   // GitLab-specific: auto-configure webhooks
@@ -166,6 +212,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           repositorySelectionMode: 'all' as const,
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
+          repositoryModelOverrides: [],
           disableReviewMd: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -186,6 +233,17 @@ export const personalReviewAgentRouter = createTRPCRouter({
           (repositoryId): repositoryId is number => typeof repositoryId === 'number'
         ),
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
+        repositoryModelOverrides: (cfg.repository_model_overrides ?? [])
+          .filter(
+            (override): override is typeof override & { repository_id: number } =>
+              typeof override.repository_id === 'number'
+          )
+          .map(override => ({
+            repositoryId: override.repository_id,
+            repoFullName: override.repo_full_name,
+            modelSlug: override.model_slug,
+            thinkingEffort: override.thinking_effort ?? null,
+          })),
         disableReviewMd: cfg.disable_review_md ?? true,
         reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
@@ -209,6 +267,18 @@ export const personalReviewAgentRouter = createTRPCRouter({
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
           [];
 
+        // Per-repository model overrides are independent of the trigger selection —
+        // they apply in both 'all' and 'selected' modes. IDs are numeric for personal
+        // (GitHub/GitLab) integrations, enforced by the input schema.
+        const repositoryModelOverrides: RepositoryModelOverride[] = (
+          input.repositoryModelOverrides ?? []
+        ).map(override => ({
+          repository_id: override.repositoryId,
+          repo_full_name: override.repoFullName,
+          model_slug: override.modelSlug,
+          thinking_effort: override.thinkingEffort ?? null,
+        }));
+
         // Save the agent config
         await upsertAgentConfigForOwner({
           owner,
@@ -224,6 +294,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
             repository_selection_mode: input.repositorySelectionMode || 'all',
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
+            repository_model_overrides: repositoryModelOverrides,
             disable_review_md: input.disableReviewMd ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
@@ -251,7 +322,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
             if (webhookSecret) {
               try {
                 // Get a valid access token (handles refresh if expired)
-                const accessToken = await getValidGitLabToken(integration);
+                const accessToken = await getValidGitLabToken(integration, {
+                  userId: ctx.user.id,
+                });
 
                 const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
                   (repositoryId): repositoryId is number => typeof repositoryId === 'number'

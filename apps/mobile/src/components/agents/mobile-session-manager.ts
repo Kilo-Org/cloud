@@ -17,6 +17,7 @@ import {
   formatSafeCloudAgentFailureDiagnostic,
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
+import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { trpcClient } from '@/lib/trpc';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
@@ -70,29 +71,21 @@ export function createMobileAgentSessionManager({
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
-      try {
-        const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
-        if (session.cloud_agent_session_id) {
-          return {
-            type: 'cloud-agent',
-            kiloSessionId,
-            cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
-          };
-        }
-        let isRemote = false;
-        try {
-          const active = await trpcClient.activeSessions.list.query();
-          isRemote = active.sessions.some(s => s.id === kiloSessionId);
-        } catch {
-          // not remote
-        }
-        if (isRemote) {
-          return { type: 'remote', kiloSessionId };
-        }
-        return { type: 'read-only', kiloSessionId };
-      } catch {
-        return { type: 'read-only', kiloSessionId };
+      // Read-only is only ever returned once we have successful evidence the
+      // session isn't cloud-agent or remote. A failed query here must
+      // propagate so it lands in the retryable error state instead of being
+      // silently misclassified as read-only.
+      const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+      if (session.cloud_agent_session_id) {
+        return {
+          type: 'cloud-agent',
+          kiloSessionId,
+          cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
+        };
       }
+      const active = await trpcClient.activeSessions.list.query();
+      const isRemote = active.sessions.some(s => s.id === kiloSessionId);
+      return { type: isRemote ? 'remote' : 'read-only', kiloSessionId };
     },
     getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
       const ticket = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
@@ -138,6 +131,7 @@ export function createMobileAgentSessionManager({
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
     },
+    fetchSnapshotPage: fetchMobileSessionSnapshotPage,
     api: {
       send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {

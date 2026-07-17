@@ -5,9 +5,7 @@ import * as z from 'zod';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
-import { filterByFeature } from '@/lib/ai-gateway/models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
@@ -44,7 +42,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
   const auth = await tryGetUserFromAuth();
   try {
     const models = await getEnhancedOpenRouterModels();
@@ -55,10 +52,9 @@ export async function POST(request: NextRequest) {
       auth?.user ? getDirectByokModelsForUser(auth.user.id) : [],
       listAvailableExperimentModels(),
     ]);
-    const available = filterByFeature(
-      models.data.concat(byokModels, experimentModels),
-      feature
-    ).some(model => model.id === bodyResult.data.modelId);
+    const available = models.data
+      .concat(byokModels, experimentModels)
+      .some(model => model.id === bodyResult.data.modelId);
     return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
   } catch (error) {
     captureException(error, {

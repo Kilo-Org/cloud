@@ -301,6 +301,89 @@ describe('tryDispatchPendingReviews', () => {
     );
   });
 
+  it('applies a per-repository model override to the dispatched config', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-agent-config',
+      config: {
+        model_slug: 'anthropic/claude-sonnet-4.6',
+        thinking_effort: null,
+        repository_model_overrides: [
+          {
+            repository_id: 123,
+            repo_full_name: REPO,
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+      },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({ owner, status: 'pending', createdAt: timestamp, updatedAt: timestamp })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({ type: 'user', id: testUser.id, userId: testUser.id });
+
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewId: review.id,
+        agentConfig: expect.objectContaining({
+          config: expect.objectContaining({
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          }),
+        }),
+      })
+    );
+  });
+
+  it('uses the global model when no repository override matches', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-agent-config',
+      config: {
+        model_slug: 'anthropic/claude-sonnet-4.6',
+        thinking_effort: null,
+        repository_model_overrides: [
+          {
+            repository_id: 999,
+            repo_full_name: 'some-other-org/some-other-repo',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+      },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({ owner, status: 'pending', createdAt: timestamp, updatedAt: timestamp })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({ type: 'user', id: testUser.id, userId: testUser.id });
+
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewId: review.id,
+        agentConfig: expect.objectContaining({
+          config: expect.objectContaining({ model_slug: 'anthropic/claude-sonnet-4.6' }),
+        }),
+      })
+    );
+  });
+
   it('keeps organization concurrency at 20 reviews', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;

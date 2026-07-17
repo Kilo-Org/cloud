@@ -38,6 +38,7 @@ import {
   auto_top_up_configs,
   platform_integrations,
   platform_oauth_credentials,
+  platform_access_token_credentials,
   byok_api_keys,
   agent_configs,
   webhook_events,
@@ -308,6 +309,19 @@ export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
 export async function findUserByEmail(email: string): Promise<User | undefined> {
   return await db.query.kilocode_users.findFirst({
     where: eq(kilocode_users.google_user_email, email),
+  });
+}
+
+export async function findUserByNormalizedEmail(email: string): Promise<User | undefined> {
+  const normalizedEmail = normalizeEmail(email);
+  return await db.query.kilocode_users.findFirst({
+    where: or(
+      eq(kilocode_users.normalized_email, normalizedEmail),
+      and(
+        isNull(kilocode_users.normalized_email),
+        sql`lower(${kilocode_users.google_user_email}) = lower(${email.trim()})`
+      )
+    ),
   });
 }
 
@@ -850,6 +864,8 @@ export class SoftDeletePreconditionError extends Error {
  * - Recommendation dismissal actor references (nulled)
  * - platform_oauth_credentials (encrypted OAuth tokens and provider identity;
  *   authorizations created by the user are removed, including organization grants)
+ * - Organization GitLab PAT credentials authorized by the user (parent integration suspended;
+ *   project access-token credentials preserved)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -973,6 +989,8 @@ export async function softDeleteUser(userId: string) {
         completed_welcome_form: false,
         cohorts: {},
         is_admin: false,
+        is_super_admin: false,
+        can_view_sessions: false,
         can_manage_credits: false,
         customer_source: null,
         signup_ip: null,
@@ -1092,6 +1110,47 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(platform_oauth_credentials)
       .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+
+    const authorizedGitLabPatIntegrationIds = tx
+      .select({ id: platform_access_token_credentials.platform_integration_id })
+      .from(platform_access_token_credentials)
+      .innerJoin(
+        platform_integrations,
+        eq(platform_integrations.id, platform_access_token_credentials.platform_integration_id)
+      )
+      .where(
+        and(
+          eq(platform_integrations.platform, 'gitlab'),
+          eq(platform_access_token_credentials.provider_credential_type, 'personal_access_token'),
+          eq(platform_access_token_credentials.authorized_by_user_id, userId),
+          isNull(platform_access_token_credentials.provider_resource_id)
+        )
+      );
+    await tx
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .where(inArray(platform_integrations.id, authorizedGitLabPatIntegrationIds));
+    await tx
+      .delete(platform_access_token_credentials)
+      .where(
+        and(
+          inArray(
+            platform_access_token_credentials.platform_integration_id,
+            tx
+              .select({ id: platform_integrations.id })
+              .from(platform_integrations)
+              .where(eq(platform_integrations.platform, 'gitlab'))
+          ),
+          eq(platform_access_token_credentials.provider_credential_type, 'personal_access_token'),
+          eq(platform_access_token_credentials.authorized_by_user_id, userId),
+          isNull(platform_access_token_credentials.provider_resource_id)
+        )
+      );
+
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));

@@ -1,15 +1,21 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Settings2 } from 'lucide-react-native';
+import { AlertTriangle, ExternalLink, Settings2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { isTransitionalStatus, statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
 import { useKiloClawStatus, useKiloClawStatusQueryKey } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
+
+export type KiloClawCardAccessIssue = {
+  label: string;
+  onOpen: () => void;
+};
 
 type KiloClawCardProps = {
   instance: {
@@ -24,6 +30,8 @@ type KiloClawCardProps = {
   unreadCount?: number;
   onPress?: (sandboxId: string) => void;
   onSettingsPress?: (sandboxId: string) => void;
+  /** Account-wide billing/access issue affecting this instance (personal instances only). */
+  accessIssue?: KiloClawCardAccessIssue | null;
 };
 
 type CachedStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>;
@@ -37,11 +45,26 @@ function firstLetter(name: string): string {
   return trimmed.length > 0 ? (trimmed[0]?.toUpperCase() ?? 'K') : 'K';
 }
 
+function resolveAccessibilityLabel(
+  displayName: string,
+  unreadCount: number,
+  accessIssue: KiloClawCardAccessIssue | null | undefined
+): string {
+  if (accessIssue) {
+    return `${displayName} needs attention: ${accessIssue.label}`;
+  }
+  if (unreadCount > 0) {
+    return `Open ${displayName}, ${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}`;
+  }
+  return `Open ${displayName}`;
+}
+
 export function KiloClawCard({
   instance,
   unreadCount = 0,
   onPress,
   onSettingsPress,
+  accessIssue,
 }: Readonly<KiloClawCardProps>) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -67,14 +90,12 @@ export function KiloClawCard({
   const rawStatus = status?.status ?? instance.status ?? 'offline';
   const tone = statusTone(rawStatus);
   const label = statusLabel(rawStatus);
-  const tapDisabled = isTransitionalStatus(rawStatus);
+  const tapDisabled = isTransitionalStatus(rawStatus) || Boolean(accessIssue);
 
   const hue = agentColor(displayName);
 
   const hasUnread = unreadCount > 0;
-  const accessibilityLabel = hasUnread
-    ? `Open ${displayName}, ${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}`
-    : `Open ${displayName}`;
+  const accessibilityLabel = resolveAccessibilityLabel(displayName, unreadCount, accessIssue);
 
   const handlePress = () => {
     if (onPress) {
@@ -88,13 +109,20 @@ export function KiloClawCard({
     onSettingsPress?.(instance.sandboxId);
   };
 
+  const handleAccessIssuePress = () => {
+    accessIssue?.onOpen();
+  };
+
   return (
-    <View className="relative mx-4 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-5">
+    <View
+      className={`relative mx-4 overflow-hidden rounded-2xl border border-border bg-card p-4 pl-5 ${tapDisabled ? 'opacity-60' : ''}`}
+    >
       <View className={`absolute bottom-0 left-0 top-0 w-[3px] ${hue.hueClass}`} />
       <View className="flex-row items-center gap-3">
         <Pressable
           onPress={handlePress}
           disabled={tapDisabled}
+          accessibilityState={{ disabled: tapDisabled }}
           className="min-w-0 flex-1 flex-row items-center gap-3 active:opacity-80"
           accessibilityLabel={accessibilityLabel}
         >
@@ -102,7 +130,7 @@ export function KiloClawCard({
             className={`h-[38px] w-[38px] items-center justify-center rounded-[10px] border ${hue.tileBgClass} ${hue.tileBorderClass}`}
           >
             {botEmoji ? (
-              <Text className="text-lg">{botEmoji}</Text>
+              <BotAvatar emoji={botEmoji} size={18} color={colors.foreground} />
             ) : (
               <Text className={`text-[15px] font-bold ${hue.hueTextClass}`}>
                 {firstLetter(displayName)}
@@ -113,20 +141,20 @@ export function KiloClawCard({
             <View className="flex-row items-center justify-between gap-2">
               <Text
                 className="shrink text-[17px] font-semibold tracking-tight text-foreground"
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {displayName}
               </Text>
             </View>
             <View className="mt-1 flex-row items-center gap-1.5">
-              <StatusDot tone={tone} glow />
-              <Text className="text-[12px] font-medium text-muted-foreground">{label}</Text>
+              <StatusDot tone={tone} />
+              <Text className="shrink text-[12px] font-medium text-muted-foreground">{label}</Text>
             </View>
           </View>
         </Pressable>
         {hasUnread ? (
-          <View className="min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5">
-            <Text className="text-xs font-semibold leading-none text-white">
+          <View className="min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5">
+            <Text className="text-xs font-semibold leading-none text-destructive-foreground">
               {formatUnreadCount(unreadCount)}
             </Text>
           </View>
@@ -143,6 +171,20 @@ export function KiloClawCard({
           </Pressable>
         ) : null}
       </View>
+      {accessIssue ? (
+        <Pressable
+          onPress={handleAccessIssuePress}
+          accessibilityRole="button"
+          accessibilityLabel={`Fix on kilo.ai: ${accessIssue.label}`}
+          className="mt-3 flex-row items-center gap-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2 active:opacity-70"
+        >
+          <AlertTriangle size={14} color={colors.warn} />
+          <Text className="flex-1 text-xs font-medium text-warn" numberOfLines={2}>
+            {accessIssue.label}
+          </Text>
+          <ExternalLink size={14} color={colors.warn} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

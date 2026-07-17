@@ -1,11 +1,16 @@
 import { describe, expect, test } from '@jest/globals';
 
 import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
-import { KiloPassTier, KiloPassWelcomePromoEligibilityReason } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassPaymentProvider,
+  KiloPassTier,
+  KiloPassWelcomePromoEligibilityReason,
+} from '@/lib/kilo-pass/enums';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
   computeUsageTriggeredYearlyIssueMonth,
 } from '@/lib/kilo-pass/usage-triggered-bonus';
+import { getKiloPassWelcomePromoPolicy } from '@/lib/kilo-pass/welcome-promo-context';
 
 describe('usage-triggered-bonus (unit)', () => {
   describe('computeUsageTriggeredMonthlyBonusDecision', () => {
@@ -15,6 +20,7 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: null,
         currentStreakMonths: 0,
         isFirstTimeSubscriberEver: false,
+        welcomePromoPolicy: 'account-history-only',
         issueMonth: '2026-01-01',
       });
 
@@ -34,6 +40,7 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: '2026-01-01T00:00:00.000Z',
         currentStreakMonths: 1,
         isFirstTimeSubscriberEver: true,
+        welcomePromoPolicy: 'account-history-only',
         issueMonth: '2026-01-01',
       });
 
@@ -59,7 +66,7 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: '2026-05-20T00:00:00.000Z',
         currentStreakMonths: 1,
         isFirstTimeSubscriberEver: true,
-        requiresSettledPaymentDecision: true,
+        welcomePromoPolicy: 'settled-payment-required',
         welcomePromoEligibilityReason:
           KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
         issueMonth: '2026-05-01',
@@ -82,7 +89,7 @@ describe('usage-triggered-bonus (unit)', () => {
           startedAtIso: '2026-05-20T00:00:00.000Z',
           currentStreakMonths: 1,
           isFirstTimeSubscriberEver: true,
-          requiresSettledPaymentDecision: true,
+          welcomePromoPolicy: 'settled-payment-required',
           welcomePromoEligibilityReason,
           issueMonth: '2026-05-01',
         });
@@ -104,7 +111,7 @@ describe('usage-triggered-bonus (unit)', () => {
           startedAtIso: '2026-05-20T00:00:00.000Z',
           currentStreakMonths: 1,
           isFirstTimeSubscriberEver: true,
-          requiresSettledPaymentDecision: true,
+          welcomePromoPolicy: 'settled-payment-required',
           welcomePromoEligibilityReason,
           issueMonth: '2026-05-01',
         });
@@ -120,6 +127,7 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: '2026-01-01T00:00:00.000Z',
         currentStreakMonths: 2,
         isFirstTimeSubscriberEver: true,
+        welcomePromoPolicy: 'account-history-only',
         issueMonth: '2026-02-01',
       });
 
@@ -135,6 +143,7 @@ describe('usage-triggered-bonus (unit)', () => {
         startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
         currentStreakMonths: 2,
         isFirstTimeSubscriberEver: true,
+        welcomePromoPolicy: 'account-history-only',
         issueMonth: '2026-06-01',
       });
 
@@ -142,6 +151,32 @@ describe('usage-triggered-bonus (unit)', () => {
       expect(d.bonusPercentApplied).toBe(0.1);
       expect(d.description).toBe('Kilo Pass monthly bonus (tier_49, streak=2)');
       expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'monthly-ramp' }));
+    });
+  });
+
+  describe('getKiloPassWelcomePromoPolicy', () => {
+    test.each([
+      ['2026-05-28T12:06:19.999Z', 'account-history-only'],
+      ['2026-05-28T12:06:20.000Z', 'settled-payment-required'],
+      ['2026-05-28T12:06:20.001Z', 'settled-payment-required'],
+      [null, 'settled-payment-required'],
+      ['not-a-timestamp', 'settled-payment-required'],
+    ] as const)('classifies Stripe issuance created at %s as %s', (createdAt, expectedPolicy) => {
+      expect(
+        getKiloPassWelcomePromoPolicy({
+          paymentProvider: KiloPassPaymentProvider.Stripe,
+          initialIssuanceCreatedAt: createdAt,
+        })
+      ).toBe(expectedPolicy);
+    });
+
+    test('keeps App Store eligibility on account history when issuance context is missing', () => {
+      expect(
+        getKiloPassWelcomePromoPolicy({
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          initialIssuanceCreatedAt: null,
+        })
+      ).toBe('account-history-only');
     });
   });
 

@@ -25,11 +25,7 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import {
-  isDeadFreeModel,
-  isExcludedForFeature,
-  isKiloExclusiveFreeModel,
-} from '@/lib/ai-gateway/models';
+import { isDeadFreeModel, isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -40,7 +36,6 @@ import {
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
-  featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
   malformedJsonResponse,
@@ -56,6 +51,7 @@ import {
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
+  checkExclusiveModelProviderAllowed,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -343,13 +339,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   let effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
-  // Reject early (before rate limiting) if the model is exclusive to other features.
-  if (isExcludedForFeature(effectiveModelIdLowerCased, feature)) {
-    console.warn(
-      `Model ${effectiveModelIdLowerCased} is not available for feature ${feature}; rejecting.`
-    );
-    return featureExclusiveModelResponse(effectiveModelIdLowerCased);
-  }
   if (!ipAddress) {
     return NextResponse.json(
       {
@@ -591,21 +580,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Request-level data-collection opt-out: a caller can set
-  // `provider.data_collection: 'deny'` or `provider.zdr: true` on any
-  // request to opt that single request out of training/data-retention.
-  // Direct experiment upstreams ignore those OpenRouter/Vercel flags
-  // (we never reach OpenRouter), but we still capture the prompt to R2
-  // for partner evaluation — which violates the caller's stated
-  // intent. Refuse here regardless of org settings, anon/BYOK status,
-  // or the org-level check below.
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
-    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
-  ) {
-    return dataCollectionRequiredResponse();
-  }
-
   if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
@@ -830,6 +804,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
+  if (
+    (await hasBestEffortGuessDataCollectionRequirement(effectiveModelIdLowerCased)) &&
+    isDataCollectionExplicitlyDisallowed(requestBodyParsed.body.provider)
+  ) {
+    return dataCollectionRequiredResponse();
+  }
+
+  const providerNotAllowedError = checkExclusiveModelProviderAllowed(
+    effectiveModelIdLowerCased,
+    requestBodyParsed.body.provider
+  );
+  if (providerNotAllowedError) return providerNotAllowedError;
+
   if (effectiveProviderContext.experiment) {
     usageContext.modelExperimentVariantVersionId =
       effectiveProviderContext.experiment.variantVersionId;
@@ -965,6 +952,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider: effectiveProviderContext.provider.id,
     model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
+    vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
     request: requestBodyParsed,
   });
 

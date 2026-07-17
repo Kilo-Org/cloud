@@ -1,14 +1,16 @@
 import * as Haptics from 'expo-haptics';
-import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
@@ -18,11 +20,17 @@ import {
 } from '@/lib/kilo-pass/subscription-page-copy';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
-import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import {
+  useInlinePurchaseErrorOwnership,
+  useStoreKiloPassPurchase,
+} from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { cn } from '@/lib/utils';
 import { RestorePurchasesButton } from './restore-purchases-button';
 
+type SubscriptionScreenFeedback = { type: 'success' | 'info' | 'error'; text: string };
+
 function formatTier(product: AppStoreKiloPassProduct): string {
-  return `$${product.webMonthlyPriceUsd} credits`;
+  return `$${product.webMonthlyPriceUsd} in credits`;
 }
 
 function formatStorePrice(product: AppStoreKiloPassProduct): string {
@@ -35,8 +43,20 @@ export function KiloPassSubscriptionScreen() {
   const router = useRouter();
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
+  useInlinePurchaseErrorOwnership();
+  const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
+  const feedback: SubscriptionScreenFeedback | null = purchase.errorMessage
+    ? { type: 'error', text: purchase.errorMessage }
+    : restoreFeedback;
   const isRetryDisabled = purchase.isPending || productsQuery.isRefetching;
   const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
+  const { clearError } = purchase;
+  useEffect(
+    () => () => {
+      clearError();
+    },
+    [clearError]
+  );
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
     void purchase.purchase(product, {
@@ -50,14 +70,26 @@ export function KiloPassSubscriptionScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Kilo Pass" modal />
       <View className="flex-1 px-5">
-        <ScrollView
+        <DetailScreenScrollView
           className="-mx-1 flex-1"
-          contentContainerClassName="gap-3 px-1 pb-6"
+          contentContainerClassName="gap-3 px-1"
           showsVerticalScrollIndicator={false}
         >
           <Text className="px-1 text-sm leading-5 text-muted-foreground">
             {KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION}
           </Text>
+
+          {feedback && (
+            <Text
+              className={cn('px-1 text-sm', {
+                'text-destructive': feedback.type === 'error',
+                'text-good': feedback.type === 'success',
+                'text-muted-foreground': feedback.type === 'info',
+              })}
+            >
+              {feedback.text}
+            </Text>
+          )}
 
           {productsQuery.isLoading &&
             [0, 1, 2].map(index => (
@@ -96,7 +128,10 @@ export function KiloPassSubscriptionScreen() {
                 accessibilityLabel={`${formatTier(product)}, ${formatStorePrice(product)}`}
                 accessibilityRole="button"
                 accessibilityState={{ busy: purchase.isPending, disabled: purchase.isPending }}
-                className="rounded-xl border border-border bg-card p-5 active:opacity-80"
+                className={cn(
+                  'rounded-xl border border-border bg-card p-5 active:opacity-80',
+                  purchase.isPending && 'opacity-50'
+                )}
                 disabled={purchase.isPending}
                 onPress={() => {
                   handleProductPress(product);
@@ -116,16 +151,26 @@ export function KiloPassSubscriptionScreen() {
               </Pressable>
             ))}
 
-          <RestorePurchasesButton />
+          <RestorePurchasesButton
+            onResult={result => {
+              if (result === 'restored') {
+                setRestoreFeedback({ type: 'success', text: 'Subscription restored.' });
+              } else if (result === 'empty') {
+                setRestoreFeedback({ type: 'info', text: 'No purchases to restore.' });
+              } else {
+                setRestoreFeedback(null);
+              }
+            }}
+          />
 
           <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
             {KILO_PASS_LEGAL_DISCLOSURE}
             {' By subscribing, you agree to the '}
             <Text
               accessibilityRole="link"
-              className="text-xs text-primary underline"
+              className="text-xs text-primary underline active:opacity-70"
               onPress={() => {
-                void WebBrowser.openBrowserAsync(termsOfUseLink.url);
+                void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
               }}
             >
               {termsOfUseLink.label}
@@ -133,16 +178,16 @@ export function KiloPassSubscriptionScreen() {
             {' and acknowledge the '}
             <Text
               accessibilityRole="link"
-              className="text-xs text-primary underline"
+              className="text-xs text-primary underline active:opacity-70"
               onPress={() => {
-                void WebBrowser.openBrowserAsync(privacyPolicyLink.url);
+                void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
               }}
             >
               {privacyPolicyLink.label}
             </Text>
             .
           </Text>
-        </ScrollView>
+        </DetailScreenScrollView>
 
         {purchase.isPending && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>

@@ -25,7 +25,7 @@ import { toast } from 'sonner-native';
 
 import { executeActionWithMobileFeedback } from '../execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from '../message-actions';
-import { canCopyMessage, canToggleReaction } from '../message-presentation';
+import { canCopyMessage, canRetryFailedMessage, canToggleReaction } from '../message-presentation';
 
 type Params = {
   client: KiloChatClient;
@@ -33,6 +33,7 @@ type Params = {
   currentUserId: string | null;
   onEditMessage: (message: Message) => void;
   onReplyToMessage: (message: Message) => void;
+  onRetrySend: (message: Message) => void;
 };
 
 export function useConversationMessageActions({
@@ -41,6 +42,7 @@ export function useConversationMessageActions({
   currentUserId,
   onEditMessage,
   onReplyToMessage,
+  onRetrySend,
 }: Params) {
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
@@ -126,6 +128,7 @@ export function useConversationMessageActions({
         canCopy: canCopyMessage(message),
         canEdit: actionAvailability.canEdit,
         canDelete: actionAvailability.canDelete,
+        canRetry: isOwnMessage && canRetryFailedMessage(message),
         isPendingMessage,
       });
       showActionSheetWithOptions(
@@ -142,6 +145,10 @@ export function useConversationMessageActions({
             return;
           }
 
+          if (selectedAction.kind === 'retry') {
+            onRetrySend(message);
+            return;
+          }
           if (selectedAction.kind === 'reaction') {
             handleReactionPress(message, selectedAction.emoji);
             return;
@@ -192,6 +199,7 @@ export function useConversationMessageActions({
       handleReactionPress,
       onEditMessage,
       onReplyToMessage,
+      onRetrySend,
       showActionSheetWithOptions,
     ]
   );

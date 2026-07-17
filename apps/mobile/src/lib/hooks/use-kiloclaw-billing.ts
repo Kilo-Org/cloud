@@ -1,4 +1,4 @@
-import { parseTimestamp } from '@/lib/utils';
+import { formatDate, parseTimestamp } from '@/lib/utils';
 
 import { type useKiloClawBillingStatus } from './use-kiloclaw-queries';
 
@@ -80,11 +80,7 @@ export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
 }
 
 export function formatBillingDate(iso: string): string {
-  return parseTimestamp(iso).toLocaleDateString(undefined, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDate(parseTimestamp(iso));
 }
 
 export function formatRemainingDays(daysRemaining: number): string {

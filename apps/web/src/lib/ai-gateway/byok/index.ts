@@ -12,18 +12,18 @@ import {
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
-import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const vercelModelMetadata = await getVercelModelsMetadata();
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];
   }
   const providers: UserByokProviderId[] =
-    vercelModelMetadata[mapModelIdToVercel(modelId, false)]?.endpoints
+    vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
       .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.provider_name ?? ep.tag).data)
       .filter(providerId => providerId !== undefined) ?? [];
   if (providers.length === 0) {

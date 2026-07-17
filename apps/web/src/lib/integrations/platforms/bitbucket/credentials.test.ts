@@ -91,7 +91,6 @@ async function insertExistingBitbucketIntegration(kiloUserId: string) {
     .insert(platform_oauth_credentials)
     .values({
       platform_integration_id: integration.id,
-      platform: 'bitbucket',
       authorized_by_user_id: kiloUserId,
       provider_subject_id: 'bitbucket-user-old',
       provider_subject_login: 'bucket-old',
@@ -172,7 +171,6 @@ describe('Bitbucket OAuth credential storage', () => {
     );
     expect(credential).toEqual(
       expect.objectContaining({
-        platform: 'bitbucket',
         authorized_by_user_id: user.id,
         provider_subject_id: 'bitbucket-user-uuid',
         provider_subject_login: 'octobucket',

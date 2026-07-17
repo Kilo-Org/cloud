@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from 'drizzle-orm';
+import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
@@ -17,6 +17,13 @@ import {
   extractNormalizedTitleFromItem,
   extractStatusFromItem,
 } from './session-ingest-extractors';
+import {
+  buildAssistantExcerpt,
+  completedAssistantMessageIdFromItemData,
+  isCompletedStatus,
+  isNeedsInputStatus,
+  type AttentionSignal,
+} from './session-ingest-attention';
 import {
   computeSessionMetrics,
   INACTIVITY_TIMEOUT_MS,
@@ -72,6 +79,13 @@ function writeIngestMetaIfChanged(
   return { changed: true, value: params.incomingValue };
 }
 
+function hasIngestMeta(db: DrizzleSqliteDODatabase, key: IngestMetaKey): boolean {
+  return (
+    db.select({ value: ingestMeta.value }).from(ingestMeta).where(eq(ingestMeta.key, key)).get() !==
+    undefined
+  );
+}
+
 const INGEST_META_EXTRACTORS: Array<{
   key: ExtractableMetaKey;
   extract: (item: IngestBatch[number]) => string | null | undefined;
@@ -86,6 +100,12 @@ const INGEST_META_EXTRACTORS: Array<{
 ];
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
+
+export type IngestResult =
+  | { accepted: true; changes: Changes; attentionSignals: AttentionSignal[] }
+  | { accepted: false; reason: 'deleted'; changes: never[] };
+/** How many of the newest message rows to inspect when pairing an idle transition with the assistant turn that just finished. */
+const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
 
 type IngestLifecycleEvent =
   | { type: 'session_open' }
@@ -136,9 +156,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     ingestVersion = 0,
     ingestedAt?: number,
     r2References?: Record<string, string>
-  ): Promise<{
-    changes: Changes;
-  }> {
+  ): Promise<IngestResult> {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
       .from(ingestMeta)
@@ -152,7 +170,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           await this.env.SESSION_INGEST_R2.delete(keys);
         }
       }
-      return { changes: [] };
+      return { accepted: false, reason: 'deleted', changes: [] };
     }
 
     writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: kiloUserId });
@@ -271,6 +289,11 @@ export class SessionIngestDO extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(Date.now() + INACTIVITY_TIMEOUT_MS);
     }
 
+    // Read before the write loop below persists incoming values: whether this session had ever
+    // reported a status. The first-ever status write also registers as a change, and a
+    // full-history backfill of an already-idle session must not push about an old turn.
+    const hadPriorStatus = hasIngestMeta(this.db, 'status');
+
     const changes: Changes = [];
     for (const key of Object.keys(incomingByKey) as ExtractableMetaKey[]) {
       const incoming = incomingByKey[key];
@@ -300,8 +323,34 @@ export class SessionIngestDO extends DurableObject<Env> {
       );
     }
 
+    const attentionSignals: AttentionSignal[] = [];
+
+    const statusChange = changes.find(change => change.name === 'status');
+    if (statusChange && isCompletedStatus(statusChange.value) && hadPriorStatus) {
+      // An idle transition means the assistant finished its turn. Pair it with the most recent
+      // completed assistant message so the signal carries that turn's excerpt; if none exists yet
+      // (e.g. a fresh session reporting idle before any turn), emit nothing rather than a spurious
+      // "Task completed" push.
+      const completedMessageId = this.findLastCompletedAssistantMessageId();
+      if (completedMessageId) {
+        attentionSignals.push({
+          signalId: completedMessageId,
+          kind: 'completed',
+          messageExcerpt: this.buildAssistantExcerptForMessage(completedMessageId),
+        });
+      }
+    } else if (statusChange && isNeedsInputStatus(statusChange.value)) {
+      attentionSignals.push({
+        signalId: `status:${statusChange.value}:${ingestedAt ?? Date.now()}`,
+        kind: 'needs_input',
+        messageExcerpt: '',
+      });
+    }
+
     return {
+      accepted: true,
       changes,
+      attentionSignals,
     };
   }
 
@@ -338,6 +387,55 @@ export class SessionIngestDO extends DurableObject<Env> {
         });
       })
     );
+  }
+
+  /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
+  private buildAssistantExcerptForMessage(messageId: string): string {
+    const range = getPartItemIdentityRange(messageId);
+    const rows = this.db
+      .select({
+        item_data: ingestItems.item_data,
+      })
+      .from(ingestItems)
+      .where(
+        and(
+          eq(ingestItems.item_type, 'part'),
+          gte(ingestItems.item_id, range.start),
+          lt(ingestItems.item_id, range.end),
+          isNull(ingestItems.item_data_r2_key)
+        )
+      )
+      .orderBy(ingestItems.ingested_at, ingestItems.id)
+      .all();
+
+    // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
+    // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
+    return buildAssistantExcerpt(rows.map(row => row.item_data));
+  }
+
+  /**
+   * Finds the most recent completed assistant message id, scanning messages newest-first. Used to
+   * pair an idle transition with the assistant turn that just finished so the `completed` attention
+   * signal carries that turn's excerpt. R2-offloaded message rows (inline '{}') are skipped.
+   *
+   * The scan is bounded: the turn that just finished is effectively always among the newest
+   * messages, and an unbounded scan would load every message row on every turn end.
+   */
+  private findLastCompletedAssistantMessageId(): string | null {
+    const rows = this.db
+      .select({
+        item_data: ingestItems.item_data,
+      })
+      .from(ingestItems)
+      .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
+      .orderBy(desc(ingestItems.ingested_at), desc(ingestItems.id))
+      .limit(COMPLETED_MESSAGE_SCAN_LIMIT)
+      .all();
+    for (const row of rows) {
+      const messageId = completedAssistantMessageIdFromItemData(row.item_data);
+      if (messageId) return messageId;
+    }
+    return null;
   }
 
   async readKiloSdkSessionSnapshot(): Promise<KiloSdkSessionSnapshotRead> {

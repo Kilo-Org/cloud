@@ -7,7 +7,13 @@
 
 import * as z from 'zod';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
-import { CODE_REVIEW_PLATFORMS, ManualCodeReviewConfigSchema } from '@kilocode/db/schema-types';
+import {
+  CODE_REVIEW_PLATFORMS,
+  ManualCodeReviewConfigSchema,
+  CodeReviewTypeSchema,
+  CodeReviewTriggerSourceSchema,
+} from '@kilocode/db/schema-types';
+import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
 // ============================================================================
@@ -17,15 +23,7 @@ import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 /**
  * Code review status enum
  */
-export const CodeReviewStatusSchema = z.enum([
-  'pending',
-  'queued',
-  'running',
-  'completed',
-  'failed',
-  'cancelled',
-  'interrupted',
-]);
+export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
 
 /**
  * Owner schema - discriminated union
@@ -128,6 +126,10 @@ export const CreateReviewParamsSchema = z.object({
   platform: CodeReviewPlatformSchema.default('github'),
   platformProjectId: z.number().int().positive().optional(),
   manualConfig: ManualCodeReviewConfigSchema.nullable().optional(),
+  // Review type for this run; unset defaults to standard at the insert boundary.
+  reviewType: CodeReviewTypeSchema.optional(),
+  // Origin of the run (manual vs webhook); optional for legacy/unknown callers.
+  triggerSource: CodeReviewTriggerSourceSchema.optional(),
 });
 
 /**
@@ -237,8 +239,12 @@ export type TriggerReviewParams = z.infer<typeof TriggerReviewParamsSchema>;
 /**
  * Response type for list code reviews
  */
+// List rows exclude the potentially large `council_result` JSONB — the jobs list is
+// polled frequently and never renders council results (only the review-detail path does).
+export type CodeReviewListItem = Omit<CloudAgentCodeReview, 'council_result'>;
+
 export type ListCodeReviewsResponse = {
-  reviews: CloudAgentCodeReview[];
+  reviews: CodeReviewListItem[];
   total: number;
   hasMore: boolean;
 };

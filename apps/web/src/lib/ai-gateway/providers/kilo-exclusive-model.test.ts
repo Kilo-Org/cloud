@@ -26,7 +26,6 @@ function makeModel(
     flags: [],
     gateway: 'openrouter',
     pricing: null,
-    exclusive_to: [],
     inference_provider_restriction: [],
     ...overrides,
   };
@@ -142,6 +141,19 @@ describe('applyKiloExclusiveModelSettings', () => {
       })
     );
     expect(req.body.provider).toEqual({ zdr: true, only: ['anthropic'] });
+  });
+
+  it('overwrites a malformed provider value', () => {
+    const req = makeRequest();
+    Object.assign(req.body, { provider: 'lmstudio' });
+    applyKiloExclusiveModelSettings(
+      req,
+      makeModel({
+        internal_id: 'vendor/x',
+        inference_provider_restriction: ['anthropic'] as OpenRouterInferenceProviderId[],
+      })
+    );
+    expect(req.body.provider).toEqual({ only: ['anthropic'] });
   });
 
   it('intersects caller-supplied only with the restriction', () => {

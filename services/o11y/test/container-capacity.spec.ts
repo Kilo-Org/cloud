@@ -29,6 +29,10 @@ describe('CONTAINER_CAPACITY_THRESHOLDS', () => {
   it('ticket threshold is 0.80', () => {
     expect(CONTAINER_CAPACITY_THRESHOLDS.ticket).toBe(0.8);
   });
+
+  it('ticketEarly threshold is 0.60', () => {
+    expect(CONTAINER_CAPACITY_THRESHOLDS.ticketEarly).toBe(0.6);
+  });
 });
 
 describe('evaluateCapacityThresholds', () => {
@@ -81,8 +85,24 @@ describe('evaluateCapacityThresholds', () => {
     expect(alerts[0].severity).toBe('page');
   });
 
-  it('returns no alert at 79% utilization (just below ticket threshold)', () => {
+  it('returns info alert at 79% utilization (crosses 60% early tier)', () => {
     const apps = [makeApp({ name: MONITORED, instances: 79, maxInstances: 100 })];
+    const alerts = evaluateCapacityThresholds(apps);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].severity).toBe('info');
+    expect(alerts[0].thresholdFraction).toBe(CONTAINER_CAPACITY_THRESHOLDS.ticketEarly);
+  });
+
+  it('returns info alert at exactly 60% utilization (early tier boundary inclusive)', () => {
+    const apps = [makeApp({ name: MONITORED, instances: 60, maxInstances: 100 })];
+    const alerts = evaluateCapacityThresholds(apps);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].severity).toBe('info');
+    expect(alerts[0].thresholdFraction).toBe(CONTAINER_CAPACITY_THRESHOLDS.ticketEarly);
+  });
+
+  it('returns no alert at 59% utilization (just below early tier)', () => {
+    const apps = [makeApp({ name: MONITORED, instances: 59, maxInstances: 100 })];
     expect(evaluateCapacityThresholds(apps)).toEqual([]);
   });
 

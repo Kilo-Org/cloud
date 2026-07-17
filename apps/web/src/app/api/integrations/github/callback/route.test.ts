@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { createAppAuth } from '@octokit/auth-app';
+import { Octokit } from '@octokit/rest';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
@@ -6,7 +8,10 @@ import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/ada
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { failureResult } from '@/lib/maybe-result';
-import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
+import {
+  findIntegrationByInstallationId,
+  upsertPlatformIntegrationForOwner,
+} from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import type { StateAdapter } from 'chat';
 
@@ -67,6 +72,9 @@ const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
+const mockedCreateAppAuth = jest.mocked(createAppAuth);
+const mockedOctokit = jest.mocked(Octokit);
+const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
@@ -204,5 +212,61 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     await GET(makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never);
 
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
+  });
+});
+
+describe('GET /api/integrations/github/callback installation flow', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: USER_ID,
+        google_user_email: 'mobile-e2e@example.com',
+        google_user_name: 'Mobile E2E',
+      },
+      authFailedResponse: null,
+    } as never);
+    mockedCreateAppAuth.mockReturnValue(
+      jest.fn(async () => ({ token: 'github-app-token' })) as never
+    );
+    mockedOctokit.mockImplementation(
+      () =>
+        ({
+          apps: {
+            getInstallation: jest.fn(async () => ({
+              data: {
+                account: { id: 12_345, login: 'securexg' },
+                created_at: '2026-07-09T19:00:00.000Z',
+                events: ['issues'],
+                permissions: { contents: 'write' },
+                repository_selection: 'all',
+              },
+            })),
+            listReposAccessibleToInstallation: jest.fn(),
+          },
+        }) as never
+    );
+  });
+
+  test('associates an existing installation after GitHub updates its configuration', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=update&state=user_${USER_ID}%7Creturn%3D%252Fgithub-app`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/github-app?github_install=success');
+    expect(mockedUpsertPlatformIntegrationForOwner).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
+      expect.objectContaining({
+        platform: 'github',
+        integrationType: 'app',
+        platformInstallationId: INSTALLATION_ID,
+        platformAccountLogin: 'securexg',
+      })
+    );
   });
 });

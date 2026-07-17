@@ -1,69 +1,80 @@
-# AGENTS.md
+# Repository Guide
 
-## Repo Structure
+## Repository Overview
 
-Monorepo for the Kilo Code cloud platform.
+Monorepo for Kilo Code cloud platform. Use pnpm; required version is in root
+`package.json`'s `packageManager` field. Before changing a subtree, check for a
+nearer `AGENTS.md` and follow its scoped invariants.
 
-```
-apps/web/         Next.js web application (Vercel)
-apps/mobile/      React Native mobile app
-services/         Cloudflare Worker services (kiloclaw, cloud-agent-next, etc.)
-packages/         Shared libraries (db, trpc, worker-utils, etc.)
-dev/              Local development tooling (tmux dashboard, env sync, docker-compose)
-scripts/          CI and one-off scripts
-```
-
-- **Package manager**: pnpm (version pinned in `package.json` `packageManager` field)
-- **Database schema**: `packages/db/src/schema.ts`
-- **Migrations**: `packages/db/src/migrations/`
-- **tRPC routers**: `apps/web/src/routers/`
-- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`). When a shared web env var needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`; agents must not run that command themselves because it prompts for secret values and writes to external systems.
-
-## Domain Context
-
-`CONTEXT.md` is the domain-language and ownership contract for the **Code Reviewer** and **Security Agent** domains only (review execution/analytics, Security Findings, Security Sync, notifications, remediation, and their email delivery — mainly `apps/web/src/lib/{code-reviews,security-agent}/`, `services/security-sync/`). It does not cover other areas of the monorepo.
-
-When working in those domains, read `CONTEXT.md` first and use its canonical terms in code, docs, task descriptions, tests, and agent outputs. Do not introduce synonyms for its concepts without updating `CONTEXT.md` first, and do not duplicate the full contract inside `AGENTS.md`.
-
-## Verification
-
-Verify your work with the narrowest relevant checks. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`.
-
-**Always run `pnpm format` before committing**
-
-| Command | What it checks |
+| Path | Description |
 |---|---|
-| `pnpm typecheck` | TypeScript type checking across all packages |
-| `pnpm lint` | Lint all source files |
-| `pnpm test` | Jest test suite |
-| `pnpm validate` | All three above in sequence |
-| `pnpm format` | Auto-format with oxfmt |
+| `apps/web/` | Next.js web application deployed to Vercel |
+| `apps/mobile/` | React Native mobile application |
+| `apps/extension/` | WXT browser extension |
+| `services/` | Cloudflare Worker and supporting services |
+| `packages/` | Shared libraries, including database, tRPC, and Worker utilities |
+| `dev/` | Local development tooling, Docker Compose, environment sync, and seed data |
+| `scripts/` | CI and one-off repository scripts |
+| `.specs/` | Domain business-rule specs |
+| `.agents/skills/` | Third-party skills managed with the `npx skills` command |
+| `.kilo/` | Repository-owned commands, agents, and skills |
 
-**Before running tests**, ensure the test database is running. If there is no active Postgres instance, run `pnpm test:db` first — this starts the Postgres container and applies migrations. You can check whether Postgres is already running with `docker compose -f dev/docker-compose.yml ps postgres`.
+## Common Locations
 
-## Timestamp Serialization
+| Need | Location |
+|---|---|
+| Root scripts and dependency entry point | `package.json` |
+| PostgreSQL schema | `packages/db/src/schema.ts` |
+| PostgreSQL migrations | `packages/db/src/migrations/` |
+| Shared PostgreSQL contracts and migration invariants | `packages/db/AGENTS.md` |
+| Durable Object SQLite conventions | `durable-objects` skill, `docs/do-sqlite-drizzle.md`, and owning service `AGENTS.md` |
+| Web tRPC routers | `apps/web/src/routers/` |
+| Local environment values | Root `.env.local` |
+| Environment variable catalog | `ENVIRONMENT.md` |
+| Local setup and service management | `DEVELOPMENT.md` and `dev/` |
 
-- Drizzle/Postgres `timestamp({ withTimezone: true, mode: 'string' })` rows may surface timestamp text like `2026-04-29 01:16:12.945+00`, which strict ISO validators such as `z.string().datetime()` reject.
-- Before putting DB-backed timestamp strings into HTTP bodies, queue messages, or other strict JSON contracts, normalize them to UTC ISO with an existing domain serializer or `new Date(value).toISOString()`. Do not forward raw DB timestamp text across contract boundaries.
-- Keep strict validators unless the receiving contract intentionally accepts a broader format. Add regression fixtures using production-shape Postgres timestamp text when fixing or extending these paths.
+Consumers of raw `@kilocode/db` values must consult `packages/db/AGENTS.md` for
+data-contract caveats, even when changed code is outside `packages/db`.
 
-## Database Migrations
+## Standard Commands
 
-Schema is in `packages/db/src/schema.ts`. Migrations live in `packages/db/src/migrations/` and are generated by `drizzle-kit` via `pnpm drizzle generate`.
+| Command | Purpose |
+|---|---|
+| `pnpm format` | Format supported files |
+| `pnpm typecheck` | Run repository TypeScript checks |
+| `pnpm lint` | Run repository lint checks |
+| `pnpm test` | Run root test script; currently web and web-env tests, not every package suite |
+| `pnpm validate` | Run root typecheck, lint, and test scripts |
 
-- **Never hand-write or hand-edit migration SQL, snapshots, or the journal.** Always use `pnpm drizzle generate` to produce migrations from the schema.
-- Backfill statements (UPDATE/INSERT) can be appended to a generated migration file after the generated DDL, using `-->  statement-breakpoint` separators.
-- **After a rebase that conflicts on migration files:** delete all migration files, snapshots, and journal entries that were added on the branch, then re-run `pnpm drizzle generate` to regenerate a clean migration from the current schema diff. Re-append any backfill SQL afterward.
-- Prefer a single migration per feature branch when the code has not yet been deployed to production. If multiple migrations accumulated during development, squash them by deleting all branch-local migrations and regenerating.
+Package-level scripts are in the relevant `package.json`. Read root and relevant
+package manifests before running repository JavaScript or package scripts. Load
+`repository-verification` to select narrow checks and prepare test dependencies.
 
-## Logging & Sensitive Data
+## Guidance Map
 
-Never log tokens, credentials, auth headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` from `@kilocode/worker-utils/redact-headers` when headers must be stored or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry config.
+| Task | Source |
+|---|---|
+| Path-specific invariants | Nearest relevant nested `AGENTS.md` |
+| TypeScript implementation or review | `code-quality` skill |
+| Verification or pre-commit checks | `repository-verification` skill |
+| Local services, ports, and fake login | `local-development` skill |
+| Shared web environment changes | `apps/web/AGENTS.md` and `DEVELOPMENT.md` |
+| PostgreSQL schema or migration work | `packages/db/AGENTS.md` and `database-migrations` skill |
+| Service, Durable Object, or Worker code | `services/AGENTS.md`, nearest owning service's `AGENTS.md`, and relevant Durable Objects or Workers skills |
+| Domain language and ownership | `CONTEXT.md`, when its scope applies |
+| Business requirements | Relevant `.specs/*.md`, indexed by `specs` skill |
+| UI and product design | `DESIGN.md`, relevant app `AGENTS.md`, and `kilo-design` skill |
+| Contribution and PR workflow | `CONTRIBUTING.md` and relevant Git or PR skill |
 
-## Stripe Subscription Schedules
+## Security Baseline
 
-When using `subscriptionSchedules.create()` with `from_subscription`, Stripe prohibits setting `metadata` in the same call (it copies metadata from the subscription automatically). Set custom metadata (e.g., `origin` tags) in the subsequent `subscriptionSchedules.update()` call instead.
+- Never log tokens, credentials, API keys, authentication headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` when headers must be retained or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry.
 
-## Git Safety
-- **Never** use `--force`, `--no-verify`, or any other flag that bypasses git hooks or safety checks without explicit user approval.
-- If a hook or check fails, diagnose the issue and either fix it or ask the user how to proceed — do not silently skip it.
+## Kilobot Review Remarks
+
+When addressing a Kilobot review remark:
+
+1. Verify that the remark is valid. If unsure, attempt to reproduce it with an E2E or unit test.
+2. If valid, fix it and commit the change. Prefer small commits in general.
+3. Reply in the review thread, then resolve the thread.
+4. Push the commits.

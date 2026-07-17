@@ -19,3 +19,6 @@ export const presenceContextForInstance = (sandboxId: string) =>
 
 export const presenceContextForConversation = (sandboxId: string, conversationId: string) =>
   `/presence${kiloclawConversationContext(sandboxId, conversationId)}` as const;
+
+export const presenceContextForCliSession = (sessionId: string) =>
+  `/presence/cli-session/${sessionId}` as const;

@@ -48,6 +48,7 @@ import {
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT,
 } from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -73,6 +74,7 @@ type StripeMock = {
     create: ReturnType<typeof jest.fn>;
     update: ReturnType<typeof jest.fn>;
     release: ReturnType<typeof jest.fn>;
+    retrieve: ReturnType<typeof jest.fn>;
   };
   checkout: {
     sessions: {
@@ -201,6 +203,12 @@ type KiloPassCaller = {
     targetTier: KiloPassTier;
     targetCadence: KiloPassCadence;
   }) => Promise<{ scheduledChangeId: string; effectiveAt: string }>;
+  getScheduledChange: () => Promise<{
+    scheduledChange: {
+      id: string;
+      status: KiloPassScheduledChangeStatus;
+    } | null;
+  }>;
   cancelScheduledChange: () => Promise<{ success: boolean }>;
   createCheckoutSession: (input: {
     tier: KiloPassTier;
@@ -285,6 +293,7 @@ jest.mock('@/lib/stripe-client', () => {
       create: jest.fn(),
       update: jest.fn(),
       release: jest.fn(),
+      retrieve: jest.fn(),
     },
     checkout: {
       sessions: {
@@ -418,6 +427,7 @@ async function insertBaseCreditsIssuance(params: {
   issueMonth?: string;
   stripeInvoiceId?: string;
   createdAt?: string;
+  usageBaselineMicrodollars?: number | null;
 }): Promise<void> {
   const issuedMonth = new Date().toISOString().slice(0, 7);
   const issueMonth = params.issueMonth ?? `${issuedMonth}-01`;
@@ -446,6 +456,7 @@ async function insertBaseCreditsIssuance(params: {
       amount_microdollars: 1_000_000,
       is_free: false,
       description: `kilo-pass-base-test-${Date.now()}`,
+      original_baseline_microdollars_used: params.usageBaselineMicrodollars,
       created_at: params.createdAt,
     })
     .returning({ id: credit_transactions.id });
@@ -554,6 +565,7 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.create.mockReset();
     stripeMock.subscriptionSchedules.update.mockReset();
     stripeMock.subscriptionSchedules.release.mockReset();
+    stripeMock.subscriptionSchedules.retrieve.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
     stripeMock.checkout.sessions.retrieve.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
@@ -843,13 +855,20 @@ describe('kiloPassRouter', () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-monthly@example.com',
       });
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly',
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 0,
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        stripeInvoiceId: 'in_test_monthly_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
       });
 
       const caller = await createCallerForUser(user.id);
@@ -984,7 +1003,7 @@ describe('kiloPassRouter', () => {
       );
     });
 
-    it('uses the latest App Store purchase period and reports current usage, hosting, and bonus', async () => {
+    it('reports qualifying credit spend from the base-credit usage baseline', async () => {
       freezeKiloPassClock('2026-02-15T12:00:00.000Z');
 
       const user = await insertTestUser({
@@ -1044,6 +1063,7 @@ describe('kiloPassRouter', () => {
           is_free: false,
           description: 'Kilo Pass base credits (tier_19, monthly)',
           credit_category: 'kilo-pass-store-test-base',
+          original_baseline_microdollars_used: 10_000_000,
           created_at: baseCreditsIssuedAt,
         })
         .returning({ id: credit_transactions.id });
@@ -1094,6 +1114,34 @@ describe('kiloPassRouter', () => {
         created_at: '2026-02-10T00:00:00.000Z',
       });
 
+      await db.insert(credit_transactions).values([
+        {
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: -2_500_000,
+          is_free: false,
+          description: 'Coding plan test deduction',
+          credit_category: 'coding-plan:test-get-state',
+          original_baseline_microdollars_used: 16_750_000,
+          created_at: '2026-02-11T00:00:00.000Z',
+        },
+        {
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: -4_000_000,
+          is_free: false,
+          description: 'Balance-neutral test deduction',
+          credit_category: 'balance-neutral:test-get-state',
+          original_baseline_microdollars_used: 19_250_000,
+          created_at: '2026-02-12T00:00:00.000Z',
+        },
+      ]);
+
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 19_250_000 })
+        .where(eq(kilocode_users.id, user.id));
+
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
@@ -1114,7 +1162,7 @@ describe('kiloPassRouter', () => {
           nextBillingAt: expiresAt,
           refillAt: expiresAt,
           currentPeriodBaseCreditsUsd: baseAmountUsd,
-          currentPeriodUsageUsd: 6.75,
+          currentPeriodUsageUsd: 9.25,
           currentPeriodHostingCostUsd: 1.5,
           currentPeriodBonusCreditsUsd: currentBonusUsd,
         })
@@ -1195,6 +1243,7 @@ describe('kiloPassRouter', () => {
           description: 'Kilo Pass upgrade base credits (tier_49, monthly)',
           credit_category:
             'kilo-pass-upgrade-base:app_store:tx_get_state_app_store_upgrade_usage_replacement',
+          original_baseline_microdollars_used: 7_000_000,
           created_at: '2026-05-16T00:00:00.000Z',
         })
         .returning({ id: credit_transactions.id });
@@ -1234,6 +1283,11 @@ describe('kiloPassRouter', () => {
           created_at: '2026-05-17T00:00:00.000Z',
         },
       ]);
+
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 10_000_000 })
+        .where(eq(kilocode_users.id, user.id));
 
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
@@ -1442,7 +1496,7 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-get-state-monthly-grandfathered-month2-next@example.com',
       });
 
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_monthly_grandfathered_month2_next',
         tier: KiloPassTier.Tier19,
@@ -1450,6 +1504,14 @@ describe('kiloPassRouter', () => {
         status: 'active',
         currentStreakMonths: 1,
         startedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: '2026-01-01',
+        stripeInvoiceId: 'in_test_monthly_grandfathered_month2_next_initial',
+        welcomePromoEligibilityReason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1462,6 +1524,76 @@ describe('kiloPassRouter', () => {
 
       expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
     });
+
+    it.each([
+      {
+        label: 'before the fingerprint-policy rollout',
+        issuanceCreatedAt: new Date(
+          KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT.valueOf() - 1
+        ).toISOString(),
+        expectedCurrentPercent: 0.5,
+        expectedNextPercent: 0.5,
+      },
+      {
+        label: 'at the fingerprint-policy rollout',
+        issuanceCreatedAt: KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT.toISOString(),
+        expectedCurrentPercent: 0.05,
+        expectedNextPercent: 0.1,
+      },
+    ])(
+      'projects Stripe bonuses from initial issuance policy $label',
+      async ({ issuanceCreatedAt, expectedCurrentPercent, expectedNextPercent }) => {
+        const stripeMock = getStripeMock();
+        const currentPeriodEndSeconds = 1_700_123_456;
+        const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+        const suffix = issuanceCreatedAt.replaceAll(/[^0-9]/g, '');
+        const stripeSubscriptionId = `sub_test_welcome_policy_${suffix}`;
+        stripeMock.subscriptions.retrieve.mockResolvedValue({
+          id: stripeSubscriptionId,
+          status: 'active',
+          items: {
+            data: [
+              {
+                current_period_end: currentPeriodEndSeconds,
+                current_period_start: currentPeriodStartSeconds,
+              },
+            ],
+          },
+        });
+
+        const user = await insertTestUser({
+          google_user_email: `kilo-pass-welcome-policy-${suffix}@example.com`,
+        });
+        const { id: subscriptionId } = await insertSubscription({
+          kiloUserId: user.id,
+          stripeSubscriptionId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          currentStreakMonths: 1,
+          startedAt: '2026-01-01T00:00:00.000Z',
+        });
+        await insertBaseCreditsIssuance({
+          subscriptionId,
+          kiloUserId: user.id,
+          issueMonth: '2026-01-01',
+          stripeInvoiceId: `in_test_welcome_policy_${suffix}`,
+          createdAt: issuanceCreatedAt,
+        });
+
+        const caller = await createCallerForUser(user.id);
+        const result = await caller.kiloPass.getState();
+        const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
+
+        expect(result.subscription).toEqual(
+          expect.objectContaining({
+            currentPeriodBonusCreditsUsd:
+              Math.round(baseAmountUsd * expectedCurrentPercent * 100) / 100,
+            nextBonusCreditsUsd: Math.round(baseAmountUsd * expectedNextPercent * 100) / 100,
+          })
+        );
+      }
+    );
 
     it('predicts monthly nextBonusCreditsUsd with ramp for reused-card month 2', async () => {
       const stripeMock = getStripeMock();
@@ -1745,7 +1877,7 @@ describe('kiloPassRouter', () => {
       const nowIso = new Date().toISOString();
       const nextYearlyIssueAtIso = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
 
-      await insertSubscription({
+      const { id: subscriptionId } = await insertSubscription({
         kiloUserId: user.id,
         stripeSubscriptionId: 'sub_test_yearly_usage_window',
         tier: KiloPassTier.Tier49,
@@ -1754,6 +1886,15 @@ describe('kiloPassRouter', () => {
         currentStreakMonths: 0,
         nextYearlyIssueAt: nextYearlyIssueAtIso,
         startedAt: nowIso,
+      });
+
+      await insertBaseCreditsIssuance({
+        subscriptionId,
+        kiloUserId: user.id,
+        issueMonth: nowIso.slice(0, 7) + '-01',
+        stripeInvoiceId: 'in_test_yearly_usage_window',
+        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+        usageBaselineMicrodollars: 10_000_000,
       });
 
       // Outside monthly bonus window
@@ -1780,10 +1921,15 @@ describe('kiloPassRouter', () => {
         created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
       });
 
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 15_000_000 })
+        .where(eq(kilocode_users.id, user.id));
+
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      // Only the in-window $5.00 should be counted.
+      // The current monthly base baseline excludes the earlier $10 and includes the later $5.
       expect(result.subscription?.currentPeriodUsageUsd).toBe(5);
     });
   });
@@ -3078,6 +3224,95 @@ describe('kiloPassRouter', () => {
     });
   });
 
+  describe('getScheduledChange', () => {
+    async function insertPendingScheduledChange(params: {
+      email: string;
+      effectiveAt: string;
+      status?: KiloPassScheduledChangeStatus;
+    }) {
+      const user = await insertTestUser({ google_user_email: params.email });
+      const stripeSubscriptionId = `sub_read_${crypto.randomUUID()}`;
+      const scheduleId = `sched_read_${crypto.randomUUID()}`;
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const scheduledChangeId = crypto.randomUUID();
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubscriptionId,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Monthly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Monthly,
+        stripe_schedule_id: scheduleId,
+        effective_at: params.effectiveAt,
+        status: params.status ?? KiloPassScheduledChangeStatus.Active,
+      });
+      return { user, scheduleId, scheduledChangeId };
+    }
+
+    it('does not retrieve Stripe state for a non-overdue pending change', async () => {
+      freezeKiloPassClock('2026-07-14T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      const { user, scheduledChangeId } = await insertPendingScheduledChange({
+        email: 'kilo-pass-scheduled-read-future@example.com',
+        effectiveAt: '2026-07-15T12:00:00.000Z',
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getScheduledChange();
+
+      expect(result.scheduledChange?.id).toBe(scheduledChangeId);
+      expect(stripeMock.subscriptionSchedules.retrieve).not.toHaveBeenCalled();
+    });
+
+    it('keeps an overdue change pending while the Stripe schedule remains active', async () => {
+      freezeKiloPassClock('2026-07-14T12:00:00.000Z');
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'active' });
+      const { user, scheduleId, scheduledChangeId } = await insertPendingScheduledChange({
+        email: 'kilo-pass-scheduled-read-active@example.com',
+        effectiveAt: '2026-07-14T11:00:00.000Z',
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getScheduledChange();
+
+      expect(result.scheduledChange?.id).toBe(scheduledChangeId);
+      expect(stripeMock.subscriptionSchedules.retrieve).toHaveBeenCalledWith(scheduleId);
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.deleted_at).toBeNull();
+      expect(row?.status).toBe(KiloPassScheduledChangeStatus.Active);
+    });
+
+    it.each([
+      KiloPassScheduledChangeStatus.Released,
+      KiloPassScheduledChangeStatus.Canceled,
+      KiloPassScheduledChangeStatus.Completed,
+    ])('reconciles an overdue change when Stripe reports %s', async providerStatus => {
+      freezeKiloPassClock('2026-07-14T12:00:00.000Z');
+      getStripeMock().subscriptionSchedules.retrieve.mockResolvedValue({ status: providerStatus });
+      const { user, scheduledChangeId } = await insertPendingScheduledChange({
+        email: `kilo-pass-scheduled-read-${providerStatus}@example.com`,
+        effectiveAt: '2026-07-14T11:00:00.000Z',
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.getScheduledChange();
+
+      expect(result).toEqual({ scheduledChange: null });
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.status).toBe(providerStatus);
+      expect(row?.deleted_at).not.toBeNull();
+    });
+  });
+
   describe('scheduleChange', () => {
     it('monthly cadence: creates a Stripe subscription schedule and inserts a pending scheduled change row', async () => {
       const stripeMock = getStripeMock();
@@ -3560,6 +3795,88 @@ describe('kiloPassRouter', () => {
       // The API releases the schedule; the DB row is deleted asynchronously by the Stripe
       // `subscription_schedule.updated` webhook when it transitions to released/canceled/completed.
       expect(updated).toBeTruthy();
+    });
+
+    it('reconciles and succeeds when Stripe reports the schedule was already released', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptionSchedules.release.mockRejectedValue(
+        new Error('The subscription schedule is already released')
+      );
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'released' });
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-already-released@example.com',
+      });
+      const stripeSubId = `sub_cancel_released_${crypto.randomUUID()}`;
+      const scheduleId = `sched_cancel_released_${crypto.randomUUID()}`;
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const scheduledChangeId = crypto.randomUUID();
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Monthly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Monthly,
+        stripe_schedule_id: scheduleId,
+        effective_at: '2026-08-01T00:00:00.000Z',
+        status: KiloPassScheduledChangeStatus.Active,
+      });
+
+      const result = await (await createCallerForUser(user.id)).kiloPass.cancelScheduledChange();
+
+      expect(result).toEqual({ success: true });
+      expect(stripeMock.subscriptionSchedules.retrieve).toHaveBeenCalledWith(scheduleId);
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.status).toBe(KiloPassScheduledChangeStatus.Released);
+      expect(row?.deleted_at).not.toBeNull();
+    });
+
+    it('restores the pending row when release fails and Stripe remains active', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptionSchedules.release.mockRejectedValue(new Error('Stripe unavailable'));
+      stripeMock.subscriptionSchedules.retrieve.mockResolvedValue({ status: 'active' });
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-cancel-still-active@example.com',
+      });
+      const stripeSubId = `sub_cancel_active_${crypto.randomUUID()}`;
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+      const scheduledChangeId = crypto.randomUUID();
+      await db.insert(kilo_pass_scheduled_changes).values({
+        id: scheduledChangeId,
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        from_tier: KiloPassTier.Tier19,
+        from_cadence: KiloPassCadence.Monthly,
+        to_tier: KiloPassTier.Tier49,
+        to_cadence: KiloPassCadence.Monthly,
+        stripe_schedule_id: `sched_cancel_active_${crypto.randomUUID()}`,
+        effective_at: '2026-08-01T00:00:00.000Z',
+        status: KiloPassScheduledChangeStatus.Active,
+      });
+
+      await expect(
+        (await createCallerForUser(user.id)).kiloPass.cancelScheduledChange()
+      ).rejects.toThrow('Stripe unavailable');
+      const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+        where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
+      });
+      expect(row?.status).toBe(KiloPassScheduledChangeStatus.Active);
+      expect(row?.deleted_at).toBeNull();
     });
 
     it('rejects active Google Play subscriptions without releasing a Stripe schedule', async () => {

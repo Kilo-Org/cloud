@@ -20,6 +20,13 @@ type ScreenHeaderProps = {
   showBackButton?: boolean;
   onBack?: () => void;
   onTitlePress?: () => void;
+  /**
+   * Accessibility label for the pressable title. Defaults to a generic
+   * "Open menu" so list callers don't have to supply one. Detail screens
+   * (e.g. session rename) should override with a verb that describes the
+   * action, not "open menu".
+   */
+  onTitlePressAccessibilityLabel?: string;
   backIcon?: 'back' | 'close';
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
@@ -34,6 +41,7 @@ export function ScreenHeader({
   showBackButton,
   onBack,
   onTitlePress,
+  onTitlePressAccessibilityLabel,
   backIcon,
   className,
 }: Readonly<ScreenHeaderProps>) {
@@ -57,7 +65,7 @@ export function ScreenHeader({
   let titleNode: React.ReactNode = null;
   if (title != null) {
     const titleText = (
-      <Text className={titleClass} numberOfLines={1}>
+      <Text className={titleClass} numberOfLines={2} accessibilityRole="header">
         {title}
       </Text>
     );
@@ -66,7 +74,9 @@ export function ScreenHeader({
         onPress={onTitlePress}
         hitSlop={13}
         accessibilityRole="button"
-        accessibilityLabel={title ? `Open menu for ${title}` : 'Open menu'}
+        accessibilityLabel={
+          onTitlePressAccessibilityLabel ?? (title ? `Open menu for ${title}` : 'Open menu')
+        }
         className="flex-row items-center gap-1 active:opacity-70"
       >
         {titleText}
@@ -92,7 +102,7 @@ export function ScreenHeader({
               }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
               className="-ml-1 mr-1 active:opacity-70"
             >
               {resolvedBackIcon === 'close' ? (

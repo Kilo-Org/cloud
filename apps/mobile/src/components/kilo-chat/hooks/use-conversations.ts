@@ -19,11 +19,9 @@ export function useCreateConversation(client: KiloChatClient) {
 }
 
 export function useRenameConversation(client: KiloChatClient) {
-  return useSharedRenameConversation(client, {
-    onError: err => {
-      toast.error(formatKiloChatError(err, 'Failed to rename conversation'));
-    },
-  });
+  // No centralized toast here — callers rename via RenameModal, which stays
+  // open on failure and shows the error inline.
+  return useSharedRenameConversation(client);
 }
 
 export function useLeaveConversation(client: KiloChatClient) {

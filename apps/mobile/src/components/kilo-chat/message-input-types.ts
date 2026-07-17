@@ -12,13 +12,13 @@ export type MessageInputTextOnSend = (
   text: string,
   inReplyToMessageId?: string,
   controls?: MessageInputSubmitControls
-) => void;
+) => void | Promise<void>;
 
 export type MessageInputContentBlocksOnSend = (
   content: InputContentBlock[],
   inReplyToMessageId?: string,
   controls?: MessageInputSubmitControls
-) => void;
+) => void | Promise<void>;
 
 export type AttachmentEnabledProps = {
   client: KiloChatClient;
@@ -44,6 +44,8 @@ export type CommonProps = {
   replyingTo?: Message | null;
   onCancelReply?: () => void;
   disabledReason?: string | null;
+  showInstanceCta?: boolean;
+  onOpenInstance?: () => void;
   clearOnSubmit?: boolean;
   botName?: string | null;
   typingMembers?: Map<string, number>;

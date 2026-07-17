@@ -23,6 +23,7 @@ import {
 import { Search, User, Calendar, Globe, GitBranch, Loader2, Download } from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SES_PREFIX = 'ses_';
@@ -89,8 +90,10 @@ export function SessionTraceViewer() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [pendingAgentId, setPendingAgentId] = useState<string | null>(null);
   const [resolvedFromAgent, setResolvedFromAgent] = useState<string | null>(null);
+  const permissions = useAdminPermissions();
+  const canViewSessions = permissions.canViewSessions;
 
-  const resolveQuery = useAdminResolveCloudAgentSession(pendingAgentId);
+  const resolveQuery = useAdminResolveCloudAgentSession(pendingAgentId, canViewSessions);
 
   // When the agent ID resolves, transition to the CLI session ID
   useEffect(() => {
@@ -116,9 +119,9 @@ export function SessionTraceViewer() {
     }
   }, [sessionIdFromUrl]);
 
-  const sessionQuery = useAdminSessionTrace(searchedSessionId);
-  const messagesQuery = useAdminSessionMessages(searchedSessionId);
-  const apiHistoryQuery = useAdminApiConversationHistory(searchedSessionId);
+  const sessionQuery = useAdminSessionTrace(searchedSessionId, canViewSessions);
+  const messagesQuery = useAdminSessionMessages(searchedSessionId, canViewSessions);
+  const apiHistoryQuery = useAdminApiConversationHistory(searchedSessionId, canViewSessions);
 
   const handleSearch = () => {
     const trimmed = inputValue.trim();
@@ -217,6 +220,33 @@ export function SessionTraceViewer() {
       <BreadcrumbPage>Session Traces</BreadcrumbPage>
     </BreadcrumbItem>
   );
+
+  if (!permissions.isPermissionResolved && !permissions.isError) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card>
+          <CardContent className="text-muted-foreground py-8 text-center text-sm">
+            Checking session viewing access...
+          </CardContent>
+        </Card>
+      </AdminPage>
+    );
+  }
+
+  if (!canViewSessions) {
+    return (
+      <AdminPage breadcrumbs={breadcrumbs}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Session viewing access required</CardTitle>
+            <CardDescription>
+              Ask a superadmin to grant Session viewer permission on the Admins page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </AdminPage>
+    );
+  }
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>

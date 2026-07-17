@@ -603,7 +603,6 @@ describe('User', () => {
         .values([
           {
             platform_integration_id: integration.id,
-            platform: 'bitbucket',
             authorized_by_user_id: user.id,
             provider_subject_id: '{bitbucket-user}',
             provider_subject_login: 'bitbucket-user',
@@ -613,7 +612,6 @@ describe('User', () => {
           },
           {
             platform_integration_id: otherIntegration.id,
-            platform: 'bitbucket',
             authorized_by_user_id: otherUser.id,
             provider_subject_id: '{bitbucket-other-user}',
             provider_subject_login: 'bitbucket-other-user',
@@ -623,7 +621,6 @@ describe('User', () => {
           },
           {
             platform_integration_id: organizationIntegration.id,
-            platform: 'bitbucket',
             authorized_by_user_id: user.id,
             provider_subject_id: '{bitbucket-organization-authorizer}',
             provider_subject_login: 'bitbucket-organization-authorizer',
@@ -682,6 +679,136 @@ describe('User', () => {
       ).toHaveLength(1);
     });
 
+    it('removes an organization GitLab PAT authorized by the deleted user without removing project tokens', async () => {
+      const authorizer = await insertTestUser();
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'GitLab PAT Authorizer Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      const [organizationIntegration, personalIntegration] = await db
+        .insert(platform_integrations)
+        .values([
+          {
+            owned_by_organization_id: organization.id,
+            created_by_user_id: authorizer.id,
+            platform: 'gitlab',
+            integration_type: 'pat',
+            platform_installation_id: 'gitlab-org-pat-authorizer-cleanup',
+            platform_account_id: '1001',
+            platform_account_login: 'organization-authorizer',
+            integration_status: 'active',
+          },
+          {
+            owned_by_user_id: authorizer.id,
+            created_by_user_id: authorizer.id,
+            platform: 'gitlab',
+            integration_type: 'pat',
+            platform_installation_id: 'gitlab-personal-pat-authorizer-cleanup',
+            platform_account_id: '1002',
+            platform_account_login: 'personal-authorizer',
+            integration_status: 'active',
+          },
+        ])
+        .returning();
+      if (!organizationIntegration || !personalIntegration) {
+        throw new Error('Failed to create GitLab PAT integrations');
+      }
+
+      const [organizationPat, organizationProjectToken, personalPat, personalProjectToken] =
+        await db
+          .insert(platform_access_token_credentials)
+          .values([
+            {
+              platform_integration_id: organizationIntegration.id,
+              token_encrypted: 'encrypted-organization-pat',
+              provider_credential_type: 'personal_access_token',
+              provider_base_url: 'https://gitlab.com',
+              authorized_by_user_id: authorizer.id,
+              provider_metadata: {},
+            },
+            {
+              platform_integration_id: organizationIntegration.id,
+              token_encrypted: 'encrypted-organization-project-token',
+              provider_credential_type: 'project_access_token',
+              provider_resource_id: '2001',
+              provider_base_url: 'https://gitlab.com',
+              provider_metadata: {
+                providerCredentialId: '3001',
+                expiresOn: '2027-07-13',
+              },
+            },
+            {
+              platform_integration_id: personalIntegration.id,
+              token_encrypted: 'encrypted-personal-pat',
+              provider_credential_type: 'personal_access_token',
+              provider_base_url: 'https://gitlab.com',
+              authorized_by_user_id: authorizer.id,
+              provider_metadata: {},
+            },
+            {
+              platform_integration_id: personalIntegration.id,
+              token_encrypted: 'encrypted-personal-project-token',
+              provider_credential_type: 'project_access_token',
+              provider_resource_id: '2002',
+              provider_base_url: 'https://gitlab.com',
+              provider_metadata: {
+                providerCredentialId: '3002',
+                expiresOn: '2027-07-13',
+              },
+            },
+          ])
+          .returning();
+      if (!organizationPat || !organizationProjectToken || !personalPat || !personalProjectToken) {
+        throw new Error('Failed to create GitLab PAT credentials');
+      }
+
+      await softDeleteUser(authorizer.id);
+
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, organizationIntegration.id))
+      ).toEqual([
+        expect.objectContaining({
+          integration_status: 'suspended',
+          auth_invalid_reason: 'authorizing_user_deleted',
+        }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(platform_access_token_credentials)
+          .where(eq(platform_access_token_credentials.id, organizationPat.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(platform_access_token_credentials)
+          .where(eq(platform_access_token_credentials.id, organizationProjectToken.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, personalIntegration.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(platform_access_token_credentials)
+          .where(eq(platform_access_token_credentials.id, personalPat.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(platform_access_token_credentials)
+          .where(eq(platform_access_token_credentials.id, personalProjectToken.id))
+      ).toHaveLength(0);
+    });
+
     it('preserves an organization Workspace Access Token when its setup actor is deleted', async () => {
       const setupActor = await insertTestUser();
       const organization = await createTestOrganization(
@@ -709,9 +836,6 @@ describe('User', () => {
         .insert(platform_access_token_credentials)
         .values({
           platform_integration_id: integration.id,
-          owned_by_organization_id: organization.id,
-          platform: 'bitbucket',
-          integration_type: 'workspace_access_token',
           token_encrypted: 'encrypted-workspace-access-token',
           provider_credential_type: 'workspace_access_token',
           provider_scopes: ['account', 'repository', 'repository:write'],
@@ -1022,6 +1146,8 @@ describe('User', () => {
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
+        is_super_admin: true,
+        can_view_sessions: true,
         can_manage_credits: true,
       });
 
@@ -1060,6 +1186,8 @@ describe('User', () => {
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
+      expect(softDeleted!.is_super_admin).toBe(false);
+      expect(softDeleted!.can_view_sessions).toBe(false);
       expect(softDeleted!.can_manage_credits).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);

@@ -1,5 +1,5 @@
 import { type LucideIcon } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -13,6 +13,8 @@ type ActionButtonProps = {
   tone?: ActionButtonTone;
   onPress?: () => void;
   disabled?: boolean;
+  /** Mutation in flight for this action: spinner instead of the icon, never the disabled look (P3/P5). */
+  loading?: boolean;
   className?: string;
 };
 
@@ -40,20 +42,27 @@ export function ActionButton({
   tone = 'neutral',
   onPress,
   disabled,
+  loading,
   className,
 }: Readonly<ActionButtonProps>) {
   const colors = useThemeColors();
+  const isDisabled = Boolean(disabled) || Boolean(loading);
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={isDisabled}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       className={cn(
         'flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 active:opacity-70',
-        disabled && 'opacity-50',
+        disabled && !loading && 'opacity-50',
         className
       )}
     >
-      <Icon size={16} color={colors[TONE_ICON[tone]]} />
+      {loading ? (
+        <ActivityIndicator size="small" color={colors[TONE_ICON[tone]]} />
+      ) : (
+        <Icon size={16} color={colors[TONE_ICON[tone]]} />
+      )}
       <Text className={cn('text-[13px] font-semibold', TONE_TEXT[tone])}>{label}</Text>
       <View />
     </Pressable>

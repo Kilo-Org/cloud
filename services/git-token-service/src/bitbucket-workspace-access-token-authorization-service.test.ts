@@ -71,8 +71,6 @@ function candidate(
     accountId: workspaceUuid,
     accountLogin: 'acme',
     authInvalidAt: null,
-    credentialPlatform: BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
-    credentialIntegrationType: BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
     tokenEncrypted,
     providerCredentialType: BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
     providerScopes: ['account', 'pullrequest', 'repository', 'repository:write', 'webhook'],
@@ -129,17 +127,32 @@ class StatefulAuthorizationStore implements BitbucketWorkspaceAccessTokenAuthori
   }
 }
 
-function service(store: StatefulAuthorizationStore, envOverrides: Record<string, unknown> = {}) {
-  return new BitbucketWorkspaceAccessTokenAuthorizationService(
-    {
-      HYPERDRIVE: { connectionString: 'postgres://unused' },
-      BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID: 'active',
-      BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY: Buffer.from(publicKeyPem).toString('base64'),
-      BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY: Buffer.from(privateKeyPem).toString('base64'),
-      ...envOverrides,
-    } as CloudflareEnv,
-    { store, now: () => now }
-  );
+type TestAuthorizationEnv = ConstructorParameters<
+  typeof BitbucketWorkspaceAccessTokenAuthorizationService
+>[0];
+
+function service(
+  store: StatefulAuthorizationStore,
+  envOverrides: Partial<TestAuthorizationEnv> = {}
+) {
+  const env: TestAuthorizationEnv = {
+    HYPERDRIVE: {
+      connectionString: 'postgres://unused',
+      host: 'unused',
+      port: 5432,
+      user: 'unused',
+      password: 'unused',
+      database: 'unused',
+      connect: () => {
+        throw new Error('unused in this test');
+      },
+    },
+    BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID: 'active',
+    BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY: Buffer.from(publicKeyPem).toString('base64'),
+    BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY: Buffer.from(privateKeyPem).toString('base64'),
+    ...envOverrides,
+  };
+  return new BitbucketWorkspaceAccessTokenAuthorizationService(env, { store, now: () => now });
 }
 
 describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
@@ -150,7 +163,10 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
     ).toSQL();
 
     expect(query.sql).toContain('inner join "platform_access_token_credentials"');
-    expect(query.sql).not.toContain('"platform_access_token_credentials"."expires_at"');
+    expect(query.sql).toContain(
+      '"platform_access_token_credentials"."platform_integration_id" = "platform_integrations"."id"'
+    );
+    expect(query.sql).toContain('"platform_access_token_credentials"."expires_at"');
     expect(query.sql).toContain('inner join "kilocode_users"');
     expect(query.sql).toContain('exists (select');
     expect(query.sql).toContain('"organization_memberships"');
@@ -172,7 +188,15 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
       authorizationFence
     ).toSQL();
     expect(generationQuery.sql).toContain('from "platform_access_token_credentials"');
-    expect(generationQuery.sql).toContain('"owned_by_organization_id" =');
+    expect(generationQuery.sql).toContain('inner join "platform_integrations"');
+    expect(generationQuery.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
+    expect(generationQuery.sql).not.toContain(
+      '"platform_access_token_credentials"."owned_by_organization_id"'
+    );
+    expect(generationQuery.sql).not.toContain('"platform_access_token_credentials"."platform"');
+    expect(generationQuery.sql).not.toContain(
+      '"platform_access_token_credentials"."integration_type"'
+    );
     expect(generationQuery.sql).toContain('"platform_integration_id" =');
     expect(generationQuery.sql).toContain('"credential_version" =');
     expect(generationQuery.params).toEqual(
@@ -229,14 +253,15 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
     ).toSQL();
 
     expect(query.sql).toContain('update "platform_access_token_credentials"');
-    expect(query.sql).toContain('"owned_by_organization_id" =');
+    expect(query.sql).not.toContain('"owned_by_organization_id"');
     expect(query.sql).toContain('"platform_integration_id" =');
     expect(query.sql).toContain('"credential_version" =');
     expect(query.sql).toContain('"last_used_at" is null');
     expect(query.sql).toContain('"last_used_at" <');
     expect(query.params).toEqual(
-      expect.arrayContaining([organizationId, integrationId, credentialId, 3, now.toISOString()])
+      expect.arrayContaining([integrationId, credentialId, 3, now.toISOString()])
     );
+    expect(query.params).not.toContain(organizationId);
   });
 
   it.each([undefined, '', 'not-an-organization-id'])(

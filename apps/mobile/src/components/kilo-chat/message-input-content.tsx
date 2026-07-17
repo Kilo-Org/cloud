@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type LayoutChangeEvent, Platform, type TextInput, View } from 'react-native';
-import { type AttachmentBlock } from '@kilocode/kilo-chat';
-import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
+import { type AttachmentBlock, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTextHeight } from '@/components/agents/use-text-height';
+import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
+import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { resolveMessageInputAppStateTransition } from './message-input-app-state';
+import {
+  editableAttachmentToPreviewRow,
+  resolveMessageInputSendDisabled,
+} from './message-input-content-state';
 import {
   MESSAGE_INPUT_FONT_SIZE,
   MESSAGE_INPUT_HORIZONTAL_PADDING,
@@ -31,27 +36,10 @@ import {
   submitMessageInputDraft,
 } from './message-input-state';
 import { MessageInputView } from './message-input-view';
+import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 const MESSAGE_INPUT_FOCUS_RESTORE_DELAY_MS = 100;
 const EMPTY_READY_ATTACHMENT_BLOCKS: readonly AttachmentBlock[] = [];
-
-function resolveSendDisabled({
-  canSend,
-  disabled,
-  overLimit,
-}: {
-  canSend: boolean;
-  disabled?: boolean;
-  overLimit: boolean;
-}): boolean {
-  if (!canSend) {
-    return true;
-  }
-  if (disabled === true) {
-    return true;
-  }
-  return overLimit;
-}
 
 export function MessageInputContent({
   onSendText,
@@ -65,6 +53,8 @@ export function MessageInputContent({
   replyingTo,
   onCancelReply,
   disabledReason,
+  showInstanceCta,
+  onOpenInstance,
   clearOnSubmit,
   botName,
   typingMembers = new Map(),
@@ -85,7 +75,9 @@ export function MessageInputContent({
   );
   const [draftLength, setDraftLength] = useState(initialText.length);
   const [inputWidth, setInputWidth] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const submissionLockRef = useRef(false);
   const inputFocusedRef = useRef(false);
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,10 +97,14 @@ export function MessageInputContent({
   const overLimit = isMessageInputOverLimit(valueRef.current);
   const showCounter = shouldShowMessageInputCounter(valueRef.current);
   const sendDisabled =
-    submitDisabled === true || resolveSendDisabled({ canSend, disabled, overLimit });
-  const controlsDisabled = disabled === true || submitDisabled === true;
+    isSubmitting ||
+    submitDisabled === true ||
+    resolveMessageInputSendDisabled({ canSend, disabled, overLimit });
+  const controlsDisabled = disabled === true || submitDisabled === true || isSubmitting;
   const showAttachmentButton =
     attachmentQueue !== null && hasAttachmentsCapability && isEditing !== true && disabled !== true;
+  const voiceDisabled =
+    disabled === true || hasUploadingAttachment || isEditing === true || isSubmitting;
   const inputMeasure = useTextHeight({
     minHeight: MESSAGE_INPUT_MIN_HEIGHT,
     maxHeight: MESSAGE_INPUT_MAX_HEIGHT,
@@ -117,6 +113,33 @@ export function MessageInputContent({
     fontSize: MESSAGE_INPUT_FONT_SIZE,
     lineHeight: MESSAGE_INPUT_LINE_HEIGHT,
     initialText,
+  });
+
+  const handleChangeText = (text: string) => {
+    setDraftLength(text.length);
+    inputMeasure.setText(text);
+    applyMessageInputTextChange({
+      text,
+      valueRef,
+      setCanSend,
+      onTyping,
+      readyAttachmentBlocks,
+      hasUploadingAttachment,
+      hasFailedAttachment,
+    });
+  };
+
+  const voiceInput = useVoiceInput({
+    disabled: voiceDisabled,
+    getDraft: () => valueRef.current,
+    onDraftChange: draft => {
+      applyVoiceDraftToInput({
+        input: inputRef.current,
+        draft,
+        maxLength: MESSAGE_TEXT_MAX_CHARS,
+        onChangeText: handleChangeText,
+      });
+    },
   });
 
   useEffect(() => {
@@ -166,23 +189,23 @@ export function MessageInputContent({
     );
   }, [hasFailedAttachment, hasUploadingAttachment, readyAttachmentBlocks]);
 
-  const submit = () => {
+  async function submitDraft() {
     if (disabled || submitDisabled) {
       return;
     }
     const submittedAttachmentTempIds =
       attachmentQueue?.rows.filter(row => row.status === 'ready').map(row => row.tempId) ?? [];
-    submitMessageInputDraft({
+    const submission = submitMessageInputDraft({
       valueRef,
       replyingToMessageId: replyingTo?.id,
-      onSend: (text, inReplyToMessageId, controls) => {
-        onSendText?.(text, inReplyToMessageId, controls);
+      onSend: async (text, inReplyToMessageId, controls) => {
+        await onSendText?.(text, inReplyToMessageId, controls);
       },
       onSendContentBlocks:
         attachmentQueue === null
           ? undefined
-          : (content, inReplyToMessageId, controls) => {
-              onSendContentBlocks?.(content, inReplyToMessageId, {
+          : async (content, inReplyToMessageId, controls) => {
+              await onSendContentBlocks?.(content, inReplyToMessageId, {
                 clearDraft: () =>
                   clearSubmittedMessageInputDraft({
                     controls,
@@ -203,7 +226,17 @@ export function MessageInputContent({
       hasUploadingAttachment,
       hasFailedAttachment,
     });
-  };
+    await submission?.completion;
+  }
+
+  async function submit() {
+    await settleVoiceInputBeforeSubmit({
+      lock: submissionLockRef,
+      onPendingChange: setIsSubmitting,
+      settleVoiceInput: voiceInput.settleBeforeSubmit,
+      submit: submitDraft,
+    });
+  }
 
   function handleInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
@@ -226,20 +259,6 @@ export function MessageInputContent({
     onRemoveEditableAttachment?.(attachmentId);
   };
 
-  const handleChangeText = (text: string) => {
-    setDraftLength(text.length);
-    inputMeasure.setText(text);
-    applyMessageInputTextChange({
-      text,
-      valueRef,
-      setCanSend,
-      onTyping,
-      readyAttachmentBlocks,
-      hasUploadingAttachment,
-      hasFailedAttachment,
-    });
-  };
-
   return (
     <View
       style={{
@@ -254,8 +273,9 @@ export function MessageInputContent({
         attachmentQueue={attachmentQueue}
         botName={botName}
         controlsDisabled={controlsDisabled}
-        disabled={disabled}
         disabledReason={disabledReason}
+        showInstanceCta={showInstanceCta}
+        onOpenInstance={onOpenInstance}
         draftLength={draftLength}
         editableAttachmentRows={editableAttachmentRows}
         inputHeight={inputMeasure.height}
@@ -276,7 +296,12 @@ export function MessageInputContent({
         onRemoveAttachment={handleRemoveAttachment}
         onRemoveEditableAttachment={handleRemoveEditableAttachment}
         onRetryAttachment={handleRetryAttachment}
-        onSubmit={submit}
+        onSubmit={() => {
+          void submit();
+        }}
+        onVoiceInputToggle={() => {
+          void voiceInput.toggle();
+        }}
         overLimit={overLimit}
         replyingTo={replyingTo}
         sendDisabled={sendDisabled}
@@ -284,19 +309,11 @@ export function MessageInputContent({
         showCounter={showCounter}
         shouldScroll={resolveMessageInputShouldScroll(inputMeasure.height)}
         typingMembers={typingMembers}
+        voiceInputActive={voiceInput.isActive}
+        voiceInputAvailable={voiceInput.available}
+        voiceInputDisabled={voiceDisabled}
+        voiceInputStatus={voiceInput.status}
       />
     </View>
   );
-}
-
-function editableAttachmentToPreviewRow(attachment: AttachmentBlock): QueuedAttachment {
-  return {
-    tempId: attachment.attachmentId,
-    attachmentId: attachment.attachmentId,
-    filename: attachment.filename,
-    mimeType: attachment.mimeType,
-    size: attachment.size,
-    status: 'ready',
-    progress: 1,
-  };
 }

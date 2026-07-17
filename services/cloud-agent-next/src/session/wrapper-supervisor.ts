@@ -53,6 +53,7 @@ import {
   recordWrapperPong,
   reduceSandboxRecoveryState,
   reduceWrapperLease,
+  resetWrapperLivenessAfterReconnect,
   type WrapperConnectionFence,
   type WrapperRuntimeState,
   WRAPPER_STOP_MAX_ATTEMPTS,
@@ -124,7 +125,7 @@ export type WrapperSupervisorStorage = DurableObjectStorage &
 
 export type WrapperSupervisor = {
   checkReconnect(input: WrapperReconnectInput): Promise<WrapperReconnectDecision>;
-  recordReconnectAccepted(fence: WrapperConnectionFence): Promise<void>;
+  recordReconnectAccepted(fence: WrapperConnectionFence, now?: number): Promise<void>;
   isCurrentConnection(wrapperGeneration: number, wrapperConnectionId: string): Promise<boolean>;
   observePong(wrapperGeneration: number, wrapperConnectionId: string, now: number): Promise<void>;
   observeMeaningfulOutput(
@@ -388,6 +389,28 @@ export function createWrapperSupervisor(
     await storage.delete(DISCONNECT_GRACE_KEY);
   }
 
+  /**
+   * A disconnect grace is "active for the current connection" when it has not
+   * yet expired and still describes the wrapper runtime we are supervising.
+   * While active, liveness checks are deferred so a reconnectable transport
+   * failure (e.g. a `1009` oversize close) gets its full grace window instead
+   * of immediately being converted into a `wrapper_ping_timeout` physical stop.
+   *
+   * A grace left behind by a stale wrapper run/generation does not suppress
+   * liveness for a newer current connection.
+   */
+  async function isActiveDisconnectGraceForCurrentConnection(now: number): Promise<boolean> {
+    const graceState = await readDisconnectGrace();
+    if (!graceState) return false;
+    if (now - graceState.disconnectedAt >= DISCONNECT_GRACE_MS) return false;
+    const state = await getWrapperRuntimeState(storage);
+    return (
+      state.wrapperRunId === graceState.wrapperRunId &&
+      state.wrapperGeneration === graceState.wrapperGeneration &&
+      state.wrapperConnectionId === graceState.wrapperConnectionId
+    );
+  }
+
   async function releaseWrapperTerminalWaitForIdleBatch(): Promise<void> {
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
     await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
@@ -428,8 +451,27 @@ export function createWrapperSupervisor(
     return { accepted: true };
   }
 
-  async function recordReconnectAccepted(fence: WrapperConnectionFence): Promise<void> {
+  async function recordReconnectAccepted(
+    fence: WrapperConnectionFence,
+    now = Date.now()
+  ): Promise<void> {
     await cancelDisconnectGrace(fence);
+    // A ping in flight when the previous socket closed can never be answered on
+    // the new socket (the wrapper only pongs in response to a ping command), so
+    // its stale deadline would expire into a wrapper_ping_timeout right after a
+    // successful reconnect. Clear it and schedule a fresh ping instead. The
+    // no-output deadline kept ticking while output could not be delivered, so
+    // it gets a fresh window too instead of firing wrapper_no_output before
+    // the wrapper's buffered events can drain.
+    if (fence.wrapperGeneration !== undefined && fence.wrapperConnectionId !== undefined) {
+      await resetWrapperLivenessAfterReconnect(
+        storage,
+        fence.wrapperGeneration,
+        fence.wrapperConnectionId,
+        now + WRAPPER_PING_INTERVAL_MS,
+        now + WRAPPER_NO_OUTPUT_TIMEOUT_MS
+      );
+    }
   }
 
   async function isCurrentConnection(
@@ -1425,7 +1467,21 @@ export function createWrapperSupervisor(
     await reconcilePhysicalCleanup(now);
     await reconcileSharedSandboxFailover();
     await checkDisconnectGrace(now);
-    await checkWrapperLiveness(now);
+    // While the current wrapper connection is inside its disconnect grace
+    // window, defer liveness checks. Otherwise an already-expired ping/no-output
+    // deadline would immediately terminalize accepted work as
+    // `wrapper_ping_timeout`/`wrapper_no_output` before the wrapper gets a
+    // chance to reconnect, defeating the purpose of the grace period.
+    if (await isActiveDisconnectGraceForCurrentConnection(now)) {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          logTag: 'wrapper_disconnect_grace_liveness_deferred',
+        })
+        .debug('Deferring wrapper liveness check while disconnect grace is active');
+    } else {
+      await checkWrapperLiveness(now);
+    }
     await checkKeepWarmCleanup(now);
   }
 

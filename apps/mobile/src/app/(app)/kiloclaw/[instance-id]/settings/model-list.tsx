@@ -1,16 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-import { Check, Eye } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Check, Eye, Search } from 'lucide-react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  TextInput,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { EmptyState } from '@/components/empty-state';
+import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 import { useTRPC } from '@/lib/trpc';
@@ -24,23 +34,39 @@ type ModelItem = {
 
 export default function ModelListScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { organizationId } = useInstanceContext(instanceId);
+  const instanceContext = useInstanceContext(instanceId);
+  const organizationId = instanceOrgId(instanceContext);
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const paddingBottom = useDetailScreenBottomPadding();
   const trpc = useTRPC();
   const [searchFilter, setSearchFilter] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
 
-  const { data: config } = useKiloClawConfig(organizationId);
+  const handleClearSearch = useCallback(() => {
+    setSearchFilter('');
+    searchInputRef.current?.clear();
+  }, []);
+
+  const configQuery = useKiloClawConfig(organizationId);
+  const config = configQuery.data;
   const mutations = useKiloClawMutations(organizationId);
   const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
 
   const {
     data: models,
-    isLoading,
-    isError,
+    isLoading: isModelsLoading,
+    isError: isModelsError,
     refetch,
   } = useQuery(trpc.models.list.queryOptions(undefined, { staleTime: 5 * 60_000 }));
+
+  // Instance context resolves organizationId — until it's ready, updateModel would
+  // mutate with organizationId undefined (PERSONAL config) instead of the org's.
+  const isLoading = isModelsLoading || instanceContext.status === 'loading';
+  // Without a known current model, rows would render selectable with no
+  // indication of what's actually selected — treat a config load failure
+  // the same as a models load failure.
+  const isError = isModelsError || configQuery.isError;
 
   const filtered = (models ?? []).filter((m: ModelItem) => {
     if (!searchFilter) {
@@ -52,6 +78,11 @@ export default function ModelListScreen() {
 
   const preferred = filtered.filter(m => m.isPreferred);
   const rest = filtered.filter(m => !m.isPreferred);
+
+  const listContentContainerStyle = useMemo(
+    () => ({ paddingBottom, flexGrow: 1 }) satisfies ViewStyle,
+    [paddingBottom]
+  );
 
   const handleSelect = useCallback(
     (modelId: string) => {
@@ -67,9 +98,14 @@ export default function ModelListScreen() {
     [mutations.updateModel, router]
   );
 
+  const pendingModelId = mutations.updateModel.isPending
+    ? stripModelPrefix(mutations.updateModel.variables.kilocodeDefaultModel)
+    : undefined;
+
   const renderItem = useCallback(
     ({ item }: { item: ModelItem }) => {
       const selected = currentModel === item.id;
+      const isRowPending = mutations.updateModel.isPending && pendingModelId === item.id;
       return (
         <Pressable
           className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
@@ -77,13 +113,20 @@ export default function ModelListScreen() {
             handleSelect(item.id);
           }}
           disabled={mutations.updateModel.isPending}
+          accessibilityState={{ disabled: mutations.updateModel.isPending, busy: isRowPending }}
         >
           <View className="flex-1">
             <Text className="text-sm font-medium">{item.name}</Text>
             <Text className="text-xs text-muted-foreground">{item.id}</Text>
           </View>
-          {item.supportsVision && <Eye size={14} color={colors.mutedForeground} />}
-          {selected && <Check size={16} color={colors.primary} />}
+          {isRowPending ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : (
+            <>
+              {item.supportsVision && <Eye size={14} color={colors.mutedForeground} />}
+              {selected && <Check size={16} color={colors.primary} />}
+            </>
+          )}
         </Pressable>
       );
     },
@@ -91,6 +134,7 @@ export default function ModelListScreen() {
       currentModel,
       handleSelect,
       mutations.updateModel.isPending,
+      pendingModelId,
       colors.mutedForeground,
       colors.primary,
     ]
@@ -105,17 +149,22 @@ export default function ModelListScreen() {
       : []),
     ...(rest.length > 0
       ? [
-          { type: 'header' as const, title: 'All Models' },
+          { type: 'header' as const, title: 'All models' },
           ...rest.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
   ];
 
+  if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
+    return <InstanceContextBoundary title="All models" context={instanceContext} />;
+  }
+
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="All Models" />
+      <ScreenHeader title="All models" />
       <View className="px-4 pb-2 pt-2">
         <TextInput
+          ref={searchInputRef}
           className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
           placeholder="Search models..."
           placeholderTextColor={colors.mutedForeground}
@@ -134,7 +183,13 @@ export default function ModelListScreen() {
       )}
       {isError && (
         <View className="flex-1 items-center justify-center">
-          <QueryError message="Could not load models" onRetry={() => void refetch()} />
+          <QueryError
+            message="Could not load models"
+            onRetry={() => {
+              void refetch();
+              void configQuery.refetch();
+            }}
+          />
         </View>
       )}
       {!isLoading && !isError && (
@@ -143,7 +198,26 @@ export default function ModelListScreen() {
           keyExtractor={(item, index) =>
             item.type === 'header' ? `header-${item.title}` : `model-${item.model.id}-${index}`
           }
-          contentContainerStyle={{ paddingBottom: Math.max(bottom, 16) }}
+          contentContainerStyle={listContentContainerStyle}
+          ListEmptyComponent={
+            <EmptyState
+              icon={Search}
+              title={searchFilter ? 'No models match your search' : 'No models available'}
+              description={
+                searchFilter
+                  ? `No results for "${searchFilter}"`
+                  : 'Models will appear here once available.'
+              }
+              placement="top"
+              action={
+                searchFilter ? (
+                  <Button variant="outline" size="sm" onPress={handleClearSearch}>
+                    <Text>Clear search</Text>
+                  </Button>
+                ) : undefined
+              }
+            />
+          }
           renderItem={({ item }) => {
             if (item.type === 'header') {
               return (

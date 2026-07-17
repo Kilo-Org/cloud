@@ -540,9 +540,6 @@ describe('review agent config REVIEW.md setting', () => {
 
     await db.insert(platform_access_token_credentials).values({
       platform_integration_id: integration.id,
-      owned_by_organization_id: organization.id,
-      platform: 'bitbucket',
-      integration_type: 'workspace_access_token',
       token_encrypted: 'encrypted-token',
       provider_credential_type: 'workspace_access_token',
       provider_scopes: providerScopes,
@@ -652,9 +649,6 @@ describe('review agent config REVIEW.md setting', () => {
           eq(agent_configs.owned_by_organization_id, organization.id)
         )
       );
-    await db
-      .delete(platform_access_token_credentials)
-      .where(eq(platform_access_token_credentials.owned_by_organization_id, organization.id));
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, testUser.id));
@@ -1404,6 +1398,31 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.is_enabled).toBe(false);
   });
 
+  it('does not enable Code Reviewer when a fresh personal config is saved without isEnabled', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    // No pre-existing agent_configs row: this sub-setting save creates it.
+    // Regression guard — the insert default used to be `?? true`, which
+    // silently turned on auto-reviews the moment a user edited any setting.
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      disableReviewMd: true,
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(false);
+  });
+
   it('preserves personal review feature settings during a full config save', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({
@@ -2020,5 +2039,215 @@ describe('codeReviewRouter attempts', () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+describe('review agent config repository model overrides', () => {
+  let testUser: User;
+  let organization: Organization;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization('Override Config Org', testUser.id, 0, {}, false);
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        or(
+          eq(agent_configs.owned_by_user_id, testUser.id),
+          eq(agent_configs.owned_by_organization_id, organization.id)
+        )
+      );
+  });
+
+  it('round-trips personal overrides independent of the selected repositories', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: [101],
+      repositoryModelOverrides: [
+        {
+          repositoryId: 101,
+          repoFullName: 'acme/api',
+          modelSlug: 'openai/gpt-5',
+          thinkingEffort: 'high',
+        },
+        // 202 is not in the trigger selection but overrides are independent of it.
+        {
+          repositoryId: 202,
+          repoFullName: 'acme/other',
+          modelSlug: 'openai/gpt-5',
+          thinkingEffort: null,
+        },
+      ],
+      autoConfigureWebhooks: false,
+    });
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    expect(returned.repositoryModelOverrides).toEqual([
+      {
+        repositoryId: 101,
+        repoFullName: 'acme/api',
+        modelSlug: 'openai/gpt-5',
+        thinkingEffort: 'high',
+      },
+      {
+        repositoryId: 202,
+        repoFullName: 'acme/other',
+        modelSlug: 'openai/gpt-5',
+        thinkingEffort: null,
+      },
+    ]);
+  });
+
+  it('keeps personal overrides in all-repositories mode', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'all',
+      selectedRepositoryIds: [],
+      repositoryModelOverrides: [
+        {
+          repositoryId: 101,
+          repoFullName: 'acme/api',
+          modelSlug: 'openai/gpt-5',
+          thinkingEffort: null,
+        },
+      ],
+      autoConfigureWebhooks: false,
+    });
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    expect(returned.repositoryModelOverrides).toEqual([
+      {
+        repositoryId: 101,
+        repoFullName: 'acme/api',
+        modelSlug: 'openai/gpt-5',
+        thinkingEffort: null,
+      },
+    ]);
+  });
+
+  it('clears personal overrides when an empty list is saved', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    const saveWith = (
+      repositoryModelOverrides: Array<{
+        repositoryId: number;
+        repoFullName: string;
+        modelSlug: string;
+        thinkingEffort: string | null;
+      }>
+    ) =>
+      caller.personalReviewAgent.saveReviewConfig({
+        platform: 'github',
+        reviewStyle: 'balanced',
+        focusAreas: [],
+        modelSlug: 'test-model',
+        repositorySelectionMode: 'all',
+        selectedRepositoryIds: [],
+        repositoryModelOverrides,
+        autoConfigureWebhooks: false,
+      });
+
+    await saveWith([
+      {
+        repositoryId: 101,
+        repoFullName: 'acme/api',
+        modelSlug: 'openai/gpt-5',
+        thinkingEffort: null,
+      },
+    ]);
+    await saveWith([]);
+
+    const returned = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
+    expect(returned.repositoryModelOverrides).toEqual([]);
+  });
+
+  it('round-trips organization github overrides independent of the selection', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: [101],
+      repositoryModelOverrides: [
+        {
+          repositoryId: 101,
+          repoFullName: 'acme/api',
+          modelSlug: 'openai/gpt-5',
+          thinkingEffort: null,
+        },
+        {
+          repositoryId: 202,
+          repoFullName: 'acme/other',
+          modelSlug: 'openai/gpt-5',
+          thinkingEffort: null,
+        },
+      ],
+      autoConfigureWebhooks: false,
+    });
+
+    const returned = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(returned.repositoryModelOverrides).toEqual([
+      {
+        repositoryId: 101,
+        repoFullName: 'acme/api',
+        modelSlug: 'openai/gpt-5',
+        thinkingEffort: null,
+      },
+      {
+        repositoryId: 202,
+        repoFullName: 'acme/other',
+        modelSlug: 'openai/gpt-5',
+        thinkingEffort: null,
+      },
+    ]);
+  });
+
+  it('rejects duplicate repository overrides for the same repo', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await expect(
+      caller.personalReviewAgent.saveReviewConfig({
+        platform: 'github',
+        reviewStyle: 'balanced',
+        focusAreas: [],
+        modelSlug: 'test-model',
+        repositorySelectionMode: 'all',
+        selectedRepositoryIds: [],
+        repositoryModelOverrides: [
+          {
+            repositoryId: 101,
+            repoFullName: 'acme/api',
+            modelSlug: 'openai/gpt-5',
+            thinkingEffort: null,
+          },
+          {
+            repositoryId: 101,
+            repoFullName: 'acme/api',
+            modelSlug: 'anthropic/claude-sonnet-5',
+            thinkingEffort: null,
+          },
+        ],
+        autoConfigureWebhooks: false,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 });

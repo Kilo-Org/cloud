@@ -4,6 +4,8 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { ZodType } from 'zod';
 
+export { formatCents, formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -56,22 +58,6 @@ export function getInitialsFromName(name: string): string {
     .map(part => part.charAt(0).toUpperCase())
     .join('')
     .slice(0, 2);
-}
-
-export function formatCents(amount: number, currency: string = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
-}
-
-export function formatDollars(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 export function formatDate(timestamp: number) {
@@ -151,10 +137,6 @@ export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | 
 
 export function toMicrodollars(amount: number): number {
   return Math.round(amount * 1000000);
-}
-
-export function fromMicrodollars(microdollars: number): number {
-  return microdollars / 1000000;
 }
 
 export function formatLargeNumber(num: number, shorten: boolean = false): string {

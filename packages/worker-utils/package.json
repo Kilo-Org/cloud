@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
+    "./gitlab-credential": "./src/gitlab-credential.ts",
     "./internal-service-token-audiences": "./src/internal-service-token-audiences.ts",
     "./instance-id": "./src/instance-id.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
@@ -28,7 +29,9 @@
     "./security-notification-policy": "./src/security-notification-policy.ts",
     "./security-finding-audit": "./src/security-finding-audit.ts",
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
-    "./client-error": "./src/client-error.ts"
+    "./client-error": "./src/client-error.ts",
+    "./review-agents": "./src/review-agents.ts",
+    "./code-review-council": "./src/code-review-council.ts"
   },
   "scripts": {
     "test": "vitest run",

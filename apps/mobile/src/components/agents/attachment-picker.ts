@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- This module wraps Alert.alert and select-style pickers in Promise-returning helpers, so require-await and promise-function-async apply; prefer-await-to-then still applies inside the body. */
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
 
 import {
@@ -8,7 +9,6 @@ import {
   type AgentAttachmentExtension,
 } from '@/lib/agent-attachments/constants';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { classifyAttachment } from '@/lib/agent-attachments/validate';
 
 const IMAGE_PICKER_OPTIONS = {
   mediaTypes: ['images'],
@@ -72,10 +72,7 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeImageAsset).filter(asset => {
-    const classified = classifyAttachment(asset);
-    return classified.ok;
-  });
+  return result.assets.map(normalizeImageAsset);
 }
 
 async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
@@ -86,10 +83,7 @@ async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeImageAsset).filter(asset => {
-    const classified = classifyAttachment(asset);
-    return classified.ok;
-  });
+  return result.assets.map(normalizeImageAsset);
 }
 
 async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
@@ -101,13 +95,13 @@ async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeDocumentAsset).filter(asset => {
-    const classified = classifyAttachment(asset);
-    return classified.ok;
-  });
+  return result.assets.map(normalizeDocumentAsset);
 }
 
 type AttachmentSource = 'camera' | 'library' | 'files';
+
+const ATTACHMENT_SOURCE_OPTIONS = ['Camera', 'Photo Library', 'Files', 'Cancel'];
+const ATTACHMENT_SOURCE_CANCEL_INDEX = ATTACHMENT_SOURCE_OPTIONS.length - 1;
 
 async function pickFromSource(source: AttachmentSource): Promise<AgentAttachmentCandidate[]> {
   if (source === 'camera') {
@@ -119,7 +113,9 @@ async function pickFromSource(source: AttachmentSource): Promise<AgentAttachment
   return pickAgentDocuments();
 }
 
-export function pickAgentAttachments(): Promise<AgentAttachmentCandidate[]> {
+export function pickAgentAttachments(
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions']
+): Promise<AgentAttachmentCandidate[]> {
   return new Promise(resolve => {
     let settled = false;
     const settle = (value: AgentAttachmentCandidate[]) => {
@@ -132,41 +128,21 @@ export function pickAgentAttachments(): Promise<AgentAttachmentCandidate[]> {
       const result = await pickFromSource(source);
       settle(result);
     };
-    Alert.alert(
-      'Add attachment',
-      'Choose a source',
-      [
-        {
-          text: 'Camera',
-          onPress: () => {
-            void handle('camera');
-          },
-        },
-        {
-          text: 'Photo Library',
-          onPress: () => {
-            void handle('library');
-          },
-        },
-        {
-          text: 'Files',
-          onPress: () => {
-            void handle('files');
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            settle([]);
-          },
-        },
-      ],
+    showActionSheetWithOptions(
       {
-        cancelable: true,
-        onDismiss: () => {
+        options: ATTACHMENT_SOURCE_OPTIONS,
+        cancelButtonIndex: ATTACHMENT_SOURCE_CANCEL_INDEX,
+      },
+      index => {
+        if (index === 0) {
+          void handle('camera');
+        } else if (index === 1) {
+          void handle('library');
+        } else if (index === 2) {
+          void handle('files');
+        } else {
           settle([]);
-        },
+        }
       }
     );
   });

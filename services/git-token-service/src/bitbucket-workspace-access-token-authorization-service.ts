@@ -14,6 +14,7 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
   buildBitbucketOrganizationCredentialLockKey,
   buildBitbucketWorkspaceAccessTokenAad,
+  BitbucketWorkspaceAccessTokenCredentialRowSchema,
   hasBitbucketAccessTokenFamilyPrefix,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
   normalizeBitbucketWorkspaceAccessTokenScopes,
@@ -34,8 +35,6 @@ export type BitbucketWorkspaceAccessTokenAuthorizationCandidate = {
   accountId: string | null;
   accountLogin: string | null;
   authInvalidAt: string | null;
-  credentialPlatform: string;
-  credentialIntegrationType: string;
   tokenEncrypted: string;
   providerCredentialType: string;
   providerScopes: string[];
@@ -136,8 +135,6 @@ function getVerifiedCredentialScopes(
     candidate.providerScopes.join(' ')
   );
   const hasVerifiedProfile =
-    candidate.credentialPlatform === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM &&
-    candidate.credentialIntegrationType === BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE &&
     candidate.providerCredentialType ===
       BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE &&
     isValidTimestamp(candidate.providerVerifiedAt) &&
@@ -183,7 +180,6 @@ export function buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
   return db
     .select({
       integrationId: platform_integrations.id,
-      credentialId: platform_access_token_credentials.id,
       organizationId: platform_integrations.owned_by_organization_id,
       ownedByUserId: platform_integrations.owned_by_user_id,
       platform: platform_integrations.platform,
@@ -193,30 +189,12 @@ export function buildBitbucketWorkspaceAccessTokenAuthorizationQuery(
       accountId: platform_integrations.platform_account_id,
       accountLogin: platform_integrations.platform_account_login,
       authInvalidAt: platform_integrations.auth_invalid_at,
-      credentialPlatform: platform_access_token_credentials.platform,
-      credentialIntegrationType: platform_access_token_credentials.integration_type,
-      tokenEncrypted: platform_access_token_credentials.token_encrypted,
-      providerCredentialType: platform_access_token_credentials.provider_credential_type,
-      providerScopes: platform_access_token_credentials.provider_scopes,
-      providerVerifiedAt: platform_access_token_credentials.provider_verified_at,
-      credentialVersion: platform_access_token_credentials.credential_version,
-      lastValidatedAt: platform_access_token_credentials.last_validated_at,
+      credential: platform_access_token_credentials,
     })
     .from(platform_integrations)
     .innerJoin(
       platform_access_token_credentials,
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_access_token_credentials.platform, platform_integrations.platform),
-        eq(
-          platform_access_token_credentials.integration_type,
-          platform_integrations.integration_type
-        ),
-        eq(
-          platform_access_token_credentials.owned_by_organization_id,
-          platform_integrations.owned_by_organization_id
-        )
-      )
+      eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id)
     )
     .innerJoin(
       kilocode_users,
@@ -257,14 +235,20 @@ export function buildBitbucketWorkspaceAccessTokenCredentialGenerationQuery(
   return db
     .select({ id: platform_access_token_credentials.id })
     .from(platform_access_token_credentials)
+    .innerJoin(
+      platform_integrations,
+      eq(platform_access_token_credentials.platform_integration_id, platform_integrations.id)
+    )
     .where(
       and(
         eq(platform_access_token_credentials.id, fence.credentialId),
-        eq(platform_access_token_credentials.owned_by_organization_id, fence.organizationId),
         eq(platform_access_token_credentials.platform_integration_id, fence.integrationId),
-        eq(platform_access_token_credentials.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
+        eq(platform_integrations.id, fence.integrationId),
+        eq(platform_integrations.owned_by_organization_id, fence.organizationId),
+        isNull(platform_integrations.owned_by_user_id),
+        eq(platform_integrations.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
         eq(
-          platform_access_token_credentials.integration_type,
+          platform_integrations.integration_type,
           BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE
         ),
         eq(platform_access_token_credentials.credential_version, fence.credentialVersion)
@@ -284,7 +268,6 @@ export function buildBitbucketWorkspaceAccessTokenMarkUsedQuery(
     .where(
       and(
         eq(platform_access_token_credentials.id, fence.credentialId),
-        eq(platform_access_token_credentials.owned_by_organization_id, fence.organizationId),
         eq(platform_access_token_credentials.platform_integration_id, fence.integrationId),
         eq(platform_access_token_credentials.credential_version, fence.credentialVersion),
         or(
@@ -330,7 +313,34 @@ class DrizzleBitbucketWorkspaceAccessTokenAuthorizationStore implements Bitbucke
   }): Promise<BitbucketWorkspaceAccessTokenAuthorizationCandidate | null> {
     const [candidate] = await buildBitbucketWorkspaceAccessTokenAuthorizationQuery(this.db, input);
     if (!candidate?.organizationId) return null;
-    return { ...candidate, organizationId: candidate.organizationId };
+    const credential = BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse(
+      candidate.credential
+    );
+    if (
+      !credential.success ||
+      credential.data.platform_integration_id !== candidate.integrationId
+    ) {
+      return null;
+    }
+    return {
+      integrationId: candidate.integrationId,
+      credentialId: credential.data.id,
+      organizationId: candidate.organizationId,
+      ownedByUserId: candidate.ownedByUserId,
+      platform: candidate.platform,
+      integrationType: candidate.integrationType,
+      integrationStatus: candidate.integrationStatus,
+      installationId: candidate.installationId,
+      accountId: candidate.accountId,
+      accountLogin: candidate.accountLogin,
+      authInvalidAt: candidate.authInvalidAt,
+      tokenEncrypted: credential.data.token_encrypted,
+      providerCredentialType: credential.data.provider_credential_type,
+      providerScopes: credential.data.provider_scopes,
+      providerVerifiedAt: credential.data.provider_verified_at,
+      credentialVersion: credential.data.credential_version,
+      lastValidatedAt: credential.data.last_validated_at,
+    };
   }
 
   async markUsed(

@@ -4,7 +4,7 @@ import {
   type MagicLinkTokenWithPlaintext,
 } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
-import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
+import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { MAGIC_LINK_EMAIL_ERRORS } from '@/lib/schemas/email';
 import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
@@ -23,7 +23,7 @@ import { POST } from './route';
 const mockVerifyTurnstileJWT = jest.mocked(verifyTurnstileJWT);
 const mockCreateMagicLinkToken = jest.mocked(createMagicLinkToken);
 const mockSendMagicLinkEmail = jest.mocked(sendMagicLinkEmail);
-const mockFindUserByEmail = jest.mocked(findUserByEmail);
+const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
@@ -42,6 +42,7 @@ describe('POST /api/auth/magic-link', () => {
     expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     consumed_at: null,
     created_at: new Date().toISOString(),
+    purpose: 'magic_link',
     plaintext_token: 'plaintext123',
   };
 
@@ -64,7 +65,7 @@ describe('POST /api/auth/magic-link', () => {
     mockSendMagicLinkEmail.mockResolvedValue({ sent: true });
 
     // Default: User does not exist (new user signup)
-    mockFindUserByEmail.mockResolvedValue(undefined);
+    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
 
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
@@ -136,10 +137,10 @@ describe('POST /api/auth/magic-link', () => {
   });
 
   it('uses an existing account primary domain for SSO enforcement', async () => {
-    mockFindUserByEmail.mockResolvedValue({
+    mockFindUserByNormalizedEmail.mockResolvedValue({
       id: 'existing-user-id',
       google_user_email: 'user@company.com',
-    } as Awaited<ReturnType<typeof findUserByEmail>>);
+    } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
     mockResolveSsoAuthorityForDomain.mockResolvedValue({
       status: 'required',
       domain: 'company.com',
@@ -182,10 +183,10 @@ describe('POST /api/auth/magic-link', () => {
   });
 
   it('should use the same rate limit key for different email casing', async () => {
-    mockFindUserByEmail.mockResolvedValue({
+    mockFindUserByNormalizedEmail.mockResolvedValue({
       id: 'existing-user-id',
       google_user_email: 'user@example.com',
-    } as Awaited<ReturnType<typeof findUserByEmail>>);
+    } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
 
     await POST(createRequest({ email: 'User@Example.com' }));
     await POST(createRequest({ email: 'user@example.com' }));
@@ -194,6 +195,15 @@ describe('POST /api/auth/magic-link', () => {
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
     const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
     expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
+    expect(secondKey).toBe(firstKey);
+  });
+
+  it('uses the same rate limit key for aliases of the same mailbox', async () => {
+    await POST(createRequest({ email: 'te.st+first@gmail.com' }));
+    await POST(createRequest({ email: 'test+second@googlemail.com' }));
+
+    const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
     expect(secondKey).toBe(firstKey);
   });
 
@@ -260,7 +270,7 @@ describe('POST /api/auth/magic-link', () => {
 
   describe('magic link signup email validation', () => {
     it('should reject uppercase email for new users', async () => {
-      mockFindUserByEmail.mockResolvedValue(undefined); // New user
+      mockFindUserByNormalizedEmail.mockResolvedValue(undefined); // New user
 
       const response = await POST(createRequest({ email: 'User@Example.com' }));
       const data = await response.json();
@@ -271,7 +281,7 @@ describe('POST /api/auth/magic-link', () => {
     });
 
     it('should reject email with + for new users', async () => {
-      mockFindUserByEmail.mockResolvedValue(undefined); // New user
+      mockFindUserByNormalizedEmail.mockResolvedValue(undefined); // New user
 
       const response = await POST(createRequest({ email: 'user+tag@example.com' }));
       const data = await response.json();
@@ -282,10 +292,10 @@ describe('POST /api/auth/magic-link', () => {
     });
 
     it('should allow uppercase email for existing users (sign-in)', async () => {
-      mockFindUserByEmail.mockResolvedValue({
+      mockFindUserByNormalizedEmail.mockResolvedValue({
         id: 'existing-user-id',
         google_user_email: 'User@Example.com',
-      } as Awaited<ReturnType<typeof findUserByEmail>>);
+      } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
 
       const response = await POST(createRequest({ email: 'User@Example.com' }));
       const data = await response.json();
@@ -296,10 +306,10 @@ describe('POST /api/auth/magic-link', () => {
     });
 
     it('should allow email with + for existing users (sign-in)', async () => {
-      mockFindUserByEmail.mockResolvedValue({
+      mockFindUserByNormalizedEmail.mockResolvedValue({
         id: 'existing-user-id',
         google_user_email: 'user+tag@example.com',
-      } as Awaited<ReturnType<typeof findUserByEmail>>);
+      } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
 
       const response = await POST(createRequest({ email: 'user+tag@example.com' }));
       const data = await response.json();
@@ -310,7 +320,7 @@ describe('POST /api/auth/magic-link', () => {
     });
 
     it('should allow valid lowercase email without + for new users', async () => {
-      mockFindUserByEmail.mockResolvedValue(undefined); // New user
+      mockFindUserByNormalizedEmail.mockResolvedValue(undefined); // New user
 
       const response = await POST(createRequest({ email: 'user@example.com' }));
       const data = await response.json();

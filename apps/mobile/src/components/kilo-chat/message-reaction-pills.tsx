@@ -37,8 +37,11 @@ export function MessageReactionPills({
             onPress={() => {
               onReactionPress(message, reaction.emoji);
             }}
+            accessibilityRole="button"
+            accessibilityLabel={`${reaction.emoji} reaction, ${reaction.count}`}
+            accessibilityState={{ selected: hasReacted }}
             className={cn(
-              'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1',
+              'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1 active:opacity-70',
               hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700'
             )}
           >

@@ -77,21 +77,21 @@ export function SessionRow({
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
           <Eyebrow className={color.hueTextClass}>{agentLabel}</Eyebrow>
-          {live && <StatusDot tone="good" glow />}
+          {live && <StatusDot tone="good" />}
           {!live && meta && (
-            <Text variant="mono" className="text-xs text-ink2">
+            <Text variant="mono" className="shrink text-xs text-ink2">
               {meta}
             </Text>
           )}
         </View>
-        <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={1}>
+        <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? (
           <Text
             variant="mono"
             className="mt-1 text-xs tracking-[0.3px] text-muted-soft"
-            numberOfLines={1}
+            numberOfLines={2}
           >
             {subtitle}
           </Text>

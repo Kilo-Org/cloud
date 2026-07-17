@@ -1,5 +1,6 @@
 import type { Organization, User } from '@kilocode/db/schema';
 import { organizations, credit_transactions, transactional_email_log } from '@kilocode/db/schema';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
@@ -97,10 +98,7 @@ async function getTopUpConfirmationRecipientMembersForOrganization(
   const recipientsByEmail = new Map<string, { id: User['id']; email: string }>();
 
   for (const member of members) {
-    if (
-      member.status === 'active' &&
-      (member.role === 'owner' || member.role === 'billing_manager')
-    ) {
+    if (member.status === 'active' && canManageOrganizationBilling(member.role)) {
       recipientsByEmail.set(member.email, { id: member.id, email: member.email });
     }
   }

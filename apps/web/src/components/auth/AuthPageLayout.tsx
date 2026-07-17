@@ -11,7 +11,7 @@ export function AuthPageLayout({ children }: AuthPageLayoutProps) {
         {/* Left Column - Content */}
         <main
           style={{ backgroundColor: '#0a0a0a' }}
-          className="flex min-h-screen w-3/5 shrink-0 flex-col items-center justify-center px-5 pt-32 pb-8"
+          className="flex min-h-screen w-full shrink-0 flex-col items-center justify-center px-5 pt-32 pb-8 xl:w-3/5"
         >
           {children}
         </main>

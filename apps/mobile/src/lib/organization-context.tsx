@@ -37,6 +37,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       setIsLoaded(true);
       return undefined;
     }
+    setIsLoaded(false);
     let cancelled = false;
     const load = async () => {
       try {

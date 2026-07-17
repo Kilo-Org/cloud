@@ -25,8 +25,14 @@ const GitLabSessionIdentitySchema = z
   .strict()
   .refine(identity => identity.accountId !== null || identity.accountLogin !== null);
 const GitLabProjectTokenDigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
-const GitLabCapabilityCredentialSourceSchema = z.discriminatedUnion('type', [
+const GitLabCredentialIdSchema = z.object({ credentialId: z.uuid() });
+const GitLabCredentialFenceSchema = GitLabCredentialIdSchema.extend({
+  credentialVersion: z.number().int().positive(),
+});
+const GitLabCapabilityCredentialSourceSchema = z.union([
   z.object({ type: z.literal('integration') }).strict(),
+  GitLabCredentialIdSchema.extend({ type: z.literal('integration') }).strict(),
+  GitLabCredentialFenceSchema.extend({ type: z.literal('integration') }).strict(),
   z
     .object({
       type: z.literal('project'),
@@ -34,6 +40,10 @@ const GitLabCapabilityCredentialSourceSchema = z.discriminatedUnion('type', [
       tokenDigest: GitLabProjectTokenDigestSchema,
     })
     .strict(),
+  GitLabCredentialFenceSchema.extend({
+    type: z.literal('project'),
+    projectId: z.number().int().positive(),
+  }).strict(),
 ]);
 const GitLabSessionCapabilityClaimsBaseSchema = z.object({
   purpose: z.literal(CAPABILITY_PURPOSE),

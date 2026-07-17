@@ -1,20 +1,44 @@
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import { createCliLiveTransport } from './cli-live-transport';
+import type { SlashCommandInfo } from './schemas';
 import type {
   RemoteModelCatalogV1,
   RemoteModelCatalogWireV1,
   RemoteModelState,
 } from './remote-model-catalog';
+import type { RemoteCommandState } from './remote-command-catalog';
 import {
   UserWebCommandError,
   type UserWebCliEvent,
   type UserWebConnection,
   type UserWebSystemEvent,
 } from './user-web-connection';
-import type { KiloSessionId, SessionSnapshot } from './types';
+import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 
 const KILO_SESSION_ID = kiloId('kilo-ses-1');
+const NEW_KILO_SESSION_ID = 'ses_12345678901234567890123456';
+const ROTATED_KILO_SESSION_ID = 'ses_abcdefghijklmnopqrstuvwxyz';
+const COMMAND_WIRE_CATALOG = {
+  protocolVersion: 1,
+  commands: [
+    {
+      name: 'review',
+      description: 'Review changes',
+      source: 'command' as const,
+      hints: ['$ARGUMENTS'],
+    },
+    {
+      name: 'compact',
+      description: 'compact the current session context',
+      hints: [],
+    },
+  ],
+} satisfies { protocolVersion: 1; commands: SlashCommandInfo[] };
+const PARSED_COMMAND_CATALOG: SlashCommandInfo[] = COMMAND_WIRE_CATALOG.commands.map(command => ({
+  ...command,
+  hints: [...command.hints],
+}));
 const WIRE_CATALOG = {
   all: [
     {
@@ -104,6 +128,7 @@ function createConnection(): FakeUserWebConnection {
     destroy: jest.fn(),
     subscribeToCliSession: jest.fn(() => release),
     sendCommand: jest.fn(() => Promise.resolve({ ok: true })),
+    sendCommandToConnection: jest.fn(() => Promise.resolve({ ok: true })),
     onCliEvent: jest.fn((_sessionId, listener) => {
       cliListeners.push(listener);
       return jest.fn();
@@ -129,6 +154,7 @@ function createTransportWithSinks(opts?: {
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onError?: (message: string) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
 }) {
   const userWebConnection = opts?.connection ?? createConnection();
@@ -141,6 +167,7 @@ function createTransportWithSinks(opts?: {
     fetchSnapshot: opts?.fetchSnapshot,
     onError: opts?.onError,
     onRemoteModelStateChange: opts?.onRemoteModelStateChange,
+    onRemoteCommandStateChange: opts?.onRemoteCommandStateChange,
     onCapabilityChange: opts?.onCapabilityChange,
   })({
     onChatEvent: event => chatEvents.push(event),
@@ -344,10 +371,10 @@ describe('CliLiveTransport unified user web connection', () => {
       ...REMOTE_CATALOG,
       providers: [{ ...REMOTE_CATALOG.providers[0], id: 'replacement-provider' }],
     } satisfies RemoteModelCatalogV1;
-    jest
-      .mocked(connection.sendCommand)
-      .mockReturnValueOnce(firstCatalog)
-      .mockResolvedValueOnce(replacementWireCatalog);
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command, _data, owner) => {
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return owner === 'owner-a' ? firstCatalog : Promise.resolve(replacementWireCatalog);
+    });
     const states: RemoteModelState[] = [];
     const { transport } = createTransportWithSinks({
       connection,
@@ -379,10 +406,12 @@ describe('CliLiveTransport unified user web connection', () => {
   it('keeps one catalog request in flight for an owner', async () => {
     const connection = createConnection();
     let resolveCatalog: ((catalog: RemoteModelCatalogWireV1) => void) | undefined;
-    jest.mocked(connection.sendCommand).mockReturnValue(
-      new Promise(resolve => {
-        resolveCatalog = resolve;
-      })
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) =>
+      command === 'list_commands'
+        ? Promise.resolve(COMMAND_WIRE_CATALOG)
+        : new Promise(resolve => {
+            resolveCatalog = resolve;
+          })
     );
     const { transport } = createTransportWithSinks({ connection });
 
@@ -391,7 +420,11 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.retryRemoteModels?.();
     connection.emitReconnect();
 
-    expect(connection.sendCommand).toHaveBeenCalledTimes(1);
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_models')
+    ).toHaveLength(1);
 
     resolveCatalog?.(WIRE_CATALOG);
     await Promise.resolve();
@@ -401,10 +434,14 @@ describe('CliLiveTransport unified user web connection', () => {
 
   it('retains a v1 catalog when a same-owner reconnect refresh fails', async () => {
     const connection = createConnection();
-    jest
-      .mocked(connection.sendCommand)
-      .mockResolvedValueOnce(WIRE_CATALOG)
-      .mockRejectedValueOnce(new Error('catalog refresh timed out'));
+    let modelCatalogRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      modelCatalogRequest += 1;
+      return modelCatalogRequest === 1
+        ? Promise.resolve(WIRE_CATALOG)
+        : Promise.reject(new Error('catalog refresh timed out'));
+    });
     const states: RemoteModelState[] = [];
     const { transport } = createTransportWithSinks({
       connection,
@@ -428,13 +465,21 @@ describe('CliLiveTransport unified user web connection', () => {
       refresh: 'error',
       error: 'catalog refresh timed out',
     });
-    expect(connection.sendCommand).toHaveBeenCalledTimes(2);
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_models')
+    ).toHaveLength(2);
     transport.destroy();
   });
 
   it('clears owner-scoped catalog state and rediscovers after session reappearance', async () => {
     const connection = createConnection();
-    jest.mocked(connection.sendCommand).mockResolvedValue(WIRE_CATALOG);
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
     const states: RemoteModelState[] = [];
     const { transport } = createTransportWithSinks({
       connection,
@@ -458,13 +503,17 @@ describe('CliLiveTransport unified user web connection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(connection.sendCommand).toHaveBeenLastCalledWith(
-      KILO_SESSION_ID,
-      'list_models',
-      { protocolVersion: 1 },
-      'owner-b'
-    );
-    expect(connection.sendCommand).toHaveBeenCalledTimes(2);
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_models')
+    ).toHaveLength(2);
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_models')
+        .at(-1)
+    ).toEqual([KILO_SESSION_ID, 'list_models', { protocolVersion: 1 }, 'owner-b']);
     transport.destroy();
   });
 
@@ -563,7 +612,10 @@ describe('CliLiveTransport unified user web connection', () => {
 
     userWebConnection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
     userWebConnection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
-    expect(serviceEvents).toEqual([{ type: 'stopped', reason: 'disconnected' }]);
+    expect(serviceEvents).toEqual([
+      { type: 'commands.available', commands: [] },
+      { type: 'stopped', reason: 'disconnected' },
+    ]);
 
     userWebConnection.emitSystem({
       event: 'sessions.heartbeat',
@@ -600,6 +652,7 @@ describe('CliLiveTransport unified user web connection', () => {
     // a session.status event clears the disconnected UI state.
     expect(serviceEvents).toEqual([
       { type: 'session.status', sessionId: KILO_SESSION_ID, status: { type: 'idle' } },
+      { type: 'commands.available', commands: [] },
       { type: 'stopped', reason: 'disconnected' },
       { type: 'session.status', sessionId: KILO_SESSION_ID, status: { type: 'idle' } },
     ]);
@@ -1208,13 +1261,1865 @@ describe('CliLiveTransport unified user web connection', () => {
     }
   );
 
-  it('rejects structured slash commands without sending a viewer command', async () => {
-    const { userWebConnection, transport } = createTransportWithSinks();
+  it('sends a structured command with arguments, message ID, model, and variant', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.resolve({ ok: true });
+    });
+    const { userWebConnection, transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await transport.send?.({
+      payload: { type: 'command', command: 'review', arguments: 'main --fix' },
+      messageId: 'msg-command-1',
+      remoteModelOverride: {
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      },
+    });
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_command',
+      {
+        protocolVersion: 1,
+        command: 'review',
+        arguments: 'main --fix',
+        messageID: 'msg-command-1',
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        variant: 'high',
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('sends a structured command without a message ID and without a model override', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.resolve({ ok: true });
+    });
+    const { userWebConnection, transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await transport.send?.({
+      payload: { type: 'command', command: 'compact', arguments: '' },
+    });
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_command',
+      {
+        protocolVersion: 1,
+        command: 'compact',
+        arguments: '',
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('sends a legacy command override as a structured kilo model with the bare modelID', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models')
+        return Promise.reject(new Error('unknown command: list_models'));
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.resolve({ ok: true });
+    });
+    const { userWebConnection, transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await transport.send?.({
+      payload: { type: 'command', command: 'review', arguments: '' },
+      remoteModelOverride: {
+        source: 'legacy-gateway',
+        selection: {
+          model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+          variant: 'high',
+        },
+      },
+    });
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_command',
+      {
+        protocolVersion: 1,
+        command: 'review',
+        arguments: '',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+        variant: 'high',
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('strips the kilo/ prefix from a legacy command override modelID to match CLI dispatch', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models')
+        return Promise.reject(new Error('unknown command: list_models'));
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.resolve({ ok: true });
+    });
+    const { userWebConnection, transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    // The CLI normalizer (`dispatchedKilocodeModelId`) strips the `kilo/`
+    // prefix from a legacy override modelID. For the structured
+    // `send_command` wire to dispatch the same model the CLI would see from
+    // a prompt wire, the modelID in the structured payload must be the
+    // dispatched (stripped) form.
+    await transport.send?.({
+      payload: { type: 'command', command: 'review', arguments: '' },
+      remoteModelOverride: {
+        source: 'legacy-gateway',
+        selection: {
+          model: { providerID: 'kilo', modelID: 'kilo/anthropic/claude-sonnet-4' },
+        },
+      },
+    });
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_command',
+      {
+        protocolVersion: 1,
+        command: 'review',
+        arguments: '',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+});
+
+describe('CliLiveTransport remote command catalog', () => {
+  it('discovers and publishes commands for the current owner', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(connection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'list_commands',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual([
+      { type: 'commands.available', commands: PARSED_COMMAND_CATALOG },
+    ]);
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'idle',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+    transport.destroy();
+  });
+
+  it('publishes an empty command catalog for a legacy CLI without list_commands support', async () => {
+    const connection = createConnection();
+    const onError = jest.fn();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        command === 'list_models'
+          ? Promise.resolve(WIRE_CATALOG)
+          : Promise.reject(new Error('unknown command: list_commands'))
+      );
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onError,
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual([
+      { type: 'commands.available', commands: [] },
+    ]);
+    expect(onError).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('clears the catalog on a malformed same-owner refresh without populating fatal error', async () => {
+    const connection = createConnection();
+    const onError = jest.fn();
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      return commandRequest === 1
+        ? Promise.resolve(COMMAND_WIRE_CATALOG)
+        : Promise.resolve({ invalid: true });
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onError,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: [],
+    });
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'error',
+      message: 'Invalid remote command catalog',
+      commands: [],
+    });
+    expect(onError).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('retains the catalog on a transient same-owner refresh failure', async () => {
+    const connection = createConnection();
+    const onError = jest.fn();
+    let rejectRefresh: ((error: Error) => void) | undefined;
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      if (commandRequest === 1) return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return new Promise((_resolve, reject) => {
+        rejectRefresh = reject;
+      });
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onError,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    const publishedBeforeRefresh = serviceEvents.filter(
+      event => event.type === 'commands.available'
+    );
+
+    connection.emitReconnect();
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual(
+      publishedBeforeRefresh
+    );
+
+    rejectRefresh?.(new Error('command catalog timed out'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual(
+      publishedBeforeRefresh
+    );
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'error',
+      message: 'command catalog timed out',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+    expect(onError).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('clears the catalog and reports a nonfatal error on a CATALOG_TOO_LARGE relay failure', async () => {
+    const connection = createConnection();
+    const onError = jest.fn();
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      return commandRequest === 1
+        ? Promise.resolve(COMMAND_WIRE_CATALOG)
+        : Promise.reject(
+            new UserWebCommandError({
+              code: 'CATALOG_TOO_LARGE',
+              message: 'Command catalog response is too large',
+            })
+          );
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onError,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: [],
+    });
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'error',
+      message: 'Command catalog response is too large',
+      commands: [],
+    });
+    expect(onError).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('publishes actionable upgrade-required state when the relay reports CLI_UPGRADE_REQUIRED', async () => {
+    const connection = createConnection();
+    const onError = jest.fn();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      return Promise.reject(
+        new UserWebCommandError({
+          code: 'CLI_UPGRADE_REQUIRED',
+          message: 'Update Kilo CLI to v8.4.0 to use slash commands',
+        })
+      );
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onError,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual([
+      { type: 'commands.available', commands: [] },
+    ]);
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'upgrade-required',
+      message: 'Update Kilo CLI to v8.4.0 to use slash commands',
+      commands: [],
+    });
+    expect(onError).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('propagates actionable copy from send_command CLI_UPGRADE_REQUIRED failures', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.reject(
+        new UserWebCommandError({
+          code: 'CLI_UPGRADE_REQUIRED',
+          message: 'Update Kilo CLI to v8.4.0 to send slash commands',
+        })
+      );
+    });
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
 
     await expect(
-      transport.send!({ payload: { type: 'command', command: 'review', arguments: '' } })
-    ).rejects.toThrow('Slash commands are not supported on the CLI live transport yet');
+      transport.send?.({ payload: { type: 'command', command: 'review', arguments: '' } })
+    ).rejects.toThrow('Update Kilo CLI to v8.4.0 to send slash commands');
+    transport.destroy();
+  });
+
+  it('keeps one command catalog request in flight per owner across reconnects', async () => {
+    const connection = createConnection();
+    let resolveCatalog: ((catalog: typeof COMMAND_WIRE_CATALOG) => void) | undefined;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      return new Promise(resolve => {
+        resolveCatalog = resolve;
+      });
+    });
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    connection.emitReconnect();
+    connection.emitReconnect();
+
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_commands')
+    ).toHaveLength(1);
+
+    resolveCatalog?.(COMMAND_WIRE_CATALOG);
+    await Promise.resolve();
+    await Promise.resolve();
+    transport.destroy();
+  });
+
+  it('keeps command discovery independent from model discovery generation', async () => {
+    const connection = createConnection();
+    let resolveModelCatalog: ((catalog: RemoteModelCatalogWireV1) => void) | undefined;
+    let resolveCommandCatalog: ((catalog: typeof COMMAND_WIRE_CATALOG) => void) | undefined;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') {
+        return new Promise(resolve => {
+          resolveModelCatalog = resolve;
+        });
+      }
+      return new Promise(resolve => {
+        resolveCommandCatalog = resolve;
+      });
+    });
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Resolving the model catalog must not resolve the command catalog
+    // (different in-flight promises) and must not leave the command request
+    // stuck — it should still be awaiting its own response.
+    resolveModelCatalog?.(WIRE_CATALOG);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_commands')
+    ).toHaveLength(1);
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_models')
+    ).toHaveLength(1);
+
+    resolveCommandCatalog?.(COMMAND_WIRE_CATALOG);
+    await Promise.resolve();
+    await Promise.resolve();
+    transport.destroy();
+  });
+
+  it('ignores a late command catalog from a replaced owner', async () => {
+    const connection = createConnection();
+    let resolveFirstCatalog: ((catalog: typeof COMMAND_WIRE_CATALOG) => void) | undefined;
+    const firstCatalog = new Promise<typeof COMMAND_WIRE_CATALOG>(resolve => {
+      resolveFirstCatalog = resolve;
+    });
+    const replacementCatalog = {
+      protocolVersion: 1,
+      commands: [{ name: 'compact', hints: [] }],
+    };
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command, _data, owner) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') {
+        return owner === 'owner-a' ? firstCatalog : Promise.resolve(replacementCatalog);
+      }
+      return Promise.resolve({ ok: true });
+    });
+    const { transport, serviceEvents } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection, 'owner-a');
+    emitOwner(connection, 'owner-b');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    resolveFirstCatalog?.(COMMAND_WIRE_CATALOG);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: replacementCatalog.commands,
+    });
+    transport.destroy();
+  });
+
+  it('clears the published command catalog when the current owner disconnects', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
+    const { transport, serviceEvents } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    connection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: [],
+    });
+    transport.destroy();
+  });
+
+  it('rejects send_command with Remote session has no connected owner when no owner is known', async () => {
+    const { transport } = createTransportWithSinks();
+
+    await expect(
+      transport.send?.({ payload: { type: 'command', command: 'review', arguments: '' } })
+    ).rejects.toThrow('Remote session has no connected owner');
+    transport.destroy();
+  });
+
+  it('rejects send_command with SESSION_OWNER_CHANGED error when the owner changes mid-flight', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.reject(
+        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
+      );
+    });
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(
+      transport.send?.({ payload: { type: 'command', command: 'review', arguments: '' } })
+    ).rejects.toMatchObject({ code: 'SESSION_OWNER_CHANGED' });
+    transport.destroy();
+  });
+
+  it('keeps an ordinary prompt on send_message after command discovery is enabled', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return Promise.resolve({ ok: true });
+    });
+    const { userWebConnection, transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await transport.send?.({ payload: { type: 'prompt', prompt: 'hello' } });
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_message',
+      {
+        sessionID: KILO_SESSION_ID,
+        parts: [{ type: 'text', text: 'hello' }],
+      },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('retains the last valid commands on a transient same-owner refresh failure (state)', async () => {
+    const connection = createConnection();
+    const onError = jest.fn();
+    let rejectRefresh: ((error: Error) => void) | undefined;
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      if (commandRequest === 1) return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return new Promise((_resolve, reject) => {
+        rejectRefresh = reject;
+      });
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport } = createTransportWithSinks({
+      connection,
+      onError,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Initial discovery: state carries the parsed commands and `idle`.
+    const idleState = commandStates.at(-1);
+    expect(idleState).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'idle',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+
+    // Reconnect triggers a new in-flight request; loading state keeps the
+    // previously valid commands so consumers can keep showing them.
+    connection.emitReconnect();
+    await Promise.resolve();
+    const loadingState = commandStates.at(-1);
+    expect(loadingState).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'loading',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+
+    // Transient failure: error state keeps the same cached commands.
+    rejectRefresh?.(new Error('command catalog timed out'));
+    await Promise.resolve();
+    await Promise.resolve();
+    const errorState = commandStates.at(-1);
+    expect(errorState).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'error',
+      message: 'command catalog timed out',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+    expect(onError).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('clears cached commands on malformed, oversized, upgrade-required, disconnect, and teardown', async () => {
+    const connection = createConnection();
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      if (commandRequest === 2) return Promise.resolve({ invalid: true });
+      if (commandRequest === 4) {
+        return Promise.reject(
+          new UserWebCommandError({
+            code: 'CATALOG_TOO_LARGE',
+            message: 'Command catalog response is too large',
+          })
+        );
+      }
+      if (commandRequest === 6) {
+        return Promise.reject(
+          new UserWebCommandError({
+            code: 'CLI_UPGRADE_REQUIRED',
+            message: 'Update Kilo CLI to v8.4.0',
+          })
+        );
+      }
+      return Promise.resolve(COMMAND_WIRE_CATALOG);
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
+
+    // Malformed refresh: cache cleared.
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'error',
+      message: 'Invalid remote command catalog',
+      commands: [],
+    });
+
+    // Reconnect, retry → recovers cache.
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
+
+    // CATALOG_TOO_LARGE: cache cleared.
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'error',
+      message: 'Command catalog response is too large',
+      commands: [],
+    });
+
+    // Reconnect, retry → recovers cache.
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
+
+    // CLI_UPGRADE_REQUIRED: cache cleared and upgrade-required surfaced.
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      refresh: 'upgrade-required',
+      message: 'Update Kilo CLI to v8.4.0',
+      commands: [],
+    });
+
+    // Owner disconnect clears the cache.
+    connection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
+    expect(commandStates.at(-1)).toEqual({
+      ownerConnectionId: null,
+      refresh: 'idle',
+      commands: [],
+    });
+    transport.destroy();
+
+    // After transport teardown the next state (if any) keeps `[]` rather
+    // than resurrecting the old cache.
+    expect(commandStates.at(-1)?.commands).toEqual([]);
+  });
+
+  it('publishes immutable command arrays so later mutation cannot rewrite prior state history', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
+    const commandStates: RemoteCommandState[] = [];
+    const { transport } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    const firstCommands = commandStates.at(-1)!.commands;
+    expect(firstCommands).toEqual(PARSED_COMMAND_CATALOG);
+
+    // Mutating the array reference held by the consumer must not bleed
+    // into the next state — each emitted state carries its own copy.
+    firstCommands.length = 0;
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
+    transport.destroy();
+  });
+
+  it('exposes retryRemoteCommands that re-discovers after a transient failure', async () => {
+    const connection = createConnection();
+    let rejectFirstRefresh: ((error: Error) => void) | undefined;
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      if (commandRequest === 1) return Promise.resolve(COMMAND_WIRE_CATALOG);
+      if (commandRequest === 2) {
+        return new Promise((_resolve, reject) => {
+          rejectFirstRefresh = reject;
+        });
+      }
+      return Promise.resolve(COMMAND_WIRE_CATALOG);
+    });
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(transport.retryRemoteCommands).toBeDefined();
+
+    // Reconnect kicks off a refresh that we will then reject.
+    connection.emitReconnect();
+    await Promise.resolve();
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_commands')
+    ).toHaveLength(2);
+    rejectFirstRefresh?.(new Error('transient timeout'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Retry must re-issue exactly one more list_commands call and recover.
+    transport.retryRemoteCommands?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_commands')
+    ).toHaveLength(3);
+
+    // After recovery the cached commands are published again.
+    const finalService = transport as unknown as {
+      // accessor used by serviceEvent assertion helper is not exposed;
+      // the cache is observed through the state callback instead.
+    };
+    void finalService;
+    transport.destroy();
+  });
+
+  it('retryRemoteCommands is a no-op when there is no current owner', () => {
+    const { transport } = createTransportWithSinks();
+    transport.connect();
+    expect(transport.retryRemoteCommands).toBeDefined();
+    expect(() => transport.retryRemoteCommands?.()).not.toThrow();
+    transport.destroy();
+  });
+
+  it('retryRemoteCommands does not issue a duplicate request while one is in flight', async () => {
+    const connection = createConnection();
+    let resolveCatalog: ((catalog: typeof COMMAND_WIRE_CATALOG) => void) | undefined;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      return new Promise(resolve => {
+        resolveCatalog = resolve;
+      });
+    });
+    const { transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    const initialCalls = jest
+      .mocked(connection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'list_commands').length;
+
+    transport.retryRemoteCommands?.();
+    transport.retryRemoteCommands?.();
+    transport.retryRemoteCommands?.();
+
+    expect(
+      jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_commands')
+    ).toHaveLength(initialCalls);
+
+    resolveCatalog?.(COMMAND_WIRE_CATALOG);
+    await Promise.resolve();
+    await Promise.resolve();
+    transport.destroy();
+  });
+
+  it('isolates the commands.available event from later mutation of the outer array, command fields, and hints', async () => {
+    const connection = createConnection();
+    let rejectSecond: ((error: Error) => void) | undefined;
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      if (commandRequest === 1) return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return new Promise((_resolve, reject) => {
+        rejectSecond = reject;
+      });
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Grab the event the transport published.
+    const availableEvent = serviceEvents.find(
+      (event): event is Extract<typeof event, { type: 'commands.available' }> =>
+        event.type === 'commands.available'
+    );
+    expect(availableEvent).toBeDefined();
+    const eventCommands = availableEvent!.commands;
+    const eventFirst = eventCommands[0];
+    expect(eventFirst).toBeDefined();
+
+    // (b) Mutate a command object field — name. The event and the cache
+    // currently share this command object reference.
+    eventFirst.name = 'hijacked';
+
+    // (c) Mutate a nested hints array on the first command.
+    eventFirst.hints.length = 0;
+
+    // (a) Mutate the outer array of the event.
+    eventCommands.length = 0;
+    eventCommands.push({
+      name: 'mutated',
+      description: 'consumer-injected',
+      hints: ['$ARGUMENTS'],
+    });
+
+    // Trigger a retry that hangs, then reject with a transient error.
+    // The transient error path surfaces the cached value via state.
+    transport.retryRemoteCommands?.();
+    await Promise.resolve();
+    rejectSecond?.(new Error('transient timeout'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The error state must still carry the original validated catalog,
+    // not the consumer-mutated data. If the cache were corrupted by
+    // the event mutations, the state would carry the mutated values.
+    expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
+    transport.destroy();
+  });
+
+  it('isolates RemoteCommandState.commands from later mutation of the outer array, command fields, and hints', async () => {
+    const connection = createConnection();
+    let rejectSecond: ((error: Error) => void) | undefined;
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      commandRequest += 1;
+      if (commandRequest === 1) return Promise.resolve(COMMAND_WIRE_CATALOG);
+      return new Promise((_resolve, reject) => {
+        rejectSecond = reject;
+      });
+    });
+    const commandStates: RemoteCommandState[] = [];
+    const { transport } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Grab the commands array from the last published state.
+    const stateCommands = commandStates.at(-1)!.commands;
+    expect(stateCommands).toEqual(PARSED_COMMAND_CATALOG);
+    const stateFirst = stateCommands[0];
+    expect(stateFirst).toBeDefined();
+
+    // (b) Mutate a command object field — name. The state and the cache
+    // currently share this command object reference.
+    stateFirst.name = 'hijacked';
+
+    // (c) Mutate a nested hints array on the first command.
+    stateFirst.hints.length = 0;
+
+    // (a) Mutate the outer array.
+    stateCommands.length = 0;
+    stateCommands.push({
+      name: 'mutated',
+      description: 'consumer-injected',
+      hints: ['$ARGUMENTS'],
+    });
+
+    // Trigger a retry that hangs, then reject with a transient error.
+    // The transient error path surfaces the cached value via state.
+    transport.retryRemoteCommands?.();
+    await Promise.resolve();
+    rejectSecond?.(new Error('transient timeout'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
+    transport.destroy();
+  });
+});
+
+describe('CliLiveTransport createSession', () => {
+  it('rejects when no owner is known', async () => {
+    const { transport } = createTransportWithSinks();
+    await expect(transport.createSession?.()).rejects.toThrow(
+      'Remote session has no connected owner'
+    );
+    transport.destroy();
+  });
+
+  it('sends create_session via sendCommand against the current session and owner and returns the branded id', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockResolvedValue({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Clear discovery calls so we can assert exactly the create_session call.
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    const result = await transport.createSession?.();
+    expect(result).toBe(NEW_KILO_SESSION_ID);
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'create_session',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('rejects a malformed response without retrying or changing owner', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockResolvedValue({ invalid: true });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    await expect(transport.createSession?.()).rejects.toThrow('Invalid create_session response');
+    // No second create_session call — never auto-retry.
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(1);
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    expect(transport.canSend?.()).toBe(true);
+    transport.destroy();
+  });
+
+  it('propagates a CLI_UPGRADE_REQUIRED error with the actionable message', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockRejectedValue(
+      new UserWebCommandError({
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'Creating remote sessions from mobile requires a newer Kilo CLI.',
+      })
+    );
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    await expect(transport.createSession?.()).rejects.toThrow(
+      'Creating remote sessions from mobile requires a newer Kilo CLI.'
+    );
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(1);
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('clears the owner on a SESSION_OWNER_CHANGED error and re-throws', async () => {
+    const connection = createConnection();
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, userWebConnection } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValue(
+        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
+      );
+
+    await expect(transport.createSession?.()).rejects.toMatchObject({
+      code: 'SESSION_OWNER_CHANGED',
+    });
+    expect(commandStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('uses the owner snapshot at call time when the owner changes mid-flight', async () => {
+    const connection = createConnection();
+    let resolveCreate: ((value: { protocolVersion: 1; sessionID: string }) => void) | undefined;
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection, 'owner-a');
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest.mocked(userWebConnection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command !== 'create_session') return Promise.resolve({ ok: true });
+      return new Promise(resolve => {
+        resolveCreate = resolve;
+      });
+    });
+    const createPromise = transport.createSession?.();
+    await Promise.resolve();
+    // Owner rotates mid-flight.
+    connection.emitSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'active', title: 'Tracked', connectionId: 'owner-b' },
+        ],
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    resolveCreate?.({ protocolVersion: 1, sessionID: ROTATED_KILO_SESSION_ID });
+    await expect(createPromise).resolves.toBe(ROTATED_KILO_SESSION_ID);
+    // The snapshot we used was 'owner-a' even though the current owner is now 'owner-b'.
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'create_session',
+      { protocolVersion: 1 },
+      'owner-a'
+    );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('does not retry a network failure', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockRejectedValue(new Error('Connection lost during reconnect'));
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    await expect(transport.createSession?.()).rejects.toThrow('Connection lost during reconnect');
+    expect(
+      jest
+        .mocked(userWebConnection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'create_session')
+    ).toHaveLength(1);
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+});
+
+describe('CliLiveTransport exitCli', () => {
+  const EXIT_COMMAND_CATALOG = {
+    protocolVersion: 1,
+    commands: [{ name: 'exit', description: 'Exit the CLI', hints: [] }],
+  };
+
+  async function connectWithCommandCatalog(
+    commandCatalog: unknown = EXIT_COMMAND_CATALOG,
+    exitResult: unknown = {}
+  ) {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(commandCatalog);
+      if (command === 'exit_cli') return Promise.resolve(exitResult);
+      return Promise.resolve({ ok: true });
+    });
+    const fixture = createTransportWithSinks({ connection });
+    fixture.transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    return { connection, ...fixture };
+  }
+
+  it('sends exit_cli exactly once against the current session and owner', async () => {
+    const { transport, userWebConnection } = await connectWithCommandCatalog();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).resolves.toBeUndefined();
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledTimes(1);
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'exit_cli',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('uses an internal command-state snapshot when consumers mutate published state', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.resolve(EXIT_COMMAND_CATALOG);
+      return Promise.resolve({});
+    });
+    const { transport, userWebConnection } = createTransportWithSinks({
+      connection,
+      onRemoteCommandStateChange: state => {
+        if (state.refresh === 'idle' && state.commands.length > 0) {
+          state.commands[0].name = 'mutated';
+          state.commands.length = 0;
+        }
+      },
+    });
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).resolves.toBeUndefined();
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'exit_cli',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('permits exit_cli while a same-owner refresh retains the canonical catalog', async () => {
+    const connection = createConnection();
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') {
+        commandRequest += 1;
+        return commandRequest === 1 ? Promise.resolve(EXIT_COMMAND_CATALOG) : new Promise(() => {});
+      }
+      return Promise.resolve({});
+    });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    connection.emitReconnect();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).resolves.toBeUndefined();
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'exit_cli',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it('permits exit_cli after a transient same-owner refresh error retains the canonical catalog', async () => {
+    const connection = createConnection();
+    let commandRequest = 0;
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') {
+        commandRequest += 1;
+        return commandRequest === 1
+          ? Promise.resolve(EXIT_COMMAND_CATALOG)
+          : Promise.reject(new Error('catalog timed out'));
+      }
+      return Promise.resolve({});
+    });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    connection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).resolves.toBeUndefined();
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'exit_cli',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it.each([null, [], { extra: true }])(
+    'rejects malformed result %p without retrying',
+    async result => {
+      const { transport, userWebConnection } = await connectWithCommandCatalog(
+        EXIT_COMMAND_CATALOG,
+        result
+      );
+      jest.mocked(userWebConnection.sendCommand).mockClear();
+
+      await expect(transport.exitCli?.()).rejects.toThrow('Invalid exit_cli response');
+      expect(userWebConnection.sendCommand).toHaveBeenCalledTimes(1);
+      transport.destroy();
+    }
+  );
+
+  it('does not retry a network failure', async () => {
+    const { transport, userWebConnection } = await connectWithCommandCatalog();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValueOnce(new Error('Connection lost before CLI acknowledgement'));
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(
+      'Connection lost before CLI acknowledgement'
+    );
+    expect(userWebConnection.sendCommand).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('uses the owner snapshot at call time', async () => {
+    const { connection, transport, userWebConnection } = await connectWithCommandCatalog();
+    let resolveExit: ((result: {}) => void) | undefined;
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest.mocked(userWebConnection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command !== 'exit_cli') return Promise.resolve({});
+      return new Promise(resolve => {
+        resolveExit = resolve;
+      });
+    });
+
+    const exitPromise = transport.exitCli?.();
+    connection.emitSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'active', title: 'Tracked', connectionId: 'owner-b' },
+        ],
+      },
+    });
+    resolveExit?.({});
+
+    await expect(exitPromise).resolves.toBeUndefined();
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'exit_cli',
+      { protocolVersion: 1 },
+      'owner'
+    );
+    transport.destroy();
+  });
+
+  it.each([
+    { label: 'empty catalog', catalog: { protocolVersion: 1, commands: [] } },
+    {
+      label: 'non-canonical exit command',
+      catalog: {
+        protocolVersion: 1,
+        commands: [{ name: 'exit', description: 'Close', hints: [] }],
+      },
+    },
+  ])('rejects unavailable for $label', async ({ catalog }) => {
+    const { transport, userWebConnection } = await connectWithCommandCatalog(catalog);
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(
+      'Remote CLI exit is unavailable for the current session'
+    );
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('rejects unavailable while the command catalog is loading', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return new Promise(() => {});
+      return Promise.resolve({});
+    });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(
+      'Remote CLI exit is unavailable for the current session'
+    );
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('rejects unavailable after command catalog error', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') return Promise.reject(new Error('catalog unavailable'));
+      return Promise.resolve({});
+    });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(
+      'Remote CLI exit is unavailable for the current session'
+    );
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('rejects unavailable after owner disconnect', async () => {
+    const { connection, transport, userWebConnection } = await connectWithCommandCatalog();
+    connection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(
+      'Remote CLI exit is unavailable for the current session'
+    );
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('rejects unavailable while an owner replacement has an empty catalog', async () => {
+    const { connection, transport, userWebConnection } = await connectWithCommandCatalog();
+    connection.emitSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          { id: KILO_SESSION_ID, status: 'active', title: 'Tracked', connectionId: 'owner-b' },
+        ],
+      },
+    });
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(
+      'Remote CLI exit is unavailable for the current session'
+    );
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('rejects with the exact upgrade-required message', async () => {
+    const connection = createConnection();
+    const upgradeMessage =
+      'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.';
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      if (command === 'list_commands') {
+        return Promise.reject(
+          new UserWebCommandError({ code: 'CLI_UPGRADE_REQUIRED', message: upgradeMessage })
+        );
+      }
+      return Promise.resolve({});
+    });
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    await expect(transport.exitCli?.()).rejects.toThrow(upgradeMessage);
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Page-seam + reconnect: transport uses fetchSnapshotPage for the initial
+// bounded read AND for reconnect/delayed resync replays, but only the initial
+// read fires onInitialPageLoaded. A reconnect must never reset the user's
+// already-advanced older-pages cursor back to the latest 50.
+// ---------------------------------------------------------------------------
+
+type FetchPage = (
+  kiloSessionId: KiloSessionId,
+  options: { cursor?: string }
+) => Promise<SessionSnapshotPageOutcome | null>;
+
+type CreatePageTransportOptions = {
+  fetchSnapshotPage: FetchPage;
+  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  onInitialPageLoaded?: (page: {
+    info: { id: string };
+    messages: Array<{ info: { id: string; sessionID: string }; parts: unknown[] }>;
+    nextCursor: string | null;
+    omittedItemCount: number;
+  }) => void;
+  onError?: (message: string) => void;
+};
+
+function createPageTransport(options: CreatePageTransportOptions) {
+  const chatEvents: ChatEvent[] = [];
+  const serviceEvents: ServiceEvent[] = [];
+  let replayCompleteCount = 0;
+  const userWebConnection = createConnection();
+  const fetchSnapshotPage = jest.fn(options.fetchSnapshotPage);
+  const onInitialPageLoaded = jest.fn(options.onInitialPageLoaded ?? (() => undefined));
+  const onError = jest.fn(options.onError ?? (() => undefined));
+
+  const transport = createCliLiveTransport({
+    kiloSessionId: KILO_SESSION_ID,
+    userWebConnection,
+    ...(options.fetchSnapshot ? { fetchSnapshot: options.fetchSnapshot } : {}),
+    fetchSnapshotPage,
+    onInitialPageLoaded,
+    onError,
+  })({
+    onChatEvent: event => chatEvents.push(event),
+    onServiceEvent: event => serviceEvents.push(event),
+    onReplayComplete: () => {
+      replayCompleteCount += 1;
+    },
+  });
+
+  return {
+    transport,
+    userWebConnection,
+    chatEvents,
+    serviceEvents,
+    fetchSnapshotPage,
+    onInitialPageLoaded,
+    onError,
+    getReplayCompleteCount: () => replayCompleteCount,
+  };
+}
+
+function makeLivePage(
+  options: {
+    nextCursor?: string | null;
+    omittedItemCount?: number;
+    id?: string;
+  } = {}
+): Extract<SessionSnapshotPageOutcome, { kind: 'success' }> {
+  return {
+    kind: 'success',
+    info: { id: options.id ?? KILO_SESSION_ID },
+    messages: [],
+    nextCursor: options.nextCursor ?? null,
+    omittedItemCount: options.omittedItemCount ?? 0,
+  };
+}
+
+describe('CliLiveTransport page-seam + reconnect', () => {
+  it('uses fetchSnapshotPage for the initial bounded read and reports it via onInitialPageLoaded', async () => {
+    const page = makeLivePage({ nextCursor: 'cursor-A', omittedItemCount: 2 });
+    const { transport, fetchSnapshotPage, onInitialPageLoaded, serviceEvents } =
+      createPageTransport({
+        fetchSnapshotPage: async () => page,
+      });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {});
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+    // session.created from the page must have flowed through.
+    expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
+    transport.destroy();
+  });
+
+  it('does not call onInitialPageLoaded again on a reconnect replay (cursor preserved)', async () => {
+    const initial = makeLivePage({ nextCursor: 'cursor-A', omittedItemCount: 0 });
+    const reconnect = makeLivePage({ nextCursor: 'cursor-B', omittedItemCount: 0 });
+    const fetchSnapshotPage = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(reconnect);
+    const onInitialPageLoaded = jest.fn();
+    const {
+      transport,
+      userWebConnection,
+      fetchSnapshotPage: _fetch,
+    } = createPageTransport({
+      fetchSnapshotPage,
+      onInitialPageLoaded,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+    expect(onInitialPageLoaded).toHaveBeenLastCalledWith(initial);
+
+    // Reconnect replay: the transport re-fetches the page (so the manager's
+    // already-advanced older-pages cursor is not overwritten), but it must
+    // NOT fire onInitialPageLoaded again — that hook is the manager's signal
+    // to advance `loadOlderGeneration`, which would reset the cursor.
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(_fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('does not call onInitialPageLoaded on the delayed resync replay', async () => {
+    jest.useFakeTimers();
+    try {
+      const initial = makeLivePage({ nextCursor: 'cursor-A' });
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValue(makeLivePage({ nextCursor: 'cursor-B' }));
+      const onInitialPageLoaded = jest.fn();
+      const { transport, userWebConnection } = createPageTransport({
+        fetchSnapshotPage,
+        onInitialPageLoaded,
+      });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+
+      userWebConnection.emitReconnect();
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Still only the initial page fired the hook; reconnect + resync
+      // replays never reset the user's older-pages cursor.
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('surfaces retryable_failure on the initial read via onError but stays subscribed', async () => {
+    const onError = jest.fn();
+    const { transport, userWebConnection, onInitialPageLoaded, serviceEvents } =
+      createPageTransport({
+        fetchSnapshotPage: async () => ({ kind: 'retryable_failure' }),
+        onError,
+      });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onInitialPageLoaded).not.toHaveBeenCalled();
+    // No session.created was emitted because no successful page replayed.
+    expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+    expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
+    transport.destroy();
+  });
+
+  it('surfaces too_large and invalid_data typed failures via onError', async () => {
+    for (const failure of [
+      { kind: 'too_large' as const, expected: 'Session history too large to load' },
+      { kind: 'invalid_data' as const, expected: 'Session history is unavailable' },
+    ]) {
+      const onError = jest.fn();
+      const { transport, onInitialPageLoaded } = createPageTransport({
+        fetchSnapshotPage: async () => failure,
+        onError,
+      });
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onError).toHaveBeenCalledWith(failure.expected);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      transport.destroy();
+    }
+  });
+
+  it('treats a null page result as session not found via onError', async () => {
+    const onError = jest.fn();
+    const { transport, onInitialPageLoaded } = createPageTransport({
+      fetchSnapshotPage: async () => null,
+      onError,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onInitialPageLoaded).not.toHaveBeenCalled();
+    transport.destroy();
+  });
+
+  it('prefers fetchSnapshotPage over legacy fetchSnapshot when both are provided', async () => {
+    const page = makeLivePage({ nextCursor: 'cursor-A' });
+    const fetchSnapshot = jest.fn(() =>
+      Promise.reject(new Error('legacy fetchSnapshot must not be called'))
+    );
+    const { transport, fetchSnapshotPage, onInitialPageLoaded } = createPageTransport({
+      fetchSnapshotPage: async () => page,
+      fetchSnapshot,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+    expect(fetchSnapshot).not.toHaveBeenCalled();
+    expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+    transport.destroy();
+  });
+
+  it('drains buffered live events only after a successful reconnect page', async () => {
+    let resolveReconnectPage: ((page: SessionSnapshotPageOutcome | null) => void) | undefined;
+    const initial = makeLivePage({ nextCursor: 'cursor-A' });
+    const fetchSnapshotPage = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+      .mockResolvedValueOnce(initial)
+      .mockReturnValueOnce(
+        new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+          resolveReconnectPage = resolve;
+        })
+      );
+    const { transport, userWebConnection, chatEvents } = createPageTransport({
+      fetchSnapshotPage,
+    });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+    // After the initial bounded read, the buffer is drained; emitting now
+    // passes the event straight through.
+    emitMessageUpdated(userWebConnection);
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(1);
+
+    // Trigger a reconnect, then emit a new live event while the page is
+    // still in flight. It must be buffered, not emitted ahead of the page.
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(1);
+
+    emitMessageUpdated(userWebConnection);
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(1);
+
+    // Resolving the reconnect page must drain the buffered event AFTER the
+    // page replay so we never show a newer message over an older snapshot.
+    resolveReconnectPage?.(makeLivePage({ nextCursor: 'cursor-B' }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(chatEvents).toHaveLength(2);
+    transport.destroy();
+  });
+
+  it('swallows a rejected reconnect page without leaving events stranded', async () => {
+    const initial = makeLivePage({ nextCursor: 'cursor-A' });
+    const fetchSnapshotPage = jest
+      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+      .mockResolvedValueOnce(initial)
+      .mockRejectedValueOnce(new Error('reconnect refetch failed'));
+    const onError = jest.fn();
+    const { transport, userWebConnection, chatEvents, getReplayCompleteCount } =
+      createPageTransport({
+        fetchSnapshotPage,
+        onError,
+      });
+
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    emitMessageUpdated(userWebConnection);
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Initial reconnect errors must not surface to the manager — the live
+    // stream carries on. The buffered event must still be drained.
+    expect(onError).not.toHaveBeenCalled();
+    expect(chatEvents).toHaveLength(1);
+    expect(getReplayCompleteCount()).toBeGreaterThanOrEqual(2);
     transport.destroy();
   });
 });

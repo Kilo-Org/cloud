@@ -39,7 +39,9 @@ export function QuestionCard({
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
   const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
   const customInputs = useRef<Record<number, string>>({});
-  const [customHasText, setCustomHasText] = useState<Record<number, boolean>>({});
+  // Unread; setting it forces a re-render on every keystroke so
+  // `allQuestionsAnswered` (derived from the customInputs ref) stays in sync.
+  const [, setCustomHasText] = useState<Record<number, boolean>>({});
 
   function toggleOption(questionIndex: number, optionIndex: number, multiple: boolean | undefined) {
     setSelectedOptions(prev => {
@@ -110,34 +112,22 @@ export function QuestionCard({
 
   function handleSubmit() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const answers = buildAnswers();
-
-    const unanswered = answers.findIndex(a => a.length === 0);
-    if (unanswered !== -1) {
-      Alert.alert('Please Answer All Questions', `Question ${unanswered + 1} needs an answer.`);
-      return;
-    }
-
-    onAnswer(answers);
+    onAnswer(buildAnswers());
   }
 
   function handleReject() {
-    Alert.alert('Skip Questions?', 'The agent will skip this step.', [
+    Alert.alert('Skip questions?', 'The agent will skip this step.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Skip', style: 'destructive', onPress: onReject },
     ]);
   }
 
-  const hasOptionSelected = Object.values(selectedOptions).some(s => s.size > 0);
-  const hasCustomAnswer = Object.entries(customSelected).some(
-    ([idx, selected]) => selected && customHasText[Number(idx)]
-  );
-  const hasAnyAnswer = hasOptionSelected || hasCustomAnswer;
+  const allQuestionsAnswered = buildAnswers().every(answer => answer.length > 0);
 
   return (
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
-        <Text className="text-sm font-medium">Agent Needs Input</Text>
+        <Text className="text-sm font-medium">Agent needs input</Text>
       </View>
 
       <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
@@ -187,6 +177,7 @@ export function QuestionCard({
                         toggleCustom(qIndex, question.multiple);
                       }}
                       disabled={isSubmitting}
+                      accessibilityState={{ disabled: isSubmitting, selected: isCustomActive }}
                       className={cn(
                         'flex-row items-center rounded-md border px-3 py-2.5 shadow-sm shadow-black/5',
                         isCustomActive
@@ -221,12 +212,16 @@ export function QuestionCard({
         <Button variant="outline" className="flex-1" onPress={handleReject} disabled={isSubmitting}>
           <Text className="text-sm">Skip</Text>
         </Button>
-        <Button className="flex-1" onPress={handleSubmit} disabled={!hasAnyAnswer || isSubmitting}>
+        <Button
+          className="flex-1"
+          onPress={handleSubmit}
+          disabled={!allQuestionsAnswered || isSubmitting}
+        >
           {isSubmitting ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
           <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
-            {isSubmitting ? 'Submitting…' : 'Submit'}
+            {isSubmitting ? 'Submitting…' : 'Send answers'}
           </Text>
         </Button>
       </View>

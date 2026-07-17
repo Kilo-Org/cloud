@@ -6,6 +6,8 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
+  BitbucketOAuthCredentialRowSchema,
+  BitbucketWorkspaceAccessTokenCredentialRowSchema,
   buildBitbucketOrganizationCredentialLockKey,
   buildBitbucketWorkspaceAccessTokenAad,
   getMissingBitbucketWorkspaceAccessTokenScopes,
@@ -24,6 +26,71 @@ const aadInput = {
 };
 
 describe('Bitbucket Workspace Access Token contract', () => {
+  it('requires the complete legacy Bitbucket OAuth credential profile', () => {
+    const row = {
+      id: 'credential-1',
+      platform_integration_id: 'integration-1',
+      authorized_by_user_id: 'user-1',
+      provider_subject_id: 'provider-user-1',
+      provider_subject_login: 'octocat',
+      provider_base_url: null,
+      access_token_encrypted: 'access-envelope',
+      access_token_expires_at: '2026-07-13T12:00:00.000Z',
+      refresh_token_encrypted: 'refresh-envelope',
+      refresh_token_expires_at: '2026-08-13T12:00:00.000Z',
+      oauth_client_secret_encrypted: null,
+      credential_version: 1,
+      revoked_at: null,
+      revocation_reason: null,
+      last_used_at: null,
+      created_at: '2026-07-13T12:00:00.000Z',
+      updated_at: '2026-07-13T12:00:00.000Z',
+    };
+
+    expect(BitbucketOAuthCredentialRowSchema.parse(row)).toEqual(row);
+    expect(
+      BitbucketOAuthCredentialRowSchema.safeParse({ ...row, authorized_by_user_id: null }).success
+    ).toBe(false);
+    expect(
+      BitbucketOAuthCredentialRowSchema.safeParse({ ...row, refresh_token_encrypted: null }).success
+    ).toBe(false);
+  });
+
+  it('requires the complete Bitbucket workspace access-token credential profile', () => {
+    const row = {
+      id: 'credential-2',
+      platform_integration_id: 'integration-2',
+      token_encrypted: 'token-envelope',
+      expires_at: null,
+      provider_credential_type: 'workspace_access_token',
+      provider_resource_id: null,
+      provider_base_url: null,
+      authorized_by_user_id: null,
+      provider_metadata: null,
+      provider_scopes: ['account', 'repository', 'repository:write', 'pullrequest', 'webhook'],
+      provider_verified_at: '2026-07-13T12:00:00.000Z',
+      credential_version: 2,
+      last_validated_at: '2026-07-13T12:00:00.000Z',
+      last_used_at: null,
+      created_at: '2026-07-13T12:00:00.000Z',
+      updated_at: '2026-07-13T12:00:00.000Z',
+    };
+
+    expect(BitbucketWorkspaceAccessTokenCredentialRowSchema.parse(row)).toEqual(row);
+    expect(
+      BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse({
+        ...row,
+        provider_scopes: null,
+      }).success
+    ).toBe(false);
+    expect(
+      BitbucketWorkspaceAccessTokenCredentialRowSchema.safeParse({
+        ...row,
+        last_validated_at: null,
+      }).success
+    ).toBe(false);
+  });
+
   it('builds the compatible organization credential lock key', () => {
     expect(
       buildBitbucketOrganizationCredentialLockKey('123e4567-e89b-12d3-a456-426614174030')

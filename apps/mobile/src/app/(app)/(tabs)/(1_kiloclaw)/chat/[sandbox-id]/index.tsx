@@ -6,10 +6,13 @@ import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 
 export default function ChatSandboxIndex() {
   const { 'sandbox-id': sandboxId } = useLocalSearchParams<{ 'sandbox-id': string }>();
-  const { data: instances } = useAllKiloClawInstances();
+  const { data: instances, isPending: instancesPending } = useAllKiloClawInstances();
   const instance = instances?.find(i => i.sandboxId === sandboxId);
-  const sandboxLabel =
-    instance?.botName ?? instance?.name ?? instance?.organizationName ?? 'KiloClaw';
+  // Blank until instances resolve — never show a "KiloClaw" placeholder that
+  // then flashes to the real instance name once the query settles.
+  const sandboxLabel = instancesPending
+    ? ''
+    : (instance?.botName ?? instance?.name ?? instance?.organizationName ?? 'KiloClaw');
   return (
     <>
       <ChatSandboxRouteMounts />

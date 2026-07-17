@@ -13,15 +13,23 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { HelpCircle } from 'lucide-react';
+import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
+import { selectBrowseCommandSets } from './browse-command-sets';
 
 type BrowseCommandsDialogProps = {
   trigger?: React.ReactNode;
+  /** Explicit command list. When provided, the dialog renders exactly these
+   *  commands so callers (NewSessionPanel, ChatInput) can keep browse and
+   *  autocomplete in sync. Without it, the dialog falls back to the active
+   *  session's hook-derived command sets. */
+  commands?: SlashCommand[];
 };
 
-export function BrowseCommandsDialog({ trigger }: BrowseCommandsDialogProps) {
+export function BrowseCommandsDialog({ trigger, commands }: BrowseCommandsDialogProps) {
   const { allSets } = useSlashCommandSets();
   const [open, setOpen] = useState(false);
+  const displayedSets = selectBrowseCommandSets(allSets, commands);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -47,7 +55,7 @@ export function BrowseCommandsDialog({ trigger }: BrowseCommandsDialogProps) {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {allSets.map(set => (
+          {displayedSets.map(set => (
             <div key={set.id} className="border-b border-gray-700 pb-3 last:border-0">
               <div className="flex items-center gap-2">
                 <Label className="text-base font-medium">{set.name}</Label>

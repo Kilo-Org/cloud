@@ -4597,7 +4597,10 @@ export const kiloclawRouter = createTRPCRouter({
     const workerFlag = isDev
       ? ` --worker-url=${process.env.KILOCLAW_API_URL ?? 'http://localhost:8795'}`
       : '';
-    const gmailPushFlag = isDev ? ' --gmail-push-worker-url=${GMAIL_PUSH_WORKER_URL}' : '';
+    const gmailPushFlag =
+      isDev && process.env.GMAIL_PUSH_WORKER_URL
+        ? ` --gmail-push-worker-url=${process.env.GMAIL_PUSH_WORKER_URL}`
+        : '';
     const instance = await getActiveInstance(ctx.user.id);
     const iid = workerInstanceId(instance);
     const instanceFlag = iid ? ` --instance-id=${iid}` : '';

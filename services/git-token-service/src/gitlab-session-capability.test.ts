@@ -65,6 +65,42 @@ describe('GitLabSessionCapabilityCodec', () => {
     vi.useRealTimers();
   });
 
+  it('binds a new project capability to the encrypted credential generation', () => {
+    const codec = new GitLabSessionCapabilityCodec(encryptionKey);
+    const capability = codec.issue({
+      ...claims,
+      source: {
+        type: 'project',
+        projectId: 42,
+        credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145d',
+        credentialVersion: 3,
+      },
+    });
+
+    expect(codec.decode(capability).source).toEqual({
+      type: 'project',
+      projectId: 42,
+      credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145d',
+      credentialVersion: 3,
+    });
+  });
+
+  it('binds an OAuth integration capability to the stable credential ID without its refresh version', () => {
+    const codec = new GitLabSessionCapabilityCodec(encryptionKey);
+    const capability = codec.issue({
+      ...claims,
+      source: {
+        type: 'integration',
+        credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145d',
+      },
+    });
+
+    expect(codec.decode(capability).source).toEqual({
+      type: 'integration',
+      credentialId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145d',
+    });
+  });
+
   it.each([
     ['legacy unbound v1', 'kgl1.', 1, 2 * 60 * 60 * 1000, false],
     ['container-bound v2', 'kgl2.', 2, 4 * 60 * 60 * 1000, true],

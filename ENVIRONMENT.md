@@ -97,6 +97,9 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GOOGLE_SHEETS_SPREADSHEET_ID` - ID of the Google Sheet used for specific app integrations. [SERVER]
 - `GITLAB_CLIENT_ID` - GitLab OAuth app client ID. `[PUBLIC]`
 - `GITLAB_CLIENT_SECRET` - GitLab OAuth app client secret. `[SECRET]`
+- `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID` - Active platform-credential envelope key ID. The legacy name is shared by Bitbucket and encrypted GitLab credentials. [SERVER]
+- `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY` - Base64-encoded active platform-credential RSA public key; available to web and `git-token-service`. The legacy name is shared by Bitbucket and GitLab. `[SECRET]`
+- `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY` - Base64-encoded active platform-credential RSA private key; available only to `git-token-service`. The legacy name is shared by Bitbucket and GitLab. `[SECRET]`
 - `LINKEDIN_CLIENT_ID` - LinkedIn OAuth app client ID. `[PUBLIC]`
 - `LINKEDIN_CLIENT_SECRET` - LinkedIn OAuth app client secret. `[SECRET]`
 - `DISCORD_CLIENT_ID` - Discord OAuth app client ID. `[PUBLIC]`
@@ -217,6 +220,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for the `text-embedding-3-small` embedding model, and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
+- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
 - `XAI_API_KEY` - xAI / Grok API key; referenced in `.env.local.example` as "your-xai-grok-key" and in Grok model naming (`x-ai/grok-*`). No direct `process.env.XAI_API_KEY` call was found outside `.env` files, so actual runtime wiring is likely via `OPENROUTER_API_KEY` routing through OpenRouter to Grok models. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`

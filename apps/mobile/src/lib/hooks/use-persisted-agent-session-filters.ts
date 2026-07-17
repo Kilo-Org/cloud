@@ -1,62 +1,27 @@
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner-native';
 
+import {
+  type AgentSessionFilters,
+  createDefaultAgentSessionFilters,
+  parseStoredAgentSessionFilters,
+} from '@/lib/agent-session-filters';
+import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
-
-type AgentSessionFilters = {
-  platformFilter: string[];
-  projectFilter: string[];
-};
 
 type FiltersUpdater = AgentSessionFilters | ((prev: AgentSessionFilters) => AgentSessionFilters);
 type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
 
-function createDefaultFilters(): AgentSessionFilters {
-  return {
-    platformFilter: [],
-    projectFilter: [],
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(item => typeof item === 'string');
-}
-
-function parseStoredFilters(raw: string | null): AgentSessionFilters | null {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) {
-      return null;
-    }
-
-    return {
-      platformFilter: readStringArray(parsed.platformFilter),
-      projectFilter: readStringArray(parsed.projectFilter),
-    };
-  } catch {
-    return null;
-  }
-}
-
 async function loadStoredFilters(): Promise<AgentSessionFilters> {
   const raw = await SecureStore.getItemAsync(SESSION_FILTERS_KEY);
-  return parseStoredFilters(raw) ?? createDefaultFilters();
+  return parseStoredAgentSessionFilters(raw) ?? createDefaultAgentSessionFilters();
 }
 
 export function usePersistedAgentSessionFilters() {
-  const [filters, setFiltersState] = useState<AgentSessionFilters>(() => createDefaultFilters());
+  const [filters, setFiltersState] = useState<AgentSessionFilters>(() =>
+    createDefaultAgentSessionFilters()
+  );
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
@@ -70,7 +35,7 @@ export function usePersistedAgentSessionFilters() {
         }
       } catch {
         if (isActive) {
-          setFiltersState(createDefaultFilters());
+          setFiltersState(createDefaultAgentSessionFilters());
         }
       } finally {
         if (isActive) {
@@ -95,7 +60,10 @@ export function usePersistedAgentSessionFilters() {
       try {
         await SecureStore.setItemAsync(SESSION_FILTERS_KEY, JSON.stringify(filters));
       } catch {
-        // Keep the in-memory filters even if local preference storage fails.
+        // Keep the in-memory filters so the session still works, but the
+        // change won't survive relaunch — tell the user so it's not a silent
+        // surprise later.
+        toast.error('Could not save setting');
       }
     };
 
@@ -126,12 +94,21 @@ export function usePersistedAgentSessionFilters() {
     [setFilters]
   );
 
+  const setSortBy = useCallback(
+    (sortBy: AgentSessionSortBy) => {
+      setFilters(prev => ({ ...prev, sortBy }));
+    },
+    [setFilters]
+  );
+
   return {
     platformFilter: filters.platformFilter,
     projectFilter: filters.projectFilter,
+    sortBy: filters.sortBy,
     hasLoaded,
     setFilters,
     setPlatformFilter,
     setProjectFilter,
+    setSortBy,
   };
 }

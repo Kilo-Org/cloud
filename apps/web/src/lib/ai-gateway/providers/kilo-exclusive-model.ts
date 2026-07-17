@@ -1,10 +1,12 @@
-import type { FeatureValue } from '@/lib/feature-detection';
 import {
   OpenRouterInferenceProviderIdSchema,
   type OpenRouterInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  isOpenRouterProviderConfig,
+  type GatewayRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag =
   | 'reasoning'
@@ -73,8 +75,6 @@ export type KiloExclusiveModel = {
   gateway: ProviderId;
   internal_id: string;
   pricing: PricingTiers | null;
-  /** Features allowed to use this model. Empty array means no restriction. */
-  exclusive_to: ReadonlyArray<FeatureValue>;
   /**
    * Upstream inference providers this model may be routed to; empty means no
    * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.
@@ -167,21 +167,39 @@ export function applyKiloExclusiveModelSettings(
     return;
   }
   const provider = requestToMutate.body.provider;
-  if (provider?.only) {
+  if (isOpenRouterProviderConfig(provider) && provider.only) {
     provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
-  } else if (provider) {
+  } else if (isOpenRouterProviderConfig(provider)) {
     provider.only = [...restriction];
   } else {
     requestToMutate.body.provider = { only: [...restriction] };
   }
 }
 
-export function getInferenceProvider(
-  model: KiloExclusiveModel
-): OpenRouterInferenceProviderId | null {
-  if (model.flags.includes('stealth')) return 'stealth';
-  if (model.gateway === 'openrouter' || model.gateway === 'vercel') return null;
-  return OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+type InferenceProvider = {
+  slug: OpenRouterInferenceProviderId;
+  name: string;
+  training: boolean;
+  retainsPrompts: boolean;
+};
+
+export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvider | null {
+  if (model.flags.includes('stealth')) {
+    return { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true };
+  }
+  if (model.public_id.includes('muse-')) {
+    return { slug: 'meta', name: 'Meta', training: false, retainsPrompts: true };
+  }
+  if (model.gateway === 'openrouter' || model.gateway === 'vercel') {
+    return null;
+  }
+  const slug = OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+  return {
+    slug,
+    name: slug.toUpperCase(),
+    training: false,
+    retainsPrompts: true,
+  };
 }
 
 function formatPricePerMillionAsPerToken(price: number): string;

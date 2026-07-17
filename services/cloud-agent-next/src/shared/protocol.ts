@@ -26,6 +26,8 @@ export type StreamEventType =
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
+  // Wrapper -> DO (internal size-safety signal, not persisted or broadcast)
+  | 'wrapper_event_truncated' // A wrapper ingest event was compacted/replaced to fit the frame budget
   // DO -> /stream clients (connection status)
   | 'wrapper_disconnected' // Wrapper WebSocket closed unexpectedly
   | 'wrapper_reconnected' // Wrapper reconnected successfully
@@ -102,6 +104,22 @@ export type AutocommitCompletedData = {
 };
 
 /**
+ * Data included in internal 'wrapper_event_truncated' events.
+ *
+ * Emitted by the wrapper when an ingest event had to be compacted or replaced
+ * to stay under the per-frame byte budget. The DO treats this as a
+ * liveness-relevant signal but does not persist or broadcast it to /stream
+ * clients; it is an internal size-safety diagnostic only.
+ */
+export type WrapperEventTruncatedData = {
+  originalStreamEventType: StreamEventType;
+  kiloEventName?: string;
+  originalBytes: number;
+  compactedBytes?: number;
+  reason: string;
+};
+
+/**
  * Preparation step identifiers for async preparation progress events.
  */
 export type PreparingStep =
@@ -113,20 +131,90 @@ export type PreparingStep =
   | 'setup_commands'
   | 'workspace_restore'
   | 'workspace_backup'
+  | 'sandbox_provision'
+  | 'sandbox_boot'
   | 'kilo_server'
   | 'kilo_session'
   | 'ready'
   | 'failed';
 
+export type PreparationAttemptStatus = 'running' | 'completed' | 'failed';
+export type PreparationStepKind = 'phase' | 'setup_command';
+export type PreparationStepStatus = 'running' | 'completed' | 'failed';
+
+export type PreparationStepSnapshot = {
+  id: string;
+  key: PreparingStep;
+  kind: PreparationStepKind;
+  label: string;
+  status: PreparationStepStatus;
+  startedAt: number;
+  completedAt?: number;
+  revision: number;
+  latestDetail?: string;
+  safeError?: string;
+  command?: string;
+  commandIndex?: number;
+  commandCount?: number;
+  outputTail?: string;
+  outputTruncated?: boolean;
+  exitCode?: number;
+};
+
+export type PreparationAttempt = {
+  id: string;
+  triggerMessageId: string;
+  status: PreparationAttemptStatus;
+  startedAt: number;
+  completedAt?: number;
+  safeError?: string;
+  revision: number;
+  steps: PreparationStepSnapshot[];
+};
+
+type PreparingEventDataV2Base = {
+  version: 2;
+  attemptId: string;
+  triggerMessageId: string;
+  revision: number;
+  timestamp: number;
+  step: PreparingStep;
+  message: string;
+};
+
+export type PreparingEventDataV2 = PreparingEventDataV2Base &
+  (
+    | { action: 'attempt_started' }
+    | {
+        action: 'step_started';
+        stepId: string;
+        kind: PreparationStepKind;
+        label: string;
+        command?: string;
+        commandIndex?: number;
+        commandCount?: number;
+      }
+    | { action: 'step_progress'; stepId: string; detail: string }
+    | { action: 'step_output'; stepId: string; output: string }
+    | { action: 'step_completed'; stepId: string; exitCode?: number }
+    | { action: 'step_failed'; stepId: string; safeError: string; exitCode?: number }
+    | { action: 'attempt_completed' }
+    | { action: 'attempt_failed'; safeError: string }
+    | { action: 'attempt_snapshot'; attempt: Omit<PreparationAttempt, 'steps'> }
+    | { action: 'step_snapshot'; stepSnapshot: PreparationStepSnapshot }
+  );
+
 /**
  * Data included in 'preparing' events (workspace preparation progress).
  */
-export type PreparingEventData = {
-  step: PreparingStep;
-  message: string;
-  /** Branch name, included in the 'ready' step after preparation completes. */
-  branch?: string;
-};
+export type PreparingEventData =
+  | {
+      step: PreparingStep;
+      message: string;
+      /** Branch name, included in the 'ready' step after preparation completes. */
+      branch?: string;
+    }
+  | PreparingEventDataV2;
 
 /** Cloud infrastructure status types. */
 export type CloudStatusType = 'preparing' | 'ready' | 'finalizing' | 'error';

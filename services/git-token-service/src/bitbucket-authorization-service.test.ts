@@ -77,7 +77,11 @@ const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toStri
 
 type TestOwner = { type: 'user' | 'org'; id: string };
 
-function aad(kind: 'access' | 'refresh', owner: TestOwner = { type: 'user', id: 'user-1' }) {
+function aad(
+  kind: 'access' | 'refresh',
+  owner: TestOwner = { type: 'user', id: 'user-1' },
+  authorizedByUserId: string | null = 'user-1'
+) {
   return JSON.stringify({
     scheme,
     version: 1,
@@ -85,7 +89,7 @@ function aad(kind: 'access' | 'refresh', owner: TestOwner = { type: 'user', id: 
     credentialId: 'credential-1',
     integrationId: 'integration-1',
     owner,
-    authorizedByUserId: 'user-1',
+    authorizedByUserId,
     kind,
   });
 }
@@ -98,10 +102,10 @@ function credential(
   return {
     id: 'credential-1',
     platform_integration_id: 'integration-1',
-    platform: 'bitbucket',
     authorized_by_user_id: 'user-1',
     provider_subject_id: '123e4567-e89b-12d3-a456-426614174010',
     provider_subject_login: 'bucket-user',
+    provider_base_url: null,
     access_token_encrypted: encryptKeyedEnvelope(
       'access-token',
       scheme,
@@ -116,6 +120,7 @@ function credential(
       aad('refresh', owner)
     ),
     refresh_token_expires_at: null,
+    oauth_client_secret_encrypted: null,
     credential_version: 1,
     revoked_at: null,
     revocation_reason: null,
@@ -186,6 +191,27 @@ describe('BitbucketAuthorizationService', () => {
       token: 'access-token',
       integrationId: 'integration-1',
       workspace: { slug: 'acme' },
+    });
+  });
+
+  it('fails closed before using a nullable OAuth authorizer', async () => {
+    const row = activeRow();
+    database.row = {
+      ...row,
+      credential: {
+        ...row.credential,
+        authorized_by_user_id: null,
+        access_token_encrypted: encryptKeyedEnvelope(
+          'access-token',
+          scheme,
+          { keyId: 'active', publicKeyPem },
+          aad('access', undefined, null)
+        ),
+      },
+    };
+
+    await expect(service().getAuthorization({ userId: 'user-1' })).resolves.toEqual({
+      status: 'reconnect_required',
     });
   });
 

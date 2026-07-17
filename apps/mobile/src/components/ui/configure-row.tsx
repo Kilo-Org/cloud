@@ -18,6 +18,7 @@ type ConfigureRowProps = {
    */
   tone?: ToneKey;
   onPress?: () => void;
+  disabled?: boolean;
   trailing?: ReactNode;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -31,6 +32,7 @@ export function ConfigureRow({
   subtitle,
   tone,
   onPress,
+  disabled,
   trailing,
   last,
   className,
@@ -38,12 +40,17 @@ export function ConfigureRow({
   const colors = useThemeColors();
   const tint: Tint = tone ? toneColor(tone) : agentColor(title);
   const iconColor = colors[tint.hueThemeKey];
+  // Inert rows (no onPress) and disabled rows are not tappable — hide the
+  // chevron so they don't look tappable, and never render pressed feedback.
+  const showChevron = Boolean(onPress) && !disabled;
 
   const inner = (
     <View
+      accessibilityState={{ disabled: Boolean(disabled) }}
       className={cn(
         'flex-row items-center gap-3 py-3',
         !last && 'border-b-[0.5px] border-hair-soft',
+        disabled && 'opacity-50',
         className
       )}
     >
@@ -60,13 +67,18 @@ export function ConfigureRow({
         <Text className="text-sm font-medium text-foreground">{title}</Text>
         {subtitle ? <Text className="mt-0.5 text-xs text-muted-foreground">{subtitle}</Text> : null}
       </View>
-      {trailing ?? <ChevronRight size={14} color={colors.mutedForeground} />}
+      {trailing ?? (showChevron ? <ChevronRight size={14} color={colors.mutedForeground} /> : null)}
     </View>
   );
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} className="active:opacity-70">
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityState={{ disabled: Boolean(disabled) }}
+        className={cn(!disabled && 'active:opacity-70')}
+      >
         {inner}
       </Pressable>
     );

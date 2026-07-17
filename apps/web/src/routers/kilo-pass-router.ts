@@ -28,6 +28,7 @@ import {
   kilo_pass_scheduled_changes,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
+  kilocode_users,
   kiloclaw_instances,
   kiloclaw_subscriptions,
   microdollar_usage,
@@ -56,7 +57,12 @@ import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { computeKiloPassBonusCreditsUsd } from '@/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
+import {
+  isTerminalKiloPassScheduleStatus,
+  maybeMapStripeScheduleStatusToDb,
+  reconcileKiloPassScheduledChangeTerminalStatus,
+  releaseScheduledChangeForSubscription,
+} from '@/lib/kilo-pass/scheduled-change-release';
 import { KILO_PASS_BONUS_LIKE_ITEM_KINDS, appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
@@ -75,11 +81,16 @@ import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
-import { getInitialWelcomePromoEligibilityReasonForSubscription } from '@/lib/kilo-pass/welcome-promo-context';
+import {
+  getInitialWelcomePromoContextForSubscription,
+  getKiloPassWelcomePromoPolicy,
+  type KiloPassWelcomePromoPolicy,
+} from '@/lib/kilo-pass/welcome-promo-context';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logHostingActivationInfo = sentryLogger('kilo-pass-hosting-activation', 'info');
 const logHostingActivationWarning = sentryLogger('kilo-pass-hosting-activation', 'warning');
+const logScheduledChangeWarning = sentryLogger('kilo-pass-scheduled-change', 'warning');
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -327,6 +338,7 @@ function getNextBillingAtFromSubscriptionStart(subscription: {
 function getNextKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
   return computeKiloPassBonusCreditsUsd({
@@ -335,7 +347,7 @@ function getNextKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.subscription.startedAt,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
 }
@@ -343,6 +355,7 @@ function getNextKiloPassBonusCreditsUsd(params: {
 function getCurrentKiloPassBonusCreditsUsd(params: {
   subscription: KiloPassSubscriptionState;
   isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
   welcomePromoEligibilityReason: KiloPassWelcomePromoEligibilityReason | null;
 }): number {
   return computeKiloPassBonusCreditsUsd({
@@ -351,7 +364,7 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
     startedAtIso: params.subscription.startedAt,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-    paymentProvider: params.subscription.paymentProvider,
+    welcomePromoPolicy: params.welcomePromoPolicy,
     welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
   });
 }
@@ -448,17 +461,22 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
 }
 
 /**
- * Get the timestamp when base credits were issued for the most recent issuance of a subscription.
+ * Get the credit transaction for the most recent base issuance of a subscription.
  *
  * The Kilo Pass usage window should start from when base credits were actually issued (via the
  * invoice.paid webhook), not from Stripe's `current_period_start`. There is often a gap between
  * these two timestamps during which usage is served from pre-existing credits, not pass credits.
+ * Its cumulative-usage baseline is the canonical start for bonus-qualifying usage.
  */
-async function getBaseCreditsIssuedAtForSubscription(
-  subscriptionId: string
-): Promise<string | null> {
+async function getLatestBaseCreditsForSubscription(subscriptionId: string): Promise<{
+  issuedAtIso: string;
+  usageBaselineMicrodollars: number | null;
+} | null> {
   const rows = await db
-    .select({ createdAt: credit_transactions.created_at })
+    .select({
+      createdAt: credit_transactions.created_at,
+      usageBaselineMicrodollars: credit_transactions.original_baseline_microdollars_used,
+    })
     .from(kilo_pass_issuance_items)
     .innerJoin(
       kilo_pass_issuances,
@@ -481,7 +499,12 @@ async function getBaseCreditsIssuedAtForSubscription(
   if (!row?.createdAt) return null;
 
   const parsed = dayjs(row.createdAt).utc();
-  return parsed.isValid() ? parsed.toISOString() : null;
+  if (!parsed.isValid()) return null;
+
+  return {
+    issuedAtIso: parsed.toISOString(),
+    usageBaselineMicrodollars: row.usageBaselineMicrodollars,
+  };
 }
 
 async function getKiloPassIssuanceCreditHistoryRows(
@@ -663,16 +686,19 @@ async function getCurrentPeriodSpendUsd(params: {
   kiloUserId: string;
   startInclusiveIso: string;
   endExclusiveIso: string;
+  usageBaselineMicrodollars: number | null;
 }): Promise<{
   currentPeriodUsageUsd: number;
   currentPeriodHostingCostUsd: number;
 }> {
-  const [currentPeriodInferenceUsageUsd, currentPeriodHostingCostUsdValue] = await Promise.all([
-    getCurrentPeriodUsageUsd({
-      kiloUserId: params.kiloUserId,
-      startInclusiveIso: params.startInclusiveIso,
-      endExclusiveIso: params.endExclusiveIso,
-    }),
+  const [userRows, currentPeriodHostingCostUsdValue] = await Promise.all([
+    params.usageBaselineMicrodollars === null
+      ? Promise.resolve([])
+      : db
+          .select({ microdollarsUsed: kilocode_users.microdollars_used })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, params.kiloUserId))
+          .limit(1),
     getCurrentPeriodHostingCostUsd({
       kiloUserId: params.kiloUserId,
       startInclusiveIso: params.startInclusiveIso,
@@ -680,10 +706,24 @@ async function getCurrentPeriodSpendUsd(params: {
     }),
   ]);
 
+  const currentMicrodollarsUsed = userRows[0]?.microdollarsUsed;
+  // Bonus issuance is driven by this same cumulative usage counter. Its delta from the
+  // base-credit transaction baseline includes every qualifying credit-funded product.
+  const currentPeriodUsageUsd =
+    params.usageBaselineMicrodollars !== null && currentMicrodollarsUsed !== undefined
+      ? roundToCents(
+          fromMicrodollars(Math.max(0, currentMicrodollarsUsed - params.usageBaselineMicrodollars))
+        )
+      : await getCurrentPeriodUsageUsd({
+          kiloUserId: params.kiloUserId,
+          startInclusiveIso: params.startInclusiveIso,
+          endExclusiveIso: params.endExclusiveIso,
+        }).then(inferenceUsageUsd =>
+          roundToCents(inferenceUsageUsd + currentPeriodHostingCostUsdValue)
+        );
+
   return {
-    currentPeriodUsageUsd: roundToCents(
-      currentPeriodInferenceUsageUsd + currentPeriodHostingCostUsdValue
-    ),
+    currentPeriodUsageUsd,
     currentPeriodHostingCostUsd: currentPeriodHostingCostUsdValue,
   };
 }
@@ -701,17 +741,21 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     subscriptionId: params.subscription.subscriptionId,
   });
-  const [isBonusUnlocked, baseCreditsIssuedAtIso, welcomePromoEligibilityReason] =
-    await Promise.all([
-      getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
-      getBaseCreditsIssuedAtForSubscription(params.subscription.subscriptionId),
-      getInitialWelcomePromoEligibilityReasonForSubscription(db, {
-        subscriptionId: params.subscription.subscriptionId,
-      }),
-    ]);
+  const [isBonusUnlocked, latestBaseCredits, initialWelcomePromoContext] = await Promise.all([
+    getIsBonusUnlockedForSubscriptionId(params.subscription.subscriptionId),
+    getLatestBaseCreditsForSubscription(params.subscription.subscriptionId),
+    getInitialWelcomePromoContextForSubscription(db, {
+      subscriptionId: params.subscription.subscriptionId,
+    }),
+  ]);
+  const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
+    paymentProvider: params.subscription.paymentProvider,
+    initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
+  });
+  const welcomePromoEligibilityReason = initialWelcomePromoContext?.eligibilityReason ?? null;
   const usageStartInclusiveIso = getUsageStartInclusiveIso({
     subscription: params.subscription,
-    baseCreditsIssuedAtIso,
+    baseCreditsIssuedAtIso: latestBaseCredits?.issuedAtIso ?? null,
     periodStartIso: params.periodStartIso,
     nowUtc: params.nowUtc,
   });
@@ -719,6 +763,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
     kiloUserId: params.kiloUserId,
     startInclusiveIso: usageStartInclusiveIso,
     endExclusiveIso: params.spendEndExclusiveIso,
+    usageBaselineMicrodollars: latestBaseCredits?.usageBaselineMicrodollars ?? null,
   });
 
   return {
@@ -726,6 +771,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
     nextBonusCreditsUsd: getNextKiloPassBonusCreditsUsd({
       subscription: params.subscription,
       isFirstTimeSubscriberEver,
+      welcomePromoPolicy,
       welcomePromoEligibilityReason,
     }),
     nextBillingAt: params.nextBillingAt,
@@ -736,6 +782,7 @@ async function buildActiveKiloPassSubscriptionState(params: {
     currentPeriodBonusCreditsUsd: getCurrentKiloPassBonusCreditsUsd({
       subscription: params.subscription,
       isFirstTimeSubscriberEver,
+      welcomePromoPolicy,
       welcomePromoEligibilityReason,
     }),
     isBonusUnlocked,
@@ -1837,13 +1884,14 @@ export const kiloPassRouter = createTRPCRouter({
       }
       assertStripeManagedSubscription(subscription);
 
-      const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+      let scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
         columns: {
           id: true,
           from_tier: true,
           from_cadence: true,
           to_tier: true,
           to_cadence: true,
+          stripe_schedule_id: true,
           effective_at: true,
           status: true,
         },
@@ -1855,6 +1903,69 @@ export const kiloPassRouter = createTRPCRouter({
 
       if (!scheduledChange) {
         return { scheduledChange: null };
+      }
+
+      const isPending =
+        scheduledChange.status === KiloPassScheduledChangeStatus.NotStarted ||
+        scheduledChange.status === KiloPassScheduledChangeStatus.Active;
+      if (isPending && !dayjs(scheduledChange.effective_at).isAfter(dayjs())) {
+        try {
+          const stripeSchedule = await stripe.subscriptionSchedules.retrieve(
+            scheduledChange.stripe_schedule_id
+          );
+          const providerStatus = maybeMapStripeScheduleStatusToDb(stripeSchedule.status);
+
+          if (providerStatus && isTerminalKiloPassScheduleStatus(providerStatus)) {
+            const reconciled = await reconcileKiloPassScheduledChangeTerminalStatus({
+              dbOrTx: db,
+              scheduledChangeId: scheduledChange.id,
+              status: providerStatus,
+            });
+            if (reconciled) return { scheduledChange: null };
+
+            const currentScheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+              columns: {
+                id: true,
+                from_tier: true,
+                from_cadence: true,
+                to_tier: true,
+                to_cadence: true,
+                stripe_schedule_id: true,
+                effective_at: true,
+                status: true,
+              },
+              where: and(
+                eq(
+                  kilo_pass_scheduled_changes.stripe_subscription_id,
+                  subscription.stripeSubscriptionId
+                ),
+                isNull(kilo_pass_scheduled_changes.deleted_at)
+              ),
+            });
+            if (!currentScheduledChange) return { scheduledChange: null };
+            scheduledChange = currentScheduledChange;
+          }
+
+          logScheduledChangeWarning('Overdue Kilo Pass provider schedule remains pending', {
+            scheduledChangeId: scheduledChange.id,
+            scheduleId: scheduledChange.stripe_schedule_id,
+            stripeSubscriptionId: subscription.stripeSubscriptionId,
+            effectiveAt: scheduledChange.effective_at,
+            localStatus: scheduledChange.status,
+            providerStatus: stripeSchedule.status,
+          });
+        } catch (error) {
+          captureException(error, {
+            tags: { source: 'kilo_pass_scheduled_change', stage: 'overdue_read_reconciliation' },
+            extra: {
+              scheduledChangeId: scheduledChange.id,
+              scheduleId: scheduledChange.stripe_schedule_id,
+              stripeSubscriptionId: subscription.stripeSubscriptionId,
+              effectiveAt: scheduledChange.effective_at,
+              localStatus: scheduledChange.status,
+            },
+          });
+        }
       }
 
       return {

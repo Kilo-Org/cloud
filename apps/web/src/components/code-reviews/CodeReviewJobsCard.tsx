@@ -1,6 +1,6 @@
 'use client';
 
-import { type ComponentType, type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,9 +29,6 @@ import {
   ExternalLink,
   GitPullRequest,
   Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
   AlertCircle,
   ChevronDown,
   ChevronUp,
@@ -41,6 +38,7 @@ import {
   Ban,
   Plus,
 } from 'lucide-react';
+import { getCodeReviewStatusIcon } from './code-review-status-icons';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -49,6 +47,24 @@ import { CodeReviewStreamView } from './CodeReviewStreamView';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { Switch } from '@/components/ui/switch';
+import {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  type CouncilAggregationStrategy,
+} from '@kilocode/db/schema-types';
+import {
+  COUNCIL_MIN_SPECIALISTS,
+  formatAggregationStrategy,
+} from '@kilocode/worker-utils/code-review-council';
+import { CouncilSpecialistPicker } from './CouncilSpecialistPicker';
+import {
+  CODE_REVIEW_COUNCIL_FLAG,
+  buildCouncilSpecialists,
+  countEnabledSelections,
+  defaultCouncilSelections,
+  type CouncilSpecialistSelection,
+} from '@/lib/code-reviews/core/council-selection';
 import {
   getAvailableThinkingEfforts,
   thinkingEffortLabel,
@@ -62,6 +78,13 @@ import {
   getCodeReviewRepositoryUrl,
   type CodeReviewUiPlatform,
 } from '@/lib/code-reviews/code-review-links';
+import {
+  CODE_REVIEW_STATUS_LABELS,
+  hasInFlightReview,
+  isCancellableReviewStatus,
+  isRetriggerableReviewStatus,
+  type CodeReviewStatus,
+} from '@kilocode/app-shared/code-review';
 
 type Platform = CodeReviewUiPlatform;
 
@@ -71,32 +94,8 @@ type CodeReviewJobsCardProps = {
   localCodeReviewDevelopmentEnabled?: boolean;
   defaultModelSlug?: string | null;
   defaultThinkingEffort?: string | null;
-};
-
-type CodeReviewStatus =
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'interrupted';
-
-const statusConfig: Record<
-  CodeReviewStatus,
-  {
-    icon: ComponentType<{ className?: string }>;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    label: string;
-  }
-> = {
-  pending: { icon: Clock, variant: 'secondary', label: 'Pending' },
-  queued: { icon: Clock, variant: 'secondary', label: 'Queued' },
-  running: { icon: Loader2, variant: 'default', label: 'Running' },
-  completed: { icon: CheckCircle2, variant: 'default', label: 'Completed' },
-  failed: { icon: XCircle, variant: 'destructive', label: 'Failed' },
-  cancelled: { icon: Ban, variant: 'outline', label: 'Cancelled' },
-  interrupted: { icon: AlertCircle, variant: 'outline', label: 'Interrupted' },
+  /** Whether this owner is entitled to council (enterprise + active). */
+  councilEntitled?: boolean;
 };
 
 const PAGE_SIZE = 10;
@@ -188,6 +187,7 @@ export function CodeReviewJobsCard({
   localCodeReviewDevelopmentEnabled = false,
   defaultModelSlug,
   defaultThinkingEffort,
+  councilEntitled = false,
 }: CodeReviewJobsCardProps) {
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -200,8 +200,22 @@ export function CodeReviewJobsCard({
   );
   const [manualJobThinkingEffort, setManualJobThinkingEffort] = useState<string | null>(null);
   const [manualJobInstructions, setManualJobInstructions] = useState('');
+  const [manualJobCouncilEnabled, setManualJobCouncilEnabled] = useState(false);
+  const [manualJobCouncilAggregation, setManualJobCouncilAggregation] =
+    useState<CouncilAggregationStrategy>('any_blocking_member');
+  const [manualJobCouncilSelections, setManualJobCouncilSelections] = useState<
+    Record<string, CouncilSpecialistSelection>
+  >(() => defaultCouncilSelections());
   const [manualJobSubmitted, setManualJobSubmitted] = useState(false);
   const [manualJobSubmitError, setManualJobSubmitError] = useState<string | null>(null);
+
+  // Council UI shows in local dev, or for entitled enterprise orgs with the rollout flag.
+  const councilFlagEnabled = useFeatureFlagEnabled(CODE_REVIEW_COUNCIL_FLAG);
+  const councilUiEnabled =
+    localCodeReviewDevelopmentEnabled || (councilEntitled && !!councilFlagEnabled);
+  const manualJobCouncilEnabledCount = countEnabledSelections(manualJobCouncilSelections);
+  const manualJobCouncilBelowMin =
+    manualJobCouncilEnabled && manualJobCouncilEnabledCount < COUNCIL_MIN_SPECIALISTS;
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -249,8 +263,7 @@ export function CodeReviewJobsCard({
       const result = query.state.data;
       if (!result || !result.success) return false;
       const reviews = result.reviews || [];
-      const hasActiveJobs = reviews.some(r => ['pending', 'queued', 'running'].includes(r.status));
-      return hasActiveJobs ? 5000 : false; // Poll every 5s if active jobs
+      return hasInFlightReview(reviews) ? 5000 : false; // Poll every 5s if active jobs
     },
   });
 
@@ -286,7 +299,11 @@ export function CodeReviewJobsCard({
     ? orgCreateManualReviewJobMutation.isPending
     : personalCreateManualReviewJobMutation.isPending;
   const manualJobSubmitDisabled =
-    isManualJobSubmitting || isLoadingModels || modelOptions.length === 0 || !manualJobModelAllowed;
+    isManualJobSubmitting ||
+    isLoadingModels ||
+    modelOptions.length === 0 ||
+    !manualJobModelAllowed ||
+    manualJobCouncilBelowMin;
 
   useEffect(() => {
     if (
@@ -333,6 +350,9 @@ export function CodeReviewJobsCard({
       selectInitialManualJobThinkingEffort(defaultThinkingEffort, nextModelSlug)
     );
     setManualJobInstructions('');
+    setManualJobCouncilEnabled(false);
+    setManualJobCouncilAggregation('any_blocking_member');
+    setManualJobCouncilSelections(defaultCouncilSelections());
     setManualJobSubmitted(false);
     setManualJobSubmitError(null);
   }
@@ -392,12 +412,27 @@ export function CodeReviewJobsCard({
       return;
     }
 
+    if (manualJobCouncilEnabled && manualJobCouncilEnabledCount < COUNCIL_MIN_SPECIALISTS) {
+      setManualJobSubmitError(`Select at least ${COUNCIL_MIN_SPECIALISTS} council specialists.`);
+      return;
+    }
+
+    const council =
+      councilUiEnabled && manualJobCouncilEnabled
+        ? {
+            enabled: true,
+            aggregation_strategy: manualJobCouncilAggregation,
+            specialists: buildCouncilSpecialists(manualJobCouncilSelections),
+          }
+        : undefined;
+
     const input = {
       platform,
       url: manualJobUrl.trim(),
       modelSlug: manualJobModelSlug,
       thinkingEffort: manualJobThinkingEffort,
       instructions: manualJobInstructions.trim() || undefined,
+      council,
     };
 
     if (organizationId) {
@@ -550,6 +585,79 @@ export function CodeReviewJobsCard({
                 {MANUAL_INSTRUCTIONS_MAX_LENGTH} characters.
               </p>
             </div>
+
+            {councilUiEnabled && (
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="grid gap-1 leading-none">
+                    <Label htmlFor="manual-code-review-council" className="font-medium">
+                      Council review
+                    </Label>
+                    <p className="text-muted-foreground text-sm">
+                      Run multiple specialists, each on its own model, and combine their votes.
+                    </p>
+                  </div>
+                  <Switch
+                    id="manual-code-review-council"
+                    checked={manualJobCouncilEnabled}
+                    onCheckedChange={setManualJobCouncilEnabled}
+                    disabled={isManualJobSubmitting}
+                    aria-label="Enable council review"
+                  />
+                </div>
+
+                {manualJobCouncilEnabled && (
+                  <div className="space-y-4">
+                    <CouncilSpecialistPicker
+                      selections={manualJobCouncilSelections}
+                      onChange={setManualJobCouncilSelections}
+                      modelOptions={modelOptions}
+                      isLoadingModels={isLoadingModels}
+                      disabled={isManualJobSubmitting}
+                      defaultModelSlug={manualJobModelSlug}
+                      modal
+                    />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-code-review-council-aggregation">
+                        Governance decision
+                      </Label>
+                      <Select
+                        value={manualJobCouncilAggregation}
+                        onValueChange={value =>
+                          setManualJobCouncilAggregation(value as CouncilAggregationStrategy)
+                        }
+                        disabled={isManualJobSubmitting}
+                      >
+                        <SelectTrigger
+                          id="manual-code-review-council-aggregation"
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNCIL_AGGREGATION_STRATEGIES.map(strategy => (
+                            <SelectItem key={strategy} value={strategy}>
+                              {formatAggregationStrategy(strategy)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p
+                        className={
+                          manualJobCouncilBelowMin
+                            ? 'text-destructive text-sm'
+                            : 'text-muted-foreground text-sm'
+                        }
+                      >
+                        Select {COUNCIL_MIN_SPECIALISTS}–4 specialists.{' '}
+                        {manualJobCouncilEnabledCount} selected.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </form>
         <DialogFooter>
@@ -681,11 +789,9 @@ export function CodeReviewJobsCard({
         <CardContent>
           <div className="space-y-3">
             {reviews.map(review => {
-              const statusInfo = statusConfig[review.status as CodeReviewStatus] ?? {
-                icon: AlertCircle,
-                variant: 'outline' as const,
-                label: review.status,
-              };
+              const statusInfo = getCodeReviewStatusIcon(review.status);
+              const statusLabel =
+                CODE_REVIEW_STATUS_LABELS[review.status as CodeReviewStatus] ?? review.status;
               const StatusIcon = statusInfo.icon;
               const isExpanded = expandedReviewId === review.id;
               const canShowStream = ['running', 'queued'].includes(review.status);
@@ -758,7 +864,7 @@ export function CodeReviewJobsCard({
                           <StatusIcon
                             className={`h-3 w-3 ${review.status === 'running' ? 'animate-spin' : ''}`}
                           />
-                          {statusInfo.label}
+                          {statusLabel}
                         </Badge>
                       </div>
 
@@ -820,7 +926,7 @@ export function CodeReviewJobsCard({
                       {/* Action Buttons */}
                       <div className="mt-2 flex gap-2">
                         {/* Cancel Button for pending/queued/running reviews */}
-                        {['pending', 'queued', 'running'].includes(review.status) && (
+                        {isCancellableReviewStatus(review.status) && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -841,7 +947,7 @@ export function CodeReviewJobsCard({
                         )}
 
                         {/* Retry Button for failed/cancelled/interrupted reviews */}
-                        {['failed', 'cancelled', 'interrupted'].includes(review.status) &&
+                        {isRetriggerableReviewStatus(review.status) &&
                           actionRequiredCopy &&
                           actionRequiredRecoveryHref && (
                             <Button variant="outline" size="sm" asChild className="gap-2">
@@ -858,28 +964,27 @@ export function CodeReviewJobsCard({
                               )}
                             </Button>
                           )}
-                        {['failed', 'cancelled', 'interrupted'].includes(review.status) &&
-                          !actionRequiredReason && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActionInProgressId(review.id);
-                                retriggerMutation.mutate({ reviewId: review.id });
-                              }}
-                              disabled={
-                                actionInProgressId === review.id && retriggerMutation.isPending
-                              }
-                              className="gap-2"
-                            >
-                              <RotateCcw
-                                className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
-                              />
-                              {actionInProgressId === review.id && retriggerMutation.isPending
-                                ? 'Retrying...'
-                                : 'Retry'}
-                            </Button>
-                          )}
+                        {isRetriggerableReviewStatus(review.status) && !actionRequiredReason && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setActionInProgressId(review.id);
+                              retriggerMutation.mutate({ reviewId: review.id });
+                            }}
+                            disabled={
+                              actionInProgressId === review.id && retriggerMutation.isPending
+                            }
+                            className="gap-2"
+                          >
+                            <RotateCcw
+                              className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                            />
+                            {actionInProgressId === review.id && retriggerMutation.isPending
+                              ? 'Retrying...'
+                              : 'Retry'}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

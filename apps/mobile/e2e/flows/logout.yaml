@@ -1,0 +1,51 @@
+# Logout helper — ends on the login page ("Welcome to Kilo Code").
+#
+# Idempotent: if the app is already signed out, it just lands on the login page.
+#
+#   maestro --device <udid> test e2e/flows/logout.yaml
+#
+# See e2e/AGENTS.md for the full workflow.
+appId: com.kilocode.kiloapp
+---
+- runFlow:
+    when:
+      visible: 'Verify code'
+    commands:
+      - tapOn: 'Back'
+- runFlow:
+    when:
+      notVisible: 'Welcome to Kilo Code'
+    commands:
+      - runFlow:
+          when:
+            notVisible: 'HOME|Home, tab, 1 of 4'
+          commands:
+            - runFlow: settle-app.yaml
+# Booted into the consent gate (signed in, not consented) -> accept it to reach
+# Home, then sign out below.
+- runFlow:
+    when:
+      visible: 'Accept and continue'
+    commands:
+      - tapOn: 'Accept and continue'
+      - extendedWaitUntil:
+          visible: 'Home, tab, 1 of 4'
+          timeout: 15000
+# Signed in: Profile tab -> Sign Out -> confirm the native alert.
+- runFlow:
+    when:
+      notVisible: 'Welcome to Kilo Code'
+    commands:
+      - tapOn: 'Profile, tab, 4 of 4'
+      - scrollUntilVisible:
+          element: 'Sign Out'
+          direction: DOWN
+      - tapOn: 'Sign Out'
+      - assertVisible: 'Sign out?'
+      # The alert's confirm ("Sign out") and the screen button ("Sign Out")
+      # collide under Maestro's case-insensitive match; index 0 is the alert
+      # button (topmost by position).
+      - tapOn:
+          text: 'Sign out'
+          index: 0
+- assertVisible: 'you@example.com'

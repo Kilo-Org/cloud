@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { applyGatewayModelsFallback } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import {
+  applyGatewayModelsFallback,
+  applyPreferredProvider,
+} from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
@@ -18,10 +21,10 @@ function makeRequest(model: string, models?: string[]): GatewayRequest {
 describe('applyGatewayModelsFallback', () => {
   it.each<ProviderId>(['openrouter', 'vercel'])(
     'sets Opus as the Fable fallback for the %s provider',
-    providerId => {
+    async providerId => {
       const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
 
-      applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
+      await applyGatewayModelsFallback(providerId, 'anthropic/claude-fable-5', request);
 
       expect(request.body.models).toEqual([
         'anthropic/claude-fable-5',
@@ -30,19 +33,50 @@ describe('applyGatewayModelsFallback', () => {
     }
   );
 
-  it('removes caller-provided fallbacks for Fable on other providers', () => {
+  it('removes caller-provided fallbacks for Fable on other providers', async () => {
     const request = makeRequest('anthropic/claude-fable-5', ['caller/fallback']);
 
-    applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
+    await applyGatewayModelsFallback('martian', 'anthropic/claude-fable-5', request);
 
     expect(request.body.models).toBeUndefined();
   });
 
-  it('removes caller-provided fallbacks for other models', () => {
+  it('removes caller-provided fallbacks for other models', async () => {
     const request = makeRequest('openai/gpt-4o', ['caller/fallback']);
 
-    applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
+    await applyGatewayModelsFallback('openrouter', 'openai/gpt-4o', request);
 
     expect(request.body.models).toBeUndefined();
+  });
+});
+
+describe('applyPreferredProvider', () => {
+  it('does not set a provider order for Fable', () => {
+    const request = makeRequest('anthropic/claude-fable-5');
+
+    applyPreferredProvider('anthropic/claude-fable-5', request.body);
+
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('preserves valid provider options when adding order', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    request.body.provider = { zdr: true };
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+
+    expect(request.body.provider).toEqual({
+      zdr: true,
+      order: ['amazon-bedrock', 'anthropic'],
+    });
+  });
+
+  it('overwrites a malformed provider value', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    Object.assign(request.body, { provider: 'lmstudio' });
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+
+    expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'anthropic'] });
   });
 });

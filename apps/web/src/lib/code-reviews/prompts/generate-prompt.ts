@@ -130,6 +130,14 @@ export type GenerateReviewPromptOptions = {
   manualInstructions?: string | null;
   /** Persisted manual job output mode. Defaults to provider publishing. */
   outputMode?: 'provider' | 'kilo';
+  /**
+   * Omit the standard sub-agent sharding policy (the Tiny/Small/Medium tier guidance that
+   * tells the primary agent how many sub-agents to spawn and to review/verify findings
+   * itself). Council runs REPLACE that policy with a coordinator contract (one sub-agent per
+   * specialist, no self-review), so including both would give the model contradictory
+   * instructions — on a small PR it could skip specialists and fail closed.
+   */
+  omitSubAgentGuidance?: boolean;
 };
 
 /**
@@ -156,6 +164,7 @@ export async function generateReviewPrompt(
     repositoryReviewInstructions,
     manualInstructions,
     outputMode = 'provider',
+    omitSubAgentGuidance = false,
   } = options;
   if (platform === PLATFORM.BITBUCKET && (!prNumber || !expectedHeadSha)) {
     throw new Error('Bitbucket review prompt requires pull request number and expected head SHA');
@@ -233,7 +242,7 @@ export async function generateReviewPrompt(
     prompt += replacePlaceholders(template.diffLineGuidance) + '\n\n';
   }
 
-  if (template.subAgentGuidance) {
+  if (template.subAgentGuidance && !omitSubAgentGuidance) {
     prompt += template.subAgentGuidance + '\n\n';
   }
 

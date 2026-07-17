@@ -83,10 +83,12 @@ pnpm drizzle:verify-bootstrap
 ### 5. Start the development server
 
 ```bash
-pnpm dev:start
+KILO_PORT_OFFSET=auto pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and local infrastructure. The web app is available at http://localhost:3000.
+This launches a tmux dashboard with the Next.js app and local infrastructure.
+The automatic offset keeps secondary worktrees from colliding with the root
+checkout. Run `pnpm dev:status` to get the web app's port.
 
 To stop all services:
 
@@ -100,7 +102,7 @@ pnpm dev:stop
 pnpm test
 ```
 
-All tests should pass against the local PostgreSQL database.
+This runs the web tests and web environment tests. They should pass against the local PostgreSQL database.
 
 ## Repo Layout
 
@@ -135,18 +137,18 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 
 | Command | Description |
 |---|---|
-| `pnpm dev:start` | Start all local services in a tmux dashboard |
+| `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:status` | Live status of running services |
 | `pnpm dev:restart` | Restart a running service |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` |
 | `pnpm web:env set <VARIABLE>` | Add or rotate shared web env vars across dotenv defaults, Vercel, and 1Password |
-| `pnpm test` | Run the Jest test suite |
+| `pnpm test` | Run web tests and web environment tests |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
 | `pnpm typecheck` | Run TypeScript type checking |
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Auto-format all supported files with oxfmt |
-| `pnpm validate` | Run typecheck, lint, and tests together |
+| `pnpm validate` | Run the root typecheck, lint, and test scripts |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 
@@ -172,19 +174,13 @@ Use `pnpm dev:start <group>` to run groups of related services via the tmux dash
 Sign in without real OAuth:
 
 ```
-http://localhost:3000/users/sign_in?fakeUser=<email>
+http://localhost:<port>/users/sign_in?fakeUser=<email>&callbackPath=<path>
 ```
 
-Use an `@admin.example.com` email for fake admin access:
+Use the port from `pnpm dev:status`. Set `callbackPath` to the page needed after login. Use an `@admin.example.com` email for fake admin access:
 
 ```
-http://localhost:3000/users/sign_in?fakeUser=<email>@admin.example.com
-```
-
-Append `callbackPath` to redirect after login:
-
-```
-http://localhost:3000/users/sign_in?fakeUser=<email>&callbackPath=/profile
+http://localhost:<port>/users/sign_in?fakeUser=<email>@admin.example.com&callbackPath=<path>
 ```
 
 ## Git Workflow

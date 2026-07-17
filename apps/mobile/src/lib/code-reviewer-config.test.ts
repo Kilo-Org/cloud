@@ -1,68 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSaveConfigInput, type ReviewConfigData } from '@/lib/code-reviewer-config';
+import { parseReviewerPlatform, PERSONAL_SCOPE } from './code-reviewer-config';
 
-const config: ReviewConfigData = {
-  isEnabled: true,
-  reviewStyle: 'balanced',
-  focusAreas: ['bugs', 'security'],
-  customInstructions: null,
-  modelSlug: 'anthropic/claude-sonnet-5',
-  thinkingEffort: null,
-  gateThreshold: 'off',
-  repositorySelectionMode: 'all',
-  selectedRepositoryIds: [],
-  disableReviewMd: true,
-};
-
-describe('buildSaveConfigInput', () => {
-  it('carries the full current config for an untouched field', () => {
-    const input = buildSaveConfigInput('github', config, { reviewStyle: 'strict' });
-    expect(input).toEqual({
-      platform: 'github',
-      reviewStyle: 'strict',
-      focusAreas: ['bugs', 'security'],
-      customInstructions: undefined,
-      modelSlug: 'anthropic/claude-sonnet-5',
-      thinkingEffort: null,
-      gateThreshold: 'off',
-      repositorySelectionMode: 'all',
-      selectedRepositoryIds: [],
-      disableReviewMd: true,
-    });
+describe('parseReviewerPlatform', () => {
+  it('allows every platform for an organization scope', () => {
+    expect(parseReviewerPlatform('org-1', 'github')).toBe('github');
+    expect(parseReviewerPlatform('org-1', 'gitlab')).toBe('gitlab');
+    expect(parseReviewerPlatform('org-1', 'bitbucket')).toBe('bitbucket');
   });
 
-  it('applies patches over current values', () => {
-    const input = buildSaveConfigInput('github', config, {
-      focusAreas: ['performance'],
-      customInstructions: 'be nice',
-    });
-    expect(input.focusAreas).toEqual(['performance']);
-    expect(input.customInstructions).toBe('be nice');
-    expect(input.reviewStyle).toBe('balanced');
+  it('allows github and gitlab for the personal scope', () => {
+    expect(parseReviewerPlatform(PERSONAL_SCOPE, 'github')).toBe('github');
+    expect(parseReviewerPlatform(PERSONAL_SCOPE, 'gitlab')).toBe('gitlab');
   });
 
-  it('includes autoConfigureWebhooks for gitlab', () => {
-    const input = buildSaveConfigInput('gitlab', config, {});
-    expect(input.platform).toBe('gitlab');
-    expect(input.autoConfigureWebhooks).toBe(true);
+  it('rejects bitbucket for the personal scope (org-only platform)', () => {
+    expect(parseReviewerPlatform(PERSONAL_SCOPE, 'bitbucket')).toBeNull();
   });
 
-  it('carries string repository ids for bitbucket', () => {
-    const input = buildSaveConfigInput('bitbucket', config, {
-      selectedRepositoryIds: ['uuid-1'],
-    });
-    expect(input.platform).toBe('bitbucket');
-    expect(input.selectedRepositoryIds).toEqual(['uuid-1']);
+  it('rejects an unknown platform', () => {
+    expect(parseReviewerPlatform('org-1', 'gitea')).toBeNull();
+    expect(parseReviewerPlatform(PERSONAL_SCOPE, 'gitea')).toBeNull();
   });
 
-  it('forces selected repository mode for gitlab even when config default is all', () => {
-    const input = buildSaveConfigInput('gitlab', config, {});
-    expect(input.repositorySelectionMode).toBe('selected');
-  });
-
-  it('forces selected repository mode for bitbucket even when config default is all', () => {
-    const input = buildSaveConfigInput('bitbucket', config, {});
-    expect(input.repositorySelectionMode).toBe('selected');
+  it('rejects a missing or repeated route segment', () => {
+    expect(parseReviewerPlatform('org-1', undefined)).toBeNull();
+    expect(parseReviewerPlatform('org-1', ['github', 'gitlab'])).toBeNull();
   });
 });

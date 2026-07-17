@@ -11,7 +11,6 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { redisClient } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
@@ -21,7 +20,10 @@ import {
 } from '@/lib/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getCachedVercelInferenceProviderIdsForModel,
+  getVercelModelsFromRedis,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -37,22 +39,25 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
-function hasOpenRouterExclusiveProviderOptions(request: GatewayRequest) {
-  if (request.body.provider?.data_collection === 'deny') {
-    console.debug('[hasOpenRouterExclusiveProviderOptions] has data_collection==deny');
+export function hasCompatibleVercelInferenceProvider(
+  openRouterInferenceProviders: string[],
+  vercelInferenceProviders: string[] | null
+) {
+  if (!vercelInferenceProviders) {
     return true;
   }
-  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
-    console.debug('[hasOpenRouterExclusiveProviderOptions] has ignore');
-    return true;
-  }
-  if (request.body.provider?.zdr) {
-    // there's a zeroDataRetention option on Vercel, but it works differently
-    // ZDR has to be set manually per provider
-    console.debug('[hasOpenRouterExclusiveProviderOptions] has zdr');
-    return true;
-  }
-  return false;
+
+  return openRouterInferenceProviders.some(provider =>
+    vercelInferenceProviders.includes(openRouterToVercelInferenceProviderId(provider))
+  );
+}
+
+export function passesVercelRoutingPercentage(randomSeed: string, routingPercentage: number) {
+  const routingSeed = 'vercel_routing_' + randomSeed;
+  const wholePercentageBucket = getRandomNumber(routingSeed, 100);
+  const fractionalPercentageBucket = getRandomNumber(routingSeed + '_fractional', 1_000);
+
+  return wholePercentageBucket + fractionalPercentageBucket / 1_000 < routingPercentage;
 }
 
 export async function shouldRouteToVercel(
@@ -61,7 +66,7 @@ export async function shouldRouteToVercel(
   request: GatewayRequest,
   randomSeed: string
 ) {
-  if (hasOpenRouterExclusiveProviderOptions(request)) {
+  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       '[shouldRouteToVercel] not routing to Vercel because of unsupported provider options'
     );
@@ -79,30 +84,42 @@ export async function shouldRouteToVercel(
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const routingPercentage = await getVercelRoutingPercentage();
 
-  const passedRandomization =
-    getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
+  const passedRandomization = passesVercelRoutingPercentage(randomSeed, routingPercentage);
 
   if (!passedRandomization) {
     return false;
   }
 
-  const vercelModels = await getVercelModels();
-  const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
+  const vercelModels = await getVercelModelsFromRedis();
+  const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }
 
+  const only = request.body.provider?.only;
+  if (only) {
+    const vercelInferenceProviders =
+      await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+    if (!hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
+      console.debug(
+        '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
+      );
+      return false;
+    }
+  }
+
   return true;
 }
 
-function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig | undefined {
+function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig {
   const provider = requestToMutate.body.provider;
   return {
     gateway: {
       only: provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
+      disallowPromptTraining: provider?.data_collection === 'deny' || undefined,
       models: requestToMutate.body.models,
     },
   };
@@ -168,10 +185,7 @@ export function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  requestToMutate.body.model = mapModelIdToVercel(
-    requestedModel,
-    isReasoningExplicitlyDisabled(requestToMutate)
-  );
+  requestToMutate.body.model = mapModelIdToVercel(requestedModel);
 
   if (userByok) {
     if (userByok.length === 0) {

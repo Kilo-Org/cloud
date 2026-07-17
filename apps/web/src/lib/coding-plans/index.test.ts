@@ -88,6 +88,7 @@ describe('coding plans', () => {
       providerName: 'MiniMax',
       name: 'Token Plan Plus',
       providerId: PROVIDER_ID,
+      coveredModelIds: ['minimax/minimax-m3'],
       costMicrodollars: COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
@@ -97,6 +98,7 @@ describe('coding plans', () => {
       providerName: 'MiniMax',
       name: 'Token Plan Max',
       providerId: PROVIDER_ID,
+      coveredModelIds: ['minimax/minimax-m3'],
       costMicrodollars: MAX_COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([
@@ -109,6 +111,7 @@ describe('coding plans', () => {
       providerName: 'MiniMax',
       name: 'Token Plan Ultra',
       providerId: PROVIDER_ID,
+      coveredModelIds: ['minimax/minimax-m3'],
       costMicrodollars: ULTRA_COST_MICRODOLLARS,
       billingPeriodDays: 30,
       features: expect.arrayContaining([
@@ -656,20 +659,29 @@ describe('coding plans', () => {
       .from(coding_plan_subscriptions)
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await terminateCodingPlanImmediately(activation.subscriptionId);
+    const [selectedCredential] = await db
+      .select({ fingerprint: coding_plan_key_inventory.credential_fingerprint })
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
+    const unchangedApiKey =
+      selectedCredential.fingerprint ===
+      codingPlanCredentialFingerprint('replace-unchanged-original-key')
+        ? 'replace-unchanged-original-key'
+        : 'replace-duplicate-existing-key';
+    const duplicateApiKey =
+      unchangedApiKey === 'replace-unchanged-original-key'
+        ? 'replace-duplicate-existing-key'
+        : 'replace-unchanged-original-key';
 
     await expect(
-      replaceManualCredentialRevocation(
-        subscription.key_inventory_id!,
-        'replace-unchanged-original-key',
-        { validateCredential }
-      )
+      replaceManualCredentialRevocation(subscription.key_inventory_id!, unchangedApiKey, {
+        validateCredential,
+      })
     ).rejects.toThrow('must be different');
     await expect(
-      replaceManualCredentialRevocation(
-        subscription.key_inventory_id!,
-        'replace-duplicate-existing-key',
-        { validateCredential }
-      )
+      replaceManualCredentialRevocation(subscription.key_inventory_id!, duplicateApiKey, {
+        validateCredential,
+      })
     ).rejects.toThrow('already present');
 
     const [credential] = await db
@@ -677,9 +689,7 @@ describe('coding plans', () => {
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
     expect(credential.status).toBe('revocation_pending');
-    expect(credential.credential_fingerprint).toBe(
-      codingPlanCredentialFingerprint('replace-unchanged-original-key')
-    );
+    expect(credential.credential_fingerprint).toBe(selectedCredential.fingerprint);
     expect(validateCredential).not.toHaveBeenCalled();
   });
 

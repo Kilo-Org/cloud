@@ -42,9 +42,12 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
   }) => Promise<{ signedUrl: string; key: string; expiresAt: string }>
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
+const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
+
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
+  getSession: mockGetSession,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -148,7 +151,9 @@ let createCaller: (ctx: { user: User }) => {
   }>;
   sendMessage: (input: {
     cloudAgentSessionId: string;
-    payload: { type: 'prompt'; prompt: string; mode: string; model: string };
+    payload:
+      | { type: 'prompt'; prompt: string; mode: string; model: string }
+      | { type: 'command'; command: string; arguments: string };
     attachments?: { path: string; files: string[] };
     images?: { path: string; files: string[] };
   }) => Promise<unknown>;
@@ -179,6 +184,11 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     mockVerifyUserOwnsSessionV2ByCloudAgentId.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+    mockGetSession.mockResolvedValue({ model: 'kilo/paid-model' });
   });
 
   it('denies a session the authenticated user does not own before calling the Worker', async () => {
@@ -226,6 +236,110 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments: images }));
     expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+  });
+
+  it('routes free follow-up prompt models through the balance-skip client', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+    const caller = createCaller({ user: { id: 'user-free', is_admin: false } as User });
+
+    await caller.sendMessage({
+      cloudAgentSessionId: 'agent_123',
+      payload: {
+        type: 'prompt',
+        prompt: 'Follow up on this',
+        mode: 'code',
+        model: 'kilo/free-model',
+      },
+    });
+
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: 'kilo/free-model' })
+    );
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it('routes free follow-up command turns through the balance-skip client using the session model', async () => {
+    mockGetSession.mockResolvedValueOnce({ model: 'kilo/free-model' });
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+    const caller = createCaller({ user: { id: 'user-free', is_admin: false } as User });
+
+    await caller.sendMessage({
+      cloudAgentSessionId: 'agent_123',
+      payload: { type: 'command', command: 'review', arguments: '' },
+    });
+
+    expect(mockGetSession).toHaveBeenCalledWith('agent_123');
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: 'kilo/free-model' })
+    );
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  it('keeps the balance check for command turns on paid sessions', async () => {
+    mockGetSession.mockResolvedValueOnce({ model: 'kilo/paid-model' });
+    const caller = createCaller({ user: { id: 'user-paid', is_admin: false } as User });
+
+    await caller.sendMessage({
+      cloudAgentSessionId: 'agent_123',
+      payload: { type: 'command', command: 'review', arguments: '' },
+    });
+
+    expect(mockGetSession).toHaveBeenCalledWith('agent_123');
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: 'kilo/paid-model' })
+    );
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  it('falls back to the balance-checked client when the session model is unavailable', async () => {
+    mockGetSession.mockResolvedValueOnce({ model: undefined });
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await caller.sendMessage({
+      cloudAgentSessionId: 'agent_123',
+      payload: { type: 'command', command: 'review', arguments: '' },
+    });
+
+    expect(mockGetSession).toHaveBeenCalledWith('agent_123');
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  it('falls back to the balance-checked client when getSession rejects', async () => {
+    mockGetSession.mockRejectedValueOnce(new Error('worker unavailable'));
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await caller.sendMessage({
+      cloudAgentSessionId: 'agent_123',
+      payload: { type: 'command', command: 'review', arguments: '' },
+    });
+
+    expect(mockGetSession).toHaveBeenCalledWith('agent_123');
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+    expect(mockSendMessage).toHaveBeenCalled();
   });
 
   it('signs Cloud Agent document uploads with the authenticated user scope', async () => {

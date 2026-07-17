@@ -3,6 +3,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_SCHEME,
+  BitbucketWorkspaceAccessTokenCredentialRowSchema,
   buildBitbucketWorkspaceAccessTokenAad,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { db } from '@/lib/drizzle';
@@ -237,17 +238,15 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     expect(credential).toEqual(
       expect.objectContaining({
         platform_integration_id: integration.id,
-        owned_by_organization_id: organization.id,
-        platform: 'bitbucket',
-        integration_type: 'workspace_access_token',
         expires_at: null,
         provider_credential_type: 'workspace_access_token',
         provider_scopes: ['account', 'pullrequest', 'repository', 'repository:write', 'webhook'],
         credential_version: 1,
       })
     );
-    expect(new Date(credential.provider_verified_at).toISOString()).toBe(result.validatedAt);
-    expect(new Date(credential.last_validated_at).toISOString()).toBe(result.validatedAt);
+    const credentialProfile = BitbucketWorkspaceAccessTokenCredentialRowSchema.parse(credential);
+    expect(new Date(credentialProfile.provider_verified_at).toISOString()).toBe(result.validatedAt);
+    expect(new Date(credentialProfile.last_validated_at).toISOString()).toBe(result.validatedAt);
 
     const aad = buildBitbucketWorkspaceAccessTokenAad({
       credentialId: credential.id,
@@ -367,7 +366,6 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       );
     if (!connectedCredential) throw new Error('Expected connected credential');
 
-    expect(connectedCredential.owned_by_organization_id).toBe(organization.id);
     expect(
       decryptKeyedEnvelope(
         connectedCredential.token_encrypted,
@@ -470,7 +468,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     const [credential] = await db
       .select()
       .from(platform_access_token_credentials)
-      .where(eq(platform_access_token_credentials.owned_by_organization_id, organization.id));
+      .where(eq(platform_access_token_credentials.platform_integration_id, winner.integrationId));
     const audits = await db
       .select()
       .from(organization_audit_logs)
@@ -601,6 +599,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       .from(organization_audit_logs)
       .where(eq(organization_audit_logs.organization_id, organization.id));
     if (!integration || !credential) throw new Error('Expected rotated integration');
+    const credentialProfile = BitbucketWorkspaceAccessTokenCredentialRowSchema.parse(credential);
 
     expect(rotated).toEqual({
       integrationId: connected.integrationId,
@@ -624,8 +623,10 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       'webhook',
     ]);
     expect(credential.expires_at).toBeNull();
-    expect(new Date(credential.provider_verified_at).toISOString()).toBe(rotated.validatedAt);
-    expect(new Date(credential.last_validated_at).toISOString()).toBe(rotated.validatedAt);
+    expect(new Date(credentialProfile.provider_verified_at).toISOString()).toBe(
+      rotated.validatedAt
+    );
+    expect(new Date(credentialProfile.last_validated_at).toISOString()).toBe(rotated.validatedAt);
     expect(integration).toEqual(
       expect.objectContaining({
         auth_invalid_at: null,
@@ -941,7 +942,9 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     const credentialsBefore = await db
       .select()
       .from(platform_access_token_credentials)
-      .where(eq(platform_access_token_credentials.owned_by_organization_id, organization.id));
+      .where(
+        eq(platform_access_token_credentials.platform_integration_id, connected.integrationId)
+      );
 
     mockSuccessfulProviderValidation({ displayName: 'Replacement Workspace' });
     mockBitbucketCredentialEncryptionConfig.publicKey =
@@ -964,7 +967,9 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       db
         .select()
         .from(platform_access_token_credentials)
-        .where(eq(platform_access_token_credentials.owned_by_organization_id, organization.id))
+        .where(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integrationId)
+        )
     ).resolves.toEqual(credentialsBefore);
     expect(integrationsBefore).toEqual([expect.objectContaining({ id: connected.integrationId })]);
     await expect(

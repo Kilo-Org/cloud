@@ -62,7 +62,7 @@ The project uses [pnpm](https://pnpm.io/) as its package manager. Use Corepack s
 
 ```bash
 corepack enable
-corepack prepare pnpm@11.1.1 --activate
+corepack install
 ```
 
 ### Docker
@@ -210,10 +210,13 @@ pnpm drizzle:verify-bootstrap
 ### 6. Start the development server
 
 ```bash
-pnpm dev:start
+KILO_PORT_OFFSET=auto pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and local infrastructure. When the Stripe CLI is installed, it also starts the Stripe webhook forwarder. The web app will be available at http://localhost:3000.
+This launches a tmux dashboard with the Next.js app and local infrastructure.
+The automatic offset keeps secondary worktrees from colliding with the root
+checkout. When the Stripe CLI is installed, the command also starts the Stripe
+webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
 To stop all services:
 
@@ -223,27 +226,27 @@ pnpm dev:stop
 
 ## Verifying Your Setup
 
-Run the test suite to confirm everything is working:
+Run the root test script to confirm everything is working:
 
 ```bash
 pnpm test
 ```
 
-All tests should pass against the local PostgreSQL database.
+This runs the web tests and web environment tests. They should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
 | Command | Description |
 |---|---|
-| `pnpm dev:start` | Start all local services in a tmux dashboard |
+| `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
-| `pnpm test` | Run the Jest test suite |
+| `pnpm test` | Run web tests and web environment tests |
 | `pnpm typecheck` | Run the TypeScript type checker |
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Format all supported files with oxfmt |
 | `pnpm format:changed` | Format only files changed since `main` |
-| `pnpm validate` | Run typecheck, lint, and tests |
+| `pnpm validate` | Run the root typecheck, lint, and test scripts |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 | `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |
@@ -280,13 +283,13 @@ If you prefer [Nix](https://nixos.org/), the project includes a `flake.nix` with
 In local development, you can sign in without real OAuth by navigating to:
 
 ```
-http://localhost:3000/users/sign_in?fakeUser=<email>
+http://localhost:<port>/users/sign_in?fakeUser=<email>&callbackPath=<path>
 ```
 
-This creates a local-only user with the `@@fake@@` hosted domain. You can append `callbackPath` to go directly to a page after login:
+Use the port reported by `pnpm dev:status`. This creates a local-only user with the `@@fake@@` hosted domain. Set `callbackPath` to go directly to a page after login:
 
 ```
-http://localhost:3000/users/sign_in?fakeUser=someone@example.com&callbackPath=/profile
+http://localhost:<port>/users/sign_in?fakeUser=someone@example.com&callbackPath=/profile
 ```
 
 ### Admin access
@@ -303,7 +306,7 @@ Some features (e.g., admin panels) are only visible to users with `is_admin = tr
 To sign in as a fake admin:
 
 ```
-http://localhost:3000/users/sign_in?fakeUser=yourname@admin.example.com
+http://localhost:<port>/users/sign_in?fakeUser=yourname@admin.example.com&callbackPath=/admin
 ```
 
 A non-`@admin.example.com` email (e.g., `someone@kilocode.ai`) used via fake login will **not** be an admin, because the fake-login provider sets `hosted_domain` to `@@fake@@`, not `kilocode.ai`.
@@ -317,7 +320,7 @@ New organizations start with a 30-day enterprise trial. After expiry, the UI pro
 The easiest approach is to use the pre-configured dev organization. While signed in, run the following in the browser console (the endpoint is POST-only):
 
 ```js
-fetch('http://localhost:3000/api/dev/create-kilocode-org', { method: 'POST' })
+fetch('/api/dev/create-kilocode-org', { method: 'POST' })
   .then(r => r.json())
   .then(console.log);
 ```

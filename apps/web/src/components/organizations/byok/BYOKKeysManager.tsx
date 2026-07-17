@@ -1,7 +1,6 @@
 'use client';
 
 import { useReducer, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button';
@@ -12,16 +11,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useConfirm } from '@/components/ui/confirm';
 import {
   Select,
@@ -104,9 +93,8 @@ function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: 
       <p>Keys you create here use provider billing instead of your Kilo balance.</p>
       {showsCodingPlanKey ? (
         <p>
-          The MiniMax Coding Plan configured your MiniMax key using Kilo Credits. Updating,
-          disabling, or deleting that key changes routing only; subscription billing continues until
-          canceled in Subscriptions.
+          The MiniMax Coding Plan configured your MiniMax key using Kilo Credits. This managed key
+          is read-only. Cancel the plan in Subscriptions to remove it when the plan ends.
         </p>
       ) : null}
     </div>
@@ -156,11 +144,6 @@ type BYOKKeysManagerProps = {
   organizationId?: string;
 };
 
-type InstalledKeyWarningAction =
-  | { type: 'disable'; keyId: string }
-  | { type: 'update'; keyId: string }
-  | { type: 'delete'; keyId: string };
-
 type BYOKDialogState = {
   isDialogOpen: boolean;
   editingKeyId: string | null;
@@ -168,7 +151,6 @@ type BYOKDialogState = {
   apiKey: string;
   showApiKey: boolean;
   awsCredentialError: string | null;
-  installedKeyWarningAction: InstalledKeyWarningAction | null;
 };
 
 const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
@@ -178,7 +160,6 @@ const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
   apiKey: '',
   showApiKey: false,
   awsCredentialError: null,
-  installedKeyWarningAction: null,
 };
 
 function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialogState>) {
@@ -190,15 +171,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     updateBYOKDialogState,
     INITIAL_BYOK_DIALOG_STATE
   );
-  const {
-    isDialogOpen,
-    editingKeyId,
-    selectedProvider,
-    apiKey,
-    showApiKey,
-    awsCredentialError,
-    installedKeyWarningAction,
-  } = dialogState;
+  const { isDialogOpen, editingKeyId, selectedProvider, apiKey, showApiKey, awsCredentialError } =
+    dialogState;
   const setIsDialogOpen = (isDialogOpen: boolean) => updateDialogState({ isDialogOpen });
   const setEditingKeyId = (editingKeyId: string | null) => updateDialogState({ editingKeyId });
   const setSelectedProvider = (selectedProvider: string) => updateDialogState({ selectedProvider });
@@ -206,13 +180,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setShowApiKey = (showApiKey: boolean) => updateDialogState({ showApiKey });
   const setAwsCredentialError = (awsCredentialError: string | null) =>
     updateDialogState({ awsCredentialError });
-  const setInstalledKeyWarningAction = (
-    installedKeyWarningAction: InstalledKeyWarningAction | null
-  ) => updateDialogState({ installedKeyWarningAction });
-
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const router = useRouter();
   const confirm = useConfirm();
 
   // Build query options - only include organizationId if provided
@@ -306,10 +275,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     return keys?.some(k => k.provider_id === providerSlug) ?? false;
   };
 
-  const isInstalledCodingPlanKey = (keyId: string) =>
-    !organizationId &&
-    (keys?.some(key => key.id === keyId && key.management_source === 'coding_plan') ?? false);
-
   const validateAwsCredentials = (value: string): string | null => {
     if (!value) return null;
     let parsed: unknown;
@@ -341,10 +306,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       if (error) return;
     }
     if (editingKeyId) {
-      if (isInstalledCodingPlanKey(editingKeyId)) {
-        setInstalledKeyWarningAction({ type: 'update', keyId: editingKeyId });
-        return;
-      }
       updateMutation.mutate({
         ...(organizationId && { organizationId }),
         id: editingKeyId,
@@ -374,10 +335,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
 
   const handleDelete = async (keyId: string, providerName: string) => {
-    if (isInstalledCodingPlanKey(keyId)) {
-      setInstalledKeyWarningAction({ type: 'delete', keyId });
-      return;
-    }
     if (
       await confirm({
         title: `Delete the ${providerName} API key?`,
@@ -391,33 +348,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
 
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
-    if (!is_enabled && isInstalledCodingPlanKey(keyId)) {
-      setInstalledKeyWarningAction({ type: 'disable', keyId });
-      return;
-    }
     setEnabledMutation.mutate({
       ...(organizationId && { organizationId }),
       id: keyId,
       is_enabled,
     });
-  };
-
-  const confirmInstalledKeyChange = () => {
-    if (!installedKeyWarningAction) return;
-
-    if (installedKeyWarningAction.type === 'update') {
-      updateMutation.mutate({
-        id: installedKeyWarningAction.keyId,
-        api_key: apiKey,
-      });
-    } else if (installedKeyWarningAction.type === 'delete') {
-      // A coding-plan-managed key can't be deleted directly; it is removed by
-      // cancelling the plan in the Subscription Center.
-      router.push('/subscriptions');
-    } else {
-      setEnabledMutation.mutate({ id: installedKeyWarningAction.keyId, is_enabled: false });
-    }
-    setInstalledKeyWarningAction(null);
   };
 
   if (keysLoading) {
@@ -441,39 +376,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     );
   }
 
-  function getInstalledKeyWarning(action: InstalledKeyWarningAction | null): {
-    title: string;
-    description: string;
-    actionLabel: string;
-    cancelLabel: string;
-  } {
-    if (action?.type === 'update') {
-      return {
-        title: 'Replace MiniMax Coding Plan key?',
-        description:
-          'Replacing this key changes MiniMax routing and makes it user-managed. MiniMax Coding Plan billing continues until you cancel it in Subscription Center.',
-        actionLabel: 'Replace key',
-        cancelLabel: 'Keep configuration',
-      };
-    }
-    if (action?.type === 'delete') {
-      return {
-        title: 'This key is managed by your coding plan',
-        description:
-          'This MiniMax key routes your MiniMax token plan, so it can\u2019t be deleted here. To remove it, cancel the plan in Subscription Center. Your plan stays active and billed until you cancel.',
-        actionLabel: 'Go to Subscription Center',
-        cancelLabel: 'Close',
-      };
-    }
-    return {
-      title: 'Disable MiniMax Coding Plan key?',
-      description:
-        'Disabling this key stops MiniMax routing while it is disabled. MiniMax Coding Plan billing continues until you cancel it in Subscription Center.',
-      actionLabel: 'Disable key',
-      cancelLabel: 'Keep configuration',
-    };
-  }
-
   // Map provider IDs to display names
   const getProviderDisplayName = (providerId: string) => {
     const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
@@ -483,8 +385,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const getProviderModels = (providerId: string): string[] => {
     return supportedModels?.[providerId] ?? [];
   };
-  const installedKeyWarning = getInstalledKeyWarning(installedKeyWarningAction);
-
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -518,82 +418,92 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       created_at: string;
                       management_source: 'user' | 'coding_plan';
                       is_enabled: boolean;
-                    }) => (
-                      <tr
-                        key={key.id}
-                        className={
-                          !key.is_enabled
-                            ? 'bg-muted/20 border-b last:border-0'
-                            : 'border-b last:border-0'
-                        }
-                      >
-                        <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
-                          <div>{getProviderDisplayName(key.provider_id)}</div>
-                          {!organizationId &&
-                          key.provider_id === 'minimax' &&
-                          key.management_source === 'coding_plan' ? (
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              Configured by MiniMax Coding Plan. BYOK changes do not cancel
-                              subscription billing.
-                            </p>
-                          ) : null}
-                          <SupportedModelsList models={getProviderModels(key.provider_id)} />
-                        </td>
-                        <td className="text-muted-foreground p-4">
-                          {new Date(key.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <Switch
-                              checked={key.is_enabled}
-                              onCheckedChange={isEnabled => handleToggleEnabled(key.id, isEnabled)}
-                              disabled={setEnabledMutation.isPending}
-                              aria-label={`Toggle ${getProviderDisplayName(key.provider_id)} BYOK key`}
-                            />
-                            <span className="text-sm">
-                              {key.is_enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="space-x-2 p-4 text-right">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() =>
-                              testMutation.mutate({
-                                ...(organizationId && { organizationId }),
-                                id: key.id,
-                              })
-                            }
-                            disabled={testMutation.isPending}
-                            title="Test API key"
-                            aria-label={`Test ${getProviderDisplayName(key.provider_id)} API key`}
-                          >
-                            <FlaskConical className="size-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleEdit(key.id)}
-                            disabled={updateMutation.isPending}
-                            aria-label={`Update ${getProviderDisplayName(key.provider_id)} API key`}
-                          >
-                            <Edit className="size-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() =>
-                              handleDelete(key.id, getProviderDisplayName(key.provider_id))
-                            }
-                            disabled={deleteMutation.isPending}
-                            aria-label={`Delete ${getProviderDisplayName(key.provider_id)} API key`}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    )
+                    }) => {
+                      const isManaged = !organizationId && key.management_source === 'coding_plan';
+                      return (
+                        <tr
+                          key={key.id}
+                          className={
+                            !key.is_enabled
+                              ? 'bg-muted/20 border-b last:border-0'
+                              : 'border-b last:border-0'
+                          }
+                        >
+                          <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
+                            <div>{getProviderDisplayName(key.provider_id)}</div>
+                            {!organizationId &&
+                            key.provider_id === 'minimax' &&
+                            key.management_source === 'coding_plan' ? (
+                              <p className="text-muted-foreground mt-1 text-xs">
+                                Managed by MiniMax Coding Plan. This key is read-only.
+                              </p>
+                            ) : null}
+                            <SupportedModelsList models={getProviderModels(key.provider_id)} />
+                          </td>
+                          <td className="text-muted-foreground p-4">
+                            {new Date(key.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              {!isManaged ? (
+                                <Switch
+                                  checked={key.is_enabled}
+                                  onCheckedChange={isEnabled =>
+                                    handleToggleEnabled(key.id, isEnabled)
+                                  }
+                                  disabled={setEnabledMutation.isPending}
+                                  aria-label={`Toggle ${getProviderDisplayName(key.provider_id)} BYOK key`}
+                                />
+                              ) : null}
+                              <span className="text-sm">
+                                {key.is_enabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="space-x-2 p-4 text-right">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                testMutation.mutate({
+                                  ...(organizationId && { organizationId }),
+                                  id: key.id,
+                                })
+                              }
+                              disabled={testMutation.isPending}
+                              title="Test API key"
+                              aria-label={`Test ${getProviderDisplayName(key.provider_id)} API key`}
+                            >
+                              <FlaskConical className="size-4" />
+                            </Button>
+                            {!isManaged ? (
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleEdit(key.id)}
+                                  disabled={updateMutation.isPending}
+                                  aria-label={`Update ${getProviderDisplayName(key.provider_id)} API key`}
+                                >
+                                  <Edit className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDelete(key.id, getProviderDisplayName(key.provider_id))
+                                  }
+                                  disabled={deleteMutation.isPending}
+                                  aria-label={`Delete ${getProviderDisplayName(key.provider_id)} API key`}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    }
                   )}
                 </tbody>
               </table>
@@ -824,23 +734,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        <AlertDialog
-          open={installedKeyWarningAction !== null}
-          onOpenChange={open => !open && setInstalledKeyWarningAction(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{installedKeyWarning.title}</AlertDialogTitle>
-              <AlertDialogDescription>{installedKeyWarning.description}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{installedKeyWarning.cancelLabel}</AlertDialogCancel>
-              <AlertDialogAction variant="default" onClick={confirmInstalledKeyChange}>
-                {installedKeyWarning.actionLabel}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
         <CardFooter>
           <BYOKSetupGuideLink />
         </CardFooter>

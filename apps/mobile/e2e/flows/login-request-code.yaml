@@ -1,0 +1,26 @@
+# Login step 1/2 — request an email sign-in code.
+#
+# Establishes a signed-out baseline, then submits EMAIL to reach the "Enter the
+# code" screen. The 6-digit code is emailed to the local outbox
+# (dev/logs/emails/); read it there and pass it to login-verify-code.yaml.
+#
+#   maestro --device <udid> test -e EMAIL=e2e-mobile@example.com \
+#     e2e/flows/login-request-code.yaml
+#
+# EMAIL is required (-e). Do NOT add it as a flow-level `env:` default — a
+# default silently overrides the -e value in this Maestro version.
+#
+# Prefer the one-shot wrapper e2e/login.sh, which runs both steps and pulls the
+# code for you. See e2e/AGENTS.md ("Sign In and Out").
+appId: com.kilocode.kiloapp
+---
+- runFlow: logout.yaml
+# Tap the input via its placeholder — the "Email address" label shares the
+# field's accessibility text and would match the (non-focusable) label.
+- tapOn: 'you@example.com'
+- inputText: ${EMAIL}
+- tapOn: 'Send sign-in code'
+# Wait for the code screen — sending is a network round-trip.
+- extendedWaitUntil:
+    visible: 'Verify code'
+    timeout: 15000

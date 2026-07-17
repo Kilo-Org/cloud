@@ -69,6 +69,7 @@ Every template must include this branding footer below the content table:
 | `orgSSOUserJoined.html` | `new_user_email`, `organization_url`, `year` | `13` |
 | `orgInvitation.html` | `organization_name`, `inviter_name`, `accept_invite_url`, `year` | `6` |
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
+| `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
 | `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `year` | — |

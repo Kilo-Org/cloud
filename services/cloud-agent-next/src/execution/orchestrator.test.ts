@@ -264,6 +264,26 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     } satisfies Partial<ExecutionError>);
   });
 
+  it('preserves non-retryable workspace setup failures during wrapper startup', async () => {
+    const { orchestrator, ensureWrapper } = createOrchestrator();
+    ensureWrapper.mockRejectedValueOnce(
+      new WrapperError('Setup command 2 failed', 'WORKSPACE_SETUP_FAILED', 503, {
+        workspaceFailureSubtype: 'setup_command_failed',
+        safeDetail:
+          'command: pip install, termination: nonzero exit, exit code: 127, output:\nsh: 1: pip: not found',
+        retryable: false,
+      })
+    );
+
+    await expect(orchestrator.execute(basePlan)).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: false,
+      workspaceFailureSubtype: 'setup_command_failed',
+      safeFailureMessage:
+        'command: pip install, termination: nonzero exit, exit code: 127, output:\nsh: 1: pip: not found',
+    } satisfies Partial<ExecutionError>);
+  });
+
   it('keeps ordinary wrapper bootstrap failure retryable', async () => {
     const { orchestrator, ensureWrapper } = createOrchestrator();
     ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));

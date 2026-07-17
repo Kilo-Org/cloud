@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react-native';
 import appsFlyer from 'react-native-appsflyer';
 
+import { captureEvent } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
 
 let initialized = false;
@@ -50,6 +51,11 @@ export function initAppsFlyer(): void {
 
 export function trackEvent(name: string, values?: Record<string, string>): void {
   const eventValues = values ?? {};
+
+  // Mirror attribution events into PostHog so the onboarding funnel is
+  // visible in product analytics too. Both SDKs sit behind the same consent
+  // gate; captureEvent no-ops until PostHog is initialized.
+  captureEvent(name, eventValues);
 
   if (!initialized) {
     pendingEvents.push({ name, values: eventValues });

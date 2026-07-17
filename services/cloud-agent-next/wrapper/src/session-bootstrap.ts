@@ -6,6 +6,7 @@ import {
   type WrapperPromptPart,
   type WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap.js';
+import type { PreparationStepKind } from '../../src/shared/protocol.js';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import {
   createSafeProcessDiagnostic,
@@ -17,7 +18,9 @@ import {
   type ProcessOptions,
   type ProcessOutputStream,
 } from './utils.js';
+import { redactSecrets } from './redact-output.js';
 import { restoreSession } from './restore-session.js';
+import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
@@ -30,8 +33,73 @@ const WORKSPACE_PREPARATION_TIMEOUT_MS = 8 * 60_000;
 const WORKSPACE_CLEANUP_TIMEOUT_MS = 60_000;
 const SHORT_GIT_COMMAND_TIMEOUT_MS = 120_000;
 const PROGRESS_UPDATE_INTERVAL_MS = 5_000;
+const SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES = 4_096;
+const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const MAX_ATTACHMENT_BYTES = 5_242_880;
+
+function cleanTerminalOutput(text: string): string {
+  return stripAnsi(text)
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.split('\r').at(-1) ?? '')
+    .map(line =>
+      Array.from(line)
+        .filter(character => {
+          const codePoint = character.codePointAt(0) ?? 0;
+          return (
+            codePoint === 9 ||
+            (codePoint >= 32 && codePoint !== 127 && (codePoint < 128 || codePoint > 159))
+          );
+        })
+        .join('')
+    )
+    .join('\n');
+}
+
+function boundedUtf8Tail(text: string, maxBytes: number): string {
+  const bytes = Buffer.from(text);
+  if (bytes.length <= maxBytes) return text;
+  return bytes
+    .subarray(bytes.length - maxBytes)
+    .toString('utf8')
+    .replace(/^\uFFFD/, '');
+}
+
+function createSetupOutputReporter(
+  progress: BootstrapProgress | undefined,
+  stepId: string
+): {
+  onOutput: (stream: ProcessOutputStream, output: string) => void;
+  flush: () => void;
+} {
+  const buffers: Record<ProcessOutputStream, string> = { stdout: '', stderr: '' };
+
+  const report = (text: string): void => {
+    const cleaned = cleanTerminalOutput(text).trim();
+    if (cleaned)
+      progress?.({
+        type: 'output',
+        step: 'setup_commands',
+        stepId,
+        output: `${redactSecrets(cleaned)}\n`,
+      });
+  };
+
+  return {
+    onOutput(stream, output) {
+      const lines = (buffers[stream] + output).split('\n');
+      buffers[stream] = lines.pop() ?? '';
+      report(lines.map(line => (line.endsWith('\r') ? line.slice(0, -1) : line)).join('\n'));
+    },
+    flush() {
+      report(buffers.stdout);
+      report(buffers.stderr);
+      buffers.stdout = '';
+      buffers.stderr = '';
+    },
+  };
+}
 
 export type BootstrapProgressStep =
   | 'disk_check'
@@ -43,7 +111,32 @@ export type BootstrapProgressStep =
   | 'attachments'
   | 'kilo_server';
 
-export type BootstrapProgress = (step: BootstrapProgressStep, message: string) => void;
+export type BootstrapProgressEvent =
+  | {
+      type: 'started';
+      step: BootstrapProgressStep;
+      stepId: string;
+      kind: PreparationStepKind;
+      label: string;
+      command?: string;
+      commandIndex?: number;
+      commandCount?: number;
+    }
+  | { type: 'progress'; step: BootstrapProgressStep; stepId: string; detail: string }
+  | { type: 'output'; step: 'setup_commands'; stepId: string; output: string }
+  | { type: 'completed'; step: BootstrapProgressStep; stepId: string; exitCode?: number }
+  | {
+      type: 'failed';
+      step: BootstrapProgressStep;
+      stepId: string;
+      safeError: string;
+      exitCode?: number;
+    };
+
+export type BootstrapProgress = {
+  (event: BootstrapProgressEvent): void;
+  (step: BootstrapProgressStep, message: string): void;
+};
 
 export type WrapperBootstrapResult = {
   workspaceWasWarm: boolean;
@@ -464,11 +557,16 @@ async function refreshGitRemoteToken(
 }
 
 async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promise<void> {
+  const kilocodeToken = request.materialized.env.KILOCODE_TOKEN;
+  if (!kilocodeToken) {
+    throw new Error('KILOCODE_TOKEN is required to write the Kilo auth file');
+  }
+
   const authFilePath = sessionAuthFilePath(request.workspace.sessionHome);
   await fs.mkdir(path.dirname(authFilePath), { recursive: true });
   await fs.writeFile(
     authFilePath,
-    JSON.stringify({ kilo: { type: 'api', key: request.session.workerAuthToken } }, null, 2)
+    JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } }, null, 2)
   );
 }
 
@@ -638,45 +736,75 @@ async function reconcileRestoredWorkspace(
 async function runSetupCommands(
   request: WrapperSessionReadyRequest,
   run: ProcessRunner,
-  failFast: boolean,
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
   logToFile(
-    `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} failFast=${failFast} workspacePath=${request.workspace.workspacePath}`
+    `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} workspacePath=${request.workspace.workspacePath}`
   );
   for (const [index, command] of setupCommands.entries()) {
-    let lastProgressAt = 0;
     const startedAt = Date.now();
+    const stepId = `setup_command:${index}`;
+    const safeCommand = redactSecrets(command);
+    const outputReporter = createSetupOutputReporter(progress, stepId);
+    progress?.({
+      type: 'started',
+      step: 'setup_commands',
+      stepId,
+      kind: 'setup_command',
+      label: `Setup command ${index + 1}`,
+      command: safeCommand,
+      commandIndex: index,
+      commandCount: setupCommands.length,
+    });
     const result = await run('sh', ['-lc', command], {
       cwd: request.workspace.workspacePath,
       inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
       hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
-      onOutput: () => {
-        const now = Date.now();
-        if (lastProgressAt !== 0 && now - lastProgressAt < PROGRESS_UPDATE_INTERVAL_MS) return;
-        lastProgressAt = now;
-        progress?.(
-          'setup_commands',
-          `Setup command ${index + 1} of ${setupCommands.length} is still running...`
-        );
-      },
+      onOutput: outputReporter.onOutput,
     });
+    outputReporter.flush();
     logToFile(
       `bootstrap setup command finished kiloSessionId=${request.kiloSessionId} index=${index + 1} count=${setupCommands.length} elapsedMs=${Date.now() - startedAt} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? '(none)'}`
     );
-    if (result.exitCode !== 0 && failFast) {
+    if (result.exitCode !== 0) {
       const timedOut = isTimeoutTermination(result);
+      const safeError = `Setup command ${index + 1} ${timedOut ? 'timed out' : 'failed'}`;
+      progress?.({
+        type: 'failed',
+        step: 'setup_commands',
+        stepId,
+        safeError,
+        exitCode: result.exitCode,
+      });
       throw workspaceBootstrapError(
         timedOut ? 'setup_command_timeout' : 'setup_command_failed',
-        `Setup command ${index + 1} ${timedOut ? 'timed out' : 'failed'}`,
-        createSafeProcessDiagnostic(result)
+        safeError,
+        createSetupCommandDiagnostic(command, result),
+        timedOut
       );
     }
+    progress?.({ type: 'completed', step: 'setup_commands', stepId, exitCode: 0 });
   }
   logToFile(
     `bootstrap setup commands finished kiloSessionId=${request.kiloSessionId} count=${setupCommands.length}`
   );
+}
+
+function createSetupCommandDiagnostic(command: string, result: ExecResult): string {
+  const base = createSafeProcessDiagnostic(result);
+  const safeCommand = boundedUtf8Tail(
+    redactSecrets(cleanTerminalOutput(command)).trim(),
+    SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES
+  );
+  const combinedOutput = [result.stdout, result.stderr].filter(Boolean).join('\n');
+  const safeOutput = redactSecrets(cleanTerminalOutput(combinedOutput)).trim();
+  const outputTail = boundedUtf8Tail(safeOutput, SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES);
+  const parts: string[] = [`command: ${safeCommand}`, base];
+  if (outputTail) {
+    parts.push(`output:\n${outputTail}`);
+  }
+  return parts.join(', ');
 }
 
 async function downloadAttachment(
@@ -786,6 +914,8 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
+    await writeSessionAuthFile(request);
+
     if (workspaceNeedsBootstrap) {
       progress?.('branch', 'Setting up branch...');
       logToFile(
@@ -808,7 +938,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       );
       await sanitizeBitbucketCodeReviewRemote(request, runGit);
 
-      await writeSessionAuthFile(request);
       await writeRuntimeSkills(request);
 
       progress?.(
@@ -819,7 +948,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
       if (request.materialized.setupCommands?.length) {
         progress?.('setup_commands', 'Running setup commands...');
-        await runSetupCommands(request, run, !request.workspace.preferSnapshot, progress);
+        await runSetupCommands(request, run, progress);
       }
 
       signal.throwIfAborted();

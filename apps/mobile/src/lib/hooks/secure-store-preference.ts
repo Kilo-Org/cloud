@@ -1,4 +1,6 @@
+import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
+import { toast } from 'sonner-native';
 
 /**
  * Module-level store for a SecureStore-backed preference so every hook
@@ -31,8 +33,11 @@ export function createSecureStorePreference<T>(options: {
       if (!dirty) {
         value = parse(raw);
       }
-    } catch {
-      // Keep the default on read failure.
+    } catch (error) {
+      // Keep the default on read failure — this runs on mount, before the
+      // user has done anything, so there's nothing actionable to tell them.
+      // Just log so we can see failure rates.
+      Sentry.captureException(error);
     } finally {
       hasLoaded = true;
       emit();
@@ -43,7 +48,10 @@ export function createSecureStorePreference<T>(options: {
     try {
       await SecureStore.setItemAsync(key, serialize(next));
     } catch {
-      // Keep the in-memory preference even if the storage write fails.
+      // Keep the in-memory preference so the session still works, but the
+      // change won't survive relaunch — tell the user so it's not a silent
+      // surprise later.
+      toast.error('Could not save setting');
     }
   };
 

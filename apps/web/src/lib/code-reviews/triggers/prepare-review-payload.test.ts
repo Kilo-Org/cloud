@@ -506,6 +506,35 @@ describe('prepareReviewPayload', () => {
     });
   });
 
+  it('builds forward-shaped reviewAgents for a standard review (single agent mirroring the session model)', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, gitlabIntegration.id, {
+          platform: 'gitlab',
+          platform_project_id: 456,
+          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
+        })
+      )
+      .returning();
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { config: { ...baseAgentConfig, thinking_effort: 'high' } },
+      platform: 'gitlab',
+    });
+
+    // Standard review => exactly one 'standard' agent, and agents[0] mirrors what the
+    // session actually runs on (no drift between the two).
+    expect(payload.reviewAgents).toEqual({
+      reviewType: 'standard',
+      agents: [{ role: 'standard', model: 'test-model', thinkingEffort: 'high' }],
+    });
+    expect(payload.reviewAgents.agents[0].model).toBe(payload.sessionInput.model);
+    expect(payload.reviewAgents.agents[0].thinkingEffort).toBe(payload.sessionInput.variant);
+  });
+
   it('throws when a provider GitLab review is missing its integration', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
@@ -581,6 +610,13 @@ describe('prepareReviewPayload', () => {
       },
     });
     expect(payload.previousCloudAgentSessionId).toBeUndefined();
+    // Bitbucket must carry the same forward-shaped reviewAgents contract as
+    // GitHub/GitLab, mirroring the session's model (no drift).
+    expect(payload.reviewAgents).toEqual({
+      reviewType: 'standard',
+      agents: [{ role: 'standard', model: 'test-model', thinkingEffort: null }],
+    });
+    expect(payload.reviewAgents.agents[0].model).toBe(payload.sessionInput.model);
     expect(payload.sessionInput).not.toHaveProperty('githubToken');
     expect(payload.sessionInput).not.toHaveProperty('gitToken');
     expect(payload.sessionInput).not.toHaveProperty('gateThreshold');

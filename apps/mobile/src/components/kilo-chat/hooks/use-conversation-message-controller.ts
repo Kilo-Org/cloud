@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useEditMessage } from '@kilocode/kilo-chat-hooks';
+import { useEditMessage, useRedeliverMessage } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageEditContent,
   contentBlocksToText,
@@ -60,6 +60,7 @@ export function useConversationMessageController({
 
   const sendMutation = useSendMessage(client, conversationId, currentUserId);
   const editMessage = useEditMessage(client, conversationId);
+  const redeliverMessage = useRedeliverMessage(client, conversationId);
   const editingTextValue = useMemo(
     () => (editingMessage ? editableText(editingMessage) : ''),
     [editingMessage]
@@ -93,16 +94,37 @@ export function useConversationMessageController({
     setRemovedEditAttachmentIds([]);
   }, []);
 
+  const handleRetrySend = useCallback(
+    (message: Message) => {
+      // Redelivers the existing failed message row server-side — no new
+      // message, no attachment re-linking. The server clears delivery_failed
+      // and pushes message.redelivered to other clients.
+      redeliverMessage.mutate(
+        { messageId: message.id },
+        {
+          onSuccess: () => {
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+          onError: err => {
+            toast.error(formatKiloChatError(err, 'Failed to retry send'));
+          },
+        }
+      );
+    },
+    [redeliverMessage]
+  );
+
   const messageActions = useConversationMessageActions({
     client,
     conversationId,
     currentUserId,
     onEditMessage: startEditingMessage,
     onReplyToMessage: startReplyToMessage,
+    onRetrySend: handleRetrySend,
   });
 
   const handleSend = useCallback(
-    (
+    async (
       content: InputContentBlock[],
       inReplyToMessageId?: string,
       controls?: MessageInputSubmitControls
@@ -116,48 +138,40 @@ export function useConversationMessageController({
           originalAttachments: editingAttachments,
           removedAttachmentIds: removedEditAttachmentIds,
         });
-        editMessage.mutate(
-          {
+        try {
+          await editMessage.mutateAsync({
             messageId: editingMessage.id,
             conversationId,
             content: editContent,
             timestamp: Date.now(),
-          },
-          {
-            onSuccess: () => {
-              controls?.clearDraft();
-              setEditingMessage(null);
-              setRemovedEditAttachmentIds([]);
-              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            },
-            onError: err => {
-              toast.error(formatKiloChatError(err, 'Failed to edit message'));
-            },
-          }
-        );
+          });
+          controls?.clearDraft();
+          setEditingMessage(null);
+          setRemovedEditAttachmentIds([]);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error) {
+          toast.error(formatKiloChatError(error, 'Failed to edit message'));
+        }
         return;
       }
-      sendMutation.mutate(
-        buildSendMessageVariables({
-          conversationId,
-          content,
-          clientId: createSendMessageClientId(),
-          inReplyToMessageId,
-        }),
-        {
-          onSuccess: () => {
-            if (controls?.clearDraft() ?? false) {
-              setReplyingTo(null);
-            }
-            captureEvent(MESSAGE_SENT_EVENT, { surface: 'claw' });
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          },
-          onError: err => {
-            toast.error(formatKiloChatError(err, 'Failed to send message'));
-          },
-        }
-      );
       setScrollToNewestRequest(request => request + 1);
+      try {
+        await sendMutation.mutateAsync(
+          buildSendMessageVariables({
+            conversationId,
+            content,
+            clientId: createSendMessageClientId(),
+            inReplyToMessageId,
+          })
+        );
+        if (controls?.clearDraft() ?? false) {
+          setReplyingTo(null);
+        }
+        captureEvent(MESSAGE_SENT_EVENT, { surface: 'claw' });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // useSendMessage owns the error toast.
+      }
     },
     [
       conversationId,

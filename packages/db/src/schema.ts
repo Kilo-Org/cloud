@@ -144,6 +144,9 @@ import type {
   Provider,
   CodeReviewAgentConfig,
   ManualCodeReviewConfig,
+  CodeReviewType,
+  CodeReviewTriggerSource,
+  CodeReviewCouncilResult,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -376,8 +379,8 @@ export type NewCreditCampaign = typeof credit_campaigns.$inferInsert;
 
 /**
  * When adding or removing PII/account-linked columns, update
- * softDeleteUser() in src/lib/user.ts (and src/lib/user.test.ts) to
- * null or reset the field.
+ * softDeleteUser() in apps/web/src/lib/user/index.ts (and its index.test.ts) to
+ * delete, anonymize, or reset the field.
  */
 export const kilocode_users = pgTable(
   'kilocode_users',
@@ -406,6 +409,8 @@ export const kilocode_users = pgTable(
       .notNull()
       .unique(),
     is_admin: boolean().default(false).notNull(),
+    is_super_admin: boolean().default(false).notNull(),
+    can_view_sessions: boolean().default(false).notNull(),
     can_manage_credits: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
@@ -462,6 +467,14 @@ export const kilocode_users = pgTable(
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
+    check(
+      'kilocode_users_is_super_admin_requires_admin_check',
+      sql`NOT ${table.is_super_admin} OR ${table.is_admin}`
+    ),
+    check(
+      'kilocode_users_can_view_sessions_requires_admin_check',
+      sql`NOT ${table.can_view_sessions} OR ${table.is_admin}`
+    ),
     check(
       'kilocode_users_can_manage_credits_requires_admin_check',
       sql`NOT ${table.can_manage_credits} OR ${table.is_admin}`
@@ -2121,10 +2134,10 @@ export const microdollar_usage = pgTable(
 );
 
 // Per-day rollup of microdollar_usage.cost, keyed by (kilo_user_id, organization_id,
-// usage_date). Maintained by the same CTE that inserts into microdollar_usage so it
-// is updated atomically with the source row. Powers the hot 3-month-rolling-sum
-// query in kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw
-// 800M-row microdollar_usage table.
+// usage_date). Asynchronously maintained through durable per-usage repair work, so
+// it can temporarily lag source usage. Powers the hot 3-month-rolling-sum query in
+// kiloPass.getAverageMonthlyUsageLast3Months without scanning the raw 800M-row
+// microdollar_usage table.
 export const microdollar_usage_daily = pgTable(
   'microdollar_usage_daily',
   {
@@ -2154,6 +2167,48 @@ export const microdollar_usage_daily = pgTable(
 );
 
 export type MicrodollarUsageDaily = typeof microdollar_usage_daily.$inferSelect;
+
+// Durable repair work for asynchronously maintaining microdollar_usage_daily.
+// One row per source usage avoids contending on a shared user/org/day key during
+// source request inserts.
+export const microdollar_usage_daily_repairs = pgTable(
+  'microdollar_usage_daily_repairs',
+  {
+    usage_id: uuid()
+      .notNull()
+      .primaryKey()
+      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    usage_date: date({ mode: 'string' }).notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
+    attempt_count: integer().default(0).notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_microdollar_usage_daily_repairs_claim').on(
+      table.attempt_count,
+      table.next_attempt_at,
+      table.claimed_at,
+      table.usage_date,
+      table.usage_id
+    ),
+    check('microdollar_usage_daily_repairs_attempt_count_check', sql`${table.attempt_count} >= 0`),
+    check(
+      'microdollar_usage_daily_repairs_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type MicrodollarUsageDailyRepair = typeof microdollar_usage_daily_repairs.$inferSelect;
 
 export const microdollar_usage_metadata = pgTable(
   'microdollar_usage_metadata',
@@ -2214,6 +2269,7 @@ export const api_request_log = pgTable(
     kilo_user_id: text(),
     organization_id: text(),
     session_id: text(),
+    vercel_request_id: text(),
     provider: text(),
     model: text(),
     status_code: integer(),
@@ -2914,6 +2970,75 @@ export const cost_insight_evaluation_dirty_owners = pgTable(
 
 export type CostInsightEvaluationDirtyOwner =
   typeof cost_insight_evaluation_dirty_owners.$inferSelect;
+
+export const cost_insight_rollup_repairs = pgTable(
+  'cost_insight_rollup_repairs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    usage_id: uuid()
+      .notNull()
+      .unique()
+      .references(() => microdollar_usage.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    generation: bigint({ mode: 'number' })
+      .default(sql`'1'`)
+      .notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
+    attempt_count: integer().default(0).notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cost_insight_rollup_repairs_user_hour').on(table.owned_by_user_id, table.hour_start),
+    index('IDX_cost_insight_rollup_repairs_org_hour').on(
+      table.owned_by_organization_id,
+      table.hour_start
+    ),
+    index('IDX_cost_insight_rollup_repairs_claim').on(
+      table.attempt_count,
+      table.next_attempt_at,
+      table.claimed_at,
+      table.hour_start,
+      table.id
+    ),
+    check(
+      'cost_insight_rollup_repairs_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_rollup_repairs_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_repairs_generation_check',
+      sql`${table.generation} > 0 AND ${table.generation} <= 9007199254740991`
+    ),
+    check('cost_insight_rollup_repairs_attempt_count_check', sql`${table.attempt_count} >= 0`),
+    check(
+      'cost_insight_rollup_repairs_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightRollupRepair = typeof cost_insight_rollup_repairs.$inferSelect;
 
 export const cost_insight_hourly_sweep_checkpoints = pgTable(
   'cost_insight_hourly_sweep_checkpoints',
@@ -3998,16 +4123,16 @@ export const platform_oauth_credentials = pgTable(
     platform_integration_id: uuid()
       .notNull()
       .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    platform: text().notNull(),
-    authorized_by_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    platform: text(),
+    authorized_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     provider_subject_id: text().notNull(),
     provider_subject_login: text().notNull(),
+    provider_base_url: text(),
     access_token_encrypted: text().notNull(),
     access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
-    refresh_token_encrypted: text().notNull(),
+    refresh_token_encrypted: text(),
     refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    oauth_client_secret_encrypted: text(),
     credential_version: integer().notNull().default(1),
     revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revocation_reason: text(),
@@ -4023,6 +4148,10 @@ export const platform_oauth_credentials = pgTable(
       table.platform_integration_id
     ),
     index('IDX_platform_oauth_credentials_authorized_by_user_id').on(table.authorized_by_user_id),
+    check(
+      'platform_oauth_credentials_credential_version_check',
+      sql`${table.credential_version} > 0`
+    ),
   ]
 );
 
@@ -4034,16 +4163,22 @@ export const platform_access_token_credentials = pgTable(
   {
     id: idPrimaryKeyColumn,
     platform_integration_id: uuid().notNull(),
-    owned_by_organization_id: uuid().notNull(),
-    platform: text().notNull().$type<'bitbucket'>(),
-    integration_type: text().notNull().$type<'workspace_access_token'>(),
+    owned_by_organization_id: uuid(),
+    platform: text().$type<'bitbucket'>(),
+    integration_type: text().$type<'workspace_access_token'>(),
     token_encrypted: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
-    provider_credential_type: text().notNull().$type<'workspace_access_token'>(),
-    provider_scopes: text().array().notNull(),
-    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    provider_credential_type: text()
+      .notNull()
+      .$type<'workspace_access_token' | 'personal_access_token' | 'project_access_token'>(),
+    provider_resource_id: text(),
+    provider_base_url: text(),
+    authorized_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    provider_metadata: jsonb(),
+    provider_scopes: text().array(),
+    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     credential_version: integer().notNull().default(1),
-    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -4052,14 +4187,28 @@ export const platform_access_token_credentials = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    unique('UQ_platform_access_token_credentials_platform_integration_id').on(
-      table.platform_integration_id
-    ),
+    uniqueIndex('UQ_platform_access_token_credentials_integration_level')
+      .on(table.platform_integration_id)
+      .where(isNull(table.provider_resource_id)),
+    uniqueIndex('UQ_platform_access_token_credentials_resource')
+      .on(table.platform_integration_id, table.provider_credential_type, table.provider_resource_id)
+      .where(isNotNull(table.provider_resource_id)),
     foreignKey({
       columns: [table.platform_integration_id],
       foreignColumns: [platform_integrations.id],
       name: 'FK_platform_access_token_credentials_parent',
     }).onDelete('cascade'),
+    index('IDX_platform_access_token_credentials_authorized_by_user_id').on(
+      table.authorized_by_user_id
+    ),
+    check(
+      'platform_access_token_credentials_credential_version_check',
+      sql`${table.credential_version} > 0`
+    ),
+    check(
+      'platform_access_token_credentials_resource_id_check',
+      sql`${table.provider_resource_id} IS NULL OR ${table.provider_resource_id} <> ''`
+    ),
   ]
 );
 
@@ -4573,6 +4722,8 @@ export const magic_link_tokens = pgTable(
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    attempts: integer().default(0).notNull(),
+    purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
   },
   table => [
     index('idx_magic_link_tokens_email').on(table.email),
@@ -4932,6 +5083,14 @@ export const cloud_agent_code_reviews = pgTable(
 
     // Immutable per-job manual review snapshot. Null means webhook-created review.
     manual_config: jsonb('manual_config').$type<ManualCodeReviewConfig>(),
+
+    // Review type for this run: 'standard' (single reviewer) or 'council' (multi-specialist).
+    review_type: text().$type<CodeReviewType>().notNull().default('standard'),
+    // How this run was requested (its origin): 'manual' | 'webhook'. Null for legacy rows.
+    trigger_source: text().$type<CodeReviewTriggerSource>(),
+    // Persisted council outcome (decision + per-specialist votes/findings) for the cloud
+    // UI job-runs screen. Null for standard runs or before a council run completes.
+    council_result: jsonb('council_result').$type<CodeReviewCouncilResult>(),
 
     // PR information
     repo_full_name: text().notNull(), // e.g., "owner/repo"

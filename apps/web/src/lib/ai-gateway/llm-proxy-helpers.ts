@@ -47,6 +47,7 @@ import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.share
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
+import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -143,6 +144,31 @@ export function dataCollectionRequiredResponse() {
       message: error,
     },
     { status: 400 }
+  );
+}
+
+export function checkExclusiveModelProviderAllowed(
+  model: string,
+  provider: OpenRouterProviderConfig | undefined
+) {
+  if (!provider) return null;
+  const exclusiveModel = findKiloExclusiveModel(model);
+  if (!exclusiveModel) return null;
+  const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
+  if (!inferenceProvider) return null;
+  if (
+    (!provider.only || provider.only.includes(inferenceProvider)) &&
+    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  )
+    return null;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  return NextResponse.json(
+    {
+      error: error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: error,
+    },
+    { status: 403 }
   );
 }
 
@@ -312,15 +338,6 @@ export function organizationAutoConfigurationResponse(message: string) {
       message,
     },
     { status: 400 }
-  );
-}
-
-export function featureExclusiveModelResponse(modelId: string) {
-  const exclusiveTo = findKiloExclusiveModel(modelId)?.exclusive_to ?? [];
-  const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.feature_exclusive_model, message: error },
-    { status: 403 }
   );
 }
 

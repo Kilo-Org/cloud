@@ -1,3 +1,4 @@
+import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -5,20 +6,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/**
- * Parse a Drizzle `mode: 'string'` timestamp into a Date.
- * Hermes can't parse PostgreSQL's default format (`2026-03-13 14:30:00+00`),
- * so we normalise the space separator to `T` before parsing.
- */
-function parseTimestamp(value: string): Date {
-  // Date-only: "2026-09-26" → treat as UTC midnight
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return new Date(`${value}T00:00:00Z`);
-  }
-  // PostgreSQL: "2026-03-16 15:21:40.957+00" → need "T" separator and full tz offset "+00:00"
-  const iso = value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
-  return new Date(iso);
-}
+const EMAIL_PATTERN = /.+@.+\..+/;
 
 /** Returns a human-readable relative time string like "3 days ago". */
 function timeAgo(date: Date): string {
@@ -49,4 +37,28 @@ function timeAgo(date: Date): string {
 // eslint-disable-next-line no-empty-function -- intentional no-op
 async function asyncNoop() {}
 
-export { asyncNoop, cn, parseTimestamp, timeAgo };
+/** Builds a new object containing only the given keys of `obj`. */
+function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): Pick<T, K> {
+  const result: Partial<T> = {};
+  for (const key of keys) {
+    result[key] = obj[key];
+  }
+  return result as Pick<T, K>;
+}
+
+/** Uppercases the first letter, e.g. for enum-like values used as labels. */
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+export {
+  asyncNoop,
+  capitalize,
+  cn,
+  EMAIL_PATTERN,
+  firstNonEmpty,
+  formatDate,
+  parseTimestamp,
+  pick,
+  timeAgo,
+};

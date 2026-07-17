@@ -1,11 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
 import { ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -30,29 +30,66 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
   const colors = useThemeColors();
   const trpc = useTRPC();
   const { isActive } = useAppLifecycle();
-  const [status, setStatus] = useState<'checking' | 'undetermined' | 'denied'>('checking');
+  const [permission, setPermission] = useState<'checking' | 'undetermined' | 'denied'>('checking');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
 
   const botName = botIdentity?.botName ?? DEFAULT_BOT_IDENTITY.botName;
   const botEmoji = botIdentity?.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji;
 
-  const registerToken = useMutation(
-    trpc.user.registerPushToken.mutationOptions({
-      onError: error => {
-        toast.error(error.message);
-      },
-    })
+  // No onError toast here: registration failures are surfaced inline (see
+  // `registerError` below) since this step stays open on failure — the
+  // wizard modal's toasts are otherwise invisible/redundant here (see
+  // `onboarding-flow.tsx`'s removed generic-error toast for the same reason).
+  const registerToken = useMutation(trpc.user.registerPushToken.mutationOptions());
+  const registerTokenMutateAsync = registerToken.mutateAsync;
+
+  // Requests (or re-confirms) the push token and registers it with the
+  // server, then marks the prompt as seen and advances. Used by both the
+  // auto-check effect (permission already granted) and the Enable button.
+  // Never leaves the user stranded: any failure — permission request,
+  // token fetch, or server registration — lands in `registerError` with a
+  // Try again / Skip escape hatch, instead of throwing silently.
+  const completeRegistration = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      setRegisterError(null);
+      setIsRegistering(true);
+      try {
+        const token = await registerForPushNotifications();
+        if (isCancelled()) {
+          return;
+        }
+        if (token) {
+          await registerTokenMutateAsync({ token, platform: getPlatform() });
+          if (isCancelled()) {
+            return;
+          }
+        }
+        await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
+        if (isCancelled()) {
+          return;
+        }
+        onComplete();
+      } catch (error) {
+        if (isCancelled()) {
+          return;
+        }
+        setRegisterError(
+          error instanceof Error ? error.message : 'Could not enable notifications.'
+        );
+      } finally {
+        if (!isCancelled()) {
+          setIsRegistering(false);
+        }
+      }
+    },
+    [onComplete, registerTokenMutateAsync]
   );
 
   // Re-check permission on mount and whenever the app returns to foreground.
   // The user may have flipped the setting via the system Settings app after
   // we deep-linked them there; picking that up on resume avoids stranding
   // them on the "denied" state view.
-  //
-  // When permission is already granted (pre-granted, or flipped in Settings
-  // after we deep-linked them there), we still need to fetch the Expo push
-  // token and register it with the server — otherwise onboarding completes
-  // without a server-registered token and the user never receives pushes.
-  const registerTokenMutate = registerToken.mutate;
   useEffect(() => {
     if (!isActive) {
       return undefined;
@@ -64,36 +101,23 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
         return;
       }
       if (permStatus === 'granted') {
-        const token = await registerForPushNotifications();
-        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
-        if (cancelled) {
-          return;
-        }
-        if (token) {
-          registerTokenMutate({ token, platform: getPlatform() });
-        }
-        await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
-        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
-        if (cancelled) {
-          return;
-        }
-        onComplete();
+        await completeRegistration(() => cancelled);
       } else {
-        setStatus(permStatus);
+        setPermission(permStatus);
       }
     };
     void check();
     return () => {
       cancelled = true;
     };
-  }, [isActive, onComplete, registerTokenMutate]);
+  }, [isActive, completeRegistration]);
 
   const handleEnable = useCallback(async () => {
     const currentStatus = await getNotificationPermissionStatus();
 
     if (currentStatus === 'denied') {
       Alert.alert(
-        'Notifications Disabled',
+        'Notifications disabled',
         'To enable notifications, turn them on in your device settings.',
         [
           { text: 'Cancel', style: 'cancel' },
@@ -103,23 +127,29 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
       return;
     }
 
-    const token = await registerForPushNotifications();
-    await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
-
-    if (token) {
-      registerToken.mutate({ token, platform: getPlatform() });
-    }
-
-    onComplete();
-  }, [onComplete, registerToken]);
+    await completeRegistration();
+  }, [completeRegistration]);
 
   const handleSkip = useCallback(async () => {
-    await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
-    onComplete();
+    try {
+      await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
+    } catch {
+      // Skip is an explicit user choice to move on — never block it on a
+      // storage write failing.
+    } finally {
+      onComplete();
+    }
   }, [onComplete]);
 
-  if (status === 'checking') {
-    return null;
+  if (permission === 'checking' || isRegistering) {
+    return (
+      <View className="flex-1 items-center justify-center gap-3 px-6">
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+        <Text variant="muted" className="text-center text-sm">
+          Setting up notifications…
+        </Text>
+      </View>
+    );
   }
 
   return (
@@ -141,7 +171,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
       <View className="rounded-2xl border border-border bg-card p-4">
         <View className="flex-row items-start gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-xl bg-neutral-200 dark:bg-neutral-800">
-            <Text className="text-xl">{botEmoji}</Text>
+            <BotAvatar emoji={botEmoji} size={20} color={colors.foreground} />
           </View>
           <View className="flex-1 gap-1">
             <View className="flex-row items-center justify-between">
@@ -155,9 +185,11 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
         </View>
       </View>
 
+      {registerError ? <Text className="text-sm text-destructive">{registerError}</Text> : null}
+
       <View className="gap-3">
         <Button size="lg" onPress={() => void handleEnable()}>
-          <Text className="text-base">Enable notifications</Text>
+          <Text className="text-base">{registerError ? 'Try again' : 'Enable notifications'}</Text>
           <ChevronRight size={16} color={colors.primaryForeground} />
         </Button>
         <Button variant="ghost" size="lg" onPress={() => void handleSkip()}>

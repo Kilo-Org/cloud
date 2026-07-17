@@ -11,6 +11,10 @@ import {
   platform_integrations,
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
+import {
+  BitbucketOAuthCredentialRowSchema,
+  type BitbucketOAuthCredentialRow,
+} from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, exists, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -68,7 +72,6 @@ export type BitbucketAuthorizationResult =
   | { status: 'reconnect_required' }
   | { status: 'temporarily_unavailable' };
 
-type CredentialRow = typeof platform_oauth_credentials.$inferSelect;
 type WorkerDb = ReturnType<typeof getWorkerDb>;
 type WorkerTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 type Secret = SecretsStoreSecret | string | undefined;
@@ -81,7 +84,7 @@ type BitbucketAuthorizationEnv = Pick<CloudflareEnv, 'HYPERDRIVE'> & {
 };
 
 type ActiveAuthorization = {
-  credential: CredentialRow;
+  credential: BitbucketOAuthCredentialRow;
   integrationId: string;
   owner: BitbucketAuthorizationOwner;
   scopes: string[] | null;
@@ -191,10 +194,7 @@ export function buildBitbucketAuthorizationQuery(
     .from(platform_integrations)
     .leftJoin(
       platform_oauth_credentials,
-      and(
-        eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id),
-        eq(platform_oauth_credentials.platform, BITBUCKET_PLATFORM)
-      )
+      eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
     )
     .innerJoin(
       kilocode_users,
@@ -211,7 +211,7 @@ export function buildBitbucketAuthorizationQuery(
 }
 
 function credentialAad(
-  credential: CredentialRow,
+  credential: BitbucketOAuthCredentialRow,
   owner: BitbucketAuthorizationOwner,
   kind: 'access' | 'refresh'
 ): string {
@@ -271,7 +271,10 @@ export class BitbucketAuthorizationService {
   > {
     const [row] = await buildBitbucketAuthorizationQuery(db, owner);
     if (!row) return { status: 'not_connected' };
-    if (!row.credential || row.credential.revoked_at) return { status: 'reconnect_required' };
+    const credential = BitbucketOAuthCredentialRowSchema.safeParse(row.credential);
+    if (!credential.success || credential.data.revoked_at) {
+      return { status: 'reconnect_required' };
+    }
 
     const metadata = MetadataSchema.safeParse(row.metadata);
     if (!metadata.success) return { status: 'reconnect_required' };
@@ -294,7 +297,7 @@ export class BitbucketAuthorizationService {
     return {
       status: 'available',
       authorization: {
-        credential: row.credential,
+        credential: credential.data,
         integrationId: row.integrationId,
         owner,
         scopes: row.scopes,
@@ -427,6 +430,8 @@ export class BitbucketAuthorizationService {
       )
       .returning();
     if (!updated) return this.loadAuthorization(tx, authorization.owner);
+    const credential = BitbucketOAuthCredentialRowSchema.safeParse(updated);
+    if (!credential.success) return { status: 'reconnect_required' };
 
     await tx
       .update(platform_integrations)
@@ -434,7 +439,7 @@ export class BitbucketAuthorizationService {
       .where(eq(platform_integrations.id, authorization.integrationId));
     return {
       status: 'available',
-      authorization: { ...authorization, credential: updated, scopes },
+      authorization: { ...authorization, credential: credential.data, scopes },
     };
   }
 

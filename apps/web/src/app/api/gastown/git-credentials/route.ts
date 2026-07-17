@@ -52,7 +52,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const credentials = await resolveGitCredentialsFromIntegration(platformIntegrationId);
+  const credentials = await resolveGitCredentialsFromIntegration(
+    platformIntegrationId,
+    authResult.kiloUserId
+  );
   if (!credentials) {
     return NextResponse.json(
       { error: 'Could not resolve credentials for this integration' },

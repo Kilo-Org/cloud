@@ -15,6 +15,7 @@ export type ModelOption = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
+  context_length?: number | null;
 };
 
 type ModelResponse = {
@@ -24,6 +25,7 @@ type ModelResponse = {
     isFree?: boolean;
     mayTrainOnYourPrompts?: boolean;
     hasUserByokAvailable?: boolean;
+    context_length?: number | null;
     preferredIndex?: number;
     opencode?: {
       variants?: Record<string, unknown>;
@@ -120,7 +122,7 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
 }
 
 export function useAvailableModels(organizationId: string | undefined) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['available-models', organizationId] as const,
     queryFn: fetchModels.bind(null, organizationId),
     staleTime: 60_000,
@@ -139,6 +141,7 @@ export function useAvailableModels(organizationId: string | undefined) {
       hasUserByokAvailable: model.hasUserByokAvailable,
       variants: Object.keys(model.opencode?.variants ?? {}),
       preferredIndex: model.preferredIndex,
+      context_length: model.context_length ?? null,
     }));
 
     items.sort((a, b) => {
@@ -165,8 +168,9 @@ export function useAvailableModels(organizationId: string | undefined) {
       isFree: item.isFree,
       mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
       hasUserByokAvailable: item.hasUserByokAvailable,
+      context_length: item.context_length,
     }));
   }, [data]);
 
-  return { models, isLoading };
+  return { models, isLoading, isError, error, refetch };
 }

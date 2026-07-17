@@ -1,214 +1,93 @@
-# AGENTS.md
+# Kilo App Agent Guide
 
-## What This Is
+## Scope
 
-Kilo App is an Expo (React Native) mobile application using Expo Router for file-based routing. It lives as a subpackage (`apps/mobile/`) in the `cloud` monorepo. **This app targets iOS and Android only — never web.** Do not add `Platform.select({ web: ... })` patterns or web-specific code. **We use dev builds, not Expo Go.**
+Expo Router app for iOS and Android only. Use dev builds, never Expo Go, and do not add web-specific code.
 
-## Tech Stack
+For a fresh-worktree backend, simulator, login, Maestro, remote CLI, logs, and cleanup workflow, follow [e2e/AGENTS.md](e2e/AGENTS.md). Agents may start what they need there; do not ask the user to start Metro or backend services.
 
-- **Framework**: Expo SDK 55, React Native, React 19
-- **Routing**: Expo Router (file-based, `src/app/`)
-- **Language**: TypeScript (strict mode, `tsgo`)
-- **Styling**: NativeWind v5 (Tailwind CSS v4) — docs: https://www.nativewind.dev/v5/llms-full.txt
-- **UI Components**: [React Native Reusables](https://reactnativereusables.com/) (shadcn/ui for React Native) in `src/components/ui/`
-- **Linting**: oxlint with type-aware rules, unicorn, react-native (jsPlugin), import, promise
-- **Formatting**: oxfmt
+For substantial mobile work, follow the orchestrated implement-review-E2E loop in [.kilo/MOBILE_WORKFLOW.md](.kilo/MOBILE_WORKFLOW.md). Its mobile role agents may change backend, shared-package, infrastructure, or sibling CLI code when the accepted plan requires it; mobile describes the product workflow, not a directory boundary.
 
-## Environment Setup
+## Stack
 
-Follow the official Expo guide to set up the development environment: https://docs.expo.dev/get-started/set-up-your-environment/
-
-The dev server (`pnpm start`) is always started by the user — do not start it yourself.
-
-## E2E Flow Testing
-
-To verify a flow end-to-end (local backend + app on a simulator, driven via the Maestro MCP), see [e2e/AGENTS.md](e2e/AGENTS.md). It covers starting the local backend, running the Kilo CLI against it, and getting the Maestro MCP set up.
-
-## Tmux Services
-
-The user typically has a `tmux` session running with all backend services and the Expo dev server in separate windows (e.g., `kilo-chat`, `kiloclaw`, `nextjs`, `postgres`, `redis`, etc.). When debugging mobile issues that touch the backend, inspect the relevant window's logs to confirm what the server actually received:
-
-```bash
-tmux ls                                       # list sessions
-tmux list-windows -t <session>                # list windows
-tmux capture-pane -p -t <session>:<window> -S -200   # last 200 lines of a window
-```
-
-If `tmux ls` shows no session, tell the user the expected services aren't running and ask them to start the tmux session before continuing — don't try to start services yourself.
+- Expo SDK 55, React Native 0.83, React 19, strict TypeScript (`tsgo`)
+- NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
+- Expo Router routes in `src/app/`
+- oxlint and oxfmt
 
 ## Commands
 
+Run from `apps/mobile/`:
+
 ```bash
-pnpm typecheck       # tsgo --noEmit
-pnpm lint            # oxlint
-pnpm format          # oxfmt src
-pnpm format:check    # oxfmt --list-different src
-pnpm check:unused    # knip (unused exports/deps)
+pnpm typecheck
+pnpm lint
+pnpm format
+pnpm format:check
+pnpm check:unused
+pnpm test
 ```
 
-## Installing Dependencies
+The repository dev runner owns Metro during E2E work. Do not also run `pnpm start`.
 
-Always use `npx expo install` to add packages — it resolves versions compatible with the current Expo SDK. Do not use `pnpm add` directly.
+## Dependencies
 
-```bash
-npx expo install <package-name>
-npx expo install --dev <package-name>   # devDependencies
-```
+Use `npx expo install <package>` (or `--dev`), never `pnpm add`. After dependency changes, run `pnpx expo-doctor` and fix every issue.
 
-After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any issues it reports (version mismatches, duplicate deps, etc.).
-
-## Injected Workspace Packages
-
-Some workspace packages are listed under `dependenciesMeta` with `"injected": true` (currently `@kilocode/kilo-chat-hooks`). pnpm **copies** these into `apps/mobile/node_modules/.pnpm/.../node_modules/@kilocode/...` at install time instead of symlinking — so edits to the source under `packages/<pkg>/src/` are NOT picked up by Metro until you re-inject:
+`@kilocode/kilo-chat-hooks` is injected rather than symlinked. After editing it, refresh the copy and Metro cache:
 
 ```bash
-pnpm install --filter kilo-app...   # refreshes the injected copies
-```
-
-After re-injecting, also clear the Metro cache (it has the old bundled module hashed):
-
-```bash
+pnpm install --filter kilo-app...
 rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
 ```
 
-…then restart Metro and force-kill the iOS app so the dev client pulls a fresh bundle. Symptom when you forget: edits to event-service, kilo-chat, etc. show up on device, but edits to an injected package don't — including `console.log` lines you just added.
+Then restart Metro and force-quit the app.
 
-## Implementation Principles
+## Implementation Rules
 
-- Implement features in the simplest boring way that preserves the requested behavior. Avoid speculative abstractions, defensive layers, and "just in case" code paths.
-- Keep code DRY when behavior or contracts are actually shared. Prefer one shared helper, schema, or type over duplicated local copies.
-- Define shared types at the ownership boundary instead of recreating the same shape in mobile code. Use existing package exports, tRPC router output types, or a new shared contract when multiple surfaces need the same shape.
-- Parse untrusted HTTP inputs with Zod at the boundary where data enters the system. After data has crossed a trusted tRPC or shared-package boundary, rely on TypeScript rather than re-parsing the same value in the mobile app.
-- Do not add defense-in-depth validation inside mobile components or hooks unless the data source is genuinely untrusted or the extra check handles a real user-visible failure mode.
+- Prefer the smallest boring implementation. Reuse existing helpers, components, contracts, and native platform behavior.
+- Keep shared contracts at their owning boundary. Derive mobile types from shared exports or tRPC results rather than copying shapes.
+- Fetch backend data through tRPC. Parse genuinely untrusted HTTP input with Zod at entry; do not re-parse trusted tRPC/shared-package data in components.
+- Parse backend dates with `parseTimestamp()` from `@/lib/utils`; Hermes cannot reliably parse PostgreSQL timestamps with `new Date()`.
+- Every mutation hook must show `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not each component.
+- Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- Keep route files thin. Extract screen logic to components or hooks.
 
-## Data Fetching
+## React Native Rules
 
-- When you need data from the backend, **always add a new tRPC procedure** rather than copying data or inventing client-side alternatives. The app uses tRPC with React Query — adding a procedure is cheap and keeps the source of truth on the server.
-- When a component takes backend data as props, derive the prop types from the tRPC router's return types (e.g., `NonNullable<ReturnType<typeof useMyQuery>['data']>`) or an existing shared type instead of manually copying type definitions. This keeps types in sync with the backend automatically.
-- **Never use `new Date()` on any date or timestamp string from the backend.** Hermes cannot reliably parse PostgreSQL timestamps (`2026-03-13 14:30:00+00`) or date-only strings (`2026-09-26`). Always use `parseTimestamp()` from `@/lib/utils` — it handles both formats.
+- Default exports are allowed only where Expo Router requires them in `src/app/`.
+- Import React Native primitives from `react-native`; NativeWind adds `className` support.
+- Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
+- Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
+- Style with Tailwind `className`, not inline styles or `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
+- Theme colors are CSS variables. Opacity modifiers such as `bg-destructive/10` do not work on them; use a concrete Tailwind color with a dark variant. Non-variable colors such as `bg-black/5` are fine.
+- Use `Href` for dynamic Expo Router paths. Never silence route types with `as never`.
+- Use Lucide icons, not emoji. Set icon colors with `color={colors.<token>}` from `useThemeColors()`; native Lucide icons do not resolve `className` colors.
 
-### Mutations
+### Text inputs
 
-- Every mutation must include an `onError` handler that shows a toast (`toast.error(error.message)` via `sonner-native`). Silent failures are not acceptable — users must always see feedback when something goes wrong.
-- Centralize `onError` in the mutation hook (e.g., `useKiloClawMutations`) rather than in individual components. Components can add their own `onSuccess` callbacks via `mutate(input, { onSuccess })` for UI-specific behavior (e.g., closing a form, clearing fields).
-- **Use optimistic updates where possible** — they make the app feel instant. Use React Query's `onMutate` to optimistically update the cache, return the previous value for rollback, restore it in `onError`, and invalidate in `onSettled` to reconcile with the server. Good candidates: toggles, model selection, renaming, any mutation where the expected result is obvious from the input.
-- For screens with text inputs, use `ScrollView` with `automaticallyAdjustKeyboardInsets` to keep inputs visible above the keyboard. No external keyboard library needed — the native iOS prop works smoothly.
+- On iOS, do not control text with `value` plus state. Store text in a ref via `onChangeText`, use state only for derived UI, and read the ref on submit.
+- Use `defaultValue` only for initial content and set an explicit Tailwind line height.
+- Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
-### TextInput on iOS
+## UI and UX Invariants
 
-- **Never use controlled `value` prop for text inputs on iOS.** The `value` + `onChangeText` + `setState` pattern causes a re-render on every keystroke, which creates a race condition with the native input — fast typing results in transposed characters and cursor jumping. Use `onChangeText` with a ref (`useRef`) to store values, and only use state for derived booleans (e.g., `canSave`) that gate UI. Read from the ref when submitting.
-- Use `defaultValue` only if the input needs an initial value. Omit both `value` and `defaultValue` for empty inputs.
-- Set explicit `leading-*` (line height) on TextInput to prevent height jumps when typing begins.
-
-## Code Style
-
-- Expo Router requires default exports in `src/app/` — this is the only place default exports are allowed.
-- Import `View`, `Text`, `ScrollView`, `Pressable`, `TextInput` from `react-native` — NativeWind's Metro plugin rewrites these imports to add `className` support automatically.
-- Import `Image` from `@/components/ui/image` (a `styled` wrapper around `expo-image`). Lint enforces this.
-- For UI components (Button, Text with variants, Card, etc.), import from `@/components/ui/<component>`. These are from react-native-reusables (shadcn/ui for RN).
-- Add new UI components with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`. Then fix import ordering and any lint issues in the generated file.
-- The `cn()` helper for merging Tailwind classes is in `@/lib/utils`.
-- Design tokens (colors, radii) are CSS variables in `src/global.css` with `@theme inline` for Tailwind v4. The theme uses shadcn/ui neutral palette with light/dark via `prefers-color-scheme`.
-- **The Tailwind `/opacity` modifier does NOT work with CSS-variable-based theme colors** (e.g., `bg-destructive/10`, `bg-foreground/20`, `border-muted-foreground/30`). Our theme defines colors as `hsl(var(--name))`, so Tailwind can't decompose them to inject an alpha channel. The result is the opacity is silently ignored. Use hardcoded Tailwind colors with dark: variants instead (e.g., `bg-neutral-200 dark:bg-neutral-700`). The `/opacity` modifier works fine with non-variable colors like `bg-black/5` or `bg-red-500/20`.
-- Style components with Tailwind utility classes via `className`. No inline styles or `StyleSheet.create`.
-- All lint rules are set to `error`, not `warn`. Fix violations, don't suppress them.
-- `as never` is a code smell — it silences all type checking. For Expo Router dynamic paths, use `as Href` instead (import `Href` from `expo-router`). If you find yourself needing `as never`, the types are wrong and need fixing.
-
-## UX Patterns
-
-### Native Feel
-
-- Prefer native-feeling platform experiences styled with Kilo tokens and existing app components. Start with the simplest platform-expected interaction, then apply Kilo spacing, color, type, and icon conventions.
-- For platform primitives such as sheets, alerts, pickers, tabs, gestures, and keyboard behavior, use established native or app-standard components that preserve expected gestures and accessibility.
-- Avoid custom replacements that need workarounds, omit standard gestures, or add complexity without a product reason. A plain sheet that behaves correctly on iOS and Android is better than a bespoke sheet that looks clever but feels broken.
-
-### Press Feedback
-
-- Every pressable surface must notify the user when the press gesture lands. Use the feedback that best fits the surface: pressed opacity, native ripple, haptics, state change, navigation transition, loading state, or another platform-appropriate response.
-- Do not add redundant feedback. If the press immediately causes a clear visual transition or native control response, that can be enough; if the surface otherwise feels inert, add explicit pressed styling or haptics.
-- Keep feedback native-feeling and lightweight. Avoid custom animations or haptic patterns that make simple list rows, cards, or buttons feel heavier than the action deserves.
-
-### Icons
-
-- Use `lucide-react-native` for all icons. Never use emoji as UI elements.
-- Lucide icons on native do NOT support `className` for color. Always use the `color` prop with resolved color strings from `useThemeColors()`: `<Icon size={18} color={colors.foreground} />`.
-
-### Navigation Headers
-
-- **Always use `ScreenHeader`** (`src/components/screen-header.tsx`) instead of native stack headers. Set `headerShown: false` on all Stack navigators.
-- `ScreenHeader` auto-detects whether a back button is needed via `router.canGoBack()` — no manual configuration required.
-- Place `ScreenHeader` as the first child inside the screen's root `View`, above any `ScrollView`. The header handles safe area insets and should not scroll with content.
-- Pass optional `headerRight` for action buttons (e.g., profile avatar on tab root screens).
-
-### Loading States
-
-- Never show bare "Loading..." text. Use the `Skeleton` component (`src/components/ui/skeleton.tsx`) for shimmer placeholders.
-- **Match skeleton dimensions exactly** to the loaded content (e.g., if a button is `h-11 rounded-md`, the skeleton should be `h-11 rounded-md`). Mismatched heights cause layout shift.
-- Use `ActivityIndicator` from `react-native` for inline spinners (e.g., waiting for an API call to initiate).
-
-### Animations & Reducing Layout Shift
-
-- `react-native-reanimated` is available. Use `FadeIn`/`FadeOut` entering/exiting animations to smooth state transitions (e.g., login states, content loading).
-- Use `LinearTransition` (not the deprecated `Layout`) on container `Animated.View` to animate height changes when children appear/disappear (e.g., skeleton → loaded content).
-- Wrap each dynamically appearing item in `<Animated.View entering={FadeIn.duration(200)}>` to fade in instead of popping.
-- **Skeleton → content swap pattern**: Wrap skeletons in `<Animated.View exiting={FadeOut.duration(150)}>` and loaded items in `<Animated.View entering={FadeIn.duration(200)}>`, with `LinearTransition` on the parent container. This gives a smooth crossfade with no jump.
-
-### Empty States
-
-- Use the `EmptyState` component (`src/components/empty-state.tsx`) for screens with no data. It takes a Lucide icon, title, and description.
-
-### Confirmations
-
-- Use native `Alert.alert()` for destructive confirmations (e.g., sign out). It renders the platform alert dialog — no JS-based modal needed.
-
-### Tabs
-
-- Set `freezeOnBlur: true` on tab `screenOptions` to prevent re-render flicker when switching tabs.
-- Fire a haptic on tab press — see **Haptics** below.
-
-### Haptics
-
-Use `expo-haptics` where appropriate — to reinforce commits and outcomes, not passive UI. Err on the side of fewer haptics when in doubt, and don't double-fire (a press haptic immediately followed by an outcome haptic is redundant).
-
-### Images
-
-- When using `expo-image` in headers or small UI elements, set `transition={0}` to disable the default fade-in which causes flicker.
-
-## Fixing Lint Errors
-
-Follow lint rules **in spirit, not literally**. The goal is better code, not just silencing the linter. For example, if a max-lines rule fires:
-
-- **Good**: Refactor the file, break it into smaller files, extract components/hooks.
-- **Bad**: Reformat code (we have a formatter), delete empty lines, "compress" or "compact" code, or otherwise mangle formatting to circumvent the limit. Always extract related blocks to separate files instead.
-- If a file has a legitimate reason to exceed 300 lines (e.g., closely related hooks that belong together), disable the rule for that file with `/* eslint-disable max-lines */` rather than forcing an artificial split.
-
-When resolving lint errors, try the autofix first before editing manually:
-
-```bash
-pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json --fix apps/mobile/src
-```
-
-Only hand-fix errors that `--fix` cannot resolve.
+- Use `ScreenHeader` as the first child of a screen root and set stack `headerShown: false`.
+- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Use `Alert.alert()` for destructive confirmation.
+- Every pressable needs lightweight feedback unless navigation or a native control already provides it.
+- Data screens must handle loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
+- Use `ActivityIndicator` only for inline waits. Smooth dynamic swaps with existing Reanimated `FadeIn`, `FadeOut`, and `LinearTransition` patterns where layout would otherwise jump.
+- Set `freezeOnBlur: true` on tabs. Use haptics for commits/outcomes, not passive interaction or duplicate feedback.
+- Set `transition={0}` on small/header `expo-image` images to avoid flicker.
 
 ## Debugging
 
-When debugging reproducible issues, don't guess at the cause. Instead:
+For reproducible bugs, add narrow temporary logs at the real boundaries, reproduce, inspect the relevant tmux service logs, fix the demonstrated cause, and remove the logs. Do not guess or leave debug logging committed.
 
-1. Add temporary `console.log` statements that capture the relevant state at key points (function entry, state changes, branch decisions, etc.).
-2. Ask the user to reproduce the issue and paste the logs.
-3. Deduce the root cause from the log output, then fix it.
-4. Remove the debug logs before committing.
-
-This is far more effective than speculating about the cause.
-
-## Change Checklist
-
-Before pushing, run all checks and fix any issues:
+## Before Pushing
 
 ```bash
 pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused
 ```
 
-- Do not suppress lint rules without justification.
-- Keep route files in `src/app/` thin — extract logic into `src/components/` or `src/hooks/`.
-- Never commit plans, specs, design docs, or other non-code markdown files to this repo.
+Run `git diff --check`. Fix lint rules in spirit; use autofix before hand edits and extract code instead of compressing it to evade line limits. Do not commit plans, specs, or other non-code Markdown files.

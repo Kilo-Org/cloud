@@ -11,6 +11,7 @@ import {
 import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
 import { Shield } from 'lucide-react';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { useUserOrganizationRole } from './OrganizationContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
@@ -73,8 +74,7 @@ export function OrganizationDataCollectionCard({
   const currentDataCollection = organizationData.settings?.data_collection ?? null;
   const displayValue = currentDataCollection === null ? 'extension' : currentDataCollection;
 
-  const canEdit =
-    (currentUserRole === 'owner' || currentUserRole === 'billing_manager') && !isReadOnly;
+  const canEdit = canManageOrganizationBilling(currentUserRole) && !isReadOnly;
 
   return (
     <Card>

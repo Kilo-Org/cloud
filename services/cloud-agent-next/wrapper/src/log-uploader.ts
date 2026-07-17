@@ -6,9 +6,21 @@ import { logToFile } from './utils.js';
 type LogUploaderOpts = {
   workerBaseUrl: string;
   sessionId: string;
+  /**
+   * Read at upload time rather than captured once at creation: a later session
+   * bind can carry a different kiloSessionId, and the Worker rejects uploads
+   * whose query param disagrees with the ticket's kiloSessionId claim.
+   */
+  getKiloSessionId: () => string;
   executionId: string;
   userId: string;
-  workerAuthToken: string;
+  /**
+   * Reads the current wrapper dispatch ticket at upload time rather than a
+   * value captured once at creation. The uploader is created once per wrapper
+   * process and outlives the ticket's own (shorter) lifetime, which is
+   * refreshed on every subsequent session bind.
+   */
+  getWorkerAuthToken: () => string;
   /** Directory containing CLI log files (e.g. ~/.local/share/kilo/log/) */
   cliLogDir: string;
   wrapperLogPath: string;
@@ -82,6 +94,7 @@ function createTarStream(paths: Array<string>): TarStream | undefined {
 export function createLogUploader(opts: LogUploaderOpts): LogUploader {
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let isUploading = false;
+  let activeAbort: AbortController | undefined;
 
   async function uploadNow(): Promise<void> {
     if (isUploading) return;
@@ -93,12 +106,16 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
     }
 
     const abort = new AbortController();
+    activeAbort = abort;
     const timer = setTimeout(() => abort.abort(), UPLOAD_TIMEOUT_MS);
     try {
-      const url = `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`;
+      const url = new URL(
+        `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`
+      );
+      url.searchParams.set('kiloSessionId', opts.getKiloSessionId());
       const response = await fetch(url, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${opts.workerAuthToken}` },
+        headers: { Authorization: `Bearer ${opts.getWorkerAuthToken()}` },
         body: tar.stream,
         // @ts-expect-error -- Node/Bun fetch supports duplex for streaming request bodies
         duplex: 'half',
@@ -117,6 +134,7 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
       clearTimeout(timer);
       tar.kill();
       isUploading = false;
+      if (activeAbort === abort) activeAbort = undefined;
     }
   }
 
@@ -132,6 +150,8 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
       clearInterval(intervalId);
       intervalId = undefined;
     }
+    activeAbort?.abort();
+    activeAbort = undefined;
   }
 
   return { start, uploadNow, stop };

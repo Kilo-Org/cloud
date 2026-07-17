@@ -12,3 +12,9 @@ export const ENV_KEYS = {
   notificationsUrl: 'NOTIFICATIONS_URL',
   posthogApiKey: 'POSTHOG_API_KEY',
 };
+
+/** Optional config keys — absent values are tolerated (dependent features hide themselves). */
+export const OPTIONAL_ENV_KEYS = {
+  googleWebClientId: 'GOOGLE_WEB_CLIENT_ID',
+  googleIosClientId: 'GOOGLE_IOS_CLIENT_ID',
+};

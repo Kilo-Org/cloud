@@ -135,6 +135,58 @@ describe('dedup', () => {
     expect(result).toBe(false);
   });
 
+  it('page suppresses info for the same dimension', async () => {
+    await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+    const result = await shouldSuppress(
+      kv,
+      'info',
+      'error_rate',
+      'openai',
+      'gpt-4',
+      'kilo-gateway'
+    );
+    expect(result).toBe(true);
+  });
+
+  it('ticket suppresses info for the same dimension', async () => {
+    await recordAlertFired(kv, 'ticket', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+    const result = await shouldSuppress(
+      kv,
+      'info',
+      'error_rate',
+      'openai',
+      'gpt-4',
+      'kilo-gateway'
+    );
+    expect(result).toBe(true);
+  });
+
+  it('info does not suppress ticket (escalation is independent)', async () => {
+    await recordAlertFired(kv, 'info', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+    const result = await shouldSuppress(
+      kv,
+      'ticket',
+      'error_rate',
+      'openai',
+      'gpt-4',
+      'kilo-gateway'
+    );
+    expect(result).toBe(false);
+  });
+
+  it('info does not suppress page', async () => {
+    await recordAlertFired(kv, 'info', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+    const result = await shouldSuppress(
+      kv,
+      'page',
+      'error_rate',
+      'openai',
+      'gpt-4',
+      'kilo-gateway'
+    );
+    expect(result).toBe(false);
+  });
+
   it('records alert with TTL', async () => {
     await recordAlertFired(kv, 'page', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
     expect(putSpy).toHaveBeenCalledWith(
@@ -150,6 +202,17 @@ describe('dedup', () => {
     await recordAlertFired(kv, 'ticket', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
     expect(putSpy).toHaveBeenCalledWith(
       'o11y:alert:ticket:error_rate:openai:gpt-4:kilo-gateway',
+      expect.any(String),
+      {
+        expirationTtl: 4 * 60 * 60,
+      }
+    );
+  });
+
+  it('info cooldown is 4 hours', async () => {
+    await recordAlertFired(kv, 'info', 'error_rate', 'openai', 'gpt-4', 'kilo-gateway');
+    expect(putSpy).toHaveBeenCalledWith(
+      'o11y:alert:info:error_rate:openai:gpt-4:kilo-gateway',
       expect.any(String),
       {
         expirationTtl: 4 * 60 * 60,

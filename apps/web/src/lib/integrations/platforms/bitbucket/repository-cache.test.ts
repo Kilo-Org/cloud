@@ -111,7 +111,6 @@ async function insertActiveIntegration(
   if (!integration) throw new Error('Expected Bitbucket integration');
   await db.insert(platform_oauth_credentials).values({
     platform_integration_id: integration.id,
-    platform: 'bitbucket',
     authorized_by_user_id: userId,
     provider_subject_id: '123e4567-e89b-12d3-a456-426614174010',
     provider_subject_login: 'bucket-user',
@@ -169,6 +168,22 @@ describe('Bitbucket repository cache', () => {
       ],
       syncedAt: CACHED_AT,
     });
+    expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for an incomplete legacy OAuth credential profile', async () => {
+    const integration = await insertActiveIntegration(user.id);
+    await db
+      .update(platform_oauth_credentials)
+      .set({ authorized_by_user_id: null })
+      .where(eq(platform_oauth_credentials.platform_integration_id, integration.id));
+
+    await expect(
+      listBitbucketRepositories({
+        owner: { type: 'user', id: user.id },
+        kiloUserId: user.id,
+      })
+    ).resolves.toEqual({ status: 'reconnect_required' });
     expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
   });
 

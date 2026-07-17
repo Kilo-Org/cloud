@@ -3,7 +3,7 @@
  *
  * Returns the cached value immediately if it's younger than `ttlMs`,
  * otherwise calls `fetcher` to refresh. If the fetcher throws (e.g.
- * Redis timeout), returns the last-known-good cached value, or
+ * a network timeout), returns the last-known-good cached value, or
  * `defaultValue` if nothing has been cached yet.
  */
 export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number, defaultValue: T) {

@@ -14,6 +14,7 @@ type MessageInputAvailability = {
   botDisplay: BotDisplay;
   disabled: boolean;
   disabledReason: string | null;
+  showInstanceCta: boolean;
   submitDisabled: boolean;
 };
 
@@ -60,6 +61,7 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay,
       disabled: true,
       disabledReason: 'Loading user...',
+      showInstanceCta: false,
       submitDisabled: true,
     };
   }
@@ -69,6 +71,7 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay,
       disabled: false,
       disabledReason: null,
+      showInstanceCta: false,
       submitDisabled: params.pendingMutation,
     };
   }
@@ -78,6 +81,7 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay,
       disabled: false,
       disabledReason: null,
+      showInstanceCta: false,
       submitDisabled: params.pendingMutation,
     };
   }
@@ -89,6 +93,11 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay.state === 'unknown'
         ? 'Waiting for bot status...'
         : 'Bot is offline. Messages will resume when it reconnects.',
+    // Only a confirmed 'offline' surfaces the CTA. 'unknown' is the cold-cache
+    // gap before the WS connects and the first bot-status round-trip resolves
+    // (see useBotStatus) — every conversation open passes through it, so
+    // treating it like offline fired the CTA on every open.
+    showInstanceCta: botDisplay.state === 'offline',
     submitDisabled: true,
   };
 }

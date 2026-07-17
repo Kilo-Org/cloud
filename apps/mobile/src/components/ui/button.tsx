@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { Pressable } from 'react-native';
+import { ActivityIndicator, Pressable } from 'react-native';
 
 import { TextClassContext } from '@/components/ui/text';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
@@ -18,10 +19,13 @@ const buttonVariants = cva(
         'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-black/5',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 gap-1.5 rounded-md px-3',
-        lg: 'h-11 rounded-md px-6',
-        icon: 'h-10 w-10',
+        // min-h (not fixed h) so the button grows to fit text scaled by large
+        // Dynamic Type instead of clipping the label; the min still guarantees
+        // the 44pt (default/lg) / 36pt-plus-hitSlop (sm) touch target.
+        default: 'min-h-11 px-4 py-2',
+        sm: 'min-h-9 gap-1.5 rounded-md px-3 py-1.5',
+        lg: 'min-h-11 rounded-md px-6 py-2',
+        icon: 'h-11 w-11',
       },
     },
     defaultVariants: {
@@ -30,6 +34,27 @@ const buttonVariants = cva(
     },
   }
 );
+
+// sm is 36pt tall; expand the touchable area by 4pt on every edge to reach 44pt
+// without changing the compact visual size.
+const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
+
+// Spinner color per variant, matching that variant's text color (see
+// buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
+// but is identical in both themes (global.css --accent-soft-foreground).
+function spinnerColor(variant: ButtonProps['variant'], colors: ThemeColors): string {
+  if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
+    return colors.foreground;
+  }
+  if (variant === 'link') {
+    return colors.primary;
+  }
+  if (variant === 'accent-soft') {
+    return '#1A1A10';
+  }
+  // default, destructive
+  return colors.primaryForeground;
+}
 
 const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
   variants: {
@@ -55,18 +80,40 @@ const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
   },
 });
 
-type ButtonProps = React.ComponentProps<typeof Pressable> &
+type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
   React.RefAttributes<typeof Pressable> &
-  VariantProps<typeof buttonVariants>;
+  VariantProps<typeof buttonVariants> & {
+    /** Disables the button and shows an ActivityIndicator alongside its content. */
+    loading?: boolean;
+    children?: React.ReactNode;
+  };
 
-function Button({ className, variant, size, ...props }: ButtonProps) {
+function Button({
+  className,
+  variant,
+  size,
+  loading,
+  disabled,
+  accessibilityState,
+  hitSlop,
+  children,
+  ...props
+}: ButtonProps) {
+  const colors = useThemeColors();
+  const isDisabled = Boolean(disabled) || Boolean(loading);
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
-        className={cn(props.disabled && 'opacity-50', buttonVariants({ variant, size }), className)}
+        className={cn(isDisabled && 'opacity-50', buttonVariants({ variant, size }), className)}
         role="button"
+        disabled={isDisabled}
+        accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
+        hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}
-      />
+      >
+        {loading ? <ActivityIndicator size="small" color={spinnerColor(variant, colors)} /> : null}
+        {children}
+      </Pressable>
     </TextClassContext.Provider>
   );
 }

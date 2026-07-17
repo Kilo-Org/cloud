@@ -18,9 +18,12 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   gateway: 'openrouter',
   internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
-  exclusive_to: [],
   inference_provider_restriction: [],
 };
+
+export function isGeminiModel(model: string) {
+  return model.includes('gemini');
+}
 
 export function isGemini3Model(model: string) {
   return model.includes('gemini-3');

@@ -42,6 +42,7 @@ export type ContainerCapacityAlert = {
 export const CONTAINER_CAPACITY_THRESHOLDS = {
   page: 0.95,
   ticket: 0.8,
+  ticketEarly: 0.6,
 } as const;
 
 /** Application names to monitor (lowercase, as returned by the Cloudflare API). */
@@ -49,6 +50,9 @@ export const MONITORED_CONTAINER_APPS: readonly string[] = [
   'cloud-agent-next-sandbox',
   'cloud-agent-next-sandboxsmall',
   'cloud-agent-next-sandboxcodereview',
+  'cloud-agent-next-sandboxcontainment',
+  'cloud-agent-next-sandboxsmallcontainment',
+  'cloud-agent-next-sandboxcodereviewcontainment',
 ];
 
 // ── Zod schemas for the Cloudflare Containers API ───────────────────────────
@@ -136,6 +140,9 @@ export function evaluateCapacityThresholds(apps: ContainerApplication[]): Contai
     } else if (utilization >= CONTAINER_CAPACITY_THRESHOLDS.ticket) {
       severity = 'ticket';
       thresholdFraction = CONTAINER_CAPACITY_THRESHOLDS.ticket;
+    } else if (utilization >= CONTAINER_CAPACITY_THRESHOLDS.ticketEarly) {
+      severity = 'info';
+      thresholdFraction = CONTAINER_CAPACITY_THRESHOLDS.ticketEarly;
     }
 
     if (severity === null) continue;

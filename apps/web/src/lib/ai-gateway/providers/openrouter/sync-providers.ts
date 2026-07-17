@@ -25,8 +25,15 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisClient } from '@/lib/redis';
-import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
-import { getLanguageModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  GATEWAY_METADATA_REDIS_KEYS,
+  type RedisKey,
+  vercelInferenceProvidersRedisKey,
+} from '@/lib/redis-keys';
+import {
+  extractVercelInferenceProviderIdsFromModel,
+  getLanguageModelIds,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
@@ -42,6 +49,19 @@ import {
  * logs for the same diff. Auto-releases on transaction commit/rollback.
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
+const VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string, StoredModel>) {
+  const pipeline = redisClient.pipeline();
+  for (const model of Object.values(vercelModels)) {
+    pipeline.set(
+      vercelInferenceProvidersRedisKey(model.id),
+      JSON.stringify(extractVercelInferenceProviderIdsFromModel(model)),
+      { ex: VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS }
+    );
+  }
+  await pipeline.exec();
+}
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
@@ -167,7 +187,7 @@ function injectExtraUserByokModels(
     }
   }
   for (const model of openRouterModels.values()) {
-    const vercelModel = vercelModels[mapModelIdToVercel(model.slug, false)];
+    const vercelModel = vercelModels[mapModelIdToVercel(model.slug)];
     if (!vercelModel) continue;
 
     const vercelInferenceProviders = new Set(
@@ -284,7 +304,9 @@ async function syncProviders(
     });
 
   for (const extraModel of mappedExtraModels) {
-    const providerData = providerModelData.find(data => data.provider.slug === extraModel.provider);
+    const providerData = providerModelData.find(
+      data => data.provider.slug === extraModel.provider.slug
+    );
     if (providerData) {
       console.log(
         `Found existing ${extraModel.provider} provider from OpenRouter, adding extra model ${extraModel.model.slug}`
@@ -327,25 +349,22 @@ async function syncProviders(
   const allProviders = [...normalizedProviders];
 
   // Auto-detect providers referenced by extra models that aren't already present
-  const missingProviderSlugs = new Set(
+  const missingProviders = new Map(
     mappedExtraModels
       .map(m => m.provider)
-      .filter(
-        (slug): slug is NonNullable<typeof slug> =>
-          slug !== null && !allProviders.some(p => p.slug === slug)
-      )
+      .filter(provider => !allProviders.some(p => p.slug === provider.slug))
+      .map(provider => [provider.slug, provider])
   );
 
-  for (const providerSlug of missingProviderSlugs) {
-    const displayName = providerSlug.toUpperCase();
-    const iconInitials = providerSlug.slice(0, 2).toUpperCase();
+  for (const provider of missingProviders.values()) {
+    const iconInitials = provider.slug.slice(0, 2).toUpperCase();
     allProviders.push({
-      name: displayName,
-      displayName,
-      slug: providerSlug,
+      name: provider.name,
+      displayName: provider.name,
+      slug: provider.slug,
       dataPolicy: {
-        training: true,
-        retainsPrompts: true,
+        training: provider.training,
+        retainsPrompts: provider.retainsPrompts,
         canPublish: false,
       },
       headquarters: 'Unknown',
@@ -354,7 +373,7 @@ async function syncProviders(
         url: `https://placehold.co/100?text=${iconInitials}&font=roboto`,
         className: 'rounded-sm',
       },
-      models: mappedExtraModels.filter(m => m.provider === providerSlug).map(m => m.model),
+      models: mappedExtraModels.filter(m => m.provider.slug === provider.slug).map(m => m.model),
     });
   }
 
@@ -374,6 +393,8 @@ async function syncProviders(
   return result;
 }
 
+const MODEL_METADATA_REDIS_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 async function mirrorToRedis(values: {
   providers: NormalizedOpenRouterResponse;
   openrouter: Record<string, StoredModel>;
@@ -390,7 +411,19 @@ async function mirrorToRedis(values: {
   if (values.openrouterProviders) {
     entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
   }
-  await Promise.all(entries.map(([key, value]) => redisClient.set(key, JSON.stringify(value))));
+  await Promise.all([
+    ...entries.map(([key, value]) => {
+      const serializedValue = JSON.stringify(value);
+      if (
+        key === GATEWAY_METADATA_REDIS_KEYS.openrouterModels ||
+        key === GATEWAY_METADATA_REDIS_KEYS.vercelModels
+      ) {
+        return redisClient.set(key, serializedValue, { ex: MODEL_METADATA_REDIS_TTL_SECONDS });
+      }
+      return redisClient.set(key, serializedValue);
+    }),
+    mirrorVercelInferenceProvidersToRedis(values.vercel),
+  ]);
 }
 
 /**

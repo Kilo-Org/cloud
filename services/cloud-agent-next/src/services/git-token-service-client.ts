@@ -3,6 +3,7 @@ import type {
   BitbucketTokenFailureReason,
   GitAuthorConfig,
   GitTokenService,
+  KiloSessionCapabilityTargets,
   ManagedGitHubFallbackReason,
 } from '../types.js';
 
@@ -422,5 +423,56 @@ export async function resolveManagedGitLabToken(
     const message = error instanceof Error ? error.message : String(error);
     logger.withFields({ error: message }).error('Failed to call git-token-service getGitLabToken');
     return { success: false, reason: 'rpc_error' };
+  }
+}
+
+export type ResolvedCloudAgentKiloCapability = {
+  capability: string;
+};
+
+export async function issueCloudAgentKiloSessionCapability(
+  env: GitTokenServiceEnv,
+  params: {
+    userId: string;
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+    outboundContainerId: string;
+    userToken: string;
+    targets: KiloSessionCapabilityTargets;
+  }
+): Promise<
+  | { success: true; value: ResolvedCloudAgentKiloCapability }
+  | { success: false; error: ResolveGitHubTokenError }
+> {
+  if (!env.GIT_TOKEN_SERVICE) {
+    return {
+      success: false,
+      error: {
+        reason: 'service_not_configured',
+        message: 'git-token-service capability issuance is not configured',
+      },
+    };
+  }
+
+  try {
+    const result = await env.GIT_TOKEN_SERVICE.issueKiloSessionCapability(params);
+    if (!result.success) {
+      return {
+        success: false,
+        error: {
+          reason: result.reason,
+          message: `Kilo session capability issuance failed (${result.reason})`,
+        },
+      };
+    }
+    logger.info('Issued Kilo session capability via git-token-service');
+    return { success: true, value: { capability: result.capability } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.withFields({ error: message }).error('Failed to issue Kilo session capability');
+    return {
+      success: false,
+      error: { reason: 'rpc_error', message: `git-token-service RPC failed: ${message}` },
+    };
   }
 }

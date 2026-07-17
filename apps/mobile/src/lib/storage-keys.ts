@@ -14,3 +14,4 @@ export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
+export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';

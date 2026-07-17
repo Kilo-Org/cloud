@@ -5,7 +5,13 @@ import { buildGitLabCloneUrl } from './gitlab-integration-helpers';
 
 // Define mock functions at module level with proper typing
 const mockGetGitLabIntegration = jest.fn<(owner: Owner) => Promise<PlatformIntegration | null>>();
-const mockGetValidGitLabToken = jest.fn<(integration: PlatformIntegration) => Promise<string>>();
+const mockGetValidGitLabToken =
+  jest.fn<
+    (
+      integration: PlatformIntegration,
+      actor: { userId: string; organizationId?: string }
+    ) => Promise<string>
+  >();
 const mockGetIntegrationForOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration | null>>();
 const mockGetIntegrationForOwner =
@@ -207,7 +213,9 @@ describe('gitlab-integration-helpers', () => {
       const result = await getGitLabTokenForUser('user-123');
 
       expect(result).toBe('valid-token-123');
-      expect(mockGetValidGitLabToken).toHaveBeenCalledWith(mockIntegration);
+      expect(mockGetValidGitLabToken).toHaveBeenCalledWith(mockIntegration, {
+        userId: 'user-123',
+      });
     });
 
     it('should throw TRPCError when token retrieval fails', async () => {
@@ -231,7 +239,7 @@ describe('gitlab-integration-helpers', () => {
       mockGetIntegrationForOrganization.mockResolvedValue(null);
 
       const { getGitLabTokenForOrganization } = await import('./gitlab-integration-helpers');
-      const result = await getGitLabTokenForOrganization('org-123');
+      const result = await getGitLabTokenForOrganization('org-123', 'actor-123');
 
       expect(result).toBeUndefined();
       expect(mockGetIntegrationForOrganization).toHaveBeenCalledWith('org-123', 'gitlab');
@@ -246,10 +254,13 @@ describe('gitlab-integration-helpers', () => {
       mockGetValidGitLabToken.mockResolvedValue('org-valid-token-456');
 
       const { getGitLabTokenForOrganization } = await import('./gitlab-integration-helpers');
-      const result = await getGitLabTokenForOrganization('org-123');
+      const result = await getGitLabTokenForOrganization('org-123', 'actor-123');
 
       expect(result).toBe('org-valid-token-456');
-      expect(mockGetValidGitLabToken).toHaveBeenCalledWith(mockIntegration);
+      expect(mockGetValidGitLabToken).toHaveBeenCalledWith(mockIntegration, {
+        userId: 'actor-123',
+        organizationId: 'org-123',
+      });
     });
 
     it('should throw TRPCError when token retrieval fails', async () => {
@@ -262,7 +273,7 @@ describe('gitlab-integration-helpers', () => {
 
       const { getGitLabTokenForOrganization } = await import('./gitlab-integration-helpers');
 
-      await expect(getGitLabTokenForOrganization('org-123')).rejects.toThrow(
+      await expect(getGitLabTokenForOrganization('org-123', 'actor-123')).rejects.toThrow(
         'Failed to authenticate with GitLab integration'
       );
     });
@@ -353,7 +364,11 @@ describe('gitlab-integration-helpers', () => {
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
-      const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
+      const result = await validateGitLabRepoAccessForOrganization(
+        'org-123',
+        'actor-123',
+        'org/project'
+      );
 
       expect(result).toBe(true);
     });
@@ -368,7 +383,11 @@ describe('gitlab-integration-helpers', () => {
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
-      const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/nonexistent');
+      const result = await validateGitLabRepoAccessForOrganization(
+        'org-123',
+        'actor-123',
+        'org/nonexistent'
+      );
 
       expect(result).toBe(false);
     });
@@ -383,7 +402,11 @@ describe('gitlab-integration-helpers', () => {
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
-      const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
+      const result = await validateGitLabRepoAccessForOrganization(
+        'org-123',
+        'actor-123',
+        'org/project'
+      );
 
       expect(result).toBe(true);
     });
@@ -393,7 +416,11 @@ describe('gitlab-integration-helpers', () => {
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
-      const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
+      const result = await validateGitLabRepoAccessForOrganization(
+        'org-123',
+        'actor-123',
+        'org/project'
+      );
 
       expect(result).toBe(false);
     });
@@ -408,7 +435,11 @@ describe('gitlab-integration-helpers', () => {
 
       const { validateGitLabRepoAccessForOrganization } =
         await import('./gitlab-integration-helpers');
-      const result = await validateGitLabRepoAccessForOrganization('org-123', 'org/project');
+      const result = await validateGitLabRepoAccessForOrganization(
+        'org-123',
+        'actor-123',
+        'org/project'
+      );
 
       expect(result).toBe(false);
     });
@@ -427,6 +458,7 @@ describe('gitlab-integration-helpers', () => {
         await import('./gitlab-integration-helpers');
       const result = await validateGitLabRepoAccessForOrganization(
         'org-123',
+        'actor-123',
         'org/subgroup/project'
       );
 

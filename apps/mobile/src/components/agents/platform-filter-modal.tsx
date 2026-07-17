@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
+import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +20,11 @@ const PLATFORM_FILTERS = [
 ] as const;
 const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
 
+const SORT_OPTIONS: readonly { value: AgentSessionSortBy; label: string }[] = [
+  { value: 'updated_at', label: 'Last updated' },
+  { value: 'created_at', label: 'Created' },
+];
+
 export type ProjectFilterOption = {
   gitUrl: string;
   displayName: string;
@@ -26,9 +33,10 @@ export type ProjectFilterOption = {
 type SessionFilters = {
   platformFilter: string[];
   projectFilter: string[];
+  sortBy: AgentSessionSortBy;
 };
 
-type SessionFilterChipsProps = SessionFilters & {
+type SessionFilterChipsProps = Omit<SessionFilters, 'sortBy'> & {
   projectOptions: ProjectFilterOption[];
   onRemovePlatform: (platform: string) => void;
   onRemoveProject: (gitUrl: string) => void;
@@ -37,6 +45,7 @@ type SessionFilterChipsProps = SessionFilters & {
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
   selectedProjects: string[];
+  selectedSortBy: AgentSessionSortBy;
   projectOptions: ProjectFilterOption[];
   onClose: () => void;
   onApply: (filters: SessionFilters) => void;
@@ -130,10 +139,11 @@ export function SessionFilterChips({
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
+            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
+            accessibilityRole="button"
             accessibilityLabel={`Remove ${label} project filter`}
           >
             <Text
@@ -149,10 +159,11 @@ export function SessionFilterChips({
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
+          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 active:opacity-70"
           onPress={() => {
             onRemovePlatform(platform);
           }}
+          accessibilityRole="button"
           accessibilityLabel={`Remove ${platformFilterLabel(platform)} platform filter`}
         >
           <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
@@ -168,12 +179,14 @@ export function SessionFilterChips({
 export function SessionFilterModal({
   selectedPlatforms,
   selectedProjects,
+  selectedSortBy,
   projectOptions,
   onClose,
   onApply,
 }: Readonly<SessionFilterModalProps>) {
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
+  const [draftSortBy, setDraftSortBy] = useState<AgentSessionSortBy>(selectedSortBy);
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>
@@ -189,17 +202,44 @@ export function SessionFilterModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-start px-6 pt-[20%]" onPress={onClose}>
+      <Pressable
+        // Backdrop tap-to-dismiss. accessible={false} so it doesn't collapse the
+        // whole sheet subtree into a single VoiceOver node (Pressable defaults to
+        // accessible=true) — the inner controls stay individually navigable.
+        accessible={false}
+        className="flex-1 justify-start px-6 pt-[20%]"
+        onPress={onClose}
+      >
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable
+          // Catches taps to stop backdrop dismissal; accessible={false} so the
+          // checkboxes/buttons inside stay individually navigable by VoiceOver
+          // (a pressable defaults to accessible=true and would collapse them).
+          accessible={false}
           className="gap-4 rounded-2xl bg-popover p-5"
           onPress={e => {
             e.stopPropagation();
           }}
         >
-          <Text className="text-base font-semibold">Filter Sessions</Text>
+          <Text className="text-base font-semibold">Filter sessions</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
+              <View className="gap-1">
+                <Text variant="eyebrow" className="px-3">
+                  Sort by
+                </Text>
+                {SORT_OPTIONS.map(option => (
+                  <ChoiceRow
+                    key={option.value}
+                    label={option.label}
+                    selected={draftSortBy === option.value}
+                    onPress={() => {
+                      setDraftSortBy(option.value);
+                    }}
+                    className="rounded-lg px-3"
+                  />
+                ))}
+              </View>
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
                   Platform
@@ -240,7 +280,11 @@ export function SessionFilterModal({
             </Button>
             <Button
               onPress={() => {
-                onApply({ platformFilter: draftPlatforms, projectFilter: draftProjects });
+                onApply({
+                  platformFilter: draftPlatforms,
+                  projectFilter: draftProjects,
+                  sortBy: draftSortBy,
+                });
                 onClose();
               }}
             >

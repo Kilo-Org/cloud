@@ -11,6 +11,7 @@ import {
   handleEditMessage,
   handleExecuteAction,
   handleListMessages,
+  handleRedeliverMessage,
   handleRemoveReaction,
   handleSetTyping,
   handleStopTyping,
@@ -66,6 +67,10 @@ export function makeApp(callerId: string, callerKind: 'user' | 'bot') {
   app.post(
     '/v1/conversations/:conversationId/messages/:messageId/execute-action',
     handleExecuteAction
+  );
+  app.post(
+    '/v1/conversations/:conversationId/messages/:messageId/redeliver',
+    handleRedeliverMessage
   );
 
   app.post('/v1/messages/:messageId/reactions', handleAddReaction);

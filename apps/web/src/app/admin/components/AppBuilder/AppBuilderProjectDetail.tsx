@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
 
 function formatRelativeTime(timestamp: string | null): string {
   if (!timestamp) return 'Never';
@@ -59,6 +60,7 @@ function AppBuilderProjectDetailPage({ children, projectTitle }: AppBuilderProje
 
 export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
   const { data: project, isLoading, error } = useAdminAppBuilderProject(projectId);
+  const { canViewSessions } = useAdminPermissions();
 
   if (isLoading) {
     return (
@@ -255,7 +257,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
                         )}
                       </div>
 
-                      {session.cli_session_id ? (
+                      {session.cli_session_id && canViewSessions ? (
                         <div className="flex items-center gap-2">
                           <Link href={`/admin/session-traces?sessionId=${session.cli_session_id}`}>
                             <Button variant="outline" size="sm">
@@ -264,6 +266,10 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
                             </Button>
                           </Link>
                         </div>
+                      ) : session.cli_session_id ? (
+                        <span className="text-muted-foreground text-sm">
+                          Session viewer access required
+                        </span>
                       ) : (
                         <span className="text-muted-foreground text-sm">No linked CLI session</span>
                       )}

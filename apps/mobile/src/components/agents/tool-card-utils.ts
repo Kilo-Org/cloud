@@ -13,3 +13,22 @@ export function truncateText(text: string, maxLength: number): string {
   }
   return `${text.slice(0, maxLength)}\u2026`;
 }
+
+export function getGenericToolTitle(
+  tool: string,
+  stateTitle: string | undefined,
+  input: Record<string, unknown>
+): string {
+  const title = stateTitle?.trim();
+  if (title) {
+    return title;
+  }
+  if (tool === 'mcp') {
+    const serverName = typeof input.server_name === 'string' ? input.server_name.trim() : '';
+    const toolName = typeof input.tool_name === 'string' ? input.tool_name.trim() : '';
+    if (serverName && toolName) {
+      return `${serverName}/${toolName}`;
+    }
+  }
+  return tool;
+}

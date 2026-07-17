@@ -15,11 +15,20 @@ import type {
   WrapperCommand,
   WrapperTerminalFailureCode,
 } from '../../src/shared/protocol.js';
-import { trimPayload } from '../../src/shared/trim-payload.js';
+import {
+  MAX_INGEST_EVENT_BYTES,
+  MAX_INGEST_BUFFERED_BYTES,
+  IngestEventBuffer,
+  isLifecycleIngestEvent,
+  kiloEventNameOf,
+  prepareIngestFrame,
+  type PreparedIngestFrame,
+} from '../../src/shared/ingest-frame.js';
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
+import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -144,11 +153,65 @@ function rejectCodeReviewPermission(
     });
 }
 
-export function trimIngestEvent(event: IngestEvent): IngestEvent {
+function kiloEventNameForLog(event: IngestEvent): string | undefined {
+  return event.streamEventType === 'kilocode' ? kiloEventNameOf(event.data) : undefined;
+}
+
+function sessionLogFields(state: WrapperState): Record<string, unknown> {
+  const session = state.currentSession;
+  if (!session) return {};
   return {
-    ...event,
-    data: trimPayload(event.streamEventType, event.data),
+    agentSessionId: session.agentSessionId,
+    kiloSessionId: session.kiloSessionId,
+    wrapperRunId: session.wrapperRunId,
+    ...(session.wrapperGeneration !== undefined
+      ? { wrapperGeneration: session.wrapperGeneration }
+      : {}),
+    ...(session.wrapperConnectionId ? { wrapperConnectionId: session.wrapperConnectionId } : {}),
   };
+}
+
+function logIngestFrameMessage(
+  state: WrapperState,
+  message: string,
+  fields: Record<string, unknown>
+): void {
+  logToFile(JSON.stringify({ message, ...sessionLogFields(state), ...fields }));
+}
+
+/**
+ * Prepare an ingest event for sending: trim, serialize, measure, and compact
+ * when oversized. Emits the structured size-safety logs. Returns the prepared
+ * frame (or a `dropped` frame that callers must not send).
+ */
+function prepareFrameForSend(event: IngestEvent, state: WrapperState): PreparedIngestFrame {
+  const frame = prepareIngestFrame(event);
+  if (frame.originalBytes > MAX_INGEST_EVENT_BYTES) {
+    logIngestFrameMessage(state, 'ingest_event_oversized_before_send', {
+      streamEventType: event.streamEventType,
+      kiloEventName: kiloEventNameForLog(event),
+      originalBytes: frame.originalBytes,
+      limitBytes: MAX_INGEST_EVENT_BYTES,
+    });
+  }
+  if (frame.kind === 'dropped') {
+    logIngestFrameMessage(state, 'ingest_event_dropped', {
+      streamEventType: event.streamEventType,
+      kiloEventName: kiloEventNameForLog(event),
+      originalBytes: frame.originalBytes,
+      reason: frame.reason,
+    });
+    return frame;
+  }
+  if (frame.compacted) {
+    logIngestFrameMessage(state, 'ingest_event_compacted', {
+      streamEventType: event.streamEventType,
+      kiloEventName: kiloEventNameForLog(event),
+      originalBytes: frame.originalBytes,
+      compactedBytes: frame.bytes,
+    });
+  }
+  return frame;
 }
 
 /**
@@ -311,14 +374,16 @@ export async function openIngestProgressChannel(
     });
 
     const sendProgressEvent = (event: IngestEvent): void => {
-      if (active && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(event));
+      if (!active || ws.readyState !== WebSocket.OPEN) return;
+      const frame = prepareFrameForSend(event, state);
+      if (frame.kind === 'send') {
+        ws.send(frame.serialized);
       }
     };
 
     const close = () => {
       active = false;
-      state.setSendToIngestFn(null);
+      state.clearSendToIngestFn(sendProgressEvent);
       try {
         ws.close();
       } catch {
@@ -359,7 +424,7 @@ export async function openIngestProgressChannel(
       }
       if (active) {
         active = false;
-        state.setSendToIngestFn(null);
+        state.clearSendToIngestFn(sendProgressEvent);
       }
     };
 
@@ -425,55 +490,74 @@ export function createConnectionManager(
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let generation = 0;
 
-  // Event buffer for disconnection periods
-  const MAX_BUFFER_SIZE = 1000;
-  const eventBuffer: IngestEvent[] = [];
-  let bufferOverflowed = false;
+  // Event buffer for disconnection periods. Byte budget is primary; the count
+  // cap is secondary. Lifecycle/terminal frames are protected from eviction.
+  const eventBuffer = new IngestEventBuffer();
 
   /**
    * Send an event to the ingest WebSocket.
-   * Buffers events if disconnected.
+   * Buffers the prepared frame if disconnected.
    */
-  function sendToIngest(event: IngestEvent): void {
+  function sendToIngestImmediately(event: IngestEvent): void {
+    const frame = prepareFrameForSend(event, state);
+    if (frame.kind === 'dropped') return;
+
     if (ingestWs && ingestWs.readyState === WebSocket.OPEN) {
-      ingestWs.send(JSON.stringify(event));
-    } else {
-      // Buffer events while disconnected
-      if (eventBuffer.length < MAX_BUFFER_SIZE) {
-        eventBuffer.push(event);
-      } else {
-        bufferOverflowed = true;
-      }
+      ingestWs.send(frame.serialized);
+      return;
+    }
+
+    const accepted = eventBuffer.push({
+      serialized: frame.serialized,
+      bytes: frame.bytes,
+      lifecycle: isLifecycleIngestEvent(event),
+    });
+    if (!accepted) {
+      logIngestFrameMessage(state, 'ingest_buffer_event_dropped', {
+        streamEventType: event.streamEventType,
+        kiloEventName: kiloEventNameForLog(event),
+        bytes: frame.bytes,
+        bufferBytes: eventBuffer.bytes,
+        bufferCount: eventBuffer.length,
+        limitBytes: MAX_INGEST_BUFFERED_BYTES,
+      });
     }
   }
 
+  const runningBashEventCoalescer = createRunningBashEventCoalescer(sendToIngestImmediately);
+
+  function sendToIngest(event: IngestEvent): void {
+    runningBashEventCoalescer.forward(event);
+  }
+
   /**
-   * Flush buffered events after reconnection.
+   * Clear buffered events (e.g. on close).
    */
   function clearBuffer(): void {
-    eventBuffer.length = 0;
-    bufferOverflowed = false;
+    eventBuffer.clear();
   }
 
   function flushBuffer(): void {
     if (!ingestWs || ingestWs.readyState !== WebSocket.OPEN) return;
 
     // Send resume marker so DO knows we may have lost events
-    if (eventBuffer.length > 0 || bufferOverflowed) {
+    if (eventBuffer.length > 0 || eventBuffer.isOverflowed) {
       ingestWs.send(
         JSON.stringify({
           streamEventType: 'wrapper_resumed',
           timestamp: new Date().toISOString(),
-          data: { bufferedEvents: eventBuffer.length, eventsLost: bufferOverflowed },
+          data: {
+            bufferedEvents: eventBuffer.length,
+            eventsLost: eventBuffer.isOverflowed,
+          },
         })
       );
     }
 
-    // Flush buffer
-    for (const event of eventBuffer) {
-      ingestWs.send(JSON.stringify(event));
+    // Flush buffered pre-serialized frames
+    for (const buffered of eventBuffer.drain()) {
+      ingestWs.send(buffered.serialized);
     }
-    clearBuffer();
   }
 
   async function resumeNetworkWait(requestID: string): Promise<void> {
@@ -1111,14 +1195,15 @@ export function createConnectionManager(
 
           maybeResumeNetworkWait(eventType, properties);
 
-          // Build and forward ingest event
-          const untrimmedIngestEvent: IngestEvent = {
+          // Build and forward ingest event. Payload trimming and per-frame
+          // byte budgeting are applied inside sendToIngest/prepareIngestFrame,
+          // so this is the single serialization path for kilocode events.
+          const ingestEvent: IngestEvent = {
             streamEventType: 'kilocode',
             data: { ...properties, event: eventType, type: eventType, properties },
             timestamp: new Date().toISOString(),
           };
 
-          const ingestEvent = trimIngestEvent(untrimmedIngestEvent);
           sendToIngest(ingestEvent);
           callbacks.onSseEvent?.();
 
@@ -1285,6 +1370,7 @@ export function createConnectionManager(
   return {
     open: async () => {
       logToFile('opening connections');
+      runningBashEventCoalescer.reopen();
 
       // Open ingest WS first
       await openIngestWs();
@@ -1312,6 +1398,7 @@ export function createConnectionManager(
         eventSubscriptionAbort?.abort();
         eventSubscriptionAbort = null;
         eventSubscriptionActive = false;
+        runningBashEventCoalescer.close();
         if (ingestWs) {
           closedByUs = true;
           try {
@@ -1334,6 +1421,7 @@ export function createConnectionManager(
       logToFile('closing connections');
       generation++;
       cancelReconnect();
+      runningBashEventCoalescer.close();
       clearBuffer();
 
       // Stop event subscription — abort the HTTP stream so the for-await

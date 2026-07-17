@@ -22,6 +22,12 @@ import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import {
+  captureEvent,
+  KILO_PASS_PURCHASE_COMPLETED_EVENT,
+  KILO_PASS_PURCHASE_FAILED_EVENT,
+  KILO_PASS_PURCHASE_STARTED_EVENT,
+} from '@/lib/analytics/posthog';
 import { useTRPC } from '@/lib/trpc';
 import { type AppStoreKiloPassProduct } from './store-products';
 import {
@@ -73,7 +79,7 @@ type StoreKiloPassPurchaseOptions = {
   onCompleted?: () => void;
 };
 
-type StoreKiloPassRestorePurchasesResult = 'restored' | 'empty' | 'failed';
+export type StoreKiloPassRestorePurchasesResult = 'restored' | 'empty' | 'failed';
 
 type StoreKiloPassPurchaseContextValue = {
   appStoreOwnershipPreflight: AppStoreKiloPassOwnershipPreflight;
@@ -84,9 +90,28 @@ type StoreKiloPassPurchaseContextValue = {
   restorePurchases: () => Promise<StoreKiloPassRestorePurchasesResult>;
   isPending: boolean;
   isRestoringPurchases: boolean;
+  /** Last purchase/restore failure message, for screens that render it inline. */
+  errorMessage: string | null;
+  clearError: () => void;
 };
 
 const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextValue | null>(null);
+
+const androidStoreKiloPassPurchaseValue: StoreKiloPassPurchaseContextValue = {
+  appStoreOwnershipPreflight: null,
+  purchase: async () => {
+    await Promise.resolve();
+  },
+  restorePurchases: async () => {
+    await Promise.resolve();
+    return 'failed';
+  },
+  isPending: false,
+  isRestoringPurchases: false,
+  errorMessage: null,
+  clearError: () => undefined,
+};
+
 type PurchaseCompletionResult =
   | { completed: true; errorMessage?: never }
   | { completed: false; errorMessage: string | null };
@@ -96,6 +121,25 @@ let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
 export function resetPurchaseErrorToastDedup() {
   lastPurchaseErrorToast = null;
+}
+
+// Screens that render `errorMessage` inline (e.g. the subscription screen)
+// register ownership on mount so purchase/restore failures don't also pop a
+// toast behind them. Counter (not a boolean) so it degrades safely if more
+// than one owner is ever mounted at once.
+let inlineErrorOwnerCount = 0;
+
+export function resetInlinePurchaseErrorOwnership() {
+  inlineErrorOwnerCount = 0;
+}
+
+export function useInlinePurchaseErrorOwnership() {
+  useEffect(() => {
+    inlineErrorOwnerCount += 1;
+    return () => {
+      inlineErrorOwnerCount -= 1;
+    };
+  }, []);
 }
 
 type PurchaseCompletionOptions = {
@@ -165,6 +209,10 @@ function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): stri
 }
 
 function showDedupedPurchaseError(message: string) {
+  if (inlineErrorOwnerCount > 0) {
+    return;
+  }
+
   const now = Date.now();
   if (
     lastPurchaseErrorToast?.message === message &&
@@ -334,10 +382,26 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 }
 
 export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNode }) {
+  if (Platform.OS !== 'ios') {
+    return createElement(
+      StoreKiloPassPurchaseContext.Provider,
+      { value: androidStoreKiloPassPurchaseValue },
+      children
+    );
+  }
+
+  return createElement(IosStoreKiloPassPurchaseProvider, null, children);
+}
+
+function IosStoreKiloPassPurchaseProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);
   const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const clearError = useCallback(() => {
+    setErrorMessage(null);
+  }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
   const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
@@ -373,9 +437,12 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     onPurchaseError: error => {
       pendingPurchaseCompletedCallbackRef.current = null;
       releasePurchaseRequest();
+      // A null message means the user cancelled — not a failure.
       const message = getKiloPassPurchaseErrorMessage(error, error.message);
       if (message) {
+        captureEvent(KILO_PASS_PURCHASE_FAILED_EVENT);
         showDedupedPurchaseError(message);
+        setErrorMessage(message);
       }
     },
     onPurchaseSuccess: purchase => {
@@ -431,6 +498,10 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
+          // Only user-initiated purchases reach here — recovery and restore
+          // flows pass notifyCompletion: false.
+          captureEvent(KILO_PASS_PURCHASE_COMPLETED_EVENT);
+          setErrorMessage(null);
           const onCompleted = pendingPurchaseCompletedCallbackRef.current;
           pendingPurchaseCompletedCallbackRef.current = null;
           onCompleted?.();
@@ -440,6 +511,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         },
         showError: message => {
           showDedupedPurchaseError(message);
+          setErrorMessage(message);
         },
       }),
     [
@@ -461,6 +533,8 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
 
       activePurchaseRequestRef.current = { sku: product.appleProductId };
       setIsRequestingPurchase(true);
+      setErrorMessage(null);
+      captureEvent(KILO_PASS_PURCHASE_STARTED_EVENT);
       try {
         const requestStarted = await actions.purchase(product, options);
         if (!requestStarted) {
@@ -484,6 +558,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     }
 
     setIsRestoringPurchases(true);
+    setErrorMessage(null);
     try {
       return await actions.restorePurchases();
     } finally {
@@ -545,10 +620,14 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
       restorePurchases,
       isPending: isRequestingPurchase || completeAppStorePurchase.isPending || isRestoringPurchases,
       isRestoringPurchases,
+      errorMessage,
+      clearError,
     }),
     [
       appStoreOwnershipPreflight,
+      clearError,
       completeAppStorePurchase.isPending,
+      errorMessage,
       isRequestingPurchase,
       isRestoringPurchases,
       restorePurchases,

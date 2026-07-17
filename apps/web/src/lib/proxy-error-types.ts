@@ -13,7 +13,6 @@ export const proxyErrorTypeSchema = z.enum([
   'model_not_allowed',
   'discontinued_free_model',
   'model_not_found',
-  'feature_exclusive_model',
   'unsupported_field',
   'authentication_required',
   'missing_client_ip',

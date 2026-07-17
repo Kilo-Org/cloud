@@ -171,8 +171,11 @@ describe('processAppStoreKiloPassNotification', () => {
       notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
     });
     const decodedTransaction = transaction();
+    const consumptionInformationStarted = Promise.withResolvers<void>();
+    const releaseConsumptionInformation = Promise.withResolvers<void>();
     const sendConsumptionInformation = jest.fn(async () => {
-      await new Promise(resolve => setTimeout(resolve, 25));
+      consumptionInformationStarted.resolve();
+      await releaseConsumptionInformation.promise;
     });
     const params = {
       signedPayload: 'concurrent-consumption-request',
@@ -181,10 +184,14 @@ describe('processAppStoreKiloPassNotification', () => {
       sendConsumptionInformation,
     };
 
-    const results = await Promise.all([
-      processAppStoreKiloPassNotification(params),
-      processAppStoreKiloPassNotification(params),
-    ]);
+    const firstDelivery = processAppStoreKiloPassNotification(params);
+    await consumptionInformationStarted.promise;
+
+    const duplicateResult = await processAppStoreKiloPassNotification(params);
+
+    releaseConsumptionInformation.resolve();
+    const firstResult = await firstDelivery;
+    const results = [firstResult, duplicateResult];
 
     expect(results.filter(result => result.processed)).toHaveLength(1);
     expect(results).toContainEqual({ processed: false, status: 'in_flight' });

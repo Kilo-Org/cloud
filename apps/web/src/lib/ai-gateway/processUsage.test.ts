@@ -11,6 +11,7 @@ import {
   processOpenRouterUsage,
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
+  usageTransactionIdleTimeoutQuery,
 } from './processUsage';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
@@ -26,17 +27,21 @@ import { db } from '@/lib/drizzle';
 import {
   cost_insight_owner_hour_driver_buckets,
   cost_insight_owner_hour_totals,
+  cost_insight_rollup_degraded_intervals,
+  cost_insight_rollup_repairs,
   microdollar_usage,
   microdollar_usage_daily,
+  microdollar_usage_daily_repairs,
   microdollar_usage_metadata,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, getTableColumns, isNull, sql } from 'drizzle-orm';
+import { eq, getTableColumns } from 'drizzle-orm';
 import { findUserById } from '../user';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 // Note: Legacy banned_ja4/whitelist_ja4 tests removed - abuse classification
 // is now handled by the external abuse detection service (src/lib/abuse-service.ts)
@@ -93,6 +98,16 @@ describe('processOpenRouterUsage', () => {
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
+  });
+});
+
+describe('authoritative usage transaction configuration', () => {
+  test('sets a transaction-local 60-second idle timeout', async () => {
+    const compiled = new PgDialect().sqlToQuery(usageTransactionIdleTimeoutQuery());
+
+    expect(compiled.sql).toContain("'idle_in_transaction_session_timeout'");
+    expect(compiled.sql).toContain('true');
+    expect(compiled.params).toEqual(['60000ms']);
   });
 });
 
@@ -587,7 +602,7 @@ describe('logMicrodollarUsage', () => {
     expect(totals).toHaveLength(0);
   });
 
-  test('keeps AI source rows when post-commit cost insight capture fails', async () => {
+  test('keeps AI source rows when legacy usage owner does not exist', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const { core, metadata } = await defineMicrodollarUsage();
     const missingUserId = `missing-ai-user-${crypto.randomUUID()}`;
@@ -613,29 +628,38 @@ describe('logMicrodollarUsage', () => {
         .from(cost_insight_owner_hour_totals)
         .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
       expect(totals).toHaveLength(0);
+
+      const degradedIntervals = await db
+        .select()
+        .from(cost_insight_rollup_degraded_intervals)
+        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
+      expect(degradedIntervals).toHaveLength(0);
     } finally {
       consoleErrorSpy.mockRestore();
     }
   });
 
-  test('keeps usage and balance write when post-commit cost insight capture fails', async () => {
+  test('keeps usage and balance write and enqueues owner-hour repair after capture fails', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const user = await insertTestUser({
       id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
       microdollars_used: 0,
       google_user_email: 'cost-insight-failure@example.com',
     });
+    const organization = await createTestOrganization(
+      'Cost insight capture failure organization',
+      user.id,
+      10_000
+    );
     const { core, metadata } = await defineMicrodollarUsage();
 
     try {
       const result = await insertUsageRecord(
-        { ...core, kilo_user_id: user.id, organization_id: null, cost: 1000 },
+        { ...core, kilo_user_id: user.id, organization_id: organization.id, cost: 1000 },
         metadata
       );
 
-      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: 1000 });
-      const updatedUser = await findUserById(user.id);
-      expect(updatedUser?.microdollars_used).toBe(1000);
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
 
       const sourceRows = await db
         .select()
@@ -649,9 +673,29 @@ describe('logMicrodollarUsage', () => {
       const totals = await db
         .select()
         .from(cost_insight_owner_hour_totals)
-        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
       expect(totals).toHaveLength(0);
+
+      const degradedIntervals = await db
+        .select()
+        .from(cost_insight_rollup_degraded_intervals)
+        .where(eq(cost_insight_rollup_degraded_intervals.source, 'ai_gateway'));
+      expect(degradedIntervals).toHaveLength(0);
+
+      const repairs = await db
+        .select()
+        .from(cost_insight_rollup_repairs)
+        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
+      expect(repairs).toHaveLength(1);
+      expect(repairs[0].usage_id).toBe(core.id);
+      expect(new Date(repairs[0].hour_start).toISOString()).toBe(
+        new Date(Math.floor(Date.parse(core.created_at) / 3_600_000) * 3_600_000).toISOString()
+      );
+      expect(Date.parse(repairs[0].next_attempt_at)).toBeGreaterThan(Date.parse(core.created_at));
     } finally {
+      await db
+        .delete(cost_insight_rollup_repairs)
+        .where(eq(cost_insight_rollup_repairs.owned_by_organization_id, organization.id));
       consoleErrorSpy.mockRestore();
     }
   });
@@ -924,7 +968,7 @@ describe('logMicrodollarUsage', () => {
     expect(updatedUser?.microdollars_used).toBe(4000); // unchanged
   });
 
-  test('insertUsageRecord populates microdollar_usage_daily for personal usage', async () => {
+  test('insertUsageRecord enqueues durable daily-rollup work without mutating the daily table', async () => {
     const user = await insertTestUser({
       id: 'test-daily-personal-user',
       microdollars_used: 0,
@@ -936,86 +980,101 @@ describe('logMicrodollarUsage', () => {
       cost: 1500,
     });
 
+    const [repair] = await db
+      .select()
+      .from(microdollar_usage_daily_repairs)
+      .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id));
+    expect(repair).toMatchObject({
+      kilo_user_id: user.id,
+      organization_id: null,
+      usage_date: '2025-08-15',
+      attempt_count: 0,
+    });
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1500);
     const dailyRows = await db
       .select()
       .from(microdollar_usage_daily)
-      .where(
-        and(
-          eq(microdollar_usage_daily.kilo_user_id, user.id),
-          isNull(microdollar_usage_daily.organization_id)
-        )
-      );
-
-    expect(dailyRows).toHaveLength(1);
-    expect(dailyRows[0].total_cost_microdollars).toBe(1500);
-    expect(dailyRows[0].organization_id).toBeNull();
+      .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+    expect(dailyRows).toHaveLength(0);
   });
 
-  test('insertUsageRecord increments microdollar_usage_daily on subsequent inserts on the same day', async () => {
+  test('does not enqueue or apply a daily repair when the authoritative usage insert fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const user = await insertTestUser({
-      id: 'test-daily-increment-user',
-      microdollars_used: 0,
-      google_user_email: 'daily-increment@example.com',
+      id: 'test-daily-authoritative-failure-user',
+      microdollars_used: 1000,
+      google_user_email: 'daily-authoritative-failure@example.com',
     });
+    const { core, metadata } = await defineMicrodollarUsage();
+    const invalidUsageId = 'not-a-usage-uuid';
 
-    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 1000 });
-    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 2500 });
-    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 700 });
-
-    const [row] = await db
-      .select({
-        total: sql<number>`coalesce(sum(${microdollar_usage_daily.total_cost_microdollars}), 0)::int`,
-      })
-      .from(microdollar_usage_daily)
-      .where(
-        and(
-          eq(microdollar_usage_daily.kilo_user_id, user.id),
-          isNull(microdollar_usage_daily.organization_id)
+    try {
+      await expect(
+        insertUsageRecord(
+          { ...core, id: invalidUsageId, kilo_user_id: user.id, cost: 600 },
+          metadata
         )
-      );
+      ).resolves.toBeNull();
 
-    expect(row.total).toBe(4200);
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(sourceRows).toHaveLength(0);
+      expect((await findUserById(user.id))?.microdollars_used).toBe(1000);
+
+      const repairRows = await db
+        .select()
+        .from(microdollar_usage_daily_repairs)
+        .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id));
+      expect(repairRows).toHaveLength(0);
+      const dailyRows = await db
+        .select()
+        .from(microdollar_usage_daily)
+        .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
+      expect(dailyRows).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
-  test('insertUsageRecord writes org-scoped rollup separately from personal rollup', async () => {
+  test('rolls negative usage into its UTC day without changing the personal balance', async () => {
     const user = await insertTestUser({
-      id: 'test-daily-org-scope-user',
-      microdollars_used: 0,
-      google_user_email: 'daily-org-scope@example.com',
+      id: 'test-daily-negative-utc-user',
+      microdollars_used: 1000,
+      google_user_email: 'daily-negative-utc@example.com',
     });
-    const organization = await createTestOrganization('Daily usage organization', user.id, 10_000);
-    const orgId = organization.id;
+    const { core: beforeMidnightCore, metadata: beforeMidnightMetadata } =
+      await defineMicrodollarUsage();
+    const { core: afterMidnightCore, metadata: afterMidnightMetadata } =
+      await defineMicrodollarUsage();
 
-    await insertUsageWithOverrides({ kilo_user_id: user.id, cost: 500 });
-    await insertUsageWithOverrides({
-      kilo_user_id: user.id,
-      organization_id: orgId,
-      cost: 9000,
-    });
+    await insertUsageRecord(
+      {
+        ...beforeMidnightCore,
+        kilo_user_id: user.id,
+        cost: -250,
+        created_at: '2025-08-15T23:59:59.999Z',
+      },
+      beforeMidnightMetadata
+    );
+    await insertUsageRecord(
+      {
+        ...afterMidnightCore,
+        kilo_user_id: user.id,
+        cost: 400,
+        created_at: '2025-08-16T00:00:00.000Z',
+      },
+      afterMidnightMetadata
+    );
 
-    const personalRows = await db
-      .select()
-      .from(microdollar_usage_daily)
-      .where(
-        and(
-          eq(microdollar_usage_daily.kilo_user_id, user.id),
-          isNull(microdollar_usage_daily.organization_id)
-        )
-      );
-    expect(personalRows).toHaveLength(1);
-    expect(personalRows[0].total_cost_microdollars).toBe(500);
-
-    const orgRows = await db
-      .select()
-      .from(microdollar_usage_daily)
-      .where(
-        and(
-          eq(microdollar_usage_daily.kilo_user_id, user.id),
-          eq(microdollar_usage_daily.organization_id, orgId)
-        )
-      );
-    expect(orgRows).toHaveLength(1);
-    expect(orgRows[0].total_cost_microdollars).toBe(9000);
+    expect((await findUserById(user.id))?.microdollars_used).toBe(1400);
+    const repairRows = await db
+      .select({ usage_date: microdollar_usage_daily_repairs.usage_date })
+      .from(microdollar_usage_daily_repairs)
+      .where(eq(microdollar_usage_daily_repairs.kilo_user_id, user.id))
+      .orderBy(microdollar_usage_daily_repairs.usage_date);
+    expect(repairRows).toEqual([{ usage_date: '2025-08-15' }, { usage_date: '2025-08-16' }]);
   });
 
   test('insertUsageRecord skips microdollar_usage_daily for zero-cost rows', async () => {

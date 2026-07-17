@@ -1,8 +1,20 @@
-export type ReviewerPlatform = 'github' | 'gitlab' | 'bitbucket';
+import {
+  type CodeReviewPlatform,
+  type RepositoryModelOverrideInput,
+} from '@kilocode/app-shared/code-review';
 
-export function asReviewerPlatform(value: string): ReviewerPlatform {
-  return value === 'gitlab' || value === 'bitbucket' ? value : 'github';
-}
+import { parseParam } from '@/lib/route-params';
+
+export {
+  buildSaveConfigInput,
+  GATE_THRESHOLDS,
+  REVIEW_FOCUS_AREAS,
+  REVIEW_STYLES,
+} from '@kilocode/app-shared/code-review';
+
+export type ReviewerPlatform = CodeReviewPlatform;
+
+export const PERSONAL_SCOPE = 'personal';
 
 export const PLATFORM_CAPABILITIES: Record<
   ReviewerPlatform,
@@ -41,6 +53,39 @@ export const PLATFORM_CAPABILITIES: Record<
   },
 };
 
+const REVIEWER_PLATFORMS = Object.keys(PLATFORM_CAPABILITIES) as ReviewerPlatform[];
+
+/**
+ * Display label for a code-review platform (e.g. 'github' → 'GitHub'), falling
+ * back to the raw value for anything unrecognized. Use this instead of a CSS
+ * `capitalize`, which renders 'github' → 'Github'.
+ */
+export function reviewerPlatformLabel(platform: string): string {
+  return REVIEWER_PLATFORMS.includes(platform as ReviewerPlatform)
+    ? PLATFORM_CAPABILITIES[platform as ReviewerPlatform].label
+    : platform;
+}
+
+/**
+ * Strictly parses a route's platform segment against the supported
+ * scope+platform combinations. Replaces the old `asReviewerPlatform`
+ * coercion, which silently fell back to `'github'` for any unrecognized
+ * value — so a malformed deep link (e.g. a personal-scope route to
+ * Bitbucket, which is org-only per PLATFORM_CAPABILITIES) could end up
+ * reading/mutating a different platform's config than the URL claimed.
+ * Returns `null` for an unknown platform or an unsupported combination.
+ */
+export function parseReviewerPlatform(
+  scope: string,
+  rawPlatform: string | string[] | undefined
+): ReviewerPlatform | null {
+  const platform = parseParam(rawPlatform, REVIEWER_PLATFORMS);
+  if (platform && PLATFORM_CAPABILITIES[platform].scopes === 'org' && scope === PERSONAL_SCOPE) {
+    return null;
+  }
+  return platform;
+}
+
 export type ReviewConfigData = {
   isEnabled: boolean;
   reviewStyle: 'strict' | 'balanced' | 'lenient' | 'roast';
@@ -51,6 +96,7 @@ export type ReviewConfigData = {
   gateThreshold: 'off' | 'all' | 'warning' | 'critical';
   repositorySelectionMode: 'all' | 'selected';
   selectedRepositoryIds: (number | string)[];
+  repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
 };
 
@@ -63,43 +109,6 @@ export type ConfigPatch = Partial<{
   gateThreshold: ReviewConfigData['gateThreshold'];
   repositorySelectionMode: ReviewConfigData['repositorySelectionMode'];
   selectedRepositoryIds: (number | string)[];
+  repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
 }>;
-
-export function buildSaveConfigInput(
-  platform: ReviewerPlatform,
-  config: ReviewConfigData,
-  patch: ConfigPatch
-) {
-  return {
-    platform,
-    reviewStyle: config.reviewStyle,
-    focusAreas: config.focusAreas,
-    customInstructions: config.customInstructions ?? undefined,
-    modelSlug: config.modelSlug,
-    thinkingEffort: config.thinkingEffort,
-    gateThreshold: config.gateThreshold,
-    // GitLab and Bitbucket only support 'selected' repo mode server-side; the
-    // mode picker only exists for github, so force it here instead of relying
-    // on a config default that can still be 'all'.
-    repositorySelectionMode:
-      platform === 'gitlab' || platform === 'bitbucket'
-        ? ('selected' as const)
-        : config.repositorySelectionMode,
-    selectedRepositoryIds: config.selectedRepositoryIds,
-    disableReviewMd: config.disableReviewMd,
-    ...(platform === 'gitlab' ? { autoConfigureWebhooks: true as const } : {}),
-    ...patch,
-  };
-}
-
-export const REVIEW_STYLES = ['strict', 'balanced', 'lenient', 'roast'] as const;
-export const GATE_THRESHOLDS = ['off', 'all', 'warning', 'critical'] as const;
-export const FOCUS_AREAS = [
-  'security',
-  'performance',
-  'bugs',
-  'style',
-  'testing',
-  'documentation',
-] as const;

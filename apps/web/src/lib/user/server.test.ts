@@ -456,6 +456,7 @@ describe('getUserFromAuth', () => {
       google_user_email: `granting-admin-${crypto.randomUUID()}@kilocode.ai`,
       hosted_domain: 'kilocode.ai',
       is_admin: true,
+      is_super_admin: true,
     });
     const target = await insertTestUser({
       google_user_email: `grant-target-${crypto.randomUUID()}@kilocode.ai`,

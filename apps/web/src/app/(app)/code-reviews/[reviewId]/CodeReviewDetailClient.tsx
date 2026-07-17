@@ -5,20 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
+import { CouncilGovernancePanel } from '@/components/code-reviews/CouncilGovernancePanel';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
-import {
-  ExternalLink,
-  GitPullRequest,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-  ArrowLeft,
-  RotateCcw,
-  Ban,
-} from 'lucide-react';
+import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
+import { getCodeReviewStatusIcon } from '@/components/code-reviews/code-review-status-icons';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -26,32 +17,13 @@ import { TRPCClientError } from '@trpc/client';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-
-type CodeReviewStatus =
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'interrupted';
-
-const statusConfig: Record<
-  CodeReviewStatus,
-  {
-    icon: React.ComponentType<{ className?: string }>;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    label: string;
-  }
-> = {
-  pending: { icon: Clock, variant: 'secondary', label: 'Pending' },
-  queued: { icon: Clock, variant: 'secondary', label: 'Queued' },
-  running: { icon: Loader2, variant: 'default', label: 'Running' },
-  completed: { icon: CheckCircle2, variant: 'default', label: 'Completed' },
-  failed: { icon: XCircle, variant: 'destructive', label: 'Failed' },
-  cancelled: { icon: Ban, variant: 'outline', label: 'Cancelled' },
-  interrupted: { icon: AlertCircle, variant: 'outline', label: 'Interrupted' },
-};
+import {
+  CODE_REVIEW_STATUS_LABELS,
+  isCancellableReviewStatus,
+  isInFlightReviewStatus,
+  isRetriggerableReviewStatus,
+  type CodeReviewStatus,
+} from '@kilocode/app-shared/code-review';
 
 type CodeReviewDetailClientProps = {
   reviewId: string;
@@ -66,8 +38,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
     refetchInterval: query => {
       const result = query.state.data;
       if (!result?.success) return false;
-      const status = result.review.status;
-      return ['pending', 'queued', 'running'].includes(status) ? 5000 : false;
+      return isInFlightReviewStatus(result.review.status) ? 5000 : false;
     },
   });
 
@@ -135,15 +106,12 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
 
   const review = data.review;
   const status = review.status as CodeReviewStatus;
-  const statusInfo = statusConfig[status] ?? {
-    icon: AlertCircle,
-    variant: 'outline' as const,
-    label: review.status,
-  };
+  const statusInfo = getCodeReviewStatusIcon(status);
+  const statusLabel = CODE_REVIEW_STATUS_LABELS[status] ?? review.status;
   const StatusIcon = statusInfo.icon;
   const showStreamView = status !== 'pending';
-  const canRetry = ['failed', 'cancelled', 'interrupted'].includes(status);
-  const canCancel = ['pending', 'queued', 'running'].includes(status);
+  const canRetry = isRetriggerableReviewStatus(status);
+  const canCancel = isCancellableReviewStatus(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
   const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);
   const isSupersededCancellation =
@@ -201,7 +169,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           )}
           <Badge variant={statusInfo.variant} className="mt-1 gap-1.5 text-sm whitespace-nowrap">
             <StatusIcon className={`h-4 w-4 ${status === 'running' ? 'animate-spin' : ''}`} />
-            {statusInfo.label}
+            {statusLabel}
           </Badge>
         </div>
       </div>
@@ -319,6 +287,14 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           )}
         </CardContent>
       </Card>
+
+      {/* Council results (council runs only) */}
+      {review.review_type === 'council' && (
+        <CouncilGovernancePanel
+          councilResult={review.council_result}
+          awaitingResults={isInFlightReviewStatus(status)}
+        />
+      )}
 
       {/* Session log / live stream */}
       {showStreamView && (

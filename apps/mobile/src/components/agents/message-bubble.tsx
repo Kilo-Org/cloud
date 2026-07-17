@@ -1,14 +1,15 @@
 import { type StoredMessage } from 'cloud-agent-sdk';
-import { Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 
 import { Bubble } from '@/components/ui/bubble';
 
+import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
-import { MarkdownText } from './markdown-text';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
+import { type OpenChildSession } from './child-session-section';
 
 type MessageBubbleProps = {
   message: StoredMessage;
@@ -16,6 +17,7 @@ type MessageBubbleProps = {
   isSessionStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
+  onOpenChildSession?: OpenChildSession;
 };
 
 export function MessageBubble({
@@ -24,12 +26,23 @@ export function MessageBubble({
   isSessionStreaming,
   getChildMessages,
   defaultReasoningExpanded,
+  onOpenChildSession,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
 
   const handleLongPress = () => {
     void copyMessage(message);
+  };
+
+  // Long-press is an accelerator; expose the same "copy" action to
+  // accessibility tooling (VoiceOver/TalkBack rotor) since a long-press
+  // gesture isn't reliably discoverable there.
+  const copyAccessibilityActions = [{ name: 'copy', label: 'Copy message' }];
+  const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === 'copy') {
+      void copyMessage(message);
+    }
   };
 
   // Compaction-only message renders as a separator
@@ -56,10 +69,12 @@ export function MessageBubble({
         accessibilityRole="text"
         accessibilityLabel="User message"
         accessibilityHint="Long press to copy message text"
+        accessibilityActions={copyAccessibilityActions}
+        onAccessibilityAction={handleAccessibilityAction}
       >
         <Bubble side="user">
           {textContent ? (
-            <MarkdownText value={textContent} variant="user" selectable={false} />
+            <ChatMarkdownText value={textContent} variant="user" selectable={false} />
           ) : null}
           {fileParts.map(part => (
             <FilePartRenderer key={part.id} part={part} />
@@ -79,6 +94,8 @@ export function MessageBubble({
       accessibilityRole="text"
       accessibilityLabel="Assistant message"
       accessibilityHint="Long press to copy message text"
+      accessibilityActions={copyAccessibilityActions}
+      onAccessibilityAction={handleAccessibilityAction}
     >
       <View className="gap-2">
         {message.parts.map(part => (
@@ -88,6 +105,7 @@ export function MessageBubble({
             isStreaming={isStreaming}
             getChildMessages={getChildMessages}
             defaultReasoningExpanded={defaultReasoningExpanded}
+            onOpenChildSession={onOpenChildSession}
           />
         ))}
       </View>

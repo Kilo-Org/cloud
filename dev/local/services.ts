@@ -213,7 +213,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/kiloclaw-billing',
   },
   'event-service': {
-    group: 'kiloclaw',
+    group: 'cloud-agent',
     dependsOn: [],
     dir: 'services/event-service',
   },
@@ -266,24 +266,35 @@ function isPrimaryWorktree(): boolean {
   return path.resolve(gitDir) === path.resolve(gitCommonDir);
 }
 
-function computeAutoOffset(): number {
-  if (isPrimaryWorktree()) return 0;
-
-  const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
-  const slug = path.basename(root);
-
+export function computePortOffset(args: {
+  explicit: string | undefined;
+  isPrimary: boolean;
+  slug: string;
+}): number {
+  const { explicit, isPrimary, slug } = args;
+  if (explicit !== undefined && explicit !== 'auto') {
+    const value = Number(explicit);
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`Invalid KILO_PORT_OFFSET: ${explicit}`);
+    }
+    return value;
+  }
+  if (isPrimary) return 0;
   let hash = 0;
   for (let i = 0; i < slug.length; i++) {
     hash = ((hash << 5) - hash + slug.charCodeAt(i)) | 0;
   }
-  return (((hash % 50) + 50) % 50) * 100;
+  const bucket = ((hash % 50) + 50) % 50;
+  return (bucket === 0 ? 50 : bucket) * 100;
 }
 
 function getPortOffset(): number {
-  const explicit = process.env.KILO_PORT_OFFSET;
-  if (explicit === undefined) return 0; // disabled by default
-  if (explicit === 'auto') return computeAutoOffset();
-  return Number(explicit);
+  const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+  return computePortOffset({
+    explicit: process.env.KILO_PORT_OFFSET,
+    isPrimary: isPrimaryWorktree(),
+    slug: path.basename(root),
+  });
 }
 
 export const portOffset = getPortOffset();

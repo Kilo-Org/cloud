@@ -139,7 +139,6 @@ export async function storeBitbucketIntegration(input: StoreBitbucketIntegration
   const credentialValues: NewPlatformOAuthCredential = {
     id: credentialId,
     platform_integration_id: integrationId,
-    platform: PLATFORM.BITBUCKET,
     authorized_by_user_id: input.authorizedByUserId,
     provider_subject_id: providerSubjectId,
     provider_subject_login: input.bitbucketUser.nickname,

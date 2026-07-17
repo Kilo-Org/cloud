@@ -1,21 +1,15 @@
 import { Stack } from 'expo-router';
-import { Platform, StatusBar, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { StoreKiloPassPurchaseProvider } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 
 export default function AppLayout() {
   const colors = useThemeColors();
-  const { height } = useWindowDimensions();
-  const { top } = useSafeAreaInsets();
-  const androidTopInset = top > 0 ? top : (StatusBar.currentHeight ?? 0);
-  const androidFullSheetDetent =
-    height > 0 ? Math.max(0.5, (height - androidTopInset) / height) : 1;
-  const fullSheetDetent = Platform.OS === 'android' ? androidFullSheetDetent : 1;
+  const { fullSheetDetent } = useFormSheetDetents();
 
   return (
     <UserWebConnectionProvider>
@@ -57,8 +51,7 @@ export default function AppLayout() {
                   presentation: 'formSheet',
                   sheetAllowedDetents: [0.5],
                   sheetGrabberVisible: true,
-                  headerShown: true,
-                  title: 'Select Mode',
+                  headerShown: false,
                 }}
               />
               <Stack.Screen

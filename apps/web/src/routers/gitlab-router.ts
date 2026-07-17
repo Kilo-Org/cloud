@@ -60,7 +60,7 @@ export const gitlabRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
       }
       const owner = resolveOwner(ctx, input.organizationId);
-      return gitlabService.connectWithPAT(owner, input.token, input.instanceUrl);
+      return gitlabService.connectWithPAT(owner, input.token, input.instanceUrl, ctx.user.id);
     }),
 
   /**
@@ -133,7 +133,15 @@ export const gitlabRouter = createTRPCRouter({
       }
       const owner = resolveOwner(ctx, input.organizationId);
 
-      const result = await gitlabService.listGitLabRepositories(owner, input.integrationId, true);
+      const result = await gitlabService.listGitLabRepositories(
+        owner,
+        input.integrationId,
+        {
+          userId: ctx.user.id,
+          ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        },
+        true
+      );
 
       return {
         success: true,
@@ -155,7 +163,15 @@ export const gitlabRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = resolveOwner(ctx, input.organizationId);
-      return gitlabService.listGitLabRepositories(owner, input.integrationId, input.forceRefresh);
+      return gitlabService.listGitLabRepositories(
+        owner,
+        input.integrationId,
+        {
+          userId: ctx.user.id,
+          ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        },
+        input.forceRefresh
+      );
     }),
 
   listBranches: baseProcedure
@@ -171,7 +187,15 @@ export const gitlabRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
       const owner = resolveOwner(ctx, input.organizationId);
-      return gitlabService.listGitLabBranches(owner, input.integrationId, input.projectPath);
+      return gitlabService.listGitLabBranches(
+        owner,
+        input.integrationId,
+        {
+          userId: ctx.user.id,
+          ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+        },
+        input.projectPath
+      );
     }),
 
   regenerateWebhookSecret: baseProcedure

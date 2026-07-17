@@ -92,6 +92,10 @@ export function isMessageEdited(message: Message): boolean {
   return !message.deleted && message.clientUpdatedAt !== null;
 }
 
+export function canRetryFailedMessage(message: Message): boolean {
+  return !message.deleted && message.deliveryFailed;
+}
+
 function firstDisplayValue(values: readonly (string | null | undefined)[]): string | null {
   for (const value of values) {
     const trimmed = value?.trim();

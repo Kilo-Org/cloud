@@ -344,6 +344,7 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
           pr_number: PULL_REQUEST_ID,
           head_sha: DEFAULT_HEAD_SHA,
           status: 'pending',
+          trigger_source: 'webhook',
         })
       );
       const events = await organizationWebhookEvents();

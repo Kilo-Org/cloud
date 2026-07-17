@@ -22,6 +22,16 @@ import {
   fetchGitHubRepositorySize,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
+import type {
+  ReviewAgentSelection,
+  ReviewAgentsConfig,
+} from '@kilocode/worker-utils/review-agents';
+import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
+import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
+import {
+  buildCouncilOrchestratorPrompt,
+  buildCouncilRuntimeAgents,
+} from '@/lib/code-reviews/prompts/council-prompt';
 import {
   findKiloReviewNote,
   fetchMRInlineComments,
@@ -120,7 +130,16 @@ export type SessionInput = {
   bitbucketExpectedHeadSha?: string;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  /** Council runs only: one inline sub-agent per specialist, each pinned to its own model. */
+  runtimeAgents?: RuntimeAgentInput[];
 };
+
+/**
+ * Review agent selection wire contract shared with the code-review Worker. Defined once
+ * in `@kilocode/worker-utils/review-agents` so producer and consumer cannot drift as
+ * council mode adds fields. See that module for the forward-plumbing notes.
+ */
+export type { ReviewAgentSelection, ReviewAgentsConfig };
 
 export type CodeReviewPayload = {
   reviewId: string;
@@ -133,6 +152,14 @@ export type CodeReviewPayload = {
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */
   repositorySize?: string | null;
+  /**
+   * Forward-shaped review agent selections. Built for every review (standard = a single
+   * `'standard'` agent). Only `agents[0]` is consumed today; the rest is plumbing for
+   * council mode. Required on the producer output so no return path can silently omit
+   * it; it stays optional on the Worker request and persisted state for rolling-deploy
+   * and in-flight compatibility.
+   */
+  reviewAgents: ReviewAgentsConfig;
 };
 
 /**
@@ -271,12 +298,15 @@ export async function prepareReviewPayload(
           }
         );
         const authToken = generateApiToken(user, { botId: 'reviewer' });
+        // Single source for the standard reviewer's model so the session input and the
+        // forward-shaped `reviewAgents[0]` can never drift apart.
+        const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
         const sessionInput: SessionInput = {
           gitUrl: `https://bitbucket.org/${workspaceSlug.data}/${repositorySlug.data}.git`,
           kilocodeOrganizationId: owner.id,
           prompt,
           mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-          model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+          model: standardModel,
           variant: config.thinking_effort ?? undefined,
           upstreamBranch: review.head_ref,
           platform: PLATFORM.BITBUCKET,
@@ -287,6 +317,20 @@ export async function prepareReviewPayload(
           bitbucketIntegrationId: integration.id,
           bitbucketPullRequestId: review.pr_number,
           bitbucketExpectedHeadSha: expectedHeadSha.data,
+        };
+
+        // Forward-shaped agent selections, built for every review (see GitHub/GitLab
+        // path below). Today this is always a single 'standard' agent mirroring the
+        // session's model/effort; council mode will populate one entry per specialist.
+        const reviewAgents: ReviewAgentsConfig = {
+          reviewType: 'standard',
+          agents: [
+            {
+              role: 'standard',
+              model: standardModel,
+              thinkingEffort: config.thinking_effort ?? null,
+            },
+          ],
         };
 
         logExceptInTest('[prepareReviewPayload] Prepared Bitbucket payload', {
@@ -305,6 +349,7 @@ export async function prepareReviewPayload(
           sessionInput,
           owner,
           repositorySize: null,
+          reviewAgents,
         };
       }
       case PLATFORM.GITHUB:
@@ -463,7 +508,10 @@ export async function prepareReviewPayload(
         }
 
         try {
-          gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
+          gitlabToken = await getOrCreateProjectAccessToken(integration, projectId, {
+            userId: owner.userId,
+            ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
+          });
           logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
             reviewId,
             repoFullName: review.repo_full_name,
@@ -665,6 +713,14 @@ export async function prepareReviewPayload(
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });
 
+    // A council run replaces the standard sub-agent sharding policy with a coordinator
+    // contract (one sub-agent per specialist, no self-review), so the base prompt must OMIT
+    // that policy — otherwise the two sets of sub-agent instructions contradict and a small
+    // PR could skip specialists and fail closed. Determined here so the prompt is generated
+    // without the policy; reused by the council fork below.
+    const councilConfig = config.council;
+    const councilActive = review.review_type === 'council' && isCouncilActive(councilConfig);
+
     // 6. Generate dynamic review prompt
     const { prompt, version } = await generateReviewPrompt(
       config,
@@ -680,6 +736,7 @@ export async function prepareReviewPayload(
         manualInstructions: manualConfig?.instructions ?? null,
         outputMode,
         expectedHeadSha: review.head_sha,
+        omitSubAgentGuidance: councilActive,
       }
     );
 
@@ -697,6 +754,9 @@ export async function prepareReviewPayload(
     // GitHub: uses githubRepo (owner/repo format) + githubToken
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const variant = config.thinking_effort ?? undefined;
+    // Single source for the standard reviewer's model so the session input and the
+    // forward-shaped `reviewAgents[0]` can never drift apart.
+    const standardModel = config.model_slug || DEFAULT_CODE_REVIEW_MODEL;
     const gateThreshold = config.gate_threshold ?? 'off';
     const githubCheckoutRef = getGitHubPullRequestCheckoutRef(review.pr_number);
     const sessionInput: SessionInput =
@@ -709,7 +769,7 @@ export async function prepareReviewPayload(
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-            model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+            model: standardModel,
             variant,
             upstreamBranch: review.head_ref,
           }
@@ -722,7 +782,7 @@ export async function prepareReviewPayload(
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
               prompt,
               mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-              model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+              model: standardModel,
               variant,
               upstreamBranch: review.head_ref,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
@@ -735,11 +795,58 @@ export async function prepareReviewPayload(
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
               prompt,
               mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-              model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+              model: standardModel,
               variant,
               upstreamBranch: githubCheckoutRef,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
             };
+
+    // Council fork: a council run delegates to one sub-agent per specialist (each on its
+    // own model) in a single session. We build `reviewAgents` (domain contract) and the
+    // cloud-agent-next `runtimeAgents` (execution), and swap the prompt to the coordinator
+    // prompt. `councilActive` (computed above, gating `omitSubAgentGuidance`) guarantees the
+    // config is enabled with >= the minimum specialists.
+    const councilMembers = councilActive && councilConfig ? enabledSpecialists(councilConfig) : [];
+    const aggregationStrategy = councilConfig?.aggregation_strategy ?? 'any_blocking_member';
+
+    // Forward-shaped agent selections. Standard = a single 'standard' agent mirroring the
+    // session's model/effort; council = one entry per enabled specialist.
+    const reviewAgents: ReviewAgentsConfig = councilActive
+      ? {
+          reviewType: 'council',
+          aggregationStrategy,
+          agents: councilMembers.map(specialist => ({
+            role: specialist.role,
+            model: specialist.model_slug ?? standardModel,
+            thinkingEffort: specialist.thinking_effort ?? null,
+          })),
+        }
+      : {
+          reviewType: 'standard',
+          agents: [
+            {
+              role: 'standard',
+              model: standardModel,
+              thinkingEffort: config.thinking_effort ?? null,
+            },
+          ],
+        };
+
+    if (councilActive) {
+      // The primary agent coordinates; specialists run as inline sub-agents on their own
+      // models. Override the prompt and attach runtimeAgents on whichever sessionInput
+      // variant was built above.
+      sessionInput.prompt = buildCouncilOrchestratorPrompt({
+        basePrompt: prompt,
+        specialists: councilMembers,
+        aggregationStrategy,
+      });
+      sessionInput.runtimeAgents = buildCouncilRuntimeAgents({
+        specialists: councilMembers,
+        defaultModel: standardModel,
+        defaultVariant: variant,
+      });
+    }
 
     // Log the session input for GitLab
     if (platform === 'gitlab') {
@@ -769,6 +876,7 @@ export async function prepareReviewPayload(
       owner,
       previousCloudAgentSessionId,
       repositorySize,
+      reviewAgents,
     };
 
     logExceptInTest('[prepareReviewPayload] Prepared payload', {

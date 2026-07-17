@@ -1,24 +1,27 @@
 import {
   checkGraceExpired,
-  isProvisioningTerminal,
+  getProvisioningTerminalReason,
   type OnboardingState,
+  type ProvisioningTerminalReason,
   shouldAdvanceFromProvisioning,
 } from '@/lib/onboarding';
 import { AlertTriangle } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
   FadeOut,
-  LinearTransition,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
+import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
 import { agentColor, toneColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -31,25 +34,50 @@ type ProvisioningStepProps = {
   onGraceElapsed: () => void;
   onComplete: () => void;
   onRetry: () => void;
+  onContinueInBackground: () => void;
 };
 
-const STATUS_MESSAGE_TEMPLATES = [
-  'Renting a small corner of the cloud…',
-  'Handing {name} a name tag…',
-  'Unpacking a fresh set of prompts…',
-  'Teaching it where the kettle is…',
-  'Warming up the silicon…',
-  'Running a quick vibe check…',
-  'Pouring {name} a cup of coffee…',
-  'Double-checking the welcome memo…',
-];
-
-const STATUS_ROTATE_MS = 2600;
+// Overall wall-clock budget for provisioning before we tell the user it's
+// stalled, rather than pulsing an indefinite "waking up" message. Resets
+// per mount, which happens on every fresh entry into the provisioning step
+// (including after a retry — see `flow-body.tsx`'s `key="provisioning"`).
+const OVERALL_TIMEOUT_MS = 150_000;
 const PULSE_PEAK = 1.06;
 const PULSE_DURATION_MS = 1400;
 
-function personalizeMessages(name: string): readonly string[] {
-  return STATUS_MESSAGE_TEMPLATES.map(m => m.replace('{name}', name));
+const TERMINAL_CONTENT: Record<
+  ProvisioningTerminalReason,
+  { title: string; body: (name: string) => string }
+> = {
+  query_error: {
+    title: "Couldn't check on setup",
+    body: name =>
+      `We lost the connection while checking on ${name}'s setup. It may still be running. Try again, or check back shortly.`,
+  },
+  instance_stopped: {
+    title: 'Setup stopped',
+    body: name => `${name}'s instance stopped unexpectedly during setup.`,
+  },
+  gateway_502: {
+    title: 'Something stalled',
+    body: name =>
+      `We couldn't finish setting up ${name}. Try again, or email hi@kilo.ai if this keeps happening.`,
+  },
+  timeout: {
+    title: 'Taking longer than expected',
+    body: name =>
+      `Setup for ${name} is taking longer than usual (over ${OVERALL_TIMEOUT_MS / 60_000} minutes).`,
+  },
+};
+
+function provisioningStageMessage(state: OnboardingState): string {
+  if (state.instanceStatus === 'running' && state.gatewayReady && !state.gatewaySettled) {
+    return 'Finishing setup';
+  }
+  if (state.instanceStatus === 'running' && !state.gatewayReady) {
+    return 'Connecting to the agent';
+  }
+  return 'Starting the sandbox';
 }
 
 export function ProvisioningStep({
@@ -57,6 +85,7 @@ export function ProvisioningStep({
   onGraceElapsed,
   onComplete,
   onRetry,
+  onContinueInBackground,
 }: Readonly<ProvisioningStepProps>) {
   const colors = useThemeColors();
 
@@ -64,21 +93,25 @@ export function ProvisioningStep({
   const botName = state.botIdentity?.botName ?? DEFAULT_BOT_IDENTITY.botName;
   const tint = agentColor(botEmoji);
 
-  const messages = useMemo(() => personalizeMessages(botName), [botName]);
-  const [messageIndex, setMessageIndex] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setMessageIndex(i => (i + 1) % messages.length);
-    }, STATUS_ROTATE_MS);
-    return () => {
-      clearInterval(id);
-    };
-  }, [messages.length]);
+  // Overall wall-clock timeout: local to this component since it's the only
+  // producer and consumer. Resets naturally on retry, same as `enteredAtMs`
+  // below — a retry sends `state.step` back to `identity`, which unmounts
+  // this component (see `key="provisioning"` in `flow-body.tsx`), so both
+  // reset fresh on the next entry into provisioning.
+  const [timedOut, setTimedOut] = useState(false);
+
+  const terminalReason = getProvisioningTerminalReason(state, timedOut);
+  const stageMessage = useMemo(() => provisioningStageMessage(state), [state]);
 
   // Gentle breathing pulse on the avatar tile — signals "actively working"
-  // without the spinner-in-the-middle-of-nowhere look.
+  // without the spinner-in-the-middle-of-nowhere look. Static tile when
+  // Reduce Motion is on, same as Skeleton/SpinningIcon.
+  const reducedMotion = useReducedMotion();
   const pulse = useSharedValue(1);
   useEffect(() => {
+    if (reducedMotion) {
+      return undefined;
+    }
     pulse.value = withRepeat(
       withTiming(PULSE_PEAK, {
         duration: PULSE_DURATION_MS,
@@ -87,28 +120,44 @@ export function ProvisioningStep({
       -1,
       true
     );
-  }, [pulse]);
+    return () => {
+      cancelAnimation(pulse);
+    };
+  }, [pulse, reducedMotion]);
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
   }));
 
-  // 502-grace poll: tick once per second while we're holding a 502 and the
-  // grace window hasn't elapsed. Checked against the pure helper so the
-  // timing logic stays testable.
+  // The overall-timeout clock starts at mount, which happens fresh every
+  // time this step is (re)entered — see the `key="provisioning"` on the
+  // FlowBody branch that renders this component.
+  const [enteredAtMs] = useState(() => Date.now());
+
+  // Single 1s poll while provisioning is live and not yet terminal: checks
+  // both the 502-grace sub-machine (pure `checkGraceExpired` helper) and the
+  // overall wall-clock budget, acting on whichever fires.
   const { first502AtMs, gateway502Expired } = state;
   useEffect(() => {
-    if (first502AtMs === null || gateway502Expired) {
+    if (terminalReason !== null) {
       return undefined;
     }
     const interval = setInterval(() => {
-      if (checkGraceExpired({ first502AtMs }, Date.now())) {
+      const nowMs = Date.now();
+      if (
+        first502AtMs !== null &&
+        !gateway502Expired &&
+        checkGraceExpired({ first502AtMs }, nowMs)
+      ) {
         onGraceElapsed();
+      }
+      if (!timedOut && nowMs - enteredAtMs >= OVERALL_TIMEOUT_MS) {
+        setTimedOut(true);
       }
     }, 1000);
     return () => {
       clearInterval(interval);
     };
-  }, [first502AtMs, gateway502Expired, onGraceElapsed]);
+  }, [terminalReason, first502AtMs, gateway502Expired, timedOut, enteredAtMs, onGraceElapsed]);
 
   // Advance to the done step once the instance + gateway gate holds. Step
   // saves are dispatched from OnboardingFlow and their apply is guaranteed by
@@ -121,8 +170,9 @@ export function ProvisioningStep({
     }
   }, [advance, onComplete]);
 
-  if (isProvisioningTerminal(state)) {
+  if (terminalReason !== null) {
     const danger = toneColor('danger');
+    const content = TERMINAL_CONTENT[terminalReason];
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
@@ -141,20 +191,22 @@ export function ProvisioningStep({
           <Text variant="eyebrow" className="text-xs">
             Provisioning
           </Text>
-          <Text className="text-center text-2xl font-semibold">Something stalled</Text>
+          <Text className="text-center text-2xl font-semibold">{content.title}</Text>
           <Text variant="muted" className="text-center text-base">
-            We couldn&apos;t finish setting up {botName}. Try again, or email hi@kilo.ai if this
-            keeps happening.
+            {content.body(botName)}
           </Text>
         </View>
-        <Button size="lg" className="w-full" onPress={onRetry}>
-          <Text className="text-base">Try again</Text>
-        </Button>
+        <View className="w-full gap-3">
+          <Button size="lg" className="w-full" onPress={onRetry}>
+            <Text className="text-base">Try again</Text>
+          </Button>
+          <Button variant="ghost" size="lg" className="w-full" onPress={onContinueInBackground}>
+            <Text className="text-base">Continue in background</Text>
+          </Button>
+        </View>
       </Animated.View>
     );
   }
-
-  const message = messages[messageIndex] ?? messages[0];
 
   return (
     <Animated.View
@@ -169,32 +221,31 @@ export function ProvisioningStep({
           tint.tileBorderClass
         )}
       >
-        <Text className="text-5xl">{botEmoji}</Text>
+        <BotAvatar emoji={botEmoji} size={48} color={colors.foreground} />
       </Animated.View>
 
       <View className="items-center gap-3">
         <View className="items-center gap-1">
           <Text variant="eyebrow" className="text-xs">
-            Setting up
+            Provisioning
           </Text>
-          <Text className="text-center text-2xl font-semibold">Waking up {botName}</Text>
+          <Text className="text-center text-2xl font-semibold">Setting up {botName}</Text>
         </View>
 
-        <Animated.View layout={LinearTransition} className="min-h-[24px] items-center">
-          <Animated.View
-            key={messageIndex}
-            entering={FadeIn.duration(400)}
-            exiting={FadeOut.duration(250)}
-          >
-            <Text variant="muted" className="text-center text-base">
-              {message}
-            </Text>
-          </Animated.View>
+        <Animated.View
+          key={stageMessage}
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+        >
+          <Text variant="muted" className="text-center text-base">
+            {stageMessage}
+          </Text>
         </Animated.View>
       </View>
 
       <Text variant="muted" className="text-center">
-        You can close this — we&apos;ll keep working in the background.
+        Usually takes under a minute. You can close this — we&apos;ll keep working in the
+        background.
       </Text>
     </Animated.View>
   );

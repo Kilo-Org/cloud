@@ -19,6 +19,7 @@ import {
   cost_insight_evaluation_dirty_owners,
   cost_insight_rollup_coverage,
   cost_insight_rollup_degraded_intervals,
+  cost_insight_rollup_repairs,
   kilocode_users,
   organizations,
 } from './schema';
@@ -30,7 +31,7 @@ import {
 
 const testDatabase = createDrizzleClient({
   connectionString: computeDatabaseUrl(),
-  poolConfig: { application_name: 'cost-insights-rollups-test', max: 4 },
+  poolConfig: { application_name: 'cost-insights-rollups-test', max: 12 },
 });
 
 type CostInsightTestFixture = {
@@ -60,6 +61,14 @@ async function withCostInsightFixture(
   try {
     await testFn({ userId, organizationId });
   } finally {
+    await testDatabase.db
+      .delete(cost_insight_rollup_repairs)
+      .where(
+        or(
+          eq(cost_insight_rollup_repairs.owned_by_user_id, userId),
+          eq(cost_insight_rollup_repairs.owned_by_organization_id, organizationId)
+        )
+      );
     await testDatabase.db
       .delete(cost_insight_evaluation_dirty_owners)
       .where(
@@ -282,6 +291,46 @@ describe('Cost Insights rollup capture', () => {
     });
   });
 
+  it('rolls back within the local lock timeout when repair holds the exclusive owner-hour lock', async () => {
+    await withCostInsightFixture(async fixture => {
+      const input = captureInput(fixture);
+      const hourStart = getCostInsightUtcHourStart(input.occurredAt);
+      const lockKey = costInsightOwnerHourLockKey(input.owner, hourStart);
+      const lockAcquired = createDeferred();
+      const releaseLock = createDeferred();
+      const lockHolder = testDatabase.db.transaction(async tx => {
+        await tx.execute(
+          sql`SELECT pg_catalog.pg_advisory_xact_lock(
+            pg_catalog.hashtextextended(${lockKey}, 0::bigint)
+          )`
+        );
+        lockAcquired.resolve();
+        await releaseLock.promise;
+      });
+
+      await lockAcquired.promise;
+      const startedAt = performance.now();
+      try {
+        await expect(
+          testDatabase.db.transaction(async tx => {
+            await tx.execute(sql`SET LOCAL lock_timeout = '100ms'`);
+            await captureCostInsightSpend(tx, input);
+          })
+        ).rejects.toMatchObject({ cause: { code: '55P03' } });
+        expect(performance.now() - startedAt).toBeLessThan(2_000);
+      } finally {
+        releaseLock.resolve();
+        await lockHolder;
+      }
+
+      const totals = await testDatabase.db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, fixture.userId));
+      expect(totals).toHaveLength(0);
+    });
+  });
+
   it('adds totals before matching driver buckets under a non-UTC database timezone', async () => {
     await withCostInsightFixture(async fixture => {
       await testDatabase.db.transaction(async tx => {
@@ -388,10 +437,10 @@ describe('Cost Insights rollup capture', () => {
     });
   });
 
-  it('serializes concurrent owner-hour captures and preserves exact sums', async () => {
+  it('serializes a high-concurrency owner-hour burst and preserves exact sums', async () => {
     await withCostInsightFixture(async fixture => {
       await Promise.all(
-        Array.from({ length: 8 }, () =>
+        Array.from({ length: 32 }, () =>
           testDatabase.db.transaction(tx =>
             captureCostInsightSpend(
               tx,
@@ -410,8 +459,8 @@ describe('Cost Insights rollup capture', () => {
         .from(cost_insight_owner_hour_driver_buckets)
         .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, fixture.userId));
 
-      expect(total).toMatchObject({ total_microdollars: 56, spend_record_count: 16 });
-      expect(driver).toMatchObject({ total_microdollars: 56, spend_record_count: 16 });
+      expect(total).toMatchObject({ total_microdollars: 224, spend_record_count: 64 });
+      expect(driver).toMatchObject({ total_microdollars: 224, spend_record_count: 64 });
     });
   });
 

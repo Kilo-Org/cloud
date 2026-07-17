@@ -1,4 +1,5 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import {
   kilocode_users,
   organization_invitations,
@@ -453,7 +454,7 @@ async function getOwnerEmailsForOrg(organizationId: string): Promise<string[]> {
   const members = await getOrganizationMembers(organizationId);
   // Only active (non-invitation) owners and billing managers — exclude pending invited members
   const activeRecipients = members.filter(
-    m => (m.role === 'owner' || m.role === 'billing_manager') && m.status === 'active'
+    m => canManageOrganizationBilling(m.role) && m.status === 'active'
   );
   return activeRecipients.map(o => o.email);
 }

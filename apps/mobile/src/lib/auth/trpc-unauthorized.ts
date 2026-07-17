@@ -2,13 +2,17 @@ import { z } from 'zod';
 
 type TrpcUnauthorizedHandler = () => Promise<void> | void;
 
+// Sign out only on the server's context-level auth failure (invalid/missing
+// token), flagged via data.authRequired — NOT on every 401. A procedure-level
+// UNAUTHORIZED (e.g. org-access denial) is also HTTP 401 but must be handled
+// in-screen as a permission error, not by logging the whole app out.
 const DirectUnauthorizedErrorSchema = z.looseObject({
-  data: z.looseObject({ httpStatus: z.literal(401) }),
+  data: z.looseObject({ authRequired: z.literal(true) }),
 });
 
 const ShapedUnauthorizedErrorSchema = z.looseObject({
   shape: z.looseObject({
-    data: z.looseObject({ httpStatus: z.literal(401) }),
+    data: z.looseObject({ authRequired: z.literal(true) }),
   }),
 });
 

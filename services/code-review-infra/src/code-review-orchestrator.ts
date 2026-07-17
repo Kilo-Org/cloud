@@ -22,6 +22,7 @@ import type {
   CodeReviewStatusResponse,
   CodeReviewStatusResult,
   SessionInput,
+  ReviewAgentsConfig,
 } from './types';
 import { InternalStatusResponseSchema } from './types';
 import { doNameForAttempt } from './do-name';
@@ -892,6 +893,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     previousCloudAgentSessionId?: string;
     repositorySize?: string | null;
     runReviewDelayMs?: number;
+    reviewAgents?: ReviewAgentsConfig;
   }): Promise<{ status: CodeReviewStatus }> {
     if (!this.state) {
       await this.loadState();
@@ -920,8 +922,25 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           ? undefined
           : params.previousCloudAgentSessionId,
       repositorySize: params.repositorySize,
+      reviewAgents: params.reviewAgents,
     };
     await this.saveState();
+
+    // Forward plumbing: today execution consumes only the standard reviewer settings
+    // (agents[0] / sessionInput). Log the full selection for observability ahead of
+    // council (multi-agent) mode, which will consume the rest. This is a pure
+    // observability log sitting between saveState() and setAlarm(): a malformed
+    // payload (non-array agents, null entries, etc.) must never throw here, or the
+    // review would be persisted as queued but never scheduled. Keep it total.
+    if (params.reviewAgents) {
+      const agents = params.reviewAgents.agents;
+      console.log('[CodeReviewOrchestrator] Review agent selections', {
+        reviewId: params.reviewId,
+        reviewType: params.reviewAgents.reviewType,
+        agentCount: Array.isArray(agents) ? agents.length : 0,
+        agentRoles: Array.isArray(agents) ? agents.map(agent => agent?.role) : [],
+      });
+    }
     const runReviewDelayMs =
       params.runReviewDelayMs ?? CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS;
     await this.ctx.storage.setAlarm(Date.now() + runReviewDelayMs);
@@ -1025,6 +1044,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       previousCloudAgentSessionId: undefined,
       repositorySize: this.state.repositorySize,
+      reviewAgents: this.state.reviewAgents,
       runReviewDelayMs: retryDelayMs,
     });
 

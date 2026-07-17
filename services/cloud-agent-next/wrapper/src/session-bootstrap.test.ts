@@ -40,7 +40,7 @@ function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyReque
     materialized: {
       env: {
         HOME: path.join(tmpDir, 'home'),
-        KILOCODE_TOKEN: 'kilo-token',
+        KILOCODE_TOKEN: 'kilo-capability',
         [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
       },
       setupCommands: ['pnpm install'],
@@ -48,7 +48,7 @@ function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyReque
     },
     session: {
       ingestUrl: 'wss://worker.example.com/sessions/user_test/agent/ingest',
-      workerAuthToken: 'kilo-token',
+      workerAuthToken: 'wrapper-dispatch-ticket',
       wrapperRunId: 'wr_test',
       wrapperGeneration: 1,
       wrapperConnectionId: 'conn_test',
@@ -158,6 +158,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
+    const authFile = await fsp.readFile(
+      path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'),
+      'utf8'
+    );
+    expect(JSON.parse(authFile)).toEqual({ kilo: { type: 'api', key: 'kilo-capability' } });
+    expect(authFile).not.toContain('wrapper-dispatch-ticket');
   });
 
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
@@ -362,10 +368,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
-  it('uses a lenient inactivity watchdog and generic progress for setup commands', async () => {
+  it('uses pipes and forwards sanitized, redacted setup command output', async () => {
     const request = makeRequest(tmpDir);
     const progress = mock(() => {});
     let setupOptions: Parameters<NonNullable<WrapperBootstrapDeps['runProcess']>>[2];
+    let setupInvocation: string[] = [];
     let markerExistedDuringSetup = true;
 
     await prepareWrapperBootstrapWorkspace(request, progress, {
@@ -379,12 +386,15 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         opts?.onOutput?.('stderr', 'Updating files: 100% (1/1)\n');
         return { stdout: '', stderr: '', exitCode: 0 };
       },
-      runProcess: async (_command, _args, opts) => {
+      runProcess: async (command, args, opts) => {
+        setupInvocation = [command, ...args];
         setupOptions = opts;
         markerExistedDuringSetup = fs.existsSync(
           path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete')
         );
-        opts?.onOutput?.('stdout', 'secret setup output');
+        opts?.onOutput?.('stdout', '\u001b[32mfirst stdout\u001b[0m\nspinner one\r');
+        opts?.onOutput?.('stdout', 'spinner two\rdone stdout\npartial stdout');
+        opts?.onOutput?.('stderr', 'Authorization: Bearer progress-token\nmeaningful stderr\r\n');
         return { stdout: '', stderr: '', exitCode: 0 };
       },
       restoreSession: async () => ({
@@ -397,15 +407,56 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     expect(setupOptions?.inactivityTimeoutMs).toBe(240_000);
     expect(setupOptions?.hardTimeoutMs).toBe(300_000);
+    expect(setupInvocation).toEqual(['sh', '-lc', 'pnpm install']);
     expect(markerExistedDuringSetup).toBe(false);
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
-    expect(progress).toHaveBeenCalledWith(
-      'setup_commands',
-      'Setup command 1 of 1 is still running...'
-    );
-    expect(progress.mock.calls.flat().join(' ')).not.toContain('secret setup output');
+    expect(progress).toHaveBeenCalledWith({
+      type: 'started',
+      step: 'setup_commands',
+      stepId: 'setup_command:0',
+      kind: 'setup_command',
+      label: 'Setup command 1',
+      command: 'pnpm install',
+      commandIndex: 0,
+      commandCount: 1,
+    });
+    expect(progress).toHaveBeenCalledWith({
+      type: 'output',
+      step: 'setup_commands',
+      stepId: 'setup_command:0',
+      output: 'first stdout\n',
+    });
+    expect(progress).toHaveBeenCalledWith({
+      type: 'output',
+      step: 'setup_commands',
+      stepId: 'setup_command:0',
+      output: 'done stdout\n',
+    });
+    expect(progress).toHaveBeenCalledWith({
+      type: 'output',
+      step: 'setup_commands',
+      stepId: 'setup_command:0',
+      output: 'partial stdout\n',
+    });
+    expect(progress).toHaveBeenCalledWith({
+      type: 'output',
+      step: 'setup_commands',
+      stepId: 'setup_command:0',
+      output: 'Authorization: Bearer [REDACTED]\nmeaningful stderr\n',
+    });
+    expect(progress).toHaveBeenCalledWith({
+      type: 'completed',
+      step: 'setup_commands',
+      stepId: 'setup_command:0',
+      exitCode: 0,
+    });
+    const progressText = progress.mock.calls.flat().join('\n');
+    expect(progressText).not.toContain('spinner one');
+    expect(progressText).not.toContain('spinner two');
+    expect(progressText).not.toContain('progress-token');
+    expect(progressText).not.toContain('\u001b');
   });
 
   it('fetches and checks out strict GitHub pull refs directly', async () => {
@@ -483,7 +534,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(gitCalls.some(args => args[0] === 'rev-parse')).toBe(false);
   });
 
-  it('keeps cold snapshot resumes alive when a setup command fails', async () => {
+  it('fails cold snapshot resumes when a setup command exits nonzero', async () => {
     const request = makeRequest(tmpDir);
     request.workspace.preferSnapshot = true;
     const deps: WrapperBootstrapDeps = {
@@ -505,10 +556,10 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       }),
     };
 
-    const result = await prepareWrapperBootstrapWorkspace(request, undefined, deps);
-
-    expect(result).toEqual({
-      workspaceWasWarm: false,
+    expect(prepareWrapperBootstrapWorkspace(request, undefined, deps)).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'setup_command_failed',
+      retryable: false,
     });
   });
 
@@ -691,7 +742,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
   });
 
-  it('still fails fresh cold bootstraps without exposing setup command or output', async () => {
+  it('exposes redacted setup command and stderr on failure but redacts secrets', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = ['private-tool --token argv-secret'];
     const deps: WrapperBootstrapDeps = {
@@ -739,18 +790,23 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(setupError).toMatchObject({
       code: 'WORKSPACE_SETUP_FAILED',
       subtype: 'setup_command_failed',
-      retryable: true,
+      retryable: false,
     });
     expect(setupError.message).toBe('Setup command 1 failed');
-    expect(setupError).toMatchObject({
-      detail: 'termination nonzero exit, exit code 1, output truncated',
-    });
+    const detail = (setupError as { detail?: string }).detail ?? '';
+    expect(detail).toContain('command: private-tool --token [REDACTED]');
+    expect(detail).toContain('exit code 1');
+    expect(detail).toContain('output truncated');
+    expect(detail).toContain('output:');
+    expect(detail).toContain('https://[REDACTED]@example.com/repo.git');
+    expect(detail).toContain('Authorization: Bearer [REDACTED]');
+    expect(detail).toContain('Cookie: [REDACTED]');
+    expect(detail).toContain('SECRET_VALUE=[REDACTED]');
+    expect(detail).toContain('private-file-content');
+    expect(detail).toContain('bare-unlabeled-token');
     const projectedError = JSON.stringify(setupError);
     for (const sensitiveValue of [
-      'private-tool',
       'argv-secret',
-      'private-file-content',
-      'bare-unlabeled-token',
       'url-secret',
       'bearer-secret',
       'cookie-secret',
@@ -789,6 +845,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       })
     ).rejects.toMatchObject({
       subtype: 'setup_command_timeout',
+      retryable: true,
       message: expect.not.stringContaining('setup-secret'),
       detail: expect.not.stringContaining('setup-secret'),
     });
@@ -1051,10 +1108,16 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         refreshRemote: true,
       },
       materialized: {
-        env: { KILO_PLATFORM: 'code-review' },
+        env: { KILO_PLATFORM: 'code-review', KILOCODE_TOKEN: 'kilo-capability' },
       },
     });
     await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const authPath = path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json');
+    await fsp.mkdir(path.dirname(authPath), { recursive: true });
+    await fsp.writeFile(
+      authPath,
+      JSON.stringify({ kilo: { type: 'api', key: 'stale-capability' } })
+    );
     const gitCalls: string[][] = [];
 
     await prepareWrapperBootstrapWorkspace(request, undefined, {
@@ -1068,6 +1131,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       ['remote', 'set-url', 'origin', 'https://bitbucket.org/acme/repo.git'],
     ]);
     expect(gitCalls.at(-1)?.join(' ')).not.toContain('bitbucket-token');
+    expect(JSON.parse(await fsp.readFile(authPath, 'utf8'))).toEqual({
+      kilo: { type: 'api', key: 'kilo-capability' },
+    });
   });
 
   it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {
@@ -1086,7 +1152,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         refreshRemote: true,
       },
       materialized: {
-        env: { GH_TOKEN: 'user-token' },
+        env: { GH_TOKEN: 'user-token', KILOCODE_TOKEN: 'kilo-capability' },
       },
     });
     await createCompleteGitWorkspace(request.workspace.workspacePath);
@@ -1124,7 +1190,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       runProcess: async (command, args) => {
         events.push(`process:${command} ${args.join(' ')}`);
         expect(process.env.HOME).toBe(request.workspace.sessionHome);
-        expect(process.env.KILOCODE_TOKEN).toBe('kilo-token');
+        expect(process.env.KILOCODE_TOKEN).toBe('kilo-capability');
         expect(process.env[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
         expect(
           fs.existsSync(path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'))

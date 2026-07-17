@@ -4,9 +4,15 @@
 
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
 import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
+import type {
+  ReviewAgentSelection,
+  ReviewAgentsConfig,
+} from '@kilocode/worker-utils/review-agents';
+import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
 import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
+export type { ReviewAgentSelection, ReviewAgentsConfig };
 
 export type CodeReviewStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -46,6 +52,8 @@ export interface SessionInput {
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  /** Council runs only: inline sub-agents (one per specialist), forwarded to cloud-agent-next. */
+  runtimeAgents?: RuntimeAgentInput[];
 }
 
 export interface CodeReview {
@@ -77,6 +85,8 @@ export interface CodeReview {
   sandboxRetryAttempted?: boolean;
   /** Provider-reported repository storage size, formatted for log correlation. */
   repositorySize?: string | null;
+  /** Forward-shaped review agent selections (only agents[0] consumed today). */
+  reviewAgents?: ReviewAgentsConfig;
 }
 
 export interface CodeReviewStatusResponse {
@@ -144,6 +154,8 @@ export interface CodeReviewRequest {
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */
   repositorySize?: string | null;
+  /** Forward-shaped review agent selections (only agents[0] consumed today). */
+  reviewAgents?: ReviewAgentsConfig;
 }
 
 export interface CodeReviewResponse {

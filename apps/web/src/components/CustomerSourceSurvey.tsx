@@ -1,72 +1,87 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useUser } from '@/hooks/useUser';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
-type CustomerSourceSurveyProps = {
-  redirectPath: string;
-};
+const ORGANIZATION_WELCOME_PATH = /^\/organizations\/[0-9a-f-]{36}\/welcome$/;
 
-export function CustomerSourceSurvey({ redirectPath }: CustomerSourceSurveyProps) {
+export function shouldShowCustomerSourceSurvey(
+  customerSource: string | null | undefined,
+  pathname: string
+): boolean {
+  return (
+    customerSource === null &&
+    pathname !== '/gastown/onboarding' &&
+    !ORGANIZATION_WELCOME_PATH.test(pathname)
+  );
+}
+
+export function CustomerSourceSurvey() {
   const [source, setSource] = useState('');
-  const [skipped, setSkipped] = useState(false);
-  const router = useRouter();
+  const [dismissed, setDismissed] = useState(false);
+  const pathname = usePathname();
+  const { data: user } = useUser();
   const trpc = useTRPC();
 
-  const { mutate: submitSource, isPending } = useMutation(
+  const submitSource = useMutation(
     trpc.user.submitCustomerSource.mutationOptions({
-      onSuccess: () => {
-        router.push(redirectPath);
-      },
+      onSuccess: () => setDismissed(true),
     })
   );
 
-  const { mutate: skipSource } = useMutation(
+  const skipSource = useMutation(
     trpc.user.skipCustomerSource.mutationOptions({
-      onSuccess: () => {
-        router.push(redirectPath);
-      },
-      onError: () => {
-        setSkipped(false);
-      },
+      onSuccess: () => setDismissed(true),
     })
   );
 
-  function handleSkip() {
-    setSkipped(true);
-    skipSource();
+  if (dismissed || !shouldShowCustomerSourceSurvey(user?.customer_source, pathname)) {
+    return null;
   }
 
   return (
-    <div className="space-y-4 px-6 pb-6">
-      <Textarea
-        autoFocus
-        placeholder="Example: A YouTube video from Theo"
-        value={source}
-        onChange={e => setSource(e.target.value)}
-        rows={3}
-        maxLength={1000}
-      />
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={handleSkip}
-          disabled={skipped || isPending}
-          className="cursor-pointer text-muted-foreground text-sm hover:underline"
-        >
-          {skipped ? 'Skipping...' : 'Skip'}
-        </button>
-        <Button
-          onClick={() => submitSource({ source: source.trim() })}
-          disabled={isPending || skipped || source.trim().length === 0}
-        >
-          {isPending ? 'Submitting...' : 'Submit'}
-        </Button>
-      </div>
-    </div>
+    <aside className="fixed right-4 bottom-20 z-40 w-[calc(100vw-2rem)] max-w-sm">
+      <Card className="shadow-lg">
+        <CardHeader className="p-4 pb-3">
+          <CardTitle>Where did you hear about Kilo Code?</CardTitle>
+          <CardDescription>A short answer helps us understand what is working.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4 pt-0">
+          <div className="space-y-1.5">
+            <Label htmlFor="customer-source">Source</Label>
+            <Input
+              id="customer-source"
+              placeholder="GitHub, a teammate, YouTube..."
+              value={source}
+              onChange={event => setSource(event.target.value)}
+              maxLength={1000}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => skipSource.mutate()}
+              disabled={skipSource.isPending || submitSource.isPending}
+            >
+              Dismiss
+            </Button>
+            <Button
+              onClick={() => submitSource.mutate({ source: source.trim() })}
+              disabled={submitSource.isPending || skipSource.isPending || !source.trim()}
+            >
+              Save answer
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </aside>
   );
 }

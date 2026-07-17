@@ -13,10 +13,7 @@ const MODEL_VALIDATION_UNAVAILABLE_MESSAGE = 'Model availability could not be ve
 
 type ModelValidationEnv = Pick<
   PersistenceEnv,
-  | 'KILOCODE_BACKEND_BASE_URL'
-  | 'KILO_OPENROUTER_BASE'
-  | 'KILOCODE_TOKEN_OVERRIDE'
-  | 'KILOCODE_ORG_ID_OVERRIDE'
+  'KILOCODE_BACKEND_BASE_URL' | 'KILO_OPENROUTER_BASE' | 'KILOCODE_ORG_ID_OVERRIDE'
 >;
 
 type EffectiveCatalogContext = {
@@ -53,7 +50,7 @@ type EndpointValidationResult =
 
 function effectiveCatalogContext(input: AssertKiloModelAvailableInput): EffectiveCatalogContext {
   return {
-    token: input.env.KILOCODE_TOKEN_OVERRIDE ?? input.originalToken,
+    token: input.originalToken,
     organizationId: input.env.KILOCODE_ORG_ID_OVERRIDE ?? input.originalOrganizationId,
     feature: input.createdOnPlatform ?? 'cloud-agent',
   };

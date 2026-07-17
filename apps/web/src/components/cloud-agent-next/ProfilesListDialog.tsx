@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Eye,
   EyeOff,
   Lock,
@@ -536,6 +537,10 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
   const [isAddingCommand, setIsAddingCommand] = useState(false);
   const [newCommand, setNewCommand] = useState('');
 
+  // State for editing existing command
+  const [editingCommandIndex, setEditingCommandIndex] = useState<number | null>(null);
+  const [editingCommandValue, setEditingCommandValue] = useState('');
+
   // Loading states
   const [savingVarKey, setSavingVarKey] = useState<string | null>(null);
   const [deletingVarKey, setDeletingVarKey] = useState<string | null>(null);
@@ -710,6 +715,74 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
       setSavingCommands(false);
     }
   };
+
+  const resetEditCommandForm = () => {
+    setEditingCommandIndex(null);
+    setEditingCommandValue('');
+  };
+
+  const handleStartEditCommand = (index: number) => {
+    const cmd = profile?.commands[index];
+    if (!cmd) return;
+    setEditingCommandIndex(index);
+    setEditingCommandValue(cmd.command);
+  };
+
+  const handleSaveCommand = async (index: number) => {
+    if (!editingCommandValue.trim()) {
+      toast.error('Command is required');
+      return;
+    }
+
+    const currentCommands = profile?.commands.map(c => c.command) || [];
+    const updatedCommands = currentCommands.map((c, i) =>
+      i === index ? editingCommandValue.trim() : c
+    );
+
+    setSavingCommands(true);
+    try {
+      await setCommands.mutateAsync({
+        profileId,
+        commands: updatedCommands,
+        organizationId,
+      });
+      toast.success('Command updated');
+      resetEditCommandForm();
+    } catch (err) {
+      console.error('Failed to update command:', err);
+      toast.error('Failed to update command');
+    } finally {
+      setSavingCommands(false);
+    }
+  };
+
+  const handleMoveCommand = async (index: number, direction: 'up' | 'down') => {
+    const currentCommands = profile?.commands.map(c => c.command) || [];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentCommands.length) return;
+
+    const updatedCommands = [...currentCommands];
+    [updatedCommands[index], updatedCommands[targetIndex]] = [
+      updatedCommands[targetIndex],
+      updatedCommands[index],
+    ];
+
+    setSavingCommands(true);
+    try {
+      await setCommands.mutateAsync({
+        profileId,
+        commands: updatedCommands,
+        organizationId,
+      });
+    } catch (err) {
+      console.error('Failed to reorder command:', err);
+      toast.error('Failed to reorder command');
+    } finally {
+      setSavingCommands(false);
+    }
+  };
+
+  const commandActionsDisabled = savingCommands || editingCommandIndex !== null;
 
   if (isLoading) {
     return (
@@ -1006,21 +1079,97 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
             {profile?.commands.map((cmd, index) => (
               <div
                 key={`${cmd.sequence}-${index}`}
-                className="hover:bg-accent/50 flex items-center gap-2 rounded-lg border p-2 transition-colors"
+                className="hover:bg-accent/50 rounded-lg border p-2 transition-colors"
               >
-                <span className="text-muted-foreground w-5 shrink-0 text-xs">{index + 1}.</span>
-                <code className="bg-muted flex-1 truncate rounded px-2 py-1 font-mono text-sm">
-                  {cmd.command}
-                </code>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:text-destructive h-7 w-7 shrink-0"
-                  onClick={() => handleDeleteCommand(index)}
-                  disabled={savingCommands}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {editingCommandIndex === index ? (
+                  // Edit mode
+                  <div className="space-y-2">
+                    <Input
+                      value={editingCommandValue}
+                      onChange={e => setEditingCommandValue(e.target.value)}
+                      placeholder="npm install"
+                      className="font-mono"
+                      autoFocus
+                      disabled={savingCommands}
+                      onKeyDown={e => {
+                        if (savingCommands) return;
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleSaveCommand(index);
+                        } else if (e.key === 'Escape') {
+                          resetEditCommandForm();
+                        }
+                      }}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetEditCommandForm}
+                        disabled={savingCommands}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveCommand(index)}
+                        disabled={savingCommands}
+                      >
+                        {savingCommands ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  // View mode
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground w-5 shrink-0 text-xs">{index + 1}.</span>
+                    <code className="bg-muted flex-1 truncate rounded px-2 py-1 font-mono text-sm">
+                      {cmd.command}
+                    </code>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleMoveCommand(index, 'up')}
+                        disabled={index === 0 || commandActionsDisabled}
+                        aria-label="Move up"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleMoveCommand(index, 'down')}
+                        disabled={
+                          index === (profile?.commands.length ?? 0) - 1 || commandActionsDisabled
+                        }
+                        aria-label="Move down"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStartEditCommand(index)}
+                        disabled={commandActionsDisabled}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive h-7 w-7"
+                        onClick={() => handleDeleteCommand(index)}
+                        disabled={commandActionsDisabled}
+                        aria-label="Delete command"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
 

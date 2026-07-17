@@ -10,7 +10,13 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
-import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
+import type {
+  CloudAgentSessionId,
+  KiloSessionId,
+  SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
+} from './types';
 import type {
   CloudAgentApi,
   CloudAgentSendPayload,
@@ -45,6 +51,18 @@ type CloudAgentTransportConfig = {
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  /**
+   * Page-aware root snapshot fetch. When provided, the transport uses it for
+   * its initial bounded read (newest 50) instead of `fetchSnapshot`, and for
+   * any reconnect snapshot replays. The transport calls `onInitialPageLoaded`
+   * after a successful initial read so the manager can record the cursor.
+   */
+  fetchSnapshotPage?: (
+    kiloSessionId: KiloSessionId,
+    options: { cursor?: string }
+  ) => Promise<SessionSnapshotPageOutcome | null>;
+  /** Called after a successful initial bounded page read. */
+  onInitialPageLoaded?: (page: SessionSnapshotPage) => void;
   websocketBaseUrl: string;
   onError?: (message: string) => void;
   lifecycleHooks?: ConnectionLifecycleHooks;
@@ -88,16 +106,73 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       connection = null;
     }
 
-    function replaySnapshot(snapshot: SessionSnapshot): void {
-      sink.onServiceEvent({ type: 'session.created', info: snapshot.info });
+    function replayPage(page: SessionSnapshotPage): void {
+      sink.onServiceEvent({ type: 'session.created', info: page.info });
 
-      for (const msg of snapshot.messages) {
+      for (const msg of page.messages) {
         sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
           sink.onChatEvent({ type: 'message.part.updated', part });
         }
       }
+    }
+
+    function replaySnapshot(snapshot: SessionSnapshot): void {
+      // The legacy full-snapshot path is retained for callers that haven't
+      // migrated to the paginated endpoint yet. Same shape; same effect.
+      replayPage({
+        info: snapshot.info,
+        messages: snapshot.messages,
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+    }
+
+    /** Fetch the initial bounded page (newest 50) and replay it. */
+    async function fetchAndReplayInitial(
+      expectedGeneration: number
+    ): Promise<{ ticket: CloudAgentStreamTicketResult } | null> {
+      const fetchPage = config.fetchSnapshotPage;
+      if (fetchPage) {
+        const [ticket, page] = await Promise.all([
+          Promise.resolve(config.getTicket(config.sessionId)),
+          fetchPage(config.kiloSessionId, {}),
+        ]);
+        if (expectedGeneration !== lifecycleGeneration) return null;
+        if (page === null) {
+          handleTicketError(new Error('Session not found'), expectedGeneration);
+          return null;
+        }
+        if (page.kind === 'success') {
+          config.onInitialPageLoaded?.(page);
+          replayPage(page);
+          return { ticket };
+        }
+        // Typed failure on initial load — surface via the standard error
+        // channel (same path as a thrown fetch failure) and still try to
+        // connect so the user can recover via live events.
+        handleTicketError(
+          new Error(
+            page.kind === 'retryable_failure'
+              ? 'Session history temporarily unavailable'
+              : page.kind === 'too_large'
+                ? 'Session history too large to load'
+                : 'Session history is unavailable'
+          ),
+          expectedGeneration
+        );
+        // Even on a typed failure, the websocket is still useful — connect
+        // without a snapshot replay. The manager will surface the error.
+        return { ticket };
+      }
+      const [ticket, snapshot] = await Promise.all([
+        Promise.resolve(config.getTicket(config.sessionId)),
+        config.fetchSnapshot(config.kiloSessionId),
+      ]);
+      if (expectedGeneration !== lifecycleGeneration) return null;
+      replaySnapshot(snapshot);
+      return { ticket };
     }
 
     function connectWebSocket(
@@ -151,15 +226,30 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           // would overwrite newer parts. Only fall back to the snapshot when
           // no cursor exists yet.
           if (lastEventId !== null) return;
-          void config.fetchSnapshot(config.kiloSessionId).then(
-            snapshot => {
-              if (expectedGeneration !== lifecycleGeneration) return;
-              replaySnapshot(snapshot);
-            },
-            () => {
-              // Snapshot refetch failure on reconnect — ignore, live events will still flow
-            }
-          );
+          // Reconnect replays use the bounded page fetch (newest 50) to
+          // avoid overwriting older messages the user has already loaded via
+          // `loadOlderMessages`. The manager already has the cursor from
+          // the initial connect, so we deliberately skip `onInitialPageLoaded`
+          // here — a reconnect must never reset the user's older-pages
+          // cursor back to the latest 50.
+          const replayRefetch = config.fetchSnapshotPage
+            ? config.fetchSnapshotPage(config.kiloSessionId, {}).then(
+                page => {
+                  if (expectedGeneration !== lifecycleGeneration) return;
+                  if (page && page.kind === 'success') {
+                    replayPage(page);
+                  }
+                },
+                () => undefined
+              )
+            : config.fetchSnapshot(config.kiloSessionId).then(
+                snapshot => {
+                  if (expectedGeneration !== lifecycleGeneration) return;
+                  replaySnapshot(snapshot);
+                },
+                () => undefined
+              );
+          void replayRefetch;
         },
         onDisconnected: () => {},
         onUnexpectedDisconnect: () => {
@@ -195,14 +285,10 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         stoppedReceived = false;
         const expectedGeneration = lifecycleGeneration;
 
-        void Promise.all([
-          Promise.resolve(config.getTicket(config.sessionId)),
-          config.fetchSnapshot(config.kiloSessionId),
-        ])
-          .then(([ticket, snapshot]) => {
-            if (expectedGeneration !== lifecycleGeneration) return;
-            replaySnapshot(snapshot);
-            connectWebSocket(ticket, expectedGeneration);
+        void fetchAndReplayInitial(expectedGeneration)
+          .then(result => {
+            if (!result) return;
+            connectWebSocket(result.ticket, expectedGeneration);
           })
           .catch(error => {
             handleTicketError(error, expectedGeneration);

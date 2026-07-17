@@ -296,10 +296,9 @@ describe('coding plans router', () => {
     if (!installedKey) {
       throw new Error('Expected Coding Plan activation to install a BYOK key');
     }
-    await ownerCaller.byok.update({ id: installedKey.id, api_key: 'owner-replacement-key' });
     await expect(
       ownerCaller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
-    ).resolves.toMatchObject({ hasInstalledByokKey: false });
+    ).resolves.toMatchObject({ hasInstalledByokKey: true });
 
     await expect(
       otherCaller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
@@ -309,7 +308,7 @@ describe('coding plans router', () => {
     ).rejects.toThrow('Coding Plan subscription not found.');
   });
 
-  it('authorizes managed usage through the original inventory assignment after BYOK changes', async () => {
+  it('authorizes managed usage through retained inventory without an installed BYOK reference', async () => {
     const managedKey = `sk-cp-managed-${crypto.randomUUID()}`;
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
@@ -355,15 +354,13 @@ describe('coding plans router', () => {
       message: 'Coding Plan subscription not found.',
     });
 
-    const [installed] = await ownerCaller.byok.list({});
-    await ownerCaller.byok.setEnabled({ id: installed.id, is_enabled: false });
-    await ownerCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId });
-    await ownerCaller.byok.update({ id: installed.id, api_key: 'replacement-user-key' });
-    await ownerCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId });
-    await ownerCaller.byok.delete({ id: installed.id });
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ installed_byok_key_id: null })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await ownerCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId });
 
-    expect(request).toHaveBeenCalledTimes(4);
+    expect(request).toHaveBeenCalledTimes(2);
     for (const call of request.mock.calls) {
       expect(call[0]).toBe('https://api.minimax.io/v1/token_plan/remains');
       expect(call[1]?.headers).toEqual(

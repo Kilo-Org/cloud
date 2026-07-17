@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { formatDate, parseTimestamp } from '@/lib/utils';
+
 import { getKiloPassSubscriptionCardContentState } from './subscription-card-state';
 
 const activeAppStoreSubscription = {
@@ -9,6 +11,8 @@ const activeAppStoreSubscription = {
   refillAt: '2026-06-08T15:21:05.000Z',
   status: 'active',
 };
+
+const endDate = formatDate(parseTimestamp(activeAppStoreSubscription.refillAt));
 
 describe('getKiloPassSubscriptionCardContentState', () => {
   it('keeps unresolved iOS state non-actionable while loading', () => {
@@ -169,7 +173,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'open-store-management',
         actionLabel: 'Manage',
-        description: '$19 monthly credits · Ends June 8, 2026',
+        description: `$19 monthly credits · Ends ${endDate}`,
         title: 'Kilo Pass canceling',
       },
     });
@@ -212,7 +216,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
       state: {
         action: 'none',
         actionLabel: null,
-        description: '$19 monthly credits · Ends June 8, 2026 · Managed in App Store',
+        description: `$19 monthly credits · Ends ${endDate} · Managed in App Store`,
         title: 'Kilo Pass canceling',
       },
     });

@@ -299,6 +299,7 @@ describe('handleMergeRequestCodeReview', () => {
         platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
         repoFullName: 'acme/widgets',
         platformProjectId: 123,
+        triggerSource: 'webhook',
       })
     );
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);

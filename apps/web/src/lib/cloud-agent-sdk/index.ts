@@ -18,7 +18,7 @@ export type {
   PrepareInput,
 } from './session-manager';
 
-export { createCloudAgentSession } from './session';
+export { createCloudAgentSession, REMOTE_CLI_EXIT_NOT_SUPPORTED } from './session';
 export type {
   CloudAgentSession,
   CloudAgentSessionAcceptSuggestionInput,
@@ -123,7 +123,13 @@ export type { SessionStorage, StorageMutation } from './storage/types';
 export { stripPartContentIfFile } from './part-utils';
 export { splitByContiguousPrefix } from './array-utils';
 
+export { calculateContextUsagePercentage } from './context-usage';
+export type { ContextUsage } from './context-usage';
+
 export type {
+  KiloSdkMessageHistory,
+  KiloSdkMessageHistoryPage,
+  KiloSdkStoredMessage,
   MessageInfo,
   ProcessedMessage,
   SessionPhase,
@@ -136,12 +142,20 @@ export type {
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
+  PreparationAttempt,
+  PreparationAttemptStatus,
+  PreparationStepKind,
+  PreparationStepSnapshot,
+  PreparationStepStatus,
   ServiceStateSnapshot,
   SessionInfo,
   KiloSessionId,
   CloudAgentSessionId,
   ResolvedSession,
   SessionSnapshot,
+  SessionSnapshotPage,
+  SessionSnapshotPageOutcome,
+  OlderMessagesError,
   // Re-exported opencode types
   Part,
   TextPart,

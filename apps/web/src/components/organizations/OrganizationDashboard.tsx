@@ -12,6 +12,7 @@ import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationWelcomeHeader } from './OrganizationWelcomeHeader';
 import { NewOrganizationWelcomeHeader } from './NewOrganizationWelcomeHeader';
 import { OrganizationTopupSuccessHeader } from './OrganizationTopupSuccessHeader';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
@@ -142,7 +143,7 @@ export function OrganizationDashboard({
             <LockableContainer>
               <OrganizationInfoCard organizationId={organizationId} />
             </LockableContainer>
-            {(currentRole === 'owner' || currentRole === 'billing_manager') && (
+            {canManageOrganizationBilling(currentRole) && (
               <OrganizationChildOrganizationsCard organizationId={organizationId} />
             )}
             {organizationData && (
@@ -165,7 +166,7 @@ export function OrganizationDashboard({
               <OrganizationAdminMembers organizationId={organizationId} />
             </LockableContainer>
             <SeatUsageCard organizationId={organizationId} />
-            {(currentRole === 'owner' || currentRole === 'billing_manager') && (
+            {canManageOrganizationBilling(currentRole) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}
             {organizationData?.plan === 'enterprise' && (

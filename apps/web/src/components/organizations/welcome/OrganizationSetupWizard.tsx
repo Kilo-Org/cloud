@@ -33,6 +33,7 @@ import {
   type OrganizationOnboardingStepKey,
 } from '@/lib/organizations/onboarding-steps';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -739,7 +740,7 @@ function CompletionScreen({
 }) {
   const complete = completedCount === totalCount;
   const hasCredits = balanceMicrodollars > 0;
-  const canManageBilling = userRole === 'owner' || userRole === 'billing_manager';
+  const canManageBilling = canManageOrganizationBilling(userRole);
   const returnPath = buildOrganizationWelcomePath(organizationId, 'complete');
   const topUpPath = `/payments/topup?${new URLSearchParams({
     amount: '10',

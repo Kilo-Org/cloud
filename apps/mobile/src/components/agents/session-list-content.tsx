@@ -1,11 +1,12 @@
-import { Bot, Plus, Search } from 'lucide-react-native';
-import { useCallback, useMemo } from 'react';
+import { Bot, Plus, Search, SearchX } from 'lucide-react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
   RefreshControl,
   SectionList,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -19,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -32,13 +34,19 @@ type AgentSessionListContentProps = {
   storedSessions: StoredSession[];
   hasAnySessions: boolean;
   isLoading: boolean;
+  isSearchPending: boolean;
   isError: boolean;
   isFetchingNextPage: boolean;
   refetch: () => Promise<void>;
+  onRetry: () => void;
   onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
   onSearchChange: (text: string) => void;
+  hasActiveQuery: boolean;
+  isSearching: boolean;
+  onClearQuery: () => void;
   onCreateSession: () => void;
+  sortBy: AgentSessionSortBy;
 };
 
 export function AgentSessionListContent({
@@ -46,40 +54,77 @@ export function AgentSessionListContent({
   storedSessions,
   hasAnySessions,
   isLoading,
+  isSearchPending,
   isError,
   isFetchingNextPage,
   refetch,
+  onRetry,
   onEndReached,
   onSessionPress,
   onSearchChange,
+  hasActiveQuery,
+  isSearching,
+  onClearQuery,
   onCreateSession,
+  sortBy,
 }: Readonly<AgentSessionListContentProps>) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
+  const [refreshing, setRefreshing] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
+
+  // The search TextInput is uncontrolled (see iOS TextInput rules — controlled
+  // `value` causes keystroke races), so clearing the query in state alone
+  // wouldn't clear what's visibly typed. Imperatively clear the input too.
+  const handleClearQuery = useCallback(() => {
+    searchInputRef.current?.clear();
+    onClearQuery();
+  }, [onClearQuery]);
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
-    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS) }),
-    [bottom]
+    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale) }),
+    [bottom, fontScale]
   );
+
+  // When the list is empty the error surface below (QueryError + retry)
+  // already covers it — don't double up with the inline header line.
+  const showInlineError = isError && sections.length > 0;
 
   const listHeader = useMemo(
     () => (
-      <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
-        <Search size={18} color={colors.mutedForeground} />
-        <TextInput
-          className="flex-1 text-[15px] text-foreground"
-          placeholder="Search sessions..."
-          placeholderTextColor={colors.mutedForeground}
-          onChangeText={onSearchChange}
-          returnKeyType="search"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+      <View>
+        <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
+          <Search size={18} color={colors.mutedForeground} />
+          <TextInput
+            ref={searchInputRef}
+            className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
+            placeholder="Search sessions..."
+            placeholderTextColor={colors.mutedForeground}
+            onChangeText={onSearchChange}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        {isSearchPending ? (
+          <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+            <Text variant="muted" className="text-xs">
+              Searching…
+            </Text>
+          </View>
+        ) : null}
+        {showInlineError ? (
+          <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
+            Couldn't refresh. Pull down to try again.
+          </Text>
+        ) : null}
       </View>
     ),
-    [colors.mutedForeground, onSearchChange]
+    [colors.mutedForeground, showInlineError, isSearchPending, onSearchChange]
   );
 
   const emptyStateAction = useMemo(
@@ -92,18 +137,51 @@ export function AgentSessionListContent({
     [colors.foreground, onCreateSession]
   );
 
-  const listEmptyComponent = useMemo(
+  const clearQueryAction = useMemo(
+    () => (
+      <Button variant="outline" onPress={handleClearQuery}>
+        <Text>{isSearching ? 'Clear search' : 'Clear filters'}</Text>
+      </Button>
+    ),
+    [handleClearQuery, isSearching]
+  );
+
+  // Only reachable when `hasAnySessions` is true (the true first-use empty
+  // state is handled separately below), which means an active search or
+  // filter narrowed the results to zero matches — never show the "create a
+  // task" CTA here, it's not the fix for a filter that's too narrow.
+  const filteredEmptyComponent = useMemo(
     () => (
       <View className="items-center justify-center pt-16">
         <EmptyState
-          icon={Bot}
-          title="No sessions yet"
-          description="Start a coding task from your phone. Your sessions will appear here."
-          action={emptyStateAction}
+          icon={SearchX}
+          title="No sessions match"
+          description={
+            isSearching ? 'Try a different search term.' : 'Try adjusting or clearing your filters.'
+          }
+          action={clearQueryAction}
         />
       </View>
     ),
-    [emptyStateAction]
+    [clearQueryAction, isSearching]
+  );
+
+  // The query in error produced no rows to show — surface a retry for it
+  // (search or list, whichever `onRetry` targets) instead of pretending the
+  // empty result is a real "no matches".
+  const queryErrorEmptyComponent = useMemo(
+    () => (
+      <View className="items-center gap-4 pt-16">
+        <QueryError
+          placement="top"
+          className="pt-0"
+          message={isSearching ? 'Could not search sessions' : 'Could not load sessions'}
+          onRetry={onRetry}
+        />
+        {clearQueryAction}
+      </View>
+    ),
+    [clearQueryAction, isSearching, onRetry]
   );
 
   const organizationIdBySessionId = useMemo(
@@ -112,7 +190,14 @@ export function AgentSessionListContent({
   );
 
   const handleRefresh = useCallback(() => {
-    void refetch();
+    void (async () => {
+      setRefreshing(true);
+      try {
+        await refetch();
+      } finally {
+        setRefreshing(false);
+      }
+    })();
   }, [refetch]);
 
   const renderItem = useCallback(
@@ -122,6 +207,7 @@ export function AgentSessionListContent({
           <StoredSessionRow
             session={item.session}
             isLive={item.isLive}
+            sortBy={sortBy}
             onPress={() => {
               onSessionPress(item.session.session_id, item.session.organization_id);
             }}
@@ -143,7 +229,7 @@ export function AgentSessionListContent({
         />
       );
     },
-    [onSessionPress, deleteSession, renameSession, organizationIdBySessionId]
+    [onSessionPress, deleteSession, renameSession, organizationIdBySessionId, sortBy]
   );
 
   const renderSectionHeader = useCallback(
@@ -168,17 +254,24 @@ export function AgentSessionListContent({
       <Animated.View exiting={FadeOut.duration(150)}>
         {Array.from({ length: 8 }, (_, i) => (
           <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-12 rounded-lg" />
+            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
           </View>
         ))}
       </Animated.View>
     );
   }
 
-  if (isError) {
+  // Full-screen error only when there is nothing cached to fall back on —
+  // a background refetch/search failure with stale sessions already in
+  // cache (keepPreviousData) must never blank out what's already rendered.
+  if (isError && !hasAnySessions) {
     return (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1 items-center justify-center">
-        <QueryError message="Could not load sessions" onRetry={() => void refetch()} />
+      <Animated.View
+        entering={FadeIn.duration(200)}
+        className="flex-1 items-center justify-center"
+        style={tabBarClearanceStyle}
+      >
+        <QueryError message="Could not load sessions" onRetry={onRetry} />
       </Animated.View>
     );
   }
@@ -203,6 +296,11 @@ export function AgentSessionListContent({
     );
   }
 
+  let emptyComponent = null;
+  if (hasActiveQuery) {
+    emptyComponent = isError ? queryErrorEmptyComponent : filteredEmptyComponent;
+  }
+
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
       <SectionList<SessionItem, SessionSection>
@@ -211,7 +309,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmptyComponent}
+        ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (
             <View className="py-4">
@@ -224,7 +322,7 @@ export function AgentSessionListContent({
         keyboardDismissMode="on-drag"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       />
     </Animated.View>
   );

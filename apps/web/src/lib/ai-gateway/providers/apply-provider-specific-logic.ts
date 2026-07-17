@@ -1,8 +1,9 @@
-import type {
-  GatewayResponsesRequest,
-  OpenRouterChatCompletionRequest,
-  GatewayRequest,
-  GatewayMessagesRequest,
+import {
+  isOpenRouterProviderConfig,
+  type GatewayResponsesRequest,
+  type OpenRouterChatCompletionRequest,
+  type GatewayRequest,
+  type GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
@@ -20,13 +21,14 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { type FraudDetectionHeaders } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
   repairMessagesTools,
   sanitizeBinaryToolResults,
 } from '@/lib/ai-gateway/tool-calling';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import {
   addCacheBreakpoints,
   enableReasoningSummaries,
@@ -35,19 +37,12 @@ import {
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
-import {
-  rewriteChatCompletionsOneOfAsAnyOf,
-  isFriendliChatCompletionsRequest,
-} from '@/lib/ai-gateway/schema-rewrite';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
-  if (isFableModel(requestedModel)) {
-    return [
-      // our bedrock account doesn't have the required data retention enabled
-      OpenRouterInferenceProviderIdSchema.enum.anthropic,
-    ];
-  }
-  if (isClaudeModel(requestedModel)) {
+  if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
+    // fable is not available on bedrock on vercel
+    // and specifying bedrock breaks the opus fallback
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
@@ -70,7 +65,6 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isGlmModel(requestedModel)) {
     return [
-      OpenRouterInferenceProviderIdSchema.enum.friendli,
       OpenRouterInferenceProviderIdSchema.enum.novita,
       OpenRouterInferenceProviderIdSchema.enum['z-ai'],
     ];
@@ -81,7 +75,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   return [];
 }
 
-function applyPreferredProvider(
+export function applyPreferredProvider(
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
@@ -95,19 +89,23 @@ function applyPreferredProvider(
   console.debug(
     `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
   );
-  if (!requestToMutate.provider) {
+  if (!isOpenRouterProviderConfig(requestToMutate.provider)) {
     requestToMutate.provider = { order: preferredProviderOrder };
   } else if (!requestToMutate.provider.order) {
     requestToMutate.provider.order = preferredProviderOrder;
   }
 }
 
-export function applyGatewayModelsFallback(
+export async function applyGatewayModelsFallback(
   providerId: ProviderId,
   requestedModel: string,
   requestToMutate: GatewayRequest
 ) {
-  if (isFableModel(requestedModel) && (providerId === 'openrouter' || providerId === 'vercel')) {
+  if (
+    !(await isFreeModel(requestedModel)) &&
+    isFableModel(requestedModel) &&
+    (providerId === 'openrouter' || providerId === 'vercel')
+  ) {
     requestToMutate.body.models = [requestedModel, CLAUDE_OPUS_CURRENT_MODEL_ID];
     return;
   }
@@ -127,14 +125,21 @@ export async function applyProviderSpecificLogic(
   sessionId: string | null,
   taskId: string | null
 ) {
-  applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
+
     repairChatCompletionsTools(requestToMutate.body);
+
+    if (isClaudeModel(requestedModel)) {
+      // Workaround for older clients corrupting Claude reasoning, resulting in:
+      // `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified
+      fixOpenCodeDuplicateReasoning(requestedModel, requestToMutate.body, taskId ?? undefined);
+    }
   }
 
   if (requestToMutate.kind === 'messages') {
@@ -158,12 +163,6 @@ export async function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
-  }
-
-  // Friendli does not support JSON Schema `oneOf`, so downgrade every `oneOf`
-  // to `anyOf` for any chat completions request routed through it.
-  if (isFriendliChatCompletionsRequest(requestToMutate)) {
-    rewriteChatCompletionsOneOfAsAnyOf(requestToMutate.body);
   }
 
   if (isKimiModel(requestedModel)) {

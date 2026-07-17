@@ -7,7 +7,7 @@ import type { ConnectTicketResponse } from '@kilocode/event-service';
 import { connectTicketQuerySchema } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
-import { logger } from './util/logger';
+import { configureDevLogging, logger, withLogTags } from './util/logger';
 import { type TicketMintRequest } from './do/connection-ticket-do';
 
 export { UserSessionDO } from './do/user-session-do';
@@ -17,15 +17,22 @@ const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
 const ALLOWED_BROWSER_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
+const LOCALHOST_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+function allowedOrigin(origin: string, env: { WORKER_ENV?: string }): string | null {
+  if (ALLOWED_BROWSER_ORIGINS.includes(origin)) return origin;
+  if (env.WORKER_ENV === 'development' && LOCALHOST_ORIGIN.test(origin)) return origin;
+  return null;
+}
 
 app.use(
   '/connect/*',
-  cors({ origin: origin => (ALLOWED_BROWSER_ORIGINS.includes(origin) ? origin : null) })
+  cors({ origin: (origin, c) => allowedOrigin(origin, c.env as Pick<Env, 'WORKER_ENV'>) })
 );
 app.use(
   '/connect-ticket',
   cors({
-    origin: origin => (ALLOWED_BROWSER_ORIGINS.includes(origin) ? origin : null),
+    origin: (origin, c) => allowedOrigin(origin, c.env as Pick<Env, 'WORKER_ENV'>),
     allowMethods: ['POST', 'OPTIONS'],
     allowHeaders: ['Authorization'],
   })
@@ -33,6 +40,11 @@ app.use(
 
 // ── Structured logging context ──────────────────────────────────────────
 app.use('*', useWorkersLogger('event-service') as unknown as MiddlewareHandler);
+// Enable debug logs for the request only in local dev (WORKER_ENV === 'development').
+app.use('*', async (c, next) => {
+  configureDevLogging(c.env);
+  await next();
+});
 
 app.get('/health', c => c.json({ ok: true }));
 
@@ -72,13 +84,18 @@ app.post('/connect-ticket', async c => {
   const token = extractBearerToken(c.req.header('authorization'));
   const auth = await authenticateToken(token, c.env);
   if (!auth) {
+    logger.debug('connect-ticket: unauthorized');
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
+  logger.setTags({ userId: auth.userId });
   const ticket = await mintConnectionTicket(c.env, auth.userId);
   if (!ticket) {
+    logger.debug('connect-ticket: mint failed');
     return c.json({ error: 'Ticket mint failed' }, 500);
   }
+
+  logger.debug('connect-ticket: minted');
 
   const response = { ticket } satisfies ConnectTicketResponse;
   return c.json(response);
@@ -86,19 +103,23 @@ app.post('/connect-ticket', async c => {
 
 app.get('/connect', async c => {
   if (c.req.header('Upgrade') !== 'websocket') {
+    logger.debug('connect: expected websocket upgrade');
     return c.json({ error: 'Expected WebSocket upgrade' }, 426);
   }
 
   const query = connectTicketQuerySchema.safeParse({ ticket: c.req.query('ticket') });
   if (!query.success) {
+    logger.debug('connect: missing ticket');
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
   const userId = await consumeConnectionTicket(c.env, query.data.ticket);
   if (!userId) {
+    logger.debug('connect: ticket consume failed');
     return c.json({ error: 'Unauthorized' }, 401);
   }
   logger.setTags({ userId });
+  logger.debug('connect: websocket upgrade', { userId });
 
   const doId = c.env.USER_SESSION_DO.idFromName(userId);
   const stub = c.env.USER_SESSION_DO.get(doId);
@@ -142,14 +163,25 @@ export default class extends WorkerEntrypoint<Env> {
     event: Name,
     payload: unknown
   ): Promise<boolean> {
-    logger.setTags({ userId, context, event });
-    const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
-    return stub.pushEvent(context, event, payload);
+    return withLogTags({ source: 'event-service.pushEvent' }, async () => {
+      configureDevLogging(this.env);
+      logger.setTags({ userId, context, event });
+      logger.debug('pushEvent: received');
+      const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
+      const delivered = await stub.pushEvent(context, event, payload);
+      logger.debug('pushEvent: delivered', { delivered });
+      return delivered;
+    });
   }
 
   async isUserInContext(userId: string, context: string): Promise<boolean> {
-    logger.setTags({ userId, context });
-    const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
-    return stub.hasContext(context);
+    return withLogTags({ source: 'event-service.isUserInContext' }, async () => {
+      configureDevLogging(this.env);
+      logger.setTags({ userId, context });
+      const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
+      const present = await stub.hasContext(context);
+      logger.debug('isUserInContext', { present });
+      return present;
+    });
   }
 }

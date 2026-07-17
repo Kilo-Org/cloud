@@ -134,8 +134,6 @@ export type PersistenceEnv = {
   NEXTAUTH_SECRET: SecretBinding;
   /** Comma-separated list of allowed Origins for /stream WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
-  /** Optional override for Kilocode token injected into session environment (does not affect authentication) */
-  KILOCODE_TOKEN_OVERRIDE?: string;
   /** Optional override for Kilocode org ID injected into session environment (does not affect authentication) */
   KILOCODE_ORG_ID_OVERRIDE?: string;
   /** Backend base URL for API calls and session environment variables (defaults to https://kilo.ai) */
@@ -172,8 +170,12 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Comma-separated org IDs that use managed SCM credential containment, or `*` for all orgs */
-  MANAGED_SCM_CONTAINMENT_ORG_IDS?: string;
+  /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
+  GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;
+  /** Comma-separated org IDs whose GitLab token uses credential containment, or `*` for all orgs */
+  GITLAB_TOKEN_CONTAINMENT_ORG_IDS?: string;
+  /** Comma-separated org IDs whose Kilo token uses credential containment, or `*` for all orgs */
+  KILOCODE_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** Service binding for dispatching push notifications */

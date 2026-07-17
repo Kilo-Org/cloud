@@ -128,6 +128,7 @@ describe('session transport routing', () => {
         destroy: jest.fn(),
         subscribeToCliSession: jest.fn(() => release),
         sendCommand: jest.fn(() => Promise.resolve()),
+        sendCommandToConnection: jest.fn(() => Promise.resolve()),
         onCliEvent: jest.fn(() => jest.fn()),
         onSystemEvent: jest.fn(() => jest.fn()),
         onReconnect: jest.fn(() => jest.fn()),
@@ -215,6 +216,7 @@ describe('session transport routing', () => {
           destroy: jest.fn(),
           subscribeToCliSession: jest.fn(() => subscribeRelease),
           sendCommand: jest.fn(() => Promise.resolve()),
+          sendCommandToConnection: jest.fn(() => Promise.resolve()),
           onCliEvent: jest.fn(() => jest.fn()),
           onSystemEvent: jest.fn((listener: (event: { event: string; data: unknown }) => void) => {
             systemListeners.add(listener);

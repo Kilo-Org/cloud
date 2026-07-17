@@ -37,6 +37,36 @@ type WSAttachment =
 
 export const MAX_CATALOG_RESULT_BYTES = 512 * 1024;
 
+// Viewer command allowlist. Anything outside this set is rejected by the relay
+// before owner resolution, pending allocation, or CLI forwarding.
+export const ALLOWED_VIEWER_COMMANDS: ReadonlySet<string> = new Set([
+  'send_message',
+  'interrupt',
+  'question_reply',
+  'question_reject',
+  'permission_respond',
+  'suggestion_accept',
+  'suggestion_dismiss',
+  'list_models',
+  'list_commands',
+  'send_command',
+  'create_session',
+  'exit_cli',
+]);
+
+// In-flight dedupe and 512 KiB response cap apply to these catalog-style reads.
+const CATALOG_DEDUPE_COMMANDS: ReadonlySet<string> = new Set(['list_models', 'list_commands']);
+
+// Operations that older CLIs reject with a precise "unknown command: <op>"
+// string. Only these commands get mapped to a structured CLI_UPGRADE_REQUIRED
+// response; any other CLI error is preserved verbatim.
+const CLI_UPGRADE_REQUIRED_COMMANDS: ReadonlySet<string> = new Set([
+  'list_commands',
+  'send_command',
+  'create_session',
+  'exit_cli',
+]);
+
 const SESSION_OWNER_CHANGED_ERROR = {
   source: 'relay',
   code: 'SESSION_OWNER_CHANGED',
@@ -65,6 +95,31 @@ const COMMAND_EXPIRED_ERROR = {
   source: 'relay',
   code: 'COMMAND_EXPIRED',
   message: 'Command expired',
+};
+
+const COMMAND_NOT_ALLOWED_ERROR = {
+  source: 'relay',
+  code: 'COMMAND_NOT_ALLOWED',
+  message: 'Command is not allowed',
+};
+
+const INVALID_COMMAND_ERROR = {
+  source: 'relay',
+  code: 'INVALID_COMMAND',
+  message: 'Invalid command',
+};
+
+const CLI_UPGRADE_REQUIRED_SLASH_ERROR = {
+  source: 'relay',
+  code: 'CLI_UPGRADE_REQUIRED',
+  message: 'Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect.',
+};
+
+const CLI_UPGRADE_REQUIRED_CREATE_SESSION_ERROR = {
+  source: 'relay',
+  code: 'CLI_UPGRADE_REQUIRED',
+  message:
+    'Creating remote sessions from mobile requires a newer Kilo CLI. Update Kilo CLI and reconnect.',
 };
 
 const CLI_COMMAND_ERROR = {
@@ -468,7 +523,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (!entry || entry.targetCliWs !== respondingWs) return;
     this.pendingCommands.delete(id);
 
-    if (entry.command === 'list_models' && result !== undefined) {
+    if (CATALOG_DEDUPE_COMMANDS.has(entry.command) && result !== undefined) {
       const serializedResult = JSON.stringify(result);
       const resultBytes = new TextEncoder().encode(serializedResult).byteLength;
       if (resultBytes > MAX_CATALOG_RESULT_BYTES) {
@@ -481,13 +536,39 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
 
+    let structuredError: { source: string; code: string; message: string } | null = null;
+    let stringError: string | null = null;
+    let sanitizeAsFailed = false;
+
+    if (typeof error === 'string' && CLI_UPGRADE_REQUIRED_COMMANDS.has(entry.command)) {
+      if (error === `unknown command: ${entry.command}`) {
+        structuredError =
+          entry.command === 'create_session'
+            ? CLI_UPGRADE_REQUIRED_CREATE_SESSION_ERROR
+            : CLI_UPGRADE_REQUIRED_SLASH_ERROR;
+      } else {
+        stringError = error;
+      }
+    } else if (typeof error === 'string') {
+      stringError = error;
+    } else if (error !== undefined) {
+      // Arbitrary non-string CLI error (e.g. a CLI-shaped structured object):
+      // sanitize to a generic CLI failure so the relay's own error policy
+      // remains the source of truth.
+      sanitizeAsFailed = true;
+    }
+
     this.sendToWeb(entry.ws, {
       type: 'response',
       id: entry.originalId,
       ...(result !== undefined ? { result } : {}),
-      ...(error !== undefined
-        ? { error: typeof error === 'string' ? error : CLI_COMMAND_ERROR }
-        : {}),
+      ...(structuredError !== null
+        ? { error: structuredError }
+        : stringError !== null
+          ? { error: stringError }
+          : sanitizeAsFailed
+            ? { error: CLI_COMMAND_ERROR }
+            : {}),
     });
   }
 
@@ -598,6 +679,35 @@ export class UserConnectionDO extends DurableObject<Env> {
     const now = Date.now();
     this.expirePendingCommands(now);
 
+    // Reject anything outside the viewer command allowlist before we touch
+    // ownership, allocate a pending slot, or forward to the CLI.
+    if (!ALLOWED_VIEWER_COMMANDS.has(msg.command)) {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: COMMAND_NOT_ALLOWED_ERROR,
+      });
+      return;
+    }
+
+    if (
+      msg.command === 'exit_cli' &&
+      (!msg.sessionId ||
+        typeof msg.data !== 'object' ||
+        msg.data === null ||
+        Array.isArray(msg.data) ||
+        Object.keys(msg.data).length !== 1 ||
+        !Object.hasOwn(msg.data, 'protocolVersion') ||
+        Reflect.get(msg.data, 'protocolVersion') !== 1)
+    ) {
+      this.sendToWeb(ws, {
+        type: 'response',
+        id: msg.id,
+        error: INVALID_COMMAND_ERROR,
+      });
+      return;
+    }
+
     // Find target CLI
     let targetCli: WebSocket | undefined;
 
@@ -633,11 +743,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     const targetConnectionId = targetAttachment.connectionId;
 
     if (
-      msg.command === 'list_models' &&
+      CATALOG_DEDUPE_COMMANDS.has(msg.command) &&
       [...this.pendingCommands.values()].some(
         entry =>
           entry.ws === ws &&
-          entry.command === 'list_models' &&
+          entry.command === msg.command &&
           entry.sessionId === msg.sessionId &&
           entry.targetConnectionId === targetConnectionId
       )

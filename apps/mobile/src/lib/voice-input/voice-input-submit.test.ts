@@ -1,6 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { createSubmitLock } from '@/lib/submit-lock';
+
 import { settleVoiceInputBeforeSubmit } from './voice-input-submit';
+
+function createSubmitLockAdapter() {
+  const lock = createSubmitLock();
+  const adapter: { current: boolean } = {
+    get current() {
+      return lock.isLocked();
+    },
+    set current(next: boolean) {
+      if (next) {
+        lock.acquire();
+      } else {
+        lock.release();
+      }
+    },
+  };
+  return { lock, adapter };
+}
 
 describe('settleVoiceInputBeforeSubmit', () => {
   it('rejects a duplicate submission while the first submission is settling', async () => {
@@ -118,17 +137,31 @@ describe('settleVoiceInputBeforeSubmit', () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it('invokes submit exactly once when settlement returns true', async () => {
-    const submit = vi.fn<() => void>();
+  it('invokes submit exactly once and rejects a synchronous duplicate while the lock stays held until asynchronous submit completes', async () => {
+    const { lock, adapter } = createSubmitLockAdapter();
+    const submit = vi.fn(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-    await expect(
-      settleVoiceInputBeforeSubmit({
-        lock: { current: false },
-        settleVoiceInput: vi.fn().mockResolvedValueOnce(true),
-        submit,
-      })
-    ).resolves.toBe(true);
+    const first = settleVoiceInputBeforeSubmit({
+      lock: adapter,
+      settleVoiceInput: vi.fn().mockResolvedValueOnce(true),
+      submit,
+    });
 
+    const duplicate = await settleVoiceInputBeforeSubmit({
+      lock: adapter,
+      settleVoiceInput: vi.fn().mockResolvedValueOnce(true),
+      submit,
+    });
+
+    expect(duplicate).toBe(false);
     expect(submit).toHaveBeenCalledTimes(1);
+    expect(lock.isLocked()).toBe(true);
+
+    await expect(first).resolves.toBe(true);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(lock.isLocked()).toBe(false);
   });
 });

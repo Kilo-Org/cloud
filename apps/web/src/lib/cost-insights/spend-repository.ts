@@ -12,9 +12,7 @@ import type { db } from '@/lib/drizzle';
 
 import {
   COST_INSIGHT_ROLLUP_VERSION,
-  getCanonicalOwnerSpendTotals,
   loadCanonicalCostInsightAggregation,
-  loadCanonicalCostInsightAggregationsByHour,
   loadCanonicalCostInsightAggregationsByIntervals,
   parseSafeDatabaseInteger,
   requireUtcHour,
@@ -22,6 +20,7 @@ import {
   type CostInsightQueryExecutor,
   type CostInsightSpendCategory,
   type CostInsightSpendSource,
+  type loadCanonicalCostInsightAggregationsByHour,
 } from './canonical-sources';
 
 const HOUR_MS = 60 * 60 * 1_000;
@@ -167,11 +166,6 @@ type DegradedIntervalRow = {
   source: CostInsightSpendSource | null;
   reason: string;
   detected_at: string | Date;
-};
-
-type InteriorTotalRow = {
-  spend_category: CostInsightSpendCategory;
-  total_microdollars: string | number | bigint;
 };
 
 type InteriorDriverRow = TopDriverRow & {
@@ -955,45 +949,6 @@ export async function getCostInsightRollupCoverage(
   };
 }
 
-async function getInteriorRollupTotals(
-  executor: CostInsightQueryExecutor,
-  owner: CostInsightSpendOwner,
-  startInclusive: string,
-  endExclusive: string
-): Promise<{ variableMicrodollars: number; scheduledMicrodollars: number }> {
-  if (startInclusive === endExclusive) {
-    return { variableMicrodollars: 0, scheduledMicrodollars: 0 };
-  }
-  const result = await executor.execute<InteriorTotalRow>(sql`
-    SELECT
-      ${cost_insight_owner_hour_totals.spend_category} AS spend_category,
-      SUM(${cost_insight_owner_hour_totals.total_microdollars})::text AS total_microdollars
-    FROM ${cost_insight_owner_hour_totals}
-    WHERE ${cost_insight_owner_hour_totals.hour_start} >= ${startInclusive}
-      AND ${cost_insight_owner_hour_totals.hour_start} < ${endExclusive}
-      AND ${ownerPredicate(
-        owner,
-        sql`${cost_insight_owner_hour_totals.owned_by_user_id}`,
-        sql`${cost_insight_owner_hour_totals.owned_by_organization_id}`
-      )}
-    GROUP BY ${cost_insight_owner_hour_totals.spend_category}
-  `);
-  let variableMicrodollars = 0;
-  let scheduledMicrodollars = 0;
-  for (const row of result.rows) {
-    const amount = parseSafeDatabaseInteger(
-      row.total_microdollars,
-      'rolling interior total_microdollars'
-    );
-    if (row.spend_category === 'variable') {
-      variableMicrodollars = amount;
-    } else if (row.spend_category === 'scheduled') {
-      scheduledMicrodollars = amount;
-    }
-  }
-  return { variableMicrodollars, scheduledMicrodollars };
-}
-
 function compareTopSpendDrivers(left: OwnerTopSpendDriver, right: OwnerTopSpendDriver): number {
   if (left.totalMicrodollars !== right.totalMicrodollars) {
     return left.totalMicrodollars > right.totalMicrodollars ? -1 : 1;
@@ -1141,58 +1096,6 @@ function toMergeableSpendDrivers(drivers: OwnerTopSpendDriver[]): MergeableSpend
       driver.providerKey,
       driver.actorUserId,
     ]),
-  }));
-}
-
-async function getInteriorRollupDrivers(
-  executor: CostInsightQueryExecutor,
-  owner: CostInsightSpendOwner,
-  startInclusive: string,
-  endExclusive: string
-): Promise<MergeableSpendDriver[]> {
-  if (startInclusive === endExclusive) return [];
-  const result = await executor.execute<InteriorDriverRow>(sql`
-    SELECT
-      ${cost_insight_owner_hour_driver_buckets.spend_category} AS spend_category,
-      ${cost_insight_owner_hour_driver_buckets.driver_key} AS driver_key,
-      ${cost_insight_owner_hour_driver_buckets.source} AS source,
-      ${cost_insight_owner_hour_driver_buckets.product_key} AS product_key,
-      ${cost_insight_owner_hour_driver_buckets.feature_key} AS feature_key,
-      ${cost_insight_owner_hour_driver_buckets.model_or_plan_key} AS model_or_plan_key,
-      ${cost_insight_owner_hour_driver_buckets.provider_key} AS provider_key,
-      ${cost_insight_owner_hour_driver_buckets.actor_user_id} AS actor_user_id,
-      SUM(${cost_insight_owner_hour_driver_buckets.total_microdollars})::text
-        AS total_microdollars,
-      SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})::text
-        AS spend_record_count
-    FROM ${cost_insight_owner_hour_driver_buckets}
-    WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${startInclusive}
-      AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${endExclusive}
-      AND ${ownerPredicate(
-        owner,
-        sql`${cost_insight_owner_hour_driver_buckets.owned_by_user_id}`,
-        sql`${cost_insight_owner_hour_driver_buckets.owned_by_organization_id}`
-      )}
-    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
-    ORDER BY 1, 2, 3, 4, 5, 6, 7, 8
-  `);
-  return result.rows.map(row => ({
-    category: row.spend_category,
-    driverKey: row.driver_key,
-    source: row.source,
-    productKey: row.product_key,
-    featureKey: row.feature_key,
-    modelOrPlanKey: row.model_or_plan_key,
-    providerKey: row.provider_key,
-    actorUserId: row.actor_user_id,
-    totalMicrodollars: parseSafeDatabaseInteger(
-      row.total_microdollars,
-      'interior driver total_microdollars'
-    ),
-    spendRecordCount: parseSafeDatabaseInteger(
-      row.spend_record_count,
-      'interior driver spend_record_count'
-    ),
   }));
 }
 

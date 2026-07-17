@@ -34,7 +34,6 @@ import {
 } from './repository';
 import {
   getOwnerHourDriverEvidence,
-  getOwnerHourlySpend,
   loadOwnerDashboardHourlySpend,
   getOwnerRolling24HourSpendExact,
   getOwnerTopSpendDriversByRange,

@@ -31,7 +31,7 @@ import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
 import {
-  AUTO_TOP_UP_THRESHOLD_CENTS,
+  AUTO_TOP_UP_THRESHOLD_DOLLARS,
   AutoTopUpAmountCentsSchema,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
@@ -666,7 +666,7 @@ export const userRouter = createTRPCRouter({
     return {
       enabled: ctx.user.auto_top_up_enabled,
       amountCents,
-      thresholdCents: AUTO_TOP_UP_THRESHOLD_CENTS,
+      thresholdCents: AUTO_TOP_UP_THRESHOLD_DOLLARS * 100,
       paymentMethod,
     };
   }),

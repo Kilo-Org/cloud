@@ -2,7 +2,6 @@ import * as z from 'zod';
 
 // Personal auto-top-up settings
 export const AUTO_TOP_UP_THRESHOLD_DOLLARS = 5;
-export const AUTO_TOP_UP_THRESHOLD_CENTS = AUTO_TOP_UP_THRESHOLD_DOLLARS * 100;
 export const AUTO_TOP_UP_AMOUNTS_CENTS = [2000, 5000, 10000] as const;
 export const DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS: AutoTopUpAmountCents = 5000;
 export const AutoTopUpAmountCentsSchema = z.union(AUTO_TOP_UP_AMOUNTS_CENTS.map(n => z.literal(n)));

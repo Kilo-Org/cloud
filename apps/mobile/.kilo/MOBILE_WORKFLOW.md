@@ -81,10 +81,10 @@ Launch the orchestrator in the current tmux session with a unique, descriptive w
 tmux new-window -t <planner-tmux-session> \
   -n <feature>-orchestrator \
   -c <dedicated-worktree>/apps/mobile \
-  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/anthropic/claude-sonnet-5 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
+  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/anthropic/claude-opus-4.8 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
 ```
 
-Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Sonnet 5 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
+Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Opus 4.8 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
 
 ## Roles
 
@@ -119,12 +119,14 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier.
 8. Perform the final full-diff review and repository-appropriate verification yourself. Commit any final narrowly scoped repair, push, create or update the PR, and assign it to the requesting human.
 
-### Kilobot and CI Loop
+### Reviewer and CI Loop
 
-9. Wait until Kilobot has reviewed the latest head. Fetch every Kilobot review thread, including comments that arrive after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
-10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code.
-11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable Kilobot comment is unresolved.
-12. Rerun local mobile E2E after any Kilobot repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
+These steps apply to review comments from every reviewer — Kilobot, other bots, and humans alike.
+
+9. Wait until Kilobot has reviewed the latest head. Fetch every unresolved review thread from every reviewer, including comments that arrive after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
+10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done.
+11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable comment from any reviewer is unresolved.
+12. Rerun local mobile E2E after any review-driven repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
 13. When the base branch advances, integrate the current base in the dedicated worktree and push the new head. Then apply exactly one of:
     - No conflicts: do not rerun checks, E2E, or review. The merged tree matches the verified head, and CI and Kilobot run on the new SHA anyway.
     - Conflicts resolved, certainly behavior-neutral: same as above, no reruns.
@@ -170,7 +172,7 @@ The orchestrator may declare the work complete only when every item holds:
 - Final automated checks pass in every changed repository
 - The orchestrator has reviewed the complete diff and performed all Git and PR actions itself
 - The PR is assigned to the requesting human
-- Kilobot has reviewed the latest head and no actionable Kilobot comment is unresolved
+- Kilobot has reviewed the latest head, no actionable comment from any reviewer is unresolved, and every addressed finding has an in-thread reply and a resolved thread
 - GitHub reports the exact latest head as mergeable with no conflicts
 - All expected CI checks on the latest head are in a successful terminal state; failed, cancelled, timed-out, action-required, or pending checks block completion
 - No generated E2E fixture remains tracked or untracked in any repository

@@ -107,10 +107,28 @@ jobs:
             --arg type "$project-production-deployment" \
             '{datasets:[$dataset], type:$type, time:$time, title:$title, description:$description, url:$url}')
 
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer $AXIOM_ANNOTATION_TOKEN" \
-            --header "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
-            --header "Content-Type: application/json" \
-            --data "$payload" \
-            https://api.axiom.co/v2/annotations >/dev/null
+          for attempt in 1 2 3; do
+            if axiom_response=$(curl --fail-with-body --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --request POST \
+              --header "Authorization: Bearer $AXIOM_ANNOTATION_TOKEN" \
+              --header "X-Axiom-Org-Id: $AXIOM_ORG_ID" \
+              --header "Content-Type: application/json" \
+              --data "$payload" \
+              https://api.axiom.co/v2/annotations 2>&1); then
+              echo "Created Axiom annotation for Vercel deployment $deployment_id"
+              exit 0
+            else
+              curl_exit=$?
+            fi
+
+            axiom_error=${axiom_response//$'\n'/ }
+            echo "Axiom annotation attempt $attempt/3 failed (curl exit $curl_exit): ${axiom_error:0:1000}"
+            if [ "$attempt" != "3" ]; then
+              sleep 2
+            fi
+          done
+
+          echo "::warning::Failed to create Axiom annotation after 3 attempts (last curl exit $curl_exit)"
+          exit "$curl_exit"

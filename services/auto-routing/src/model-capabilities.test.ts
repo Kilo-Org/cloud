@@ -333,6 +333,51 @@ describe('getModelCapabilities', () => {
     expect(result.get('coding-plan/chat')?.contextLength).toBe(200000);
   });
 
+  it('distinguishes an unavailable routing table from a genuinely empty one when caching capabilities', async () => {
+    const put = vi.fn(async () => undefined);
+    const get = vi.fn(async () => null);
+    const env = makeEnv(null);
+    env.AUTO_ROUTING_CONFIG = { get, put } as unknown as KVNamespace;
+
+    // (a) Routing table is unavailable: queryAllIds returns null, so the origin
+    // value for kvReadThrough is null and the model_capabilities_v1 key is NOT
+    // written. A later in-memory-miss must still re-check KV and re-fetch origin.
+    mockGetRoutingTable.mockResolvedValue(null);
+    const first = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
+    expect(first.size).toBe(0);
+    const capabilityPutsBefore = put.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'model_capabilities_v1'
+    );
+    expect(capabilityPutsBefore).toEqual([]);
+
+    clearModelCapabilitiesCache();
+    const second = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
+    expect(second.size).toBe(0);
+    expect(get).toHaveBeenCalledTimes(2);
+    const capabilityPutsAfter = put.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'model_capabilities_v1'
+    );
+    expect(capabilityPutsAfter).toEqual([]);
+
+    // (b) Routing table resolves successfully but has zero candidates: this is
+    // real data, not a failure, so the empty map IS written to KV.
+    put.mockClear();
+    get.mockClear();
+    clearModelCapabilitiesCache();
+    clearRoutingTableCache();
+    mockGetRoutingTable.mockResolvedValue({
+      ...SAMPLE_ROUTING_TABLE,
+      routes: {},
+    });
+    const third = await getModelCapabilities(env, { codingPlanModelId: 'coding-plan/chat' });
+    expect(third.size).toBe(0);
+    const capabilityPutsEmpty = (put.mock.calls as unknown[][]).filter(
+      call => call[0] === 'model_capabilities_v1'
+    );
+    expect(capabilityPutsEmpty).toHaveLength(1);
+    expect(JSON.parse(capabilityPutsEmpty[0][1] as unknown as string)).toEqual({});
+  });
+
   it('returns an empty map when the routing table is missing entirely', async () => {
     mockGetRoutingTable.mockResolvedValue(null);
     const env = {

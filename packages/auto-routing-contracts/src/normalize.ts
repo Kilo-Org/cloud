@@ -370,9 +370,8 @@ function collectModalities(value: unknown, out: Set<string>): void {
   // visited. Bodies use different keys per provider:
   //   * OpenAI chat completions / Anthropic: `messages[]`
   //   * OpenAI Responses: `input` (string or array)
-  //   * Gemini-style: `contents[].parts[]`
   // Content parts live under `content` (chat / Anthropic) or `parts`
-  // (Gemini). We do NOT recurse into every key — that would over-walk
+  // (Responses). We do NOT recurse into every key — that would over-walk
   // tools, metadata, and provider hints — only into the known structural
   // containers.
   for (const key of MODALITY_CONTAINER_KEYS) {
@@ -522,12 +521,17 @@ function sumContentPartTextChars(part: unknown): number {
       return 0;
     }
 
-    // Tool/function result content strings
+    // Tool/function result content strings.
+    // Anthropic/Chat Completions tool results use `content`; OpenAI Responses
+    // `function_call_output` and `tool_call_output` items use `output`.
     if (type === 'tool_result' || type === 'function_call_output' || type === 'tool_call_output') {
-      const content = part.content;
-      if (typeof content === 'string') return content.length;
-      if (Array.isArray(content)) {
-        return content.reduce((sum: number, p: unknown) => sum + sumContentPartTextChars(p), 0);
+      const text =
+        type === 'function_call_output' || type === 'tool_call_output'
+          ? (part.output ?? part.content)
+          : part.content;
+      if (typeof text === 'string') return text.length;
+      if (Array.isArray(text)) {
+        return text.reduce((sum: number, p: unknown) => sum + sumContentPartTextChars(p), 0);
       }
       return 0;
     }

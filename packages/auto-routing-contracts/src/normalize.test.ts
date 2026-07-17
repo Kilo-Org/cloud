@@ -254,6 +254,25 @@ describe('detectRequiredInputModalities', () => {
       })
     ).toEqual(['image']);
   });
+
+  it('does not claim support for Gemini native contents[].parts[] bodies', () => {
+    // Native Gemini request bodies never reach this helper: the gateway only
+    // invokes auto-routing for chat_completions / responses / messages shapes,
+    // and normalizeClassifierInput rejects any other top-level structure. The
+    // doc comment therefore does not advertise Gemini-style support.
+    expect(
+      detectRequiredInputModalities({
+        contents: [
+          {
+            parts: [
+              { inline_data: { mime_type: 'image/png', data: 'iVBORw0KGgo=' } },
+              { text: 'What is this?' },
+            ],
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
 });
 
 describe('estimateRoutingTokens', () => {
@@ -393,6 +412,36 @@ describe('estimateRoutingTokens', () => {
 
   it('returns 0 for a completely empty body with no reservation', () => {
     expect(estimateRoutingTokens({})).toBe(0);
+  });
+
+  it('counts Responses API function_call_output output field, not content', () => {
+    const output = 'x'.repeat(1000);
+    const estimate = estimateRoutingTokens({
+      model: 'gpt-4o',
+      input: [{ type: 'function_call_output', call_id: 'call-1', output }],
+    });
+    expect(estimate).toBe(Math.round(output.length / 4));
+  });
+
+  it('does not zero-count a large Responses function_call_output output', () => {
+    const output = 'x'.repeat(100_000);
+    const estimate = estimateRoutingTokens({
+      model: 'gpt-4o',
+      input: [{ type: 'function_call_output', call_id: 'call-1', output }],
+    });
+    expect(estimate).toBe(Math.round(output.length / 4));
+  });
+
+  it('counts Anthropic tool_result content as before', () => {
+    const content = 'x'.repeat(1000);
+    const estimate = estimateRoutingTokens({
+      model: 'claude-sonnet-4-20250514',
+      messages: [
+        { role: 'user', content: 'Read file' },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool-1', content }] },
+      ],
+    });
+    expect(estimate).toBe(Math.round((9 + content.length) / 4));
   });
 
   it('returns a positive integer (never fractional, never 0 when text exists)', () => {

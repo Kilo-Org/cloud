@@ -165,14 +165,15 @@ async function loadAll(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCach
   return fromKv ?? {};
 }
 
-async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCacheValue> {
+async function queryAllIds(env: ModelCapabilitiesEnv): Promise<ModelCapabilitiesCacheValue | null> {
   const routingTable = await getRoutingTable(env);
+  if (!routingTable) {
+    return null;
+  }
   const ids = new Set<string>();
-  if (routingTable) {
-    for (const route of Object.values(routingTable.routes)) {
-      for (const candidate of route) {
-        ids.add(candidate.model);
-      }
+  for (const route of Object.values(routingTable.routes)) {
+    for (const candidate of route) {
+      ids.add(candidate.model);
     }
   }
   return queryModelCapabilities(env, Array.from(ids));

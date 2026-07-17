@@ -568,7 +568,17 @@ export async function loadOwnerDashboardHourlySpend(
         startHour: range.startHour,
         endHourExclusive: range.endHourExclusive,
       });
-      const uncoveredIntervals = groupContiguousHourlyIntervals(rollupPoints, false);
+      const coverage = await getCostInsightRollupCoverage(transaction, range);
+      const effectiveCoverageStart = coverage.coverageStartHour ?? coverage.liveCaptureStartHour;
+      const uncoveredIntervals = groupContiguousHourlyIntervals(
+        rollupPoints.filter(
+          point =>
+            !point.isCovered &&
+            effectiveCoverageStart !== null &&
+            point.hourStart >= effectiveCoverageStart
+        ),
+        false
+      );
       if (!hasIntervals(uncoveredIntervals)) return rollupPoints;
 
       const canonicalPoints = await withCanonicalFallbackTelemetry(

@@ -1,4 +1,5 @@
 import type { CostInsightQueryExecutor } from './canonical-sources';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   getCostInsightRollupCoverage,
   getOwnerCurrentHourSpend,
@@ -7,6 +8,7 @@ import {
   getRolling24HourFragments,
   getRollingWindowFragments,
   groupContiguousHourlyIntervals,
+  loadOwnerDashboardHourlySpend,
 } from './spend-repository';
 
 const owner = { type: 'user', id: 'user-1' } as const;
@@ -133,6 +135,124 @@ describe('Cost Insights spend repository', () => {
         isCovered: false,
       },
     ]);
+  });
+
+  test('leaves pre-coverage dashboard hours unavailable while replacing degraded covered hours', async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            hour_start: '2026-06-01 00:00:00+00',
+            variable_microdollars: null,
+            scheduled_microdollars: null,
+            variable_record_count: null,
+            scheduled_record_count: null,
+            is_covered: false,
+          },
+          {
+            hour_start: '2026-06-01 01:00:00+00',
+            variable_microdollars: null,
+            scheduled_microdollars: null,
+            variable_record_count: null,
+            scheduled_record_count: null,
+            is_covered: false,
+          },
+          {
+            hour_start: '2026-06-01 02:00:00+00',
+            variable_microdollars: '7',
+            scheduled_microdollars: '0',
+            variable_record_count: '1',
+            scheduled_record_count: '0',
+            is_covered: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            rollup_version: '1',
+            live_capture_start_hour: '2026-06-01 01:00:00+00',
+            coverage_start_hour: null,
+            last_reconciled_at: null,
+            database_now: '2026-06-01 03:00:00+00',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'degraded-1',
+            start_hour: '2026-06-01 01:00:00+00',
+            end_hour_exclusive: '2026-06-01 02:00:00+00',
+            source: null,
+            reason: 'capture_bypass',
+            detected_at: '2026-06-01 02:00:00+00',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            hour_start: '2026-06-01 01:00:00+00',
+            owned_by_user_id: 'user-1',
+            owned_by_organization_id: null,
+            actor_user_id: 'user-1',
+            raw_product_key: null,
+            raw_feature_key: null,
+            requested_model: 'model',
+            resolved_model: 'model',
+            inference_provider: 'provider',
+            gateway_provider: 'provider',
+            total_microdollars: '11',
+            spend_record_count: '1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const database = {
+      transaction: async (callback: (transaction: CostInsightQueryExecutor) => Promise<unknown>) =>
+        await callback({ execute } as unknown as CostInsightQueryExecutor),
+    };
+
+    await expect(
+      loadOwnerDashboardHourlySpend(database as never, {
+        owner,
+        startHour: '2026-06-01T00:00:00.000Z',
+        endHourExclusive: '2026-06-01T03:00:00.000Z',
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        hourStart: '2026-06-01T00:00:00.000Z',
+        totalMicrodollars: null,
+        isCovered: false,
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T01:00:00.000Z',
+        totalMicrodollars: 11,
+        isCovered: true,
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T02:00:00.000Z',
+        totalMicrodollars: 7,
+        isCovered: true,
+      }),
+    ]);
+
+    expect(execute).toHaveBeenCalledTimes(7);
+    const canonicalQueries = execute.mock.calls
+      .slice(3)
+      .map(([query]) => new PgDialect().sqlToQuery(query).params);
+    expect(canonicalQueries).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(['2026-06-01T01:00:00.000Z', '2026-06-01T02:00:00.000Z']),
+      ])
+    );
+    for (const queryParameters of canonicalQueries) {
+      expect(queryParameters).not.toContain('2026-06-01T00:00:00.000Z');
+    }
   });
 
   test('adds current-hour categories using safe integer conversion', async () => {

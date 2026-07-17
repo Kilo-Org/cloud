@@ -6,6 +6,7 @@ import {
   getOwnerTopSpendDriversByRange,
   getRolling24HourFragments,
   getRollingWindowFragments,
+  groupContiguousHourlyIntervals,
 } from './spend-repository';
 
 const owner = { type: 'user', id: 'user-1' } as const;
@@ -58,6 +59,32 @@ describe('Cost Insights spend repository', () => {
     expect(fragments.currentBoundaryStart).toBe(fragments.asOf);
     expect(fragments.interiorStart).toBe('2026-06-01T12:00:00.000Z');
     expect(fragments.interiorEnd).toBe('2026-06-02T12:00:00.000Z');
+  });
+
+  test('groups adjacent hours with the same coverage state into intervals', () => {
+    const points = [
+      { hourStart: '2026-06-01T00:00:00.000Z', isCovered: false },
+      { hourStart: '2026-06-01T01:00:00.000Z', isCovered: false },
+      { hourStart: '2026-06-01T02:00:00.000Z', isCovered: true },
+      { hourStart: '2026-06-01T03:00:00.000Z', isCovered: false },
+    ];
+
+    expect(groupContiguousHourlyIntervals(points, false)).toEqual([
+      {
+        startHour: '2026-06-01T00:00:00.000Z',
+        endHourExclusive: '2026-06-01T02:00:00.000Z',
+      },
+      {
+        startHour: '2026-06-01T03:00:00.000Z',
+        endHourExclusive: '2026-06-01T04:00:00.000Z',
+      },
+    ]);
+    expect(groupContiguousHourlyIntervals(points, true)).toEqual([
+      {
+        startHour: '2026-06-01T02:00:00.000Z',
+        endHourExclusive: '2026-06-01T03:00:00.000Z',
+      },
+    ]);
   });
 
   test('returns covered sparse hours as zero and uncovered hours as null', async () => {

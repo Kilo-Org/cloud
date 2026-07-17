@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { ChevronRight } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
@@ -18,6 +19,11 @@ type SessionRowProps = {
   meta?: string;
   /** When true, renders a pulsing good-tone StatusDot before the meta. */
   live?: boolean;
+  /**
+   * When true, replaces the live dot / meta with a pulsing warn-tone dot
+   * and a `NEEDS INPUT` label. Highest priority in the eyebrow row.
+   */
+  needsInput?: boolean;
   onPress?: () => void;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -43,6 +49,7 @@ export function SessionRow({
   subtitle,
   meta,
   live,
+  needsInput = false,
   onPress,
   last,
   stripMode = 'edge',
@@ -50,7 +57,28 @@ export function SessionRow({
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
   const color = agentColor(agentLabel);
-  const dimStrip = !live;
+  const dimStrip = !live && !needsInput;
+
+  let eyebrowRight: React.ReactNode = null;
+  if (needsInput) {
+    eyebrowRight = (
+      <View className="flex-row items-center gap-1.5">
+        <StatusDot tone="warn" pulse />
+        <Text variant="mono" className="shrink text-xs text-warn">
+          NEEDS INPUT
+        </Text>
+      </View>
+    );
+  } else if (live) {
+    eyebrowRight = <StatusDot tone="good" />;
+  } else if (meta) {
+    eyebrowRight = (
+      <Text variant="mono" className="shrink text-xs text-ink2">
+        {meta}
+      </Text>
+    );
+  }
+
   const row = (
     <View
       className={cn(
@@ -77,12 +105,7 @@ export function SessionRow({
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
           <Eyebrow className={color.hueTextClass}>{agentLabel}</Eyebrow>
-          {live && <StatusDot tone="good" />}
-          {!live && meta && (
-            <Text variant="mono" className="shrink text-xs text-ink2">
-              {meta}
-            </Text>
-          )}
+          {eyebrowRight}
         </View>
         <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>
           {title}

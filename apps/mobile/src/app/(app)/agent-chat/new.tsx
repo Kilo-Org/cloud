@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { toast } from 'sonner-native';
 
+import { InstanceSelector } from '@/components/agents/instance-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
@@ -26,6 +27,9 @@ import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
+import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
+import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -39,11 +43,24 @@ export default function NewSessionScreen() {
   const [model, setModel] = useState('');
   const [variant, setVariant] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
+  // `null` = default Cloud Agent target (the existing path). Any non-null
+  // value is a live `kilo remote` instance the user picked. The submit
+  // predicate is intentionally inert for non-null values in this slice —
+  // wiring the actual remote submit happens in C3b, which reads this
+  // state directly.
+  const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasPrompt, setHasPrompt] = useState(false);
   const submissionLockRef = useRef(false);
   const voiceInputSettlerRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  // Org-scoped new-agent flows are Cloud-Agent only by design: a remote
+  // spawn creates a personal CLI session that the org route would not be
+  // able to attribute to the flow's organization (mobile's data model
+  // only loads CLI sessions on personal routes). Hide the entire
+  // "Run on" section when the flow is org-scoped.
+  const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
   // ── Models ───────────────────────────────────────────────────────
   const {
@@ -99,6 +116,23 @@ export default function NewSessionScreen() {
       isPrivate: r.private,
     }));
   }, [repoData]);
+
+  // "Run on" instance list. Fetched at the screen level (not inside the
+  // picker) so the selector's value label and the picker's row list stay
+  // in sync without round-tripping through the bridge. The picker ALSO
+  // re-queries on focus + polls (per the spec), so this is a soft
+  // pre-population, not the source of truth.
+  const { data: instancesData, isLoading: isLoadingInstances } = useQuery({
+    ...trpc.activeSessions.listInstances.queryOptions(undefined, {
+      refetchOnWindowFocus: true,
+      staleTime: 5000,
+    }),
+    enabled: showRunOnSelector,
+  });
+  const instanceList: InstancePickerInstance[] = useMemo(
+    () => instancesData?.instances ?? [],
+    [instancesData]
+  );
 
   // ── Session creator ──────────────────────────────────────────────
   const { createSessionFromDraft, promptRef } = useNewSessionCreator({
@@ -162,12 +196,26 @@ export default function NewSessionScreen() {
     addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
   }, [addCandidates, showActionSheetWithOptions]);
 
-  const canCreate =
-    hasPrompt &&
-    Boolean(selectedRepo) &&
-    Boolean(model) &&
-    !attachments.isUploading &&
-    !attachments.hasFailedAttachments;
+  // Cloud-Agent vs. remote-instance submit safety. While a remote target
+  // is selected in THIS slice the submit must be inert — the actual
+  // remote-spawn wiring is owned by C3b. The cloud-agent submit path
+  // (`createSessionFromDraft`) is deliberately not touched: the
+  // predicate in `@/lib/new-session-submit` reproduces the existing
+  // `canCreate && !isCreating && !isSubmitting` expression bit-for-bit
+  // when the default Cloud Agent target is selected, and short-circuits
+  // to `false` when a remote target is selected.
+  const isRemoteTargetSelected = runOnInstance !== null;
+
+  const isStartDisabled = resolveNewSessionSubmitDisabled({
+    attachmentsHasFailed: attachments.hasFailedAttachments,
+    attachmentsIsUploading: attachments.isUploading,
+    hasPrompt,
+    isCreating,
+    isRemoteTargetSelected,
+    isSubmitting,
+    model,
+    selectedRepo,
+  });
 
   return (
     <View className="flex-1 bg-background">
@@ -224,12 +272,20 @@ export default function NewSessionScreen() {
           value={selectedRepo}
         />
 
-        <Button
-          size="lg"
-          className="mt-6"
-          disabled={isCreating || isSubmitting || !canCreate}
-          onPress={handleStartSession}
-        >
+        {showRunOnSelector ? (
+          <View className="mt-5">
+            <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
+            <InstanceSelector
+              value={runOnInstance}
+              instances={instanceList}
+              isLoading={isLoadingInstances}
+              onChange={setRunOnInstance}
+              disabled={isCreating}
+            />
+          </View>
+        ) : null}
+
+        <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={handleStartSession}>
           {isCreating ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : (

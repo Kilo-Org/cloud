@@ -50,9 +50,28 @@ type RepoPickerBridge = {
   onSelect: (repo: string) => void;
 };
 
+/**
+ * One row inside the "Run on" instance picker. Identical to the tRPC
+ * `activeSessions.listInstances` output shape so the bridge can hand the
+ * server payload straight to the picker without re-derivation.
+ */
+export type InstancePickerInstance = {
+  connectionId: string;
+  name: string;
+  projectName: string;
+  version?: string;
+};
+
+type InstancePickerBridge = {
+  instances: InstancePickerInstance[];
+  currentValue: InstancePickerInstance | null;
+  onSelect: (instance: InstancePickerInstance | null) => void;
+};
+
 let modelBridge: ModelPickerBridge | null = null;
 let modeBridge: ModePickerBridge | null = null;
 let repoBridge: RepoPickerBridge | null = null;
+let instanceBridge: InstancePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
   bridge: ModelPickerBridge,
@@ -116,4 +135,14 @@ export function getRepoPickerBridge() {
 }
 export function clearRepoPickerBridge() {
   repoBridge = null;
+}
+
+export function setInstancePickerBridge(bridge: InstancePickerBridge) {
+  instanceBridge = bridge;
+}
+export function getInstancePickerBridge() {
+  return instanceBridge;
+}
+export function clearInstancePickerBridge() {
+  instanceBridge = null;
 }

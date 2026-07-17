@@ -12,7 +12,8 @@ These rules apply to every session and role. Later sections do not repeat them.
 - Every reviewer and verifier invocation must be a fresh session so earlier conclusions cannot anchor later passes.
 - Choose the simplest maintainable implementation that fully satisfies the accepted requirements. Reuse existing code and contracts. Do not add abstraction or scope without evidence that it is required.
 - Make small, logically scoped commits throughout. Never squash the work into one catch-all commit unless the user explicitly requests it.
-- Repair-round limit: after three repair rounds on the same issue, the planner or orchestrator takes over, resolves the issue directly, and records the resolution. Never loop indefinitely.
+- Delegation discipline: the orchestrator is the expensive model driving cheap role agents. Its output is judgment — handoffs, steering, triage, and verification — not diffs. When the orchestrator diagnoses a problem, the diagnosis goes into a role handoff with acceptance criteria; the orchestrator does not implement the fix itself, even when it already knows it. Direct orchestrator edits are limited to trivial glue: merge-conflict resolution, one-line configuration, and the final narrowly scoped repair in the last orchestration step. Anything behavioral routes through an implementer and a fresh reviewer.
+- Escalation ladder, not takeover-by-count. When a loop iteration fails: first re-dispatch the same role with sharper steering — the diagnosis, the failing evidence, what was already tried, and a narrower goal. If the steered round also fails, restructure the work: split the slice or change the approach in the handoff. Take over directly only when a steered round produced zero new progress, and record every takeover with a one-line justification in the final report. Progress means new root-cause information, a smaller reproduction, fewer reviewer findings, or a previously failing check now passing; the same error under the same theory twice is not progress. Never loop indefinitely: a steered round with zero new progress is the floor at which takeover is required.
 - Step limits are hard ceilings: `mobile-plan-reviewer` 40, `mobile-implementer` 80, `mobile-reviewer` 50, `mobile-e2e-verifier` 100. Size every handoff below 75% of the role's limit; an implementation slice should fit in roughly 60 planned steps. Never raise a limit to fit an oversized task; split the task instead.
 
 ## Interaction Modes
@@ -56,7 +57,7 @@ After the draft plan is complete and before approval, dispatch a fresh `mobile-p
 
 The reviewer has less context than the planner and may be wrong. Treat every finding as untrusted advice: verify each claim independently against the request, repository evidence, and applicable instructions. Fix only valid findings. Record rejected findings with a short technical rationale; a rejected finding must not reopen without new evidence. Never weaken or expand the plan merely to satisfy the reviewer.
 
-After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If the repair-round limit is reached on one issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.`
+After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If three consecutive rounds stay stuck on the same issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.`
 
 ### Planner Handoff
 
@@ -114,9 +115,9 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 2. Dispatch ready independent slices in a bounded wave of at most two or three concurrent `mobile-implementer`s. Each handoff lists the other active slices and their ownership boundaries. While a wave is active, run only ownership-safe narrow checks.
 3. When every implementer in the wave has returned, treat it as a synchronization barrier: inspect each result, ownership adherence, and the combined diff; resolve integration and architecture decisions yourself; run shared mutating commands and shared checks once. If one slice failed, preserve the successful ones.
 4. Dispatch one fresh `mobile-reviewer` over the coherent wave diff. Triage findings yourself: route valid findings through a bounded repair wave and then a fresh reviewer; record rejected findings with a short rationale.
-5. After checks and review pass, create the commits at the ledger's intended per-slice boundaries. If a slice exhausts its implementer budget twice, take it over yourself.
+5. After checks and review pass, create the commits at the ledger's intended per-slice boundaries. If a slice exhausts its implementer budget, split it or re-dispatch it with a sharper handoff; take it over yourself only per the escalation ladder.
 6. When device E2E is likely, prewarm infrastructure concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Do not judge acceptance behavior while implementation is still changing. Record a resource manifest for the final verifier.
-7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier.
+7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier. The orchestrator may reproduce a failure once to triage it; the repair itself, with the orchestrator's diagnosis and acceptance criteria attached, goes through the implementer-reviewer loop. The orchestrator never sits in an edit-run-verify loop itself.
 8. Perform the final full-diff review and repository-appropriate verification yourself. Commit any final narrowly scoped repair, push, create or update the PR, and assign it to the requesting human.
 
 ### Reviewer and CI Loop
@@ -158,7 +159,7 @@ Never ask a role agent to infer context from a conversation it cannot see. Keep 
 
 ## Workflow Metrics
 
-Record lightweight in-session measurements in the final report when applicable: wave count and width, budget exhaustions, ownership collisions, unmanaged listener detections, prewarm reuse or invalidation, simulator relabel or name-restoration failures, accepted-plan-to-final-E2E-start time, accepted-plan-to-merged-PR time, and review/E2E/CI repair rounds. Do not add persistent telemetry or a data store for these.
+Record lightweight in-session measurements in the final report when applicable: wave count and width, budget exhaustions, ownership collisions, unmanaged listener detections, prewarm reuse or invalidation, simulator relabel or name-restoration failures, accepted-plan-to-final-E2E-start time, accepted-plan-to-merged-PR time, review/E2E/CI repair rounds, and orchestrator takeovers with a one-line justification each. Do not add persistent telemetry or a data store for these.
 
 ## Completion Gate
 

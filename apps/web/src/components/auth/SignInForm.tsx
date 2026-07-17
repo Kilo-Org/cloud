@@ -344,7 +344,7 @@ export function SignInForm({
                 href="/get-started"
                 className="text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
               >
-                Get started with Kilo Code
+                Install Kilo Code
               </Link>
             </div>
           )}
@@ -377,7 +377,7 @@ export function SignInForm({
                   href="/get-started"
                   className="text-brand-primary font-medium underline-offset-4 hover:underline"
                 >
-                  Get started with Kilo Code
+                  Install Kilo Code
                 </Link>
               </p>
             </div>

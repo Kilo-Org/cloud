@@ -636,6 +636,15 @@ describe('buildCouncilReviewSection', () => {
     const section = buildCouncilReviewSection(result, { gates: true });
     expect(section).toContain('vendor\\|weird');
   });
+
+  it('escapes backslashes before pipes so a pre-existing backslash cannot break the cell', () => {
+    const result = councilResult('pass', ['pass']);
+    // Raw `a\|b`: the `\` must be escaped first (→ `\\`) so the `|` we escape stays escaped.
+    result.specialists[0].model = 'a\\|b';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).toContain('a\\\\\\|b'); // `\\` (literal backslash) + `\|` (escaped pipe)
+    expect(section).not.toContain('a\\\\|b'); // the broken form (backslash + bare pipe)
+  });
 });
 
 describe('upsertCouncilVerdictInBody', () => {

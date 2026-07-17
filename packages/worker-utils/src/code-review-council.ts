@@ -538,9 +538,13 @@ const GOVERNANCE_EXPLANATIONS: Record<CouncilAggregationStrategy, string> = {
   majority: 'the merge is blocked when blocking votes outnumber passing votes',
 };
 
-/** Escapes a value for safe use inside a single markdown table cell. */
+/**
+ * Escapes a value for safe use inside a single markdown table cell. Backslashes are escaped
+ * FIRST (before pipes), otherwise a pre-existing backslash in the input would consume the
+ * escape we add to a following pipe and let the pipe break out of the cell.
+ */
 function escapeTableCell(value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
 
 /**

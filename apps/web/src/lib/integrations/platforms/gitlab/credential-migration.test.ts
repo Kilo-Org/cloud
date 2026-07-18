@@ -22,7 +22,11 @@ import {
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { runGitLabCredentialMigration } from './credential-migration';
+import {
+  processGitLabCredentialMigrationBatch,
+  runGitLabCredentialMigration,
+} from './credential-migration';
+import { emptyGitLabCredentialAuditCounts } from './credential-migration-audit';
 
 const testKeyPair = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -142,6 +146,98 @@ describe('GitLab credential migration', () => {
       { id: oauthIntegration.id, updatedAt: expect.stringContaining('2026-07-01') },
       { id: patIntegration.id, updatedAt: expect.stringContaining('2026-07-01') },
     ]);
+  });
+
+  it('resumes deterministic public-audit batches without repeating integrations', async () => {
+    const user = await insertTestUser();
+    await db.insert(platform_integrations).values([
+      {
+        id: '00000000-0000-4000-8000-000000000007',
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'pat',
+        integration_status: 'active',
+        metadata: { auth_type: 'pat', access_token: 'first-secret' },
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000008',
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'pat',
+        integration_status: 'active',
+        metadata: { auth_type: 'pat', access_token: 'second-secret' },
+      },
+    ]);
+
+    const first = await processGitLabCredentialMigrationBatch({
+      mode: 'audit',
+      apply: false,
+      batchSize: 1,
+    });
+    const second = await processGitLabCredentialMigrationBatch({
+      mode: 'audit',
+      apply: false,
+      batchSize: 1,
+      afterIntegrationId: first.nextCursor,
+    });
+
+    expect(first).toEqual(
+      expect.objectContaining({
+        complete: false,
+        nextCursor: '00000000-0000-4000-8000-000000000007',
+        scannedIntegrations: 1,
+        issueIntegrationIds: ['00000000-0000-4000-8000-000000000007'],
+      })
+    );
+    expect(second).toEqual(
+      expect.objectContaining({
+        complete: true,
+        nextCursor: null,
+        scannedIntegrations: 1,
+        issueIntegrationIds: ['00000000-0000-4000-8000-000000000008'],
+      })
+    );
+  });
+
+  it('does not treat credentials owned by other platforms as audit mismatches', async () => {
+    const user = await insertTestUser();
+    const [bitbucketIntegration] = await db
+      .insert(platform_integrations)
+      .values({
+        id: '00000000-0000-4000-8000-000000000009',
+        owned_by_user_id: user.id,
+        platform: 'bitbucket',
+        integration_type: 'oauth',
+        platform_account_id: 'workspace-1',
+        platform_account_login: 'workspace-1',
+        integration_status: 'active',
+        metadata: { state: 'active' },
+      })
+      .returning();
+    if (!bitbucketIntegration) throw new Error('Expected bitbucket integration');
+    await db.insert(platform_oauth_credentials).values({
+      platform_integration_id: bitbucketIntegration.id,
+      authorized_by_user_id: user.id,
+      provider_subject_id: 'bitbucket-user-1',
+      provider_subject_login: 'bucket-1',
+      access_token_encrypted: 'envelope',
+    });
+
+    const batch = await processGitLabCredentialMigrationBatch({
+      mode: 'audit',
+      apply: false,
+      batchSize: 100,
+    });
+
+    expect(batch).toEqual(
+      expect.objectContaining({
+        complete: true,
+        nextCursor: null,
+        scannedIntegrations: 0,
+        counts: emptyGitLabCredentialAuditCounts(),
+        issueIntegrationIds: [],
+      })
+    );
   });
 
   it('inserts a missing OAuth credential from freshly locked legacy metadata', async () => {

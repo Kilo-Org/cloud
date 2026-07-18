@@ -4216,6 +4216,77 @@ export type PlatformAccessTokenCredential = typeof platform_access_token_credent
 export type NewPlatformAccessTokenCredential =
   typeof platform_access_token_credentials.$inferInsert;
 
+export const gitlab_credential_migration_jobs = pgTable(
+  'gitlab_credential_migration_jobs',
+  {
+    id: idPrimaryKeyColumn,
+    requested_mode: text().notNull().$type<'audit' | 'backfill' | 'scrub'>(),
+    phase: text()
+      .notNull()
+      .$type<
+        | 'public_audit'
+        | 'backfill'
+        | 'private_audit'
+        | 'scrub'
+        | 'final_public_audit'
+        | 'final_private_audit'
+      >(),
+    status: text().notNull().$type<'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'>(),
+    requested_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'restrict' }),
+    cursor: text(),
+    lease_token: uuid(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    scanned_integrations: integer().notNull().default(0),
+    mutated_integrations: integer().notNull().default(0),
+    public_audit_counts: jsonb().$type<Record<string, number>>().notNull().default({}),
+    private_audit_counts: jsonb().$type<Record<string, number>>().notNull().default({}),
+    private_audit_key_id: text(),
+    private_audit_public_key_sha256: text(),
+    retry_count: integer().notNull().default(0),
+    issue_integration_ids: jsonb().$type<string[]>().notNull().default([]),
+    error_code: text(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Singleton active job: unique over a constant so at most one queued/running row exists.
+    uniqueIndex('UQ_gitlab_credential_migration_jobs_active')
+      .on(sql`(1)`)
+      .where(sql`${table.status} IN ('queued', 'running')`),
+    index('IDX_gitlab_credential_migration_jobs_created_at').on(table.created_at),
+    check(
+      'gitlab_credential_migration_jobs_mode_check',
+      sql`${table.requested_mode} IN ('audit', 'backfill', 'scrub')`
+    ),
+    check(
+      'gitlab_credential_migration_jobs_phase_check',
+      sql`${table.phase} IN ('public_audit', 'backfill', 'private_audit', 'scrub', 'final_public_audit', 'final_private_audit')`
+    ),
+    check(
+      'gitlab_credential_migration_jobs_status_check',
+      sql`${table.status} IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')`
+    ),
+    check(
+      'gitlab_credential_migration_jobs_lease_check',
+      sql`(${table.lease_token} IS NULL AND ${table.lease_expires_at} IS NULL) OR (${table.lease_token} IS NOT NULL AND ${table.lease_expires_at} IS NOT NULL)`
+    ),
+    check(
+      'gitlab_credential_migration_jobs_counter_check',
+      sql`${table.scanned_integrations} >= 0 AND ${table.mutated_integrations} >= 0 AND ${table.retry_count} >= 0`
+    ),
+  ]
+);
+
+export type GitLabCredentialMigrationJob = typeof gitlab_credential_migration_jobs.$inferSelect;
+export type NewGitLabCredentialMigrationJob = typeof gitlab_credential_migration_jobs.$inferInsert;
+
 // User Deployments
 
 export const deployments = pgTable(

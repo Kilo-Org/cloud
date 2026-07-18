@@ -7,8 +7,8 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 
-export const DEFAULT_EXPAND_WINDOW = 20;
-export const EXPAND_ALL_MAX = 100;
+const DEFAULT_EXPAND_WINDOW = 20;
+const EXPAND_ALL_MAX = 100;
 
 // Module-level style constants so FlashList content containers avoid
 // recreating object literals (and so no-inline-styles is satisfied).

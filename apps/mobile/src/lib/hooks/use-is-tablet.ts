@@ -2,9 +2,6 @@ import { Platform, useWindowDimensions } from 'react-native';
 
 import { isTabletFromDimensions } from '@/lib/hooks/is-tablet';
 
-// Re-export so the existing import path keeps working for callers.
-export { isTabletFromDimensions } from '@/lib/hooks/is-tablet';
-
 // `Platform.isPad` is a runtime constant on iOS hardware (not in the public
 // TS types for cross-platform code), so we narrow at the call site.
 function readIsPad(): boolean {

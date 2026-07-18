@@ -35,11 +35,11 @@ import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
 import {
-  type PrReviewFile,
   useFetchToCompletion,
   usePrReviewFileListQuery,
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
+import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import {
   type FileNavigatorRequest,
@@ -47,7 +47,7 @@ import {
 } from '@/lib/pr-review/file-navigator-bridge';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
-export type PrReviewFileListProps = {
+type PrReviewFileListProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

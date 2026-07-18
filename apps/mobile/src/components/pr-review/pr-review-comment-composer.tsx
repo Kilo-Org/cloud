@@ -28,7 +28,7 @@ import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useCreateReviewCommentMutation } from '@/lib/pr-review/use-pr-review-mutations';
 import { cn } from '@/lib/utils';
 
-export type PrReviewCommentComposerProps = Readonly<{
+type PrReviewCommentComposerProps = Readonly<{
   owner: string;
   repo: string;
   number: number;

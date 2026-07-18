@@ -13,7 +13,7 @@ import {
 } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { trpcClient } from '@/lib/trpc';
 
-export type UsePrDiffContextLoaderResult = {
+type UsePrDiffContextLoaderResult = {
   expandedContext: Record<string, Record<number, ExpandSeparatorState>>;
   setExpandedContext: React.Dispatch<
     React.SetStateAction<Record<string, Record<number, ExpandSeparatorState>>>

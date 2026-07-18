@@ -42,7 +42,7 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const REPLY_PLACEHOLDER = 'Reply…';
 
-export type DiscussionThreadProps = {
+type DiscussionThreadProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

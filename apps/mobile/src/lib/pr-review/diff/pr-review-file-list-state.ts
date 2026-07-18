@@ -22,24 +22,9 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import {
-  PR_REVIEW_FILES_PAGE_SIZE,
-  PR_REVIEW_MAX_LISTED_FILES,
-  PR_REVIEW_MAX_PAGES,
-  type PrReviewFile,
-} from '@/lib/pr-review/diff/pr-review-file-types';
+import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
 import { getViewedFiles, toggleViewedFile } from '@/lib/pr-review/viewed-files';
 import { useTRPC } from '@/lib/trpc';
-
-// Re-export the pure file types/constants so existing consumers that import
-// them from this module keep working (single source of truth lives in
-// `pr-review-file-types`, which has no React/react-query import).
-export {
-  PR_REVIEW_FILES_PAGE_SIZE,
-  PR_REVIEW_MAX_LISTED_FILES,
-  PR_REVIEW_MAX_PAGES,
-  type PrReviewFile,
-};
 
 export function usePrReviewFileListQuery(args: {
   owner: string;

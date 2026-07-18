@@ -24,7 +24,7 @@ import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-q
 import { WEB_BASE_URL } from '@/lib/config';
 import { useTRPC } from '@/lib/trpc';
 
-export type PrReviewOverviewProps = {
+type PrReviewOverviewProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

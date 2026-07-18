@@ -12,7 +12,6 @@ export type PrReviewFile = {
   patchMissing: boolean;
 };
 
-export const PR_REVIEW_FILES_PAGE_SIZE = 100;
 export const PR_REVIEW_MAX_LISTED_FILES = 3000;
 
 // Server caps cursor at 60 (per the S2 read DTO contract). Pages after

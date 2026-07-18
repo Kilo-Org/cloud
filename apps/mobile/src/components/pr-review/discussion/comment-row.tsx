@@ -21,7 +21,7 @@ import {
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 import { View } from 'react-native';
 
-export type CommentRowProps = {
+type CommentRowProps = {
   readonly comment: ReviewComment;
   readonly onToggleReaction: (content: ReviewReactionContent) => void;
   readonly reactionsDisabled?: boolean;

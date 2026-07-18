@@ -11,7 +11,7 @@ import {
   type ListItem,
 } from '@/lib/pr-review/diff/pr-diff-list-items';
 
-export function deriveSeparatorState(
+function deriveSeparatorState(
   state: ExpandSeparatorState,
   loadedCount: number
 ): ExpandSeparatorItem['state'] {

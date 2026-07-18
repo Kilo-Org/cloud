@@ -11,7 +11,7 @@ type ViewedFileMap = Record<string, ViewedFileEntry>;
 
 const VIEWED_FILES_PR_LIMIT = 20;
 
-export type ViewedFilePrRef = {
+type ViewedFilePrRef = {
   owner: string;
   repo: string;
   number: number;
@@ -36,7 +36,7 @@ async function enqueueWrite(op: () => Promise<void>): Promise<void> {
   await next;
 }
 
-export function viewedFilesKey(ref: ViewedFilePrRef): string {
+function viewedFilesKey(ref: ViewedFilePrRef): string {
   return `${ref.owner.toLowerCase()}/${ref.repo.toLowerCase()}#${ref.number}`;
 }
 
@@ -116,7 +116,7 @@ export async function getViewedFiles(ref: ViewedFilePrRef, headSha: string): Pro
  * almost certainly stale and shouldn't be re-marked). The map itself is
  * LRU-trimmed to VIEWED_FILES_PR_LIMIT PRs by most-recently-touched.
  */
-export type ToggleViewedFileInput = ViewedFilePrRef & {
+type ToggleViewedFileInput = ViewedFilePrRef & {
   headSha: string;
   path: string;
 };

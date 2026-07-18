@@ -5,7 +5,7 @@ import {
 
 export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
 
-export type BuildSubmitReviewInputArgs = {
+type BuildSubmitReviewInputArgs = {
   owner: string;
   repo: string;
   number: number;

@@ -41,19 +41,6 @@ async function invalidateReviewCaches(
   ]);
 }
 
-export type CreateReviewCommentInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  body: string;
-  path: string;
-  line: number;
-  side: 'LEFT' | 'RIGHT';
-  startLine?: number;
-  startSide?: 'LEFT' | 'RIGHT';
-  commitSha: string;
-};
-
 export function useCreateReviewCommentMutation(ref: PrRef) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

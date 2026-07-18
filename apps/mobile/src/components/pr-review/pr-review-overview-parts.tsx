@@ -13,9 +13,9 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-export type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
+type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 
-export type PrStateChipDescriptor = {
+type PrStateChipDescriptor = {
   label: string;
   tone: PrStateChipTone;
   icon: LucideIcon;

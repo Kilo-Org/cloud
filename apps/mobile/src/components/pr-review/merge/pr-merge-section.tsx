@@ -36,7 +36,7 @@ import {
   TerminalChip,
 } from '@/components/pr-review/merge/pr-merge-section-parts';
 
-export type PrMergeSectionProps = Readonly<{
+type PrMergeSectionProps = Readonly<{
   owner: string;
   repo: string;
   overview: PrOverviewDto;

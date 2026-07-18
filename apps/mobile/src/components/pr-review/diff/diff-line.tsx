@@ -72,7 +72,7 @@ const TOKEN_DARK_LIGHT: Record<string, { light: string; dark: string }> = {
 const DEFAULT_TOKEN_COLOR = { light: '#14130F', dark: '#F2F0EB' };
 const MUTED_COLOR = { light: '#6F6A61', dark: '#8A8680' };
 
-export type DiffLineProps = {
+type DiffLineProps = {
   line: ParsedDiffLine;
   language: string | null;
   keyId: string;

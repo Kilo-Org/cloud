@@ -34,7 +34,7 @@ import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
 import { cn } from '@/lib/utils';
 
-export type PrReviewSubmitProps = Readonly<{
+type PrReviewSubmitProps = Readonly<{
   owner: string;
   repo: string;
   number: number;

@@ -19,7 +19,7 @@ import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
-export type PrReviewChecksSectionProps = {
+type PrReviewChecksSectionProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

@@ -38,7 +38,7 @@ export type PrOverviewDto = {
   repo: PrOverviewRepoSettings;
 };
 
-export type MergeabilityStatus = 'unknown' | 'blocked' | 'mergeable' | 'terminal';
+type MergeabilityStatus = 'unknown' | 'blocked' | 'mergeable' | 'terminal';
 
 export type MergeBlockedReasonId =
   | 'conflicts'
@@ -260,12 +260,6 @@ export const PR_MERGE_LABELS: Record<AllowedMergeMethod, string> = {
   merge: 'Create a merge commit',
   squash: 'Squash and merge',
   rebase: 'Rebase and merge',
-};
-
-export const PR_MERGE_AUTO_METHODS: Record<AllowedMergeMethod, 'MERGE' | 'SQUASH' | 'REBASE'> = {
-  merge: 'MERGE',
-  squash: 'SQUASH',
-  rebase: 'REBASE',
 };
 
 export const PR_MERGE_DESCRIPTIONS: Record<AllowedMergeMethod, string> = {

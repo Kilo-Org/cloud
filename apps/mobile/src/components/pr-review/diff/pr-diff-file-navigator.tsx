@@ -26,14 +26,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
-  type PrReviewFile,
   useFetchToCompletion,
   usePrReviewFileListQuery,
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
+import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-export type PrDiffFileNavigatorProps = {
+type PrDiffFileNavigatorProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

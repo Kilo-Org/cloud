@@ -9,7 +9,7 @@
 // the same decision tree. No React, no react-query, no expo modules —
 // that keeps it testable in plain Node.
 
-export type PrReviewQueryState =
+type PrReviewQueryState =
   | {
       /**
        * The fetch failed with a transient error (network, 5xx, etc.). The
@@ -96,7 +96,7 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   return { kind: 'retryable' };
 }
 
-export type PrReviewMutationErrorState =
+type PrReviewMutationErrorState =
   | {
       /**
        * The mutation failed with a transient error (network, 5xx, etc.).

@@ -12,7 +12,7 @@
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-list-state';
+import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 function splitPath(path: string): { dir: string; basename: string } {

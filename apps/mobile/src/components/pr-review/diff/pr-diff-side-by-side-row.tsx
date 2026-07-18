@@ -72,7 +72,7 @@ const TOKEN_DARK_LIGHT: Record<string, { light: string; dark: string }> = {
 const DEFAULT_TOKEN_COLOR = { light: '#14130F', dark: '#F2F0EB' };
 const MUTED_COLOR = { light: '#6F6A61', dark: '#8A8680' };
 
-export type SideBySideRowProps = {
+type SideBySideRowProps = {
   row: SideBySideRowData;
   language: string | null;
   rowKeyId: string;
@@ -302,7 +302,7 @@ export const SideBySideRow = memo(
     prev.isSelected === next.isSelected
 );
 
-export type HunkSideBySideHeaderProps = {
+type HunkSideBySideHeaderProps = {
   hunk: ParsedHunk;
 };
 

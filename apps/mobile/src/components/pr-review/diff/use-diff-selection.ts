@@ -15,7 +15,7 @@ import {
 import { type SelectionState, selectLine } from '@/lib/pr-review/diff-selection';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
 
-export type UseDiffSelectionArgs = {
+type UseDiffSelectionArgs = {
   owner: string;
   repo: string;
   number: number;
@@ -23,7 +23,7 @@ export type UseDiffSelectionArgs = {
   isTablet: boolean;
 };
 
-export type UseDiffSelectionResult = {
+type UseDiffSelectionResult = {
   selection: SelectionState | null;
   selectionView: SelectionView;
   handleLineTap: (args: LineTapArgs) => void;
@@ -119,5 +119,3 @@ export function useDiffSelection({
 
   return { selection, selectionView, handleLineTap, clearSelection };
 }
-
-export type { SelectionView };

@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
-export type PrDiffFloatingActionsProps = Readonly<{
+type PrDiffFloatingActionsProps = Readonly<{
   owner: string;
   repo: string;
   number: number;

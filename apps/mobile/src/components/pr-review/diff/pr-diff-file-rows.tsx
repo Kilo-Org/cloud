@@ -8,7 +8,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-list-state';
+import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 
 function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: boolean }) {
   const colors = useThemeColors();

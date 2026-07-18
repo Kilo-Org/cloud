@@ -40,7 +40,7 @@ const REACTION_EMOJI: Record<ReviewReactionContent, string> = {
   EYES: '👀',
 };
 
-export type ReactionsRowProps = {
+type ReactionsRowProps = {
   // Raw reactions from the DTO — `content` is a plain string (GitHub can
   // return content outside the 8 emoji). We index by string and only render
   // + toggle the fixed 8 known reactions.

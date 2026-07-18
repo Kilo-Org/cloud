@@ -2,7 +2,7 @@
 // `pr-merge-section.tsx` so the section file stays under the
 // repo's 300-line limit.
 
-import { GitMerge, type LucideIcon, RefreshCw } from 'lucide-react-native';
+import { type LucideIcon, RefreshCw } from 'lucide-react-native';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -146,19 +146,5 @@ export function AutoMergeEnabledBanner({
         <Text>Disable auto-merge</Text>
       </Button>
     </View>
-  );
-}
-
-export function MergeNowButton({
-  onPress,
-  accessibilityLabel,
-}: Readonly<{ onPress: () => void; accessibilityLabel: string }>) {
-  return (
-    <Button onPress={onPress} accessibilityLabel={accessibilityLabel}>
-      <View className="flex-row items-center gap-2">
-        <GitMerge size={14} color={undefined} />
-        <Text>Merge now</Text>
-      </View>
-    </Button>
   );
 }

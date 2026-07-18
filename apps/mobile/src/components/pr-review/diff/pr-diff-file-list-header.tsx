@@ -19,7 +19,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { cn } from '@/lib/utils';
 
-export type PrDiffFileListHeaderProps = {
+type PrDiffFileListHeaderProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

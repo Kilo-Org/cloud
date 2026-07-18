@@ -1,6 +1,6 @@
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 
-export type PrReviewFilesTabProps = {
+type PrReviewFilesTabProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

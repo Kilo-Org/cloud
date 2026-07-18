@@ -10,7 +10,7 @@ type RawComposerParams = {
   startLine?: string | string[] | undefined;
 };
 
-export type ParsedComposerParams = {
+type ParsedComposerParams = {
   owner: string;
   repo: string;
   number: number;

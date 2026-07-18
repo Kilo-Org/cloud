@@ -119,7 +119,7 @@ export type ListItem =
 
 export type DiffViewMode = 'unified' | 'side-by-side';
 
-export const ITEM_TYPE = {
+const ITEM_TYPE = {
   Truncation: 'truncation',
   FileHeader: 'file-header',
   FilePatchMissing: 'file-patch-missing',

@@ -7,9 +7,7 @@ export {
   TruncationBannerRow,
 } from '@/components/pr-review/diff/pr-diff-file-rows';
 export {
-  DEFAULT_EXPAND_WINDOW,
   EmptyFilesView,
-  EXPAND_ALL_MAX,
   ExpandSeparatorRow,
   HunkHeaderRow,
   LIST_CONTENT_STYLE,

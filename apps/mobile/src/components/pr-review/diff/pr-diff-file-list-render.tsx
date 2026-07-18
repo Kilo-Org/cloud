@@ -7,13 +7,11 @@ import { useCallback } from 'react';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
 import {
-  EmptyFilesView,
   ExpandSeparatorRow,
   FileHeaderRow,
   HunkHeaderRow,
   PaginationRow,
   PatchMissingRow,
-  TabStateMessage,
   TruncationBannerRow,
 } from '@/components/pr-review/diff/pr-diff-rows';
 import {
@@ -25,11 +23,10 @@ import { type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { sideForDiffLineType } from '@/lib/pr-review/diff-selection';
 import {
   type FetchToCompletionResult,
-  type PrReviewFile,
   type UsePrReviewFileListQueryResult,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 
-export type UseDiffRenderItemArgs = {
+type UseDiffRenderItemArgs = {
   viewed: {
     isViewed: (path: string) => boolean;
     toggle: (path: string) => Promise<void>;
@@ -48,7 +45,7 @@ export type UseDiffRenderItemArgs = {
 /** Lightweight view of the current selection — what the rows need to
  *  decide whether to paint the focus ring. The full `DiffSelection`
  *  (incl. `selectedText`) is in the bridge, not here. */
-export type SelectionView = {
+type SelectionView = {
   filePath: string;
   side: 'LEFT' | 'RIGHT';
   startLine: number;
@@ -64,14 +61,6 @@ export type LineTapArgs = {
   /** The full hunk — the reducer needs the line-number → text map. */
   hunk: ParsedHunk;
 };
-
-// Re-exported here so the file-list module can import the terminal
-// state views from one place.
-export { EmptyFilesView, TabStateMessage };
-
-// Re-export so the file-list module can keep its PrReviewFile import
-// without touching the file-list-types module.
-export type { PrReviewFile };
 
 export function useDiffRenderItem({
   viewed,

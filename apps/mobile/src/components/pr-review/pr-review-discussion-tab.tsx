@@ -54,7 +54,7 @@ import {
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { cn } from '@/lib/utils';
 
-export type PrReviewDiscussionTabProps = {
+type PrReviewDiscussionTabProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;

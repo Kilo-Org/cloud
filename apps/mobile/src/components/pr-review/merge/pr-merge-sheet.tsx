@@ -38,9 +38,9 @@ import {
   MethodPicker,
 } from '@/components/pr-review/merge/pr-merge-sheet-parts';
 
-export type PrMergeSheetMode = 'merge' | 'enable-auto-merge';
+type PrMergeSheetMode = 'merge' | 'enable-auto-merge';
 
-export type PrMergeSheetProps = Readonly<{
+type PrMergeSheetProps = Readonly<{
   owner: string;
   /** The GitHub repository name (the `repo` path segment, not the settings object). */
   repoName: string;

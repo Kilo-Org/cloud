@@ -46,20 +46,14 @@ export const REVIEW_REACTION_CONTENTS: readonly ReviewReactionContent[] = [
   'EYES',
 ] as const;
 
-function isReviewReactionContent(value: string): value is ReviewReactionContent {
-  return (REVIEW_REACTION_CONTENTS as readonly string[]).includes(value);
-}
-
 // Derive the wire (DTO) shapes from the tRPC `listReviewThreads` output so a
 // backend contract change (fields, nullability) is type-checked here rather
 // than silently drifting from a hand-copied shape (apps/mobile/AGENTS.md).
 // `reactions[].content` is typed as a plain `string` by tRPC; we narrow it to
-// `ReviewReactionContent` at the comment-row boundary via `narrowReactionContent`.
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 export type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
 export type ReviewThread = ReviewThreadsPage['threads'][number];
 export type ReviewComment = ReviewThread['comments'][number];
-export type ReviewReaction = ReviewComment['reactions'][number];
 
 // The shape of a single page in the cached `InfiniteData<ReviewThreadsPage>`
 // produced by `useInfiniteQuery(trpc.githubPrReview.listReviewThreads…)`.
@@ -141,7 +135,7 @@ export function selectCommentAuthorName(author: ReviewComment['author']): string
  * grouping is deterministic (Map insertion order = API order) so
  * snapshots are stable across renders.
  */
-export type ReviewThreadGroup = {
+type ReviewThreadGroup = {
   readonly path: string;
   readonly threads: readonly ReviewThread[];
 };
@@ -288,13 +282,4 @@ export function findReviewComment(
     }
   }
   return null;
-}
-
-/**
- * Narrow a `string` reaction content to the known union. Returns
- * `null` for unknown values so callers can fall back to a safe
- * default (e.g. show the emoji verbatim or skip rendering).
- */
-export function narrowReactionContent(value: string): ReviewReactionContent | null {
-  return isReviewReactionContent(value) ? value : null;
 }

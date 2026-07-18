@@ -1,0 +1,159 @@
+// A single line of a diff, rendered in JetBrains Mono with syntax
+// highlighting, a gutter for old/new line numbers, and a tinted
+// background that signals add / del / context.
+//
+// We render fixed-height rows (height = lineHeight + vertical padding)
+// so FlashList can virtualize without measuring each row. The diff
+// surface renders thousands of lines and remeasuring on every scroll
+// frame would destroy scroll perf on mid-tier Android devices.
+
+import { memo, useMemo } from 'react';
+import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
+import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
+import { cn } from '@/lib/utils';
+
+const LINE_HEIGHT = 18;
+const VERTICAL_PADDING = 2;
+const GUTTER_WIDTH = 56;
+const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
+
+const ROW_MIN_HEIGHT = LINE_HEIGHT + VERTICAL_PADDING * 2;
+const ROW_STYLE: ViewStyle = { minHeight: ROW_MIN_HEIGHT };
+const GUTTER_STYLE: ViewStyle = {
+  width: GUTTER_WIDTH,
+  height: ROW_MIN_HEIGHT,
+};
+const CODE_CONTAINER_STYLE: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+const CODE_BASE_STYLE: TextStyle = {
+  fontFamily: 'JetBrainsMono_500Medium',
+  fontSize: 12,
+  lineHeight: LINE_HEIGHT,
+};
+const GUTTER_TEXT_BASE: TextStyle = {
+  fontFamily: 'JetBrainsMono_500Medium',
+  fontSize: 11,
+  lineHeight: LINE_HEIGHT,
+};
+const NO_NEWLINE_BASE: TextStyle = {
+  fontFamily: 'JetBrainsMono_500Medium',
+  fontSize: 11,
+  lineHeight: LINE_HEIGHT,
+};
+
+const TOKEN_DARK_LIGHT: Record<string, { light: string; dark: string }> = {
+  keyword: { light: '#7B2CBF', dark: '#D8B4FE' },
+  builtin: { light: '#1F6FEB', dark: '#79B8FF' },
+  literal: { light: '#7B2CBF', dark: '#D8B4FE' },
+  number: { light: '#B27214', dark: '#F2B05F' },
+  string: { light: '#278150', dark: '#5FCB8E' },
+  comment: { light: '#6F6A61', dark: '#8A8680' },
+  type: { light: '#1F6FEB', dark: '#79B8FF' },
+  function: { light: '#1F6FEB', dark: '#79B8FF' },
+  variable: { light: '#14130F', dark: '#F2F0EB' },
+  property: { light: '#1F6FEB', dark: '#79B8FF' },
+  tag: { light: '#BE4E3F', dark: '#F28B7A' },
+  selector: { light: '#7B2CBF', dark: '#D8B4FE' },
+  attribute: { light: '#1F6FEB', dark: '#79B8FF' },
+  operator: { light: '#6F6A61', dark: '#8A8680' },
+  meta: { light: '#6F6A61', dark: '#8A8680' },
+  add: { light: '#278150', dark: '#5FCB8E' },
+  del: { light: '#BE4E3F', dark: '#F28B7A' },
+};
+
+const DEFAULT_TOKEN_COLOR = { light: '#14130F', dark: '#F2F0EB' };
+const MUTED_COLOR = { light: '#6F6A61', dark: '#8A8680' };
+
+export type DiffLineProps = {
+  line: ParsedDiffLine;
+  language: string | null;
+  keyId: string;
+};
+
+function gutterTextFor(line: ParsedDiffLine): string {
+  if (line.type === 'add') {
+    return `${line.newLine ?? ''}`;
+  }
+  if (line.type === 'del') {
+    return `${line.oldLine ?? ''}`;
+  }
+  return `${line.oldLine ?? line.newLine ?? ''}`;
+}
+
+function rowBackgroundFor(type: ParsedDiffLine['type']): string {
+  if (type === 'add') {
+    return 'bg-good-tile-bg';
+  }
+  if (type === 'del') {
+    return 'bg-danger-tile-bg';
+  }
+  return 'bg-transparent';
+}
+
+function tokenColorFor(className: string | null, isDark: boolean): string {
+  if (!className) {
+    return isDark ? DEFAULT_TOKEN_COLOR.dark : DEFAULT_TOKEN_COLOR.light;
+  }
+  const palette = TOKEN_DARK_LIGHT[className];
+  if (!palette) {
+    return isDark ? DEFAULT_TOKEN_COLOR.dark : DEFAULT_TOKEN_COLOR.light;
+  }
+  return isDark ? palette.dark : palette.light;
+}
+
+function DiffLineImpl({ line, language }: Readonly<DiffLineProps>) {
+  const colors = useThemeColors();
+  const isDark = colors.background === '#0E0E10';
+
+  const tokens = useMemo<HighlightToken[]>(
+    () => highlightLine(line.text, language),
+    [language, line.text]
+  );
+
+  const gutterText = gutterTextFor(line);
+  const rowBackground = rowBackgroundFor(line.type);
+  const gutterColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
+  const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
+  const noNewlineLabel = ` ${NO_NEWLINE_INDICATOR}`;
+
+  return (
+    <View className={cn('flex-row items-stretch', rowBackground)} style={ROW_STYLE}>
+      <View className="items-end justify-center pr-2" style={GUTTER_STYLE}>
+        {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for gutter */}
+        <RNText allowFontScaling={false} style={{ ...GUTTER_TEXT_BASE, color: gutterColor }}>
+          {gutterText}
+        </RNText>
+      </View>
+      <View className="flex-1" style={CODE_CONTAINER_STYLE} accessibilityLabel={line.text}>
+        {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for code */}
+        <RNText
+          allowFontScaling={false}
+          selectable
+          style={{ ...CODE_BASE_STYLE, color: colors.foreground }}
+        >
+          {tokens.map((token, index) => {
+            const tokenColor = tokenColorFor(token.className, isDark);
+            return (
+              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
+              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
+                {token.text}
+              </RNText>
+            );
+          })}
+          {line.noNewlineAtEndOfFile ? (
+            // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
+            <RNText style={{ ...NO_NEWLINE_BASE, color: noNewlineColor }}>{noNewlineLabel}</RNText>
+          ) : null}
+        </RNText>
+      </View>
+    </View>
+  );
+}
+
+export const DiffLine = memo(
+  DiffLineImpl,
+  (prev, next) =>
+    prev.keyId === next.keyId && prev.language === next.language && prev.line === next.line
+);

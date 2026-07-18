@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
@@ -92,9 +92,21 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     })();
   }, [queryClient, trpc, owner, repo, number, pr.data?.headSha]);
 
-  let body: React.ReactNode = null;
+  // Each tab owns its own scroll: Overview is a ScrollView with
+  // pull-to-refresh; the Files tab hosts a virtualized FlashList and must
+  // NOT be nested inside a ScrollView.
+  let body: ReactNode = null;
   if (tab === 'overview') {
-    body = <PrReviewOverview owner={owner} repo={repo} number={number} isActive />;
+    body = (
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="gap-5 px-4 pb-12"
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        <PrReviewOverview owner={owner} repo={repo} number={number} isActive />
+      </ScrollView>
+    );
   } else if (tab === 'files') {
     body = (
       <PrReviewFilesTab
@@ -103,6 +115,9 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         number={number}
         headSha={pr.data?.headSha ?? ''}
         changedFiles={pr.data?.counts.changedFiles ?? 0}
+        onRequestOverview={() => {
+          setTab('overview');
+        }}
       />
     );
   } else {
@@ -112,15 +127,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={`#${number}`} eyebrow={`${owner}/${repo}`} />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-5 px-4 pb-12 pt-3"
-        keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
+      <View className="px-4 pb-2 pt-3">
         <PrReviewTabSelector activeTab={tab} onChange={setTab} />
-        {body}
-      </ScrollView>
+      </View>
+      {body}
     </View>
   );
 }

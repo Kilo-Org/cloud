@@ -1,26 +1,21 @@
-import { FileText } from 'lucide-react-native';
-import { View } from 'react-native';
-
-import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 
 export type PrReviewFilesTabProps = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
-  /** Head SHA at the time the Overview was loaded — S6b's diff uses this to keep the file list stable. */
+  /** Head SHA at the time the Overview was loaded — keeps the file list stable. */
   readonly headSha: string;
-  /** File count from the Overview DTO so S6b can pre-size the list header. */
+  /** File count from the Overview DTO for the >3,000-file truncation banner. */
   readonly changedFiles: number;
+  /** Invoked by the empty state ("0 changed files") to jump back to Overview. */
+  readonly onRequestOverview?: () => void;
 };
 
 /**
- * Placeholder body for the Files tab. S5 only renders a centered
- * "Files view coming soon" so the tab shell can be exercised end-to-end;
- * S6b replaces the body with the diff list + file navigator mount.
- *
- * The prop contract is deliberately fixed here so S6b only has to
- * implement the body without re-touching `pr-review-screen.tsx`.
+ * Files tab: hosts the S6b diff file list (a virtualized FlashList, so the
+ * screen renders this outside its Overview ScrollView). S6c layers the file
+ * navigator sheet and the tablet unified/side-by-side toggle on top of this.
  */
 export function PrReviewFilesTab({
   owner,
@@ -28,20 +23,16 @@ export function PrReviewFilesTab({
   number,
   headSha,
   changedFiles,
+  onRequestOverview,
 }: PrReviewFilesTabProps) {
-  const colors = useThemeColors();
   return (
-    <View
-      accessibilityLabel="Files tab"
-      className="flex-1 items-center justify-center gap-2 px-6 py-12"
-    >
-      <FileText size={28} color={colors.mutedForeground} />
-      <Text variant="muted" className="text-center">
-        Files view for {owner}/{repo}#{number} ({changedFiles} files) coming soon.
-      </Text>
-      <Text variant="muted" className="text-center text-xs">
-        head {headSha.slice(0, 7)}
-      </Text>
-    </View>
+    <PrReviewFileList
+      owner={owner}
+      repo={repo}
+      number={number}
+      headSha={headSha}
+      changedFiles={changedFiles}
+      onRequestOverview={onRequestOverview}
+    />
   );
 }

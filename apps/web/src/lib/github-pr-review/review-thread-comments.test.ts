@@ -63,19 +63,18 @@ describe('fetchAllThreadComments', () => {
     expect(comments.map(c => c.databaseId)).toEqual([1, 2, 3]);
     expect(request).toHaveBeenCalledTimes(2);
 
-    // The follow-up query must reference only $threadId/$first/$after (no
-    // unused $owner/$name/$number that GraphQL would reject).
-    const [, firstVars] = request.mock.calls[0] as [string, Record<string, unknown>];
-    expect(firstVars.query).toBe(REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST);
-    expect(firstVars).toEqual({
+    // GraphQL variables must be nested under `variables` (GitHub — and a
+    // faithful mock — ignore top-level params), and the follow-up query must
+    // reference only $threadId/$first/$after (no unused $owner/$name/$number).
+    const [, firstArgs] = request.mock.calls[0] as [string, Record<string, unknown>];
+    expect(firstArgs.query).toBe(REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST);
+    expect(firstArgs).toEqual({
       query: REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST,
-      threadId: 'thread_1',
-      first: 50,
-      after: 'c1',
+      variables: { threadId: 'thread_1', first: 50, after: 'c1' },
     });
     expect(REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST).not.toMatch(/\$owner|\$name|\$number/);
 
-    const [, secondVars] = request.mock.calls[1] as [string, Record<string, unknown>];
-    expect(secondVars.after).toBe('c2');
+    const [, secondArgs] = request.mock.calls[1] as [string, { variables: Record<string, unknown> }];
+    expect(secondArgs.variables.after).toBe('c2');
   });
 });

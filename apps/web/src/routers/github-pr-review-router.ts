@@ -411,9 +411,7 @@ export async function fetchAllThreadComments(args: {
   while (hasNext && cursor) {
     const response = (await octokit.request('POST /graphql', {
       query: REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
-      threadId,
-      first: 50,
-      after: cursor,
+      variables: { threadId, first: 50, after: cursor },
     })) as {
       data: {
         data: { node: { comments: GraphQlCommentConnection } | null } | null;
@@ -440,11 +438,13 @@ async function fetchReviewThreadsPage(args: {
   const { octokit, owner, repo, number, cursor } = args;
   const response = (await octokit.request('POST /graphql', {
     query: REVIEW_THREADS_QUERY,
-    owner,
-    name: repo,
-    number,
-    first: REVIEW_THREADS_PAGE_SIZE,
-    after: cursor ?? null,
+    variables: {
+      owner,
+      name: repo,
+      number,
+      first: REVIEW_THREADS_PAGE_SIZE,
+      after: cursor ?? null,
+    },
   })) as {
     data: {
       data: {
@@ -479,7 +479,7 @@ async function runGraphQlMutation<T>(args: {
   const { octokit, query, variables } = args;
   const response = (await octokit.request('POST /graphql', {
     query,
-    ...variables,
+    variables,
   })) as GraphQlMutationResponse<T>;
   throwTrpcFromGraphQlErrors(response.data.errors as never);
   const payload = response.data.data;
@@ -532,9 +532,7 @@ export const githubPrReviewRouter = createTRPCRouter({
         try {
           const gqlResp = (await octokit.request('POST /graphql', {
             query: PULL_REQUEST_FRAGMENT_QUERY,
-            owner: input.owner,
-            name: input.repo,
-            number: input.number,
+            variables: { owner: input.owner, name: input.repo, number: input.number },
           })) as { data: { data: OverviewGraphQl | null; errors?: unknown } };
           throwTrpcFromGraphQlErrors(gqlResp.data.errors as never);
           graphQl = gqlResp.data.data ?? null;

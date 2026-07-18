@@ -17,11 +17,11 @@
 
 import * as Haptics from 'expo-haptics';
 import { Check, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
-import { Button } from '@/components/ui/button';
+import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { Text } from '@/components/ui/text';
 import {
   type ReviewComment,
@@ -39,8 +39,6 @@ import {
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
-
-const REPLY_PLACEHOLDER = 'Reply…';
 
 type DiscussionThreadProps = {
   readonly owner: string;
@@ -254,86 +252,5 @@ function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveTogglePr
         {resolved ? 'Resolved' : 'Resolve'}
       </Text>
     </Pressable>
-  );
-}
-
-// ── Reply input (uncontrolled) ────────────────────────────────────────
-
-type ReplyInputProps = {
-  readonly owner: string;
-  readonly repo: string;
-  readonly number: number;
-  readonly commentId: number;
-  readonly reply: ReturnType<typeof useReplyToCommentMutation>;
-};
-
-function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<ReplyInputProps>) {
-  const colors = useThemeColors();
-  const bodyRef = useRef<string>('');
-  const inputRef = useRef<TextInput | null>(null);
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const [resetKey, setResetKey] = useState(0);
-
-  // Mirror mutation error into the inline box. Reply is NOT
-  // optimistic, so the user can hit the inline error and retry
-  // without waiting for a re-fetch.
-  useEffect(() => {
-    if (reply.error) {
-      const message = reply.error instanceof Error ? reply.error.message : 'Could not reply.';
-      setInlineError(message);
-    }
-  }, [reply.error]);
-
-  const submit = () => {
-    const body = bodyRef.current.trim();
-    if (!body || reply.isPending) {
-      return;
-    }
-    setInlineError(null);
-    reply.mutate(
-      { owner, repo, number, commentId, body },
-      {
-        onSuccess: () => {
-          bodyRef.current = '';
-          setResetKey(prev => prev + 1);
-        },
-      }
-    );
-  };
-
-  return (
-    <View className="gap-2">
-      <TextInput
-        key={resetKey}
-        ref={inputRef}
-        defaultValue=""
-        editable={!reply.isPending}
-        placeholder={REPLY_PLACEHOLDER}
-        placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Reply body"
-        onChangeText={value => {
-          bodyRef.current = value;
-          if (inlineError) {
-            setInlineError(null);
-          }
-        }}
-        multiline
-        textAlignVertical="top"
-        className="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
-      />
-      {inlineError ? <Text className="text-xs text-destructive">{inlineError}</Text> : null}
-      <View className="flex-row justify-end">
-        <Button
-          size="sm"
-          variant="outline"
-          loading={reply.isPending}
-          disabled={reply.isPending}
-          onPress={submit}
-          accessibilityLabel="Submit reply"
-        >
-          <Text>Reply</Text>
-        </Button>
-      </View>
-    </View>
   );
 }

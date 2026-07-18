@@ -21,6 +21,8 @@ import { Alert, ScrollView, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { type DiffSelection, getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
@@ -60,20 +62,38 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [inlineErrorKind, setInlineErrorKind] = useState<
+    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
+  >(null);
 
   const isSubmitting = createComment.isPending;
   const lineRangeLabel = rangeLabel(line, startLine);
 
-  // When the mutation errors, mirror its message into the inline error
-  // box. The hook toasts the same message; this box is the one the
-  // user actually sees in the formSheet.
+  // When the mutation errors, classify it and mirror a short message into
+  // the inline error box. The hook toasts the same message; this box is
+  // the one the user actually sees in the formSheet.
   useEffect(() => {
     if (createComment.error) {
-      const message =
-        createComment.error instanceof Error
-          ? createComment.error.message
-          : 'Could not post comment.';
-      setInlineError(message);
+      const classification = classifyPrReviewMutationError(createComment.error);
+      if (classification.kind === 'bad-request') {
+        setInlineError(
+          "This comment can't be posted. The selected line may have changed, or the PR may have been updated."
+        );
+        setInlineErrorKind('bad-request');
+      } else if (classification.kind === 'forbidden') {
+        setInlineError("You don't have permission to post a comment on this pull request.");
+        setInlineErrorKind('forbidden');
+      } else if (classification.kind === 'reconnect') {
+        setInlineError('GitHub connection expired.');
+        setInlineErrorKind('reconnect');
+      } else {
+        const message =
+          createComment.error instanceof Error
+            ? createComment.error.message
+            : 'Could not post comment.';
+        setInlineError(message);
+        setInlineErrorKind('retryable');
+      }
     }
   }, [createComment.error]);
 
@@ -84,6 +104,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     setInlineError(null);
+    setInlineErrorKind(null);
     pending.addComment({
       id: Crypto.randomUUID(),
       path,
@@ -101,9 +122,11 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     const body = bodyRef.current;
     if (body.trim().length === 0) {
       setInlineError('Comment body cannot be empty.');
+      setInlineErrorKind('bad-request');
       return;
     }
     setInlineError(null);
+    setInlineErrorKind(null);
     try {
       await createComment.mutateAsync({
         owner,
@@ -121,12 +144,10 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDismiss();
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        setInlineError(error.message);
-      } else {
-        setInlineError('Could not post comment.');
-      }
+    } catch {
+      // The mutation's error is already classified into inlineError by
+      // the effect above; swallow here so it doesn't become an unhandled
+      // promise rejection.
     }
   }
 
@@ -199,7 +220,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             <Text>Insert suggestion</Text>
           </Button>
         </View>
-        {inlineError ? (
+        {inlineError && inlineErrorKind !== 'reconnect' ? (
           <View
             className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 p-3"
             accessibilityLiveRegion="polite"
@@ -207,6 +228,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             <Text className="text-sm text-destructive">{inlineError}</Text>
           </View>
         ) : null}
+        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
       </ScrollView>
 
       <View className="border-t-[0.5px] border-hair-soft bg-background px-6 pb-6 pt-3">
@@ -215,7 +237,12 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
             void handleCommentNow();
           }}
           loading={isSubmitting}
-          disabled={isSubmitting}
+          disabled={
+            isSubmitting ||
+            inlineErrorKind === 'bad-request' ||
+            inlineErrorKind === 'forbidden' ||
+            inlineErrorKind === 'reconnect'
+          }
           accessibilityLabel="Comment now"
         >
           <Text>Comment now</Text>

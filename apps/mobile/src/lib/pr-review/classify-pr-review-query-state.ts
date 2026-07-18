@@ -99,8 +99,9 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
 type PrReviewMutationErrorState =
   | {
       /**
-       * The mutation failed with a transient error (network, 5xx, etc.).
-       * The caller should keep the retry affordance available.
+       * The mutation failed with a transient error (network, 5xx, rate
+       * limit, etc.). The caller should keep the retry affordance
+       * available.
        */
       kind: 'retryable';
     }
@@ -114,6 +115,24 @@ type PrReviewMutationErrorState =
       kind: 'bad-request';
       /** Original error message, suitable for logging but not the UI. */
       message: string;
+    }
+  | {
+      /**
+       * The mutation failed with a permanent permission error. The
+       * caller should show a specific inline message and remove the
+       * retry affordance; no retry can succeed.
+       */
+      kind: 'forbidden';
+      message: string;
+    }
+  | {
+      /**
+       * The mutation failed because the GitHub authorization is no
+       * longer valid. The caller should remove the retry affordance and
+       * surface a reconnect CTA that invalidates the gate's auth query.
+       */
+      kind: 'reconnect';
+      message: string;
     };
 
 export function classifyPrReviewMutationError(error: unknown): PrReviewMutationErrorState {
@@ -122,6 +141,18 @@ export function classifyPrReviewMutationError(error: unknown): PrReviewMutationE
     return {
       kind: 'bad-request',
       message: error instanceof Error ? error.message : 'Bad request',
+    };
+  }
+  if (code === 'FORBIDDEN') {
+    return {
+      kind: 'forbidden',
+      message: error instanceof Error ? error.message : 'Forbidden',
+    };
+  }
+  if (code === 'PRECONDITION_FAILED' || code === 'UNAUTHORIZED') {
+    return {
+      kind: 'reconnect',
+      message: error instanceof Error ? error.message : 'GitHub connection expired',
     };
   }
   return { kind: 'retryable' };

@@ -42,6 +42,7 @@ import { MessageSquarePlus } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -102,11 +103,9 @@ export function PrReviewDiscussionTab({
     }
     if (firstPageErrorState.kind === 'reconnect') {
       return (
-        <QueryError
-          variant="neutral"
-          title="Reconnect to GitHub"
-          message="Your GitHub connection needs to be refreshed before the discussion can load."
-        />
+        <View className="flex-1 items-center justify-center px-6 py-12">
+          <PrReviewReconnectNotice />
+        </View>
       );
     }
     // retryable

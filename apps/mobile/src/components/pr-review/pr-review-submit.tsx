@@ -29,6 +29,7 @@ import {
   buildSubmitReviewInput,
   type ReviewEvent,
 } from '@/lib/pr-review/build-submit-review-input';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
@@ -57,9 +58,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<'retryable' | 'non-retryable' | null>(
-    null
-  );
+  const [inlineErrorKind, setInlineErrorKind] = useState<
+    'retryable' | 'non-retryable' | 'reconnect' | null
+  >(null);
 
   // iOS uncontrolled pattern: body lives in a ref, the input's visible
   // value is set via defaultValue once. No `value` + state.
@@ -76,11 +77,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   useEffect(() => {
     if (submitReview.error) {
       const classification = classifyPrReviewMutationError(submitReview.error);
-      if (classification.kind === 'bad-request') {
+      if (classification.kind === 'bad-request' || classification.kind === 'forbidden') {
         setInlineError(
-          "This review can't be submitted as is. The PR may have changed, or you can't approve your own pull request."
+          classification.kind === 'forbidden'
+            ? "You don't have permission to submit this review."
+            : "This review can't be submitted as is. The PR may have changed, or you can't approve your own pull request."
         );
         setInlineErrorKind('non-retryable');
+      } else if (classification.kind === 'reconnect') {
+        setInlineError('GitHub connection expired.');
+        setInlineErrorKind('reconnect');
       } else {
         setInlineError('Could not submit review. Check your connection and try again.');
         setInlineErrorKind('retryable');
@@ -107,12 +113,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       pending.clear();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDismiss();
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        setInlineError(error.message);
-      } else {
-        setInlineError('Could not submit review.');
-      }
+    } catch {
+      // The effect above classifies the mutation error into inlineError;
+      // swallow here to avoid an unhandled promise rejection.
     }
   }
 
@@ -163,7 +166,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />
         </View>
 
-        {inlineError ? (
+        {inlineError && inlineErrorKind !== 'reconnect' ? (
           <View
             className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 p-3"
             accessibilityLiveRegion="polite"
@@ -171,6 +174,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             <Text className="text-sm text-destructive">{inlineError}</Text>
           </View>
         ) : null}
+        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
       </ScrollView>
 
       <View className="border-t-[0.5px] border-hair-soft bg-background px-6 pb-6 pt-3">
@@ -179,7 +183,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             void handleSubmit();
           }}
           loading={isSubmitting}
-          disabled={isSubmitting || inlineErrorKind === 'non-retryable'}
+          disabled={
+            isSubmitting || inlineErrorKind === 'non-retryable' || inlineErrorKind === 'reconnect'
+          }
           accessibilityLabel="Submit review"
         >
           <Text>Submit review</Text>

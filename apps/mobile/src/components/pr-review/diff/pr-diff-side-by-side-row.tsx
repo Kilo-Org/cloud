@@ -5,19 +5,23 @@
 // Either column may be empty (left blank with a placeholder) when the
 // pair is a pure add or pure del.
 //
+// Side-by-side is read-only — commenting is unified-view only — so the
+// row does not accept tap/selection handlers.
+//
 // Renders fixed-height rows so FlashList can virtualize without
 // remeasuring. The row height matches the unified `DiffLine` row so
 // mixed view-mode content (if the toggle changes mid-scroll) would
 // still fit a stable grid.
 
 import { memo, useMemo } from 'react';
-import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
 import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
+import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 
 const LINE_HEIGHT = 18;
@@ -49,40 +53,10 @@ const NO_NEWLINE_BASE: TextStyle = {
   lineHeight: LINE_HEIGHT,
 };
 
-const TOKEN_DARK_LIGHT: Record<string, { light: string; dark: string }> = {
-  keyword: { light: '#7B2CBF', dark: '#D8B4FE' },
-  builtin: { light: '#1F6FEB', dark: '#79B8FF' },
-  literal: { light: '#7B2CBF', dark: '#D8B4FE' },
-  number: { light: '#B27214', dark: '#F2B05F' },
-  string: { light: '#278150', dark: '#5FCB8E' },
-  comment: { light: '#6F6A61', dark: '#8A8680' },
-  type: { light: '#1F6FEB', dark: '#79B8FF' },
-  function: { light: '#1F6FEB', dark: '#79B8FF' },
-  variable: { light: '#14130F', dark: '#F2F0EB' },
-  property: { light: '#1F6FEB', dark: '#79B8FF' },
-  tag: { light: '#BE4E3F', dark: '#F28B7A' },
-  selector: { light: '#7B2CBF', dark: '#D8B4FE' },
-  attribute: { light: '#1F6FEB', dark: '#79B8FF' },
-  operator: { light: '#6F6A61', dark: '#8A8680' },
-  meta: { light: '#6F6A61', dark: '#8A8680' },
-  add: { light: '#278150', dark: '#5FCB8E' },
-  del: { light: '#BE4E3F', dark: '#F28B7A' },
-};
-
-const DEFAULT_TOKEN_COLOR = { light: '#14130F', dark: '#F2F0EB' };
-const MUTED_COLOR = { light: '#6F6A61', dark: '#8A8680' };
-
 type SideBySideRowProps = {
   row: SideBySideRowData;
   language: string | null;
   rowKeyId: string;
-  /** Optional tap producer — wired by S7a so the side-by-side row can
-   *  start a diff selection. Only the right column participates; the
-   *  side-by-side viewer is tablet-only and RIGHT is the canonical
-   *  post-merge view that the user reads to write a review. */
-  onTap?: (cell: { line: ParsedDiffLine; side: 'left' | 'right' }) => void;
-  /** When true, paint the row with the selection focus ring. */
-  isSelected?: boolean;
 };
 
 function sideGutterText(line: ParsedDiffLine, side: 'left' | 'right'): string {
@@ -96,17 +70,6 @@ function sideGutterText(line: ParsedDiffLine, side: 'left' | 'right'): string {
     return '';
   }
   return `${line.newLine ?? line.oldLine ?? ''}`;
-}
-
-function tokenColorFor(className: string | null, isDark: boolean): string {
-  if (!className) {
-    return isDark ? DEFAULT_TOKEN_COLOR.dark : DEFAULT_TOKEN_COLOR.light;
-  }
-  const palette = TOKEN_DARK_LIGHT[className];
-  if (!palette) {
-    return isDark ? DEFAULT_TOKEN_COLOR.dark : DEFAULT_TOKEN_COLOR.light;
-  }
-  return isDark ? palette.dark : palette.light;
 }
 
 function rowBackgroundFor(type: ParsedDiffLine['type']): string {
@@ -217,31 +180,15 @@ function describeRow(row: SideBySideRowData): string {
   return 'Empty diff row';
 }
 
-function SideBySideRowImpl({
-  row,
-  language,
-  rowKeyId,
-  onTap,
-  isSelected,
-}: Readonly<SideBySideRowProps>) {
+function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowProps>) {
   const colors = useThemeColors();
   const isDark = colors.background === '#0E0E10';
   const leftLine = row.left?.line ?? null;
   const rightLine = row.right?.line ?? null;
-  // Side-by-side uses the right column when present; a left-only row
-  // (pure deletion) lets the user comment on the LEFT line instead.
-  const tappableLine = rightLine ?? leftLine;
-  let tappableColumn: 'left' | 'right' | null = null;
-  if (rightLine) {
-    tappableColumn = 'right';
-  } else if (leftLine) {
-    tappableColumn = 'left';
-  }
-  // Selection ring uses the primary color (matches the unified diff).
-  const selectionClass = isSelected ? 'border-l-2 border-primary' : 'border-l-2 border-transparent';
-  const rowContent = (
+
+  return (
     <View
-      className={cn('flex-row items-stretch border-b border-hair-soft', selectionClass)}
+      className="flex-row items-stretch border-b border-hair-soft"
       style={ROW_STYLE}
       accessibilityLabel={describeRow(row)}
       testID={rowKeyId}
@@ -271,35 +218,12 @@ function SideBySideRowImpl({
       )}
     </View>
   );
-  if (!onTap || !tappableLine || !tappableColumn) {
-    return rowContent;
-  }
-  return (
-    <Pressable
-      onPress={() => {
-        onTap({ line: tappableLine, side: tappableColumn });
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={
-        isSelected
-          ? `Selected diff row (${tappableColumn}), tap to change selection`
-          : `Comment on diff row (${tappableColumn})`
-      }
-      accessibilityState={{ selected: Boolean(isSelected) }}
-    >
-      {rowContent}
-    </Pressable>
-  );
 }
 
 export const SideBySideRow = memo(
   SideBySideRowImpl,
   (prev, next) =>
-    prev.rowKeyId === next.rowKeyId &&
-    prev.language === next.language &&
-    prev.row === next.row &&
-    prev.onTap === next.onTap &&
-    prev.isSelected === next.isSelected
+    prev.rowKeyId === next.rowKeyId && prev.language === next.language && prev.row === next.row
 );
 
 type HunkSideBySideHeaderProps = {

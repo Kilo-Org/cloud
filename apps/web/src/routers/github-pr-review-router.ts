@@ -532,7 +532,18 @@ export const githubPrReviewRouter = createTRPCRouter({
           graphQl = gqlResp.data.data ?? null;
         } catch (error) {
           if (error instanceof TRPCError) throw error;
-          // GraphQL failure should not block the rest of the overview.
+          // A raw 401 must reach withGitHubUserTokenRetry so it can rotate the
+          // credential (and report a terminal rejection) — never silently
+          // degrade an authorization failure.
+          if (
+            error !== null &&
+            typeof error === 'object' &&
+            (error as { status?: number }).status === 401
+          ) {
+            throw error;
+          }
+          // Other GraphQL failures (5xx, field errors) should not block the
+          // rest of the overview — degrade the reviewDecision/viewer enrichment.
           graphQl = null;
         }
         return buildOverviewDto({

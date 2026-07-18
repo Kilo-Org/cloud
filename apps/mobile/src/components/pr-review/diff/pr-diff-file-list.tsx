@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import {
   PrDiffFileListHeader,
   useDiffViewMode,
@@ -215,7 +216,14 @@ export function PrReviewFileList({
         />
       );
     }
-    if (firstPageErrorState?.kind === 'retryable' || firstPageErrorState?.kind === 'reconnect') {
+    if (firstPageErrorState?.kind === 'reconnect') {
+      return (
+        <View className="flex-1 items-center justify-center px-6 py-12">
+          <PrReviewReconnectNotice />
+        </View>
+      );
+    }
+    if (firstPageErrorState?.kind === 'retryable') {
       return (
         <View className="flex-1">
           <QueryError

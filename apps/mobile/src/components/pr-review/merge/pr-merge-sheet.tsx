@@ -27,6 +27,8 @@ import {
   useEnableAutoMergeMutation,
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   defaultMergeMethodOptionFor,
   mergeMethodOptionsFor,
@@ -37,6 +39,10 @@ import {
   DeleteBranchToggle,
   MethodPicker,
 } from '@/components/pr-review/merge/pr-merge-sheet-parts';
+import {
+  defaultCommitMessage,
+  defaultCommitTitle,
+} from '@/lib/pr-review/merge/merge-commit-defaults';
 
 type PrMergeSheetMode = 'merge' | 'enable-auto-merge';
 
@@ -84,20 +90,6 @@ type AutoMergeInput = {
   commitMessage?: string;
 };
 
-function defaultCommitTitle(title: string, number: number): string {
-  return `${title} (#${number})`;
-}
-
-function defaultCommitMessage(method: PrMergeMethod, body: string | null): string {
-  if (method === 'squash') {
-    return body && body.trim().length > 0 ? body : '';
-  }
-  if (body && body.trim().length > 0) {
-    return body;
-  }
-  return '';
-}
-
 export function PrMergeSheet(props: PrMergeSheetProps) {
   const {
     owner,
@@ -137,6 +129,9 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   const messageRef = useRef(defaultCommitMessage(safeInitial, bodyMarkdown));
 
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [inlineErrorKind, setInlineErrorKind] = useState<
+    'retryable' | 'non-retryable' | 'reconnect' | null
+  >(null);
 
   const ref: { owner: string; repo: string; number: number } = useMemo(
     () => ({ owner, repo: repoName, number }),
@@ -153,9 +148,23 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
 
   useEffect(() => {
     if (lastError) {
-      const message =
-        lastError instanceof Error ? lastError.message : 'Could not merge pull request.';
-      setInlineError(message);
+      const classification = classifyPrReviewMutationError(lastError);
+      if (classification.kind === 'bad-request' || classification.kind === 'forbidden') {
+        setInlineError(
+          classification.kind === 'forbidden'
+            ? "You don't have permission to merge this pull request."
+            : 'This pull request cannot be merged as is.'
+        );
+        setInlineErrorKind('non-retryable');
+      } else if (classification.kind === 'reconnect') {
+        setInlineError('GitHub connection expired.');
+        setInlineErrorKind('reconnect');
+      } else {
+        setInlineError(
+          lastError instanceof Error ? lastError.message : 'Could not merge pull request.'
+        );
+        setInlineErrorKind('retryable');
+      }
     }
   }, [lastError]);
 
@@ -202,6 +211,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
 
   async function performSubmit() {
     setInlineError(null);
+    setInlineErrorKind(null);
     try {
       // eslint-disable-next-line typescript-eslint/prefer-ternary -- awaits inside branches can't be a ternary expression
       if (mode === 'merge') {
@@ -215,12 +225,9 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       // refreshed PR review screen visible. Do NOT also call router.back()
       // here or it would pop the review screen too.
       onDismiss();
-    } catch (error) {
-      if (error instanceof Error && error.message) {
-        setInlineError(error.message);
-      } else {
-        setInlineError('Could not merge pull request.');
-      }
+    } catch {
+      // The effect above classifies the mutation error into inlineError;
+      // swallow here to avoid an unhandled promise rejection.
     }
   }
 
@@ -229,6 +236,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       return;
     }
     setInlineError(null);
+    setInlineErrorKind(null);
 
     const submit = () => {
       void performSubmit();
@@ -302,7 +310,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
             isDisabled={isMutating}
           />
         ) : null}
-        {inlineError ? (
+        {inlineError && inlineErrorKind !== 'reconnect' ? (
           <View
             className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 p-3"
             accessibilityLiveRegion="polite"
@@ -310,13 +318,18 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
             <Text className="text-sm text-destructive">{inlineError}</Text>
           </View>
         ) : null}
+        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
       </ScrollView>
 
       <View className="border-t-[0.5px] border-hair-soft bg-background px-6 pb-6 pt-3">
         <Button
           onPress={handleConfirmPress}
           loading={isMutating}
-          disabled={noMethodsAllowed}
+          disabled={
+            noMethodsAllowed ||
+            inlineErrorKind === 'non-retryable' ||
+            inlineErrorKind === 'reconnect'
+          }
           accessibilityLabel={submitLabel}
         >
           <Text>{submitLabel}</Text>

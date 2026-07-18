@@ -11,6 +11,7 @@ import {
 import { useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -226,10 +227,18 @@ export function PrReviewChecksSection({
         </View>
       );
     }
-    // Retryable (server/offline) AND reconnect: same UI — section-level
-    // retry button. Reconnect users will need to back out to the gate to
-    // reconnect, but the retry still has utility (a stale cached check
-    // may already be present, or the gate may resolve on its own).
+    if (state.kind === 'reconnect') {
+      return (
+        <View className="gap-2">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Checks
+          </Text>
+          <PrReviewReconnectNotice />
+        </View>
+      );
+    }
+
+    // Retryable (server/offline) — section-level retry button.
     return (
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

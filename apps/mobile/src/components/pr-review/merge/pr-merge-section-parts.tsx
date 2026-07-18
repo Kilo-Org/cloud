@@ -41,6 +41,7 @@ export function MergeabilityTimedOutRow({
   onRefresh,
   isRefreshing,
 }: Readonly<{ onRefresh: () => void; isRefreshing: boolean }>) {
+  const colors = useThemeColors();
   return (
     <View className="gap-2 rounded-lg bg-secondary p-4">
       <Text className="text-sm text-muted-foreground">Couldn&apos;t determine mergeability.</Text>
@@ -54,7 +55,7 @@ export function MergeabilityTimedOutRow({
         accessibilityLabel="Refresh mergeability"
       >
         <View className="flex-row items-center gap-2">
-          <RefreshCw size={14} color={undefined} />
+          <RefreshCw size={14} color={colors.foreground} />
           <Text>Refresh</Text>
         </View>
       </Button>

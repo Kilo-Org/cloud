@@ -19,6 +19,7 @@ import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
+import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 
 const LINE_HEIGHT = 18;
@@ -49,29 +50,6 @@ const NO_NEWLINE_BASE: TextStyle = {
   lineHeight: LINE_HEIGHT,
 };
 
-const TOKEN_DARK_LIGHT: Record<string, { light: string; dark: string }> = {
-  keyword: { light: '#7B2CBF', dark: '#D8B4FE' },
-  builtin: { light: '#1F6FEB', dark: '#79B8FF' },
-  literal: { light: '#7B2CBF', dark: '#D8B4FE' },
-  number: { light: '#B27214', dark: '#F2B05F' },
-  string: { light: '#278150', dark: '#5FCB8E' },
-  comment: { light: '#6F6A61', dark: '#8A8680' },
-  type: { light: '#1F6FEB', dark: '#79B8FF' },
-  function: { light: '#1F6FEB', dark: '#79B8FF' },
-  variable: { light: '#14130F', dark: '#F2F0EB' },
-  property: { light: '#1F6FEB', dark: '#79B8FF' },
-  tag: { light: '#BE4E3F', dark: '#F28B7A' },
-  selector: { light: '#7B2CBF', dark: '#D8B4FE' },
-  attribute: { light: '#1F6FEB', dark: '#79B8FF' },
-  operator: { light: '#6F6A61', dark: '#8A8680' },
-  meta: { light: '#6F6A61', dark: '#8A8680' },
-  add: { light: '#278150', dark: '#5FCB8E' },
-  del: { light: '#BE4E3F', dark: '#F28B7A' },
-};
-
-const DEFAULT_TOKEN_COLOR = { light: '#14130F', dark: '#F2F0EB' };
-const MUTED_COLOR = { light: '#6F6A61', dark: '#8A8680' };
-
 type DiffLineProps = {
   line: ParsedDiffLine;
   language: string | null;
@@ -100,17 +78,6 @@ function rowBackgroundFor(type: ParsedDiffLine['type']): string {
     return 'bg-danger-tile-bg';
   }
   return 'bg-transparent';
-}
-
-function tokenColorFor(className: string | null, isDark: boolean): string {
-  if (!className) {
-    return isDark ? DEFAULT_TOKEN_COLOR.dark : DEFAULT_TOKEN_COLOR.light;
-  }
-  const palette = TOKEN_DARK_LIGHT[className];
-  if (!palette) {
-    return isDark ? DEFAULT_TOKEN_COLOR.dark : DEFAULT_TOKEN_COLOR.light;
-  }
-  return isDark ? palette.dark : palette.light;
 }
 
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {

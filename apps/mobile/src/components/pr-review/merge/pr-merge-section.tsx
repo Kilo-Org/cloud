@@ -16,6 +16,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type AllowedMergeMethod,
   defaultMergeMethodFor,
@@ -89,6 +90,7 @@ export function PrMergeSection({
   isRefetching,
 }: PrMergeSectionProps) {
   const router = useRouter();
+  const colors = useThemeColors();
   const status = getMergeabilityStatus(overview);
   const reasons = useMemo(
     () =>
@@ -211,7 +213,7 @@ export function PrMergeSection({
             accessibilityLabel="Merge now"
           >
             <View className="flex-row items-center gap-2">
-              <GitMerge size={14} color={undefined} />
+              <GitMerge size={14} color={colors.primaryForeground} />
               <Text>Merge now</Text>
             </View>
           </Button>
@@ -280,7 +282,7 @@ export function PrMergeSection({
         accessibilityLabel="Merge pull request"
       >
         <View className="flex-row items-center gap-2">
-          <GitMerge size={14} color={undefined} />
+          <GitMerge size={14} color={colors.primaryForeground} />
           <Text>Merge</Text>
         </View>
       </Button>

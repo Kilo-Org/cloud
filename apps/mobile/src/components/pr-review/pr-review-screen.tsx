@@ -121,7 +121,16 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       />
     );
   } else {
-    body = <PrReviewDiscussionTab owner={owner} repo={repo} number={number} />;
+    body = (
+      <PrReviewDiscussionTab
+        owner={owner}
+        repo={repo}
+        number={number}
+        onRequestFiles={() => {
+          setTab('files');
+        }}
+      />
+    );
   }
 
   return (

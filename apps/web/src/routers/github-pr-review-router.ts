@@ -20,6 +20,26 @@ import {
 } from '@/lib/github-pr-review/dtos';
 import { throwTrpcFromGraphQlErrors, withGitHubUserTokenRetry } from '@/lib/github-pr-review/retry';
 import { getGitHubUserAccessToken } from '@/lib/integrations/platforms/github/user-token-client';
+import {
+  AutoMergeMethodSchema,
+  CommentPositionSchema,
+  MergeMethodSchema,
+  ReactionContentSchema,
+  ReviewEventSchema,
+  ReviewSideSchema,
+  buildAddReactionVariables,
+  buildCreateReviewCommentParams,
+  buildDeleteRefParams,
+  buildDisableAutoMergeVariables,
+  buildEnableAutoMergeVariables,
+  buildMergePullRequestParams,
+  buildRemoveReactionVariables,
+  buildReplyToCommentParams,
+  buildResolveThreadVariables,
+  buildSubmitReviewParams,
+  buildUnresolveThreadVariables,
+  buildUpdateBranchParams,
+} from '@/lib/github-pr-review/mutations';
 
 const ownerRepoRegex = /^[A-Za-z0-9_.-]+$/;
 
@@ -59,6 +79,89 @@ const ListReviewThreadsInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
     cursor: z.string().min(1).optional(),
+  })
+  .strict();
+
+const CreateReviewCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    body: z.string().min(1).max(65_535),
+    path: z.string().min(1).max(1024),
+    line: z.number().int().positive(),
+    side: ReviewSideSchema,
+    startLine: z.number().int().positive().optional(),
+    startSide: ReviewSideSchema.optional(),
+    commitSha: z.string().min(40).max(64),
+  })
+  .strict()
+  .refine(v => v.startLine === undefined || v.startLine <= v.line, {
+    message: 'startLine must be <= line',
+    path: ['startLine'],
+  })
+  .refine(v => (v.startLine === undefined) === (v.startSide === undefined), {
+    message: 'startLine and startSide must be provided together',
+    path: ['startSide'],
+  });
+
+const ReplyToCommentInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    commentId: z.number().int().positive(),
+    body: z.string().min(1).max(65_535),
+  })
+  .strict();
+
+const SubmitReviewInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    event: ReviewEventSchema,
+    body: z.string().min(1).max(65_535).optional(),
+    commitSha: z.string().min(40).max(64),
+    comments: z
+      .array(CommentPositionSchema.extend({ body: z.string().min(1).max(65_535) }).strict())
+      .max(100)
+      .optional(),
+  })
+  .strict();
+
+const ThreadIdInput = z.object({ threadId: z.string().min(1).max(256) }).strict();
+
+const ReactionInput = z
+  .object({
+    commentNodeId: z.string().min(1).max(256),
+    content: ReactionContentSchema,
+  })
+  .strict();
+
+const MergePullRequestInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    method: MergeMethodSchema,
+    commitTitle: z.string().min(1).max(255).optional(),
+    commitMessage: z.string().min(1).max(65_535).optional(),
+    deleteBranch: z.boolean(),
+    expectedHeadSha: z.string().min(40).max(64),
+    headRef: z.string().min(1).max(255),
+    isCrossRepo: z.boolean(),
+  })
+  .strict();
+
+const UpdateBranchInput = ownerRepoSchema
+  .extend({
+    number: prNumberSchema,
+    expectedHeadSha: z.string().min(40).max(64),
+  })
+  .strict();
+
+const AutoMergeInput = z
+  .object({
+    owner: z.string().regex(ownerRepoRegex),
+    repo: z.string().regex(ownerRepoRegex),
+    number: prNumberSchema,
+    prNodeId: z.string().min(1).max(256),
+    method: AutoMergeMethodSchema.optional(),
+    commitTitle: z.string().min(1).max(255).optional(),
+    commitMessage: z.string().min(1).max(65_535).optional(),
   })
   .strict();
 
@@ -162,6 +265,68 @@ const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY = /* GraphQL */ `
             }
           }
         }
+      }
+    }
+  }
+`;
+
+const ENABLE_AUTO_MERGE_MUTATION = /* GraphQL */ `
+  mutation EnableAutoMerge($input: EnablePullRequestAutoMergeInput!) {
+    enablePullRequestAutoMerge(input: $input) {
+      pullRequest {
+        id
+      }
+    }
+  }
+`;
+
+const DISABLE_AUTO_MERGE_MUTATION = /* GraphQL */ `
+  mutation DisableAutoMerge($input: DisablePullRequestAutoMergeInput!) {
+    disablePullRequestAutoMerge(input: $input) {
+      pullRequest {
+        id
+      }
+    }
+  }
+`;
+
+const RESOLVE_THREAD_MUTATION = /* GraphQL */ `
+  mutation ResolveThread($input: ResolveReviewThreadInput!) {
+    resolveReviewThread(input: $input) {
+      thread {
+        id
+        isResolved
+      }
+    }
+  }
+`;
+
+const UNRESOLVE_THREAD_MUTATION = /* GraphQL */ `
+  mutation UnresolveThread($input: UnresolveReviewThreadInput!) {
+    unresolveReviewThread(input: $input) {
+      thread {
+        id
+        isResolved
+      }
+    }
+  }
+`;
+
+const ADD_REACTION_MUTATION = /* GraphQL */ `
+  mutation AddReaction($input: AddReactionInput!) {
+    addReaction(input: $input) {
+      reaction {
+        content
+      }
+    }
+  }
+`;
+
+const REMOVE_REACTION_MUTATION = /* GraphQL */ `
+  mutation RemoveReaction($input: RemoveReactionInput!) {
+    removeReaction(input: $input) {
+      reaction {
+        content
       }
     }
   }
@@ -289,6 +454,47 @@ async function fetchReviewThreadsPage(args: {
   };
   throwTrpcFromGraphQlErrors(response.data.errors as never);
   return response.data.data?.repository?.pullRequest?.reviewThreads ?? null;
+}
+
+// Octokit's `request('POST /graphql', …)` resolves to `{ data: { data, errors } }`
+// (the same envelope the read helpers unwrap). Reading `response.data.errors`
+// and `response.data.data` — NOT an extra `.data` level.
+type GraphQlMutationResponse<T> = {
+  data: { data: T | null; errors?: unknown };
+};
+
+async function runGraphQlMutation<T>(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  query: string;
+  variables: Record<string, unknown>;
+}): Promise<T> {
+  const { octokit, query, variables } = args;
+  const response = (await octokit.request('POST /graphql', {
+    query,
+    ...variables,
+  })) as GraphQlMutationResponse<T>;
+  throwTrpcFromGraphQlErrors(response.data.errors as never);
+  const payload = response.data.data;
+  if (payload === null || payload === undefined) {
+    throw new TRPCError({
+      code: 'BAD_GATEWAY',
+      message: 'GitHub returned an empty GraphQL response',
+    });
+  }
+  return payload;
+}
+
+// A GraphQL mutation whose top-level operation field is null (with no errors[])
+// means GitHub did not perform the action — surface a deliberate failure rather
+// than reporting a synthesized success.
+function requireGraphQlOperation<T>(value: T | null | undefined, operation: string): T {
+  if (value === null || value === undefined) {
+    throw new TRPCError({
+      code: 'BAD_GATEWAY',
+      message: `GitHub did not confirm the ${operation} operation`,
+    });
+  }
+  return value;
 }
 
 export const githubPrReviewRouter = createTRPCRouter({
@@ -457,6 +663,279 @@ export const githubPrReviewRouter = createTRPCRouter({
         });
       },
     });
+  }),
+
+  // Post a single immediate review comment (no pending review required).
+  createReviewComment: baseProcedure
+    .input(CreateReviewCommentInput)
+    .mutation(async ({ ctx, input }) => {
+      const result = await withGitHubUserTokenRetry({
+        kiloUserId: ctx.user.id,
+        call: async octokit => {
+          const params = buildCreateReviewCommentParams({
+            owner: input.owner,
+            repo: input.repo,
+            number: input.number,
+            body: input.body,
+            commitSha: input.commitSha,
+            path: input.path,
+            line: input.line,
+            side: input.side,
+            startLine: input.startLine,
+            startSide: input.startSide,
+          });
+          const response = await octokit.pulls.createReviewComment(params);
+          return {
+            commentId: response.data.id,
+            nodeId: response.data.node_id,
+          };
+        },
+      });
+      return result;
+    }),
+
+  // Reply to an existing review comment (creates a child comment in the
+  // same thread).
+  replyToComment: baseProcedure.input(ReplyToCommentInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const params = buildReplyToCommentParams({
+          owner: input.owner,
+          repo: input.repo,
+          number: input.number,
+          commentId: input.commentId,
+          body: input.body,
+        });
+        const response = await octokit.pulls.createReplyForReviewComment(params);
+        return {
+          commentId: response.data.id,
+          nodeId: response.data.node_id,
+        };
+      },
+    });
+    return result;
+  }),
+
+  // Submit a pending review with an optional batch of inline comments and
+  // an overall event (APPROVE / REQUEST_CHANGES / COMMENT).
+  submitReview: baseProcedure.input(SubmitReviewInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const params = buildSubmitReviewParams({
+          owner: input.owner,
+          repo: input.repo,
+          number: input.number,
+          event: input.event,
+          body: input.body,
+          commitSha: input.commitSha,
+          comments: input.comments,
+        });
+        const response = await octokit.pulls.createReview(params);
+        return {
+          reviewId: response.data.id,
+          nodeId: response.data.node_id,
+          state: response.data.state,
+        };
+      },
+    });
+    return result;
+  }),
+
+  // Resolve a review thread (GraphQL — there is no REST endpoint for this).
+  resolveThread: baseProcedure.input(ThreadIdInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const variables = buildResolveThreadVariables({ threadId: input.threadId });
+        const payload = await runGraphQlMutation<{
+          resolveReviewThread: { thread: { id: string; isResolved: boolean } } | null;
+        }>({ octokit, query: RESOLVE_THREAD_MUTATION, variables });
+        const thread = requireGraphQlOperation(
+          payload.resolveReviewThread?.thread,
+          'resolveReviewThread'
+        );
+        return { threadId: thread.id, isResolved: thread.isResolved };
+      },
+    });
+    return result;
+  }),
+
+  unresolveThread: baseProcedure.input(ThreadIdInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const variables = buildUnresolveThreadVariables({ threadId: input.threadId });
+        const payload = await runGraphQlMutation<{
+          unresolveReviewThread: { thread: { id: string; isResolved: boolean } } | null;
+        }>({ octokit, query: UNRESOLVE_THREAD_MUTATION, variables });
+        const thread = requireGraphQlOperation(
+          payload.unresolveReviewThread?.thread,
+          'unresolveReviewThread'
+        );
+        return { threadId: thread.id, isResolved: thread.isResolved };
+      },
+    });
+    return result;
+  }),
+
+  addReaction: baseProcedure.input(ReactionInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const variables = buildAddReactionVariables({
+          commentNodeId: input.commentNodeId,
+          content: input.content,
+        });
+        const payload = await runGraphQlMutation<{
+          addReaction: { reaction: { content: string } } | null;
+        }>({ octokit, query: ADD_REACTION_MUTATION, variables });
+        const reaction = requireGraphQlOperation(payload.addReaction?.reaction, 'addReaction');
+        return { content: reaction.content };
+      },
+    });
+    return result;
+  }),
+
+  removeReaction: baseProcedure.input(ReactionInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const variables = buildRemoveReactionVariables({
+          commentNodeId: input.commentNodeId,
+          content: input.content,
+        });
+        const payload = await runGraphQlMutation<{
+          removeReaction: { reaction: { content: string } } | null;
+        }>({ octokit, query: REMOVE_REACTION_MUTATION, variables });
+        const reaction = requireGraphQlOperation(
+          payload.removeReaction?.reaction,
+          'removeReaction'
+        );
+        return { content: reaction.content };
+      },
+    });
+    return result;
+  }),
+
+  // Merge a pull request. `expectedHeadSha` enforces the optimistic-concurrency
+  // fence — if the head moved since the mobile overview was rendered, GitHub
+  // returns 409 and the caller should re-fetch. The branch delete after a
+  // successful merge is BEST-EFFORT: failures are reported in the result
+  // (never thrown) so the mobile client can surface a banner.
+  mergePullRequest: baseProcedure.input(MergePullRequestInput).mutation(async ({ ctx, input }) => {
+    return withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const params = buildMergePullRequestParams({
+          owner: input.owner,
+          repo: input.repo,
+          number: input.number,
+          method: input.method,
+          commitTitle: input.commitTitle,
+          commitMessage: input.commitMessage,
+          expectedHeadSha: input.expectedHeadSha,
+        });
+        const response = await octokit.pulls.merge(params);
+        const merged = Boolean(response.data.merged);
+        if (!merged || !input.deleteBranch || input.isCrossRepo) {
+          return {
+            merged,
+            sha: response.data.sha,
+            branchDeleted: false as const,
+          };
+        }
+        // Best-effort: only call deleteRef when the head is same-repo.
+        // Catch every error and surface it in the result instead of
+        // failing the whole mutation.
+        try {
+          await octokit.git.deleteRef(
+            buildDeleteRefParams({
+              owner: input.owner,
+              repo: input.repo,
+              headRef: input.headRef,
+            })
+          );
+          return {
+            merged: true as const,
+            sha: response.data.sha,
+            branchDeleted: true as const,
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error && error.message ? error.message : 'Branch delete failed';
+          return {
+            merged: true as const,
+            sha: response.data.sha,
+            branchDeleted: false as const,
+            branchDeleteError: message,
+          };
+        }
+      },
+    });
+  }),
+
+  // Update a PR's head branch from its base (the "Update branch" button).
+  // `expectedHeadSha` is the same stale-screen fence as merge; a mismatch
+  // 422s and the classifier surfaces it as BAD_REQUEST / CONFLICT.
+  updateBranch: baseProcedure.input(UpdateBranchInput).mutation(async ({ ctx, input }) => {
+    return withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const params = buildUpdateBranchParams({
+          owner: input.owner,
+          repo: input.repo,
+          number: input.number,
+          expectedHeadSha: input.expectedHeadSha,
+        });
+        const response = await octokit.pulls.updateBranch(params);
+        return {
+          message: response.data.message,
+        };
+      },
+    });
+  }),
+
+  enableAutoMerge: baseProcedure.input(AutoMergeInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const variables = buildEnableAutoMergeVariables({
+          prNodeId: input.prNodeId,
+          method: input.method ?? 'MERGE',
+          commitTitle: input.commitTitle,
+          commitMessage: input.commitMessage,
+        });
+        const payload = await runGraphQlMutation<{
+          enablePullRequestAutoMerge: { pullRequest: { id: string } } | null;
+        }>({ octokit, query: ENABLE_AUTO_MERGE_MUTATION, variables });
+        const pullRequest = requireGraphQlOperation(
+          payload.enablePullRequestAutoMerge?.pullRequest,
+          'enablePullRequestAutoMerge'
+        );
+        return { enabled: true as const, prNodeId: pullRequest.id };
+      },
+    });
+    return result;
+  }),
+
+  disableAutoMerge: baseProcedure.input(AutoMergeInput).mutation(async ({ ctx, input }) => {
+    const result = await withGitHubUserTokenRetry({
+      kiloUserId: ctx.user.id,
+      call: async octokit => {
+        const variables = buildDisableAutoMergeVariables({ prNodeId: input.prNodeId });
+        const payload = await runGraphQlMutation<{
+          disablePullRequestAutoMerge: { pullRequest: { id: string } } | null;
+        }>({ octokit, query: DISABLE_AUTO_MERGE_MUTATION, variables });
+        const pullRequest = requireGraphQlOperation(
+          payload.disablePullRequestAutoMerge?.pullRequest,
+          'disablePullRequestAutoMerge'
+        );
+        return { enabled: false as const, prNodeId: pullRequest.id };
+      },
+    });
+    return result;
   }),
 });
 

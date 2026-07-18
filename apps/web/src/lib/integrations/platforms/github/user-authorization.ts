@@ -4,17 +4,11 @@ import { Octokit } from '@octokit/rest';
 import { captureException } from '@sentry/nextjs';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import {
-  USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID,
-  USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY,
-} from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
-import { encryptKeyedEnvelope } from '@/lib/encryption';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { getGitHubAppCredentials, type GitHubAppType } from './app-selector';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';
-
-const GITHUB_USER_TOKEN_ENVELOPE_SCHEME = 'github-user-token-rsa-aes-256-gcm';
+import { encryptUserGithubTokenEnvelope } from './user-token-envelope';
 
 const GitHubUserTokenResponseSchema = z.object({
   access_token: z.string().min(1),
@@ -52,25 +46,6 @@ async function withDevelopmentFailureStage<T>(
     logDevelopmentAuthorizationFailure(stage);
     throw error;
   }
-}
-
-function requireTokenEnvelopePublicKey(): { keyId: string; publicKeyPem: Buffer } {
-  if (!USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID || !USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY) {
-    logDevelopmentAuthorizationFailure('missing_token_envelope_public_key');
-    throw new Error('GitHub user token envelope encryption is not configured');
-  }
-  return {
-    keyId: USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID,
-    publicKeyPem: Buffer.from(USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY, 'base64'),
-  };
-}
-
-function tokenEnvelopeAad(
-  kiloUserId: string,
-  githubUserId: string,
-  tokenType: 'access' | 'refresh'
-): string {
-  return `github-user-authorization:v1:${kiloUserId}:standard:${githubUserId}:${tokenType}`;
 }
 
 function authorizationGrantLockKey(githubUserId: string): string {
@@ -190,7 +165,6 @@ export async function exchangeAndStoreGitHubUserAuthorization(input: {
       if (currentUser.id.toString() !== githubUserId) {
         throw new Error('GitHub user authorization identity changed during connection');
       }
-      const encryptionKey = requireTokenEnvelopePublicKey();
       const now = Date.now();
       let values: typeof user_github_app_tokens.$inferInsert;
       try {
@@ -199,19 +173,17 @@ export async function exchangeAndStoreGitHubUserAuthorization(input: {
           github_app_type: 'standard',
           github_user_id: githubUserId,
           github_login: currentUser.login,
-          access_token_encrypted: encryptKeyedEnvelope(
-            tokens.access_token,
-            GITHUB_USER_TOKEN_ENVELOPE_SCHEME,
-            encryptionKey,
-            tokenEnvelopeAad(input.kiloUserId, githubUserId, 'access')
-          ),
+          access_token_encrypted: encryptUserGithubTokenEnvelope(tokens.access_token, {
+            kiloUserId: input.kiloUserId,
+            githubUserId,
+            tokenType: 'access',
+          }),
           access_token_expires_at: new Date(now + tokens.expires_in * 1000).toISOString(),
-          refresh_token_encrypted: encryptKeyedEnvelope(
-            tokens.refresh_token,
-            GITHUB_USER_TOKEN_ENVELOPE_SCHEME,
-            encryptionKey,
-            tokenEnvelopeAad(input.kiloUserId, githubUserId, 'refresh')
-          ),
+          refresh_token_encrypted: encryptUserGithubTokenEnvelope(tokens.refresh_token, {
+            kiloUserId: input.kiloUserId,
+            githubUserId,
+            tokenType: 'refresh',
+          }),
           refresh_token_expires_at: new Date(
             now + tokens.refresh_token_expires_in * 1000
           ).toISOString(),

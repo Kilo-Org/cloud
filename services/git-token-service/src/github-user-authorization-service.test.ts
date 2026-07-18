@@ -199,6 +199,28 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     ).resolves.toEqual({ selected: false, reason: 'credential_unreadable' });
   });
 
+  it('revokes the current generation when the refresh token is rejected during selection', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ error: 'bad_refresh_token' }))
+    );
+
+    const result = await makeService().selectUserAuthorization({
+      userId: 'user_1',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(result).toEqual({ selected: false, reason: 'revoked' });
+    expect(database.updates).toHaveLength(1);
+    expect(database.updates[0]).toMatchObject({
+      revoked_at: expect.any(String),
+      revocation_reason: 'github_token_rejected',
+    });
+  });
+
   it('classifies an unknown envelope key id as unreadable', async () => {
     database.rows = [makeRow(retiredPublicKey, 'retired')];
 
@@ -597,6 +619,41 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
       expect.objectContaining({ method: 'POST' })
     );
     expect(database.lockExecutions).toBe(1);
+  });
+
+  it('strips multiple trailing slashes from the configured OAuth base URL', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    const refreshedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    database.updatedRow = refreshedRow;
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await makeService({ GITHUB_OAUTH_BASE_URL: 'https://github.test///' }).getUserAccessToken(
+      'user_1',
+      { op: 'fetch' }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://github.test/login/oauth/access_token',
+      expect.anything()
+    );
   });
 
   it('honors the GITHUB_OAUTH_BASE_URL env seam for the refresh request', async () => {

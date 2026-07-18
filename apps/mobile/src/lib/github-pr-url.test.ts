@@ -89,7 +89,18 @@ describe('parseGitHubPrUrl', () => {
     expect(parseGitHubPrUrl('')).toBeNull();
   });
 
-  it('returns null for a URL missing the owner', () => {
-    expect(parseGitHubPrUrl('https://github.com/hello-world/pull/42')).toBeNull();
+  it('rejects owner or repo composed solely of dots', () => {
+    expect(parseGitHubPrUrl('https://github.com/./repo/pull/5')).toBeNull();
+    expect(parseGitHubPrUrl('https://github.com/owner/./pull/5')).toBeNull();
+    expect(parseGitHubPrUrl('https://github.com/../repo/pull/5')).toBeNull();
+    expect(parseGitHubPrUrl('https://github.com/owner/../pull/5')).toBeNull();
+  });
+
+  it('parses owners and repos with dots, dashes and underscores', () => {
+    expect(parseGitHubPrUrl('https://github.com/my.repo/a-b_c/pull/1')).toEqual({
+      owner: 'my.repo',
+      repo: 'a-b_c',
+      number: 1,
+    });
   });
 });

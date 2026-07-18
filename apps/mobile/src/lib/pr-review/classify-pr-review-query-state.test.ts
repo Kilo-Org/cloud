@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyPrReviewQueryState } from './classify-pr-review-query-state';
+import {
+  classifyPrReviewMutationError,
+  classifyPrReviewQueryState,
+} from './classify-pr-review-query-state';
 
 function makeTrpcError(code: string): unknown {
   // Mirrors the shape tRPC v11 surfaces on a thrown TRPCClientError from
@@ -38,9 +41,9 @@ describe('classifyPrReviewQueryState', () => {
     });
   });
 
-  it('classifies UNAUTHORIZED as a permanent permission error (no CTA, no retry)', () => {
+  it('classifies UNAUTHORIZED as a reconnect state (revoked connection, reconnect CTA)', () => {
     expect(classifyPrReviewQueryState(makeTrpcError('UNAUTHORIZED'))).toEqual({
-      kind: 'permission',
+      kind: 'reconnect',
     });
   });
 
@@ -71,5 +74,33 @@ describe('classifyPrReviewQueryState', () => {
       kind: 'retryable',
     });
     expect(classifyPrReviewQueryState(makeTrpcError('TIMEOUT'))).toEqual({ kind: 'retryable' });
+  });
+});
+
+describe('classifyPrReviewMutationError', () => {
+  it('classifies FORBIDDEN as a terminal permission error', () => {
+    expect(classifyPrReviewMutationError(makeTrpcError('FORBIDDEN'))).toEqual({
+      kind: 'forbidden',
+      message: 'Forbidden',
+    });
+  });
+
+  it('classifies UNAUTHORIZED as a reconnect state', () => {
+    expect(classifyPrReviewMutationError(makeTrpcError('UNAUTHORIZED'))).toEqual({
+      kind: 'reconnect',
+      message: 'GitHub connection expired',
+    });
+  });
+
+  it('classifies PRECONDITION_FAILED as a reconnect state', () => {
+    expect(classifyPrReviewMutationError(makeTrpcError('PRECONDITION_FAILED'))).toEqual({
+      kind: 'reconnect',
+      message: 'GitHub connection expired',
+    });
+  });
+
+  it('falls back to retryable for unknown / non-tRPC errors', () => {
+    expect(classifyPrReviewMutationError(new Error('network down'))).toEqual({ kind: 'retryable' });
+    expect(classifyPrReviewMutationError('string error')).toEqual({ kind: 'retryable' });
   });
 });

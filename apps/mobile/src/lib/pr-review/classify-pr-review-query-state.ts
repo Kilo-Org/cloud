@@ -90,8 +90,11 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   if (code === 'NOT_FOUND') {
     return { kind: 'not-found' };
   }
-  if (code === 'FORBIDDEN' || code === 'UNAUTHORIZED') {
+  if (code === 'FORBIDDEN') {
     return { kind: 'permission' };
+  }
+  if (code === 'UNAUTHORIZED') {
+    return { kind: 'reconnect' };
   }
   return { kind: 'retryable' };
 }

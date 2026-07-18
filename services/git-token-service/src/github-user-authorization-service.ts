@@ -112,6 +112,7 @@ export class GitHubUserAuthorizationService {
       ) {
         const refreshResult = await this.refreshAuthorizationWithLock(db, authorization);
         if (refreshResult === 'terminal_rejection') {
+          await this.revokeCurrentGeneration(db, authorization, 'github_token_rejected');
           return { selected: false, reason: 'revoked' };
         }
         if (refreshResult === 'transient_failure') {
@@ -357,7 +358,11 @@ export class GitHubUserAuthorizationService {
 
   private getGitHubOAuthBaseUrl(): string {
     const baseUrl = this.env.GITHUB_OAUTH_BASE_URL ?? DEFAULT_GITHUB_OAUTH_BASE_URL;
-    return baseUrl.replace(/\/+$/, '');
+    let end = baseUrl.length;
+    while (end > 0 && baseUrl[end - 1] === '/') {
+      end -= 1;
+    }
+    return baseUrl.slice(0, end);
   }
 
   private getGitHubOAuthAccessTokenUrl(): string {

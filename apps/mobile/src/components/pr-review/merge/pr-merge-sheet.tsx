@@ -126,7 +126,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   const titleInputRef = useRef<TextInput>(null);
   const messageInputRef = useRef<TextInput>(null);
   const titleRef = useRef(defaultCommitTitle(title, number));
-  const messageRef = useRef(defaultCommitMessage(safeInitial, bodyMarkdown));
+  const messageRef = useRef(defaultCommitMessage(bodyMarkdown));
 
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<
@@ -170,7 +170,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
 
   function resetForNewMethod(next: AllowedMergeMethod) {
     setMethod(next);
-    messageRef.current = defaultCommitMessage(next, bodyMarkdown);
   }
 
   function buildMergeInput(): MergePullRequestInput {
@@ -295,10 +294,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
           placeholder={defaultCommitTitle(title, number)}
           isDisabled={isMutating}
         />
-        {/* Remount on method change so the visible commit message matches the
-            method-specific default that will actually be submitted. */}
         <CommitMessageField
-          key={method}
           messageRef={messageRef}
           inputRef={messageInputRef}
           isDisabled={isMutating}

@@ -4,9 +4,15 @@ import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { type BuildItemsArgs, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 
+type FilePatchMissingItem = Extract<ListItem, { kind: 'file-patch-missing' }>;
+
 type SeparatorItem = Extract<ListItem, { kind: 'expand-separator' }>;
 type DiffLineListItem = Extract<ListItem, { kind: 'diff-line' }>;
 type PaginationItem = Extract<ListItem, { kind: 'pagination-row' }>;
+
+function patchMissingItems(items: ListItem[]): FilePatchMissingItem[] {
+  return items.filter((i): i is FilePatchMissingItem => i.kind === 'file-patch-missing');
+}
 
 function separators(items: ListItem[]): SeparatorItem[] {
   return items.filter((i): i is SeparatorItem => i.kind === 'expand-separator');
@@ -247,6 +253,23 @@ describe('buildItems progressive context windowing', () => {
     for (const line of lines) {
       expect(line.selectable).not.toBe(false);
     }
+  });
+});
+
+describe('buildItems malformed patch', () => {
+  it('routes a non-empty patch that parses to zero hunks through the patch-missing fallback', () => {
+    const items = buildItems(
+      baseArgs({
+        files: [makeFile('this is not a valid patch', 'bad.ts')],
+        expanded: { 'bad.ts': true },
+      })
+    );
+    const missing = patchMissingItems(items);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]).toMatchObject({
+      kind: 'file-patch-missing',
+      file: { path: 'bad.ts' },
+    });
   });
 });
 

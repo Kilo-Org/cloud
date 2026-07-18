@@ -9,6 +9,7 @@ import {
   type BuildItemsArgs,
   type DiffViewMode,
   type ListItem,
+  type PaginationRowItem,
   PR_REVIEW_MAX_LISTED_FILES,
   shouldShowTruncationBanner,
   truncationBannerCopy,
@@ -114,19 +115,15 @@ function pushExpandedFileItems(
     number: args.number,
     path: file.path,
   });
-  if (file.patchMissing || !file.patch) {
-    pushPatchMissingItems({
-      items,
-      file,
-      viewed: args.viewed(file.path),
-      githubUrl,
-    });
+  const parsed: ParsedFile = file.patch ? parsePatch(file.patch) : { isRename: false, hunks: [] };
+  const hunks = parsed.hunks;
+
+  if (file.patchMissing || hunks.length === 0) {
+    pushPatchMissingItems({ items, file, viewed: args.viewed(file.path), githubUrl });
     return;
   }
 
-  const parsed = parsePatch(file.patch);
   const language = languageForPath(file.path);
-  const hunks = parsed.hunks;
   const fileContext = args.expandedContext[file.path] ?? {};
   const viewMode: DiffViewMode = args.viewMode ?? 'unified';
 
@@ -148,6 +145,7 @@ function pushExpandedFileItems(
         parsed,
         language,
         headSha: args.headSha,
+        viewMode,
       });
     }
 
@@ -168,6 +166,7 @@ function pushExpandedFileItems(
             parsed,
             language,
             headSha: args.headSha,
+            viewMode,
           });
         }
       }
@@ -193,91 +192,55 @@ function pushExpandedFileItems(
       parsed,
       language,
       headSha: args.headSha,
+      viewMode,
     });
   }
 }
 
-function pushPaginationItem(items: ListItem[], args: BuildItemsArgs): void {
-  if (args.isLoading) {
-    items.push({
-      kind: 'pagination-row',
-      key: 'pagination-row',
-      state: 'loading',
-      loadedFiles: 0,
-      totalFiles: args.totalFiles,
-    });
-    return;
-  }
-
-  if (args.hasNextPage) {
-    if (args.laterPageError && !args.isFetchingNextPage && !args.fetchToCompletionRunning) {
-      items.push({
-        kind: 'pagination-row',
-        key: 'pagination-row',
-        state: 'error',
-        loadedFiles: args.fetchToCompletionLoaded,
-        totalFiles: args.totalFiles,
-      });
-      return;
-    }
-    if (args.fetchToCompletionLoaded >= PR_REVIEW_MAX_LISTED_FILES) {
-      items.push({
-        kind: 'pagination-row',
-        key: 'pagination-row',
-        state: 'all-loaded',
-        loadedFiles: args.fetchToCompletionLoaded,
-        totalFiles: args.totalFiles,
-      });
-      return;
-    }
-    if (args.fetchToCompletionRunning) {
-      items.push({
-        kind: 'pagination-row',
-        key: 'pagination-row',
-        state: 'fetch-to-completion',
-        loadedFiles: args.fetchToCompletionLoaded,
-        totalFiles: args.totalFiles,
-      });
-      return;
-    }
-    if (args.isFetchingNextPage) {
-      items.push({
-        kind: 'pagination-row',
-        key: 'pagination-row',
-        state: 'loading',
-        loadedFiles: args.fetchToCompletionLoaded,
-        totalFiles: args.totalFiles,
-      });
-      return;
-    }
-    items.push({
-      kind: 'pagination-row',
-      key: 'pagination-row',
-      state: 'no-pages',
-      loadedFiles: args.fetchToCompletionLoaded,
-      totalFiles: args.totalFiles,
-    });
-    return;
-  }
-
-  if (args.isFetchingNextPage) {
-    items.push({
-      kind: 'pagination-row',
-      key: 'pagination-row',
-      state: 'loading',
-      loadedFiles: args.fetchToCompletionLoaded,
-      totalFiles: args.totalFiles,
-    });
-    return;
-  }
-
+function pushPaginationState(
+  items: ListItem[],
+  state: PaginationRowItem['state'],
+  args: BuildItemsArgs
+): void {
   items.push({
     kind: 'pagination-row',
     key: 'pagination-row',
-    state: 'all-loaded',
-    loadedFiles: args.fetchToCompletionLoaded,
+    state,
+    loadedFiles: args.isLoading ? 0 : args.fetchToCompletionLoaded,
     totalFiles: args.totalFiles,
   });
+}
+
+function pushPaginationItem(items: ListItem[], args: BuildItemsArgs): void {
+  if (args.isLoading) {
+    pushPaginationState(items, 'loading', args);
+    return;
+  }
+  if (args.hasNextPage) {
+    if (args.laterPageError && !args.isFetchingNextPage && !args.fetchToCompletionRunning) {
+      pushPaginationState(items, 'error', args);
+      return;
+    }
+    if (args.fetchToCompletionLoaded >= PR_REVIEW_MAX_LISTED_FILES) {
+      pushPaginationState(items, 'all-loaded', args);
+      return;
+    }
+    if (args.fetchToCompletionRunning) {
+      pushPaginationState(items, 'fetch-to-completion', args);
+      return;
+    }
+    if (args.isFetchingNextPage) {
+      pushPaginationState(items, 'loading', args);
+      return;
+    }
+    pushPaginationState(items, 'no-pages', args);
+    return;
+  }
+  if (args.isFetchingNextPage) {
+    pushPaginationState(items, 'loading', args);
+    return;
+  }
+  pushPaginationState(items, 'all-loaded', args);
 }
 
 export function buildItems(args: BuildItemsArgs): ListItem[] {

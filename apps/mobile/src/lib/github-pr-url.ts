@@ -5,7 +5,11 @@ type GitHubPrUrl = {
 };
 
 const GITHUB_PR_PATTERN =
-  /^https?:\/\/(www\.)?github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:[/?#][^\s]*)?$/i;
+  /^https?:\/\/(www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/pull\/(\d+)(?:[/?#][^\s]*)?$/i;
+
+function isValidIdentifier(value: string): boolean {
+  return value !== '.' && value !== '..';
+}
 
 /**
  * Parse a GitHub pull request URL into its owner, repo and PR number.
@@ -32,5 +36,10 @@ export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
   if (!Number.isInteger(number) || number <= 0) {
     return null;
   }
-  return { owner: match[2] ?? '', repo: match[3] ?? '', number };
+  const owner = match[2] ?? '';
+  const repo = match[3] ?? '';
+  if (!isValidIdentifier(owner) || !isValidIdentifier(repo)) {
+    return null;
+  }
+  return { owner, repo, number };
 }

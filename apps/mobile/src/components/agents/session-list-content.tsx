@@ -25,7 +25,7 @@ import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useSessionAttentionRevision } from '@/lib/session-attention';
+import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
 // Height of the hidden-by-default search bar (mt-3 12 + border 1 + py-1.5 12 + line-20 + border 1 + mb-14 14 = 60).
@@ -195,22 +195,20 @@ export function AgentSessionListContent({
   // is pushed the Agents list is frozen. react-freeze reveals the previously
   // rendered (cached) cells on return WITHOUT re-running them, so the attention
   // store's `useSyncExternalStore` subscription does not re-render the list and
-  // the detail-screen mount ack is not reflected. `useFocusEffect` fires
-  // reliably on refocus (after unfreeze); bump a tick so the content re-renders
-  // and re-reads the current attention revision.
-  const attentionRevision = useSessionAttentionRevision();
-  const [, bumpFocusTick] = useState(0);
+  // the detail-screen mount ack is not reflected. Snapshot the attention
+  // revision only when the tab (re)gains focus, via `useFocusEffect`, which
+  // fires reliably after unfreeze. Keying the list on that focus snapshot
+  // remounts it exactly when an ack/reconcile happened while the list was away
+  // (e.g. returning from a session that was just opened) so frozen cells re-read
+  // the ack store — while a revision bump for some unrelated session that occurs
+  // *during* browsing does not touch the snapshot, so scroll is preserved.
+  const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
-      bumpFocusTick(tick => tick + 1);
+      setAttentionFocusRevision(getRevisionSnapshot());
     }, [])
   );
-  // Remount the list only when the attention revision changed since it was last
-  // rendered — e.g. returning from a session that was just opened (acked). A
-  // remount is the only reliable way to force frozen cells to re-read the ack
-  // store; keying on the revision (re-read above on focus) leaves scroll intact
-  // during ordinary focus changes where no ack/reconcile occurred.
-  const attentionListKey = `${sortBy}:${attentionRevision}`;
+  const attentionListKey = `${sortBy}:${attentionFocusRevision}`;
 
   const handleRefresh = useCallback(() => {
     void (async () => {

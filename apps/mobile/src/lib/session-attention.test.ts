@@ -306,6 +306,24 @@ describe('revision snapshot and listener notification', () => {
     unsubscribe();
   });
 
+  it('isolates a throwing listener so later subscribers are still notified once', () => {
+    const throwing = vi.fn(() => {
+      throw new Error('listener boom');
+    });
+    const good = vi.fn<() => void>();
+    const unsubThrowing = subscribe(throwing);
+    const unsubGood = subscribe(good);
+
+    const before = getRevisionSnapshot();
+    expect(() => ackSessionAttention('s1')).not.toThrow();
+    expect(throwing).toHaveBeenCalledTimes(1);
+    expect(good).toHaveBeenCalledTimes(1);
+    expect(getRevisionSnapshot()).toBe(before + 1);
+
+    unsubThrowing();
+    unsubGood();
+  });
+
   it('unsubscribe stops further notifications', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribe(listener);

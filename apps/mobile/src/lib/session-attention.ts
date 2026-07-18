@@ -37,8 +37,14 @@ const store: AttentionStore = (globalScope[STORE_KEY] ??= {
 
 function bumpRevision(): void {
   store.revision += 1;
+  // Isolate subscribers: one throwing listener must not prevent the rest from
+  // being notified of the revision change.
   for (const listener of store.listeners) {
-    listener();
+    try {
+      listener();
+    } catch {
+      // A subscriber's own error must not break store notification.
+    }
   }
 }
 

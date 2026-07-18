@@ -680,8 +680,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * dependencies, and log on dispatch failure.
    */
   private async handleAttentionEvent(event: AttentionEvent): Promise<void> {
-    const metadata = await this.getMetadata();
     try {
+      const metadata = await this.getMetadata();
       await dispatchCloudAgentAttentionPush(event, metadata, {
         hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,
         sendPush: params => this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),

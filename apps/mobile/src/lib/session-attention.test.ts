@@ -315,7 +315,9 @@ describe('revision snapshot and listener notification', () => {
     const unsubGood = subscribe(good);
 
     const before = getRevisionSnapshot();
-    expect(() => ackSessionAttention('s1')).not.toThrow();
+    expect(() => {
+      ackSessionAttention('s1');
+    }).not.toThrow();
     expect(throwing).toHaveBeenCalledTimes(1);
     expect(good).toHaveBeenCalledTimes(1);
     expect(getRevisionSnapshot()).toBe(before + 1);

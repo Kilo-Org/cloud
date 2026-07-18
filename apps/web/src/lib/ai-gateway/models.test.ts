@@ -22,13 +22,6 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
     });
 
-    test('should return true for OpenRouter stealth models (alpha/beta)', async () => {
-      expect(await isFreeModel('openrouter/model-alpha')).toBe(true);
-      expect(await isFreeModel('openrouter/model-beta')).toBe(true);
-      expect(await isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(true);
-      expect(await isFreeModel('openrouter/sonoma-sky-beta')).toBe(true);
-    });
-
     test('should return true for enabled Kilo exclusive models with no pricing', async () => {
       // Test with known Kilo exclusive models that are enabled and have no pricing (free)
       const enabledFreeModels = kiloExclusiveModels.filter(
@@ -158,10 +151,15 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('freemium')).toBe(false);
     });
 
-    test('should return false for OpenRouter models that do not end with -alpha or -beta', async () => {
+    test('should return false for OpenRouter models including alpha/beta', async () => {
       expect(await isFreeModel('openrouter/model')).toBe(false);
       expect(await isFreeModel('openrouter/model-gamma')).toBe(false);
       expect(await isFreeModel('openrouter/model-stable')).toBe(false);
+      expect(await isFreeModel('openrouter/model-alpha')).toBe(false);
+      expect(await isFreeModel('openrouter/model-beta')).toBe(false);
+      expect(await isFreeModel('openrouter/sonoma-dusk-alpha')).toBe(false);
+      expect(await isFreeModel('openrouter/sonoma-sky-beta')).toBe(false);
+      expect(await isFreeModel('openrouter/auto-beta')).toBe(false);
     });
 
     test('should return false for non-OpenRouter models ending with -alpha or -beta', async () => {
@@ -185,7 +183,6 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('model:FREE')).toBe(false);
       expect(await isFreeModel('model:Free')).toBe(false);
       expect(await isFreeModel('OPENROUTER/FREE')).toBe(false);
-      expect(await isFreeModel('openrouter/model-ALPHA')).toBe(false);
     });
 
     test('should handle whitespace correctly', async () => {
@@ -193,7 +190,6 @@ describe('isFreeModel', () => {
       expect(await isFreeModel(' model:free')).toBe(true);
       expect(await isFreeModel(' openrouter/free')).toBe(false);
       expect(await isFreeModel('openrouter/free ')).toBe(false);
-      expect(await isFreeModel('openrouter/model-alpha ')).toBe(false);
     });
   });
 });

@@ -116,10 +116,6 @@ export function shouldRedactModelNameInResponse(provider: ProviderId, model: str
   );
 }
 
-export function isOpenRouterStealthModel(model: string): boolean {
-  return model.startsWith('openrouter/') && (model.endsWith('-alpha') || model.endsWith('-beta'));
-}
-
 export function isDeadFreeModel(model: string): boolean {
   return !!kiloExclusiveModels.find(
     m => m.public_id === model && m.status === 'disabled' && !m.pricing

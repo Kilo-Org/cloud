@@ -47,9 +47,19 @@ Rules:
 ## Planning
 
 1. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
-2. Create the dedicated worktrees and write the complete draft plan.
-3. Run the plan review gate below.
-4. In hands-on mode, obtain explicit user approval. In hands-off mode, self-approve.
+2. Create the dedicated worktrees.
+3. For defect work, run the bug reproduction gate below before writing the plan.
+4. Write the complete draft plan.
+5. Run the plan review gate below.
+6. In hands-on mode, obtain explicit user approval. In hands-off mode, self-approve.
+
+### Bug Reproduction Gate
+
+When the work fixes a reported defect, dispatch a fresh `mobile-e2e-verifier` in repro mode on the unmodified baseline in the dedicated worktree before writing the draft plan. Its assignment is to reproduce the reported issue — not to fix anything — and return exact reproduction steps, evidence, and a failure classification. It claims iOS with `--phase prewarm`; the claimed device and warmed services carry into the planner handoff as existing resources to preserve, and the final verifier later reclaims the same device with `--phase verify`.
+
+A confirmed reproduction feeds the plan: the reproduction steps and failure classification inform the root-cause hypothesis, and the confirmed repro flow passing becomes an acceptance criterion the final verifier must rerun.
+
+`Cannot reproduce` is a blocker, not a license to fix an unconfirmed bug. In hands-on mode, return the repro attempt evidence to the user and ask how to proceed. In hands-off mode, stop with a blocker report containing that evidence: no plan, no orchestrator.
 
 ### Plan Review Gate
 
@@ -70,6 +80,7 @@ The handoff must contain:
 - The absolute path of the accepted plan and any approved design
 - The dedicated worktree path for every repository in scope, with each worktree's current branch, commit, and working-tree state
 - Acceptance criteria, feature-state matrix, execution ledger, non-goals, and unresolved risks
+- For defect work: the reported defect, the confirmed reproduction steps and failure classification from the bug reproduction gate, and the repro run's resource manifest
 - Existing changes and resources that must be preserved
 - The completion gate: review, E2E, Git, PR, Kilobot, mergeability, and CI requirements, with a direct instruction to continue until the PR is mergeable and conflict-free with all expected CI checks green on the latest head
 - The GitHub comment rule (see GitHub Communication)
@@ -94,7 +105,7 @@ Use `kilo run --interactive` exactly as shown, with the message positional befor
 | `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | Denied |
 | `mobile-implementer` | Implements one bounded task from the accepted plan and runs narrow checks | Allowed where the task requires |
 | `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
-| `mobile-e2e-verifier` | Exercises accepted behavior; may create temporary state-generation fixtures in verify mode | Temporary, verify mode only |
+| `mobile-e2e-verifier` | Exercises accepted behavior; in repro mode, reproduces a reported defect on the unmodified baseline before planning; may create temporary state-generation fixtures | Temporary only |
 
 ## Execution Ledger
 

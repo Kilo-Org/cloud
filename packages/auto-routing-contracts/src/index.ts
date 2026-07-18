@@ -111,6 +111,13 @@ const BenchmarkAutoRoutingDecisionSchema = z.object({
   // pick. Defaulted so responses from a not-yet-redeployed worker still
   // parse.
   sticky: z.boolean().default(false),
+  // Why the session's incumbent model was abandoned, when it was:
+  // 'threshold' — the incumbent is denied, off the route, or below the
+  // accuracy bar; 'cost' — eligible, but the mode's switch condition made
+  // the fresh pick worth it; 'capability' — ejected by the modality/context
+  // capability filters. Null when there was no incumbent or it was kept.
+  // Optional so responses from a not-yet-redeployed worker still parse.
+  switchReason: z.enum(['threshold', 'cost', 'capability']).nullable().optional(),
 });
 
 const CodingPlanDefaultDecisionSchema = z.object({

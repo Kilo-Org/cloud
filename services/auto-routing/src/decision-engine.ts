@@ -179,9 +179,11 @@ export function computeDecision(
       tableVersion: table.version,
       reasoningEffort: incumbent.reasoningEffort ?? null,
       sticky: true,
+      switchReason: null,
     };
   }
 
+  const switched = incumbentModel !== null && incumbentModel !== freshPick.model;
   return {
     model: freshPick.model,
     taskType: classification.taskType,
@@ -190,5 +192,18 @@ export function computeDecision(
     tableVersion: table.version,
     reasoningEffort: freshPick.reasoningEffort ?? null,
     sticky: false,
+    // 'cost': the incumbent was eligible but the mode's switch condition
+    // (cost factor / accuracy gap) made the fresh pick worth it;
+    // 'capability': the modality/context filters ejected it from the route;
+    // 'threshold': it is denied, off the route, or below the accuracy bar.
+    switchReason: !switched
+      ? null
+      : incumbent
+        ? incumbent.meetsThreshold
+          ? 'cost'
+          : 'threshold'
+        : routeCandidates.some(c => c.model === incumbentModel)
+          ? 'capability'
+          : 'threshold',
   };
 }

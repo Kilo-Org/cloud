@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
 import {
   describePrState,
   formatPrCounts,
@@ -197,7 +198,15 @@ export function PrReviewOverview({
 
       <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
 
-      {/* S8 merge section mounts here */}
+      <PrMergeSection
+        owner={owner}
+        repo={repo}
+        overview={data}
+        onRefetch={async () => {
+          await pr.refetch();
+        }}
+        isRefetching={pr.isFetching}
+      />
 
       <Text variant="muted" className="text-xs">
         {formatPrCounts(data.counts.additions, data.counts.deletions)} · head{' '}

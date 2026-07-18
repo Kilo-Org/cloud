@@ -7,11 +7,84 @@ import { pushGapItems } from '@/lib/pr-review/diff/pr-diff-gap-builder';
 import {
   buildGithubFileUrl,
   type BuildItemsArgs,
+  type DiffViewMode,
   type ListItem,
   PR_REVIEW_MAX_LISTED_FILES,
   shouldShowTruncationBanner,
   truncationBannerCopy,
 } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { buildSideBySideRows } from '@/lib/pr-review/diff/side-by-side';
+
+type ParsedFile = ReturnType<typeof parsePatch>;
+type ParsedHunk = ParsedFile['hunks'][number];
+
+function pushSideBySideHunk(args: {
+  items: ListItem[];
+  file: BuildItemsArgs['files'][number];
+  hunk: ParsedHunk;
+  hunkIndex: number;
+  language: string | null;
+}): void {
+  const { items, file, hunk, hunkIndex, language } = args;
+  items.push({
+    kind: 'hunk-side-by-side',
+    key: `hunk-sbs:${file.path}:${hunkIndex}`,
+    hunk,
+    hunkIndex,
+    language,
+  });
+  const rows = buildSideBySideRows(hunk);
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex];
+    if (!row) {
+      break;
+    }
+    const rowKeyId = `sbs:${file.path}:${hunkIndex}:${rowIndex}`;
+    items.push({
+      kind: 'side-by-side-row',
+      key: rowKeyId,
+      rowKey: rowKeyId,
+      hunkIndex,
+      rowIndex,
+      row,
+      language,
+      rowKeyId,
+    });
+  }
+}
+
+function pushUnifiedHunk(args: {
+  items: ListItem[];
+  file: BuildItemsArgs['files'][number];
+  hunk: ParsedHunk;
+  hunkIndex: number;
+  parsed: ParsedFile;
+  language: string | null;
+}): void {
+  const { items, file, hunk, hunkIndex, parsed, language } = args;
+  items.push({
+    kind: 'hunk-header',
+    key: `hunk:${file.path}:${hunkIndex}`,
+    header: hunk.header,
+  });
+  for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
+    const line = hunk.lines[lineIndex];
+    if (!line) {
+      break;
+    }
+    items.push({
+      kind: 'diff-line',
+      key: `line:${file.path}:${hunkIndex}:${lineIndex}`,
+      lineKey: `line:${file.path}:${hunkIndex}:${lineIndex}`,
+      hunkIndex,
+      lineIndex,
+      parsed,
+      line,
+      language,
+      lineKeyId: `line:${file.path}:${hunkIndex}:${lineIndex}`,
+    });
+  }
+}
 
 function pushPatchMissingItems(args: {
   items: ListItem[];
@@ -53,6 +126,7 @@ function pushExpandedFileItems(
   const language = languageForPath(file.path);
   const hunks = parsed.hunks;
   const fileContext = args.expandedContext[file.path] ?? {};
+  const viewMode: DiffViewMode = args.viewMode ?? 'unified';
 
   for (let hunkIndex = 0; hunkIndex < hunks.length; hunkIndex += 1) {
     const hunk = hunks[hunkIndex];
@@ -97,27 +171,10 @@ function pushExpandedFileItems(
       }
     }
 
-    items.push({
-      kind: 'hunk-header',
-      key: `hunk:${file.path}:${hunkIndex}`,
-      header: hunk.header,
-    });
-    for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
-      const line = hunk.lines[lineIndex];
-      if (!line) {
-        break;
-      }
-      items.push({
-        kind: 'diff-line',
-        key: `line:${file.path}:${hunkIndex}:${lineIndex}`,
-        lineKey: `line:${file.path}:${hunkIndex}:${lineIndex}`,
-        hunkIndex,
-        lineIndex,
-        parsed,
-        line,
-        language,
-        lineKeyId: `line:${file.path}:${hunkIndex}:${lineIndex}`,
-      });
+    if (viewMode === 'side-by-side') {
+      pushSideBySideHunk({ items, file, hunk, hunkIndex, language });
+    } else {
+      pushUnifiedHunk({ items, file, hunk, hunkIndex, parsed, language });
     }
   }
 

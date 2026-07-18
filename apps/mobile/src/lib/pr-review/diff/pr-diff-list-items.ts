@@ -10,7 +10,12 @@ import {
   shouldShowTruncationBanner,
   truncationBannerCopy,
 } from '@/lib/pr-review/diff/pr-review-truncation';
-import { type ParsedDiffLine, type ParsedPatch } from '@/lib/pr-review/diff/parse-patch';
+import {
+  type ParsedDiffLine,
+  type ParsedHunk,
+  type ParsedPatch,
+} from '@/lib/pr-review/diff/parse-patch';
+import { type SideBySideRow } from '@/lib/pr-review/diff/side-by-side';
 
 export type TruncationBannerItem = {
   kind: 'truncation-banner';
@@ -53,6 +58,25 @@ export type DiffLineItem = {
   lineKeyId: string;
 };
 
+export type SideBySideRowItem = {
+  kind: 'side-by-side-row';
+  key: string;
+  rowKey: string;
+  hunkIndex: number;
+  rowIndex: number;
+  row: SideBySideRow;
+  language: string | null;
+  rowKeyId: string;
+};
+
+export type HunkSideBySideHeaderItem = {
+  kind: 'hunk-side-by-side';
+  key: string;
+  hunk: ParsedHunk;
+  hunkIndex: number;
+  language: string | null;
+};
+
 export type ExpandSeparatorItem = {
   kind: 'expand-separator';
   key: string;
@@ -80,8 +104,12 @@ export type ListItem =
   | FilePatchMissingItem
   | HunkHeaderItem
   | DiffLineItem
+  | SideBySideRowItem
+  | HunkSideBySideHeaderItem
   | ExpandSeparatorItem
   | PaginationRowItem;
+
+export type DiffViewMode = 'unified' | 'side-by-side';
 
 export const ITEM_TYPE = {
   Truncation: 'truncation',
@@ -89,6 +117,8 @@ export const ITEM_TYPE = {
   FilePatchMissing: 'file-patch-missing',
   HunkHeader: 'hunk-header',
   DiffLine: 'diff-line',
+  SideBySideRow: 'side-by-side-row',
+  HunkSideBySide: 'hunk-side-by-side',
   ExpandSeparator: 'expand-separator',
   Pagination: 'pagination',
 } as const;
@@ -120,6 +150,12 @@ export function itemTypeFor(item: ListItem): string {
     }
     case 'diff-line': {
       return ITEM_TYPE.DiffLine;
+    }
+    case 'side-by-side-row': {
+      return ITEM_TYPE.SideBySideRow;
+    }
+    case 'hunk-side-by-side': {
+      return ITEM_TYPE.HunkSideBySide;
     }
     case 'expand-separator': {
       return ITEM_TYPE.ExpandSeparator;
@@ -268,6 +304,8 @@ export type BuildItemsArgs = {
   fetchToCompletionRunning: boolean;
   fetchToCompletionLoaded: number;
   totalFiles: number | null;
+  /** Unified (default) or side-by-side (tablet only). */
+  viewMode?: DiffViewMode;
 };
 
 export { PR_REVIEW_MAX_LISTED_FILES, shouldShowTruncationBanner, truncationBannerCopy };

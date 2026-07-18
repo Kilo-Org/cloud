@@ -8,24 +8,24 @@
 //   * `useFetchToCompletion` lets S6c's navigator drive the query to its end
 //   * `subscribeFileNavigatorRequest` is consumed here so a "scroll to file"
 //     request (emitted by S6c) snaps the list to the right section
+//   * A compact header above the FlashList hosts the navigator entry
+//     button and the tablet-only unified/side-by-side toggle (S6c)
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
-import { DiffLine } from '@/components/pr-review/diff/diff-line';
+import {
+  PrDiffFileListHeader,
+  useDiffViewMode,
+} from '@/components/pr-review/diff/pr-diff-file-list-header';
 import {
   EmptyFilesView,
-  ExpandSeparatorRow,
-  FileHeaderRow,
-  HunkHeaderRow,
   LIST_CONTENT_STYLE,
-  PaginationRow,
-  PatchMissingRow,
   TabStateMessage,
-  TruncationBannerRow,
 } from '@/components/pr-review/diff/pr-diff-rows';
+import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -39,6 +39,7 @@ import {
   type FileNavigatorRequest,
   subscribeFileNavigatorRequest,
 } from '@/lib/pr-review/file-navigator-bridge';
+import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 export type PrReviewFileListProps = {
   readonly owner: string;
@@ -75,6 +76,8 @@ export function PrReviewFileList({
     repo,
     headSha,
   });
+  const { viewMode, setViewMode } = useDiffViewMode();
+  const isTablet = useIsTablet();
 
   const files = useMemo(() => {
     const all: PrReviewFile[] = [];
@@ -85,6 +88,16 @@ export function PrReviewFileList({
     }
     return all;
   }, [query.data]);
+
+  const viewedCount = useMemo(() => {
+    let count = 0;
+    for (const file of files) {
+      if (viewed.isViewed(file.path)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [files, viewed]);
 
   const items = useMemo(
     () =>
@@ -105,6 +118,7 @@ export function PrReviewFileList({
         fetchToCompletionRunning: fetchToCompletion.isRunning,
         fetchToCompletionLoaded: fetchToCompletion.loadedFiles,
         totalFiles: changedFiles,
+        viewMode: isTablet ? viewMode : 'unified',
       }),
     [
       files,
@@ -122,6 +136,8 @@ export function PrReviewFileList({
       query.isError,
       fetchToCompletion.isRunning,
       fetchToCompletion.loadedFiles,
+      viewMode,
+      isTablet,
     ]
   );
 
@@ -153,78 +169,13 @@ export function PrReviewFileList({
     return unsubscribe;
   }, [owner, repo, number]);
 
-  const renderItem = useCallback(
-    ({ item }: { item: ListItem }) => {
-      switch (item.kind) {
-        case 'truncation-banner': {
-          return <TruncationBannerRow text={item.text} />;
-        }
-        case 'file-header': {
-          return (
-            <FileHeaderRow
-              file={item.file}
-              expanded={item.expanded}
-              hasDiff={item.hasDiff}
-              viewed={item.viewed}
-              onToggleExpand={() => {
-                setExpanded(prev => ({ ...prev, [item.file.path]: !prev[item.file.path] }));
-              }}
-              onToggleViewed={() => {
-                void viewed.toggle(item.file.path);
-              }}
-            />
-          );
-        }
-        case 'file-patch-missing': {
-          return (
-            <PatchMissingRow
-              file={item.file}
-              viewed={item.viewed}
-              githubUrl={item.githubUrl}
-              onToggleViewed={() => {
-                void viewed.toggle(item.file.path);
-              }}
-            />
-          );
-        }
-        case 'hunk-header': {
-          return <HunkHeaderRow header={item.header} />;
-        }
-        case 'diff-line': {
-          return <DiffLine line={item.line} language={item.language} keyId={item.lineKeyId} />;
-        }
-        case 'expand-separator': {
-          return (
-            <ExpandSeparatorRow
-              item={item}
-              onLoad={windowSize => {
-                handleLoadContext(item, windowSize);
-              }}
-            />
-          );
-        }
-        case 'pagination-row': {
-          return (
-            <PaginationRow
-              state={item.state}
-              loadedFiles={item.loadedFiles}
-              totalFiles={item.totalFiles}
-              onRetry={() => {
-                void query.fetchNextPage();
-              }}
-              onFetchAll={() => {
-                void fetchToCompletion.run();
-              }}
-            />
-          );
-        }
-        default: {
-          return null;
-        }
-      }
-    },
-    [viewed, query, fetchToCompletion, handleLoadContext]
-  );
+  const renderItem = useDiffRenderItem({
+    viewed,
+    query,
+    fetchToCompletion,
+    handleLoadContext,
+    setExpanded,
+  });
 
   if (files.length === 0) {
     if (firstPageErrorState?.kind === 'not-found') {
@@ -262,8 +213,21 @@ export function PrReviewFileList({
     return <EmptyFilesView changedFiles={changedFiles} onRequestOverview={onRequestOverview} />;
   }
 
+  const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
+  const effectiveViewMode = isTablet ? viewMode : 'unified';
+
   return (
     <View className="flex-1" accessibilityLabel="Files list">
+      <PrDiffFileListHeader
+        owner={owner}
+        repo={repo}
+        number={number}
+        viewedCount={viewedCount}
+        totalListed={files.length}
+        isTruncated={isTruncated}
+        viewMode={effectiveViewMode}
+        onViewModeChange={setViewMode}
+      />
       <FlashList
         ref={listRef}
         data={items}

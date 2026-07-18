@@ -66,14 +66,23 @@ export function usePrReviewFileListQuery(args: {
   );
 
   const errorState = query.error ? classifyPrReviewQueryState(query.error) : null;
-  const firstPageErrorState = errorState;
+  // A first-page error is one where NO page has loaded yet. A failure while
+  // fetching a LATER page (already-loaded files present) is a later-page error
+  // and must not blank the screen — consumers keep the loaded files and offer a
+  // resume/retry affordance instead.
+  const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
+  const firstPageErrorState = hasLoadedPages ? null : errorState;
+  const laterPageError = Boolean(query.error) && hasLoadedPages;
 
   return {
     query,
     errorState,
     firstPageErrorState,
+    laterPageError,
   };
 }
+
+export type UsePrReviewFileListQueryResult = ReturnType<typeof usePrReviewFileListQuery>;
 
 /**
  * Subscribes the viewed-files store for a specific PR (keyed by
@@ -83,6 +92,17 @@ export function usePrReviewFileListQuery(args: {
  * PRs, so the hook re-reads on toggle rather than maintaining a
  * long-lived in-memory cache.
  */
+// Module-level notifier so every mounted viewed-files hook (e.g. the diff list
+// AND the file navigator sheet mounted over it) re-reads after any toggle,
+// keeping their viewed indicators in sync without prop drilling.
+const viewedChangeListeners = new Set<() => void>();
+
+function notifyViewedChange(): void {
+  for (const listener of viewedChangeListeners) {
+    listener();
+  }
+}
+
 export function usePrReviewViewedFiles(
   ref: {
     owner: string;
@@ -115,16 +135,22 @@ export function usePrReviewViewedFiles(
     }
 
     void load();
+    // Re-read whenever any instance toggles a file so this instance stays in
+    // sync (the navigator sheet and the underlying diff list share the store).
+    const onChange = () => {
+      void load();
+    };
+    viewedChangeListeners.add(onChange);
     return () => {
       cancelled = true;
+      viewedChangeListeners.delete(onChange);
     };
   }, [owner, repo, number, headSha]);
 
   const toggle = useCallback(
     async (path: string) => {
       // Optimistic toggle: flip the local set first so the UI updates
-      // instantly. The store write is durable (SecureStore), and a
-      // read on the next mount will reconcile any divergence.
+      // instantly. The store write is durable (SecureStore).
       setPaths(previous => {
         if (previous.includes(path)) {
           return previous.filter(p => p !== path);
@@ -132,6 +158,8 @@ export function usePrReviewViewedFiles(
         return [...previous, path];
       });
       await toggleViewedFile({ owner, repo, number, headSha, path });
+      // Notify other mounted instances (they re-read the durable store).
+      notifyViewedChange();
     },
     [owner, repo, number, headSha]
   );

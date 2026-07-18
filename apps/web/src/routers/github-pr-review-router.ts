@@ -56,10 +56,17 @@ const GetPullRequestInput = ownerRepoSchema.extend({ number: prNumberSchema }).s
 
 const ListChecksInput = ownerRepoSchema.extend({ ref: z.string().min(1).max(255) }).strict();
 
+// tRPC's `useInfiniteQuery` integration injects a `direction` discriminator
+// ('forward'|'backward') into the procedure input alongside `cursor`. The input
+// stays `.strict()` (unknown fields still rejected), so it must accept it
+// explicitly or every infinite-query page 400s.
+const infiniteQueryDirection = z.enum(['forward', 'backward']).optional();
+
 const ListFilesInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
     cursor: z.number().int().min(1).max(FILES_MAX_PAGES).optional(),
+    direction: infiniteQueryDirection,
   })
   .strict();
 
@@ -79,6 +86,7 @@ const ListReviewThreadsInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
     cursor: z.string().min(1).optional(),
+    direction: infiniteQueryDirection,
   })
   .strict();
 

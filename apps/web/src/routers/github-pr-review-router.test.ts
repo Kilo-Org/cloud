@@ -23,6 +23,7 @@ type OctokitMock = {
     createReviewComment: jest.Mock;
     createReplyForReviewComment: jest.Mock;
     updateBranch: jest.Mock;
+    listFiles: jest.Mock;
   };
   git: { deleteRef: jest.Mock };
   request: jest.Mock;
@@ -41,6 +42,7 @@ function buildOctokit(token: string): OctokitMock {
       createReviewComment: jest.fn(),
       createReplyForReviewComment: jest.fn(),
       updateBranch: jest.fn(),
+      listFiles: jest.fn(),
     },
     git: { deleteRef: jest.fn() },
     request: jest.fn(),
@@ -160,6 +162,42 @@ describe('githubPrReviewRouter.mergePullRequest', () => {
     expect(result.merged).toBe(true);
     expect(result.branchDeleted).toBe(false);
     expect(typeof result.branchDeleteError).toBe('string');
+  });
+});
+
+describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction field', () => {
+  // tRPC's useInfiniteQuery integration injects `direction: 'forward'|'backward'`
+  // into the procedure input. The inputs are `.strict()`, so without an explicit
+  // `direction` field every page 400s (only reproducible end-to-end, since the
+  // mobile client — not these unit callers — is what sends `direction`).
+  it('listFiles accepts direction: "forward" and returns the page', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').pulls.listFiles.mockResolvedValueOnce({ data: [] });
+
+    await expect(
+      caller.listFiles({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
+    ).resolves.toMatchObject({ files: [] });
+  });
+
+  it('listReviewThreads accepts direction: "forward"', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').request.mockResolvedValue({
+      data: {
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+            },
+          },
+        },
+      },
+    });
+
+    await expect(
+      caller.listReviewThreads({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
+    ).resolves.toBeDefined();
   });
 });
 

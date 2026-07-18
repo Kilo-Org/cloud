@@ -46,7 +46,7 @@ export function PrDiffFileListHeader({
   const isTablet = useIsTablet();
   const colors = useThemeColors();
 
-  const navigatorHref = useMemo<Href<typeof FILE_NAVIGATOR_PATH>>(
+  const navigatorHref = useMemo<Href>(
     () => ({ pathname: FILE_NAVIGATOR_PATH, params: { owner, repo, number } }),
     [owner, repo, number]
   );

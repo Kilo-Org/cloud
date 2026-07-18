@@ -58,26 +58,23 @@ export function PrDiffFloatingActions({
     if (!selection) {
       return;
     }
-    const params: Record<string, string | number> = {
-      owner,
-      repo,
-      number,
-      path: selection.path,
-      side: selection.side,
-      line: selection.line,
-    };
-    if (selection.startLine !== selection.line) {
-      params.startLine = selection.startLine;
-    }
-    const href: Href<typeof COMMENT_COMPOSER_PATH> = {
+    const href: Href = {
       pathname: COMMENT_COMPOSER_PATH,
-      params,
+      params: {
+        owner,
+        repo,
+        number,
+        path: selection.path,
+        side: selection.side,
+        line: selection.line,
+        ...(selection.startLine !== selection.line ? { startLine: selection.startLine } : {}),
+      },
     };
     router.push(href);
   }
 
   function openReviewSubmit() {
-    const href: Href<typeof REVIEW_SUBMIT_PATH> = {
+    const href: Href = {
       pathname: REVIEW_SUBMIT_PATH,
       params: { owner, repo, number },
     };

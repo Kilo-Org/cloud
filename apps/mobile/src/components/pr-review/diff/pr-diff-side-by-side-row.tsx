@@ -11,7 +11,7 @@
 // still fit a stable grid.
 
 import { memo, useMemo } from 'react';
-import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -76,6 +76,13 @@ export type SideBySideRowProps = {
   row: SideBySideRowData;
   language: string | null;
   rowKeyId: string;
+  /** Optional tap producer — wired by S7a so the side-by-side row can
+   *  start a diff selection. Only the right column participates; the
+   *  side-by-side viewer is tablet-only and RIGHT is the canonical
+   *  post-merge view that the user reads to write a review. */
+  onTap?: (cell: { line: ParsedDiffLine; side: 'left' | 'right' }) => void;
+  /** When true, paint the row with the selection focus ring. */
+  isSelected?: boolean;
 };
 
 function sideGutterText(line: ParsedDiffLine, side: 'left' | 'right'): string {
@@ -210,14 +217,31 @@ function describeRow(row: SideBySideRowData): string {
   return 'Empty diff row';
 }
 
-function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowProps>) {
+function SideBySideRowImpl({
+  row,
+  language,
+  rowKeyId,
+  onTap,
+  isSelected,
+}: Readonly<SideBySideRowProps>) {
   const colors = useThemeColors();
   const isDark = colors.background === '#0E0E10';
   const leftLine = row.left?.line ?? null;
   const rightLine = row.right?.line ?? null;
-  return (
+  // Side-by-side uses the right column when present; a left-only row
+  // (pure deletion) lets the user comment on the LEFT line instead.
+  const tappableLine = rightLine ?? leftLine;
+  let tappableColumn: 'left' | 'right' | null = null;
+  if (rightLine) {
+    tappableColumn = 'right';
+  } else if (leftLine) {
+    tappableColumn = 'left';
+  }
+  // Selection ring uses the primary color (matches the unified diff).
+  const selectionClass = isSelected ? 'border-l-2 border-primary' : 'border-l-2 border-transparent';
+  const rowContent = (
     <View
-      className="flex-row items-stretch border-b border-hair-soft"
+      className={cn('flex-row items-stretch border-b border-hair-soft', selectionClass)}
       style={ROW_STYLE}
       accessibilityLabel={describeRow(row)}
       testID={rowKeyId}
@@ -247,12 +271,35 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
       )}
     </View>
   );
+  if (!onTap || !tappableLine || !tappableColumn) {
+    return rowContent;
+  }
+  return (
+    <Pressable
+      onPress={() => {
+        onTap({ line: tappableLine, side: tappableColumn });
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={
+        isSelected
+          ? `Selected diff row (${tappableColumn}), tap to change selection`
+          : `Comment on diff row (${tappableColumn})`
+      }
+      accessibilityState={{ selected: Boolean(isSelected) }}
+    >
+      {rowContent}
+    </Pressable>
+  );
 }
 
 export const SideBySideRow = memo(
   SideBySideRowImpl,
   (prev, next) =>
-    prev.rowKeyId === next.rowKeyId && prev.language === next.language && prev.row === next.row
+    prev.rowKeyId === next.rowKeyId &&
+    prev.language === next.language &&
+    prev.row === next.row &&
+    prev.onTap === next.onTap &&
+    prev.isSelected === next.isSelected
 );
 
 export type HunkSideBySideHeaderProps = {

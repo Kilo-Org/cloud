@@ -8,8 +8,11 @@
 //   * `useFetchToCompletion` lets S6c's navigator drive the query to its end
 //   * `subscribeFileNavigatorRequest` is consumed here so a "scroll to file"
 //     request (emitted by S6c) snaps the list to the right section
-//   * A compact header above the FlashList hosts the navigator entry
-//     button and the tablet-only unified/side-by-side toggle (S6c)
+//   * S7a adds diff-line selection: tapping a line runs the pure
+//     `selectLine` reducer; the result is mirrored into the
+//     `diff-selection-bridge` (so the comment composer can read it on
+//     mount) and a floating action bar (`PrDiffFloatingActions`)
+//     hosts the "Comment" and "Finish review" affordances.
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,12 +23,14 @@ import {
   PrDiffFileListHeader,
   useDiffViewMode,
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
+import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
+import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
+import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import {
   EmptyFilesView,
   LIST_CONTENT_STYLE,
   TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-rows';
-import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -35,6 +40,7 @@ import {
   usePrReviewFileListQuery,
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
+import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import {
   type FileNavigatorRequest,
   subscribeFileNavigatorRequest,
@@ -78,6 +84,19 @@ export function PrReviewFileList({
   });
   const { viewMode, setViewMode } = useDiffViewMode();
   const isTablet = useIsTablet();
+  const { selection, selectionView, handleLineTap, clearSelection } = useDiffSelection({
+    owner,
+    repo,
+    number,
+    viewMode,
+    isTablet,
+  });
+
+  // When the component unmounts (user navigates away from the PR or
+  // pops the PR screen off the stack), drop the bridge so a stale
+  // selection can never leak into the next mount. Re-mounting this
+  // list always starts with no selection.
+  useEffect(() => clearDiffSelection, []);
 
   const files = useMemo(() => {
     const all: PrReviewFile[] = [];
@@ -175,6 +194,8 @@ export function PrReviewFileList({
     fetchToCompletion,
     handleLoadContext,
     setExpanded,
+    onLineTap: handleLineTap,
+    selection: selectionView,
   });
 
   if (files.length === 0) {
@@ -242,6 +263,14 @@ export function PrReviewFileList({
         onEndReachedThreshold={0.5}
         contentContainerStyle={LIST_CONTENT_STYLE}
         ItemSeparatorComponent={null}
+      />
+      <PrDiffFloatingActions
+        owner={owner}
+        repo={repo}
+        number={number}
+        viewMode={effectiveViewMode}
+        selection={selection}
+        onClearSelection={clearSelection}
       />
     </View>
   );

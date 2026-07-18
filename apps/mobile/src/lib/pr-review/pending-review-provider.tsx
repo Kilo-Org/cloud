@@ -1,8 +1,14 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 
-// Minimal item shape — S7a owns the final pending-comment fields. Keeping
-// the type intentionally loose lets the provider land in S4b without
-// baking in fields that the comment composer hasn't decided on yet.
+// One queued inline comment in the pending review. The composer fills
+// this in when the user taps "Add to review"; the submit sheet drains
+// the whole list into one `submitReview` batch call.
+//
+// `commitSha` records the PR head SHA at the time the comment was
+// queued so the submit sheet can flag "may be outdated" if the head
+// moves between queue and submit. Submission itself always uses the
+// LATEST head SHA (per the S3 contract) — a per-item 422 surfaces
+// inline so the user can decide whether to retry or drop the comment.
 export type PendingReviewItem = {
   id: string;
   path: string;
@@ -10,11 +16,13 @@ export type PendingReviewItem = {
   line: number;
   startLine?: number;
   body: string;
+  commitSha: string;
 };
 
 type PendingReviewContextValue = {
   items: PendingReviewItem[];
   addComment: (item: PendingReviewItem) => void;
+  updateComment: (id: string, body: string) => void;
   removeComment: (id: string) => void;
   clear: () => void;
 };
@@ -28,6 +36,10 @@ export function PendingReviewProvider({ children }: { readonly children: ReactNo
     setItems(previous => [...previous, item]);
   }, []);
 
+  const updateComment = useCallback((id: string, body: string) => {
+    setItems(previous => previous.map(item => (item.id === id ? { ...item, body } : item)));
+  }, []);
+
   const removeComment = useCallback((id: string) => {
     setItems(previous => previous.filter(item => item.id !== id));
   }, []);
@@ -37,8 +49,8 @@ export function PendingReviewProvider({ children }: { readonly children: ReactNo
   }, []);
 
   const value = useMemo<PendingReviewContextValue>(
-    () => ({ items, addComment, removeComment, clear }),
-    [items, addComment, removeComment, clear]
+    () => ({ items, addComment, updateComment, removeComment, clear }),
+    [items, addComment, updateComment, removeComment, clear]
   );
 
   return <PendingReviewContext value={value}>{children}</PendingReviewContext>;

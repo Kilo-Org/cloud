@@ -50,18 +50,26 @@ export type DiffLineItem = {
   kind: 'diff-line';
   key: string;
   lineKey: string;
+  /** The owning file path — needed by the S7a tap producer to build a `DiffSelection`. */
+  filePath: string;
   hunkIndex: number;
   lineIndex: number;
   parsed: ParsedPatch;
   line: ParsedDiffLine;
   language: string | null;
   lineKeyId: string;
+  /**
+   * Gap/expanded-context lines are read-only and must not participate in
+   * diff-line selection. Real parsed-hunk lines are selectable by default.
+   */
+  selectable?: boolean;
 };
 
 export type SideBySideRowItem = {
   kind: 'side-by-side-row';
   key: string;
   rowKey: string;
+  filePath: string;
   hunkIndex: number;
   rowIndex: number;
   row: SideBySideRow;

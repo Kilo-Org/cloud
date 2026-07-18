@@ -1,13 +1,15 @@
-import { useLocalSearchParams } from 'expo-router';
-import { ScrollView, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { type ReactNode } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
+import { PrReviewSubmit } from '@/components/pr-review/pr-review-submit';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { parseParam } from '@/lib/route-params';
+import { useTRPC } from '@/lib/trpc';
 
-// Thin stub for the review-submit sheet (approve / request-changes /
-// comment-only summary). S8 implements the actual radio group + submit
-// mutation. S4b only needs the route to mount and pin the param contract.
 type Params = {
   owner: string;
   repo: string;
@@ -15,26 +17,67 @@ type Params = {
 };
 
 export function PrReviewReviewSubmitScreen() {
+  const router = useRouter();
   const colors = useThemeColors();
   const params = useLocalSearchParams<Params>();
+  const owner = parseParam(params.owner) ?? '';
+  const repo = parseParam(params.repo) ?? '';
+  const rawNumber = parseParam(params.number) ?? '';
+  const number = Number.parseInt(rawNumber, 10);
+
+  const trpc = useTRPC();
+  const pr = useQuery(
+    trpc.githubPrReview.getPullRequest.queryOptions(
+      { owner, repo, number },
+      { enabled: Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0 }
+    )
+  );
+
+  let content: ReactNode = null;
+  if (pr.isLoading) {
+    content = (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      </View>
+    );
+  } else if (pr.isError || !pr.data) {
+    content = (
+      <View className="flex-1">
+        <QueryError
+          variant="server"
+          title="Couldn't load review submission"
+          onRetry={() => {
+            void pr.refetch();
+          }}
+          isRetrying={pr.isFetching}
+        />
+      </View>
+    );
+  } else {
+    content = (
+      <PrReviewSubmit
+        owner={owner}
+        repo={repo}
+        number={number}
+        headSha={pr.data.headSha}
+        onDismiss={() => {
+          router.back();
+        }}
+      />
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title="Submit review"
-        eyebrow={`${params.owner}/${params.repo}#${params.number}`}
+        eyebrow={`${owner}/${repo}#${rawNumber}`}
         modal
+        onBack={() => {
+          router.back();
+        }}
       />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-6 pb-8 pt-2"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-      >
-        <Text variant="muted" className="text-sm" style={{ color: colors.mutedForeground }}>
-          Review submit lands in S8.
-        </Text>
-      </ScrollView>
+      {content}
     </View>
   );
 }

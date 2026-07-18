@@ -95,3 +95,34 @@ export function classifyPrReviewQueryState(error: unknown): PrReviewQueryState {
   }
   return { kind: 'retryable' };
 }
+
+export type PrReviewMutationErrorState =
+  | {
+      /**
+       * The mutation failed with a transient error (network, 5xx, etc.).
+       * The caller should keep the retry affordance available.
+       */
+      kind: 'retryable';
+    }
+  | {
+      /**
+       * The mutation failed with a validation / 422-class error (e.g.
+       * approving your own PR or a stale comment line). The caller should
+       * show a specific inline message and remove the retry affordance;
+       * the user must change the input or event before submitting again.
+       */
+      kind: 'bad-request';
+      /** Original error message, suitable for logging but not the UI. */
+      message: string;
+    };
+
+export function classifyPrReviewMutationError(error: unknown): PrReviewMutationErrorState {
+  const code = readTrpcErrorCode(error);
+  if (code === 'BAD_REQUEST') {
+    return {
+      kind: 'bad-request',
+      message: error instanceof Error ? error.message : 'Bad request',
+    };
+  }
+  return { kind: 'retryable' };
+}

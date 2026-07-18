@@ -53,6 +53,7 @@ export function pushGapItems(args: {
       kind: 'diff-line',
       key: `gap-line:${args.file.path}:${args.gapIndex}:${lineIdx}`,
       lineKey: `gap-line:${args.file.path}:${args.gapIndex}:${lineIdx}`,
+      filePath: args.file.path,
       hunkIndex: args.hunkIndex,
       lineIndex: lineIdx,
       parsed: args.parsed,
@@ -64,6 +65,7 @@ export function pushGapItems(args: {
       },
       language: args.language,
       lineKeyId: `gap-line:${args.file.path}:${args.gapIndex}:${lineIdx}`,
+      selectable: false,
     });
   }
 

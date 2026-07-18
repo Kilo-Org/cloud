@@ -218,6 +218,36 @@ describe('buildItems progressive context windowing', () => {
       context: { startLine: 28, endLine: 44 },
     });
   });
+
+  it('marks expanded gap lines as non-selectable', () => {
+    const items = buildItems(
+      baseArgs({
+        files: [makeFile(largeGapPatch)],
+        expanded: { 'a.ts': true },
+        expandedContext: {
+          'a.ts': {
+            0: { status: 'partial', lines: Array.from({ length: 20 }, (_, i) => `gap-line-${i}`) },
+          },
+        },
+      })
+    );
+    const gapLines = gapLinesFor(items, 'a.ts', 0);
+    expect(gapLines.length).toBeGreaterThan(0);
+    for (const gapLine of gapLines) {
+      expect(gapLine.selectable).toBe(false);
+    }
+  });
+
+  it('leaves real parsed-hunk lines selectable by default', () => {
+    const items = buildItems(
+      baseArgs({ files: [makeFile(singleHunkPatch)], expanded: { 'a.ts': true } })
+    );
+    const lines = diffLines(items).filter(l => l.lineKey.startsWith('line:'));
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line.selectable).not.toBe(false);
+    }
+  });
 });
 
 describe('buildItems trailing gap totalLines', () => {

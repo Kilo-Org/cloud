@@ -21,6 +21,8 @@ import {
   SideBySideRow,
 } from '@/components/pr-review/diff/pr-diff-side-by-side-row';
 import { type ExpandSeparatorItem, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
+import { sideForDiffLineType } from '@/lib/pr-review/diff-selection';
 import {
   type FetchToCompletionResult,
   type PrReviewFile,
@@ -36,6 +38,31 @@ export type UseDiffRenderItemArgs = {
   fetchToCompletion: FetchToCompletionResult;
   handleLoadContext: (item: ExpandSeparatorItem, windowSize: number) => void;
   setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  /** Producer-side tap handler. Receives the parsed data needed to run
+   *  the diff-selection reducer. S7a wires this from `PrDiffFileList`. */
+  onLineTap: (args: LineTapArgs) => void;
+  /** `null` when no selection; otherwise the current selection range. */
+  selection: SelectionView;
+};
+
+/** Lightweight view of the current selection — what the rows need to
+ *  decide whether to paint the focus ring. The full `DiffSelection`
+ *  (incl. `selectedText`) is in the bridge, not here. */
+export type SelectionView = {
+  filePath: string;
+  side: 'LEFT' | 'RIGHT';
+  startLine: number;
+  line: number;
+} | null;
+
+export type LineTapArgs = {
+  filePath: string;
+  hunkKey: string;
+  side: 'LEFT' | 'RIGHT';
+  line: number;
+  text: string;
+  /** The full hunk — the reducer needs the line-number → text map. */
+  hunk: ParsedHunk;
 };
 
 // Re-exported here so the file-list module can import the terminal
@@ -52,6 +79,8 @@ export function useDiffRenderItem({
   fetchToCompletion,
   handleLoadContext,
   setExpanded,
+  onLineTap,
+  selection,
 }: UseDiffRenderItemArgs) {
   return useCallback(
     ({ item }: { item: ListItem }) => {
@@ -94,10 +123,44 @@ export function useDiffRenderItem({
           return <HunkSideBySideHeader hunk={item.hunk} />;
         }
         case 'side-by-side-row': {
+          // Commenting is done from the unified view; side-by-side is read-only.
           return <SideBySideRow row={item.row} language={item.language} rowKeyId={item.rowKeyId} />;
         }
         case 'diff-line': {
-          return <DiffLine line={item.line} language={item.language} keyId={item.lineKeyId} />;
+          const parsedLine = item.line;
+          const side = sideForDiffLineType(parsedLine.type);
+          const lineNumber = side === 'LEFT' ? parsedLine.oldLine : parsedLine.newLine;
+          const hunk = item.parsed.hunks[item.hunkIndex];
+          const isSelectable = item.selectable !== false;
+          return (
+            <DiffLine
+              line={parsedLine}
+              language={item.language}
+              keyId={item.lineKeyId}
+              onTap={
+                isSelectable && typeof lineNumber === 'number' && hunk
+                  ? () => {
+                      onLineTap({
+                        filePath: item.filePath,
+                        hunkKey: `${item.filePath}:${item.hunkIndex}`,
+                        side,
+                        line: lineNumber,
+                        text: parsedLine.text,
+                        hunk,
+                      });
+                    }
+                  : undefined
+              }
+              isSelected={
+                selection !== null &&
+                selection.filePath === item.filePath &&
+                selection.side === side &&
+                typeof lineNumber === 'number' &&
+                lineNumber >= selection.startLine &&
+                lineNumber <= selection.line
+              }
+            />
+          );
         }
         case 'expand-separator': {
           return (
@@ -129,6 +192,6 @@ export function useDiffRenderItem({
         }
       }
     },
-    [viewed, query, fetchToCompletion, handleLoadContext, setExpanded]
+    [viewed, query, fetchToCompletion, handleLoadContext, setExpanded, onLineTap, selection]
   );
 }

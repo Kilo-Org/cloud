@@ -1,55 +1,91 @@
+import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScrollView, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
+import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
+import { QueryError } from '@/components/query-error';
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { parseComposerParams } from '@/lib/pr-review/comment-composer-params';
+import { useTRPC } from '@/lib/trpc';
 
-// Thin stub for the comment composer sheet. S7a fills in the body — the
-// line/side context, the text input, the diff snippet preview, the
-// submit/cancel actions. S4b only needs the route to render something
-// inside a ScrollView (iOS formSheet gotcha) and pin the param contract.
 type Params = {
   owner: string;
   repo: string;
   number: string;
   path: string;
-  side: 'LEFT' | 'RIGHT';
+  side?: string;
   line: string;
   startLine?: string;
 };
 
 export function PrReviewCommentComposerScreen() {
-  const colors = useThemeColors();
   const router = useRouter();
+  const colors = useThemeColors();
   const params = useLocalSearchParams<Params>();
-  const startLine = params.startLine ? Number.parseInt(params.startLine, 10) : undefined;
-  const lineNumber = Number.parseInt(params.line, 10);
+  const parsed = parseComposerParams(params);
+
+  const trpc = useTRPC();
+  const pr = useQuery(
+    trpc.githubPrReview.getPullRequest.queryOptions(
+      { owner: parsed?.owner ?? '', repo: parsed?.repo ?? '', number: parsed?.number ?? 0 },
+      { enabled: parsed !== null }
+    )
+  );
+
+  let content: ReactNode = null;
+  if (!parsed) {
+    content = <InvalidRouteState backTo="/(app)/pr-review" />;
+  } else if (pr.isLoading) {
+    content = (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      </View>
+    );
+  } else if (pr.isError || !pr.data) {
+    content = (
+      <View className="flex-1">
+        <QueryError
+          variant="server"
+          title="Couldn't load the comment composer"
+          onRetry={() => {
+            void pr.refetch();
+          }}
+          isRetrying={pr.isFetching}
+        />
+      </View>
+    );
+  } else {
+    content = (
+      <PrReviewCommentComposer
+        owner={parsed.owner}
+        repo={parsed.repo}
+        number={parsed.number}
+        headSha={pr.data.headSha}
+        path={parsed.path}
+        side={parsed.side}
+        line={parsed.line}
+        startLine={parsed.startLine}
+        onDismiss={() => {
+          router.back();
+        }}
+      />
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title="Add comment"
-        eyebrow={`${params.owner}/${params.repo}#${params.number}`}
+        eyebrow={parsed ? `${parsed.owner}/${parsed.repo}#${parsed.number}` : ''}
         modal
         onBack={() => {
           router.back();
         }}
       />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-6 pb-8 pt-2"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-      >
-        <Text variant="muted">
-          {params.path} {params.side} L{Number.isFinite(lineNumber) ? lineNumber : '?'}
-          {startLine && Number.isFinite(startLine) ? `–L${startLine}` : ''}
-        </Text>
-        <Text className="text-sm" style={{ color: colors.mutedForeground }}>
-          Comment composer lands in S7a.
-        </Text>
-      </ScrollView>
+      {content}
     </View>
   );
 }

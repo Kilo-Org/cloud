@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   sendCloudAgentSessionNotificationInputSchema,
+  sendSessionReadyNotificationInputSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
 } from '@kilocode/notifications';
@@ -252,6 +253,148 @@ describe('dispatchCloudAgentSessionPush', () => {
     ).rejects.toThrow();
     expect(deps.getSession).not.toHaveBeenCalled();
   });
+
+  it('composes the push title from the session title for an attention dispatch', async () => {
+    const deps = createDeps({
+      session: { title: 'Refactor auth module', organizationId: null },
+    });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'attention:req_1',
+        status: 'completed',
+        body: 'Kilo needs your input.',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          title: 'Refactor auth module',
+          body: 'Kilo needs your input.',
+        }),
+      })
+    );
+  });
+
+  it('falls back to the fixed title when the session title is null', async () => {
+    const deps = createDeps({ session: { title: null, organizationId: null } });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_null',
+        status: 'completed',
+        body: 'Finished',
+      },
+      deps
+    );
+
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({ push: expect.objectContaining({ title: 'Agent session' }) })
+    );
+  });
+
+  it('falls back to the fixed title when the session title is only whitespace', async () => {
+    const deps = createDeps({ session: { title: '   \n  \t', organizationId: null } });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_ws',
+        status: 'completed',
+        body: 'Finished',
+      },
+      deps
+    );
+
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({ push: expect.objectContaining({ title: 'Agent session' }) })
+    );
+  });
+
+  it('truncates a long session title to at most 80 code points ending in ellipsis', async () => {
+    // Mix ASCII with a surrogate-pair emoji to exercise the codepoint-safe path.
+    const longTitle = 'x'.repeat(70) + ' 🦊 '.repeat(5) + ' tail';
+    const deps = createDeps({ session: { title: longTitle, organizationId: null } });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_long',
+        status: 'completed',
+        body: 'Finished',
+      },
+      deps
+    );
+
+    const calls = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    const pushedTitle = calls.push.title;
+    expect(pushedTitle.endsWith('...')).toBe(true);
+    expect(pushedTitle.includes('\n')).toBe(false);
+    expect(Array.from(pushedTitle).length).toBeLessThanOrEqual(80);
+    // No lone surrogate: if the truncation keeps the emoji, it must remain intact;
+    // otherwise the truncation point must be on an ASCII/space boundary.
+    if (pushedTitle.includes('🦊')) {
+      // Surviving emoji must be the full code point sequence, not a lone surrogate.
+      expect(pushedTitle.includes('\uD83E')).toBe(true);
+    }
+  });
+
+  it('truncates surrogate-pair emoji by code points, not UTF-16 code units', async () => {
+    const emojiTitle = '🦊'.repeat(85);
+    const expected = '🦊'.repeat(77) + '...';
+    const deps = createDeps({ session: { title: emojiTitle, organizationId: null } });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_emoji_surrogate',
+        status: 'completed',
+        body: 'Finished',
+      },
+      deps
+    );
+
+    const calls = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    const pushedTitle = calls.push.title;
+    expect(pushedTitle).toBe(expected);
+    expect(Array.from(pushedTitle).length).toBe(80);
+    expect(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(pushedTitle)
+    ).toBe(false);
+  });
+
+  it('collapses whitespace runs (including newlines/tabs) into single spaces', async () => {
+    const deps = createDeps({
+      session: { title: 'Refactor\n\nthe\t auth  module', organizationId: null },
+    });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_ws',
+        status: 'completed',
+        body: 'Finished',
+      },
+      deps
+    );
+
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({ title: 'Refactor the auth module' }),
+      })
+    );
+  });
 });
 
 describe('dispatchSessionReadyPush', () => {
@@ -322,6 +465,59 @@ describe('dispatchSessionReadyPush', () => {
 
     expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
   });
+
+  it('prefers the heartbeat hint title over the DB title when both are present', async () => {
+    const deps = createDeps({
+      session: { title: 'DB title', organizationId: null },
+    });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_1', title: 'Heartbeat title' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          title: 'Heartbeat title',
+          body: 'Your Kilo session is ready to control from your phone',
+        }),
+      })
+    );
+  });
+
+  it('uses the DB title when no heartbeat hint is provided', async () => {
+    const deps = createDeps({
+      session: { title: 'DB title', organizationId: null },
+    });
+
+    await dispatchSessionReadyPush({ userId: 'user-1', cliSessionId: 'ses_1' }, deps);
+
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          title: 'DB title',
+          body: 'Your Kilo session is ready to control from your phone',
+        }),
+      })
+    );
+  });
+
+  it('falls back to the fixed copy when no hint and no DB title are present', async () => {
+    const deps = createDeps({ session: { title: null, organizationId: null } });
+
+    await dispatchSessionReadyPush({ userId: 'user-1', cliSessionId: 'ses_1' }, deps);
+
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          title: 'Kilo session ready',
+          body: 'Your Kilo session is ready to control from your phone',
+        }),
+      })
+    );
+  });
 });
 
 describe('sendCloudAgentSessionNotificationInputSchema', () => {
@@ -343,6 +539,36 @@ describe('sendCloudAgentSessionNotificationInputSchema', () => {
       status: 'completed',
       body: 'Finished',
       suppressIfViewingSession: true,
+    });
+  });
+});
+
+describe('sendSessionReadyNotificationInputSchema', () => {
+  it('accepts input without title and strips unknown keys', () => {
+    const parsed = sendSessionReadyNotificationInputSchema.parse({
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+      extra: 'stripped',
+    });
+
+    expect(parsed).toEqual({
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+    });
+  });
+
+  it('accepts input with a title', () => {
+    const parsed = sendSessionReadyNotificationInputSchema.parse({
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+      title: 'Heartbeat title',
+      extra: 'stripped',
+    });
+
+    expect(parsed).toEqual({
+      userId: 'user-1',
+      cliSessionId: 'ses_1',
+      title: 'Heartbeat title',
     });
   });
 });

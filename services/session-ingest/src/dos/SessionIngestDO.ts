@@ -362,7 +362,7 @@ export class SessionIngestDO extends DurableObject<Env> {
    * CLI reconnects and UserConnectionDO evictions can't re-arm it. Push
    * failures are non-fatal: log and move on.
    */
-  claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+  claimSessionReadyPush(kiloUserId: string, sessionId: string, title?: string): void {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
       .from(ingestMeta)
@@ -380,6 +380,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       this.env.NOTIFICATIONS.sendSessionReadyNotification({
         userId: kiloUserId,
         cliSessionId: sessionId,
+        title,
       }).catch((error: unknown) => {
         console.error('Failed to send session-ready push (non-fatal)', {
           sessionId,

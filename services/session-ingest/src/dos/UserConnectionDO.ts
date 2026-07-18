@@ -420,7 +420,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       // remote-controllable — the only moment the session-ready push fires.
       // The durable claim in SessionIngestDO makes reconnect re-sights no-ops.
       if (!previousOwner && !session.parentSessionId && attachment.kiloUserId) {
-        this.claimSessionReadyPush(attachment.kiloUserId, session.id);
+        this.claimSessionReadyPush(attachment.kiloUserId, session.id, session.title);
       }
       this.sessionOwners.set(session.id, connectionId);
     }
@@ -474,10 +474,10 @@ export class UserConnectionDO extends DurableObject<Env> {
    * Fire-and-forget "session ready to control from your phone" push via the
    * session's SessionIngestDO, which holds the durable once-ever claim.
    */
-  private claimSessionReadyPush(kiloUserId: string, sessionId: string): void {
+  private claimSessionReadyPush(kiloUserId: string, sessionId: string, title: string): void {
     const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
     this.ctx.waitUntil(
-      stub.claimSessionReadyPush(kiloUserId, sessionId).catch((error: unknown) => {
+      stub.claimSessionReadyPush(kiloUserId, sessionId, title).catch((error: unknown) => {
         console.error('Failed to claim session-ready push (non-fatal)', {
           sessionId,
           error: error instanceof Error ? error.message : String(error),

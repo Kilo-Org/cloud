@@ -15,6 +15,17 @@ type CloudAgentNotificationSession = {
   organizationId: string | null;
 };
 
+const TITLE_MAX_LENGTH = 80;
+
+function sanitizeTitle(title: string | null | undefined): string | null {
+  if (title == null) return null;
+  const collapsed = title.replace(/\s+/g, ' ').trim();
+  if (collapsed === '') return null;
+  const codePoints = Array.from(collapsed);
+  if (codePoints.length <= TITLE_MAX_LENGTH) return collapsed;
+  return `${codePoints.slice(0, TITLE_MAX_LENGTH - 3).join('')}...`;
+}
+
 export type DispatchCloudAgentSessionPushDeps = {
   getSession: (
     userId: string,
@@ -85,7 +96,7 @@ export async function dispatchCloudAgentSessionPush(
         ? presenceContextForCliSession(parsed.cliSessionId)
         : null,
       idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
-      title: session.title ?? 'Agent session',
+      title: sanitizeTitle(session.title) ?? 'Agent session',
       body: parsed.body,
     }),
     deps
@@ -105,10 +116,11 @@ export async function dispatchSessionReadyPush(
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
-    () => ({
+    session => ({
       presenceContext: presenceContextForPlatform('app'),
       idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
-      title: 'Kilo session ready',
+      title:
+        sanitizeTitle(parsed.title ?? null) ?? sanitizeTitle(session.title) ?? 'Kilo session ready',
       body: 'Your Kilo session is ready to control from your phone',
     }),
     deps

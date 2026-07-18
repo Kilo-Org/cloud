@@ -162,6 +162,7 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 export const sendSessionReadyNotificationInputSchema = z.object({
   userId: z.string().min(1),
   cliSessionId: z.string().min(1),
+  title: z.string().optional(),
 });
 export type SendSessionReadyNotificationParams = z.infer<
   typeof sendSessionReadyNotificationInputSchema

@@ -3094,7 +3094,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
 
       expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
-      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main');
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main', 'Test');
 
       // Subsequent heartbeats for the same session must not re-claim.
       sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
@@ -3111,7 +3111,7 @@ describe('UserConnectionDO', () => {
       ]);
 
       expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
-      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main');
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main', 'Test');
     });
 
     it('does not claim on sockets without a kiloUserId (legacy attachment)', () => {

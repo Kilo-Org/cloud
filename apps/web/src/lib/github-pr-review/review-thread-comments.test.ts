@@ -74,7 +74,10 @@ describe('fetchAllThreadComments', () => {
     });
     expect(REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST).not.toMatch(/\$owner|\$name|\$number/);
 
-    const [, secondArgs] = request.mock.calls[1] as [string, { variables: Record<string, unknown> }];
+    const [, secondArgs] = request.mock.calls[1] as [
+      string,
+      { variables: Record<string, unknown> },
+    ];
     expect(secondArgs.variables.after).toBe('c2');
   });
 });

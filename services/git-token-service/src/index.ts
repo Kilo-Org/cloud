@@ -1193,9 +1193,7 @@ export default {
     // shared early-return error paths (405/401/503). The GitHub user-access
     // token endpoint joins the GitLab private endpoints here.
     const privateNoStoreHeaders =
-      isGitLabCredentialAudit ||
-      isGitLabCredentialBroker ||
-      url.pathname === USER_ACCESS_TOKEN_PATH
+      isGitLabCredentialAudit || isGitLabCredentialBroker || url.pathname === USER_ACCESS_TOKEN_PATH
         ? { 'Cache-Control': 'no-store' }
         : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);

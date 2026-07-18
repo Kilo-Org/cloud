@@ -216,8 +216,7 @@ export class GitHubUserAuthorizationService {
 
     if (
       forceRefresh ||
-      new Date(authorization.access_token_expires_at).getTime() - Date.now() <
-        EXPIRY_BUFFER_MS
+      new Date(authorization.access_token_expires_at).getTime() - Date.now() < EXPIRY_BUFFER_MS
     ) {
       const refreshResult = await this.refreshAuthorizationWithLock(db, authorization, {
         force: forceRefresh,
@@ -476,8 +475,7 @@ export class GitHubUserAuthorizationService {
       }
       if (
         !options.force &&
-        new Date(authorization.access_token_expires_at).getTime() - Date.now() >=
-          EXPIRY_BUFFER_MS
+        new Date(authorization.access_token_expires_at).getTime() - Date.now() >= EXPIRY_BUFFER_MS
       ) {
         return 'refreshed';
       }

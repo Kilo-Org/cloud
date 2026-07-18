@@ -31,9 +31,7 @@ const mockFetchGitHubRepositories =
   jest.fn<(installationId: string, appType: GitHubAppType) => Promise<unknown[]>>();
 const mockSeedUserGithubToken =
   jest.fn<
-    (
-      input: Record<string, unknown>
-    ) => Promise<{ upserted: boolean; githubLogin: string }>
+    (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
   >();
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({}));

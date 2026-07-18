@@ -613,16 +613,14 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
       refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
     };
     database.updatedRow = refreshedRow;
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({
-          access_token: 'refreshed-access',
-          expires_in: 3600,
-          refresh_token: 'refreshed-refresh',
-          refresh_token_expires_in: 7200,
-        })
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await makeService({ GITHUB_OAUTH_BASE_URL: 'https://github.test/' }).getUserAccessToken(
@@ -781,9 +779,9 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
     database.rows = [row];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
-    await expect(
-      makeService().getUserAccessToken('user_1', { op: 'fetch' })
-    ).rejects.toThrow('temporarily_unavailable');
+    await expect(makeService().getUserAccessToken('user_1', { op: 'fetch' })).rejects.toThrow(
+      'temporarily_unavailable'
+    );
     expect(database.updates).toHaveLength(0);
   });
 });

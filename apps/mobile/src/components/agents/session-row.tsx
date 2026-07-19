@@ -6,13 +6,14 @@ import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { formatMeta, platformLabel } from './session-list-helpers';
+import { formatMeta, platformLabel, remoteAgentLabel, remoteMeta } from './session-list-helpers';
 
 type StoredSessionRowProps = {
   session: {
@@ -27,7 +28,6 @@ type StoredSessionRowProps = {
     status: string | null;
     status_updated_at: string | null;
   };
-  isLive: boolean;
   /**
    * Which timestamp drives the row's relative meta label. The list
    * section the session lands in and the timestamp shown here are
@@ -40,12 +40,7 @@ type StoredSessionRowProps = {
 };
 
 type RemoteSessionRowProps = {
-  session: {
-    id: string;
-    title: string;
-    status: string;
-    gitBranch?: string;
-  };
+  session: ActiveSession;
   onPress: () => void;
 };
 
@@ -80,7 +75,6 @@ function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => 
 
 export function StoredSessionRow({
   session,
-  isLive,
   sortBy,
   onPress,
   onDelete,
@@ -163,7 +157,6 @@ export function StoredSessionRow({
           title={title}
           subtitle={session.git_branch}
           meta={formatMeta(getAgentSessionTimestamp(session, sortBy))}
-          live={isLive}
           needsInput={needsInput}
           stripMode="inline"
           className="pl-[22px] pr-[22px]"
@@ -243,12 +236,13 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
       className="active:opacity-70"
     >
       <SessionRow
-        agentLabel="CLOUD AGENT"
+        agentLabel={remoteAgentLabel(session.createdOnPlatform)}
         title={title}
-        subtitle={session.gitBranch}
-        meta={session.status.toUpperCase()}
+        subtitle={session.gitBranch ?? null}
+        meta={remoteMeta(session)}
         live
         needsInput={needsInput}
+        metaWhileLive
         stripMode="inline"
         className="pl-[22px] pr-[22px]"
       />

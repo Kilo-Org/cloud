@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { AgentBadge } from '@/components/ui/agent-badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
+import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
@@ -17,13 +18,21 @@ type SessionRowProps = {
   /** Small mono line shown below the title (e.g. git branch). */
   subtitle?: string | null;
   meta?: string;
-  /** When true, renders a pulsing good-tone StatusDot before the meta. */
+  /** When true, renders a good-tone StatusDot in the eyebrow. */
   live?: boolean;
   /**
    * When true, replaces the live dot / meta with a pulsing warn-tone dot
    * and a `NEEDS INPUT` label. Highest priority in the eyebrow row.
    */
   needsInput?: boolean;
+  /**
+   * Opt-in: when true AND `live` AND `meta` are set (and `needsInput` is
+   * false), render the live dot AND the meta text side-by-side instead
+   * of choosing one. Default false — Home passes `meta` with `live` and
+   * must stay byte-for-byte unchanged. The Agents "Active now" tray
+   * opts in so tray rows show a dot beside the relative-time meta.
+   */
+  metaWhileLive?: boolean;
   onPress?: () => void;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -50,6 +59,7 @@ export function SessionRow({
   meta,
   live,
   needsInput = false,
+  metaWhileLive = false,
   onPress,
   last,
   stripMode = 'edge',
@@ -59,8 +69,14 @@ export function SessionRow({
   const color = agentColor(agentLabel);
   const dimStrip = !live && !needsInput;
 
+  const eyebrowDecision = selectSessionRowEyebrowRight({
+    needsInput,
+    live: Boolean(live),
+    hasMeta: Boolean(meta),
+    metaWhileLive,
+  });
   let eyebrowRight: React.ReactNode = null;
-  if (needsInput) {
+  if (eyebrowDecision.kind === 'needs-input') {
     eyebrowRight = (
       <View className="flex-row items-center gap-1.5">
         <StatusDot tone="warn" pulse />
@@ -69,9 +85,18 @@ export function SessionRow({
         </Text>
       </View>
     );
-  } else if (live) {
+  } else if (eyebrowDecision.kind === 'live-and-meta') {
+    eyebrowRight = (
+      <View className="flex-row items-center gap-1.5">
+        <StatusDot tone="good" />
+        <Text variant="mono" className="shrink text-xs text-ink2">
+          {meta}
+        </Text>
+      </View>
+    );
+  } else if (eyebrowDecision.kind === 'live') {
     eyebrowRight = <StatusDot tone="good" />;
-  } else if (meta) {
+  } else if (eyebrowDecision.kind === 'meta' && meta) {
     eyebrowRight = (
       <Text variant="mono" className="shrink text-xs text-ink2">
         {meta}

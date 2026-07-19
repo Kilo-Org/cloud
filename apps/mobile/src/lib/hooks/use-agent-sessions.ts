@@ -1,6 +1,6 @@
 import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import {
   buildAgentSessionListInput,
@@ -174,6 +174,37 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     () => groupAgentSessionsByDate(storedSessions, sortBy),
     [storedSessions, sortBy]
   );
+
+  // Departure-triggered stored refetch. Only the active poll has a refetch
+  // interval (10s); the stored/history list does not. When a session id
+  // leaves the active set, the just-terminated session has not yet shown up
+  // in history, so refetching once makes it reappear. We use `refetch()` so
+  // the fresh fetch bypasses the 30s `staleTime` that would otherwise keep
+  // the cached page hidden. The refetch only refreshes loaded pages —
+  // sufficient because a just-terminated session always lands on page 1.
+  //
+  // The guard is strictly "id present before, absent now": the empty→populated
+  // transition (first poll) is ignored, and the initial mount with a non-empty
+  // set is ignored (no "before" to compare against).
+  const previousActiveIdsRef = useRef<Set<string> | null>(null);
+  const refetch = stored.refetch;
+  useEffect(() => {
+    const previous = previousActiveIdsRef.current;
+    previousActiveIdsRef.current = activeSessionIds;
+    if (!previous) {
+      return;
+    }
+    let departedId: string | undefined = undefined;
+    for (const id of previous) {
+      if (!activeSessionIds.has(id)) {
+        departedId = id;
+        break;
+      }
+    }
+    if (departedId) {
+      void refetch();
+    }
+  }, [activeSessionIds, refetch]);
 
   return {
     storedSessions,

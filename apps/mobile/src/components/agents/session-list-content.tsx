@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { Bot, Plus, Search, SearchX } from 'lucide-react-native';
+import { Bot, Plus, Search } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,12 +13,17 @@ import {
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { type SessionItem, type SessionSection } from '@/components/agents/session-list-helpers';
-import { RemoteSessionRow, StoredSessionRow } from '@/components/agents/session-row';
+import { BodyEmpty } from '@/components/agents/session-list-body-empty';
+import {
+  selectSessionListBodyModel,
+  type SessionListBodyModel,
+} from '@/components/agents/session-list-body-model';
+import { type SessionSection } from '@/components/agents/session-list-helpers';
+import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
+import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
-import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
@@ -33,11 +38,21 @@ const SEARCH_BAR_HEIGHT = 60;
 
 type AgentSessionListContentProps = {
   sections: SessionSection[];
-  storedSessions: StoredSession[];
   hasAnySessions: boolean;
+  /** True when the pinned "Active now" tray is non-empty. Used by the
+   * render model to keep the inline "Couldn't refresh" line visible and
+   * to suppress the full-screen QueryError when the tray is the only
+   * thing on screen. */
+  hasPinnedActive: boolean;
   isLoading: boolean;
   isSearchPending: boolean;
+  /** Body-driving error flag — a search failure (when searching) OR a
+   * stored/history failure. Active-only failures are surfaced separately
+   * via the body's `showInlineError` output, NEVER as the empty-state
+   * message. */
   isError: boolean;
+  /** Active-poll failure — drives ONLY the inline staleness line. */
+  activeIsError: boolean;
   isFetchingNextPage: boolean;
   refetch: () => Promise<void>;
   onRetry: () => void;
@@ -53,11 +68,12 @@ type AgentSessionListContentProps = {
 
 export function AgentSessionListContent({
   sections,
-  storedSessions,
   hasAnySessions,
+  hasPinnedActive,
   isLoading,
   isSearchPending,
   isError,
+  activeIsError,
   isFetchingNextPage,
   refetch,
   onRetry,
@@ -91,9 +107,21 @@ export function AgentSessionListContent({
     [bottom, fontScale]
   );
 
-  // When the list is empty the error surface below (QueryError + retry)
-  // already covers it — don't double up with the inline header line.
-  const showInlineError = isError && sections.length > 0;
+  const hasHistoryContent = sections.length > 0;
+
+  // Pure body decision — see `session-list-body-model.ts`.
+  const bodyModel = useMemo<SessionListBodyModel>(
+    () =>
+      selectSessionListBodyModel({
+        hasHistoryContent,
+        hasPinnedActive,
+        hasActiveQuery,
+        isSearching,
+        isError,
+        activeIsError,
+      }),
+    [activeIsError, hasActiveQuery, hasHistoryContent, hasPinnedActive, isError, isSearching]
+  );
 
   const listHeader = useMemo(
     () => (
@@ -119,14 +147,14 @@ export function AgentSessionListContent({
             </Text>
           </View>
         ) : null}
-        {showInlineError ? (
+        {bodyModel.showInlineError ? (
           <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
             Couldn't refresh. Pull down to try again.
           </Text>
         ) : null}
       </View>
     ),
-    [colors.mutedForeground, showInlineError, isSearchPending, onSearchChange]
+    [bodyModel.showInlineError, colors.mutedForeground, isSearchPending, onSearchChange]
   );
 
   const emptyStateAction = useMemo(
@@ -146,49 +174,6 @@ export function AgentSessionListContent({
       </Button>
     ),
     [handleClearQuery, isSearching]
-  );
-
-  // Only reachable when `hasAnySessions` is true (the true first-use empty
-  // state is handled separately below), which means an active search or
-  // filter narrowed the results to zero matches — never show the "create a
-  // task" CTA here, it's not the fix for a filter that's too narrow.
-  const filteredEmptyComponent = useMemo(
-    () => (
-      <View className="items-center justify-center pt-16">
-        <EmptyState
-          icon={SearchX}
-          title="No sessions match"
-          description={
-            isSearching ? 'Try a different search term.' : 'Try adjusting or clearing your filters.'
-          }
-          action={clearQueryAction}
-        />
-      </View>
-    ),
-    [clearQueryAction, isSearching]
-  );
-
-  // The query in error produced no rows to show — surface a retry for it
-  // (search or list, whichever `onRetry` targets) instead of pretending the
-  // empty result is a real "no matches".
-  const queryErrorEmptyComponent = useMemo(
-    () => (
-      <View className="items-center gap-4 pt-16">
-        <QueryError
-          placement="top"
-          className="pt-0"
-          message={isSearching ? 'Could not search sessions' : 'Could not load sessions'}
-          onRetry={onRetry}
-        />
-        {clearQueryAction}
-      </View>
-    ),
-    [clearQueryAction, isSearching, onRetry]
-  );
-
-  const organizationIdBySessionId = useMemo(
-    () => new Map(storedSessions.map(s => [s.session_id, s.organization_id])),
-    [storedSessions]
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -222,53 +207,32 @@ export function AgentSessionListContent({
   }, [refetch]);
 
   const renderItem = useCallback(
-    ({ item }: { item: SessionItem }) => {
-      if (item.kind === 'stored') {
-        return (
-          <StoredSessionRow
-            session={item.session}
-            isLive={item.isLive}
-            sortBy={sortBy}
-            onPress={() => {
-              onSessionPress(item.session.session_id, item.session.organization_id);
-            }}
-            onDelete={() => {
-              deleteSession(item.session.session_id);
-            }}
-            onRename={newTitle => {
-              renameSession(item.session.session_id, newTitle);
-            }}
-          />
-        );
-      }
-      return (
-        <RemoteSessionRow
-          session={item.session}
-          onPress={() => {
-            onSessionPress(item.session.id, organizationIdBySessionId.get(item.session.id));
-          }}
-        />
-      );
-    },
-    [onSessionPress, deleteSession, renameSession, organizationIdBySessionId, sortBy]
+    ({ item }: { item: StoredSession }) => (
+      <StoredSessionRow
+        session={item}
+        sortBy={sortBy}
+        onPress={() => {
+          onSessionPress(item.session_id, item.organization_id);
+        }}
+        onDelete={() => {
+          deleteSession(item.session_id);
+        }}
+        onRename={newTitle => {
+          renameSession(item.session_id, newTitle);
+        }}
+      />
+    ),
+    [onSessionPress, deleteSession, renameSession, sortBy]
   );
 
   const renderSectionHeader = useCallback(
     ({ section }: { section: SessionSection }) => (
-      <View className="flex-row items-center justify-between bg-background px-[22px] pb-2 pt-[18px]">
-        <Eyebrow>{section.title}</Eyebrow>
-        <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-soft">
-          {section.data.length}
-        </Text>
-      </View>
+      <SessionListSectionHeader title={section.title} count={section.data.length} />
     ),
     []
   );
 
-  const keyExtractor = useCallback(
-    (item: SessionItem) => (item.kind === 'stored' ? item.session.session_id : item.session.id),
-    []
-  );
+  const keyExtractor = useCallback((item: StoredSession) => item.session_id, []);
 
   if (isLoading) {
     return (
@@ -285,7 +249,8 @@ export function AgentSessionListContent({
   // Full-screen error only when there is nothing cached to fall back on —
   // a background refetch/search failure with stale sessions already in
   // cache (keepPreviousData) must never blank out what's already rendered.
-  if (isError && !hasAnySessions) {
+  // A populated tray counts as "something on screen" and also suppresses.
+  if (isError && !hasAnySessions && !hasPinnedActive) {
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
@@ -297,9 +262,10 @@ export function AgentSessionListContent({
     );
   }
 
-  // When the user has no sessions at all, skip the SectionList entirely. The `contentOffset`
-  // trick that hides the search bar by default requires scrollable content, so mounting the
-  // list with only a ListEmptyComponent would leave the search bar fully visible.
+  // The `contentOffset` trick that hides the search bar by default requires
+  // scrollable content, so when the user has no sessions at all we skip
+  // the SectionList entirely — mounting it with only a ListEmptyComponent
+  // would leave the search bar fully visible.
   if (!hasAnySessions) {
     return (
       <Animated.View
@@ -317,14 +283,25 @@ export function AgentSessionListContent({
     );
   }
 
-  let emptyComponent = null;
-  if (hasActiveQuery) {
-    emptyComponent = isError ? queryErrorEmptyComponent : filteredEmptyComponent;
+  let emptyComponent: React.ReactNode = null;
+  if (bodyModel.kind !== 'render-list') {
+    emptyComponent = (
+      <BodyEmpty
+        kind={bodyModel.kind}
+        isSearching={isSearching}
+        secondaryAction={
+          bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
+        }
+        emptyStateAction={emptyStateAction}
+        clearQueryAction={clearQueryAction}
+        onRetry={onRetry}
+      />
+    );
   }
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-      <SectionList<SessionItem, SessionSection>
+      <SectionList<StoredSession, SessionSection>
         key={attentionListKey}
         sections={sections}
         renderItem={renderItem}

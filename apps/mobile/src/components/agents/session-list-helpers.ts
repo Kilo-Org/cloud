@@ -4,22 +4,14 @@ import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-export type StoredSessionItem = {
-  kind: 'stored';
-  session: StoredSession;
-  isLive: boolean;
-};
-
-export type RemoteSessionItem = {
-  kind: 'remote';
-  session: ActiveSession;
-};
-
-export type SessionItem = StoredSessionItem | RemoteSessionItem;
-
+/**
+ * One stored-history section. Exclusivity against the "Active now" tray is
+ * enforced on the history side via `excludeActiveFromGroups`; active sessions
+ * no longer appear as `SessionItem`s in any section.
+ */
 export type SessionSection = {
   title: string;
-  data: SessionItem[];
+  data: StoredSession[];
 };
 
 const platformExpansion: Record<string, string[]> = {
@@ -62,13 +54,6 @@ export function formatGitUrlProject(gitUrl: string): string {
   }
 
   return gitUrl;
-}
-
-export function matchesSearch(query: string, title: string | null, gitUrl: string | null): boolean {
-  const q = query.toLowerCase();
-  return (
-    (title?.toLowerCase().includes(q) ?? false) || (gitUrl?.toLowerCase().includes(q) ?? false)
-  );
 }
 
 /**

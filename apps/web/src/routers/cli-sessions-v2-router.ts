@@ -39,7 +39,7 @@ import {
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
-import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
+import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {

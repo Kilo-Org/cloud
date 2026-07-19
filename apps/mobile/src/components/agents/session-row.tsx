@@ -12,7 +12,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
+import { formatMeta, platformLabel } from './session-list-helpers';
 
 type StoredSessionRowProps = {
   session: {
@@ -48,36 +48,6 @@ type RemoteSessionRowProps = {
   };
   onPress: () => void;
 };
-
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label
- * for the row eyebrow. The row's hue is hashed from this label.
- */
-function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
-
-function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
-}
 
 function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);

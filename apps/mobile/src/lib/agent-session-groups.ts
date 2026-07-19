@@ -7,7 +7,7 @@ import { parseTimestamp } from '@/lib/utils';
 
 type SessionTimestamps = { created_at: string; updated_at: string };
 
-type AgentSessionDateGroup<T extends SessionTimestamps> = {
+export type AgentSessionDateGroup<T extends SessionTimestamps> = {
   label: string;
   sessions: T[];
 };

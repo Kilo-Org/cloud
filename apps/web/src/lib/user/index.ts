@@ -73,6 +73,7 @@ import {
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
+  user_notification_preferences,
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
@@ -878,7 +879,8 @@ export class SoftDeletePreconditionError extends Error {
  *   cloud_agent_code_reviews, review memory feedback/proposals,
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
- *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents)
+ *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
+ *   user_notification_preferences)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1265,6 +1267,9 @@ export async function softDeleteUser(userId: string) {
         )
       );
     await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
+    await tx
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, userId));
     await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
     await tx
       .delete(kilo_pass_scheduled_changes)

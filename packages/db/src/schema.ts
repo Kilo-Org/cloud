@@ -8907,6 +8907,24 @@ export const user_push_tokens = pgTable(
 export type UserPushToken = typeof user_push_tokens.$inferSelect;
 export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
 
+// ─── Notification Preferences ─────────────────────────────────────────
+
+export const user_notification_preferences = pgTable('user_notification_preferences', {
+  user_id: text()
+    .primaryKey()
+    .notNull()
+    .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+  agent_push_enabled: boolean().default(true).notNull(),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
+export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
+
 // ============ EXA USAGE TRACKING ============
 // Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
 

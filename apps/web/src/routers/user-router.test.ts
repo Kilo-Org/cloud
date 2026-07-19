@@ -1,6 +1,10 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
+import {
+  credit_transactions,
+  kilocode_users,
+  user_notification_preferences,
+} from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
@@ -523,5 +527,96 @@ describe('user router - credit purchase history', () => {
     await expect(
       otherCaller.user.getCreditPurchaseReceipt({ transactionId: manualPurchaseId })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
+describe('user router - notification preferences', () => {
+  let firstUser: User;
+  let secondUser: User;
+
+  beforeAll(async () => {
+    firstUser = await insertTestUser({
+      google_user_email: 'notif-prefs-first@example.com',
+      google_user_name: 'Notif Prefs First',
+    });
+    secondUser = await insertTestUser({
+      google_user_email: 'notif-prefs-second@example.com',
+      google_user_name: 'Notif Prefs Second',
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [firstUser.id, secondUser.id]));
+  });
+
+  it('returns the default-on preference for a user with no row', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result).toEqual({ agentPushEnabled: true });
+  });
+
+  it('returns the stored preference when a row exists', async () => {
+    await db
+      .insert(user_notification_preferences)
+      .values({ user_id: firstUser.id, agent_push_enabled: false });
+
+    const caller = await createCallerForUser(firstUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result).toEqual({ agentPushEnabled: false });
+  });
+
+  it('upserts the preference for the authenticated user only', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({ agentPushEnabled: false });
+    expect(result).toEqual({ agentPushEnabled: false });
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.agent_push_enabled).toBe(false);
+
+    // Calling again with true must update, not insert
+    await caller.user.setNotificationPreferences({ agentPushEnabled: true });
+    const rows = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.agent_push_enabled).toBe(true);
+  });
+
+  it('isolates preferences per user', async () => {
+    const firstCaller = await createCallerForUser(firstUser.id);
+    const secondCaller = await createCallerForUser(secondUser.id);
+
+    await firstCaller.user.setNotificationPreferences({ agentPushEnabled: false });
+    // Second user has no row; default-on must be returned and the first user's
+    // row must not leak.
+    const secondPrefs = await secondCaller.user.getNotificationPreferences();
+    expect(secondPrefs).toEqual({ agentPushEnabled: true });
+
+    const firstPrefs = await firstCaller.user.getNotificationPreferences();
+    expect(firstPrefs).toEqual({ agentPushEnabled: false });
+
+    // Setting second user's preference must not affect first user's row.
+    await secondCaller.user.setNotificationPreferences({ agentPushEnabled: false });
+
+    const [firstRow] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    const [secondRow] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, secondUser.id));
+    expect(firstRow?.agent_push_enabled).toBe(false);
+    expect(secondRow?.agent_push_enabled).toBe(false);
   });
 });

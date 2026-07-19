@@ -174,6 +174,44 @@ export type SendSessionReadyNotificationResult = z.infer<
   typeof sendSessionReadyNotificationOutputSchema
 >;
 
+// ── sendAgentSessionNotification ────────────────────────────────────
+//
+// Agent-callable push for an explicit `notify_user` tool call. Resolved
+// session-side (no title supplied by callers). Sibling RPC to
+// `sendCloudAgentSessionNotification`; intentionally not folded into that
+// RPC so the existing completed/failed/interrupted enum stays unchanged.
+
+export const sendAgentSessionNotificationInputSchema = z.object({
+  userId: z.string().min(1),
+  cliSessionId: z.string().min(1),
+  notificationId: z.string().min(1).max(64),
+  message: z.string().min(1).max(500),
+});
+export type SendAgentSessionNotificationParams = z.infer<
+  typeof sendAgentSessionNotificationInputSchema
+>;
+
+export const sendAgentSessionNotificationReasonSchema = z.enum([
+  'not_found',
+  'suppressed_presence',
+  'suppressed_preference',
+  'suppressed_rate_limit',
+  'no_tokens',
+  'duplicate',
+  'failed',
+]);
+export type SendAgentSessionNotificationReason = z.infer<
+  typeof sendAgentSessionNotificationReasonSchema
+>;
+
+export const sendAgentSessionNotificationOutputSchema = z.object({
+  dispatched: z.boolean(),
+  reason: sendAgentSessionNotificationReasonSchema.optional(),
+});
+export type SendAgentSessionNotificationResult = z.infer<
+  typeof sendAgentSessionNotificationOutputSchema
+>;
+
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
 export const dispatchPushInputSchema = z.object({
@@ -193,12 +231,24 @@ export const dispatchPushInputSchema = z.object({
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),
   }),
+  // Optional per-call rate limit (sliding window). When set, the DO checks
+  // the sliding window after idempotency/presence and before the Expo send;
+  // an attempt that fails the check returns `suppressed_rate_limit` and
+  // records its idempotency key with that outcome so replays dedup.
+  rateLimit: z
+    .object({
+      key: z.string().min(1),
+      limit: z.number().int().positive(),
+      windowSeconds: z.number().int().positive(),
+    })
+    .optional(),
 });
 export type DispatchPushInput = z.infer<typeof dispatchPushInputSchema>;
 
 export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('suppressed_presence') }),
+  z.object({ kind: z.literal('suppressed_rate_limit') }),
   z.object({ kind: z.literal('no_tokens') }),
   z.object({ kind: z.literal('duplicate') }),
   z.object({ kind: z.literal('failed'), error: z.string() }),

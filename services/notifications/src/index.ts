@@ -1,6 +1,11 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships, user_push_tokens } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  organization_memberships,
+  user_notification_preferences,
+  user_push_tokens,
+} from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
@@ -15,6 +20,8 @@ import {
   type ClearBadgeBucketForUserOutput,
   type DispatchPushInput,
   type DispatchPushOutcome,
+  type SendAgentSessionNotificationParams,
+  type SendAgentSessionNotificationResult,
   type SendCloudAgentSessionNotificationParams,
   type SendCloudAgentSessionNotificationResult,
   type SendSessionReadyNotificationParams,
@@ -29,6 +36,10 @@ import {
 } from '@kilocode/notifications';
 
 import { authMiddleware, type AuthContext } from './auth';
+import {
+  dispatchAgentSessionNotificationPush,
+  type DispatchAgentSessionNotificationPushDeps,
+} from './lib/agent-session-notification-push';
 import {
   dispatchCloudAgentSessionPush,
   dispatchSessionReadyPush,
@@ -148,7 +159,10 @@ export async function sendPushForConversationCore(
         },
       } satisfies DispatchPushInput;
       const outcome = await stub.dispatchPush(dispatchInput);
-      return outcome.kind;
+      // The old conversation RPC never passes a rate limit, but narrow the
+      // DO outcome to the legacy recipient enum anyway (§9.6: do not widen
+      // the existing RPC with `suppressed_rate_limit`).
+      return outcome.kind === 'suppressed_rate_limit' ? 'failed' : outcome.kind;
     })
   );
   const perRecipient: PerRecipientResult[] = recipients.map((userId, index) => {
@@ -229,6 +243,87 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult> {
     return dispatchCloudAgentSessionPush(params, this.cloudAgentSessionPushDeps());
+  }
+
+  /**
+   * Agent-callable push for the `notify_user` tool. Resolves the session
+   * service-side, fails closed on a preference read failure, dispatches with
+   * the CLI session presence context and the per-session agent rate limit,
+   * and emits the deterministic `agent_push_outcome` structured log
+   * (identifiers + outcome only, never message content).
+   *
+   * A thrown DO/transport error propagates as a thrown RPC error so the
+   * caller's dispatch marker stays `pending`; returned results are
+   * terminal.
+   */
+  async sendAgentSessionNotification(
+    params: SendAgentSessionNotificationParams
+  ): Promise<SendAgentSessionNotificationResult> {
+    const result = await dispatchAgentSessionNotificationPush(
+      params,
+      this.agentSessionNotificationPushDeps()
+    );
+    // Deterministic outcome observer (§4.15). Identifiers and outcome only;
+    // never the user-supplied message content.
+    console.log({
+      event: 'agent_push_outcome',
+      cliSessionId: params.cliSessionId,
+      notificationId: params.notificationId,
+      outcome: result.dispatched ? 'delivered' : (result.reason ?? 'unknown'),
+    });
+    return result;
+  }
+
+  private agentSessionNotificationPushDeps(): DispatchAgentSessionNotificationPushDeps {
+    let db: ReturnType<typeof getWorkerDb> | undefined;
+    const getDbForCall = () => (db ??= getWorkerDb(this.env.HYPERDRIVE.connectionString));
+
+    return {
+      getSession: async (userId, cliSessionId) => {
+        const [session] = await getDbForCall()
+          .select({
+            title: cli_sessions_v2.title,
+            organizationId: cli_sessions_v2.organization_id,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, cliSessionId),
+              eq(cli_sessions_v2.kilo_user_id, userId)
+            )
+          )
+          .limit(1);
+        return session ?? null;
+      },
+      hasOrganizationAccess: async (userId, organizationId) => {
+        const [membership] = await getDbForCall()
+          .select({ id: organization_memberships.id })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organizationId),
+              eq(organization_memberships.kilo_user_id, userId)
+            )
+          )
+          .limit(1);
+        return membership !== undefined;
+      },
+      readPreference: async userId => {
+        const [row] = await getDbForCall()
+          .select({ enabled: user_notification_preferences.agent_push_enabled })
+          .from(user_notification_preferences)
+          .where(eq(user_notification_preferences.user_id, userId))
+          .limit(1);
+        // null = no row, which is the default-ON path per §4.5.
+        return row?.enabled ?? null;
+      },
+      dispatchPush: async input => {
+        const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
+          this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
+        ) as unknown as RecipientDOStub;
+        return stub.dispatchPush(input);
+      },
+    };
   }
 
   async sendSessionReadyNotification(

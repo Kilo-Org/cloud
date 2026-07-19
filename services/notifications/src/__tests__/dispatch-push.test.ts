@@ -1,9 +1,10 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
 import type { DispatchPushInput } from '@kilocode/notifications';
 
 import { sendPushNotifications } from '../lib/expo-push';
+import { setPushSinkModeForTesting } from '../lib/push-sink';
 import * as dbClient from '@kilocode/db/client';
 
 vi.mock('../lib/expo-push', () => ({
@@ -735,5 +736,390 @@ describe('NotificationChannelDO.dispatchPush', () => {
     }
     const secondAlarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
     expect(secondAlarm).toBe(firstAlarm);
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — agent rate limit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+    setPushSinkModeForTesting(undefined);
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  const agentInput = (
+    over: Partial<DispatchPushInput> = {},
+    idemSuffix = ''
+  ): DispatchPushInput => ({
+    userId: 'user-rl',
+    presenceContext: null,
+    idempotencyKey: `agent-notification:ses_xyz:n${idemSuffix}`,
+    badge: null,
+    push: {
+      title: 'T',
+      body: 'B',
+      data: { type: 'cloud_agent_session', cliSessionId: 'ses_xyz' },
+      sound: 'default',
+      priority: 'high',
+    },
+    rateLimit: { key: 'agent:ses_xyz', limit: 5, windowSeconds: 600 },
+    ...over,
+  });
+
+  it('allows 5 attempts and suppresses the 6th within the window', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-rl-window');
+
+    for (let i = 1; i <= 5; i++) {
+      const result = await stub.dispatchPush(agentInput({}, String(i)));
+      expect(result.kind).toBe('delivered');
+    }
+    const sixth = await stub.dispatchPush(agentInput({}, '6'));
+    expect(sixth.kind).toBe('suppressed_rate_limit');
+    expect(sendPushNotifications).toHaveBeenCalledTimes(5);
+  });
+
+  it('prunes timestamps older than the window and re-allows attempts', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl-prune', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-rl-prune');
+
+    const realNow = Date.now;
+    try {
+      // Fill the 5-slot window at t=0.
+      for (let i = 1; i <= 5; i++) {
+        const result = await stub.dispatchPush(agentInput({}, String(i)));
+        expect(result.kind).toBe('delivered');
+      }
+      const sixth = await stub.dispatchPush(agentInput({}, '6'));
+      expect(sixth.kind).toBe('suppressed_rate_limit');
+
+      // Jump past the 600s window. Prune-on-read should re-allow the next
+      // attempt without needing the alarm GC sweep to have fired.
+      vi.spyOn(Date, 'now').mockImplementation(() => realNow.call(Date) + 601 * 1000);
+      const afterWindow = await stub.dispatchPush(agentInput({}, '7'));
+      expect(afterWindow.kind).toBe('delivered');
+    } finally {
+      vi.mocked(Date.now).mockRestore();
+    }
+  });
+
+  it('records the idempotency key with suppressed_rate_limit so replays dedup', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl-dedup', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-rl-dedup');
+    const input = agentInput({}, 'rl-dedup');
+
+    for (let i = 1; i <= 5; i++) {
+      await stub.dispatchPush(agentInput({}, `filler-${i}`));
+    }
+    const first = await stub.dispatchPush(input);
+    expect(first.kind).toBe('suppressed_rate_limit');
+    const replay = await stub.dispatchPush(input);
+    expect(replay.kind).toBe('duplicate');
+    expect(sendPushNotifications).toHaveBeenCalledTimes(5);
+
+    const stored = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:agent-notification:ses_xyz:nrl-dedup')
+    );
+    expect(stored).toMatchObject({ stage: 'suppressed_rate_limit' });
+  });
+
+  it('a duplicate attempt does not consume rate-limit quota', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl-dup', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-rl-dup');
+    const input = agentInput({}, 'dup');
+
+    const first = await stub.dispatchPush(input);
+    expect(first.kind).toBe('delivered');
+    const replay = await stub.dispatchPush(input);
+    expect(replay.kind).toBe('duplicate');
+
+    // 4 more distinct attempts should still fit; the 6th is suppressed.
+    for (let i = 1; i <= 4; i++) {
+      const result = await stub.dispatchPush(agentInput({}, `extra-${i}`));
+      expect(result.kind).toBe('delivered');
+    }
+    const sixth = await stub.dispatchPush(agentInput({}, 'sixth'));
+    expect(sixth.kind).toBe('suppressed_rate_limit');
+  });
+
+  it('a presence-suppressed attempt does not consume rate-limit quota', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl-pres', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
+    const stub = getDO('user-rl-pres');
+    const presInput = {
+      ...agentInput({}, 'pres'),
+      presenceContext: '/presence/cli-session/ses_xyz',
+    };
+
+    const first = await stub.dispatchPush(presInput);
+    expect(first.kind).toBe('suppressed_presence');
+
+    // 5 more attempts that bypass presence should all be allowed; the
+    // presence-suppressed attempt never consumed quota.
+    for (let i = 1; i <= 5; i++) {
+      const result = await stub.dispatchPush(agentInput({}, `npr-${i}`));
+      expect(result.kind).toBe('delivered');
+    }
+    expect(sendPushNotifications).toHaveBeenCalledTimes(5);
+  });
+
+  it('writing an rl: record ensures a cleanup alarm exists and reschedules while unexpired', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl-alarm', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-rl-alarm');
+
+    const firstAlarmBefore = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.getAlarm()
+    );
+    expect(firstAlarmBefore).toBeNull();
+
+    await stub.dispatchPush(agentInput({}, '1'));
+    const firstAlarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(firstAlarm).not.toBeNull();
+
+    // Subsequent writes inside the window must not advance the alarm.
+    const realNow = Date.now;
+    try {
+      vi.spyOn(Date, 'now').mockImplementation(() => realNow.call(Date) + 60_000);
+      await stub.dispatchPush(agentInput({}, '2'));
+    } finally {
+      vi.mocked(Date.now).mockRestore();
+    }
+    const secondAlarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(secondAlarm).toBe(firstAlarm);
+  });
+
+  it('the alarm GC sweep deletes expired rl: records and reschedules for the earliest unexpired one', async () => {
+    const stub = getDO('user-rl-gc');
+    const now = Date.now();
+
+    await runInDurableObject(stub, async (_inst, state) => {
+      // Expired rl record (expiresAt in the past)
+      await state.storage.put('rl:agent:ses_old', {
+        expiresAt: now - 1_000,
+        timestamps: [now - 700_000],
+      });
+      // Unexpired rl record (expiresAt in the future)
+      await state.storage.put('rl:agent:ses_fresh', {
+        expiresAt: now + 60_000,
+        timestamps: [now],
+      });
+      // Expired idem record to confirm GC still touches it
+      await state.storage.put('idem:old', { stage: 'delivered', ts: now - 2 * 60 * 60 * 1000 });
+    });
+
+    await runInDurableObject(stub, async inst => {
+      await (inst as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+
+    const remaining = await runInDurableObject(stub, async (_inst, state) => {
+      const rl = await state.storage.list({ prefix: 'rl:' });
+      const idem = await state.storage.list({ prefix: 'idem:' });
+      return { rlKeys: Array.from(rl.keys()), idemKeys: Array.from(idem.keys()) };
+    });
+    expect(remaining.rlKeys).toEqual(['rl:agent:ses_fresh']);
+    expect(remaining.idemKeys).toEqual([]);
+
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(alarm).toBe(now + 60_000);
+  });
+
+  it('skips the rate-limit check entirely when no rateLimit is set on the input', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-no-rl', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-no-rl');
+    const input = baseInput({ userId: 'user-no-rl', idempotencyKey: 'no-rl-1' });
+    delete (input as Partial<DispatchPushInput>).rateLimit;
+
+    for (let i = 0; i < 6; i++) {
+      const result = await stub.dispatchPush({ ...input, idempotencyKey: `no-rl-${i + 1}` });
+      expect(result.kind).toBe('delivered');
+    }
+    expect(sendPushNotifications).toHaveBeenCalledTimes(6);
+  });
+});
+
+describe('NotificationChannelDO.dispatchPush — local push sink', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(env.EXPO_ACCESS_TOKEN, 'get').mockResolvedValue('test-token');
+  });
+
+  afterEach(() => {
+    setPushSinkModeForTesting(undefined);
+  });
+
+  it('is off by default (PUSH_SINK_MODE unset) and calls the real Expo path', async () => {
+    setPushSinkModeForTesting(undefined);
+    installDbMock({ tokens: [{ user_id: 'user-sink-off', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-sink-off');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'user-sink-off', idempotencyKey: 'sink-off-1' })
+    );
+    expect(result.kind).toBe('delivered');
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    expect(logSpy.mock.calls.some(call => call[0] === 'agent_push_sink_payload')).toBe(false);
+    logSpy.mockRestore();
+  });
+
+  it('in sink mode, records the redacted payload, returns delivered, and skips Expo entirely', async () => {
+    setPushSinkModeForTesting('log');
+    installDbMock({ tokens: [{ user_id: 'user-sink-on', token: 'tok-real' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-sink-on');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const idemKey = 'agent-notification:ses_sink:n-sink-1';
+
+    const result = await stub.dispatchPush({
+      userId: 'user-sink-on',
+      presenceContext: null,
+      idempotencyKey: idemKey,
+      badge: null,
+      push: {
+        title: 'My title',
+        body: 'My body',
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_sink' },
+        sound: 'default',
+        priority: 'high',
+      },
+    });
+
+    expect(result.kind).toBe('delivered');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+
+    const sinkCall = logSpy.mock.calls.find(call => call[0] === 'agent_push_sink_payload');
+    expect(sinkCall).toBeDefined();
+    const payload = sinkCall?.[1] as {
+      idempotencyKey: string;
+      payload: {
+        title: string;
+        body: string;
+        data: unknown;
+        sound: string | null;
+        priority: string;
+      };
+      to: string;
+    };
+    expect(payload.idempotencyKey).toBe(idemKey);
+    expect(payload.payload).toEqual({
+      title: 'My title',
+      body: 'My body',
+      data: { type: 'cloud_agent_session', cliSessionId: 'ses_sink' },
+      sound: 'default',
+      priority: 'high',
+    });
+    expect(payload.to).toBe('<redacted>');
+    // Token must never appear in the sink payload.
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain('tok-real');
+    expect(serialized).not.toContain('ExponentPushToken');
+
+    // No receipt work created.
+    expect(env.RECEIPTS_QUEUE.send).not.toHaveBeenCalled();
+
+    // Terminal `delivered` idem state + cleanup alarm scheduled.
+    const stored = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>(`idem:${idemKey}`)
+    );
+    expect(stored).toMatchObject({ stage: 'delivered' });
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(alarm).not.toBeNull();
+
+    logSpy.mockRestore();
+  });
+
+  it('in sink mode with no tokens, returns no_tokens and does not reach the sink', async () => {
+    setPushSinkModeForTesting('log');
+    installDbMock({ tokens: [] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-sink-no-tokens');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const idemKey = 'agent-notification:ses_no_tokens:n-1';
+
+    const result = await stub.dispatchPush({
+      userId: 'user-sink-no-tokens',
+      presenceContext: null,
+      idempotencyKey: idemKey,
+      badge: null,
+      push: {
+        title: 'T',
+        body: 'B',
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_no_tokens' },
+        sound: 'default',
+        priority: 'high',
+      },
+    });
+
+    expect(result.kind).toBe('no_tokens');
+    expect(logSpy.mock.calls.some(call => call[0] === 'agent_push_sink_payload')).toBe(false);
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+
+    const stored = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>(`idem:${idemKey}`)
+    );
+    expect(stored).toMatchObject({ stage: 'no_tokens' });
+
+    logSpy.mockRestore();
+  });
+
+  it('in sink mode, replays return duplicate (terminal state)', async () => {
+    setPushSinkModeForTesting('log');
+    installDbMock({ tokens: [{ user_id: 'user-sink-replay', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-sink-replay');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const input: DispatchPushInput = {
+      userId: 'user-sink-replay',
+      presenceContext: null,
+      idempotencyKey: 'agent-notification:ses_replay:n-1',
+      badge: null,
+      push: {
+        title: 'T',
+        body: 'B',
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_replay' },
+        sound: 'default',
+        priority: 'high',
+      },
+    };
+    const first = await stub.dispatchPush(input);
+    expect(first.kind).toBe('delivered');
+    const replay = await stub.dispatchPush(input);
+    expect(replay.kind).toBe('duplicate');
+    logSpy.mockRestore();
+  });
+
+  it('presence suppression still applies in sink mode', async () => {
+    setPushSinkModeForTesting('log');
+    installDbMock({ tokens: [{ user_id: 'user-sink-pres', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
+    const stub = getDO('user-sink-pres');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    const result = await stub.dispatchPush({
+      userId: 'user-sink-pres',
+      presenceContext: '/presence/cli-session/ses_pres',
+      idempotencyKey: 'agent-notification:ses_pres:n-1',
+      badge: null,
+      push: {
+        title: 'T',
+        body: 'B',
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_pres' },
+        sound: 'default',
+        priority: 'high',
+      },
+    });
+    expect(result.kind).toBe('suppressed_presence');
+    expect(logSpy.mock.calls.some(call => call[0] === 'agent_push_sink_payload')).toBe(false);
+    logSpy.mockRestore();
   });
 });

@@ -17,7 +17,7 @@ type CloudAgentNotificationSession = {
 
 const TITLE_MAX_LENGTH = 80;
 
-function sanitizeTitle(title: string | null | undefined): string | null {
+export function sanitizeTitle(title: string | null | undefined): string | null {
   if (title == null) return null;
   const collapsed = title.replace(/\s+/g, ' ').trim();
   if (collapsed === '') return null;

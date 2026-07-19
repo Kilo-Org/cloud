@@ -7,6 +7,8 @@
  */
 
 import type {
+  SendAgentSessionNotificationParams,
+  SendAgentSessionNotificationResult,
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
   SendSessionReadyNotificationParams,
@@ -17,6 +19,9 @@ export type NotificationsBinding = Fetcher & {
   sendCloudAgentSessionNotification(
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult>;
+  sendAgentSessionNotification(
+    params: SendAgentSessionNotificationParams
+  ): Promise<SendAgentSessionNotificationResult>;
   sendSessionReadyNotification(
     params: SendSessionReadyNotificationParams
   ): Promise<SendSessionReadyNotificationResult>;

@@ -90,7 +90,7 @@ export function AgentSessionListScreen() {
     activeSessionIds,
     activeIsError,
     isLoading,
-    isError,
+    storedIsError,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
@@ -116,12 +116,15 @@ export function AgentSessionListScreen() {
     enabled: ready,
   });
 
-  // While searching, only the search query's own error/pending state matters —
-  // it's the one actually driving what's on screen. Retrying should hit
-  // whichever query is really in error instead of always refetching the base
-  // list underneath a failed search. An active-only failure during search
-  // additionally retries the active poll so the inline staleness line clears.
-  const contentIsError = isSearching ? search.isError : isError;
+  // The body's error/empty state is driven only by the query that actually
+  // fills the body: the search query while searching, otherwise the stored
+  // (history) list. A transient active-poll blip must never fold into this —
+  // it surfaces solely through the inline "Couldn't refresh" line via
+  // `activeIsError`. Retrying still hits whichever query is really in error
+  // instead of always refetching the base list underneath a failed search;
+  // an active-only failure during search additionally retries the active poll
+  // so the inline staleness line clears.
+  const contentIsError = isSearching ? search.isError : storedIsError;
   const isSearchPending = isSearching && search.isPending;
   const searchRefetch = search.refetch;
   const handleRetry = useCallback(() => {

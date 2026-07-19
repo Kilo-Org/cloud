@@ -194,9 +194,7 @@ function injectExtraProviderModels(
       vercelModel.endpoints
         .map(
           endpoint =>
-            VercelInferenceProviderIdSchema.safeParse(
-              endpoint.provider_name ?? endpoint.tag
-            ).data
+            VercelInferenceProviderIdSchema.safeParse(endpoint.provider_name ?? endpoint.tag).data
         )
         .filter(p => p !== undefined)
     );

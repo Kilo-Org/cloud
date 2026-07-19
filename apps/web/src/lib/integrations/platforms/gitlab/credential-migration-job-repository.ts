@@ -215,8 +215,9 @@ export async function checkpointGitLabCredentialMigrationJob(input: {
   publicAuditCounts: GitLabCredentialAuditCounts;
   privateAuditCounts: GitLabCredentialPrivateAuditCounts;
   issueIntegrationIds: string[];
-  privateAuditKeyId?: string | null;
-  privateAuditPublicKeySha256?: string | null;
+  // Required so callers explicitly pass the persisted value or null to clear.
+  privateAuditKeyId: string | null;
+  privateAuditPublicKeySha256: string | null;
 }): Promise<LeasedGitLabCredentialMigrationJobRecord | null> {
   const issueIntegrationIds = [...new Set(input.issueIntegrationIds)].slice(
     0,
@@ -230,8 +231,8 @@ export async function checkpointGitLabCredentialMigrationJob(input: {
       mutated_integrations = ${input.mutatedIntegrations},
       public_audit_counts = ${JSON.stringify(input.publicAuditCounts)}::jsonb,
       private_audit_counts = ${JSON.stringify(input.privateAuditCounts)}::jsonb,
-      private_audit_key_id = ${input.privateAuditKeyId ?? null},
-      private_audit_public_key_sha256 = ${input.privateAuditPublicKeySha256 ?? null},
+      private_audit_key_id = ${input.privateAuditKeyId},
+      private_audit_public_key_sha256 = ${input.privateAuditPublicKeySha256},
       retry_count = 0,
       issue_integration_ids = ${JSON.stringify(issueIntegrationIds)}::jsonb,
       updated_at = CURRENT_TIMESTAMP

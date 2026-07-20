@@ -14,6 +14,10 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { formatMeta, platformLabel, remoteAgentLabel, remoteMeta } from './session-list-helpers';
+import {
+  formatSpokenTimeAgo,
+  sessionRowAccessibilityLabel,
+} from './session-row-accessibility-label';
 
 type StoredSessionRowProps = {
   session: {
@@ -85,6 +89,7 @@ export function StoredSessionRow({
   const [renameVisible, setRenameVisible] = useState(false);
   const renameTextRef = useRef(title);
   const agentLabel = platformLabel(session.created_on_platform);
+  const timestamp = getAgentSessionTimestamp(session, sortBy);
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status_updated_at ?? session.status ?? null;
@@ -144,19 +149,30 @@ export function StoredSessionRow({
     }
   };
 
+  // Spoken meta mirrors the visible meta for the same inputs the row
+  // already uses to render `formatMeta(timestamp)`. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
+  // so the label omits it.
+  const spokenMeta = needsInput ? null : formatSpokenTimeAgo(timestamp);
+
   return (
     <>
       <Pressable
         onPress={onPress}
         onLongPress={handleLongPress}
-        accessibilityLabel={needsInput ? `${title}, needs input` : title}
+        accessibilityLabel={sessionRowAccessibilityLabel({
+          title,
+          needsInput,
+          badge: agentLabel,
+          meta: spokenMeta,
+        })}
         className="active:opacity-70"
       >
         <SessionRow
           agentLabel={agentLabel}
           title={title}
           subtitle={session.git_branch}
-          meta={formatMeta(getAgentSessionTimestamp(session, sortBy))}
+          meta={formatMeta(timestamp)}
           needsInput={needsInput}
           stripMode="inline"
           className="pl-[22px] pr-[22px]"
@@ -229,10 +245,29 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
     reconcileSessionAttention(session.id, session.status, null);
   }, [session.id, session.status, revision]);
 
+  // Spoken meta mirrors the visible meta the row renders. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
+  // so the label omits it. The remote row's `live` eyebrow (`live-and-meta`)
+  // renders the timestamp when `updatedAt` is present, otherwise the
+  // uppercased status. For speech we expand the timestamp via
+  // `formatSpokenTimeAgo` and lowercase/underscore-strip the status so
+  // VoiceOver doesn't read it letter-by-letter.
+  let spokenMeta: string | null = null;
+  if (!needsInput) {
+    spokenMeta = session.updatedAt
+      ? formatSpokenTimeAgo(session.updatedAt)
+      : session.status.toLowerCase().replaceAll('_', ' ');
+  }
+
   return (
     <Pressable
       onPress={onPress}
-      accessibilityLabel={needsInput ? `${title}, needs input` : title}
+      accessibilityLabel={sessionRowAccessibilityLabel({
+        title,
+        needsInput,
+        badge: remoteAgentLabel(session.createdOnPlatform),
+        meta: spokenMeta,
+      })}
       className="active:opacity-70"
     >
       <SessionRow

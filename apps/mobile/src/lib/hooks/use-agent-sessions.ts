@@ -13,6 +13,7 @@ import {
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
 import { useTRPC } from '@/lib/trpc';
+import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -84,9 +85,15 @@ function useStoredSessions(options?: UseAgentSessionsOptions) {
 
 function useActiveSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
+  // While the shared WS is connected, the app-level `ActiveSessionsLiveSync`
+  // owner pushes tray updates through `setQueryData` and triggers refreshes
+  // on connect/enrichment/etc. — the 10s poll would only mask the WS as
+  // the source of truth. When the socket is down, fall back to the 10s
+  // interval so a transient outage still updates the tray.
+  const wsConnected = useUserWebConnectionState();
   return useQuery(
     trpc.activeSessions.list.queryOptions(undefined, {
-      refetchInterval: 10_000,
+      refetchInterval: wsConnected ? false : 10_000,
       staleTime: 5000,
       enabled: options?.enabled,
     })

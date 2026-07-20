@@ -39,6 +39,9 @@ export default defineConfig({
       'cloud-agent-sdk/preparation-attempts': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/preparation-attempts.ts', import.meta.url)
       ),
+      'cloud-agent-sdk/schemas': fileURLToPath(
+        new URL('../../apps/web/src/lib/cloud-agent-sdk/schemas.ts', import.meta.url)
+      ),
       'cloud-agent-sdk': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/index.ts', import.meta.url)
       ),

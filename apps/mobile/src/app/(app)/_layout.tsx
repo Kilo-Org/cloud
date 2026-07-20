@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { StoreKiloPassPurchaseProvider } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -13,6 +14,7 @@ export default function AppLayout() {
 
   return (
     <UserWebConnectionProvider>
+      <ActiveSessionsLiveSyncMount />
       <KiloChatProvider>
         <KiloChatPresenceMount>
           <StoreKiloPassPurchaseProvider>

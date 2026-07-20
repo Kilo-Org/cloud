@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ActiveSessionsLiveSync,
+  deferred,
   makeCached,
   makeConnection,
   makeFakeQueryClient,
@@ -30,6 +31,55 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     expect(conn.onConnectionChange).toHaveBeenCalledTimes(1);
     detach();
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not publish a queued write after detach', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn: makeQueryFn(),
+    });
+    sync.attach();
+    const blockedWrite = deferred<undefined>();
+    vi.mocked(qc.cancelQueries).mockImplementationOnce(async () => {
+      await blockedWrite.promise;
+    });
+    conn.__fireSystem({
+      event: 'sessions.list',
+      data: { sessions: [{ id: 'first', status: 'running', title: 'First' }] },
+    });
+    conn.__fireSystem({
+      event: 'sessions.list',
+      data: { sessions: [{ id: 'queued', status: 'running', title: 'Queued' }] },
+    });
+    sync.detach();
+    blockedWrite.resolve(undefined);
+    await sync.getWriteQueue();
+    expect(qc.setQueryData).not.toHaveBeenCalled();
+  });
+
+  it('does not publish or re-kick an in-flight fetch after detach', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn: makeQueryFn(),
+    });
+    sync.attach();
+    sync.scheduleRefresh('reconnect');
+    await sync.getFetchQueue();
+    sync.scheduleRefresh('cli-connected');
+    sync.detach();
+    await sync.getFetchCompletion();
+    await Promise.resolve();
+    expect(sync.getPendingReasons()).toEqual(new Set());
+    expect(qc.fetchQueryCalls).toBe(1);
+    expect(qc.setQueryData).not.toHaveBeenCalled();
   });
 });
 
@@ -173,5 +223,23 @@ describe('ActiveSessionsLiveSync — cli.connected', () => {
     await sync.getFetchQueue();
     expect(setQueryDataCalls).not.toHaveBeenCalled();
     expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a malformed payload', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    const queryFn = makeQueryFn();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn,
+    });
+    sync.attach();
+    const event: SystemEvent = { event: 'cli.connected', data: { connectionId: 42 } };
+    conn.__fireSystem(event);
+    await Promise.resolve();
+    expect(sync.getPendingReasons()).toEqual(new Set());
+    expect(queryFn).not.toHaveBeenCalled();
   });
 });

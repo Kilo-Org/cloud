@@ -134,7 +134,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     await sync.getFetchQueue();
     qc.__triggerFetchResolve({ sessions: [makeCached({ id: 'a' })] });
     await sync.getFetchCompletion();
-    expect(sync.getLastEnrichmentCompletedAt()).not.toBeNull();
     // Second heartbeat within < 10s of last completion → no new fetch.
     const heartbeat2: SystemEvent = {
       event: 'sessions.heartbeat',
@@ -157,6 +156,44 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
       },
     };
     conn.__fireSystem(heartbeat3);
+    await sync.getWriteQueue();
+    await sync.getFetchQueue();
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('rate-limits enrichment retries after a failed fetch', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    qc.__setCached({ sessions: [makeCached({ id: 'a' })] });
+    const queryFn = makeQueryFn();
+    const { now, advance } = setupNow();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn,
+      now,
+    });
+    sync.attach();
+    const heartbeat: SystemEvent = {
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c1',
+        sessions: [{ id: 'a', status: 'running', title: 'A' }],
+      },
+    };
+    conn.__fireSystem(heartbeat);
+    await sync.getWriteQueue();
+    await sync.getFetchQueue();
+    qc.__triggerFetchReject(new Error('network down'));
+    await sync.getFetchCompletion();
+    conn.__fireSystem(heartbeat);
+    await sync.getWriteQueue();
+    await Promise.resolve();
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    advance(10_000);
+    conn.__fireSystem(heartbeat);
     await sync.getWriteQueue();
     await sync.getFetchQueue();
     expect(queryFn).toHaveBeenCalledTimes(2);

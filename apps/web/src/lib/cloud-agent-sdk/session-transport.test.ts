@@ -94,9 +94,12 @@ async function connectSession(session: CloudAgentSession): Promise<void> {
 function createUserWebConnection() {
   let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
   return {
+    retain: jest.fn(() => jest.fn()),
     connect: jest.fn(),
     disconnect: jest.fn(),
     destroy: jest.fn(),
+    isConnected: jest.fn(() => false),
+    onConnectionChange: jest.fn(() => jest.fn()),
     subscribeToCliSession: jest.fn(() => jest.fn()),
     sendCommand: jest.fn((_sessionId: string, command: string) =>
       Promise.resolve(

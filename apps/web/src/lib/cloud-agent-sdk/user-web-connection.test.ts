@@ -1706,3 +1706,180 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
   });
 });
+
+describe('createUserWebConnection connection-state API', () => {
+  it('reports false until the first server message flips it true and true until the final release flips it false', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const listener = jest.fn();
+    const unsubscribe = client.onConnectionChange(listener);
+
+    expect(client.isConnected()).toBe(false);
+
+    const release = client.retain();
+    open();
+    // Open alone does not mark connected — only the first inbound message does
+    // (mirroring the base-connection's `onConnected` semantics).
+    expect(client.isConnected()).toBe(false);
+
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(client.isConnected()).toBe(true);
+    expect(listener).toHaveBeenLastCalledWith(true);
+
+    release();
+    expect(client.isConnected()).toBe(false);
+    expect(listener).toHaveBeenLastCalledWith(false);
+
+    unsubscribe();
+    client.destroy();
+  });
+
+  it('covers a release-then-retain transition (true → release-all → false → retain → true)', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const listener = jest.fn();
+    client.onConnectionChange(listener);
+
+    const releaseA = client.retain();
+    const releaseB = client.retain();
+    open();
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(client.isConnected()).toBe(true);
+    const transitionCountAfterFirstConnect = listener.mock.calls.length;
+
+    releaseA();
+    expect(client.isConnected()).toBe(true);
+    releaseB();
+    expect(client.isConnected()).toBe(false);
+
+    const releaseC = client.retain();
+    open(sockets[1]);
+    expect(client.isConnected()).toBe(false);
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } }, sockets[1]);
+    expect(client.isConnected()).toBe(true);
+
+    const transitions = listener.mock.calls.map(call => call[0]);
+    expect(transitions).toEqual([true, false, true]);
+    expect(listener.mock.calls.length).toBe(transitionCountAfterFirstConnect + 2);
+
+    releaseC();
+    client.destroy();
+  });
+
+  it('reports false on destroy() even though base-connection.destroy() emits no callback', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const listener = jest.fn();
+    client.onConnectionChange(listener);
+
+    client.retain();
+    open();
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(client.isConnected()).toBe(true);
+
+    client.destroy();
+
+    expect(client.isConnected()).toBe(false);
+    expect(listener.mock.calls.map(call => call[0])).toEqual([true, false]);
+  });
+
+  it('does not emit state changes after destroy()', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const listener = jest.fn();
+    client.onConnectionChange(listener);
+
+    client.retain();
+    open();
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(listener.mock.calls.map(call => call[0])).toEqual([true]);
+
+    client.destroy();
+    // destroy() must drive the final false transition; the listener set is
+    // cleared as part of teardown so no further notifications can fire.
+    expect(listener.mock.calls.map(call => call[0])).toEqual([true, false]);
+
+    // A late inbound on the now-destroyed client must not emit another
+    // transition.
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(listener.mock.calls.map(call => call[0])).toEqual([true, false]);
+  });
+
+  it('flips disconnected → connected across a pong-timeout-triggered reconnect', async () => {
+    jest.useFakeTimers();
+    try {
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce('old-token')
+        .mockResolvedValue('recovered-token');
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+      const listener = jest.fn();
+      client.onConnectionChange(listener);
+      const release = client.retain();
+      open();
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+      expect(client.isConnected()).toBe(true);
+      const callsAfterFirstConnect = listener.mock.calls.length;
+
+      // Drive the existing ping/pong liveness machinery: the ping fires on
+      // the viewer-ping interval, the pong is wrong, then the pong-timeout
+      // triggers `reconnectWithRefreshedAuth` — which fires `onDisconnected`
+      // before the new socket's first message flips state back to true.
+      jest.advanceTimersByTime(VIEWER_PING_INTERVAL_MS);
+      inbound({ type: 'pong', nonce: 'wrong-nonce' });
+      jest.advanceTimersByTime(VIEWER_PONG_TIMEOUT_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(sockets[0].close).toHaveBeenCalledTimes(1);
+      expect(sockets[1]).toBeDefined();
+      expect(client.isConnected()).toBe(false);
+
+      open(sockets[1]);
+      expect(client.isConnected()).toBe(false);
+      inbound(
+        { type: 'system', event: 'sessions.list', data: { sessions: [] } },
+        sockets[1]
+      );
+      expect(client.isConnected()).toBe(true);
+
+      const transitions = listener.mock.calls
+        .slice(callsAfterFirstConnect)
+        .map(call => call[0]);
+      expect(transitions).toEqual([false, true]);
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('coalesces repeated identical transitions and the unsubscribe is a no-op thereafter', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const listener = jest.fn();
+    const unsubscribe = client.onConnectionChange(listener);
+
+    const releaseA = client.retain();
+    const releaseB = client.retain();
+    open();
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenLastCalledWith(true);
+
+    releaseA();
+    // Release of a non-final retain does not change state.
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    releaseB();
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith(false);
+
+    unsubscribe();
+    const releaseC = client.retain();
+    open(sockets[1]);
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } }, sockets[1]);
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    releaseC();
+    client.destroy();
+  });
+});

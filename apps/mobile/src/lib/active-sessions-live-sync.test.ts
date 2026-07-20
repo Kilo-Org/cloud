@@ -61,6 +61,71 @@ describe('ActiveSessionsLiveSync — attach / detach', () => {
     expect(qc.setQueryData).not.toHaveBeenCalled();
   });
 
+  it('keeps queued work fenced after detach and re-attach', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    qc.__setCached({
+      sessions: [
+        makeCached({
+          id: 'current',
+          connectionId: 'c2',
+          createdAt: '2026-07-20T00:00:00.000Z',
+        }),
+      ],
+    });
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn: makeQueryFn(),
+    });
+    const detach = sync.attach();
+    const blockedWrite = deferred<undefined>();
+    vi.mocked(qc.cancelQueries).mockImplementationOnce(async () => {
+      await blockedWrite.promise;
+    });
+    conn.__fireSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          {
+            id: 'stale',
+            status: 'running',
+            title: 'Stale',
+            connectionId: 'c1',
+            createdAt: '2026-07-20T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    expect(qc.cancelQueries).toHaveBeenCalledTimes(1);
+
+    detach();
+    sync.attach();
+    conn.__fireSystem({
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c2',
+        sessions: [
+          {
+            id: 'current',
+            status: 'running',
+            title: 'Current',
+          },
+        ],
+      },
+    });
+    blockedWrite.resolve(undefined);
+    await sync.getWriteQueue();
+
+    expect(qc.setQueryData).toHaveBeenCalledTimes(1);
+    expect(qc.__getCached()?.sessions.map(session => session.id)).toEqual(['current']);
+    expect(sync.getPendingReasons()).toEqual(new Set());
+  });
+
   it('does not publish or re-kick an in-flight fetch after detach', async () => {
     const conn = makeConnection();
     const qc = makeFakeQueryClient();

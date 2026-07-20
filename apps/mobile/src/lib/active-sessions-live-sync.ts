@@ -96,7 +96,7 @@ export class ActiveSessionsLiveSync {
   private inFlightFetchCanceled = false;
   private lastEnrichmentAttemptAt: number | null = null;
   private lastConnectedState: boolean;
-  private detached = false;
+  private attachmentEpoch = 0;
 
   private releaseRetain: (() => void) | null = null;
   private systemListenerUnsubscribe: (() => void) | null = null;
@@ -122,7 +122,7 @@ export class ActiveSessionsLiveSync {
       throw new Error('ActiveSessionsLiveSync already attached');
     }
     // Re-attach while connected must not look like a rising edge.
-    this.detached = false;
+    this.attachmentEpoch += 1;
     this.lastConnectedState = this.connection.isConnected();
     this.releaseRetain = this.connection.retain();
     this.systemListenerUnsubscribe = this.connection.onSystemEvent(event => {
@@ -137,7 +137,7 @@ export class ActiveSessionsLiveSync {
   }
 
   detach(): void {
-    this.detached = true;
+    this.attachmentEpoch += 1;
     this.pendingReasons.clear();
     this.systemListenerUnsubscribe?.();
     this.connectionListenerUnsubscribe?.();
@@ -149,7 +149,7 @@ export class ActiveSessionsLiveSync {
   }
 
   scheduleRefresh(reason: RefreshReason): void {
-    if (this.detached) {
+    if (this.releaseRetain === null) {
       return;
     }
     this.pendingReasons.add(reason);
@@ -237,12 +237,16 @@ export class ActiveSessionsLiveSync {
   }
 
   private enqueueWrite(updater: WriteUpdater): void {
+    if (this.releaseRetain === null) {
+      return;
+    }
+    const attachmentEpoch = this.attachmentEpoch;
     // Serialize ALL cache writes (cancel + setQueryData) on one queue.
     // The pipeline never awaits a network fetch — that is the
     // cancel-based fencing model.
     this.writeQueue = (async () => {
       await this.writeQueue;
-      if (this.readDetached()) {
+      if (attachmentEpoch !== this.attachmentEpoch) {
         return;
       }
       // A write always cancels the in-flight fetch so the new cache
@@ -253,7 +257,7 @@ export class ActiveSessionsLiveSync {
         this.inFlightFetchCanceled = true;
       }
       await this.queryClient.cancelQueries({ queryKey: this.queryKey });
-      if (this.readDetached()) {
+      if (attachmentEpoch !== this.attachmentEpoch) {
         return;
       }
       this.queryClient.setQueryData<CachedActiveSessionsData>(this.queryKey, current => {
@@ -307,9 +311,10 @@ export class ActiveSessionsLiveSync {
   }
 
   private kickFetch(): void {
-    if (this.readDetached()) {
+    if (this.releaseRetain === null) {
       return;
     }
+    const attachmentEpoch = this.attachmentEpoch;
     // Cancel any in-flight fetch so a newly scheduled refresh can start
     // immediately instead of being queued behind a stale one.
     if (this.isFetchInFlight) {
@@ -321,12 +326,12 @@ export class ActiveSessionsLiveSync {
     }
     this.fetchQueue = (async () => {
       await this.fetchQueue;
-      await this.processFetchQueue();
+      await this.processFetchQueue(attachmentEpoch);
     })();
   }
 
-  private async processFetchQueue(): Promise<void> {
-    if (this.readDetached() || this.pendingReasons.size === 0) {
+  private async processFetchQueue(attachmentEpoch: number): Promise<void> {
+    if (attachmentEpoch !== this.attachmentEpoch || this.pendingReasons.size === 0) {
       return;
     }
     if (this.isFetchInFlight) {
@@ -341,23 +346,20 @@ export class ActiveSessionsLiveSync {
     let success = false;
     try {
       await this.queryClient.cancelQueries({ queryKey: this.queryKey });
-      if (this.readDetached()) {
-        this.inFlightReasons = null;
-        this.notifyFetchCompletion();
-        return;
+      if (attachmentEpoch === this.attachmentEpoch) {
+        // fetchQuery with staleTime: 0 forces a network call regardless
+        // of any preceding setQueryData.
+        const fetchPromise = this.queryClient.fetchQuery({
+          queryKey: this.queryKey,
+          queryFn: this.queryFn,
+          staleTime: 0,
+        });
+        // The fetch is now in flight: let tests waiting on getFetchQueue()
+        // observe the pending state and/or issue cancellations.
+        this.notifyFetchStart();
+        await fetchPromise;
+        success = true;
       }
-      // fetchQuery with staleTime: 0 forces a network call regardless
-      // of any preceding setQueryData.
-      const fetchPromise = this.queryClient.fetchQuery({
-        queryKey: this.queryKey,
-        queryFn: this.queryFn,
-        staleTime: 0,
-      });
-      // The fetch is now in flight: let tests waiting on getFetchQueue()
-      // observe the pending state and/or issue cancellations.
-      this.notifyFetchStart();
-      await fetchPromise;
-      success = true;
     } catch {
       // Either the query was canceled by a later WS write, or the
       // network call itself failed. In either case, the reasons stay
@@ -365,6 +367,11 @@ export class ActiveSessionsLiveSync {
       // re-kick) re-attempts.
     } finally {
       this.isFetchInFlight = false;
+    }
+    if (attachmentEpoch !== this.attachmentEpoch) {
+      this.inFlightReasons = null;
+      this.notifyFetchCompletion();
+      return;
     }
     if (inFlightReasons.has('enrichment')) {
       this.lastEnrichmentAttemptAt = this.now();
@@ -391,9 +398,6 @@ export class ActiveSessionsLiveSync {
     // Signal completion (success or failure) so tests waiting on
     // getFetchCompletion() can inspect the updated state.
     this.notifyFetchCompletion();
-    if (this.readDetached()) {
-      return;
-    }
     // Re-kick immediately only when a replacement fetch is genuinely
     // warranted: either the in-flight fetch was intentionally canceled by
     // newer work, or new reasons were raised while it was in flight. On a
@@ -406,9 +410,5 @@ export class ActiveSessionsLiveSync {
 
   private readInFlightFetchCanceled(): boolean {
     return this.inFlightFetchCanceled;
-  }
-
-  private readDetached(): boolean {
-    return this.detached;
   }
 }

@@ -43,6 +43,9 @@
  * Unlike memory.max there are no kill semantics, so like the server memory
  * limit the weights apply in every mode except `off`; unset/0 leaves the
  * kernel default (100).
+ *
+ * PIDs: `TOOL_CGROUP_PIDS_MAX` caps all processes and threads in kilo-tools.
+ * It defaults to 8000; zero explicitly leaves the tool slice uncapped.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -52,6 +55,7 @@ import {
   TOOL_CGROUP_CPU_WEIGHT_ENV,
   TOOL_CGROUP_MODE_ENV,
   TOOL_CGROUP_OOM_GROUP_ENV,
+  TOOL_CGROUP_PIDS_MAX_ENV,
   TOOL_CGROUP_RESERVE_MB_ENV,
   TOOL_CGROUP_SERVER_CPU_WEIGHT_ENV,
   TOOL_CGROUP_SERVER_LIMIT_MB_ENV,
@@ -70,6 +74,8 @@ export type ToolCgroupConfig = {
   cpuWeight: number | null;
   /** cpu.weight for the server slice; null = unset/0 = kernel default (100). */
   serverCpuWeight: number | null;
+  /** pids.max for the tool slice; null = explicitly uncapped. */
+  toolPidsMax: number | null;
   sweepIntervalMs: number;
   statsIntervalMs: number;
   /** kilo-tools only; kilo-server always runs with oom.group=0. */
@@ -108,6 +114,7 @@ type Logger = (message: string) => void;
 const DEFAULT_RESERVE_MB = 1536;
 const DEFAULT_CPU_WEIGHT = 100;
 const MAX_CPU_WEIGHT = 10000;
+const DEFAULT_TOOL_PIDS_MAX = 8000;
 const DEFAULT_SWEEP_INTERVAL_MS = 1000;
 const MIN_SWEEP_INTERVAL_MS = 200;
 const DEFAULT_STATS_INTERVAL_MS = 5 * 60 * 1000;
@@ -166,6 +173,11 @@ function parseCpuWeight(
   return weight;
 }
 
+function parseToolPidsMax(env: Record<string, string | undefined>, log: Logger): number | null {
+  const pidsMax = parseEnvInt(env, TOOL_CGROUP_PIDS_MAX_ENV, DEFAULT_TOOL_PIDS_MAX, log);
+  return pidsMax > 0 ? pidsMax : null;
+}
+
 export function parseToolCgroupConfig(
   env: Record<string, string | undefined>,
   log: Logger = logToFile
@@ -177,6 +189,7 @@ export function parseToolCgroupConfig(
     serverLimitBytes: parseServerLimitBytes(env, log),
     cpuWeight: parseCpuWeight(env, TOOL_CGROUP_CPU_WEIGHT_ENV, log),
     serverCpuWeight: parseCpuWeight(env, TOOL_CGROUP_SERVER_CPU_WEIGHT_ENV, log),
+    toolPidsMax: parseToolPidsMax(env, log),
     sweepIntervalMs: Math.max(
       MIN_SWEEP_INTERVAL_MS,
       parseEnvInt(env, TOOL_CGROUP_SWEEP_INTERVAL_MS_ENV, DEFAULT_SWEEP_INTERVAL_MS, log)
@@ -342,12 +355,11 @@ class CgroupSlice {
   }
 
   /**
-   * Create (idempotent) and apply the memory limit (null = uncapped) and cpu
-   * weight (null = kernel default). The weight is always written so a stale
-   * value left by a previous wrapper generation in a reused container
-   * self-neutralizes.
+   * Create (idempotent) and apply memory, CPU, and PID limits. Limits are
+   * always written so stale values from a previous wrapper generation in a
+   * reused container self-neutralize.
    */
-  setup(memoryMaxBytes: number | null, cpuWeight: number | null): void {
+  setup(memoryMaxBytes: number | null, cpuWeight: number | null, pidsMax: number | null): void {
     try {
       mkdirSync(this.dir);
     } catch (error) {
@@ -364,6 +376,7 @@ class CgroupSlice {
     this.writeBestEffort('memory.oom.group', this.oomGroup ? '1' : '0');
     this.writeBestEffort('memory.swap.max', memoryMaxBytes === null ? 'max' : '0');
     this.writeBestEffort('cpu.weight', String(cpuWeight ?? DEFAULT_CPU_WEIGHT));
+    this.writeBestEffort('pids.max', pidsMax === null ? 'max' : String(pidsMax));
     this.eventsBaseline = this.readMemoryEvents();
     this.eventsSeen = this.eventsBaseline;
   }
@@ -556,11 +569,11 @@ export class ToolCgroupManager {
     try {
       this.enableControllers();
       this.toolMemoryMaxBytes = this.computeToolCap();
-      this.toolSlice.setup(this.toolMemoryMaxBytes, this.config.cpuWeight);
-      this.serverSlice.setup(this.config.serverLimitBytes, this.config.serverCpuWeight);
+      this.toolSlice.setup(this.toolMemoryMaxBytes, this.config.cpuWeight, this.config.toolPidsMax);
+      this.serverSlice.setup(this.config.serverLimitBytes, this.config.serverCpuWeight, null);
       this.warnIfBudgetExceeded();
       this.log(
-        `tool_cgroup_ready mode=${this.effectiveMode()} memoryMaxBytes=${this.toolMemoryMaxBytes ?? 'none'} serverLimitBytes=${this.config.serverLimitBytes ?? 'none'} cpuWeight=${this.config.cpuWeight ?? 'default'} serverCpuWeight=${this.config.serverCpuWeight ?? 'default'} cgroupRoot=${this.config.cgroupRoot}`
+        `tool_cgroup_ready mode=${this.effectiveMode()} memoryMaxBytes=${this.toolMemoryMaxBytes ?? 'none'} serverLimitBytes=${this.config.serverLimitBytes ?? 'none'} cpuWeight=${this.config.cpuWeight ?? 'default'} serverCpuWeight=${this.config.serverCpuWeight ?? 'default'} toolPidsMax=${this.config.toolPidsMax ?? 'none'} cgroupRoot=${this.config.cgroupRoot}`
       );
       return true;
     } catch (error) {
@@ -672,7 +685,7 @@ export class ToolCgroupManager {
     try {
       // Token match — a substring check would mistake `cpuset` for `cpu`.
       const enabled = new Set(readFileSync(controlPath, 'utf8').trim().split(/\s+/));
-      const missing = ['memory', 'cpu'].filter(controller => !enabled.has(controller));
+      const missing = ['memory', 'cpu', 'pids'].filter(controller => !enabled.has(controller));
       if (missing.length > 0) {
         writeFileSync(controlPath, missing.map(controller => `+${controller}`).join(' '));
       }
@@ -701,6 +714,7 @@ export function startToolCgroup(
       resetStaleControl(config.cgroupRoot, name, 'memory.max', 'max', log);
       resetStaleControl(config.cgroupRoot, name, 'cpu.weight', String(DEFAULT_CPU_WEIGHT), log);
     }
+    resetStaleControl(config.cgroupRoot, config.toolCgroupName, 'pids.max', 'max', log);
     return null;
   }
   const manager = new ToolCgroupManager(config, log);

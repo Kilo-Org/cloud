@@ -290,7 +290,11 @@ describe('CloudflareAgentSandbox', () => {
       .spyOn(WrapperClient, 'ensureBootstrapWrapper')
       .mockResolvedValueOnce({ client: {} as WrapperClient });
     const sandbox = new CloudflareAgentSandbox(
-      { TOOL_CGROUP_ORG_IDS: '*', TOOL_CGROUP_MODE: 'enforce' } as unknown as Env,
+      {
+        TOOL_CGROUP_ORG_IDS: '*',
+        TOOL_CGROUP_MODE: 'enforce',
+        TOOL_CGROUP_PIDS_MAX: '8000',
+      } as unknown as Env,
       metadata(),
       {
         resolveSandbox: () =>
@@ -307,7 +311,7 @@ describe('CloudflareAgentSandbox', () => {
     expect(ensureBootstrapWrapper).toHaveBeenCalledWith(expect.anything(), bootstrapSession, {
       agentSessionId: 'agent_cloudflare',
       userId: 'user_cloudflare',
-      toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce' },
+      toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce', TOOL_CGROUP_PIDS_MAX: '8000' },
     });
     ensureBootstrapWrapper.mockRestore();
   });

@@ -61,6 +61,7 @@
     "TOOL_CGROUP_MODE": "enforce",
     "TOOL_CGROUP_RESERVE_MB": "1024",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
+    "TOOL_CGROUP_PIDS_MAX": "8000",
   },
   "placement": { "mode": "smart" },
   /**

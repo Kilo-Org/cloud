@@ -1068,7 +1068,11 @@ describe('WrapperClient', () => {
         agentSessionId: 'test-session',
         userId: 'test-user',
         workspacePath: '/workspace/test',
-        toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce', TOOL_CGROUP_RESERVE_MB: '1536' },
+        toolCgroupEnv: {
+          TOOL_CGROUP_MODE: 'enforce',
+          TOOL_CGROUP_RESERVE_MB: '1536',
+          TOOL_CGROUP_PIDS_MAX: '8000',
+        },
       });
 
       const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -1076,10 +1080,12 @@ describe('WrapperClient', () => {
       const options = startProcessCall[1] as { env?: Record<string, string> };
       expect(command).toContain('TOOL_CGROUP_MODE=');
       expect(command).toContain('TOOL_CGROUP_RESERVE_MB=');
+      expect(command).toContain('TOOL_CGROUP_PIDS_MAX=');
       expect(options.env).toEqual(
         expect.objectContaining({
           TOOL_CGROUP_MODE: 'enforce',
           TOOL_CGROUP_RESERVE_MB: '1536',
+          TOOL_CGROUP_PIDS_MAX: '8000',
         })
       );
     });

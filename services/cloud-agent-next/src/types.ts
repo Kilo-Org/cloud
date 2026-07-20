@@ -543,6 +543,7 @@ export type Env = {
   TOOL_CGROUP_OOM_GROUP?: string;
   TOOL_CGROUP_CPU_WEIGHT?: string;
   TOOL_CGROUP_SERVER_CPU_WEIGHT?: string;
+  TOOL_CGROUP_PIDS_MAX?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

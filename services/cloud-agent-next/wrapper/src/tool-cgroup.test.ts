@@ -70,6 +70,7 @@ function makeConfig(overrides: Partial<ToolCgroupConfig>): ToolCgroupConfig {
     serverLimitBytes: null,
     cpuWeight: null,
     serverCpuWeight: null,
+    toolPidsMax: 8000,
     sweepIntervalMs: 1000,
     statsIntervalMs: 5 * 60 * 1000,
     oomGroup: true,
@@ -102,6 +103,7 @@ describe('parseToolCgroupConfig', () => {
     expect(config.serverLimitBytes).toBeNull();
     expect(config.cpuWeight).toBeNull();
     expect(config.serverCpuWeight).toBeNull();
+    expect(config.toolPidsMax).toBe(8000);
     expect(config.sweepIntervalMs).toBe(1000);
     expect(config.oomGroup).toBe(true);
   });
@@ -116,6 +118,7 @@ describe('parseToolCgroupConfig', () => {
         TOOL_CGROUP_OOM_GROUP: '0',
         TOOL_CGROUP_CPU_WEIGHT: '50',
         TOOL_CGROUP_SERVER_CPU_WEIGHT: '300',
+        TOOL_CGROUP_PIDS_MAX: '4000',
       },
       () => {}
     );
@@ -126,6 +129,7 @@ describe('parseToolCgroupConfig', () => {
     expect(config.oomGroup).toBe(false);
     expect(config.cpuWeight).toBe(50);
     expect(config.serverCpuWeight).toBe(300);
+    expect(config.toolPidsMax).toBe(4000);
   });
 
   it('treats an unset or zero cpu weight as kernel default', () => {
@@ -149,6 +153,15 @@ describe('parseToolCgroupConfig', () => {
     expect(
       parseToolCgroupConfig({ TOOL_CGROUP_SERVER_LIMIT_MB: '0' }, () => {}).serverLimitBytes
     ).toBeNull();
+  });
+
+  it('defaults an invalid PID limit and permits an explicit opt-out', () => {
+    const logs: string[] = [];
+    expect(parseToolCgroupConfig({ TOOL_CGROUP_PIDS_MAX: '0' }, () => {}).toolPidsMax).toBeNull();
+    expect(
+      parseToolCgroupConfig({ TOOL_CGROUP_PIDS_MAX: 'invalid' }, log => logs.push(log)).toolPidsMax
+    ).toBe(8000);
+    expect(logs).toHaveLength(1);
   });
 
   it('falls back on invalid values and clamps the sweep interval', () => {
@@ -255,6 +268,8 @@ describe('ToolCgroupManager.setup', () => {
     );
     expect(readCgroupFile(config, 'kilo-tools', 'memory.oom.group')).toBe('1');
     expect(readCgroupFile(config, 'kilo-tools', 'memory.swap.max')).toBe('0');
+    expect(readCgroupFile(config, 'kilo-tools', 'pids.max')).toBe('8000');
+    expect(readCgroupFile(config, 'kilo-server', 'pids.max')).toBe('max');
   });
 
   it('observe mode leaves the tool slice uncapped', () => {
@@ -307,10 +322,10 @@ describe('ToolCgroupManager.setup', () => {
     it('enables missing controllers by token, not substring', () => {
       // `cpuset` present but `cpu` absent must still enable +cpu.
       const config = makeConfig({});
-      writeFileSync(join(config.cgroupRoot, 'cgroup.subtree_control'), 'cpuset io pids');
+      writeFileSync(join(config.cgroupRoot, 'cgroup.subtree_control'), 'cpuset io');
       expect(new ToolCgroupManager(config, () => {}).setup()).toBe(true);
       expect(readFileSync(join(config.cgroupRoot, 'cgroup.subtree_control'), 'utf8')).toBe(
-        '+memory +cpu'
+        '+memory +cpu +pids'
       );
     });
 
@@ -554,6 +569,14 @@ describe('rollback hygiene (mode=off)', () => {
     startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, message => logs.push(message), { cgroupRoot });
     expect(readFileSync(join(cgroupRoot, 'kilo-tools', 'cpu.weight'), 'utf8')).toBe('100');
     expect(logs.filter(line => line.includes('tool_cgroup_stale_cap_reset')).length).toBe(1);
+  });
+
+  it('resets a stale pids.max on the tool cgroup', () => {
+    const cgroupRoot = makeCgroupRoot();
+    mkdirSync(join(cgroupRoot, 'kilo-tools'));
+    writeFileSync(join(cgroupRoot, 'kilo-tools', 'pids.max'), '8000');
+    startToolCgroup({ TOOL_CGROUP_MODE: 'off' }, () => {}, { cgroupRoot });
+    expect(readFileSync(join(cgroupRoot, 'kilo-tools', 'pids.max'), 'utf8')).toBe('max');
   });
 
   it('is a no-op when no cgroup dirs exist', () => {

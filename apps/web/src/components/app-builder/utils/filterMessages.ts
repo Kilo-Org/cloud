@@ -163,6 +163,85 @@ export function filterAppBuilderMessages(messages: CloudMessage[]): CloudMessage
 }
 
 /**
+ * Result type for tail-based pagination (V2 sessions).
+ */
+export type TailPaginationResult<T> = {
+  visibleMessages: T[];
+  hasEarlierMessages: boolean;
+};
+
+type RoleChecker<T> = (msg: T) => 'user' | 'assistant' | 'system';
+
+/**
+ * Find the index of the last user-role message in the array, or -1 if none.
+ */
+export function lastUserIndex<T>(messages: T[], isUser: RoleChecker<T>): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (isUser(messages[i]) === 'user') return i;
+  }
+  return -1;
+}
+
+/**
+ * Initial visible window for V2 sessions: from the last user message to the
+ * end of the array. If no user message exists, the full list is shown.
+ */
+export function tailFromLastUserTurn(messages: CloudMessage[]): TailPaginationResult<CloudMessage>;
+export function tailFromLastUserTurn<T>(
+  messages: T[],
+  isUser: RoleChecker<T>
+): TailPaginationResult<T>;
+export function tailFromLastUserTurn<T>(
+  messages: T[],
+  isUser?: RoleChecker<T>
+): TailPaginationResult<T> {
+  const checker: RoleChecker<T> = isUser ?? (getMessageRole as RoleChecker<T>);
+  const idx = lastUserIndex(messages, checker);
+  if (idx < 0) {
+    return { visibleMessages: messages, hasEarlierMessages: false };
+  }
+  return {
+    visibleMessages: messages.slice(idx),
+    hasEarlierMessages: idx > 0,
+  };
+}
+
+/**
+ * Grow the visible window backwards by exactly one user turn.
+ * Returns the new visible count and whether older messages remain.
+ */
+export function loadEarlierUserTurn(
+  messages: CloudMessage[],
+  currentVisibleCount: number
+): { visibleCount: number; hasEarlierMessages: boolean };
+export function loadEarlierUserTurn<T>(
+  messages: T[],
+  currentVisibleCount: number,
+  isUser: RoleChecker<T>
+): { visibleCount: number; hasEarlierMessages: boolean };
+export function loadEarlierUserTurn<T>(
+  messages: T[],
+  currentVisibleCount: number,
+  isUser?: RoleChecker<T>
+): { visibleCount: number; hasEarlierMessages: boolean } {
+  const checker: RoleChecker<T> = isUser ?? (getMessageRole as RoleChecker<T>);
+  const hiddenCount = Math.max(0, messages.length - currentVisibleCount);
+  if (hiddenCount <= 0) {
+    return { visibleCount: currentVisibleCount, hasEarlierMessages: false };
+  }
+  const hidden = messages.slice(0, hiddenCount);
+  const priorUserIdx = lastUserIndex(hidden, checker);
+  if (priorUserIdx < 0) {
+    return { visibleCount: messages.length, hasEarlierMessages: false };
+  }
+  const newVisibleCount = messages.length - priorUserIdx;
+  return {
+    visibleCount: newVisibleCount,
+    hasEarlierMessages: priorUserIdx > 0,
+  };
+}
+
+/**
  * Paginate messages by "sessions" - each session is a user message
  * plus all assistant/system messages that follow until the next user message.
  *

@@ -46,7 +46,7 @@ export function SpendEvidenceCard({
     '90d': 'Last 90 days',
   }[range];
   const highest = evidence
-    .filter(point => point.coverage === 'complete')
+    .filter(point => point.coverage !== 'unavailable')
     .reduce<(typeof evidence)[number] | undefined>((currentHighest, point) => {
       if (!currentHighest) return point;
       const currentTotal = currentHighest.variableUsd + currentHighest.scheduledUsd;
@@ -105,7 +105,7 @@ export function SpendEvidenceCard({
               ? `${rangeLabel}: spend total unavailable because one or more periods have incomplete coverage.`
               : `${rangeLabel}: ${money(completeTotal)} total.`}{' '}
             {highest
-              ? `Highest complete period was ${highest.label} at ${money(highest.variableUsd + highest.scheduledUsd)}.`
+              ? `Highest period with spend evidence was ${highest.label} at ${money(highest.variableUsd + highest.scheduledUsd)}.`
               : ''}
           </p>
           <p id={chartInstructionsId} className="sr-only">
@@ -135,9 +135,9 @@ export function SpendEvidenceCard({
                   const isPeak = highest !== undefined && point.periodStart === highest.periodStart;
                   const showTick = index % tickStride === 0 || index === evidence.length - 1;
                   const accessibilityLabel =
-                    point.coverage === 'complete'
-                      ? `${point.label}: ${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled`
-                      : `${point.label}: spend data unavailable, ${point.coveredHours} of ${point.totalHours} hours covered`;
+                    point.coverage === 'unavailable'
+                      ? `${point.label}: spend data unavailable, ${point.coveredHours} of ${point.totalHours} hours covered`
+                      : `${point.label}: ${point.coverage === 'partial' ? 'at least ' : ''}${money(pointTotal)} total, ${money(point.variableUsd)} usage-based, ${money(point.scheduledUsd)} scheduled${point.coverage === 'partial' ? `, ${point.coveredHours} of ${point.totalHours} hours covered` : ''}`;
                   return (
                     <Tooltip key={point.periodStart}>
                       <TooltipTrigger asChild>
@@ -153,7 +153,7 @@ export function SpendEvidenceCard({
                           onKeyDown={event => handleBarKeyDown(event, index)}
                         >
                           <span className="flex h-5 w-full items-end justify-center">
-                            {isPeak && point.coverage === 'complete' && (
+                            {isPeak && point.coverage !== 'unavailable' && (
                               <span className="type-label font-mono tabular-nums whitespace-nowrap">
                                 {money(pointTotal)}
                               </span>
@@ -163,16 +163,18 @@ export function SpendEvidenceCard({
                             <span
                               className={cn(
                                 'group-hover:ring-foreground/50 mx-auto flex w-full max-w-10 flex-col-reverse overflow-hidden rounded-t-sm transition-[filter,box-shadow] duration-150 group-hover:brightness-110 group-focus-visible:brightness-110',
-                                point.coverage !== 'complete' &&
+                                point.coverage === 'partial' &&
+                                  'border-border-strong border border-dashed',
+                                point.coverage === 'unavailable' &&
                                   'border-border-strong bg-surface-overlay h-2 border border-dashed'
                               )}
                               style={
-                                point.coverage === 'complete'
+                                point.coverage !== 'unavailable'
                                   ? { height: `${totalHeight}%` }
                                   : undefined
                               }
                             >
-                              {point.coverage === 'complete' && (
+                              {point.coverage !== 'unavailable' && (
                                 <>
                                   <span
                                     className="bg-chart-1"
@@ -198,9 +200,11 @@ export function SpendEvidenceCard({
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={8} className="min-w-44 p-3">
                         <div className="type-label font-medium">{point.label}</div>
-                        {point.coverage === 'complete' ? (
+                        {point.coverage !== 'unavailable' ? (
                           <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 type-label">
-                            <dt className="text-muted-foreground">Total</dt>
+                            <dt className="text-muted-foreground">
+                              {point.coverage === 'partial' ? 'Known spend' : 'Total'}
+                            </dt>
                             <dd className="text-right font-mono font-semibold tabular-nums">
                               {money(pointTotal)}
                             </dd>
@@ -218,6 +222,11 @@ export function SpendEvidenceCard({
                             <dd className="text-right font-mono tabular-nums">
                               {money(point.scheduledUsd)}
                             </dd>
+                            {point.coverage === 'partial' && (
+                              <dt className="text-muted-foreground col-span-2 mt-1">
+                                Partial coverage: {point.coveredHours} of {point.totalHours} hours.
+                              </dt>
+                            )}
                           </dl>
                         ) : (
                           <p className="type-label text-muted-foreground mt-2">

@@ -198,7 +198,18 @@ export type ServiceStateSnapshot = {
 // ---------------------------------------------------------------------------
 
 export type ResolvedSession =
-  | { type: 'remote'; kiloSessionId: KiloSessionId }
+  | {
+      type: 'remote';
+      kiloSessionId: KiloSessionId;
+      /**
+       * Per-session capabilities reported by the owning CLI's most recent
+       * heartbeat or `sessions.list`. A `remote` session supports attachments
+       * only when `capabilities?.attachments === true`; absent / false is a
+       * structural no-attachments state (older CLIs, CLIs that have not yet
+       * advertised the capability, or CLIs that have downgraded).
+       */
+      capabilities?: { attachments?: boolean };
+    }
   | { type: 'cloud-agent'; kiloSessionId: KiloSessionId; cloudAgentSessionId: CloudAgentSessionId }
   | { type: 'read-only'; kiloSessionId: KiloSessionId };
 

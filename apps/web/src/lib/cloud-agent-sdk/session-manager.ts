@@ -1,7 +1,12 @@
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
-import type { SendCommandPayload, SendPromptPayload, TransportSendPayload } from './transport';
+import type {
+  RemoteAttachmentPart,
+  SendCommandPayload,
+  SendPromptPayload,
+  TransportSendPayload,
+} from './transport';
 import { modelRefsEqual } from './remote-model-catalog';
 import type {
   ModelRef,
@@ -269,6 +274,16 @@ type SessionManager = {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
     images?: Images;
+    /**
+     * Ready file parts to forward to a CAPABLE remote CLI session (the CLI
+     * advertised `capabilities.attachments: true` in its most recent
+     * heartbeat). Distinct from the cloud-only `attachments` field: cloud
+     * sessions use `attachments`, remote sessions use `attachmentParts`.
+     * Session-manager enforces the gate — a non-null payload for a
+     * non-capable session is rejected with a typed error before it can
+     * reach the transport.
+     */
+    attachmentParts?: RemoteAttachmentPart[];
   }): Promise<boolean>;
   setRemoteModelOverride(override: RemoteModelOverride | null): void;
   retryRemoteModels(): void;
@@ -502,6 +517,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
   let activeSessionType: ActiveSessionType | null = null;
+  /**
+   * Latest per-session capabilities reported by the live CLI transport's
+   * `onTransportCapabilitiesChange` callback. Captured here so the
+   * `supportsAttachments` gate can be recomputed on every heartbeat-driven
+   * capability change (upgrade, downgrade, reconnect, absent) — not only at
+   * the initial `onResolved` moment. `undefined` means the CLI has not
+   * reported any (older CLIs, mid-reconnect, or a session that the active
+   * CLI no longer claims).
+   */
+  let currentCapabilities: { attachments?: boolean } | undefined = undefined;
   let observedModelSource: ObservedModelSource | null = null;
   // True while a connect/reconnect cycle is still replaying its message
   // history; false once live events are flowing. See clearOverrideIfDiverged.
@@ -582,6 +607,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     loadOlderGeneration += 1;
     olderMessagesInFlight = null;
     olderMessagesTerminal = false;
+    currentCapabilities = undefined;
   }
 
   function setChildSessionHydrationState(
@@ -660,6 +686,35 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const cloudReady = cloudStatus === null || cloudStatus.type === 'ready';
     store.set(canSendAtom, session.canSend && cloudReady);
     store.set(canInterruptAtom, session.canInterrupt);
+  }
+
+  /**
+   * Recompute the `supportsAttachments` gate for the active session. Called
+   * on every `onResolved` (initial resolution) AND every
+   * `onTransportCapabilitiesChange` (heartbeat upgrade/downgrade/reconnect/
+   * absent) so the UI gate tracks the CLI's most recent advertisement.
+   *
+   * Rules:
+   *  - `cloud-agent`: always supports attachments (S3a is a no-op for
+   *    cloud-agent sessions, but cloud-agent attachments flow through
+   *    the existing `attachments` field, not the new `attachmentParts`).
+   *  - `remote`: supports attachments only when the live CLI reported
+   *    `capabilities.attachments === true` in its most recent heartbeat
+   *    or `sessions.list`. Any other state (absent, false, mid-reconnect)
+   *    → `false`, matching today's "no paperclip" parity for non-capable
+   *    remote sessions.
+   *  - `read-only`: never supports attachments.
+   */
+  function recomputeSupportsAttachments(sessionType: ActiveSessionType | null): void {
+    let supports: boolean;
+    if (sessionType === 'cloud-agent') {
+      supports = true;
+    } else if (sessionType === 'remote') {
+      supports = currentCapabilities?.attachments === true;
+    } else {
+      supports = false;
+    }
+    store.set(supportsAttachmentsAtom, supports);
   }
 
   function updateObservedModel(model: ModelSelection, source: ObservedModelSource): void {
@@ -1093,7 +1148,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         activeSessionType = resolved.type;
         store.set(sessionTypeAtom, resolved.type);
         store.set(activeSessionTypeAtom, resolved.type);
-        store.set(supportsAttachmentsAtom, resolved.type === 'cloud-agent');
+        // Seed capabilities from the resolved session so the initial gate
+        // reflects whatever the mobile-side `resolveSession` adapter had
+        // to work with (e.g. the current `activeSessions.list` snapshot).
+        // Subsequent heartbeat changes arrive via `onTransportCapabilitiesChange`
+        // and overwrite this.
+        currentCapabilities = resolved.type === 'remote' ? resolved.capabilities : undefined;
+        recomputeSupportsAttachments(resolved.type);
         updateCapabilityAtoms(session);
       },
       onRemoteModelStateChange: handleRemoteModelStateChange,
@@ -1104,6 +1165,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onTransportCapabilityChange: () => {
         if (expectedGeneration !== switchGeneration) return;
         if (currentSession === session) updateCapabilityAtoms(session);
+      },
+      onTransportCapabilitiesChange: capabilities => {
+        if (expectedGeneration !== switchGeneration) return;
+        currentCapabilities = capabilities;
+        recomputeSupportsAttachments(activeSessionType);
       },
       onReplayComplete: () => {
         if (expectedGeneration !== switchGeneration) return;
@@ -1212,6 +1278,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
     images?: Images;
+    attachmentParts?: RemoteAttachmentPart[];
   }): Promise<boolean> {
     store.set(errorAtom, null);
     if (store.get(agentStatusAtom).type !== 'disconnected') {
@@ -1261,7 +1328,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     try {
       if (!currentSession) throw new Error('No active session');
       if (input.attachments && sessionType !== 'cloud-agent') {
+        // The cloud-only `attachments` field is exclusive to cloud-agent
+        // sessions. Remote CLI sessions (capable or not) go through the
+        // new `attachmentParts` path. Reject loudly if a caller mixes them
+        // up — this is a programmer error, not a user-recoverable state.
         throw new Error('Only Cloud Agent sessions support attachments');
+      }
+      if (input.attachmentParts && input.attachmentParts.length > 0) {
+        if (sessionType !== 'remote' || currentCapabilities?.attachments !== true) {
+          // A non-null `attachmentParts` for a non-capable session is a
+          // UI-bug: the paperclip is supposed to be hidden whenever this
+          // gate fails, so we should never see payload here. Refuse to
+          // forward rather than silently drop — same policy as the
+          // cloud-only branch above.
+          throw new Error('Only capable remote CLI sessions support attachments');
+        }
       }
       await currentSession.send({
         payload: transportPayload,
@@ -1269,6 +1350,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         ...(input.attachments ? { attachments: input.attachments } : {}),
         images: input.images,
         ...(sessionType === 'remote' && remoteModelOverride ? { remoteModelOverride } : {}),
+        ...(input.attachmentParts && input.attachmentParts.length > 0
+          ? { attachmentParts: input.attachmentParts }
+          : {}),
       });
 
       if (sessionType === 'remote' && kiloSessionId) {

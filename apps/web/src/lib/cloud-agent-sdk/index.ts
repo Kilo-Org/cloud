@@ -104,6 +104,7 @@ export type {
   CloudAgentApi,
   CloudAgentStreamTicket,
   CloudAgentStreamTicketResult,
+  RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
   Transport,

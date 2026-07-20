@@ -24,6 +24,7 @@ import type { UserWebConnection } from './user-web-connection';
 import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
+  RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
   TransportSendPayload,
@@ -75,6 +76,7 @@ type CloudAgentSessionConfig = {
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
+  onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
   onReplayComplete?: () => void;
@@ -93,6 +95,14 @@ type CloudAgentSessionSendInput = {
   attachments?: CloudAgentAttachments;
   images?: Images;
   remoteModelOverride?: RemoteModelOverride;
+  /**
+   * Ready file parts to forward to a CAPABLE remote CLI session. The
+   * session-manager gate already enforces that this is only non-empty for
+   * a `remote` session whose CLI has advertised `capabilities.attachments:
+   * true`; transports that don't support the path (cloud-agent, read-only,
+   * non-capable remote) simply ignore it.
+   */
+  attachmentParts?: RemoteAttachmentPart[];
 };
 
 type CloudAgentSessionAnswerInput = {
@@ -288,6 +298,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           onRemoteModelStateChange: config.onRemoteModelStateChange,
           onRemoteCommandStateChange: config.onRemoteCommandStateChange,
           onCapabilityChange: config.onTransportCapabilityChange,
+          onCapabilitiesChange: config.onTransportCapabilitiesChange,
         });
       }
       case 'cloud-agent': {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { type ChipStateInput, describeAttachmentChip, progressLabel } from './attachment-chip-description';
+import {
+  type ChipStateInput,
+  describeAttachmentChip,
+  progressLabel,
+} from './attachment-chip-description';
 
 const baseState: ChipStateInput = {
   filename: 'doc.pdf',

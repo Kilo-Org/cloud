@@ -435,6 +435,13 @@ export type WebInboundMessage = z.infer<typeof webInboundMessageSchema>;
 // Active CLI sessions
 // ---------------------------------------------------------------------------
 
+export const activeSessionCapabilitiesSchema = z
+  .object({
+    attachments: z.boolean().optional(),
+  })
+  .optional();
+export type ActiveSessionCapabilities = z.infer<typeof activeSessionCapabilitiesSchema>;
+
 export const activeSessionSchema = z
   .object({
     id: z.string(),
@@ -443,6 +450,18 @@ export const activeSessionSchema = z
     gitUrl: z.string().optional(),
     gitBranch: z.string().optional(),
     parentSessionId: z.string().optional(),
+    /**
+     * Per-session capabilities advertised by the owning CLI in its
+     * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
+     * gates the remote-CLI attachment path; absent / false means the CLI
+     * either predates the capability or has not yet reported it.
+     *
+     * Declared here (rather than relying on `.passthrough()`) so typed
+     * consumers can reason about the shape without an extra `as` cast. The
+     * surrounding `activeSessionSchema` is `.passthrough()` so older
+     * forward-compatible fields continue to be preserved verbatim.
+     */
+    capabilities: activeSessionCapabilitiesSchema,
   })
   .passthrough();
 export type ActiveSessionData = z.infer<typeof activeSessionSchema>;

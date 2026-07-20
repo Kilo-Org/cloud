@@ -4,10 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
 
-import {
-  AGENT_ATTACHMENT_MIME_BY_EXTENSION,
-  type AgentAttachmentExtension,
-} from '@/lib/agent-attachments/constants';
+import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 const IMAGE_PICKER_OPTIONS = {
@@ -22,17 +19,18 @@ function showPermissionSettingsAlert({ message, title }: { message: string; titl
   ]);
 }
 
-function mimeTypeForExtension(extension: AgentAttachmentExtension): string {
-  return AGENT_ATTACHMENT_MIME_BY_EXTENSION[extension];
-}
-
 function normalizeImageAsset(asset: {
   uri: string;
   fileName?: string | null;
   mimeType?: string | null;
   fileSize?: number | null;
 }): AgentAttachmentCandidate {
-  const name = asset.fileName ?? `image.${(asset.mimeType ?? 'image/png').split('/')[1] ?? 'png'}`;
+  // Image picker cannot return a filename with an arbitrary extension;
+  // synthesize one from the picker's MIME so `normalizeAttachmentExtension`
+  // can resolve a known key. The actual byte size is re-measured by the
+  // upload hook via `getInfoAsync`; `size` here is informational.
+  const fallbackName = `image.${(asset.mimeType ?? 'image/png').split('/')[1] ?? 'png'}`;
+  const name = asset.fileName ?? fallbackName;
   return {
     name,
     uri: asset.uri,
@@ -47,14 +45,21 @@ function normalizeDocumentAsset(asset: {
   mimeType?: string;
   size?: number;
 }): AgentAttachmentCandidate {
-  const dot = asset.name.lastIndexOf('.');
-  const ext =
-    dot > 0 ? (asset.name.slice(dot + 1).toLowerCase() as AgentAttachmentExtension) : null;
-  const mimeType = asset.mimeType ?? (ext ? mimeTypeForExtension(ext) : undefined);
+  // The picker MIME is intentionally NOT consulted. The cloud-agent
+  // storage layer rejects anything outside the canonical extension
+  // table, and iOS pickers report `application/octet-stream` for any
+  // extension the platform doesn't ship a UTI for. Resolving MIME from
+  // the extension makes the picker → upload hook contract exact.
+  const extension = normalizeAttachmentExtension(asset.name);
   return {
     name: asset.name,
     uri: asset.uri,
-    mimeType,
+    // The candidate shape carries MIME for kilochat-picker parity, but
+    // the agent-attachments classifier ignores it and re-derives from
+    // the extension. No closed-union cast — the extension is whatever
+    // survives `normalizeAttachmentExtension`, including the `bin`
+    // fallback.
+    mimeType: mimeForExtension(extension),
     size: asset.size,
   };
 }

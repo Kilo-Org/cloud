@@ -72,6 +72,10 @@ describe('cloudAgentGetAttachmentUploadUrlSchema', () => {
         extension,
       });
       expect(result.success).toBe(false);
+      if (!result.success) {
+        const extensionIssues = result.error.issues.filter(issue => issue.path[0] === 'extension');
+        expect(extensionIssues[0]?.message).toContain(extension);
+      }
     }
   });
 

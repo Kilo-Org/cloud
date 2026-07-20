@@ -18,6 +18,7 @@ function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
     id: 'a1',
     filename: 'doc.pdf',
     kind: 'document',
+    extension: 'pdf',
     mimeType: 'application/pdf',
     size: 1024,
     localUri: 'file:///cache/doc.pdf',

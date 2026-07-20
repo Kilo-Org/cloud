@@ -63,6 +63,26 @@ function asFetch(
   return Object.assign(fn, { preconnect: fetch.preconnect });
 }
 
+function makeByteStream(totalBytes: number): ReadableStream<Uint8Array> {
+  const chunk = new Uint8Array(64 * 1024);
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      let pushed = 0;
+      while (pushed < totalBytes) {
+        const remaining = totalBytes - pushed;
+        if (remaining >= chunk.byteLength) {
+          controller.enqueue(chunk);
+          pushed += chunk.byteLength;
+        } else {
+          controller.enqueue(chunk.subarray(0, remaining));
+          pushed += remaining;
+        }
+      }
+      controller.close();
+    },
+  });
+}
+
 async function createCompleteGitWorkspace(workspacePath: string): Promise<void> {
   const gitPath = path.join(workspacePath, '.git');
   await fsp.mkdir(gitPath, { recursive: true });
@@ -1473,6 +1493,130 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       {
         type: 'text',
         text: 'attachment too-large.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+      },
+    ]);
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
+
+  it('materializes a file exactly at the 5 MiB cap as a binary text part', async () => {
+    const localPath = path.join(tmpDir, 'exactly-5-mib.bin');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_exact',
+        prompt: 'Process this file',
+        attachments: [
+          {
+            filename: 'exactly-5-mib.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/exactly-5-mib.bin',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response(makeByteStream(5 * 1024 * 1024), { status: 200 })),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this file' },
+      {
+        type: 'text',
+        text: `binary attachment saved: filename=exactly-5-mib.bin mime=application/octet-stream size=${5 * 1024 * 1024} path=${localPath}`,
+      },
+    ]);
+    expect(fs.existsSync(localPath)).toBe(true);
+  });
+
+  it('rejects a file one byte over the 5 MiB cap and deletes the partial file', async () => {
+    const localPath = path.join(tmpDir, 'one-byte-over.bin');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_over',
+        prompt: 'Process this file',
+        attachments: [
+          {
+            filename: 'one-byte-over.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/one-byte-over.bin',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(
+        async () => new Response(makeByteStream(5 * 1024 * 1024 + 1), { status: 200 })
+      ),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this file' },
+      {
+        type: 'text',
+        text: 'attachment one-byte-over.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+      },
+    ]);
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
+
+  it('deletes the partial file when a mid-transfer read fails', async () => {
+    const localPath = path.join(tmpDir, 'interrupted.bin');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_interrupted',
+        prompt: 'Process this file',
+        attachments: [
+          {
+            filename: 'interrupted.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/interrupted.bin',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const chunk = new Uint8Array(64 * 1024);
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(chunk);
+        controller.error(new Error('stream reset'));
+      },
+    });
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response(body, { status: 200 })),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this file' },
+      {
+        type: 'text',
+        text: 'attachment interrupted.bin could not be retrieved (stream reset)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);

@@ -7,7 +7,7 @@
  * importing from one place.
  */
 
-import { type AgentAttachmentMime } from './constants';
+import { type AgentAttachmentExtension, type AgentAttachmentMime } from './constants';
 
 export type AgentAttachmentKind = 'image' | 'document';
 export type AgentAttachmentStatus = 'pending' | 'uploading' | 'uploaded' | 'error';
@@ -19,6 +19,8 @@ export type AgentAttachment = {
   /** Basename of the server-side R2 key; set once the upload succeeds. */
   remoteFilename?: string;
   kind: AgentAttachmentKind;
+  /** Normalized extension used for the R2 key suffix and MIME derivation. */
+  extension: AgentAttachmentExtension;
   mimeType: AgentAttachmentMime;
   /**
    * Measured local byte size (via `getInfoAsync`). The picker-reported

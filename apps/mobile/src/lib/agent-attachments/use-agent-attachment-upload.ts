@@ -2,16 +2,12 @@ import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
-import {
-  AGENT_ATTACHMENT_MAX_FILES,
-  type AgentAttachmentExtension,
-} from '@/lib/agent-attachments/constants';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
   canAddAttachments,
   classifyAttachment,
   describeClassificationFailure,
   mimeForExtension,
-  normalizeAttachmentExtension,
 } from '@/lib/agent-attachments/validate';
 import {
   type AgentAttachment,
@@ -95,9 +91,7 @@ export function useAgentAttachmentUpload(
             organizationId,
             attachmentId: attachment.id,
             path,
-            extension: attachment.filename.includes('.')
-              ? (attachment.filename.toLowerCase().split('.').pop() as AgentAttachmentExtension)
-              : normalizeAttachmentExtension(attachment.filename),
+            extension: attachment.extension,
             contentType: attachment.mimeType,
             contentLength: attachment.size,
             localUri: attachment.localUri,
@@ -170,6 +164,7 @@ export function useAgentAttachmentUpload(
             id: Crypto.randomUUID(),
             filename,
             kind: classified.kind,
+            extension: ext,
             mimeType: mimeForExtension(ext),
             size: classified.size,
             localUri: candidate.uri,

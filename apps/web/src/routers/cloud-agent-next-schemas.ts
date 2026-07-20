@@ -105,8 +105,14 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
     extension: z
       .string()
       .regex(CLOUD_AGENT_ATTACHMENT_EXTENSION_REGEX)
-      .refine(extension => !DENIED_EXTENSION_SET.has(extension.toLowerCase()), {
-        message: `Attachment extension "${'<ext>'}" is not allowed`,
+      .superRefine((extension, ctx) => {
+        if (DENIED_EXTENSION_SET.has(extension.toLowerCase())) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Attachment extension "${extension}" is not allowed`,
+            path: [],
+          });
+        }
       })
       .optional(),
   })

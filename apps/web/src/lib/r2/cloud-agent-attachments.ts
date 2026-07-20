@@ -1,6 +1,7 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
+  CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
   CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION,
   CLOUD_AGENT_ATTACHMENT_PRESIGNED_URL_EXPIRY_SECONDS,
   CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION,
@@ -112,7 +113,13 @@ export async function generateCloudAgentAttachmentUploadUrl({
   extension,
 }: GenerateCloudAgentAttachmentUploadUrlParams): Promise<GenerateCloudAgentAttachmentUploadUrlResult> {
   const suffix = extension
-    ? normalizeAttachmentExtension(extension)
+    ? (() => {
+        const normalized = normalizeAttachmentExtension(extension);
+        if ((CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS as readonly string[]).includes(normalized)) {
+          throw new Error(`Attachment extension "${normalized}" is not allowed`);
+        }
+        return normalized;
+      })()
     : CLOUD_AGENT_ATTACHMENT_MIME_TO_EXTENSION[contentType as CloudAgentAttachmentAllowedType];
   const key = `${userId}/cloud-agent/${messageUuid}/${attachmentId}.${suffix}`;
   const command = new PutObjectCommand({

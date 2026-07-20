@@ -108,6 +108,20 @@ describe('cloud-agent attachment upload URL signing', () => {
     expect(result.key).toBe(`user-1/cloud-agent/${MESSAGE_UUID}/${ATTACHMENT_ID}.kilo`);
   });
 
+  it('rejects a deny-listed extension in the upload helper before signing', async () => {
+    await expect(
+      generateCloudAgentAttachmentUploadUrl({
+        userId: 'user-1',
+        messageUuid: MESSAGE_UUID,
+        attachmentId: ATTACHMENT_ID,
+        contentType: 'application/octet-stream',
+        contentLength: 42,
+        extension: 'exe',
+      })
+    ).rejects.toThrow('exe');
+    expect(mockGetSignedUrl).not.toHaveBeenCalled();
+  });
+
   it('preserves image-only App Builder key generation and metadata', async () => {
     await generateImageUploadUrl({
       service: 'app-builder',

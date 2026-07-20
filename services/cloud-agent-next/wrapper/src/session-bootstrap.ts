@@ -853,9 +853,10 @@ async function downloadBounded(
       if (done) break;
       if (!value) continue;
       const remaining = MAX_ATTACHMENT_DOWNLOAD_BYTES - bytesWritten;
-      if (value.byteLength > remaining) {
-        await handle.write(value.subarray(0, remaining));
-        bytesWritten += remaining;
+      if (value.byteLength >= remaining) {
+        const writable = MAX_ATTACHMENT_BYTES - bytesWritten;
+        await handle.write(value.subarray(0, writable));
+        bytesWritten += writable;
         overflowed = true;
         try {
           await reader.cancel();
@@ -867,6 +868,9 @@ async function downloadBounded(
       await handle.write(value);
       bytesWritten += value.byteLength;
     }
+  } catch (error) {
+    await safeUnlink(filePath);
+    throw error;
   } finally {
     await handle.close();
   }

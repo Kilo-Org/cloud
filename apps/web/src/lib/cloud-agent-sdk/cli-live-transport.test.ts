@@ -3238,7 +3238,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     transport.destroy();
   });
 
-  it('publishes undefined on owner drop after a capability advertisement', async () => {
+  it('publishes undefined on reconnect then re-advertises via heartbeat', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -3266,12 +3266,24 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     ]);
     expect(capabilities.at(-1)).toEqual({ attachments: true });
 
-    userWebConnection.emitSystem({
-      event: 'sessions.list',
-      data: { sessions: [] },
-    });
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
 
+    // The gate must close immediately on reconnect, before the next
+    // heartbeat/sessions.list has a chance to re-advertise.
     expect(capabilities.at(-1)).toBeUndefined();
+
+    emitHeartbeat(userWebConnection, [
+      {
+        id: KILO_SESSION_ID,
+        status: 'active',
+        title: 'Tracked',
+        capabilities: { attachments: true },
+      },
+    ]);
+    expect(capabilities.at(-1)).toEqual({ attachments: true });
+
     transport.destroy();
   });
 });

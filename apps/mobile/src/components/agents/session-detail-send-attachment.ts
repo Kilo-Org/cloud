@@ -1,4 +1,10 @@
-import  { type ResolvedSession } from 'cloud-agent-sdk';
+import { type RemoteAttachmentPart, type ResolvedSession } from 'cloud-agent-sdk';
+
+import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
+
+export type BuildRemoteAttachmentPartsResult =
+  | { ok: true; parts: RemoteAttachmentPart[] }
+  | { ok: false; message: string };
 
 /**
  * Pure decision for the send path: given the active session type and
@@ -35,4 +41,29 @@ export function resolveSendAttachmentKind(
     return 'remote-capable';
   }
   return 'none';
+}
+
+/**
+ * Build remote attachment parts for a capable remote session, mapping a
+ * transient presign failure to a retryable user-facing message. The caller
+ * is responsible for surfacing `message` through the same toast/error surface
+ * used for send failures and for preserving the composer draft so the user
+ * can retry by sending again.
+ *
+ * `buildParts` is injected so the test can stub it without pulling in the
+ * real tRPC client.
+ */
+export async function buildRemoteAttachmentPartsWithRetryableFeedback(
+  submission: AgentAttachmentSubmissionPayload,
+  buildParts: (payload: AgentAttachmentSubmissionPayload) => Promise<RemoteAttachmentPart[]>
+): Promise<BuildRemoteAttachmentPartsResult> {
+  try {
+    const parts = await buildParts(submission);
+    return { ok: true, parts };
+  } catch {
+    return {
+      ok: false,
+      message: "Couldn't attach files. Tap send to try again.",
+    };
+  }
 }

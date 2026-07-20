@@ -4156,23 +4156,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
-
-    it('reconnect (publish undefined then re-advertise) recomputes', async () => {
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
-      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
-
-      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
-      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
-
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
-      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
-    });
   });
 
   // -------------------------------------------------------------------------

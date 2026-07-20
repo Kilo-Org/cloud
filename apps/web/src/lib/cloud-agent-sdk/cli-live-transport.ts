@@ -780,6 +780,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           handleSystemMessage(msg.event, msg.data);
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
+          // Recompute the capability gate fail-closed immediately. The prior
+          // owner may have been attachment-capable, but after a reconnect we
+          // must wait for the next heartbeat / sessions.list to re-advertise.
+          publishCapabilities(undefined);
           replayCurrentSnapshot(false);
           // The snapshot store lags the live stream, and the CLI only forwards
           // events "from now" after a resubscribe — parts finalized while the

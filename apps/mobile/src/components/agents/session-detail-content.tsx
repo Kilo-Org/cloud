@@ -28,7 +28,10 @@ import {
 } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
-import { resolveSendAttachmentKind } from '@/components/agents/session-detail-send-attachment';
+import {
+  buildRemoteAttachmentPartsWithRetryableFeedback,
+  resolveSendAttachmentKind,
+} from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
@@ -475,7 +478,19 @@ export function SessionDetailContent({
       let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
         undefined;
       if (kind === 'remote-capable' && submission) {
-        attachmentParts = await buildRemoteAttachmentParts(submission);
+        const result = await buildRemoteAttachmentPartsWithRetryableFeedback(
+          submission,
+          buildRemoteAttachmentParts
+        );
+        if (!result.ok) {
+          // Retryable presign failure: the manager never reached send(), so
+          // its onSendFailed toast does not fire. Surface the retryable message
+          // through the same toast channel and throw so the composer keeps the
+          // draft/attachments for a retry.
+          toast.error(result.message);
+          throw new Error(result.message);
+        }
+        attachmentParts = result.parts;
       }
       // manager.send() reports failures via its own return value (and toasts
       // through the manager's onSendFailed hook) rather than rejecting — it

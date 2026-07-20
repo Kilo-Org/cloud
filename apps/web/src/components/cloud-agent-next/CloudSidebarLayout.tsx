@@ -13,6 +13,16 @@ import { useSidebarSessions } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
 import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 // Context for children to toggle the mobile sidebar sheet
@@ -49,6 +59,8 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     initializeWithValue: false,
   });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<string>();
+  const [sessionPendingDeletion, setSessionPendingDeletion] = useState<string>();
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 
   const createdOnPlatform = useMemo(() => {
@@ -107,30 +119,32 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
 
   const handleDeleteSession = useCallback(
     async (sessionId: string) => {
-      // Navigate away if deleting the current session
-      if (sessionId === currentSessionId) {
-        const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
-        router.push(basePath);
+      setDeletingSessionId(sessionId);
+      try {
+        await deleteCliSessionV2({ session_id: sessionId });
+      } catch (error) {
+        console.error('Error calling session deletion API:', error);
+        toast.error('Failed to delete session');
+        return false;
+      } finally {
+        setDeletingSessionId(undefined);
       }
 
-      // Delete from IndexedDB (optimistic)
       try {
         await deleteSessionFromStore(sessionId);
       } catch (error) {
         console.error('Error deleting session from IndexedDB:', error);
       }
 
-      // Delete from server
-      try {
-        await deleteCliSessionV2({ session_id: sessionId });
-        toast('Session deleted successfully');
-      } catch (error) {
-        console.error('Error calling session deletion API:', error);
-        toast.error('Failed to delete session');
+      if (sessionId === currentSessionId) {
+        const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+        router.push(basePath);
       }
 
+      toast('Session deleted successfully');
       void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       refetchSessions();
+      return true;
     },
     [
       currentSessionId,
@@ -143,6 +157,15 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
       refetchSessions,
     ]
   );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!sessionPendingDeletion) return;
+
+    const wasDeleted = await handleDeleteSession(sessionPendingDeletion);
+    if (wasDeleted) {
+      setSessionPendingDeletion(undefined);
+    }
+  }, [handleDeleteSession, sessionPendingDeletion]);
 
   const handleRenameSession = useCallback(
     async (sessionId: string, title: string) => {
@@ -170,7 +193,8 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
               sessions={sessions}
               currentSessionId={currentSessionId}
               organizationId={organizationId}
-              onDeleteSession={handleDeleteSession}
+              onDeleteSession={setSessionPendingDeletion}
+              deletingSessionId={deletingSessionId}
               onRenameSession={handleRenameSession}
               isInSheet
               activeSessions={activeSessions}
@@ -192,7 +216,8 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
             sessions={sessions}
             currentSessionId={currentSessionId}
             organizationId={organizationId}
-            onDeleteSession={handleDeleteSession}
+            onDeleteSession={setSessionPendingDeletion}
+            deletingSessionId={deletingSessionId}
             onRenameSession={handleRenameSession}
             activeSessions={activeSessions}
             searchQuery={searchQuery}
@@ -208,6 +233,33 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
         {/* Main Content */}
         <div className="h-full flex-1 overflow-hidden">{children}</div>
       </div>
+      <AlertDialog
+        open={sessionPendingDeletion !== undefined}
+        onOpenChange={open => {
+          if (!open && !deletingSessionId) {
+            setSessionPendingDeletion(undefined);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the session and its history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingSessionId !== undefined}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deletingSessionId !== undefined}
+              onClick={handleConfirmDelete}
+            >
+              {deletingSessionId ? 'Deleting...' : 'Delete session'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarLayoutContext.Provider>
   );
 }

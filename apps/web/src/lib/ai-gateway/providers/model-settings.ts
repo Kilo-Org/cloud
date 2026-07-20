@@ -112,7 +112,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   }
   if (
     isMinimaxModel(model) ||
-    isKimiModel(model) ||
     isGrok42Model(model) ||
     isQwenModel(model) ||
     isGemmaModel(model) ||

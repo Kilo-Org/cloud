@@ -720,6 +720,39 @@ describe('MessageSettlementOutbox', () => {
     expect(harness.callbackJobs[0].payload.messageId).toBe(firstMessageId);
   });
 
+  it('repairs a released terminal wrapper-run callback while the next run remains pending', async () => {
+    const harness = createHarness({ hasObservedWrapperIdle: false });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/repaired-batch' })
+    );
+    await storePendingSessionMessage(
+      harness.storage,
+      createPendingSessionMessage({
+        messageId: secondMessageId,
+        role: 'user',
+        content: 'next prompt',
+        createdAt: 3_000,
+      })
+    );
+
+    await harness.outbox.persistTerminalTransition(
+      firstMessageId,
+      {
+        kind: 'failed',
+        reason: 'wrapper became unhealthy',
+        completionSource: 'wrapper_failure',
+      },
+      { allowIdleBatchWithoutObservedIdle: true }
+    );
+
+    await harness.outbox.repairTerminalEffects();
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.messageId).toBe(firstMessageId);
+  });
+
   it('keeps a wrapper-run callback blocked while that run has a nonterminal accepted message', async () => {
     const harness = createHarness();
     await putSessionMessageState(

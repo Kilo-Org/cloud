@@ -21,6 +21,7 @@ import {
 import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
+import type { SharedSandboxAssignment } from '../shared-sandbox-route.js';
 import {
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_MAX_SERIALIZED_BYTES,
@@ -32,6 +33,8 @@ import {
   clearCurrentWrapperRuntimeLivenessState,
   clearSettledSandboxRecovery,
   clearWrapperRuntimeIdentity,
+  doesRecoveryMatchExhaustedLease,
+  exhaustedWrapperLeaseIdentity,
   getSandboxRecoveryState,
   getWrapperLease,
   getWrapperRuntimeState,
@@ -55,6 +58,7 @@ import {
   reduceWrapperLease,
   resetWrapperLivenessAfterReconnect,
   type WrapperConnectionFence,
+  type PostExhaustionRecovery,
   type WrapperRuntimeState,
   WRAPPER_STOP_MAX_ATTEMPTS,
 } from './wrapper-runtime-state.js';
@@ -64,6 +68,8 @@ const WRAPPER_PING_TIMEOUT_MS = 30_000;
 const WRAPPER_STOP_ATTEMPT_TIMEOUT_MS = 45_000;
 const WRAPPER_STOP_RETRY_DELAYS_MS = [5_000, 10_000, 10_000, 10_000] as const;
 const SHARED_SANDBOX_FAILOVER_RETRY_DELAYS_MS = [2_000, 4_000, 8_000] as const;
+const SANDBOX_RECOVERY_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 30_000] as const;
+const SANDBOX_RECOVERY_MAX_RETRY_DELAY_MS = 30_000;
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
 const MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE = 'Assistant request failed: model not found';
 
@@ -147,6 +153,7 @@ export type WrapperSupervisorDependencies = {
   agentRuntime: Pick<AgentRuntime, 'sendPing'>;
   messageSettlementOutbox: Pick<
     MessageSettlementOutbox,
+    | 'persistTerminalTransition'
     | 'terminalizeSessionMessageOnce'
     | 'observeWrapperTerminalForIdleBatch'
     | 'releaseWrapperTerminalWaitForIdleBatch'
@@ -176,6 +183,14 @@ export type WrapperSupervisorDependencies = {
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
   recordSharedSandboxFailover: (routeKey: SandboxId) => Promise<void>;
+  resolveSharedSandboxFailover: (routeKey: SandboxId) => Promise<SharedSandboxAssignment>;
+  persistSharedSandboxRecoveryAssignment: (input: {
+    routeKey: SandboxId;
+    sourceSandboxId: SandboxId;
+    replacementSandboxId: SandboxId;
+    suffix: 'shared-slot-v1';
+  }) => Promise<void>;
+  destroyIsolatedSandbox: (metadata: SessionMetadata) => Promise<void>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
 };
@@ -360,6 +375,9 @@ export function createWrapperSupervisor(
     ensureAcceptedMessageBeforeTerminal,
     stopWrappers,
     recordSharedSandboxFailover,
+    resolveSharedSandboxFailover,
+    persistSharedSandboxRecoveryAssignment,
+    destroyIsolatedSandbox,
     requestAlarmAtOrBefore,
     getSessionIdForLogs,
   } = dependencies;
@@ -633,23 +651,29 @@ export function createWrapperSupervisor(
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
     for (const message of acceptedMessages) {
       const activityObserved = message.agentActivityObservedAt !== undefined;
-      await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
-        kind: 'failed',
-        reason: 'wrapper_failure',
-        error,
-        completionSource: 'wrapper_failure',
-        failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
-      });
+      await messageSettlementOutbox.persistTerminalTransition(
+        message.messageId,
+        {
+          kind: 'failed',
+          reason: 'wrapper_failure',
+          error,
+          completionSource: 'wrapper_failure',
+          failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+          failureCode: activityObserved ? 'wrapper_error_after_activity' : failureCode,
+        },
+        { allowIdleBatchWithoutObservedIdle: true }
+      );
     }
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        wrapperRunId: state.wrapperRunId,
+        wrapperGeneration: state.wrapperGeneration,
+        acceptedMessageCount: acceptedMessages.length,
+      })
+      .info('Unhealthy wrapper terminal states persisted');
+
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
-    if (isWrapperRunFinalizing(state) && state.wrapperRunId) {
-      await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(state.wrapperRunId);
-    } else {
-      await messageSettlementOutbox.finalizeIdleBatchCallbackIfReady({
-        allowWithoutObservedIdle: true,
-      });
-    }
 
     if (state.wrapperConnectionId) {
       await clearCurrentWrapperRuntimeFailureState(
@@ -1073,6 +1097,206 @@ export function createWrapperSupervisor(
       .error('Wrapper cleanup attempt limit exhausted');
   }
 
+  function sandboxRecoveryRetryAt(now: number, attempts: number): number {
+    const delay =
+      SANDBOX_RECOVERY_RETRY_DELAYS_MS[
+        Math.min(attempts, SANDBOX_RECOVERY_RETRY_DELAYS_MS.length - 1)
+      ];
+    return now + delay;
+  }
+
+  function createPostExhaustionRecovery(
+    metadata: SessionMetadata,
+    lease: Extract<Awaited<ReturnType<typeof getWrapperLease>>, { state: 'stop_needed' }>,
+    now: number
+  ): PostExhaustionRecovery | undefined {
+    const sandboxId = metadata.workspace?.sandboxId;
+    const route = metadata.workspace?.sandboxRoute;
+    if (!sandboxId) return undefined;
+    const common = {
+      expectedLease: exhaustedWrapperLeaseIdentity(lease),
+      attempts: 0,
+      nextAttemptAt: now,
+    };
+    if (route?.kind === 'shared') {
+      return {
+        kind: 'shared-failover',
+        routeKey: route.routeKey,
+        sourceSandboxId: sandboxId,
+        ...common,
+      };
+    }
+    if (/^(ses|dind|crv)-/.test(sandboxId)) {
+      return { kind: 'isolated-destroy', sourceSandboxId: sandboxId, ...common };
+    }
+    return undefined;
+  }
+
+  async function settlePostExhaustionRecovery(recovery: PostExhaustionRecovery): Promise<boolean> {
+    const latestLease = await getWrapperLease(storage);
+    const completedLease = reduceWrapperLease(latestLease, {
+      type: 'sandbox_recovery_completed',
+      expectedLease: recovery.expectedLease,
+    });
+    const latestRecovery = await getSandboxRecoveryState(storage);
+    const settled = reduceSandboxRecoveryState(latestRecovery, {
+      type: 'settle_post_exhaustion',
+      expectedLease: recovery.expectedLease,
+    });
+    if (completedLease === latestLease) {
+      if (settled) await putSandboxRecoveryState(storage, settled);
+      await clearSettledSandboxRecovery(storage);
+      return false;
+    }
+    await putWrapperLease(storage, completedLease);
+    if (settled) await putSandboxRecoveryState(storage, settled);
+    await clearSettledSandboxRecovery(storage);
+    await sessionMessageQueue.requestPendingDrainIfNeeded();
+    return true;
+  }
+
+  async function recordPostExhaustionRecoveryFailure(
+    recovery: PostExhaustionRecovery,
+    error: unknown
+  ): Promise<void> {
+    const failedAt = Date.now();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const latest = await getSandboxRecoveryState(storage);
+    const updated = reduceSandboxRecoveryState(latest, {
+      type: 'record_post_exhaustion_retry',
+      expectedLease: recovery.expectedLease,
+      expectedAttempts: recovery.attempts,
+      nextAttemptAt: sandboxRecoveryRetryAt(failedAt, recovery.attempts),
+      error: errorMessage,
+    });
+    if (updated) {
+      await putSandboxRecoveryState(storage, updated);
+      const retryAt = updated.postExhaustionRecovery?.nextAttemptAt;
+      if (retryAt !== undefined) await requestAlarmAtOrBefore?.(retryAt);
+    }
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        recoveryKind: recovery.kind,
+        sourceSandboxId: recovery.sourceSandboxId,
+        attempts: recovery.attempts + 1,
+        error: errorMessage,
+        logTag: 'sandbox_recovery_failed',
+      })
+      .error('Post-exhaustion sandbox recovery failed');
+  }
+
+  async function reconcilePostExhaustionSandboxRecovery(now: number): Promise<void> {
+    const lease = await getWrapperLease(storage);
+    let state = await getSandboxRecoveryState(storage);
+    let recovery = state?.postExhaustionRecovery;
+
+    if (recovery && !doesRecoveryMatchExhaustedLease(recovery, lease)) {
+      const settled = reduceSandboxRecoveryState(state, {
+        type: 'settle_post_exhaustion',
+        expectedLease: recovery.expectedLease,
+      });
+      if (settled) await putSandboxRecoveryState(storage, settled);
+      await clearSettledSandboxRecovery(storage);
+      return;
+    }
+    if (!isWrapperCleanupExhausted(lease)) return;
+
+    if (!recovery) {
+      const metadata = await getMetadata();
+      recovery = metadata ? createPostExhaustionRecovery(metadata, lease, now) : undefined;
+      if (!recovery) {
+        const retryAt = now + SANDBOX_RECOVERY_MAX_RETRY_DELAY_MS;
+        await requestAlarmAtOrBefore?.(retryAt);
+        logger
+          .withFields({
+            sessionId: getSessionIdForLogs(),
+            sandboxId: metadata?.workspace?.sandboxId,
+            routeKind: metadata?.workspace?.sandboxRoute?.kind,
+            retryAt,
+            logTag: 'sandbox_recovery_metadata_unactionable',
+          })
+          .error('Cannot classify exhausted wrapper sandbox recovery');
+        return;
+      }
+      state = reduceSandboxRecoveryState(state, {
+        type: 'prepare_post_exhaustion',
+        recovery,
+      });
+      if (!state) return;
+      await putSandboxRecoveryState(storage, state);
+    }
+
+    if (recovery.nextAttemptAt > now) return;
+    const metadata = await getMetadata();
+    if (!metadata || metadata.workspace?.sandboxId !== recovery.sourceSandboxId) {
+      if (
+        recovery.kind !== 'shared-failover' ||
+        !recovery.replacementSandboxId ||
+        metadata?.workspace?.sandboxId !== recovery.replacementSandboxId
+      ) {
+        await recordPostExhaustionRecoveryFailure(
+          recovery,
+          new Error('Session sandbox metadata no longer matches recovery action')
+        );
+        return;
+      }
+    }
+    if (!metadata) return;
+
+    try {
+      if (recovery.kind === 'isolated-destroy') {
+        await destroyIsolatedSandbox(metadata);
+      } else {
+        let replacementSandboxId = recovery.replacementSandboxId;
+        let routeSuffix = recovery.routeSuffix;
+        if (!replacementSandboxId || !routeSuffix) {
+          await recordSharedSandboxFailover(recovery.routeKey);
+          const assignment = await resolveSharedSandboxFailover(recovery.routeKey);
+          if (assignment.sandboxId === recovery.sourceSandboxId || !assignment.suffix) {
+            throw new Error('Shared sandbox failover did not resolve a replacement assignment');
+          }
+          const latest = await getSandboxRecoveryState(storage);
+          const withAssignment = reduceSandboxRecoveryState(latest, {
+            type: 'record_post_exhaustion_assignment',
+            expectedLease: recovery.expectedLease,
+            routeKey: recovery.routeKey,
+            replacementSandboxId: assignment.sandboxId,
+            routeSuffix: assignment.suffix,
+          });
+          if (!withAssignment) return;
+          await putSandboxRecoveryState(storage, withAssignment);
+          const assignedRecovery = withAssignment.postExhaustionRecovery;
+          if (assignedRecovery?.kind !== 'shared-failover') return;
+          recovery = assignedRecovery;
+          replacementSandboxId = assignment.sandboxId;
+          routeSuffix = assignment.suffix;
+        }
+        await persistSharedSandboxRecoveryAssignment({
+          routeKey: recovery.routeKey,
+          sourceSandboxId: recovery.sourceSandboxId,
+          replacementSandboxId,
+          suffix: routeSuffix,
+        });
+      }
+      const releasedDelivery = await settlePostExhaustionRecovery(recovery);
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          recoveryKind: recovery.kind,
+          sourceSandboxId: recovery.sourceSandboxId,
+          replacementSandboxId:
+            recovery.kind === 'shared-failover' ? recovery.replacementSandboxId : undefined,
+          routeKey: recovery.kind === 'shared-failover' ? recovery.routeKey : undefined,
+          releasedDelivery,
+          logTag: 'sandbox_recovery_completed',
+        })
+        .warn('Post-exhaustion sandbox recovery completed');
+    } catch (error) {
+      await recordPostExhaustionRecoveryFailure(recovery, error);
+    }
+  }
+
   let sharedSandboxFailoverReconciliation: Promise<void> | undefined;
 
   async function clearCompletedRecoveryIfWrapperAbsent(): Promise<void> {
@@ -1465,6 +1689,8 @@ export function createWrapperSupervisor(
 
   async function runMaintenance(now: number): Promise<void> {
     await reconcilePhysicalCleanup(now);
+    await reconcilePostExhaustionSandboxRecovery(now);
+    const leaseAfterInitialCleanup = await getWrapperLease(storage);
     await reconcileSharedSandboxFailover();
     await checkDisconnectGrace(now);
     // While the current wrapper connection is inside its disconnect grace
@@ -1481,6 +1707,15 @@ export function createWrapperSupervisor(
         .debug('Deferring wrapper liveness check while disconnect grace is active');
     } else {
       await checkWrapperLiveness(now);
+    }
+    const leaseAfterSupervision = await getWrapperLease(storage);
+    if (
+      leaseAfterInitialCleanup.state !== 'stop_needed' &&
+      leaseAfterInitialCleanup.state !== 'stopping' &&
+      leaseAfterSupervision.state === 'stop_needed'
+    ) {
+      await reconcilePhysicalCleanup(Date.now());
+      await reconcilePostExhaustionSandboxRecovery(Date.now());
     }
     await checkKeepWarmCleanup(now);
   }

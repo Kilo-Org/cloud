@@ -45,6 +45,33 @@ const wrapperStopReasonSchema = z.enum([
 const SharedSandboxRouteKeySchema = z.custom<SandboxId>(
   value => typeof value === 'string' && isGeneratedSharedSandboxId(value)
 );
+const SandboxIdSchema = z.custom<SandboxId>(value => typeof value === 'string' && value.length > 0);
+const exhaustedWrapperLeaseIdentitySchema = z.object({
+  target: wrapperStopTargetSchema,
+  requestedAt: z.number().int().nonnegative(),
+  nextInstanceGeneration: z.number().int().positive(),
+});
+const postExhaustionRecoveryCommonSchema = {
+  expectedLease: exhaustedWrapperLeaseIdentitySchema,
+  attempts: z.number().int().nonnegative(),
+  nextAttemptAt: z.number().int().nonnegative(),
+  lastError: z.string().optional(),
+};
+const postExhaustionRecoverySchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('isolated-destroy'),
+    sourceSandboxId: SandboxIdSchema,
+    ...postExhaustionRecoveryCommonSchema,
+  }),
+  z.object({
+    kind: z.literal('shared-failover'),
+    routeKey: SharedSandboxRouteKeySchema,
+    sourceSandboxId: SandboxIdSchema,
+    replacementSandboxId: SandboxIdSchema.optional(),
+    routeSuffix: z.literal('shared-slot-v1').optional(),
+    ...postExhaustionRecoveryCommonSchema,
+  }),
+]);
 const sharedSandboxFailoverPublicationSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('pending'),
@@ -67,8 +94,9 @@ const sharedSandboxFailoverPublicationSchema = z.discriminatedUnion('status', [
 ]);
 const sandboxRecoveryStateSchema = z
   .object({
-    listProcessesTimeouts: z.number().int().positive(),
+    listProcessesTimeouts: z.number().int().nonnegative(),
     failoverPublication: sharedSandboxFailoverPublicationSchema.optional(),
+    postExhaustionRecovery: postExhaustionRecoverySchema.optional(),
   })
   .superRefine((state, context) => {
     if (state.failoverPublication && state.listProcessesTimeouts < 2) {
@@ -133,6 +161,8 @@ const wrapperLeaseSchema = z
 
 export type WrapperLease = z.infer<typeof wrapperLeaseSchema>;
 export type SandboxRecoveryState = z.infer<typeof sandboxRecoveryStateSchema>;
+export type ExhaustedWrapperLeaseIdentity = z.infer<typeof exhaustedWrapperLeaseIdentitySchema>;
+export type PostExhaustionRecovery = z.infer<typeof postExhaustionRecoverySchema>;
 
 export type SandboxRecoveryEvent =
   | {
@@ -153,7 +183,23 @@ export type SandboxRecoveryEvent =
       outcome: 'recorded' | 'exhausted';
       routeKey: SandboxId;
       expectedFailedAttempts: number;
-    };
+    }
+  | { type: 'prepare_post_exhaustion'; recovery: PostExhaustionRecovery }
+  | {
+      type: 'record_post_exhaustion_assignment';
+      expectedLease: ExhaustedWrapperLeaseIdentity;
+      routeKey: SandboxId;
+      replacementSandboxId: SandboxId;
+      routeSuffix: 'shared-slot-v1';
+    }
+  | {
+      type: 'record_post_exhaustion_retry';
+      expectedLease: ExhaustedWrapperLeaseIdentity;
+      expectedAttempts: number;
+      nextAttemptAt: number;
+      error: string;
+    }
+  | { type: 'settle_post_exhaustion'; expectedLease: ExhaustedWrapperLeaseIdentity };
 
 export type WrapperLeaseEvent =
   | { type: 'allocate'; instance: WrapperInstanceLease; startupDeadlineAt: number }
@@ -167,7 +213,8 @@ export type WrapperLeaseEvent =
   | { type: 'stop_absent'; attemptId: string }
   | { type: 'stop_not_confirmed'; attemptId: string; retryAt: number; error: string }
   | { type: 'stop_attempt_expired'; attemptId: string; retryAt: number }
-  | { type: 'cleanup_exhausted'; attemptId?: string; now: number; error: string };
+  | { type: 'cleanup_exhausted'; attemptId?: string; now: number; error: string }
+  | { type: 'sandbox_recovery_completed'; expectedLease: ExhaustedWrapperLeaseIdentity };
 
 export const emptyWrapperLease = (): WrapperLease => ({
   state: 'none',
@@ -250,6 +297,7 @@ export async function recordSandboxInspectionFailure(
 export async function clearSettledSandboxRecovery(storage: DurableObjectStorage): Promise<void> {
   const state = await getSandboxRecoveryState(storage);
   if (
+    state?.postExhaustionRecovery ||
     state?.failoverPublication?.status === 'pending' ||
     (state && state.listProcessesTimeouts >= 2 && !state.failoverPublication)
   ) {
@@ -328,15 +376,120 @@ export function reduceSandboxRecoveryState(
               },
       };
     }
+    case 'prepare_post_exhaustion':
+      if (state?.postExhaustionRecovery) return state;
+      return {
+        listProcessesTimeouts: state?.listProcessesTimeouts ?? 0,
+        ...state,
+        postExhaustionRecovery: event.recovery,
+      };
+    case 'record_post_exhaustion_assignment': {
+      const recovery = state?.postExhaustionRecovery;
+      if (
+        !state ||
+        recovery?.kind !== 'shared-failover' ||
+        !isSameExhaustedWrapperLeaseIdentity(recovery.expectedLease, event.expectedLease) ||
+        recovery.routeKey !== event.routeKey
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        postExhaustionRecovery: {
+          ...recovery,
+          replacementSandboxId: event.replacementSandboxId,
+          routeSuffix: event.routeSuffix,
+        },
+      };
+    }
+    case 'record_post_exhaustion_retry': {
+      const recovery = state?.postExhaustionRecovery;
+      if (
+        !state ||
+        !recovery ||
+        !isSameExhaustedWrapperLeaseIdentity(recovery.expectedLease, event.expectedLease) ||
+        recovery.attempts !== event.expectedAttempts
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        postExhaustionRecovery: {
+          ...recovery,
+          attempts: recovery.attempts + 1,
+          nextAttemptAt: event.nextAttemptAt,
+          lastError: event.error,
+        },
+      };
+    }
+    case 'settle_post_exhaustion': {
+      const recovery = state?.postExhaustionRecovery;
+      if (
+        !state ||
+        !recovery ||
+        !isSameExhaustedWrapperLeaseIdentity(recovery.expectedLease, event.expectedLease)
+      ) {
+        return state;
+      }
+      const { postExhaustionRecovery: _settled, ...remaining } = state;
+      if (remaining.listProcessesTimeouts < 2 || remaining.failoverPublication) {
+        return remaining;
+      }
+      return {
+        ...remaining,
+        failoverPublication:
+          recovery.kind === 'shared-failover'
+            ? { status: 'recorded', routeKey: recovery.routeKey }
+            : { status: 'not-applicable' },
+      };
+    }
   }
+}
+
+export function exhaustedWrapperLeaseIdentity(
+  lease: Extract<WrapperLease, { state: 'stop_needed' }>
+): ExhaustedWrapperLeaseIdentity {
+  return {
+    target: lease.target,
+    requestedAt: lease.requestedAt,
+    nextInstanceGeneration: lease.nextInstanceGeneration,
+  };
+}
+
+export function isSameExhaustedWrapperLeaseIdentity(
+  left: ExhaustedWrapperLeaseIdentity,
+  right: ExhaustedWrapperLeaseIdentity
+): boolean {
+  return (
+    left.requestedAt === right.requestedAt &&
+    left.nextInstanceGeneration === right.nextInstanceGeneration &&
+    JSON.stringify(left.target) === JSON.stringify(right.target)
+  );
+}
+
+export function doesRecoveryMatchExhaustedLease(
+  recovery: PostExhaustionRecovery,
+  lease: WrapperLease
+): boolean {
+  return (
+    isWrapperCleanupExhausted(lease) &&
+    isSameExhaustedWrapperLeaseIdentity(
+      recovery.expectedLease,
+      exhaustedWrapperLeaseIdentity(lease)
+    )
+  );
 }
 
 export function nextSandboxRecoveryDeadline(
   state: SandboxRecoveryState | undefined
 ): number | undefined {
-  return state?.failoverPublication?.status === 'pending'
-    ? state.failoverPublication.nextAttemptAt
-    : undefined;
+  const deadlines = [
+    state?.failoverPublication?.status === 'pending'
+      ? state.failoverPublication.nextAttemptAt
+      : undefined,
+    state?.postExhaustionRecovery?.nextAttemptAt,
+  ].filter((deadline): deadline is number => deadline !== undefined);
+  return deadlines.length > 0 ? Math.min(...deadlines) : undefined;
 }
 
 export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent): WrapperLease {
@@ -442,6 +595,17 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
         lastError: event.error,
         exhaustedAt: event.now,
       };
+    case 'sandbox_recovery_completed':
+      if (
+        !isWrapperCleanupExhausted(state) ||
+        !isSameExhaustedWrapperLeaseIdentity(
+          exhaustedWrapperLeaseIdentity(state),
+          event.expectedLease
+        )
+      ) {
+        return state;
+      }
+      return { state: 'none', nextInstanceGeneration: state.nextInstanceGeneration };
   }
 }
 

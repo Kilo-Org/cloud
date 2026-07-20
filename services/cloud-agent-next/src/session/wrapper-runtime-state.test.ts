@@ -252,6 +252,87 @@ describe('WrapperLease', () => {
     ).toEqual(exhausted);
   });
 
+  it('persists one post-exhaustion action and retries it with a durable capped deadline', () => {
+    const expectedLease = {
+      target: { kind: 'session' as const },
+      requestedAt: 100,
+      nextInstanceGeneration: 3,
+    };
+    const prepared = reduceSandboxRecoveryState(undefined, {
+      type: 'prepare_post_exhaustion',
+      recovery: {
+        kind: 'isolated-destroy',
+        sourceSandboxId: 'ses-abcdef' as SandboxId,
+        expectedLease,
+        attempts: 0,
+        nextAttemptAt: 300,
+      },
+    });
+    const duplicate = reduceSandboxRecoveryState(prepared, {
+      type: 'prepare_post_exhaustion',
+      recovery: {
+        kind: 'isolated-destroy',
+        sourceSandboxId: 'ses-competing' as SandboxId,
+        expectedLease,
+        attempts: 0,
+        nextAttemptAt: 301,
+      },
+    });
+    const retrying = reduceSandboxRecoveryState(duplicate, {
+      type: 'record_post_exhaustion_retry',
+      expectedLease,
+      expectedAttempts: 0,
+      nextAttemptAt: 2_300,
+      error: 'provider unavailable',
+    });
+
+    expect(duplicate).toEqual(prepared);
+    expect(retrying).toMatchObject({
+      postExhaustionRecovery: {
+        sourceSandboxId: 'ses-abcdef',
+        attempts: 1,
+        nextAttemptAt: 2_300,
+        lastError: 'provider unavailable',
+      },
+    });
+    expect(nextSandboxRecoveryDeadline(retrying)).toBe(2_300);
+  });
+
+  it('clears only the exhausted lease captured by completed sandbox recovery', () => {
+    const requested = reduceWrapperLease(
+      { state: 'none', nextInstanceGeneration: 3 },
+      {
+        type: 'request_stop',
+        target: { kind: 'session' },
+        reason: 'unhealthy-wrapper',
+        now: 100,
+      }
+    );
+    if (requested.state !== 'stop_needed') throw new Error('Expected cleanup request');
+    const exhausted = reduceWrapperLease(
+      { ...requested, attempts: 5 },
+      { type: 'cleanup_exhausted', now: 300, error: 'still present' }
+    );
+    const expectedLease = {
+      target: { kind: 'session' as const },
+      requestedAt: 100,
+      nextInstanceGeneration: 3,
+    };
+
+    expect(
+      reduceWrapperLease(exhausted, {
+        type: 'sandbox_recovery_completed',
+        expectedLease: { ...expectedLease, requestedAt: 99 },
+      })
+    ).toEqual(exhausted);
+    expect(
+      reduceWrapperLease(exhausted, {
+        type: 'sandbox_recovery_completed',
+        expectedLease,
+      })
+    ).toEqual({ state: 'none', nextInstanceGeneration: 3 });
+  });
+
   it('counts only fresh list-processes timeouts and persists publication deadlines', () => {
     const routeKey = `usr-${'d'.repeat(48)}` as SandboxId;
     expect(

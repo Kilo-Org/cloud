@@ -13,12 +13,18 @@ import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import {
+  getSandboxRecoveryState,
   getWrapperLease,
   getWrapperRuntimeState,
   recordWrapperPong,
   allocateWrapperRuntimeState,
   recordWrapperAcceptedMessage,
 } from '../../../src/session/wrapper-runtime-state.js';
+import type { CallbackJob } from '../../../src/callbacks/types.js';
+import { deriveSharedSandboxId } from '../../../src/sandbox-id.js';
+import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../../../src/shared-sandbox-route.js';
+import { serializeSessionMetadata } from '../../../src/persistence/session-metadata.js';
+import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import {
   getSessionMessageState,
   listNonTerminalAcceptedMessages,
@@ -538,6 +544,512 @@ describe('new-path liveness without executionId', () => {
 
     expect(result.wrapperRuntimeState.pingDeadlineAt).toBeUndefined();
     expect(result.wrapperRuntimeState.nextPingAt).toBeUndefined();
+  });
+
+  it('delivers only the queued follow-up on a fresh fence after ping-timeout recovery', async () => {
+    const userId = 'user_ping_recovery';
+    const sessionId = 'agent_ping_recovery';
+    const acceptedMessageId = 'msg_018f1e2d3c4bPingOldAbCdEfG';
+    const followUpMessageId = 'msg_018f1e2d3c4bPingNewAbCdEfG';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const deliveredPlans: FencedWrapperDispatchRequest[] = [];
+      (instance as any).orchestrator = {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
+          deliveredPlans.push(plan);
+          return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_ping_recovery' };
+        },
+      };
+      instance['physicalWrapperStopper'] = async () => ({ status: 'absent' });
+
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: 'org_ping_recovery',
+        kiloSessionId: '12121212-1212-4121-8121-121212121212',
+        prompt: 'initial prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-ping-recovery',
+      });
+
+      const { state: originalWrapper } = await allocateWrapperRuntimeState(instance.ctx.storage);
+      const originalRunId = originalWrapper.wrapperRunId!;
+      const originalConnectionId = originalWrapper.wrapperConnectionId!;
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_ping_recovery', instanceGeneration: 1 },
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: acceptedMessageId,
+        status: 'accepted',
+        prompt: 'work accepted by the old wrapper',
+        createdAt: Date.now(),
+        acceptedAt: Date.now(),
+        wrapperRunId: originalRunId,
+      });
+
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'queued follow-up',
+          messageId: followUpMessageId,
+        })
+      );
+      expect(admission.success).toBe(true);
+
+      const expiredAt = Date.now() - 1;
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: originalWrapper.wrapperGeneration,
+        wrapperConnectionId: originalConnectionId,
+        wrapperRunId: originalRunId,
+        pingDeadlineAt: expiredAt,
+        lastHeartbeatUpdate: expiredAt - 10 * 60_000,
+      });
+
+      await instance.alarm();
+
+      const db = drizzle(state.storage, { logger: false });
+      const allEvents = createEventQueries(db, state.storage.sql).findByFilters({});
+      const supervisor = instance['getWrapperSupervisor']();
+      return {
+        deliveredPlans,
+        acceptedMessage: await getSessionMessageState(instance.ctx.storage, acceptedMessageId),
+        followUpMessage: await getSessionMessageState(instance.ctx.storage, followUpMessageId),
+        pendingMessages: await listPendingSessionMessages(instance.ctx.storage),
+        wrapperRuntimeState: await getWrapperRuntimeState(instance.ctx.storage),
+        wrapperLease: await getWrapperLease(instance.ctx.storage),
+        failedEvents: allEvents.filter(event => event.stream_event_type === 'cloud.message.failed'),
+        staleReconnect: await supervisor.checkReconnect({
+          wrapperRunId: originalRunId,
+          wrapperGeneration: originalWrapper.wrapperGeneration,
+          wrapperConnectionId: originalConnectionId,
+        }),
+        originalRunId,
+        originalGeneration: originalWrapper.wrapperGeneration,
+      };
+    });
+
+    expect(result.acceptedMessage).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_ping_timeout',
+    });
+    expect(result.followUpMessage).toMatchObject({
+      status: 'accepted',
+    });
+    expect(result.pendingMessages).toHaveLength(0);
+    expect(result.deliveredPlans).toHaveLength(1);
+    expect(result.deliveredPlans[0].turn.messageId).toBe(followUpMessageId);
+    expect(result.deliveredPlans[0].wrapper.fence.wrapperRunId).not.toBe(result.originalRunId);
+    expect(result.deliveredPlans[0].wrapper.fence.wrapperGeneration).toBeGreaterThan(
+      result.originalGeneration
+    );
+    expect(result.wrapperRuntimeState.wrapperRunId).toBe(
+      result.deliveredPlans[0].wrapper.fence.wrapperRunId
+    );
+    expect(result.wrapperLease).toMatchObject({ state: 'owns_wrapper' });
+    expect(result.failedEvents).toHaveLength(1);
+    expect(result.staleReconnect).toEqual({ accepted: false, reason: 'stale-wrapper-run' });
+  });
+
+  it('defers terminal effects while physical cleanup still fences queued recovery', async () => {
+    const userId = 'user_ping_cleanup_hold';
+    const sessionId = 'agent_ping_cleanup_hold';
+    const acceptedMessageId = 'msg_018f1e2d3c4bPingHoldOldAbC';
+    const followUpMessageId = 'msg_018f1e2d3c4bPingHoldNewAbC';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: 'org_ping_cleanup_hold',
+        kiloSessionId: '34343434-3434-4343-8343-343434343434',
+        prompt: 'initial prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-ping-cleanup-hold',
+      });
+
+      const { state: originalWrapper } = await allocateWrapperRuntimeState(instance.ctx.storage);
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'owns_wrapper',
+        nextInstanceGeneration: 2,
+        instance: { instanceId: 'instance_ping_cleanup_hold', instanceGeneration: 1 },
+      });
+      instance['physicalWrapperStopper'] = async () => ({
+        status: 'still-present',
+        observed: [],
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: acceptedMessageId,
+        status: 'accepted',
+        prompt: 'work accepted by the old wrapper',
+        createdAt: Date.now(),
+        acceptedAt: Date.now(),
+        wrapperRunId: originalWrapper.wrapperRunId!,
+      });
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'queued follow-up',
+          messageId: followUpMessageId,
+        })
+      );
+      expect(admission.success).toBe(true);
+
+      const expiredAt = Date.now() - 1;
+      await instance.ctx.storage.put('wrapper_runtime_state', {
+        wrapperGeneration: originalWrapper.wrapperGeneration,
+        wrapperConnectionId: originalWrapper.wrapperConnectionId!,
+        wrapperRunId: originalWrapper.wrapperRunId!,
+        pingDeadlineAt: expiredAt,
+        lastHeartbeatUpdate: expiredAt - 10 * 60_000,
+      });
+
+      await instance.alarm();
+
+      const db = drizzle(state.storage, { logger: false });
+      const allEvents = createEventQueries(db, state.storage.sql).findByFilters({});
+      return {
+        acceptedMessage: await getSessionMessageState(instance.ctx.storage, acceptedMessageId),
+        pendingMessages: await listPendingSessionMessages(instance.ctx.storage),
+        wrapperLease: await getWrapperLease(instance.ctx.storage),
+        failedEvents: allEvents.filter(event => event.stream_event_type === 'cloud.message.failed'),
+      };
+    });
+
+    expect(result.acceptedMessage).toMatchObject({
+      status: 'failed',
+      failureCode: 'wrapper_ping_timeout',
+      terminalEffects: {
+        event: 'pending',
+        push: { disposition: 'pending' },
+      },
+    });
+    expect(result.pendingMessages).toEqual([
+      expect.objectContaining({ messageId: followUpMessageId }),
+    ]);
+    expect(result.wrapperLease).toMatchObject({
+      state: 'stop_needed',
+      reason: 'unhealthy-wrapper',
+      attempts: 1,
+    });
+    expect(result.failedEvents).toHaveLength(0);
+  });
+
+  it('repairs terminal effects during exhausted cleanup and resumes queued work after isolated recovery', async () => {
+    const userId = 'user_exhausted_isolated_recovery';
+    const sessionId = 'agent_exhausted_isolated_recovery';
+    const acceptedMessageId = 'msg_018f1e2d3c4bExhaustOldAbCd';
+    const unrelatedCallbackMessageId = 'msg_018f1e2d3c4bExhaustCbAbCdE';
+    const followUpMessageId = 'msg_018f1e2d3c4bExhaustNewAbCd';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const callbackJobs: CallbackJob[] = [];
+      (
+        instance as unknown as {
+          env: { CALLBACK_QUEUE: { send(job: CallbackJob): Promise<void> } };
+        }
+      ).env.CALLBACK_QUEUE = {
+        send: async job => {
+          callbackJobs.push(job);
+        },
+      };
+      const deliveredPlans: FencedWrapperDispatchRequest[] = [];
+      (instance as any).orchestrator = {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
+          deliveredPlans.push(plan);
+          return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_exhausted_recovery' };
+        },
+      };
+      let destroyAttempts = 0;
+      instance['postExhaustionSandboxDestroyer'] = async () => {
+        destroyAttempts += 1;
+        if (destroyAttempts === 1) throw new Error('sandbox delete temporarily unavailable');
+      };
+
+      const callbackTarget = { url: 'https://example.com/exhausted-recovery' };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: 'org_exhausted_isolated_recovery',
+        kiloSessionId: '56565656-5656-4656-8656-565656565656',
+        prompt: 'initial prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-exhausted-recovery',
+        sandboxId: 'ses-abcdef',
+        callbackTarget,
+      });
+
+      await instance.ctx.storage.put('wrapper_runtime_state', { wrapperGeneration: 4 });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stop_needed',
+        nextInstanceGeneration: 5,
+        target: { kind: 'session' },
+        reason: 'unhealthy-wrapper',
+        requestedAt: 100,
+        nextAttemptAt: 3_153_600_000_100,
+        attempts: 5,
+        lastError: 'wrapper remains present',
+        exhaustedAt: 100,
+      });
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: acceptedMessageId,
+        status: 'accepted',
+        prompt: 'accepted by the failed wrapper',
+        createdAt: 1,
+        acceptedAt: 2,
+        wrapperRunId: 'wr_exhausted_old',
+        callbackRequired: true,
+        callbackTarget,
+      });
+      await instance['getMessageSettlementOutbox']().persistTerminalTransition(
+        acceptedMessageId,
+        {
+          kind: 'failed',
+          reason: 'wrapper_failure',
+          error: 'Wrapper liveness ping timed out',
+          completionSource: 'wrapper_failure',
+          failureStage: 'post_dispatch_no_activity',
+          failureCode: 'wrapper_ping_timeout',
+        },
+        { allowIdleBatchWithoutObservedIdle: true }
+      );
+      await putSessionMessageState(instance.ctx.storage, {
+        messageId: unrelatedCallbackMessageId,
+        status: 'failed',
+        prompt: 'unrelated callback retry',
+        createdAt: 1,
+        terminalAt: 2,
+        failureReason: 'delivery_failure',
+        completionSource: 'delivery_failure',
+        callbackRequired: true,
+        callbackTarget,
+        callbackAttempts: 1,
+        callbackRetryAt: 0,
+        terminalEffects: {
+          event: 'accounted',
+          callback: { disposition: 'accounted', allowWithoutObservedIdle: true },
+          push: { disposition: 'accounted' },
+        },
+      });
+      await instance.ctx.storage.put('idle_batch_callback:unrelated-retry', {
+        batchId: 'unrelated-retry',
+        createdAt: 1,
+        updatedAt: 2,
+        representativeMessageId: unrelatedCallbackMessageId,
+        finalizedAt: 2,
+      });
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId,
+          prompt: 'queued follow-up',
+          messageId: followUpMessageId,
+        })
+      );
+      expect(admission.success).toBe(true);
+
+      await instance.alarm();
+
+      const db = drizzle(state.storage, { logger: false });
+      const eventsAfterFailure = createEventQueries(db, state.storage.sql).findByFilters({});
+      const messageAfterFailure = await getSessionMessageState(
+        instance.ctx.storage,
+        acceptedMessageId
+      );
+      const pendingAfterFailure = await listPendingSessionMessages(instance.ctx.storage);
+      const recoveryAfterFailure = await getSandboxRecoveryState(instance.ctx.storage);
+      expect(pendingAfterFailure).toEqual([
+        expect.objectContaining({ messageId: followUpMessageId }),
+      ]);
+      expect(messageAfterFailure?.terminalEffects).toMatchObject({
+        event: 'accounted',
+        callback: { disposition: 'accounted' },
+      });
+      expect(
+        eventsAfterFailure.filter(event => event.stream_event_type === 'cloud.message.failed')
+      ).toHaveLength(1);
+      expect(callbackJobs.map(job => job.payload.messageId).sort()).toEqual(
+        [acceptedMessageId, unrelatedCallbackMessageId].sort()
+      );
+      expect(recoveryAfterFailure?.postExhaustionRecovery).toMatchObject({
+        kind: 'isolated-destroy',
+        attempts: 1,
+        lastError: 'sandbox delete temporarily unavailable',
+      });
+
+      if (!recoveryAfterFailure?.postExhaustionRecovery) {
+        throw new Error('Expected persisted sandbox recovery');
+      }
+      await instance.ctx.storage.put('sandbox_recovery_state', {
+        ...recoveryAfterFailure,
+        postExhaustionRecovery: {
+          ...recoveryAfterFailure.postExhaustionRecovery,
+          nextAttemptAt: 0,
+        },
+      });
+      await instance.alarm();
+
+      return {
+        callbackJobs,
+        deliveredPlans,
+        destroyAttempts,
+        acceptedMessage: await getSessionMessageState(instance.ctx.storage, acceptedMessageId),
+        followUpMessage: await getSessionMessageState(instance.ctx.storage, followUpMessageId),
+        pendingMessages: await listPendingSessionMessages(instance.ctx.storage),
+        wrapperLease: await getWrapperLease(instance.ctx.storage),
+        events: createEventQueries(db, state.storage.sql).findByFilters({}),
+      };
+    });
+
+    expect(result.destroyAttempts).toBe(2);
+    expect(result.acceptedMessage).toMatchObject({
+      status: 'failed',
+      wrapperRunId: 'wr_exhausted_old',
+    });
+    expect(result.followUpMessage).toMatchObject({ status: 'accepted' });
+    expect(result.pendingMessages).toHaveLength(0);
+    expect(result.deliveredPlans).toHaveLength(1);
+    expect(result.deliveredPlans[0].turn.messageId).toBe(followUpMessageId);
+    expect(result.deliveredPlans[0].wrapper.fence.wrapperGeneration).toBeGreaterThan(4);
+    expect(result.wrapperLease).toMatchObject({ state: 'owns_wrapper' });
+    expect(result.callbackJobs.map(job => job.payload.messageId).sort()).toEqual(
+      [acceptedMessageId, unrelatedCallbackMessageId].sort()
+    );
+    expect(
+      result.events.filter(event => event.stream_event_type === 'cloud.message.failed')
+    ).toHaveLength(1);
+  });
+
+  it('moves only the exhausted shared session to failover before queued delivery resumes', async () => {
+    const routeKey = `usr-${'9'.repeat(48)}` as const;
+    const replacementSandboxId = await deriveSharedSandboxId(
+      routeKey,
+      SHARED_SANDBOX_FAILOVER_SUFFIX
+    );
+    const affectedUserId = 'user_exhausted_shared_recovery';
+    const affectedSessionId = 'agent_exhausted_shared_recovery';
+    const otherUserId = 'user_exhausted_shared_other';
+    const otherSessionId = 'agent_exhausted_shared_other';
+    const followUpMessageId = 'msg_018f1e2d3c4bSharedNewAbCdE';
+    const affectedStub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${affectedUserId}:${affectedSessionId}`)
+    );
+    const otherStub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${otherUserId}:${otherSessionId}`)
+    );
+
+    const installSharedMetadata = async (instance: CloudAgentSession) => {
+      const metadata = await instance.getMetadata();
+      if (!metadata?.workspace) throw new Error('Expected ready workspace metadata');
+      await instance.ctx.storage.put(
+        'metadata',
+        serializeSessionMetadata({
+          ...metadata,
+          workspace: {
+            ...metadata.workspace,
+            sandboxId: routeKey,
+            sandboxRoute: { kind: 'shared', routeKey },
+          },
+        })
+      );
+    };
+
+    await runInDurableObject(otherStub, async instance => {
+      await registerReadySession(instance, {
+        sessionId: otherSessionId,
+        userId: otherUserId,
+        kiloSessionId: '67676767-6767-4676-8676-676767676767',
+        prompt: 'other session',
+        mode: 'code',
+        model: 'test-model',
+        sandboxId: routeKey,
+      });
+      await installSharedMetadata(instance);
+    });
+
+    const result = await runInDurableObject(affectedStub, async instance => {
+      const deliveredPlans: FencedWrapperDispatchRequest[] = [];
+      (instance as any).orchestrator = {
+        execute: async (plan: FencedWrapperDispatchRequest) => {
+          deliveredPlans.push(plan);
+          return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_shared_recovery' };
+        },
+      };
+      let destroyCalls = 0;
+      instance['postExhaustionSandboxDestroyer'] = async () => {
+        destroyCalls += 1;
+      };
+      await registerReadySession(instance, {
+        sessionId: affectedSessionId,
+        userId: affectedUserId,
+        kiloSessionId: '78787878-7878-4787-8787-787878787878',
+        prompt: 'affected session',
+        mode: 'code',
+        model: 'test-model',
+        sandboxId: routeKey,
+      });
+      await installSharedMetadata(instance);
+      await instance.ctx.storage.put('wrapper_runtime_state', { wrapperGeneration: 6 });
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stop_needed',
+        nextInstanceGeneration: 7,
+        target: { kind: 'session' },
+        reason: 'unhealthy-wrapper',
+        requestedAt: 200,
+        nextAttemptAt: 3_153_600_000_200,
+        attempts: 5,
+        lastError: 'wrapper remains present',
+        exhaustedAt: 200,
+      });
+      const admission = await instance.admitSubmittedMessage(
+        queueUserMessageInput({
+          userId: affectedUserId,
+          prompt: 'queued for shared failover',
+          messageId: followUpMessageId,
+        })
+      );
+      expect(admission.success).toBe(true);
+
+      await instance.alarm();
+
+      return {
+        deliveredPlans,
+        destroyCalls,
+        metadata: await instance.getMetadata(),
+        pendingMessages: await listPendingSessionMessages(instance.ctx.storage),
+        wrapperLease: await getWrapperLease(instance.ctx.storage),
+      };
+    });
+    const otherMetadata = await runInDurableObject(otherStub, instance => instance.getMetadata());
+
+    expect(result.destroyCalls).toBe(0);
+    expect(result.metadata?.workspace).toMatchObject({
+      sandboxId: replacementSandboxId,
+      sandboxRoute: {
+        kind: 'shared',
+        routeKey,
+        suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+      },
+    });
+    expect(result.pendingMessages).toHaveLength(0);
+    expect(result.deliveredPlans).toHaveLength(1);
+    expect(result.deliveredPlans[0].turn.messageId).toBe(followUpMessageId);
+    expect(result.deliveredPlans[0].workspace.sandboxId).toBe(replacementSandboxId);
+    expect(result.deliveredPlans[0].wrapper.fence.wrapperGeneration).toBeGreaterThan(6);
+    expect(result.wrapperLease).toMatchObject({ state: 'owns_wrapper' });
+    expect(otherMetadata?.workspace).toMatchObject({
+      sandboxId: routeKey,
+      sandboxRoute: { kind: 'shared', routeKey },
+    });
   });
 });
 

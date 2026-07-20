@@ -6,7 +6,7 @@ import {
   createMessageSettlementOutbox,
   type MessageSettlementOutboxStorage,
 } from './message-settlement-outbox.js';
-import { storePendingSessionMessage } from './pending-messages.js';
+import { listPendingSessionMessages, storePendingSessionMessage } from './pending-messages.js';
 import {
   getSessionMessageState,
   putSessionMessageState,
@@ -24,6 +24,8 @@ import {
 } from './wrapper-runtime-state.js';
 import type { LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
+import { deriveSharedSandboxId } from '../sandbox-id.js';
+import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
@@ -122,6 +124,17 @@ function createHarness(
       wrapperRunId: string
     ) => Promise<void>;
     recordSharedSandboxFailover?: (routeKey: SandboxId) => Promise<void>;
+    destroyIsolatedSandbox?: (metadata: SessionMetadata) => Promise<void>;
+    resolveSharedSandboxFailover?: (routeKey: SandboxId) => Promise<{
+      sandboxId: SandboxId;
+      suffix?: typeof SHARED_SANDBOX_FAILOVER_SUFFIX;
+    }>;
+    persistSharedSandboxRecoveryAssignment?: (input: {
+      routeKey: SandboxId;
+      sourceSandboxId: SandboxId;
+      replacementSandboxId: SandboxId;
+      suffix: typeof SHARED_SANDBOX_FAILOVER_SUFFIX;
+    }) => Promise<void>;
   }
 ) {
   const getAssistantMessageForUserMessage =
@@ -158,6 +171,17 @@ function createHarness(
   const recordSharedSandboxFailover = vi.fn(
     options?.recordSharedSandboxFailover ?? (async () => {})
   );
+  const destroyIsolatedSandbox = vi.fn(options?.destroyIsolatedSandbox ?? (async () => {}));
+  const resolveSharedSandboxFailover = vi.fn(
+    options?.resolveSharedSandboxFailover ??
+      (async routeKey => ({
+        sandboxId: await deriveSharedSandboxId(routeKey, SHARED_SANDBOX_FAILOVER_SUFFIX),
+        suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+      }))
+  );
+  const persistSharedSandboxRecoveryAssignment = vi.fn(
+    options?.persistSharedSandboxRecoveryAssignment ?? (async () => {})
+  );
   const supervisor = createWrapperSupervisor({
     storage,
     agentRuntime: {
@@ -175,6 +199,9 @@ function createHarness(
       options?.ensureAcceptedMessageBeforeTerminal ?? (async () => {}),
     stopWrappers,
     recordSharedSandboxFailover: routeKey => recordSharedSandboxFailover(routeKey),
+    resolveSharedSandboxFailover: routeKey => resolveSharedSandboxFailover(routeKey),
+    persistSharedSandboxRecoveryAssignment: input => persistSharedSandboxRecoveryAssignment(input),
+    destroyIsolatedSandbox: metadata => destroyIsolatedSandbox(metadata),
     requestAlarmAtOrBefore: async deadline => {
       requestedAlarms.push(deadline);
     },
@@ -191,6 +218,9 @@ function createHarness(
     requestedAlarms,
     requestPendingDrainIfNeeded,
     recordSharedSandboxFailover,
+    resolveSharedSandboxFailover,
+    persistSharedSandboxRecoveryAssignment,
+    destroyIsolatedSandbox,
     settlementOutbox,
     supervisor,
   };
@@ -286,13 +316,14 @@ describe('WrapperSupervisor', () => {
 
     await harness.supervisor.runMaintenance(grace.disconnectedAt + 10_001);
 
-    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
-      state: 'stop_needed',
-      reason: 'unhealthy-wrapper',
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
     });
     await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
       wrapperGeneration: 5,
     });
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
   });
 
   it('starts disconnect grace while a completed gate callback still waits for wrapper terminal state', async () => {
@@ -500,13 +531,13 @@ describe('WrapperSupervisor', () => {
     await expect(getWrapperRuntimeState(harness.storage)).resolves.toMatchObject({
       wrapperGeneration: 5,
     });
-    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
-      state: 'stop_needed',
-      reason: 'unhealthy-wrapper',
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 1,
     });
-    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
-    expect(harness.stops).toEqual([]);
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
   });
 
   it('rejects a stale wrapper run before reconnect grace can be cancelled', async () => {
@@ -919,12 +950,16 @@ describe('WrapperSupervisor', () => {
       failureCode: 'wrapper_no_output',
     });
     expect(runtimeState.wrapperConnectionId).toBeUndefined();
-    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
-      state: 'stop_needed',
-      reason: 'unhealthy-wrapper',
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
     });
-    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
-    expect(harness.stops).toEqual([]);
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
+    expect(harness.events).toHaveLength(0);
+
+    await harness.settlementOutbox.repairTerminalEffects();
+
     expect(harness.events.map(event => event.streamEventType)).toEqual(['cloud.message.failed']);
   });
 
@@ -944,6 +979,89 @@ describe('WrapperSupervisor', () => {
       error: 'Wrapper did not respond to liveness ping',
       failureCode: 'wrapper_ping_timeout',
     });
+  });
+
+  it('recovers queued work after a ping timeout without waiting for terminal effects', async () => {
+    const pingDeadlineAt = 92_000;
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt: 332_000 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+    await storePendingSessionMessage(harness.storage, {
+      messageId: NEWER_MESSAGE_ID,
+      content: 'queued follow-up',
+      createdAt: 4_000,
+      intent: {
+        turn: { type: 'prompt', messageId: NEWER_MESSAGE_ID, prompt: 'queued follow-up' },
+        agent: { mode: 'code', model: 'test-model' },
+      },
+    });
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'wrapper_failure',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'wrapper_ping_timeout',
+      terminalEffects: {
+        event: 'pending',
+        callback: { disposition: 'not-required' },
+        push: { disposition: 'pending' },
+      },
+    });
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toEqual([
+      expect.objectContaining({ messageId: NEWER_MESSAGE_ID }),
+    ]);
+    await expect(getWrapperRuntimeState(harness.storage)).resolves.toEqual({
+      wrapperGeneration: 5,
+    });
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
+    });
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+    await expect(
+      harness.supervisor.checkReconnect({
+        wrapperRunId: WRAPPER_RUN_ID,
+        wrapperGeneration: 4,
+        wrapperConnectionId: WRAPPER_CONNECTION_ID,
+      })
+    ).resolves.toEqual({ accepted: false, reason: 'stale-wrapper-run' });
+  });
+
+  it('keeps queued work fenced when the unhealthy wrapper remains physically present', async () => {
+    const pingDeadlineAt = 92_000;
+    const harness = createHarness([
+      liveRuntimeState({ pingDeadlineAt, noOutputDeadlineAt: 332_000 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    harness.stopWrappers.mockResolvedValue({ status: 'still-present', observed: [] });
+    await putSessionMessageState(harness.storage, acceptedMessage());
+    await storePendingSessionMessage(harness.storage, {
+      messageId: NEWER_MESSAGE_ID,
+      content: 'queued follow-up',
+      createdAt: 4_000,
+      intent: {
+        turn: { type: 'prompt', messageId: NEWER_MESSAGE_ID, prompt: 'queued follow-up' },
+        agent: { mode: 'code', model: 'test-model' },
+      },
+    });
+
+    await harness.supervisor.runMaintenance(pingDeadlineAt);
+
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'unhealthy-wrapper',
+      attempts: 1,
+    });
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+    await expect(listPendingSessionMessages(harness.storage)).resolves.toEqual([
+      expect.objectContaining({ messageId: NEWER_MESSAGE_ID }),
+    ]);
   });
 
   it('defers liveness failure while disconnect grace is active for the current connection', async () => {
@@ -1093,10 +1211,11 @@ describe('WrapperSupervisor', () => {
       failureReason: 'wrapper_disconnected',
       failureCode: 'wrapper_disconnected',
     });
-    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
-      state: 'stop_needed',
-      reason: 'unhealthy-wrapper',
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
     });
+    expect(harness.stopWrappers).toHaveBeenCalledOnce();
   });
 
   it('includes the disconnect grace expiry deadline even when the ping deadline is earlier', async () => {
@@ -1156,28 +1275,23 @@ describe('WrapperSupervisor', () => {
 
     await harness.supervisor.runMaintenance(10_000);
 
-    expect(harness.callbackJobs).toHaveLength(1);
-    expect(harness.callbackJobs[0].payload).toMatchObject({
-      messageId: MESSAGE_ID,
-      status: 'completed',
-    });
-    expect(harness.callbackJobs[0].payload.gateResult).toBeUndefined();
-    const cleanupHold = await getWrapperLease(harness.storage);
-    expect(cleanupHold).toMatchObject({
-      state: 'stop_needed',
-      reason: 'unhealthy-wrapper',
-    });
-    if (cleanupHold.state !== 'stop_needed') throw new Error('Expected physical cleanup hold');
-    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
-
-    await harness.supervisor.runMaintenance(cleanupHold.nextAttemptAt);
-
+    expect(harness.callbackJobs).toHaveLength(0);
     expect(harness.stopWrappers).toHaveBeenCalledOnce();
     await expect(getWrapperLease(harness.storage)).resolves.toEqual({
       state: 'none',
       nextInstanceGeneration: 2,
     });
     expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+
+    await harness.settlementOutbox.repairTerminalEffects();
+    await harness.settlementOutbox.repairTerminalEffects();
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'completed',
+    });
+    expect(harness.callbackJobs[0].payload.gateResult).toBeUndefined();
   });
 
   it('schedules the updated no-output deadline when it is the next liveness deadline', async () => {
@@ -1437,6 +1551,9 @@ describe('WrapperSupervisor', () => {
       clearInterruptRequest: async () => {},
       ensureAcceptedMessageBeforeTerminal: ensureAccepted,
       recordSharedSandboxFailover: async () => {},
+      resolveSharedSandboxFailover: async routeKey => ({ sandboxId: routeKey }),
+      persistSharedSandboxRecoveryAssignment: async () => {},
+      destroyIsolatedSandbox: async () => {},
       requestAlarmAtOrBefore: async () => {},
       getSessionIdForLogs: () => 'agent_supervisor',
     });
@@ -2091,7 +2208,7 @@ describe('WrapperSupervisor', () => {
     });
   });
 
-  it('records failover when the fifth cleanup attempt supplies the second fresh timeout', async () => {
+  it('completes shared recovery when the fifth cleanup attempt supplies the second timeout', async () => {
     const routeKey = `usr-${'c'.repeat(48)}` as SandboxId;
     const metadata = {
       ...createMetadata(),
@@ -2127,15 +2244,12 @@ describe('WrapperSupervisor', () => {
     await harness.supervisor.runMaintenance(10_000);
 
     expect(harness.recordSharedSandboxFailover).toHaveBeenCalledWith(routeKey);
-    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
-      state: 'stop_needed',
-      attempts: 5,
-      exhaustedAt: expect.any(Number),
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 2,
     });
-    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
-      listProcessesTimeouts: 2,
-      failoverPublication: { status: 'recorded', routeKey },
-    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toBeUndefined();
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
   });
 
   it('clears timeout evidence after cleanup confirms wrapper absence', async () => {
@@ -2270,9 +2384,7 @@ describe('WrapperSupervisor', () => {
             reason: 'observation-failed',
             requestedAt: 1,
             nextAttemptAt: 3_153_600_000_001,
-            attempts: 5,
-            lastError: 'inspection failed',
-            exhaustedAt: 1,
+            attempts: 1,
           },
         ],
         ['sandbox_recovery_state', { listProcessesTimeouts: 2 }],
@@ -2301,7 +2413,9 @@ describe('WrapperSupervisor', () => {
     });
     await harness.supervisor.runMaintenance(25_000);
     expect(publish).toHaveBeenCalledTimes(4);
-    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([]);
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([
+      3_153_600_000_001,
+    ]);
   });
 
   it('quarantines cleanup after five failed attempts', async () => {
@@ -2355,6 +2469,161 @@ describe('WrapperSupervisor', () => {
     await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.not.toContainEqual(
       expect.any(Number)
     );
+  });
+
+  it('retries isolated sandbox destruction after cleanup exhaustion before releasing delivery', async () => {
+    const metadata = {
+      ...createMetadata(),
+      workspace: { sandboxId: 'ses-abcdef' as SandboxId },
+    } satisfies SessionMetadata;
+    const destroy = vi
+      .fn<(metadata: SessionMetadata) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('delete unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 4,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 100,
+            nextAttemptAt: 1_000,
+            attempts: 4,
+          },
+        ],
+      ],
+      { metadata, destroyIsolatedSandbox: destroy }
+    );
+    harness.stopWrappers.mockResolvedValue({ status: 'still-present', observed: [] });
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+
+    try {
+      await harness.supervisor.runMaintenance(1_000);
+      await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+        state: 'stop_needed',
+        exhaustedAt: 1_000,
+      });
+      await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+        postExhaustionRecovery: {
+          kind: 'isolated-destroy',
+          attempts: 1,
+          nextAttemptAt: 3_000,
+        },
+      });
+      expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
+
+      clock.mockReturnValue(3_000);
+      await harness.supervisor.runMaintenance(3_000);
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(destroy).toHaveBeenCalledTimes(2);
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 4,
+    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toBeUndefined();
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('moves an exhausted shared session to failover without destroying shared compute', async () => {
+    const routeKey = `usr-${'f'.repeat(48)}` as SandboxId;
+    const replacementSandboxId = await deriveSharedSandboxId(
+      routeKey,
+      SHARED_SANDBOX_FAILOVER_SUFFIX
+    );
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 5,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 100,
+            nextAttemptAt: 3_153_600_000_100,
+            attempts: 5,
+            exhaustedAt: 100,
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.destroyIsolatedSandbox).not.toHaveBeenCalled();
+    expect(harness.recordSharedSandboxFailover).toHaveBeenCalledWith(routeKey);
+    expect(harness.persistSharedSandboxRecoveryAssignment).toHaveBeenCalledWith({
+      routeKey,
+      sourceSandboxId: routeKey,
+      replacementSandboxId,
+      suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+    });
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 5,
+    });
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('settles a stale sandbox recovery action without releasing a newer wrapper lease', async () => {
+    const metadata = {
+      ...createMetadata(),
+      workspace: { sandboxId: 'ses-abcdef' as SandboxId },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'owns_wrapper',
+            nextInstanceGeneration: 6,
+            instance: { instanceId: 'instance_newer', instanceGeneration: 5 },
+          },
+        ],
+        [
+          'sandbox_recovery_state',
+          {
+            listProcessesTimeouts: 0,
+            postExhaustionRecovery: {
+              kind: 'isolated-destroy',
+              sourceSandboxId: 'ses-abcdef',
+              expectedLease: {
+                target: { kind: 'session' },
+                requestedAt: 100,
+                nextInstanceGeneration: 5,
+              },
+              attempts: 0,
+              nextAttemptAt: 1_000,
+            },
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.destroyIsolatedSandbox).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'owns_wrapper',
+      instance: { instanceId: 'instance_newer' },
+    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toBeUndefined();
+    expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
   });
 
   it('quarantines the fifth cleanup attempt when its watchdog expires', async () => {

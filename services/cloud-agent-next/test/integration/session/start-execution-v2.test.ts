@@ -10,6 +10,8 @@ import {
   storePendingSessionMessage,
 } from '../../../src/session/pending-messages.js';
 import { listNonTerminalAcceptedMessages } from '../../../src/session/session-message-state.js';
+import { deriveSharedSandboxId } from '../../../src/sandbox-id.js';
+import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../../../src/shared-sandbox-route.js';
 
 import {
   groupedRegisterSessionInput,
@@ -518,6 +520,77 @@ describe('CloudAgentSession message admission', () => {
     expect(result.first).toMatchObject({ success: true, messageId });
     expect(result.replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
     expect(result.metadata?.workspace).toEqual(input.workspace);
+  });
+
+  it('replays registration against the durably installed shared failover assignment', async () => {
+    const userId = 'user_grouped_route_migrated' as const;
+    const sessionId = 'agent_grouped_route_migrated' as const;
+    const messageId = 'msg_018f1e2d3c4bRouteMigrAbCdE';
+    const routeKey = `usr-${'8'.repeat(48)}` as const;
+    const replacementSandboxId = await deriveSharedSandboxId(
+      routeKey,
+      SHARED_SANDBOX_FAILOVER_SUFFIX
+    );
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+    const base = groupedRegisterSessionInput({
+      sessionId,
+      userId,
+      prompt: 'replay migrated route',
+      mode: 'code',
+      model: 'test-model',
+      kiloSessionId: '89898989-8989-4898-8989-898989898989',
+    });
+    const original = {
+      ...base,
+      workspace: {
+        sandboxId: routeKey,
+        sandboxProvider: 'cloudflare' as const,
+        sandboxRoute: { kind: 'shared' as const, routeKey },
+      },
+      message: {
+        initialTurn: {
+          type: 'prompt' as const,
+          messageId,
+          prompt: 'replay migrated route',
+        },
+      },
+    };
+
+    const result = await runInDurableObject(stub, async instance => {
+      const first = await instance.createSessionWithInitialAdmission(original);
+      await instance['persistSharedSandboxRecoveryAssignment']({
+        routeKey,
+        sourceSandboxId: routeKey,
+        replacementSandboxId,
+        suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+      });
+      const replay = await instance.createSessionWithInitialAdmission({
+        ...original,
+        workspace: {
+          ...original.workspace,
+          sandboxId: replacementSandboxId,
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey,
+            suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+          },
+        },
+      });
+      return { first, replay, metadata: await instance.getMetadata() };
+    });
+
+    expect(result.first).toMatchObject({ success: true, messageId });
+    expect(result.replay).toEqual(result.first);
+    expect(result.metadata?.workspace).toMatchObject({
+      sandboxId: replacementSandboxId,
+      sandboxRoute: {
+        kind: 'shared',
+        routeKey,
+        suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+      },
+    });
   });
 
   it('rejects readiness updates that change a shared route to another sandbox', async () => {

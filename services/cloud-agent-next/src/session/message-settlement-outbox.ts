@@ -792,9 +792,21 @@ export function createMessageSettlementOutbox(
       }
       const batch = await getCurrentIdleBatchCallbackState();
       if (batch) {
-        await finalizeIdleBatchCallbackIfReady({
-          allowWithoutObservedIdle: batch.allowWithoutObservedIdle,
-        });
+        const representative = batch.representativeMessageId
+          ? await getSessionMessageState(storage, batch.representativeMessageId)
+          : null;
+        if (
+          representative?.wrapperRunId &&
+          (batch.wrapperTerminalWaitReleasedAt !== undefined ||
+            (batch.allowWithoutObservedIdle &&
+              representative.completionSource === 'wrapper_failure'))
+        ) {
+          await finalizeTerminalWrapperRunCallbackIfReady(representative.wrapperRunId);
+        } else {
+          await finalizeIdleBatchCallbackIfReady({
+            allowWithoutObservedIdle: batch.allowWithoutObservedIdle,
+          });
+        }
       }
     } catch (error) {
       await requestAlarmAtOrBefore(Date.now() + 1_000);

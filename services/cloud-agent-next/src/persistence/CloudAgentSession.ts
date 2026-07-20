@@ -90,7 +90,11 @@ import type {
 import { renderExecutionTurnContent } from '../execution/types.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
-import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
+import {
+  recordSharedSandboxFailover,
+  resolveSharedSandboxAssignment,
+} from '../shared-sandbox-route.js';
+import type { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 
 import { resolveSecret, validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
@@ -438,6 +442,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }) => Promise<StopWrappersResult>;
   private sandboxSessionDeleter?: (reason: 'explicit' | 'retention-expired') => Promise<void>;
   private ephemeralSandboxDestroyer?: () => Promise<void>;
+  private postExhaustionSandboxDestroyer?: () => Promise<void>;
   private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
   private sandboxLifecycle?: AgentSandboxLifecycle;
@@ -768,6 +773,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           this.sharedSandboxFailoverRecorder
             ? this.sharedSandboxFailoverRecorder(routeKey)
             : recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, routeKey),
+        resolveSharedSandboxFailover: routeKey =>
+          resolveSharedSandboxAssignment(this.env.SHARED_SANDBOX_OVERRIDES, routeKey),
+        persistSharedSandboxRecoveryAssignment: input =>
+          this.persistSharedSandboxRecoveryAssignment(input),
+        destroyIsolatedSandbox: async metadata => {
+          if (this.postExhaustionSandboxDestroyer) {
+            await this.postExhaustionSandboxDestroyer();
+            return;
+          }
+          await createAgentSandbox(this.env, metadata).delete('recovery');
+        },
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -1270,6 +1286,51 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private async getStoredMetadata(): Promise<SessionMetadata | null> {
     const metadata = await this.ctx.storage.get('metadata');
     return metadata ? parseSessionMetadata(metadata) : null;
+  }
+
+  private async persistSharedSandboxRecoveryAssignment(input: {
+    routeKey: SandboxId;
+    sourceSandboxId: SandboxId;
+    replacementSandboxId: SandboxId;
+    suffix: typeof SHARED_SANDBOX_FAILOVER_SUFFIX;
+  }): Promise<void> {
+    const metadata = await this.getStoredMetadata();
+    if (!metadata?.workspace) throw new Error('Session workspace metadata is unavailable');
+    const route = metadata.workspace.sandboxRoute;
+    if (route?.kind !== 'shared' || route.routeKey !== input.routeKey) {
+      throw new Error('Session shared sandbox route no longer matches recovery action');
+    }
+    if (
+      metadata.workspace.sandboxId === input.replacementSandboxId &&
+      route.suffix === input.suffix
+    ) {
+      return;
+    }
+    if (metadata.workspace.sandboxId !== input.sourceSandboxId || route.suffix !== undefined) {
+      throw new Error('Session shared sandbox assignment no longer matches recovery action');
+    }
+    const updated = serializeSessionMetadata({
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        sandboxId: input.replacementSandboxId,
+        sandboxRoute: {
+          kind: 'shared',
+          routeKey: input.routeKey,
+          suffix: input.suffix,
+        },
+      },
+    });
+    await this.ctx.storage.put('metadata', updated);
+    logger
+      .withFields({
+        sessionId: metadata.identity.sessionId,
+        oldSandboxId: input.sourceSandboxId,
+        newSandboxId: input.replacementSandboxId,
+        routeKey: input.routeKey,
+        logTag: 'shared_sandbox_session_reassigned',
+      })
+      .warn('Moved session to shared sandbox failover assignment');
   }
 
   async getMetadata(): Promise<SessionMetadata | null> {
@@ -2412,19 +2473,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
       await this.getWrapperSupervisor().runMaintenance(now);
       await this.destroyEphemeralSandboxIfReady(now);
-
-      try {
-        await this.getMessageSettlementOutbox().repairTerminalEffects();
-      } catch (error) {
-        terminalEffectRepairRetryAt = Date.now() + PENDING_FLUSH_DEBOUNCE_MS;
-        logger
-          .withFields({
-            sessionId: this.sessionId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-          .warn('Terminal effect repair failed; scheduled retry will continue recovery');
-      }
-      await this.retryPendingCallbacks(now);
       await this.getSessionMessageQueue().recoverPendingInterruption(async () => {
         await this.interruptAcceptedWrapperMessages();
       });
@@ -2437,6 +2485,34 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const flushOneResult = await this.flushOnePendingSessionMessage();
       pendingFlushRetryAt = flushOneResult.retryAt;
       remainingPendingCount = flushOneResult.remainingPendingCount;
+
+      const runtimeState = await getWrapperRuntimeState(this.ctx.storage);
+      const wrapperLease = await getWrapperLease(this.ctx.storage);
+      const deferTerminalEffects =
+        remainingPendingCount > 0 &&
+        isWrapperDeliveryHeld(runtimeState, wrapperLease) &&
+        !isWrapperCleanupExhausted(wrapperLease);
+      if (deferTerminalEffects) {
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            remainingPendingCount,
+          })
+          .debug('Deferring terminal effect repair while queued delivery is held');
+      } else {
+        try {
+          await this.getMessageSettlementOutbox().repairTerminalEffects();
+        } catch (error) {
+          terminalEffectRepairRetryAt = Date.now() + PENDING_FLUSH_DEBOUNCE_MS;
+          logger
+            .withFields({
+              sessionId: this.sessionId,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .warn('Terminal effect repair failed; scheduled retry will continue recovery');
+        }
+        await this.retryPendingCallbacks(now);
+      }
     } catch (error) {
       alarmWorkFailed = true;
       logger

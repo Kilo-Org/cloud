@@ -169,6 +169,28 @@ The internal `getWrapperLogs` path also discovers these sandbox-side files direc
 
 - Worker queueing succeeds, but no wrapper logs appear:
   - inspect pending flush scheduling, sandbox creation, and wrapper startup logs in `dev/logs/cloud-agent-next.log`.
+- Worker log shows `Failed to issue Kilo session capability` / `Worker "git-token-service-dev" not found`:
+  - the `GIT_TOKEN_SERVICE` service binding did not resolve. This fails before
+    any wrapper or sandbox work, so no wrapper log or fake-LLM traffic exists.
+    Check `.wrangler/dev-registry/` for a missing `git-token-service-dev`
+    entry; if absent, `pnpm dev:restart cloudflare-git-token-service` and
+    confirm it reappears before retrying the turn.
+- Turn stalls in `preparing` (repeats several times, no kilo events, no
+  fake-LLM traffic):
+  - the wrapper inside the sandbox is failing to start. Look for
+    `Reconciling physical wrapper stop … reason: 'startup-failed'`,
+    `ContainerControlConnection upgrade returned retryable status` (503),
+    or `Container is not listening to port …` in
+    `dev/logs/cloud-agent-next.log`, then read the wrapper log inside the
+    sandbox (`/tmp/kilocode-wrapper-*.log`) for bootstrap/import detail. The
+    503 from the container control connection means the Docker container's
+    control plane isn't ready — this is an environmental issue under Docker
+    Desktop load, not a code regression. If the failure is transient, suspect
+    Docker contention: leftover stopped containers, a competing dev session
+    also running Cloud Agent sandboxes, or stale DO alarm timers from
+    previous sessions. Confirm the fake LLM was never reached with
+    `curl -s $FAKE_LLM_URL/test/requests` — a flat `chatCompletions` count
+    proves the stall is upstream of kilo inference.
 - Wrapper log reaches bootstrap/import, then repeats:
   - inspect import metadata, import exit code, and post-import `getSession()` lookup.
 - Wrapper ingest connects, but UI stays stale:

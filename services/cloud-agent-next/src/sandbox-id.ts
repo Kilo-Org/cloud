@@ -1,4 +1,4 @@
-import type { SandboxId, Env } from './types.js';
+import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
@@ -128,6 +128,38 @@ export async function deriveSharedSandboxId(
     throw new Error('Shared sandbox route key must be a generated shared sandbox ID');
   }
   return hashToSandboxId(`${suffix}:${routeKey}`, getSharedSandboxPrefix(routeKey));
+}
+
+export type SandboxSelection = {
+  sandboxId: SandboxId;
+  provider: AgentSandboxProvider;
+};
+
+export type SandboxSelectionEnv = {
+  PER_SESSION_SANDBOX_ORG_IDS?: string;
+};
+
+type SelectSandboxForNewSessionInput = {
+  env: SandboxSelectionEnv;
+  orgId?: string;
+  userId: string;
+  sessionId: string;
+  botId?: string;
+  devcontainer?: boolean;
+};
+
+export async function selectSandboxForNewSession(
+  input: SelectSandboxForNewSessionInput
+): Promise<SandboxSelection> {
+  const sandboxId = await generateSandboxId(
+    input.env.PER_SESSION_SANDBOX_ORG_IDS,
+    input.orgId,
+    input.userId,
+    input.sessionId,
+    input.botId,
+    input.devcontainer
+  );
+  return { sandboxId, provider: 'cloudflare' };
 }
 
 /**

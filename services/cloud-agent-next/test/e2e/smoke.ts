@@ -113,6 +113,23 @@ async function main(): Promise<void> {
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
   };
 
+  // Kill stale sandbox containers from previous runs before starting.
+  // Accumulated stopped/running containers degrade Docker Desktop performance
+  // and cause the preparing×7 wrapper-startup stall pattern. The baseline
+  // snapshot below only identifies *new* containers, so leftovers from prior
+  // runs would be skipped by cleanupMatrixSandboxes.
+  const staleContainers = await listSandboxContainers();
+  if (staleContainers.length > 0) {
+    console.log(`smoke: cleaning ${staleContainers.length} stale sandbox container(s)`);
+    for (const container of staleContainers) {
+      await killSandboxFamily(container);
+      const gone = await waitForSandboxFamilyGone(container, 30_000);
+      if (!gone) {
+        console.warn(`smoke: sandbox family ${sandboxFamilyKey(container)} remained after cleanup`);
+      }
+    }
+  }
+
   const baselineSandboxIds = new Set(
     (await listSandboxContainers()).map(container => container.id)
   );

@@ -27,7 +27,12 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { generateSandboxRoutingTarget, isOrgInList } from '../sandbox-id.js';
+import {
+  generateSandboxRoutingTarget,
+  isOrgInList,
+  selectSandboxForNewSession,
+  type SandboxSelection,
+} from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
@@ -57,6 +62,7 @@ export type SessionRegistrationResult = {
   kiloSessionId: string;
   sandboxId: SandboxId;
   sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxProvider: SandboxSelection['provider'];
   /**
    * Canonical initial turn reserved for a later legacy initiation request.
    */
@@ -168,10 +174,11 @@ async function allocateNewSession(
   };
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
+  let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   try {
     const target = await generateSandboxRoutingTarget(
       ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
-      input.options?.kilocodeOrganizationId,
+      orgId,
       ctx.userId,
       cloudAgentSessionId,
       ctx.botId,
@@ -192,7 +199,16 @@ async function allocateNewSession(
         ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
       };
     } else {
-      sandboxId = target.sandboxId;
+      const selection = await selectSandboxForNewSession({
+        env: ctx.env,
+        orgId,
+        userId: ctx.userId,
+        sessionId: cloudAgentSessionId,
+        botId: ctx.botId,
+        devcontainer: input.runtime?.devcontainer,
+      });
+      sandboxId = selection.sandboxId;
+      sandboxProvider = selection.provider;
     }
   } catch (error) {
     await recordCloudAgentSessionFailure(
@@ -243,6 +259,7 @@ async function allocateNewSession(
     kiloSessionId,
     sandboxId,
     sandboxRoute,
+    sandboxProvider,
     initialTurn,
     credentialContainment,
     sessionService,
@@ -293,6 +310,7 @@ function buildSessionRegistrationCommand(
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
       sandboxId: allocation.sandboxId,
+      sandboxProvider: allocation.sandboxProvider,
       shallow: input.options?.shallow,
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       credentialContainment: allocation.credentialContainment,
@@ -422,6 +440,7 @@ export async function startNewSession(
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     kiloSessionId: allocation.kiloSessionId,
     sandboxId: allocation.sandboxId,
+    sandboxProvider: allocation.sandboxProvider,
     admission,
   };
 }

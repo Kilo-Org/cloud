@@ -32,6 +32,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `services/cloud-agent-next/test/e2e/README.md` is the source of truth for setup, fake-LLM routing, lifecycle directives, and troubleshooting.
 - Prefer focused scenario debugging first: `pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts <lifecycle> <conversation>`.
 - Run the aggregate local regression matrix with `pnpm exec tsx services/cloud-agent-next/test/e2e/smoke.ts` when validating the full real Worker + DO + sandbox + wrapper path.
+- Non-zero `portOffset` sessions (the common case) require `WORKER_URL`/`FAKE_LLM_URL` env overrides on every driver invocation — see README "Running". Discover the offset with `pnpm dev:status --json`.
 - This harness is local/manual rather than part of normal `pnpm test` or CI; use `dev/logs/cloud-agent-next.log` and `dev/logs/fake-llm.log` when debugging it.
 - Read `services/cloud-agent-next/DEBUG.md` when correlating local Wrangler logs with Docker sandbox containers, wrapper log files, Kilo CLI logs, uploaded archives, or stuck session flows.
 

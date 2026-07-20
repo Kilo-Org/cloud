@@ -1,9 +1,10 @@
 import * as z from 'zod';
 
+import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
-import type { SandboxId } from '../types.js';
+import type { AgentSandboxProvider, SandboxId } from '../types.js';
 import {
   AttachmentsSchema,
   branchNameSchema,
@@ -26,6 +27,7 @@ const SharedSandboxIdSchema = z
   .transform(s => s as SandboxId);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
+const SandboxProviderSchema = z.enum(['cloudflare']);
 
 const MetadataIdentitySchema = z
   .object({
@@ -207,6 +209,7 @@ const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
+    sandboxProvider: SandboxProviderSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
@@ -245,7 +248,13 @@ const MetadataWorkspaceSchema = z
         path: ['sandboxId'],
       });
     }
-  });
+  })
+  .refine(
+    workspace =>
+      PROVIDER_CAPABILITIES[workspace.sandboxProvider ?? 'cloudflare'].devcontainer ||
+      workspace.devcontainerRequested !== true,
+    'Sandbox provider does not support devcontainers'
+  );
 
 const MetadataDevContainerSchema = z
   .object({
@@ -281,7 +290,13 @@ export const CurrentSessionMetadataSchema = z
     devcontainer: MetadataDevContainerSchema.optional(),
     lifecycle: MetadataLifecycleSchema,
   })
-  .strip();
+  .strip()
+  .refine(
+    metadata =>
+      PROVIDER_CAPABILITIES[metadata.workspace?.sandboxProvider ?? 'cloudflare'].devcontainer ||
+      !metadata.devcontainer,
+    'Sandbox provider metadata cannot contain a devcontainer runtime'
+  );
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
@@ -299,6 +314,10 @@ export function getEffectiveCredentialContainment(
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
   const containment = getEffectiveCredentialContainment(metadata);
   return containment.github || containment.gitlab || containment.kilocode;
+}
+
+export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvider {
+  return metadata.workspace?.sandboxProvider ?? 'cloudflare';
 }
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;

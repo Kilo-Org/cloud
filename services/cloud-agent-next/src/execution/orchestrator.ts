@@ -25,7 +25,11 @@ import {
   getPreparationInfrastructureFailure,
   withPreparationInfrastructureRecovery,
 } from '../sandbox-recovery.js';
-import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
+import {
+  AgentSandboxUnavailableError,
+  type AgentSandbox,
+  type WrapperInstanceLease,
+} from '../agent-sandbox/protocol.js';
 import { isCodeReviewEphemeralSandboxId } from '../code-review-ephemeral-sandbox.js';
 
 /** Maximum time allowed for complete wrapper readiness, including Kilo startup. */
@@ -167,6 +171,12 @@ export class ExecutionOrchestrator {
       await this.destroyEphemeralSandboxAfterPreAcceptanceFailure(sandbox, plan, error);
       const knownFailure = translateKnownWrapperFailure(error);
       if (knownFailure) throw knownFailure;
+      if (error instanceof AgentSandboxUnavailableError) {
+        throw ExecutionError.sandboxCapabilityUnavailable(
+          'Sandbox runtime delivery is unavailable for this session',
+          error
+        );
+      }
       throw ExecutionError.wrapperStartFailed(
         `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
         error

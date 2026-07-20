@@ -358,6 +358,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         attachmentId: input.attachmentId,
         contentType: input.contentType,
         contentLength: input.contentLength,
+        ...(input.extension ? { extension: input.extension } : {}),
       });
     }),
 

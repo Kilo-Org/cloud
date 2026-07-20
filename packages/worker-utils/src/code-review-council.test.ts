@@ -562,7 +562,9 @@ describe('determineAutomatedReviewType', () => {
   });
 
   it('falls back to standard when any condition is missing (fail-safe)', () => {
-    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilEntitled: false })).toBe('standard');
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilEntitled: false })).toBe(
+      'standard'
+    );
     expect(determineAutomatedReviewType({}, { ...ALL_ON, councilConfigActive: false })).toBe(
       'standard'
     );

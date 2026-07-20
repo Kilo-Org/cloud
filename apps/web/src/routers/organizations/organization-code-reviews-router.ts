@@ -29,6 +29,8 @@ import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
+import { CodeReviewCouncilConfigSchema } from '@kilocode/db/schema-types';
+import { isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
@@ -132,6 +134,11 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .optional(),
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
+  // Org-level council config (specialists + governance), shared by every council-enabled repo.
+  // `null`/absent leaves council unset. Persisted only for entitled orgs (checked in the handler).
+  council: CodeReviewCouncilConfigSchema.nullable().optional(),
+  // Per-repository council opt-in: repos (by platform id) that run council on automated reviews.
+  councilEnabledRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   // GitLab-specific: auto-configure webhooks
   autoConfigureWebhooks: z.boolean().optional().default(true),
 });
@@ -489,6 +496,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
+          council: null,
+          councilEnabledRepositoryIds: [],
           disableReviewMd: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -530,6 +539,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
+        council: cfg.council ?? null,
+        councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
       };
@@ -587,6 +598,20 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinking_effort: override.thinkingEffort ?? null,
           }));
 
+        // Council config may only be SAVED by council-entitled orgs. This is the authoritative
+        // save-time gate (the UI also hides the section); without it a non-entitled org could
+        // persist an active council that the automated trigger would then honor.
+        const council = input.council ?? undefined;
+        if (council && isCouncilActive(council)) {
+          const entitled = await isCouncilEntitledForOrganization(input.organizationId);
+          if (!entitled) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Council review requires an enterprise plan with an active subscription.',
+            });
+          }
+        }
+
         await upsertAgentConfig({
           organizationId: input.organizationId,
           agentType: 'code_review',
@@ -604,6 +629,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             selected_repository_ids: selectedRepositoryIds,
             manually_added_repositories: isBitbucket ? [] : input.manuallyAddedRepositories || [],
             repository_model_overrides: repositoryModelOverrides,
+            council,
+            council_enabled_repository_ids: input.councilEnabledRepositoryIds ?? [],
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
             review_memory_enabled: false,
             review_analytics_enabled: false,

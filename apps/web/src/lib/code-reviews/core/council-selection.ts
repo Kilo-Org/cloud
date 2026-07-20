@@ -1,4 +1,4 @@
-import type { CouncilSpecialist } from '@kilocode/db/schema-types';
+import type { CodeReviewCouncilConfig, CouncilSpecialist } from '@kilocode/db/schema-types';
 import {
   COUNCIL_SPECIALIST_PRESETS,
   presetToSpecialist,
@@ -34,6 +34,30 @@ export function defaultCouncilSelections(): Record<string, CouncilSpecialistSele
       preset.id,
       { enabled: true, modelSlug: null, thinkingEffort: null },
     ])
+  );
+}
+
+/**
+ * Reverse of `buildCouncilSpecialists`: hydrates picker selections from a persisted council
+ * config so an existing org config round-trips into the UI. Presets absent from the config are
+ * disabled; present ones carry their saved per-specialist model/effort.
+ */
+export function councilSelectionsFromConfig(
+  council: CodeReviewCouncilConfig | null | undefined
+): Record<string, CouncilSpecialistSelection> {
+  const byId = new Map((council?.specialists ?? []).map(specialist => [specialist.id, specialist]));
+  return Object.fromEntries(
+    COUNCIL_SPECIALIST_PRESETS.map(preset => {
+      const saved = byId.get(preset.id);
+      return [
+        preset.id,
+        {
+          enabled: saved?.enabled ?? false,
+          modelSlug: saved?.model_slug ?? null,
+          thinkingEffort: saved?.thinking_effort ?? null,
+        },
+      ];
+    })
   );
 }
 

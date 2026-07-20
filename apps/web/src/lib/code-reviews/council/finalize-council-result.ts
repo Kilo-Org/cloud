@@ -110,7 +110,8 @@ export function computeCouncilResultForReview(params: {
 }): CodeReviewCouncilResult | null {
   const { review, lastAssistantMessageText } = params;
   if (review.review_type !== 'council') return null;
-  const agentConfig = getManualCodeReviewConfig(review)?.agentConfig ?? params.orgAgentConfig ?? null;
+  const agentConfig =
+    getManualCodeReviewConfig(review)?.agentConfig ?? params.orgAgentConfig ?? null;
   const council = agentConfig?.council;
   if (!council) return null;
 

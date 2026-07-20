@@ -543,8 +543,17 @@ export function ReviewConfigForm({
     setRepositorySelectionMode(enabled ? 'selected' : 'all');
   };
 
-  // Council is on when 1+ repos opt in; the shared specialist picker then applies to all of them.
-  const councilEnabled = councilEnabledRepositoryIds.size > 0;
+  // Council is on when 1+ *currently selected* repos opt in; the shared specialist picker then
+  // applies to all of them. A council opt-in only counts while its repository is still selected:
+  // removing a repo from the Repositories list stops rendering its council toggle, so without this
+  // intersection a stale id would keep the picker open, block save on the minimum-specialist check,
+  // and persist to council_enabled_repository_ids (silently re-activating council if the repo were
+  // re-added). Deriving from the live selection instead of mutating the set means re-selecting the
+  // repo within the same edit restores its prior opt-in.
+  const councilEnabledSelectedRepositoryIds = selectedRepositoryIds.filter(id =>
+    councilEnabledRepositoryIds.has(id)
+  );
+  const councilEnabled = councilEnabledSelectedRepositoryIds.length > 0;
   const councilEnabledCount = countEnabledSelections(councilSelections);
   const councilBelowMin = councilEnabled && councilEnabledCount < COUNCIL_MIN_SPECIALISTS;
   // Only repositories the user actually selected can be configured per-repo (model + council),
@@ -601,8 +610,10 @@ export function ReviewConfigForm({
           specialists: buildCouncilSpecialists(councilSelections),
         }
       : null;
+    // Persist only opt-ins for still-selected repos, so a repo deselected after enabling council
+    // never leaves a stale id in council_enabled_repository_ids.
     const councilEnabledRepositoryIdsPayload = perRepoOverridesEnabled
-      ? Array.from(councilEnabledRepositoryIds)
+      ? councilEnabledSelectedRepositoryIds
       : [];
 
     if (organizationId) {

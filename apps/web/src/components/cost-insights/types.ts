@@ -30,12 +30,12 @@ type SpendEvidencePointBase = {
 
 export type SpendEvidencePoint =
   | (SpendEvidencePointBase & {
-      coverage: 'complete';
+      coverage: 'complete' | 'partial';
       variableUsd: number;
       scheduledUsd: number;
     })
   | (SpendEvidencePointBase & {
-      coverage: 'partial' | 'unavailable';
+      coverage: 'unavailable';
       variableUsd: null;
       scheduledUsd: null;
     });

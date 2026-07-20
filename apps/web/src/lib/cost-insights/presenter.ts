@@ -468,7 +468,7 @@ function buildMetrics(params: {
         params.currentHourVariableMicrodollars === null
           ? 'Current-hour spend evidence is unavailable'
           : params.currentHourVariableMicrodollars >= params.anomalyThresholdMicrodollars
-            ? 'Above current alert level'
+            ? 'Unusually high for this account'
             : `Typical hour: ${money(params.anomalyBaselineMicrodollars)}`,
       tone:
         params.currentHourVariableMicrodollars !== null &&

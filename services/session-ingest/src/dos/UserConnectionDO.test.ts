@@ -450,6 +450,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, firstOwner, [makeSession('s1')]);
       sendHeartbeat(doInstance, nextOwner, []);
       firstOwner.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
@@ -461,7 +462,10 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, nextOwner, [makeSession('s1')]);
 
-      expect(parseSent(webWs)).toEqual({
+      // The owner-change heartbeat broadcasts sessions.heartbeat and also fires
+      // the SESSION_OWNER_CHANGED error response for the in-flight command. The
+      // test cares about the latter; find it by type+id.
+      expect(allSent(webWs).find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
         type: 'response',
         id: 'cmd-1',
         error: {
@@ -471,7 +475,11 @@ describe('UserConnectionDO', () => {
         },
       });
       sendCliResponse(doInstance, firstOwner, { id: correlationId, result: 'late' });
-      expect(webWs.send).toHaveBeenCalledTimes(1);
+      // The late sendCliResponse is filtered (the pending entry was already
+      // removed by the owner-change path) so webWs sees exactly the two
+      // messages produced by the owner-change heartbeat itself: the broadcast
+      // sessions.heartbeat and the SESSION_OWNER_CHANGED error response.
+      expect(webWs.send).toHaveBeenCalledTimes(2);
     });
 
     it('replays existing web subscriptions when a session gets a new CLI owner', () => {
@@ -498,7 +506,7 @@ describe('UserConnectionDO', () => {
       expect(cli2Msgs).toContainEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('sends heartbeat only to web clients subscribed to sessions from this connection', () => {
+    it('broadcasts heartbeat to every web socket regardless of subscription', () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const cli2 = addCliSocket(mockCtx, 'cli-2');
@@ -509,13 +517,14 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
       sendHeartbeat(doInstance, cli2, [makeSession('s2')]);
 
-      // subWeb subscribes to s1, otherWeb subscribes to s2
+      // subWeb subscribes to s1, otherWeb subscribes to s2 (subscriptions are
+      // irrelevant to broadcast delivery — both should still receive cli1's heartbeat)
       sendSubscribe(doInstance, subWeb, 's1');
       sendSubscribe(doInstance, otherWeb, 's2');
       subWeb.send.mockClear();
       otherWeb.send.mockClear();
 
-      // cli1 sends heartbeat — only subWeb (watching s1) should receive it
+      // cli1 sends heartbeat — both viewers must receive it
       sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
 
       expect(subWeb.send).toHaveBeenCalledTimes(1);
@@ -524,10 +533,45 @@ describe('UserConnectionDO', () => {
         event: 'sessions.heartbeat',
         data: { connectionId: 'cli-1' },
       });
-      expect(otherWeb.send).not.toHaveBeenCalled();
+      expect(otherWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(otherWeb)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1' },
+      });
     });
 
-    it('forwards the CLI-reported protocolVersion to subscribed web clients', () => {
+    it('delivers one heartbeat per web socket (delivery count equals ws count)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const web1 = addWebSocket(mockCtx, 'web-1');
+      const web2 = addWebSocket(mockCtx, 'web-2');
+      const web3 = addWebSocket(mockCtx, 'web-3');
+
+      // No subscriptions — the broadcast must still hit every web socket.
+      web1.send.mockClear();
+      web2.send.mockClear();
+      web3.send.mockClear();
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      // One heartbeat frame per active web socket.
+      expect(web1.send).toHaveBeenCalledTimes(1);
+      expect(web2.send).toHaveBeenCalledTimes(1);
+      expect(web3.send).toHaveBeenCalledTimes(1);
+
+      // The delivered payload is the same shape (including the connectionId).
+      for (const ws of [web1, web2, web3]) {
+        const sent = parseSent(ws) as { data: { connectionId: string; sessions: unknown[] } };
+        expect(sent).toMatchObject({
+          type: 'system',
+          event: 'sessions.heartbeat',
+          data: { connectionId: 'cli-1', sessions: [{ id: 's1' }] },
+        });
+      }
+    });
+
+    it('forwards the CLI-reported protocolVersion to every web socket', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -560,36 +604,50 @@ describe('UserConnectionDO', () => {
       expect(sent.data).not.toHaveProperty('protocolVersion');
     });
 
-    it('sends heartbeat to subscribers of removed sessions', () => {
+    it('broadcasts removed-session information to every web socket (no subscriber special-case)', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
-      const webWs = addWebSocket(mockCtx, 'web-1');
+      // subWeb subscribed to s1, otherWeb is unrelated — both must learn s1 is gone.
+      const subWeb = addWebSocket(mockCtx, 'web-sub');
+      const otherWeb = addWebSocket(mockCtx, 'web-other');
 
       // cli1 owns s1
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
-      sendSubscribe(doInstance, webWs, 's1');
-      webWs.send.mockClear();
+      sendSubscribe(doInstance, subWeb, 's1');
+      subWeb.send.mockClear();
+      otherWeb.send.mockClear();
 
-      // s1 disappears from heartbeat — subscriber should still get the heartbeat
+      // s1 disappears from heartbeat — every web socket gets a heartbeat with sessions:[].
       sendHeartbeat(doInstance, cliWs, []);
 
-      expect(webWs.send).toHaveBeenCalledTimes(1);
-      expect(parseSent(webWs)).toMatchObject({
+      expect(subWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(subWeb)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1', sessions: [] },
+      });
+      expect(otherWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(otherWeb)).toMatchObject({
         type: 'system',
         event: 'sessions.heartbeat',
         data: { connectionId: 'cli-1', sessions: [] },
       });
     });
 
-    it('does not send heartbeat to unsubscribed web clients', () => {
+    it('delivers heartbeat to web sockets that are not subscribed to anything', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      // webWs is not subscribed to anything
+      // webWs has no subscriptions
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
 
-      expect(webWs.send).not.toHaveBeenCalled();
+      expect(webWs.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(webWs)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1', sessions: [{ id: 's1' }] },
+      });
     });
 
     it('schedules stale alarm on heartbeat', () => {
@@ -880,6 +938,7 @@ describe('UserConnectionDO', () => {
       const webWs = addWebSocket(mockCtx, 'web-1');
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')]);
+      webWs.send.mockClear();
       sendSubscribe(doInstance, webWs, 's1');
 
       expect(parseSent(webWs)).toEqual({
@@ -1559,6 +1618,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
@@ -1593,6 +1653,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_models',
@@ -1676,6 +1737,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       for (let index = 0; index < 128; index++) {
         sendCommand(doInstance, webWs, {
           id: `cmd-${index}`,
@@ -1816,6 +1878,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, staleOwner, []);
       currentOwner.send.mockClear();
       staleOwner.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -1951,6 +2014,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, { id: 'cmd-1', command: 'eval', sessionId: 's1' });
 
@@ -1973,6 +2037,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -2023,6 +2088,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, { id: 'cmd-1', command: 'eval', sessionId: 's1' });
       const sent = parseSent(webWs) as Record<string, unknown>;
@@ -2047,6 +2113,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, staleOwner, []);
       currentOwner.send.mockClear();
       staleOwner.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -2081,6 +2148,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'list_commands',
@@ -2476,6 +2544,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_command',
@@ -2516,6 +2585,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, []);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'create_session',
@@ -2622,6 +2692,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
@@ -2681,6 +2752,7 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, staleOwner, []);
       currentOwner.send.mockClear();
       staleOwner.send.mockClear();
+      webWs.send.mockClear();
 
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
@@ -2728,6 +2800,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
@@ -2756,6 +2829,7 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       cliWs.send.mockClear();
+      webWs.send.mockClear();
       sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'exit_cli',
@@ -2968,15 +3042,13 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('broadcast resilience', () => {
-    it('one closed socket does not abort send to other subscribers', () => {
+    it('one closed socket does not abort send to other web sockets', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const failWeb = addWebSocket(mockCtx, 'web-fail');
       const okWeb = addWebSocket(mockCtx, 'web-ok');
 
-      // Both subscribe to s1 so they receive heartbeats
-      sendSubscribe(doInstance, failWeb, 's1');
-      sendSubscribe(doInstance, okWeb, 's1');
+      // Both web sockets receive heartbeats via broadcast (no subscription needed).
       failWeb.send.mockClear();
       okWeb.send.mockClear();
 
@@ -3335,6 +3407,43 @@ describe('UserConnectionDO', () => {
       // Sanity: the bounded instance alone is far below the headroom.
       const instanceBytes = new TextEncoder().encode(JSON.stringify(worstCaseInstance)).byteLength;
       expect(instanceBytes).toBeLessThan(INSTANCE_HEADROOM);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Owner-unique active sessions (W-followup)
+  // -------------------------------------------------------------------------
+
+  describe('owner-unique active sessions', () => {
+    it('emits owner-unique rows: ownership transfer with both CLIs live yields exactly one row under the new owner', () => {
+      const { doInstance, ctx, mockCtx } = setup();
+      const oldOwner = addCliSocket(mockCtx, 'cli-old');
+      const newOwner = addCliSocket(mockCtx, 'cli-new');
+
+      // cli-old claims the session
+      sendHeartbeat(doInstance, oldOwner, [makeSession('ses_transfer', 'busy', 'Transfer me')]);
+
+      // cli-new also claims the same session id while cli-old is still connected.
+      // The DO routes the session to the new owner (sessionOwners.get === 'cli-new').
+      sendHeartbeat(doInstance, newOwner, [makeSession('ses_transfer', 'busy', 'Transfer me')]);
+
+      // Both CLIs are still live sockets — the snapshot should see them both.
+      expect(ctx.getWebSockets('cli').map(ws => ws.deserializeAttachment())).toEqual([
+        expect.objectContaining({ role: 'cli', connectionId: 'cli-old' }),
+        expect.objectContaining({ role: 'cli', connectionId: 'cli-new' }),
+      ]);
+
+      const result = doInstance.getActiveSessions();
+
+      // Exactly one row for the transferred session id, under the new owner.
+      expect(result).toEqual([
+        {
+          id: 'ses_transfer',
+          status: 'busy',
+          title: 'Transfer me',
+          connectionId: 'cli-new',
+        },
+      ]);
     });
   });
 

@@ -487,29 +487,14 @@ export class UserConnectionDO extends DurableObject<Env> {
     };
     ws.serializeAttachment(updatedAttachment);
 
-    // Send heartbeat only to web clients subscribed to sessions from this connection.
-    // Include subscribers for just-removed sessions so they learn the session is gone.
-    const subscribers = new Set<WebSocket>();
-    for (const session of sessions) {
-      const subs = this.webSubscriptions.get(session.id);
-      if (subs) for (const ws2 of subs) subscribers.add(ws2);
-    }
-    for (const prev of previousSessions) {
-      if (!currentIds.has(prev.id)) {
-        const subs = this.webSubscriptions.get(prev.id);
-        if (subs) for (const ws2 of subs) subscribers.add(ws2);
-      }
-    }
-    if (subscribers.size > 0) {
-      const msg: WebInboundMessage = {
-        type: 'system',
-        event: 'sessions.heartbeat',
-        data: { connectionId, protocolVersion, capabilities, sessions },
-      };
-      for (const ws2 of subscribers) {
-        this.sendToWeb(ws2, msg);
-      }
-    }
+    // Broadcast the heartbeat to every one of the user's web sockets. Subscribers
+    // and non-subscribers both receive it: a removed session id is detectable
+    // from its absence in the payload, so no subscriber special-case is needed.
+    this.broadcastToWeb({
+      type: 'system',
+      event: 'sessions.heartbeat',
+      data: { connectionId, protocolVersion, capabilities, sessions },
+    });
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
@@ -1175,6 +1160,10 @@ export class UserConnectionDO extends DurableObject<Env> {
       const capabilities = this.connectionCapabilities.get(connectionId);
       for (const session of sessions) {
         if (session.parentSessionId) continue;
+        // Owner-unique: only emit a row for a session id under its current owner,
+        // so a session that has transferred owners while both CLIs are still
+        // connected does not appear twice in the snapshot.
+        if (this.sessionOwners.get(session.id) !== connectionId) continue;
         result.push({
           ...session,
           connectionId,

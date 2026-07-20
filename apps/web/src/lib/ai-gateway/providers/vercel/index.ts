@@ -29,7 +29,6 @@ import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { isOpenAiProModel } from '@/lib/ai-gateway/providers/openai';
-import { isOpusFastModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -182,28 +181,23 @@ function parseAwsCredentials(input: string) {
   }
 }
 
-export function getAnthropicProviderOptions(
-  requestedModel: string,
+export function getAnthropicProviderOptionsForVercel(
   request: GatewayRequest
 ): AnthropicProviderOptions | undefined {
-  const options: AnthropicProviderOptions = {};
+  const anthropicOptions: AnthropicProviderOptions = {};
 
   if (request.kind === 'chat_completions' && request.body.verbosity) {
-    options.effort = request.body.verbosity;
+    anthropicOptions.effort = request.body.verbosity;
   }
   if (request.kind === 'responses' && request.body.text?.verbosity) {
-    options.effort = request.body.text.verbosity;
+    anthropicOptions.effort = request.body.text.verbosity;
   }
 
-  if (isOpusFastModel(requestedModel)) {
-    options.speed = 'fast';
-  }
-
-  if (Object.keys(options).length === 0) {
+  if (Object.keys(anthropicOptions).length === 0) {
     return undefined;
   }
 
-  return options;
+  return anthropicOptions;
 }
 
 export function getOpenAIProviderOptions(
@@ -288,11 +282,15 @@ export async function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    requestToMutate.body.providerOptions.anthropic = getAnthropicProviderOptions(
-      requestedModel,
-      requestToMutate
-    );
-    requestToMutate.body.providerOptions.openai = getOpenAIProviderOptions(requestedModel);
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestToMutate);
+    if (anthropicOptions) {
+      requestToMutate.body.providerOptions.anthropic = anthropicOptions;
+    }
+
+    const openAIOptions = getOpenAIProviderOptions(requestedModel);
+    if (openAIOptions) {
+      requestToMutate.body.providerOptions.openai = openAIOptions;
+    }
   }
 
   delete requestToMutate.body.provider;

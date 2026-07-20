@@ -1,8 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-  getAnthropicProviderOptions,
-  getOpenAIProviderOptions,
   convertProviderOptions,
+  getAnthropicProviderOptionsForVercel,
+  getOpenAIProviderOptions,
   getVercelInferenceProvidersExcludingIgnored,
   hasCompatibleVercelInferenceProvider,
   passesVercelRoutingPercentage,
@@ -10,7 +10,7 @@ import {
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
-describe('getAnthropicProviderOptions', () => {
+describe('getAnthropicProviderOptionsForVercel', () => {
   it('maps chat completion verbosity to Anthropic effort', () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
@@ -21,7 +21,7 @@ describe('getAnthropicProviderOptions', () => {
       },
     };
 
-    expect(getAnthropicProviderOptions(request.body.model, request)).toEqual({
+    expect(getAnthropicProviderOptionsForVercel(request)).toEqual({
       effort: 'high',
     });
   });
@@ -36,7 +36,7 @@ describe('getAnthropicProviderOptions', () => {
       },
     };
 
-    expect(getAnthropicProviderOptions('anthropic/claude-sonnet-4.5', request)).toEqual({
+    expect(getAnthropicProviderOptionsForVercel(request)).toEqual({
       effort: 'low',
     });
   });
@@ -50,21 +50,7 @@ describe('getAnthropicProviderOptions', () => {
       },
     };
 
-    expect(getAnthropicProviderOptions(request.body.model, request)).toBe(undefined);
-  });
-
-  it('enables fast mode for fast Opus models', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: 'anthropic/claude-opus-4.6-fast',
-        messages: [{ role: 'user', content: 'hello' }],
-      },
-    };
-
-    expect(getAnthropicProviderOptions(request.body.model, request)).toEqual({
-      speed: 'fast',
-    });
+    expect(getAnthropicProviderOptionsForVercel(request)).toBe(undefined);
   });
 });
 

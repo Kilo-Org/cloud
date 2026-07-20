@@ -610,9 +610,13 @@ export function ReviewConfigForm({
           specialists: buildCouncilSpecialists(councilSelections),
         }
       : null;
-    // Persist only opt-ins for still-selected repos, so a repo deselected after enabling council
-    // never leaves a stale id in council_enabled_repository_ids.
-    const councilEnabledRepositoryIdsPayload = perRepoOverridesEnabled
+    // Gate on `councilActiveForSave` (not just `perRepoOverridesEnabled`) so `council` and its
+    // per-repo opt-ins are always written or cleared as a unit. Otherwise, if council becomes
+    // UI-unavailable (entitlement lapses or the flag is turned off) while Advanced stays on, an
+    // unrelated save would persist `council: null` alongside a non-empty opt-in list, leaving
+    // orphaned ids that would silently re-activate council if it were later re-enabled. When
+    // active, still persist only opt-ins for repos that are currently selected.
+    const councilEnabledRepositoryIdsPayload = councilActiveForSave
       ? councilEnabledSelectedRepositoryIds
       : [];
 

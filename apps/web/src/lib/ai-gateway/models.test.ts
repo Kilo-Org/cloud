@@ -2,6 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import { autoFreeModels, findKiloExclusiveModel, kiloExclusiveModels } from './models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
+import { getAiSdkProvider } from './providers/model-settings';
 import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
@@ -122,6 +123,14 @@ describe('isFreeModel', () => {
       for (const model of autoFreeModels) {
         expect(await isFreeModel(model)).toBe(true);
       }
+    });
+
+    test('all autoFreeModels should use the same AI SDK provider (openrouter, the default)', () => {
+      expect(autoFreeModels.length).toBeGreaterThan(0);
+      const providers = new Set(autoFreeModels.map(model => getAiSdkProvider(model, null)));
+      expect(providers.size).toBe(1);
+      // getAiSdkProvider returns undefined for openrouter, the default provider
+      expect([...providers][0]).toBeUndefined();
     });
 
     test('should return true for disabled Kilo exclusive models that end with :free', async () => {

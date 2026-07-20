@@ -26,7 +26,7 @@ import {
   putStickyDecision,
 } from './decision-cache';
 import type { StickyDecision } from './decision-cache';
-import { computeDecision, ENFORCED_MODALITIES } from './decision-engine';
+import { computeDecision, modelSatisfiesConstraints } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { getRoutingTable } from './routing-table';
@@ -34,36 +34,7 @@ import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
 import { getModelCapabilities } from './model-capabilities';
-import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
-
-// Check whether the coding-plan default model satisfies a constrained
-// request. Mirrors the same `fail-closed when required` policy used in
-// `decision-engine.ts`:
-//   * Unknown capability metadata fails when a required+enforced modality
-//     is set (the model might or might not support it, so we do not trust
-//     the short-circuit).
-//   * Unknown context length is treated as "still fits" (consistent with
-//     the unknown-keeps-rank policy in the engine).
-//   * A known context that is provably smaller than the estimate fails
-//     the check.
-function codingPlanSatisfiesConstraints(
-  caps: ModelCapabilities | undefined,
-  constraints: RoutingConstraints
-): boolean {
-  const required = constraints.requiredInputModalities ?? [];
-  const enforcedAndRequired = required.filter(m => ENFORCED_MODALITIES.includes(m));
-  if (enforcedAndRequired.length > 0) {
-    if (!caps) return false;
-    for (const modality of enforcedAndRequired) {
-      if (!caps.inputModalities.has(modality)) return false;
-    }
-  }
-  const estimate = constraints.promptTokensEstimate;
-  if (typeof estimate === 'number' && caps && typeof caps.contextLength === 'number') {
-    if (caps.contextLength < estimate) return false;
-  }
-  return true;
-}
+import type { ModelCapabilitiesMap } from './model-capabilities';
 
 // Isolate-scoped request counter, used to correlate latency with isolate
 // warm-up in logs.
@@ -367,10 +338,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   if (codingPlanActive) {
     const canTakeShortCircuit =
       hasConstraints && constraints
-        ? codingPlanSatisfiesConstraints(
-            capabilities.get(codingPlanPreference.modelId),
-            constraints
-          )
+        ? modelSatisfiesConstraints(capabilities.get(codingPlanPreference.modelId), constraints)
         : true;
     if (canTakeShortCircuit) {
       const decision = codingPlanDefaultDecision(codingPlanPreference);

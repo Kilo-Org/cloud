@@ -16,9 +16,6 @@ export function isEligibleForRemoteSessionAttention(session: RemoteSessionInfo):
 const NEEDS_INPUT_BODY = 'Kilo needs your input.';
 const DEFAULT_COMPLETED_BODY = 'Task completed';
 
-// Temporary until the CLI's session-presence reporting is released.
-const REMOTE_SESSION_ATTENTION_PUSH_ENABLED = false;
-
 export function buildRemoteSessionAttentionPushBody(
   signal: Pick<AttentionSignal, 'kind' | 'messageExcerpt'>
 ): string {
@@ -27,6 +24,7 @@ export function buildRemoteSessionAttentionPushBody(
 }
 
 export type DispatchRemoteSessionAttentionDeps = {
+  remoteSessionAttentionPushUserId?: string;
   hasActiveCliSession: () => Promise<boolean>;
   sendPush: (
     params: SendCloudAgentSessionNotificationParams
@@ -45,7 +43,7 @@ export async function dispatchRemoteSessionAttentionSignal(
   params: { kiloUserId: string; sessionId: string; signal: AttentionSignal },
   deps: DispatchRemoteSessionAttentionDeps
 ): Promise<DispatchRemoteSessionAttentionOutcome> {
-  if (!REMOTE_SESSION_ATTENTION_PUSH_ENABLED) {
+  if (deps.remoteSessionAttentionPushUserId?.trim() !== params.kiloUserId) {
     return 'suppressed';
   }
 

@@ -34,6 +34,12 @@ export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
+export const REASONING_VARIANTS_MAX_HIGH_LOW = {
+  max: { reasoning: { enabled: true, effort: 'max' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+} as const;
+
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
@@ -95,7 +101,10 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.includes('mistral-medium-3-5')) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model.includes('kimi-k2.7-code') || model.includes('kimi-k3')) {
+  if (model.includes('kimi-k3')) {
+    return REASONING_VARIANTS_MAX_HIGH_LOW;
+  }
+  if (model.includes('kimi-k2.7-code')) {
     return REASONING_VARIANTS_THINKING_ONLY;
   }
   if (

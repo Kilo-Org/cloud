@@ -30,7 +30,8 @@ import { randomUUID } from 'crypto';
 import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
-import { logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
@@ -362,7 +363,7 @@ export async function removeUserFromOrganization(
   userId: User['id'],
   removedBy?: User['id']
 ): Promise<{ rowCount: number | null }> {
-  return await db.transaction(async tx => {
+  const result = await db.transaction(async tx => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
     // Look up the user's current role before deleting
     const [membership] = await tx
@@ -422,6 +423,34 @@ export async function removeUserFromOrganization(
 
     return result;
   });
+
+  if ((result.rowCount ?? 0) > 0) {
+    await invalidateRemovedMemberSessionAccess(organizationId, userId);
+  }
+
+  return result;
+}
+
+/**
+ * Best-effort: a removed member loses cached Session Ingest access within the
+ * cache TTL even when this call fails, so removal never fails on it.
+ */
+async function invalidateRemovedMemberSessionAccess(
+  organizationId: Organization['id'],
+  userId: User['id']
+): Promise<void> {
+  try {
+    await invalidateOrganizationSessionAccess(userId, organizationId);
+  } catch (error) {
+    errorExceptInTest(
+      'Failed to invalidate cached session access for removed organization member',
+      {
+        organizationId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    );
+  }
 }
 
 export async function updateUserRoleInOrganization(

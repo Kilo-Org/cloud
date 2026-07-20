@@ -177,6 +177,102 @@ describe('WrapperClient', () => {
 
       expect(client).toBeDefined();
     });
+
+    it('supports every protocol endpoint through transport-only construction', async () => {
+      const responses = [
+        { healthy: true, state: 'idle', version: WRAPPER_VERSION, sessionId: 'kilo_sess' },
+        { state: 'active', sessionId: 'kilo_sess' },
+        { status: 'ready', kiloSessionId: 'kilo_sess', workspaceReady: {} },
+        { status: 'sent', messageId: 'msg_result' },
+        { status: 'sent', result: { output: 'done' } },
+        { status: 'answered', success: true },
+        { status: 'answered', success: true },
+        { status: 'rejected', success: true },
+        { status: 'aborted' },
+      ];
+      const transport: WrapperTransport = {
+        request: vi.fn().mockImplementation(async () => Response.json(responses.shift())),
+      };
+      const client = new WrapperClient({ transport });
+      const readyRequest = {
+        agentSessionId: 'agent_test',
+        userId: 'user_test',
+        sandboxId: 'ses-test',
+        kiloSessionId: 'kilo_sess',
+        workspace: {
+          workspacePath: '/workspace/test',
+          sessionHome: '/home/test',
+          branchName: 'main',
+        },
+        materialized: { env: {} },
+        session: defaultPromptSession,
+      };
+
+      await expect(client.health()).resolves.toMatchObject({ healthy: true });
+      await expect(client.status()).resolves.toMatchObject({ state: 'active' });
+      await expect(client.ensureSessionReady(readyRequest)).resolves.toMatchObject({
+        kiloSessionId: 'kilo_sess',
+      });
+      await expect(client.prompt(createPromptOptions())).resolves.toEqual({
+        messageId: 'msg_result',
+      });
+      await expect(client.command({ command: 'status' })).resolves.toEqual({ output: 'done' });
+      await expect(client.answerPermission('perm_1', 'once')).resolves.toEqual({ success: true });
+      await expect(client.answerQuestion('question_1', [['yes']])).resolves.toEqual({
+        success: true,
+      });
+      await expect(client.rejectQuestion('question_2')).resolves.toEqual({ success: true });
+      await expect(client.abort()).resolves.toBeUndefined();
+      expect(transport.request).toHaveBeenCalledTimes(9);
+    });
+
+    it('preserves finalizing errors through transport-only construction', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          Response.json(
+            {
+              error: 'WRAPPER_FINALIZING',
+              message: 'Wrapper batch is finalizing',
+              wrapperRunId: 'wr_transport',
+            },
+            { status: 409 }
+          )
+        ),
+      };
+      const client = new WrapperClient({ transport });
+
+      await expect(client.prompt(createPromptOptions())).rejects.toEqual(
+        expect.objectContaining({
+          name: 'WrapperFinalizingError',
+          code: 'WRAPPER_FINALIZING',
+          wrapperRunId: 'wr_transport',
+        })
+      );
+    });
+
+    it('preserves workspace setup errors through transport-only construction', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          Response.json(
+            {
+              error: 'WORKSPACE_SETUP_FAILED',
+              message: 'Workspace checkout failed',
+            },
+            { status: 503 }
+          )
+        ),
+      };
+      const client = new WrapperClient({ transport });
+
+      await expect(client.health()).rejects.toEqual(
+        expect.objectContaining({
+          name: 'WrapperError',
+          code: 'WORKSPACE_SETUP_FAILED',
+          message: 'Workspace checkout failed',
+          statusCode: 503,
+        })
+      );
+    });
   });
 
   describe('ensureSessionReady', () => {

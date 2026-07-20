@@ -124,6 +124,8 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
+export type AgentSandboxProvider = 'cloudflare';
+
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}`;
 
@@ -518,7 +520,7 @@ export type Env = {
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */
   GITHUB_APP_BOT_USER_ID?: string;
-  /** Comma-separated org IDs that use per-session sandbox containers */
+  /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
   GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;

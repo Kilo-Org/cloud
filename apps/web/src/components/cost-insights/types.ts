@@ -35,7 +35,12 @@ export type SpendEvidencePoint =
       scheduledUsd: number;
     })
   | (SpendEvidencePointBase & {
-      coverage: 'partial' | 'unavailable';
+      coverage: 'partial';
+      variableUsd: number;
+      scheduledUsd: number;
+    })
+  | (SpendEvidencePointBase & {
+      coverage: 'unavailable';
       variableUsd: null;
       scheduledUsd: null;
     });

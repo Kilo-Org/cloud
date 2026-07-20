@@ -7,6 +7,7 @@ import {
   getOutboundContainerId,
   getSandboxNamespace,
   isOrgInList,
+  selectSandboxForNewSession,
 } from './sandbox-id.js';
 import type { Env, SandboxId } from './types.js';
 
@@ -421,6 +422,45 @@ describe('generateSandboxId', () => {
 
       expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
     });
+  });
+});
+
+describe('selectSandboxForNewSession', () => {
+  it('selects Cloudflare by default while preserving shared sandbox allocation', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {},
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: 'session-id',
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^org-/);
+  });
+
+  it('selects Cloudflare for isolated per-session organizations', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: 'session-id',
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('keeps devcontainer sessions on Cloudflare DIND allocation', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: 'session-id',
+      devcontainer: true,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^dind-/);
   });
 });
 

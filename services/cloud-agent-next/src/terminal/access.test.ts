@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentSandbox } from '../agent-sandbox/protocol.js';
+import { AgentSandboxUnavailableError, type AgentSandbox } from '../agent-sandbox/protocol.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 import type { Env } from '../types.js';
 import { resolveTerminalWrapperClient, validateTerminalMetadata } from './access.js';
@@ -112,7 +112,7 @@ function sandboxWithTerminalResult(
 }
 
 describe('resolveTerminalWrapperClient', () => {
-  it('returns the ready terminal client from AgentSandbox', async () => {
+  it('returns the ready terminal client from the selected AgentSandbox', async () => {
     const client = {
       health: vi.fn(),
       createTerminal: vi.fn(),
@@ -137,7 +137,7 @@ describe('resolveTerminalWrapperClient', () => {
     expect(getRunningTerminalClient).toHaveBeenCalledOnce();
   });
 
-  it('returns unavailable when no wrapper process is running', async () => {
+  it('preserves not-running as a distinct terminal-unavailable outcome', async () => {
     const result = await resolveTerminalWrapperClient(
       {
         env: {} as Env,
@@ -178,6 +178,51 @@ describe('resolveTerminalWrapperClient', () => {
     expect(result).toEqual({
       success: false,
       error: 'Terminal is unavailable because the session wrapper is not healthy',
+    });
+  });
+
+  it('surfaces the provider capability-unavailable outcome reported by the sandbox', async () => {
+    const getRunningTerminalClient = vi.fn().mockResolvedValue({
+      status: 'capability-unavailable',
+      message: 'Terminal access is unavailable for this sandbox provider',
+    });
+    const createSandbox = vi
+      .fn()
+      .mockReturnValue(sandboxWithTerminalResult(getRunningTerminalClient));
+    const result = await resolveTerminalWrapperClient(
+      {
+        env: {} as Env,
+        metadata: baseMetadata,
+        sessionId: baseMetadata.identity.sessionId,
+      },
+      { createSandbox }
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Terminal access is unavailable for this sandbox provider',
+    });
+  });
+
+  it('maps sandbox construction failures to a terminal-unavailable outcome', async () => {
+    const createSandbox = vi.fn(() => {
+      throw new AgentSandboxUnavailableError(
+        'Sandbox operational configuration is incomplete',
+        'provider_not_configured'
+      );
+    });
+    const result = await resolveTerminalWrapperClient(
+      {
+        env: {} as Env,
+        metadata: baseMetadata,
+        sessionId: baseMetadata.identity.sessionId,
+      },
+      { createSandbox }
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Sandbox operational configuration is incomplete',
     });
   });
 });

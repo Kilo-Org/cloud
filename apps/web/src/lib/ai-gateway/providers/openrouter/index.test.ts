@@ -127,6 +127,29 @@ describe('formatName', () => {
     const model = buildModel({ created: 0 });
     expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
   });
+
+  it('prefixes the name with OpenRouter for openrouter/ models without it', () => {
+    const model = buildModel({ id: 'openrouter/auto', created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model');
+  });
+
+  it('does not prefix the name when it already contains OpenRouter', () => {
+    const model = buildModel({ id: 'openrouter/auto', name: 'OpenRouter Test Model', created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model');
+  });
+
+  it('does not prefix the name for non-openrouter/ models', () => {
+    const model = buildModel({ id: 'vendor/model', created: 0 });
+    expect(formatName(model, NOT_PREFERRED)).toBe('Test Model');
+  });
+
+  it('prefixes the name before appending markers', () => {
+    const model = buildModel({
+      id: 'openrouter/auto',
+      pricing: { prompt: '0.00001', completion: '0' },
+    });
+    expect(formatName(model, NOT_PREFERRED)).toBe('OpenRouter Test Model ($$$$)');
+  });
 });
 
 describe('undoPricingDiscount', () => {

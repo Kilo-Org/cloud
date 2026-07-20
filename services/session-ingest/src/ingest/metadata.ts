@@ -1,9 +1,10 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { normalizeGitUrl } from '@kilocode/worker-utils';
+import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
+import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
 
@@ -173,6 +174,23 @@ export async function applyMetadataChanges(
       session: mapSessionEventRow(persistedRow),
     };
   });
+
+  if (mergedChanges.has('orgId')) {
+    try {
+      await withDORetry(
+        () => getSessionAccessCacheDO(env, { kiloUserId }),
+        sessionCache => sessionCache.remove(sessionId),
+        'SessionAccessCacheDO.remove'
+      );
+    } catch (error) {
+      console.error('Failed to invalidate session access after organization scope change', {
+        kiloUserId,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   if (!notification) return;
 
   if (notification.changedNonStatus) {

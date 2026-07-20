@@ -590,6 +590,9 @@ describe('buildCouncilReviewSection', () => {
     expect(section).toContain('| Specialist | Model | Highest severity | Findings |');
     expect(section).toContain('_Governance mode: Unanimous —');
     expect(section).toContain('a single blocking vote blocks the merge');
+    // Note so the per-specialist raw counts are not misread against the grouped inline-comment count.
+    expect(section).toContain('counted per specialist');
+    expect(section).toContain('grouped into one inline comment');
   });
 
   it('phrases a gating (automated) block decision as a hard merge block', () => {

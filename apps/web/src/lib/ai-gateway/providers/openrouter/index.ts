@@ -76,13 +76,17 @@ function buildAutoModels(): OpenRouterModel[] {
 }
 
 export function formatName(model: OpenRouterModel, preferredIndex: number) {
+  const name =
+    model.id.startsWith('openrouter/') && !model.name.includes('OpenRouter')
+      ? 'OpenRouter ' + model.name
+      : model.name;
   const promptPrice = Number.parseFloat(model.pricing.prompt);
   const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00001; // Opus 4.8 Fast price
-  if (isExpensive) return model.name + ' ($$$$)';
-  if (model.name.endsWith(')')) return model.name;
+  if (isExpensive) return name + ' ($$$$)';
+  if (name.endsWith(')')) return name;
   const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-  if (isNew) return model.name + ' (new)';
+  if (isNew) return name + ' (new)';
   if (model.expiration_date) {
     const expirationDate = new Date(model.expiration_date);
     if (expirationDate <= addMonths(new Date(), 1)) {
@@ -91,10 +95,10 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
         day: 'numeric',
         timeZone: 'UTC',
       });
-      return model.name + ' (retires ' + suffix + ')';
+      return name + ' (retires ' + suffix + ')';
     }
   }
-  return model.name;
+  return name;
 }
 
 type EndpointPricing = NonNullable<StoredModel['endpoints'][number]['pricing']>;

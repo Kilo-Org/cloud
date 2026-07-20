@@ -90,11 +90,13 @@ import { appRouter } from './router.js';
 import type { Env, TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 import { parseSessionMetadata } from './persistence/session-metadata.js';
+import { WrapperClient } from './kilo/wrapper-client.js';
 
 type MockSessionStub = {
   deleteSession?: ReturnType<typeof vi.fn>;
   markAsInterrupted?: ReturnType<typeof vi.fn>;
   interruptExecution?: ReturnType<typeof vi.fn>;
+  failExecutionRpc?: ReturnType<typeof vi.fn>;
   getCurrentRuntimeExecution?: ReturnType<typeof vi.fn>;
   getCurrentMessageWork?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
@@ -770,6 +772,7 @@ describe('router sessionId validation', () => {
             success: true,
             executionId: 'exc_interrupt_runtime',
           }),
+          failExecutionRpc: vi.fn().mockResolvedValue(undefined),
           getCurrentRuntimeExecution: vi.fn().mockResolvedValue(null),
           getMetadata: vi.fn().mockResolvedValue(null),
         };
@@ -810,6 +813,10 @@ describe('router sessionId validation', () => {
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
+
+        vi.stubGlobal('scheduler', {
+          wait: vi.fn().mockResolvedValue(undefined),
+        });
 
         caller = appRouter.createCaller(mockContext);
       });
@@ -1240,7 +1247,7 @@ describe('router sessionId validation', () => {
         caller = appRouter.createCaller(mockContext);
       });
 
-      it('returns healthy sandbox and none execution health when no execution is active', async () => {
+      it('returns healthy sandbox after idle cleanup leaves no running wrapper', async () => {
         const sessionId: SessionId = 'agent_88888888-8888-8888-8888-888888888888';
         const sandboxId = 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6';
         mockGetMetadata.mockResolvedValue(
@@ -1734,6 +1741,88 @@ describe('getMessageResult procedure', () => {
   });
 });
 
+describe('router question and permission controls', () => {
+  function createControlCaller(metadata: CloudAgentSessionState) {
+    const sessionId = metadata.identity.sessionId as SessionId;
+    const executionSession = {};
+    const getSession = vi.fn().mockResolvedValue(executionSession);
+    const createSession = vi.fn();
+    const listProcesses = vi.fn().mockResolvedValue([
+      {
+        id: 'wrapper-control',
+        command: `kilocode-wrapper WRAPPER_PORT=5050 --agent-session ${sessionId}`,
+        status: 'running',
+      },
+    ]);
+    vi.mocked(getSandbox).mockReturnValue({
+      listProcesses,
+      getSession,
+      createSession,
+    } as unknown as ReturnType<typeof getSandbox>);
+    vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+    const context = {
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: {
+        Sandbox: {},
+        SandboxSmall: {},
+        SandboxDIND: {},
+      },
+    } as unknown as TRPCContext;
+    return { caller: appRouter.createCaller(context), sessionId, getSession, createSession };
+  }
+
+  it('forwards question and permission responses through an existing Cloudflare wrapper', async () => {
+    vi.clearAllMocks();
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        userId: 'test-user-123',
+      },
+      auth: {},
+      workspace: { sandboxId: `ses-${'2'.repeat(48)}`, sandboxProvider: 'cloudflare' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    const answerQuestion = vi
+      .spyOn(WrapperClient.prototype, 'answerQuestion')
+      .mockResolvedValueOnce({
+        success: true,
+      });
+    const rejectQuestion = vi
+      .spyOn(WrapperClient.prototype, 'rejectQuestion')
+      .mockResolvedValueOnce({
+        success: true,
+      });
+    const answerPermission = vi
+      .spyOn(WrapperClient.prototype, 'answerPermission')
+      .mockResolvedValueOnce({ success: true });
+    const { caller, sessionId, getSession, createSession } = createControlCaller(metadata);
+
+    await expect(
+      caller.answerQuestion({ sessionId, questionId: 'q_1', answers: [['yes']] })
+    ).resolves.toEqual({ success: true });
+    await expect(caller.rejectQuestion({ sessionId, questionId: 'q_2' })).resolves.toEqual({
+      success: true,
+    });
+    await expect(
+      caller.answerPermission({ sessionId, permissionId: 'p_1', response: 'once' })
+    ).resolves.toEqual({ success: true });
+
+    expect(answerQuestion).toHaveBeenCalledWith('q_1', [['yes']]);
+    expect(rejectQuestion).toHaveBeenCalledWith('q_2');
+    expect(answerPermission).toHaveBeenCalledWith('p_1', 'once');
+    expect(getSession).toHaveBeenCalledTimes(3);
+    expect(getSession).toHaveBeenCalledWith(`${sessionId}-bootstrap`);
+    expect(createSession).not.toHaveBeenCalled();
+    answerQuestion.mockRestore();
+    rejectQuestion.mockRestore();
+    answerPermission.mockRestore();
+  });
+});
+
 describe('router terminal procedures', () => {
   it('creates a terminal through the session Durable Object', async () => {
     const createTerminal = vi.fn().mockResolvedValue({
@@ -1813,6 +1902,48 @@ describe('router terminal procedures', () => {
 
     expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
     expect(cloudAgentSession.get).not.toHaveBeenCalled();
+  });
+
+  it('resizes and closes terminals through the session Durable Object', async () => {
+    const pty = {
+      id: 'pty_123',
+      title: 'Workspace terminal',
+      command: '/bin/sh',
+      args: [],
+      cwd: '/workspace/repo',
+      status: 'running' as const,
+      pid: 123,
+    };
+    const resizeTerminal = vi.fn().mockResolvedValue({ success: true, data: { pty } });
+    const closeTerminal = vi.fn().mockResolvedValue({ success: true, data: { success: true } });
+    const context = {
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: {
+        CLOUD_AGENT_SESSION: {
+          idFromName: vi.fn().mockReturnValue('do-id'),
+          get: vi.fn().mockReturnValue({ resizeTerminal, closeTerminal }),
+        },
+      },
+    } as unknown as TRPCContext;
+    const caller = appRouter.createCaller(context);
+    const sessionId = 'agent_12345678-1234-1234-1234-123456789abc' as SessionId;
+
+    await expect(
+      caller.resizeTerminal({
+        cloudAgentSessionId: sessionId,
+        ptyId: 'pty_123',
+        cols: 80,
+        rows: 24,
+      })
+    ).resolves.toEqual({ pty });
+    await expect(
+      caller.closeTerminal({ cloudAgentSessionId: sessionId, ptyId: 'pty_123' })
+    ).resolves.toEqual({ success: true });
+    expect(resizeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123', cols: 80, rows: 24 });
+    expect(closeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123' });
   });
 });
 

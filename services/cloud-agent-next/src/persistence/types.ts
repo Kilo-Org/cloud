@@ -168,7 +168,7 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
   R2_ATTACHMENTS_BUCKET?: string;
-  /** Comma-separated org IDs that use per-session sandbox containers */
+  /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
   GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;

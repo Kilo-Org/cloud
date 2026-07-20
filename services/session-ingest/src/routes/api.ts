@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { sql, eq, and, inArray, isNull, or, isNotNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
@@ -18,6 +18,7 @@ import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { handleDirectIngestRequest } from '../ingest/direct-ingest';
+import { resolveAccessibleKiloSession } from '../services/session-access';
 
 export type ApiContext = {
   Bindings: Env;
@@ -104,12 +105,25 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
     // first reports the session as remote-controllable — not here.
   }
 
-  // Warm the session cache so the first ingest can skip Postgres.
-  await withDORetry(
-    () => getSessionAccessCacheDO(c.env, { kiloUserId }),
-    sessionCache => sessionCache.add(body.sessionId),
-    'SessionAccessCacheDO.add'
-  );
+  if (createdRow) {
+    try {
+      await withDORetry(
+        () => getSessionAccessCacheDO(c.env, { kiloUserId }),
+        sessionCache =>
+          sessionCache.putValidated({
+            sessionId: body.sessionId,
+            organizationId: null,
+          }),
+        'SessionAccessCacheDO.putValidated'
+      );
+    } catch (error) {
+      console.error('Failed to warm session access cache after create', {
+        kiloUserId,
+        sessionId: body.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   return c.json(
     {
@@ -129,36 +143,59 @@ api.delete('/session/:sessionId', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
 
-  const sessionRows = await db
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  if (!sessionRows[0]) {
+  if (!accessibleSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
   // Delete children first (FK is RESTRICT/NO ACTION).
   // This only covers direct/indirect descendants (not arbitrary cycles).
-  const treeResult = await db.execute<{ session_id: string }>(sql`
+  const treeResult = await db.execute<{ session_id: string; has_access: boolean }>(sql`
     WITH RECURSIVE tree AS (
-      SELECT session_id, parent_session_id, kilo_user_id, 0 AS depth, ARRAY[session_id] AS path
+      SELECT
+        session_id,
+        parent_session_id,
+        kilo_user_id,
+        organization_id,
+        0 AS depth,
+        ARRAY[session_id] AS path
       FROM ${cli_sessions_v2}
       WHERE session_id = ${parsed.data} AND kilo_user_id = ${kiloUserId}
       UNION ALL
-      SELECT c.session_id, c.parent_session_id, c.kilo_user_id, t.depth + 1, t.path || c.session_id
+      SELECT
+        c.session_id,
+        c.parent_session_id,
+        c.kilo_user_id,
+        c.organization_id,
+        t.depth + 1,
+        t.path || c.session_id
       FROM ${cli_sessions_v2} c
       INNER JOIN tree t ON c.parent_session_id = t.session_id AND c.kilo_user_id = t.kilo_user_id
       WHERE NOT (c.session_id = ANY(t.path)) AND t.depth < 10
     )
-    SELECT session_id FROM tree ORDER BY depth DESC
+    SELECT
+      tree.session_id,
+      tree.organization_id IS NULL OR EXISTS (
+        SELECT 1
+        FROM ${organization_memberships}
+        INNER JOIN ${organizations}
+          ON ${organizations.id} = ${organization_memberships.organization_id}
+          AND ${organizations.deleted_at} IS NULL
+        WHERE ${organization_memberships.organization_id} = tree.organization_id
+          AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+      ) AS has_access
+    FROM tree
+    ORDER BY depth DESC
   `);
 
   const treeRows = treeResult.rows;
+  if (treeRows.some(row => !row.has_access)) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
   const orderedSessionIds = treeRows.length > 0 ? treeRows.map(r => r.session_id) : [parsed.data];
   const deletedRows = await db
     .select()
@@ -235,35 +272,13 @@ api.post('/session/:sessionId/ingest', async c => {
   const ingestedAt = Date.now();
   const ingestRequestId = crypto.randomUUID();
   const kiloUserId = c.get('user_id');
-  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: sessionId,
+  });
 
-  const sessionCacheStubFactory = () => getSessionAccessCacheDO(c.env, { kiloUserId });
-
-  const hasAccess = await withDORetry(
-    sessionCacheStubFactory,
-    sessionCache => sessionCache.has(sessionId),
-    'SessionAccessCacheDO.has'
-  );
-
-  if (!hasAccess) {
-    const sessionRows = await db
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1);
-
-    if (!sessionRows[0]) {
-      return c.json({ success: false, error: 'session_not_found' }, 404);
-    }
-
-    // Backfill so subsequent ingests can skip Postgres.
-    await withDORetry(
-      sessionCacheStubFactory,
-      sessionCache => sessionCache.add(sessionId),
-      'SessionAccessCacheDO.add'
-    );
+  if (!accessibleSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
   const ingestVersion = ingestVersionSchema.parse(c.req.query('v') ?? 0);
@@ -421,62 +436,33 @@ api.post('/session/:sessionId/share', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
+  const publicId = crypto.randomUUID();
+  const shareResult = await db.execute<{ public_id: string }>(sql`
+    UPDATE ${cli_sessions_v2}
+    SET public_id = COALESCE(${cli_sessions_v2.public_id}, ${publicId})
+    WHERE ${cli_sessions_v2.session_id} = ${parsed.data}
+      AND ${cli_sessions_v2.kilo_user_id} = ${kiloUserId}
+      AND (
+        ${cli_sessions_v2.organization_id} IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM ${organization_memberships}
+          INNER JOIN ${organizations}
+            ON ${organizations.id} = ${organization_memberships.organization_id}
+            AND ${organizations.deleted_at} IS NULL
+          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
+            AND ${organization_memberships.kilo_user_id} = ${kiloUserId}
+        )
+      )
+    RETURNING ${cli_sessions_v2.public_id}
+  `);
 
-  const sessionRows = await db
-    .select({
-      session_id: cli_sessions_v2.session_id,
-      public_id: cli_sessions_v2.public_id,
-    })
-    .from(cli_sessions_v2)
-    .where(
-      and(eq(cli_sessions_v2.session_id, parsed.data), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .limit(1);
-
-  const session = sessionRows[0];
-
-  if (!session) {
+  const sharedSession = shareResult.rows[0];
+  if (!sharedSession) {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  if (session.public_id) {
-    return c.json({ success: true, public_id: session.public_id }, 200);
-  }
-
-  const publicId = crypto.randomUUID();
-  const updated = await db
-    .update(cli_sessions_v2)
-    .set({ public_id: publicId })
-    .where(
-      and(
-        eq(cli_sessions_v2.session_id, parsed.data),
-        eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-        isNull(cli_sessions_v2.public_id)
-      )
-    )
-    .returning({ public_id: cli_sessions_v2.public_id });
-
-  // If another request already set it, just return the existing value.
-  if (updated.length === 0) {
-    const existingRows = await db
-      .select({ public_id: cli_sessions_v2.public_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.data),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-        )
-      )
-      .limit(1);
-
-    const existing = existingRows[0];
-
-    if (existing?.public_id) {
-      return c.json({ success: true, public_id: existing.public_id }, 200);
-    }
-  }
-
-  return c.json({ success: true, public_id: publicId }, 200);
+  return c.json({ success: true, public_id: sharedSession.public_id }, 200);
 });
 
 api.post('/session/:sessionId/unshare', async c => {
@@ -488,6 +474,14 @@ api.post('/session/:sessionId/unshare', async c => {
 
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const kiloUserId = c.get('user_id');
+  const accessibleSession = await resolveAccessibleKiloSession(c.env, {
+    kiloUserId,
+    kiloSessionId: parsed.data,
+  });
+
+  if (!accessibleSession) {
+    return c.json({ success: false, error: 'session_not_found' }, 404);
+  }
 
   const sessionRows = await db
     .select({ session_id: cli_sessions_v2.session_id })

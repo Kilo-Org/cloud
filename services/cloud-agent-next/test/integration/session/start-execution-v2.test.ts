@@ -3,13 +3,14 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createPendingSessionMessage,
   listPendingSessionMessages,
   storePendingSessionMessage,
 } from '../../../src/session/pending-messages.js';
 import { listNonTerminalAcceptedMessages } from '../../../src/session/session-message-state.js';
+
 import {
   groupedRegisterSessionInput,
   queueRegisteredInitialInput,
@@ -53,7 +54,6 @@ describe('CloudAgentSession message admission', () => {
       success: true,
       messageId,
       outcome: 'queued',
-      compatibilityDelivery: 'queued',
       compatibilityDelivery: 'queued',
     });
     expect(result.metadata?.initialMessage?.id).toBe(messageId);
@@ -134,6 +134,132 @@ describe('CloudAgentSession message admission', () => {
       error: 'Invalid metadata: repository.type must be github, gitlab, bitbucket, or git',
     });
     expect(result.metadata).toBeNull();
+  });
+
+  it('routes explicit and retention Cloudflare deletion through the DO sandbox lifecycle owner', async () => {
+    const explicitStub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_cf_explicit_delete:agent_cf_explicit_delete')
+    );
+    const retentionStub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_cf_retention_delete:agent_cf_retention_delete')
+    );
+
+    const reasons = await runInDurableObject(explicitStub, async instance => {
+      await instance.registerSession(
+        groupedRegisterSessionInput({
+          sessionId: 'agent_cf_explicit_delete',
+          userId: 'user_cf_explicit_delete',
+          prompt: 'delete explicit',
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
+      const captured: string[] = [];
+      vi.spyOn(instance as any, 'deleteSandboxSessionResources').mockImplementation(
+        async (_metadata: unknown, reason: unknown) => {
+          captured.push(String(reason));
+        }
+      );
+      await instance.deleteSession();
+      return captured;
+    });
+
+    const retained = await runInDurableObject(retentionStub, async instance => {
+      await instance.registerSession(
+        groupedRegisterSessionInput({
+          sessionId: 'agent_cf_retention_delete',
+          userId: 'user_cf_retention_delete',
+          prompt: 'delete retention',
+          mode: 'code',
+          model: 'test-model',
+        })
+      );
+      const captured: string[] = [];
+      vi.spyOn(instance as any, 'deleteSandboxSessionResources').mockImplementation(
+        async (_metadata: unknown, reason: unknown) => {
+          captured.push(String(reason));
+        }
+      );
+      await instance.ctx.storage.put('last_activity', Date.now() - 91 * 24 * 60 * 60 * 1000);
+      await instance.alarm();
+      return { captured, metadata: await instance.getMetadata() };
+    });
+
+    expect(reasons).toEqual(['explicit']);
+    expect(retained.captured).toEqual(['retention-expired']);
+    expect(retained.metadata).toBeNull();
+  });
+
+  it('reconciles committed Cloudflare deletion intent and retains it until cleanup succeeds', async () => {
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_cf_intent_recovery:agent_cf_intent_recovery')
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId: 'agent_cf_intent_recovery',
+          userId: 'user_cf_intent_recovery',
+          prompt: 'recover interrupted deletion',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: { sandboxId: 'usr-acde1234', sandboxProvider: 'cloudflare' },
+      });
+      await instance.ctx.storage.put('session_deletion_intent', {
+        reason: 'explicit',
+        startedAt: 12_000,
+      });
+      const cleanup = vi
+        .spyOn(instance as any, 'deleteSandboxSessionResources')
+        .mockRejectedValueOnce(new Error('temporary Cloudflare cleanup failure'))
+        .mockResolvedValueOnce(undefined);
+
+      await instance.alarm();
+      const retained = {
+        metadata: await instance.ctx.storage.get('metadata'),
+        deletionIntent: await instance.ctx.storage.get('session_deletion_intent'),
+        alarm: await instance.ctx.storage.getAlarm(),
+      };
+      await instance.alarm();
+      return {
+        retained,
+        cleanupReasons: cleanup.mock.calls.map(call => call[1]),
+        keys: [...(await instance.ctx.storage.list()).keys()],
+      };
+    });
+
+    expect(result.retained.metadata).toBeDefined();
+    expect(result.retained.deletionIntent).toMatchObject({ reason: 'explicit', startedAt: 12_000 });
+    expect(result.retained.alarm).toEqual(expect.any(Number));
+    expect(result.cleanupReasons).toEqual(['explicit', 'explicit']);
+    expect(result.keys).toEqual([]);
+  });
+
+  it('persists the registered sandbox provider selection', async () => {
+    const userId = 'user_cloudflare_selection' as const;
+    const sessionId = 'agent_cloudflare_selection' as const;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const workspace = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'stay on Cloudflare',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: {
+          sandboxId: 'usr-abcdef',
+          sandboxProvider: 'cloudflare',
+        },
+      });
+      return (await instance.getMetadata())?.workspace;
+    });
+
+    expect(workspace?.sandboxProvider).toBe('cloudflare');
   });
 
   it('surfaces initial admission failure after retaining registered DO metadata', async () => {
@@ -220,6 +346,85 @@ describe('CloudAgentSession message admission', () => {
     expect(result.pending[0]?.messageId).toBe(messageId);
   });
 
+  it('does not mutate persisted sandbox identity when a registration replay changes selection', async () => {
+    const userId = 'user_provider_replay' as const;
+    const sessionId = 'agent_provider_replay' as const;
+    const messageId = 'msg_018f1e2d3c4bBoundMsgAbCdEf';
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      const initialInput = {
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'preserve provider',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: {
+          sandboxId: 'usr-abcdef' as const,
+          sandboxProvider: 'cloudflare' as const,
+        },
+        message: {
+          initialTurn: {
+            type: 'prompt' as const,
+            messageId,
+            prompt: 'preserve provider',
+          },
+        },
+      };
+      await instance.createSessionWithInitialAdmission(initialInput);
+      await instance.createSessionWithInitialAdmission({
+        ...initialInput,
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'cloudflare',
+        },
+      });
+      return {
+        metadata: await instance.getMetadata(),
+      };
+    });
+
+    expect(result.metadata?.workspace?.sandboxProvider).toBe('cloudflare');
+    expect(result.metadata?.workspace?.sandboxId).toBe('usr-abcdef');
+  });
+
+  it('rejects metadata updates that replace the registered sandbox name', async () => {
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_runtime_identity:agent_runtime_identity')
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId: 'agent_runtime_identity',
+          userId: 'user_runtime_identity',
+          prompt: 'immutable runtime identity',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+      });
+      const metadata = await instance.getMetadata();
+      if (!metadata) throw new Error('Expected metadata after registration');
+      let error: string | undefined;
+      try {
+        await instance.updateMetadata({
+          ...metadata,
+          workspace: { ...metadata.workspace, sandboxId: 'ses-fedcba' },
+        });
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : String(caught);
+      }
+      return { error, metadata: await instance.getMetadata() };
+    });
+
+    expect(result.error).toBe('Registered sandbox name cannot be changed');
+    expect(result.metadata?.workspace?.sandboxId).toBe('ses-abcdef');
+  });
+
   it('rejects a grouped replay that changes the immutable initial intent', async () => {
     const userId = 'user_grouped_start_mismatch' as const;
     const sessionId = 'agent_grouped_start_mismatch' as const;
@@ -282,6 +487,7 @@ describe('CloudAgentSession message admission', () => {
       ...base,
       workspace: {
         sandboxId,
+        sandboxProvider: 'cloudflare' as const,
         sandboxRoute: {
           kind: 'shared' as const,
           routeKey,

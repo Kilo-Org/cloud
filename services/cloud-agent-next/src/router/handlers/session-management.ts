@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { AgentSandboxUnavailableError } from '../../agent-sandbox/protocol.js';
 import { createAgentSandbox } from '../../agent-sandbox/factory.js';
 import { logger, withLogTags } from '../../logger.js';
 import { generateSandboxId } from '../../sandbox-id.js';
@@ -417,17 +418,20 @@ export function createSessionManagementHandlers() {
             s => s.isSandboxCleanupScheduled(),
             'isSandboxCleanupScheduled'
           );
-          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' = cleanupScheduled
+          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' | 'unknown' = cleanupScheduled
             ? 'destroyed'
-            : 'healthy';
+            : 'unknown';
           if (!cleanupScheduled) {
             try {
               await createAgentSandbox(env, metadata).probeHealth();
+              sandboxStatus = 'healthy';
             } catch (error) {
-              sandboxStatus = 'unreachable';
-              logger
-                .withFields({ error: error instanceof Error ? error.message : String(error) })
-                .warn('Sandbox health probe failed');
+              if (!(error instanceof AgentSandboxUnavailableError)) {
+                sandboxStatus = 'unreachable';
+                logger
+                  .withFields({ error: error instanceof Error ? error.message : String(error) })
+                  .warn('Sandbox health probe failed');
+              }
             }
           }
 
@@ -591,7 +595,15 @@ export function createSessionManagementHandlers() {
             });
           }
 
-          const logs = await createAgentSandbox(env, metadata).readWrapperLogs();
+          let logs: Awaited<ReturnType<ReturnType<typeof createAgentSandbox>['readWrapperLogs']>>;
+          try {
+            logs = await createAgentSandbox(env, metadata).readWrapperLogs();
+          } catch (error) {
+            if (error instanceof AgentSandboxUnavailableError) {
+              throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+            }
+            throw error;
+          }
           if (!logs) {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',

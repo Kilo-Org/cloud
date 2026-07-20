@@ -1,3 +1,7 @@
 DIRECT_INGEST_PERCENT="0"
 DIRECT_INGEST_USER_IDS=""
 DIRECT_INGEST_MAX_BYTES="4194304"
+
+# Exact user ID allowed to receive remote session attention pushes during rollout.
+# Leave empty to keep remote session pushes disabled.
+REMOTE_SESSION_ATTENTION_PUSH_USER_ID=""

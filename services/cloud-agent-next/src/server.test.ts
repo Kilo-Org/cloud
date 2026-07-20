@@ -285,7 +285,6 @@ describe('server /terminal', () => {
       { algorithm: 'HS256', expiresIn: 60 }
     );
     const env = createEnv();
-    const sandboxId = `usr-${'a'.repeat(48)}`;
     const metadata = {
       metadataSchemaVersion: 2,
       identity: {
@@ -295,7 +294,7 @@ describe('server /terminal', () => {
       },
       auth: {},
       workspace: {
-        sandboxId,
+        sandboxId: `usr-${'a'.repeat(48)}`,
         workspacePath: '/workspace/user/repo',
       },
       lifecycle: {
@@ -329,6 +328,10 @@ describe('server /terminal', () => {
     expect(getMetadata).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
     expect(getRunningTerminalClientMock).toHaveBeenCalledOnce();
+    expect(connectTerminal).toHaveBeenCalledTimes(1);
+    const connectRequest = connectTerminal.mock.calls[0]?.[1];
+    expect(connectRequest).toBeInstanceOf(Request);
+    expect(new URL((connectRequest as Request).url).pathname).toBe('/terminal');
     expect(connectTerminal).toHaveBeenCalledWith('pty_123', request);
   });
 

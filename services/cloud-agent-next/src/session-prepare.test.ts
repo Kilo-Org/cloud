@@ -7,6 +7,7 @@ import * as schemas from './router/schemas.js';
 const {
   generateSessionIdMock,
   generateSandboxRoutingTargetMock,
+  selectSandboxForNewSessionMock,
   createCliSessionMock,
   deleteCliSessionMock,
   createSessionReportMock,
@@ -24,6 +25,10 @@ const {
   generateSandboxRoutingTargetMock: vi
     .fn()
     .mockResolvedValue({ kind: 'isolated', sandboxId: 'sb-test-123' }),
+  selectSandboxForNewSessionMock: vi.fn().mockResolvedValue({
+    sandboxId: 'sb-test-123',
+    provider: 'cloudflare',
+  }),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
@@ -66,6 +71,7 @@ vi.mock('./sandbox-id.js', async importOriginal => {
   return {
     ...actual,
     generateSandboxRoutingTarget: generateSandboxRoutingTargetMock,
+    selectSandboxForNewSession: selectSandboxForNewSessionMock,
     getSandboxNamespace: vi.fn(),
   };
 });
@@ -264,6 +270,10 @@ describe('prepareSession endpoint', () => {
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
       sandboxId: 'sb-test-123',
+    });
+    selectSandboxForNewSessionMock.mockResolvedValue({
+      sandboxId: 'sb-test-123',
+      provider: 'cloudflare',
     });
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
@@ -533,6 +543,7 @@ describe('prepareSession endpoint', () => {
         },
         workspace: {
           sandboxId: 'sb-test-123',
+          sandboxProvider: 'cloudflare',
           shallow: true,
           credentialContainment: { github: true, gitlab: false, kilocode: false },
         },
@@ -765,6 +776,7 @@ describe('prepareSession endpoint', () => {
       expect.objectContaining({
         workspace: {
           sandboxId: failoverSandboxId,
+          sandboxProvider: 'cloudflare',
           shallow: undefined,
           credentialContainment: { github: true, gitlab: false, kilocode: false },
           sandboxRoute: {
@@ -785,6 +797,10 @@ describe('prepareSession endpoint', () => {
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({
       kind: 'isolated',
       sandboxId: 'dind-abcdef',
+    });
+    selectSandboxForNewSessionMock.mockResolvedValueOnce({
+      sandboxId: 'dind-abcdef',
+      provider: 'cloudflare',
     });
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -809,10 +825,21 @@ describe('prepareSession endpoint', () => {
         createdOnPlatform: undefined,
       }
     );
+    expect(selectSandboxForNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.any(Object),
+        orgId: undefined,
+        userId: 'test-user-123',
+        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        botId: undefined,
+        devcontainer: true,
+      })
+    );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: {
           sandboxId: 'dind-abcdef',
+          sandboxProvider: 'cloudflare',
           shallow: false,
           credentialContainment: { github: false, gitlab: false, kilocode: false },
           devcontainerRequested: true,
@@ -1216,6 +1243,10 @@ describe('start endpoint', () => {
       kind: 'isolated',
       sandboxId: 'sb-test-123',
     });
+    selectSandboxForNewSessionMock.mockResolvedValue({
+      sandboxId: 'sb-test-123',
+      provider: 'cloudflare',
+    });
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -1496,6 +1527,7 @@ describe('start endpoint', () => {
     ).rejects.toThrow('session report unavailable');
 
     expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(recordVisibleSessionOutcomeMock).not.toHaveBeenCalled();
     expect(recordInitialAdmissionMock).not.toHaveBeenCalled();

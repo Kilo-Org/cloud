@@ -381,9 +381,7 @@ export class ActiveSessionsLiveSync {
         this.pendingReasons.delete('enrichment');
       }
     }
-    const hasNewReasons = [...this.pendingReasons].some(
-      reason => !inFlightReasons.has(reason)
-    );
+    const hasNewReasons = [...this.pendingReasons].some(reason => !inFlightReasons.has(reason));
     // Read via helper so control-flow analysis does not treat the field as
     // stuck at the `false` written above — other methods flip it during await.
     const wasCanceled = this.readInFlightFetchCanceled();

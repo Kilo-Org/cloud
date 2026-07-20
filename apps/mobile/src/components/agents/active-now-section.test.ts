@@ -168,7 +168,7 @@ vi.mock('react', async () => {
   const actual = (await vi.importActual('react')) as typeof React;
   return {
     ...actual,
-    useState: vi.fn(<T,>(initial: T) => [initial, () => undefined] as [T, () => void]),
+    useState: vi.fn(<T>(initial: T) => [initial, () => undefined] as [T, () => void]),
   };
 });
 vi.mock('react-native-reanimated', () => ({

@@ -8,6 +8,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { OperationResult } from './types.js';
 import {
+  getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
   type SessionMetadata,
@@ -16,7 +17,9 @@ import { readProfileBundle, type SessionProfileBundle } from '../session-profile
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
+import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { commandQueue, events, executionLeases } from '../db/sqlite-schema.js';
 import { logger } from '../logger.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -146,8 +149,11 @@ import {
   type WrapperTerminalEvent,
 } from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
-import { createAgentSandbox } from '../agent-sandbox/factory.js';
+import { createAgentSandbox, createAgentSandboxLifecycle } from '../agent-sandbox/factory.js';
 import type {
+  AgentSandboxLifecycle,
+  SandboxDeleteReason,
+  SessionDeletionIntent,
   StopWrappersResult,
   WrapperObservation,
   WrapperStopReason,
@@ -172,7 +178,7 @@ const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
 
 /** Storage key for tracking last activity timestamp */
 const LAST_ACTIVITY_KEY = 'last_activity';
-const EXPLICIT_DELETION_PENDING_KEY = 'explicit_deletion_pending';
+const DELETION_INTENT_KEY = 'session_deletion_intent';
 const EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY = 'ephemeral_sandbox_destroy_after';
 const EPHEMERAL_SANDBOX_DESTROYED_AT_KEY = 'ephemeral_sandbox_destroyed_at';
 
@@ -257,7 +263,12 @@ type GroupedRegisterSessionInput = {
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
-    'sandboxId' | 'sandboxRoute' | 'shallow' | 'credentialContainment' | 'devcontainerRequested'
+    | 'sandboxId'
+    | 'sandboxRoute'
+    | 'sandboxProvider'
+    | 'shallow'
+    | 'credentialContainment'
+    | 'devcontainerRequested'
   >;
 };
 
@@ -429,6 +440,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private ephemeralSandboxDestroyer?: () => Promise<void>;
   private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
+  private sandboxLifecycle?: AgentSandboxLifecycle;
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
   private wrapperSupervisor?: WrapperSupervisor;
@@ -665,6 +677,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         storage: this.ctx.storage,
         env: this.env,
         getMetadata: () => this.getMetadata(),
+        canUseSandboxRuntime: () => this.canUseSandboxRuntime(),
         getSessionIdForLogs: () => this.sessionId,
         sendToWrapper: (ingestTagId, command, fence) =>
           this.sendToWrapper(ingestTagId, command, fence),
@@ -682,6 +695,27 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.agentRuntime;
   }
 
+  private async hasDeletionIntent(): Promise<boolean> {
+    return (await this.ctx.storage.get<SessionDeletionIntent>(DELETION_INTENT_KEY)) !== undefined;
+  }
+
+  private async canUseSandboxRuntime(): Promise<boolean> {
+    return !(await this.hasDeletionIntent());
+  }
+
+  private getSandboxLifecycle(): AgentSandboxLifecycle {
+    if (!this.sandboxLifecycle) {
+      this.sandboxLifecycle = createAgentSandboxLifecycle(this.env, {
+        storage: this.ctx.storage,
+        scheduleAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        eraseDurableObjectState: () => this.eraseDurableObjectState(),
+        purgeDeletedSessionPayload: () => this.purgeDeletedSessionPayload(),
+        getSessionIdForLogs: () => this.sessionId,
+      });
+    }
+    return this.sandboxLifecycle;
+  }
+
   private getWrapperSupervisor(): WrapperSupervisor {
     if (!this.wrapperSupervisor) {
       this.wrapperSupervisor = createWrapperSupervisor({
@@ -691,7 +725,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         },
         messageSettlementOutbox: this.getMessageSettlementOutbox(),
         sessionMessageQueue: this.getSessionMessageQueue(),
-        getMetadata: () => this.getMetadata(),
+        // Unguarded: the supervisor performs the physical wrapper stop that
+        // deletion itself depends on, so it must still see metadata once
+        // deletion intent has been persisted.
+        getMetadata: () => this.getStoredMetadata(),
         getAssistantMessageForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
           this.eventQueries.getAssistantMessageForUserMessage(
             sessionId,
@@ -706,13 +743,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           this.ensureAcceptedMessageBeforeTerminal(messageId, wrapperRunId),
         stopWrappers: async request => {
           if (this.physicalWrapperStopper) return this.physicalWrapperStopper(request);
-          if (this.orchestrator || (!this.env.Sandbox && !this.env.SandboxSmall)) {
+          if (this.orchestrator) return { status: 'absent' };
+          const metadata = await this.getStoredMetadata();
+          if (!metadata) {
+            return { status: 'inspection-failed', error: 'Session metadata unavailable' };
+          }
+          if (
+            getSandboxProvider(metadata) === 'cloudflare' &&
+            !this.env.Sandbox &&
+            !this.env.SandboxSmall
+          ) {
             return { status: 'absent' };
           }
-          const metadata = await this.getMetadata();
-          if (!metadata)
-            return { status: 'inspection-failed', error: 'Session metadata unavailable' };
-          return createAgentSandbox(this.env, metadata).stopWrappers(request);
+          try {
+            return await createAgentSandbox(this.env, metadata).stopWrappers(request);
+          } catch (error) {
+            return {
+              status: 'inspection-failed',
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
         },
         recordSharedSandboxFailover: routeKey =>
           this.sharedSandboxFailoverRecorder
@@ -902,6 +952,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (!ticketSessionId || ticketSessionId !== sessionIdParam) {
         return new Response('Invalid ticket session', { status: 401 });
       }
+      if (await this.hasDeletionIntent()) {
+        return new Response('Session not found', { status: 404 });
+      }
 
       const streamHandler = await this.getStreamHandler(sessionIdParam ?? undefined);
       const response = await streamHandler.handleStreamRequest(request);
@@ -916,6 +969,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Route ingest WebSocket (internal only - from queue consumer)
     if (url.pathname === '/ingest') {
+      if (await this.hasDeletionIntent()) {
+        return new Response('Session not found', { status: 404 });
+      }
       const ingestHandler = await this.getIngestHandler();
       return ingestHandler.handleIngestRequest(request);
     }
@@ -937,6 +993,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Check if this is an ingest connection
     if (tags.some(tag => tag.startsWith('ingest:'))) {
+      if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
       await ingestHandler.handleIngestMessage(ws, message);
       return;
@@ -960,6 +1017,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     // Clean up ingest connection tracking
     if (tags.some(tag => tag.startsWith('ingest:'))) {
+      if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
       const disconnected = await ingestHandler.handleIngestClose(ws);
 
@@ -1209,9 +1267,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Get session metadata.
    * Returns null if no metadata has been written yet (e.g., before first CLI execution).
    */
-  async getMetadata(): Promise<SessionMetadata | null> {
+  private async getStoredMetadata(): Promise<SessionMetadata | null> {
     const metadata = await this.ctx.storage.get('metadata');
     return metadata ? parseSessionMetadata(metadata) : null;
+  }
+
+  async getMetadata(): Promise<SessionMetadata | null> {
+    if (await this.hasDeletionIntent()) return null;
+    return this.getStoredMetadata();
   }
 
   async validateKiloGlobalFeedProducer(params: {
@@ -1295,7 +1358,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Throws an error if validation fails.
    */
   async updateMetadata(data: unknown): Promise<void> {
+    if (await this.hasDeletionIntent()) {
+      throw new Error('Cannot update deleted session metadata');
+    }
     const newMetadata = serializeSessionMetadata(parseSessionMetadata(data));
+    const existingMetadata = await this.getMetadata();
+    if (existingMetadata) {
+      if (getSandboxProvider(existingMetadata) !== getSandboxProvider(newMetadata)) {
+        throw new Error('Registered sandbox provider cannot be changed');
+      }
+      if (existingMetadata.workspace?.sandboxId !== newMetadata.workspace?.sandboxId) {
+        throw new Error('Registered sandbox name cannot be changed');
+      }
+    }
     await this.ctx.storage.put('metadata', newMetadata);
 
     // Track activity for session TTL
@@ -1721,58 +1796,49 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
   }
 
-  private async finalizeSessionDeletion(
-    reason: 'explicit' | 'retention-expired'
-  ): Promise<boolean> {
-    const metadata = await this.getMetadata();
-    if (!metadata) {
-      const lease = await getWrapperLease(this.ctx.storage);
-      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
-        await this.schedulePhysicalWrapperCleanupRetry();
-        return false;
-      }
-    } else {
-      const supervisor = this.getWrapperSupervisor();
-      await supervisor.requestPhysicalWrapperStop('session-delete', { kind: 'session' });
-      await supervisor.runMaintenance(Date.now());
-      const lease = await getWrapperLease(this.ctx.storage);
-      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
-        if (reason === 'explicit') {
-          await this.schedulePhysicalWrapperCleanupRetry();
-        }
-        return false;
-      }
-      if (isWrapperCleanupExhausted(lease)) {
-        try {
-          await this.deleteSandboxSessionResources(metadata, reason);
-        } catch (error) {
-          logger
-            .withFields({
-              sessionId: this.sessionId,
-              attempts: lease.attempts,
-              reason,
-              error: error instanceof Error ? error.message : String(error),
-            })
-            .warn('Best-effort quarantined sandbox session deletion failed');
-        }
-      } else {
-        await this.deleteSandboxSessionResources(metadata, reason);
-      }
-    }
-
-    const recovery = await getSandboxRecoveryState(this.ctx.storage);
-    if (recovery?.failoverPublication?.status === 'pending') {
-      if (reason === 'explicit') await this.schedulePhysicalWrapperCleanupRetry();
-      return false;
-    }
-
+  /** Erase all Durable Object storage once a session's deletion is fully resolved. */
+  private async eraseDurableObjectState(): Promise<void> {
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
+  }
+
+  /**
+   * Finish the Cloudflare deletion path: defer while a shared-sandbox failover
+   * publication is still pending, otherwise erase Durable Object state.
+   */
+  private async finalizeCloudflareDeletion(): Promise<boolean> {
+    const recovery = await getSandboxRecoveryState(this.ctx.storage);
+    if (recovery?.failoverPublication?.status === 'pending') {
+      await this.schedulePhysicalWrapperCleanupRetry();
+      return false;
+    }
+    await this.eraseDurableObjectState();
     return true;
   }
 
-  private async isExplicitDeletionPending(): Promise<boolean> {
-    return (await this.ctx.storage.get<boolean>(EXPLICIT_DELETION_PENDING_KEY)) === true;
+  private async purgeDeletedSessionPayload(
+    additionalRetainedKeys: readonly string[] = []
+  ): Promise<void> {
+    // The deletion fence survives the purge, along with any durable keys a
+    // provider's deferred deletion plan asked the session to persist.
+    const retainedKeys = new Set<string>([DELETION_INTENT_KEY, ...additionalRetainedKeys]);
+    while (true) {
+      const persistedKeys = await this.ctx.storage.list({ limit: 128 });
+      const sensitiveKeys = [...persistedKeys.keys()].filter(key => !retainedKeys.has(key));
+      if (sensitiveKeys.length === 0) break;
+      await this.ctx.storage.delete(sensitiveKeys);
+    }
+
+    const db = drizzle(this.ctx.storage, { logger: false });
+    db.delete(events)
+      .where(sql`true`)
+      .run();
+    db.delete(executionLeases)
+      .where(sql`true`)
+      .run();
+    db.delete(commandQueue)
+      .where(sql`true`)
+      .run();
   }
 
   async isSandboxCleanupScheduled(): Promise<boolean> {
@@ -1859,8 +1925,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async deletionPendingAdmissionFailure(): Promise<SessionMessageAdmissionResult | null> {
-    if (await this.isExplicitDeletionPending()) {
-      return { success: false, code: 'NOT_FOUND', error: 'Session deletion is pending' };
+    if (await this.hasDeletionIntent()) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     }
     if (await this.isSandboxCleanupScheduled()) {
       return { success: false, code: 'BAD_REQUEST', error: 'Session sandbox cleanup is scheduled' };
@@ -1869,12 +1935,87 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Delete session after physical wrapper absence is verified or cleanup is quarantined.
+   * Delete session after physical wrapper absence is verified, its provider's
+   * lifecycle cleanup is confirmed or quarantined, or provider deletion is
+   * dispatched for asynchronous reconciliation via alarms.
    */
+  private async initiateSessionDeletion(
+    reason: Extract<SandboxDeleteReason, 'explicit' | 'retention-expired'>,
+    persistedIntent?: SessionDeletionIntent
+  ): Promise<'complete' | 'deferred' | 'physical-cleanup-pending'> {
+    const metadata = await this.getStoredMetadata();
+    if (!metadata) {
+      // Metadata already purged but the deletion fence is still present:
+      // provider-side deletion is reconciling asynchronously via alarms.
+      if (await this.ctx.storage.get(DELETION_INTENT_KEY)) {
+        return 'deferred';
+      }
+      const lease = await getWrapperLease(this.ctx.storage);
+      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
+        await this.schedulePhysicalWrapperCleanupRetry();
+        return 'physical-cleanup-pending';
+      }
+      return (await this.finalizeCloudflareDeletion()) ? 'complete' : 'physical-cleanup-pending';
+    }
+
+    const now = Date.now();
+    const existingIntent = await this.ctx.storage.get<SessionDeletionIntent>(DELETION_INTENT_KEY);
+    const intent =
+      persistedIntent ??
+      existingIntent ??
+      ({ reason, startedAt: now } satisfies SessionDeletionIntent);
+    if (!existingIntent) {
+      await this.ctx.storage.put(DELETION_INTENT_KEY, intent);
+    }
+
+    const deletionPlan = await this.getSandboxLifecycle().planDeletion({ metadata, intent, now });
+    if (deletionPlan.kind === 'complete') {
+      await this.eraseDurableObjectState();
+      return 'complete';
+    }
+    if (deletionPlan.kind === 'deferred') {
+      await this.ctx.storage.put({
+        [DELETION_INTENT_KEY]: intent,
+        ...deletionPlan.entries,
+      });
+      await this.purgeDeletedSessionPayload(Object.keys(deletionPlan.entries));
+      await this.getSandboxLifecycle().reconcilePendingDeletion(now);
+      return 'deferred';
+    }
+
+    const supervisor = this.getWrapperSupervisor();
+    await supervisor.requestPhysicalWrapperStop('session-delete', { kind: 'session' });
+    // Use a fresh timestamp: requestPhysicalWrapperStop stamps nextAttemptAt
+    // with its own Date.now(), which can be a millisecond after `now` above.
+    await supervisor.runMaintenance(Date.now());
+    const lease = await getWrapperLease(this.ctx.storage);
+    if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
+      await this.schedulePhysicalWrapperCleanupRetry();
+      return 'physical-cleanup-pending';
+    }
+    if (isWrapperCleanupExhausted(lease)) {
+      try {
+        await this.deleteSandboxSessionResources(metadata, reason);
+      } catch (error) {
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            attempts: lease.attempts,
+            reason,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          .warn('Best-effort quarantined sandbox session deletion failed');
+      }
+    } else {
+      await this.deleteSandboxSessionResources(metadata, reason);
+    }
+
+    return (await this.finalizeCloudflareDeletion()) ? 'complete' : 'physical-cleanup-pending';
+  }
+
   async deleteSession(): Promise<void> {
     logger.info('Explicit DELETE requested for Durable Object');
-    await this.ctx.storage.put(EXPLICIT_DELETION_PENDING_KEY, true);
-    if (!(await this.finalizeSessionDeletion('explicit'))) {
+    if ((await this.initiateSessionDeletion('explicit')) === 'physical-cleanup-pending') {
       throw new Error('Session deletion pending physical wrapper cleanup');
     }
   }
@@ -1885,10 +2026,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * delivers the first message.
    */
   async registerSession(input: GroupedRegisterSessionInput): Promise<OperationResult> {
-    if (await this.isExplicitDeletionPending()) {
-      return { success: false, error: 'Session deletion is pending' };
-    }
     await this.requireSessionId(input.identity.sessionId as SessionId);
+    if (await this.hasDeletionIntent()) {
+      return { success: false, error: 'Session is deleted' };
+    }
     const existing = await this.ctx.storage.get('metadata');
     if (existing) {
       return { success: false, error: 'Session already registered' };
@@ -1946,7 +2087,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       finalization: input.finalization,
       profile: input.profile,
       callback: input.callback,
-      workspace: input.workspace,
+      workspace: {
+        ...input.workspace,
+        sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
+      },
       lifecycle: {
         version: now,
         timestamp: now,
@@ -2239,16 +2383,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     let alarmWorkFailed = false;
 
     try {
-      if (await this.isExplicitDeletionPending()) {
-        logger.withFields({ sessionId: this.sessionId }).info('Resuming explicit session deletion');
-        if (await this.finalizeSessionDeletion('explicit')) {
+      if (await this.hasDeletionIntent()) {
+        if ((await this.getSandboxLifecycle().reconcilePendingDeletion(now)) === 'handled') {
           return;
         }
-        logger
-          .withFields({ sessionId: this.sessionId })
-          .info('Postponing explicit session deletion until wrapper cleanup confirms absence');
+        const intent = await this.ctx.storage.get<SessionDeletionIntent>(DELETION_INTENT_KEY);
+        const metadata = await this.getStoredMetadata();
+        if (intent && metadata) {
+          await this.initiateSessionDeletion(intent.reason, intent);
+          return;
+        }
+        await this.scheduleAlarmAtOrBefore(now + REAPER_INTERVAL_MS_DEFAULT);
         return;
       }
+
+      await this.getSandboxLifecycle().reconcileCreateIntent(now);
 
       // Check if session should be deleted due to inactivity (90 days)
       const lastActivity = await this.ctx.storage.get<number>(LAST_ACTIVITY_KEY);
@@ -2257,12 +2406,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           .withFields({ sessionId: this.sessionId, lastActivity })
           .info('Deleting session due to inactivity');
 
-        if (await this.finalizeSessionDeletion('retention-expired')) {
-          return;
-        }
-        logger
-          .withFields({ sessionId: this.sessionId })
-          .info('Postponing inactive session deletion until wrapper cleanup confirms absence');
+        await this.initiateSessionDeletion('retention-expired');
+        return;
       }
 
       await this.getWrapperSupervisor().runMaintenance(now);
@@ -2516,6 +2661,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Called from the ingest heartbeat adapter; AgentRuntime owns the renewal transport.
    */
   private async keepContainerAlive(): Promise<void> {
+    if (await this.hasDeletionIntent()) return;
     await this.getAgentRuntime().keepSandboxAlive();
   }
 
@@ -3175,6 +3321,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const sessionId = plan.scope.sessionId;
     const eventSourceId = '' as EventSourceId;
 
+    if (await this.hasDeletionIntent()) {
+      return {
+        success: false,
+        code: 'INTERNAL',
+        error: 'Session deletion is in progress',
+      };
+    }
+
     await this.scheduleAlarmAtOrBefore(Date.now() + PENDING_FLUSH_DEBOUNCE_MS);
 
     const recorder = createPreparationProgressRecorder({
@@ -3232,21 +3386,23 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         : { status: 'failed', safeError: 'Environment preparation failed' }
     );
 
-    this.broadcastVolatileEvent({
-      executionId: eventSourceId,
-      sessionId,
-      streamEventType: 'cloud.status',
-      payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
-      timestamp: Date.now(),
-    });
-
-    logger
-      .withFields({
+    if (result.success) {
+      this.broadcastVolatileEvent({
+        executionId: eventSourceId,
         sessionId,
-        messageId: plan.turn.messageId,
-        wrapperRunId: result.success ? result.wrapperRunId : undefined,
-      })
-      .info('Wrapper accepted delivered session message');
+        streamEventType: 'cloud.status',
+        payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+        timestamp: Date.now(),
+      });
+
+      logger
+        .withFields({
+          sessionId,
+          messageId: plan.turn.messageId,
+          wrapperRunId: result.wrapperRunId,
+        })
+        .info('Wrapper accepted delivered session message');
+    }
 
     return result;
   }

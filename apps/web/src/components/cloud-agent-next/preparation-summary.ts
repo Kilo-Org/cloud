@@ -1,6 +1,8 @@
 import type { PreparationAttempt, PreparationStepSnapshot } from '@/lib/cloud-agent-sdk';
 import { formatAttemptDuration, humanizePhaseLabel } from './preparation-phases';
 
+export { isNoOpCompletedPreparationAttempt } from '@/lib/cloud-agent-sdk';
+
 /** The single line the chat row shows for a preparation attempt. */
 export type PreparationRowSummary =
   | { kind: 'starting' }

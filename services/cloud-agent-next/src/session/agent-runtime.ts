@@ -1,10 +1,11 @@
 import { ExecutionError } from '../execution/errors.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
-import type {
-  AgentSandbox,
-  WrapperInstanceLease,
-  WrapperObservation,
+import {
+  AgentSandboxUnavailableError,
+  type AgentSandbox,
+  type WrapperInstanceLease,
+  type WrapperObservation,
 } from '../agent-sandbox/protocol.js';
 import type {
   ExecutionResult,
@@ -79,6 +80,7 @@ export type AgentRuntimeDependencies = {
   storage: DurableObjectStorage;
   env: WorkerEnv;
   getMetadata: () => Promise<SessionMetadata | null>;
+  canUseSandboxRuntime?: () => Promise<boolean>;
   getSessionIdForLogs: () => string | undefined;
   sendToWrapper: (
     ingestTagId: string,
@@ -129,8 +131,15 @@ function buildRuntimeAcceptanceResult(
 }
 
 export function createAgentRuntime(dependencies: AgentRuntimeDependencies): AgentRuntime {
-  const { storage, env, getMetadata, getSessionIdForLogs, sendToWrapper, getOrchestratorOverride } =
-    dependencies;
+  const {
+    storage,
+    env,
+    getMetadata,
+    canUseSandboxRuntime,
+    getSessionIdForLogs,
+    sendToWrapper,
+    getOrchestratorOverride,
+  } = dependencies;
   const resolveAgentSandbox =
     dependencies.createAgentSandbox ??
     ((metadata: SessionMetadata) => createAgentSandbox(env, metadata));
@@ -170,10 +179,21 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       throw cleanupBlockedError(current);
     }
 
-    const observeWrappers = () =>
-      dependencies.discoverSessionWrappers
-        ? dependencies.discoverSessionWrappers(plan.workspace.metadata)
-        : resolveAgentSandbox(plan.workspace.metadata).discoverSessionWrappers();
+    const observeWrappers = async (): Promise<WrapperObservation> => {
+      try {
+        return await (dependencies.discoverSessionWrappers
+          ? dependencies.discoverSessionWrappers(plan.workspace.metadata)
+          : resolveAgentSandbox(plan.workspace.metadata).discoverSessionWrappers());
+      } catch (error) {
+        if (error instanceof AgentSandboxUnavailableError) {
+          throw ExecutionError.sandboxCapabilityUnavailable(
+            'Sandbox runtime delivery is unavailable for this session',
+            error
+          );
+        }
+        throw error;
+      }
+    };
     let allocatable = current;
     if (current.state === 'owns_wrapper') {
       const observation = await observeWrappers();
@@ -296,6 +316,9 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     plan: MessageDeliveryRequest,
     hooks: AgentRuntimeSendHooks = {}
   ): Promise<MessageDeliveryResult> {
+    if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) {
+      return { success: false, code: 'INTERNAL', error: 'Session deletion is in progress' };
+    }
     const { sessionId } = plan.scope;
     const { turn, agent } = plan;
     const currentRuntimeState = await getWrapperRuntimeState(storage);
@@ -306,8 +329,17 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         error: 'Wrapper batch is finalizing',
       };
     }
+    let physicalAuthorization;
+    try {
+      physicalAuthorization = await authorizePhysicalWrapper(plan);
+    } catch (error) {
+      if (error instanceof ExecutionError && error.code === 'SANDBOX_CAPABILITY_UNAVAILABLE') {
+        return { success: false, code: error.code, error: error.message };
+      }
+      throw error;
+    }
     const { leasedInstance, allocatedPhysicalInstance, requiresFreshRunFence } =
-      await authorizePhysicalWrapper(plan);
+      physicalAuthorization;
     const previousRuntimeState = await getWrapperRuntimeState(storage);
     if (
       (allocatedPhysicalInstance || requiresFreshRunFence) &&
@@ -478,6 +510,9 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
             .debug('Preserved existing runtime liveness after failed hot delivery');
         }
       }
+      if (error instanceof ExecutionError && error.code === 'SANDBOX_CAPABILITY_UNAVAILABLE') {
+        return { success: false, code: error.code, error: error.message };
+      }
       throw error;
     }
   }
@@ -520,6 +555,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
 
   async function keepSandboxAlive(): Promise<void> {
     try {
+      if (canUseSandboxRuntime && !(await canUseSandboxRuntime())) return;
       const metadata = await getMetadata();
       if (!metadata) return;
       await resolveAgentSandbox(metadata).keepAlive();

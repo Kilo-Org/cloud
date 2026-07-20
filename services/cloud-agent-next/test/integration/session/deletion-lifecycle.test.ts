@@ -1,5 +1,6 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
+import type { AgentSandboxLifecycle } from '../../../src/agent-sandbox/protocol.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import { getWrapperLease } from '../../../src/session/wrapper-runtime-state.js';
@@ -80,13 +81,17 @@ describe('session deletion physical cleanup', () => {
       );
       const result = {
         metadata: await instance.getMetadata(),
+        storedMetadata: await instance.ctx.storage.get<{ identity: { sessionId: string } }>(
+          'metadata'
+        ),
         lease: await getWrapperLease(instance.ctx.storage),
       };
       await instance.ctx.storage.deleteAll();
       return result;
     });
 
-    expect(result.metadata?.identity.sessionId).toBe(sessionId);
+    expect(result.metadata).toBeNull();
+    expect(result.storedMetadata?.identity.sessionId).toBe(sessionId);
     expect(result.lease).toMatchObject({
       state: 'stop_needed',
       reason: 'session-delete',
@@ -181,6 +186,9 @@ describe('session deletion physical cleanup', () => {
       );
       const result = {
         metadata: await instance.getMetadata(),
+        storedMetadata: await instance.ctx.storage.get<{ identity: { sessionId: string } }>(
+          'metadata'
+        ),
         alarm: await instance.ctx.storage.getAlarm(),
         nextAttemptAt,
       };
@@ -188,7 +196,8 @@ describe('session deletion physical cleanup', () => {
       return result;
     });
 
-    expect(result.metadata?.identity.sessionId).toBe(sessionId);
+    expect(result.metadata).toBeNull();
+    expect(result.storedMetadata?.identity.sessionId).toBe(sessionId);
     expect(result.alarm).toBe(result.nextAttemptAt);
   });
 
@@ -220,7 +229,8 @@ describe('session deletion physical cleanup', () => {
 
     expect(result.lease).toMatchObject({ state: 'stop_needed', attempts: 1 });
     if (result.lease.state !== 'stop_needed') throw new Error('Expected pending wrapper cleanup');
-    expect(result.alarm).toBe(result.lease.nextAttemptAt);
+    expect(result.alarm).not.toBeNull();
+    expect(result.alarm).toBeLessThanOrEqual(result.lease.nextAttemptAt);
   });
 
   it('rejects new message admission while explicit deletion is pending', async () => {
@@ -277,16 +287,16 @@ describe('session deletion physical cleanup', () => {
       };
     });
 
-    const deletionPending = {
+    const deletedSession = {
       success: false,
       code: 'NOT_FOUND',
-      error: 'Session deletion is pending',
+      error: 'Session not found',
     };
     expect(result).toEqual({
-      submittedAdmission: deletionPending,
-      groupedInitialAdmission: deletionPending,
-      preparedInitialAdmission: deletionPending,
-      registration: { success: false, error: 'Session deletion is pending' },
+      submittedAdmission: deletedSession,
+      groupedInitialAdmission: deletedSession,
+      preparedInitialAdmission: deletedSession,
+      registration: { success: false, error: 'Session is deleted' },
       pendingMessages: [],
     });
   });
@@ -364,13 +374,17 @@ describe('session deletion physical cleanup', () => {
       await instance.alarm();
       const result = {
         metadata: await instance.getMetadata(),
+        storedMetadata: await instance.ctx.storage.get<{ identity: { sessionId: string } }>(
+          'metadata'
+        ),
         lease: await getWrapperLease(instance.ctx.storage),
       };
       await instance.ctx.storage.deleteAll();
       return result;
     });
 
-    expect(result.metadata?.identity.sessionId).toBe(sessionId);
+    expect(result.metadata).toBeNull();
+    expect(result.storedMetadata?.identity.sessionId).toBe(sessionId);
     expect(result.lease).toMatchObject({
       state: 'stop_needed',
       reason: 'session-delete',
@@ -416,5 +430,80 @@ describe('session deletion physical cleanup', () => {
 
     expect(result.lease).toMatchObject({ state: 'stop_needed', attempts: 1 });
     expect(result.alarm).toBe(result.nextAttemptAt);
+  });
+
+  it('retains provider deferred-deletion entries through the payload purge', async () => {
+    const userId = 'user_delete_deferred';
+    const sessionId = 'agent_delete_deferred';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'deferred deletion',
+        mode: 'code',
+        model: 'test-model',
+      });
+      await instance.ctx.storage.put('sensitive_payload', { token: 'secret' });
+
+      instance['sandboxLifecycle'] = {
+        reconcileCreateIntent: async () => undefined,
+        planDeletion: async () => ({
+          kind: 'deferred',
+          entries: { provider_deletion_state: { remoteId: 'rm-123', status: 'pending' } },
+        }),
+        reconcilePendingDeletion: async () => 'none',
+      } satisfies AgentSandboxLifecycle;
+
+      await instance.deleteSession();
+      return {
+        deletionIntent: await instance.ctx.storage.get('session_deletion_intent'),
+        providerState: await instance.ctx.storage.get('provider_deletion_state'),
+        metadata: await instance.ctx.storage.get('metadata'),
+        sensitivePayload: await instance.ctx.storage.get('sensitive_payload'),
+      };
+    });
+
+    expect(result.deletionIntent).toEqual({ reason: 'explicit', startedAt: expect.any(Number) });
+    expect(result.providerState).toEqual({ remoteId: 'rm-123', status: 'pending' });
+    expect(result.metadata).toBeUndefined();
+    expect(result.sensitivePayload).toBeUndefined();
+  });
+
+  it('writes the deletion fence before provider deletion planning', async () => {
+    const userId = 'user_delete_fence';
+    const sessionId = 'agent_delete_fence';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const intentDuringPlanning = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'fenced deletion',
+        mode: 'code',
+        model: 'test-model',
+      });
+      await establishOwnedWrapper(instance, 'absent');
+
+      let observedIntent: unknown;
+      instance['sandboxLifecycle'] = {
+        reconcileCreateIntent: async () => undefined,
+        planDeletion: async () => {
+          observedIntent = await instance.ctx.storage.get('session_deletion_intent');
+          return { kind: 'not-applicable' };
+        },
+        reconcilePendingDeletion: async () => 'none',
+      } satisfies AgentSandboxLifecycle;
+
+      await instance.deleteSession();
+      return observedIntent;
+    });
+
+    expect(intentDuringPlanning).toEqual({ reason: 'explicit', startedAt: expect.any(Number) });
   });
 });

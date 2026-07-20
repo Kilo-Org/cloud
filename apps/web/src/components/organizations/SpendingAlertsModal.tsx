@@ -17,17 +17,13 @@ import type { OrganizationSettings } from '@/lib/organizations/organization-type
 import { Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateMinimumBalanceAlert } from '@/app/api/organizations/hooks';
+import { isValidEmail, resolveNotificationEmails } from './spending-alerts-form';
 
 type SpendingAlertsModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId: string;
   settings: OrganizationSettings | undefined;
-};
-
-const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email.trim());
 };
 
 export function SpendingAlertsModal({
@@ -102,26 +98,34 @@ export function SpendingAlertsModal({
   };
 
   const parsedBalance = parseFloat(minimumBalance);
+  const notificationEmails = resolveNotificationEmails(emails, newEmail);
   const isBalanceValid = !enabled || (!isNaN(parsedBalance) && parsedBalance > 0);
-  const hasEmails = !enabled || emails.length > 0;
-  const canSave = isBalanceValid && hasEmails;
+  const areEmailsValid = !enabled || (notificationEmails !== null && notificationEmails.length > 0);
+  const canSave = isBalanceValid && areEmailsValid;
 
   const handleSave = () => {
     if (!canSave) {
       if (!isBalanceValid) {
         toast.error('Please enter a valid minimum balance greater than $0');
-      } else if (!hasEmails) {
-        toast.error('Please add at least one email address');
+      } else if (!areEmailsValid) {
+        toast.error(
+          newEmail.trim()
+            ? 'Please enter a valid email address'
+            : 'Please enter at least one email address'
+        );
       }
       return;
     }
+
+    const emailsToSave = enabled ? notificationEmails : undefined;
+    if (emailsToSave === null) return;
 
     updateMinimumBalanceAlertMutation.mutate(
       {
         organizationId,
         enabled,
         minimum_balance: enabled ? parsedBalance : undefined,
-        minimum_balance_alert_email: enabled ? emails : undefined,
+        minimum_balance_alert_email: emailsToSave,
       },
       {
         onSuccess: () => {
@@ -205,14 +209,39 @@ export function SpendingAlertsModal({
                       setNewEmail(e.target.value);
                       setEmailError(null);
                     }}
+                    onBlur={() => {
+                      if (newEmail.trim() && !isValidEmail(newEmail)) {
+                        setEmailError('Please enter a valid email address');
+                      }
+                    }}
                     onKeyDown={handleKeyDown}
+                    aria-describedby={
+                      emailError
+                        ? 'notification-email-help notification-email-error'
+                        : 'notification-email-help'
+                    }
+                    aria-invalid={emailError !== null}
                     className={emailError ? 'border-red-500 focus:border-red-500' : ''}
                   />
-                  <Button type="button" variant="outline" size="icon" onClick={handleAddEmail}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleAddEmail}
+                    aria-label="Add another notification email"
+                  >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                {emailError && <p className="text-sm text-red-600">{emailError}</p>}
+                {emailError && (
+                  <p id="notification-email-error" className="text-sm text-red-600">
+                    {emailError}
+                  </p>
+                )}
+
+                <p id="notification-email-help" className="text-muted-foreground text-xs">
+                  Save adds this address automatically. Use the add button for another.
+                </p>
 
                 {/* Email list display */}
                 {emails.length > 0 && (
@@ -227,18 +256,13 @@ export function SpendingAlertsModal({
                           type="button"
                           onClick={() => handleRemoveEmail(email)}
                           className="text-muted-foreground hover:text-foreground"
+                          aria-label={`Remove ${email}`}
                         >
                           <X className="h-4 w-4" />
                         </button>
                       </div>
                     ))}
                   </div>
-                )}
-
-                {emails.length === 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    Add at least one email address to receive alerts.
-                  </p>
                 )}
               </div>
             </>

@@ -65,6 +65,7 @@ import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
+import { adminGitLabCredentialMigrationRouter } from '@/routers/admin-gitlab-credential-migration-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
@@ -478,6 +479,7 @@ export const adminRouter = createTRPCRouter({
       canManageCredits: userCanManageCredits(currentUser),
     };
   }),
+  gitlabCredentialMigration: adminGitLabCredentialMigrationRouter,
   kiloclawReferrals: adminKiloclawReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({

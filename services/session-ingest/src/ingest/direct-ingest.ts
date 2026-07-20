@@ -393,6 +393,7 @@ async function runDirectPostCommitTasks(
         await dispatchRemoteSessionAttentionSignal(
           { kiloUserId: request.kiloUserId, sessionId: request.sessionId, signal },
           {
+            remoteSessionAttentionPushUserId: request.env.REMOTE_SESSION_ATTENTION_PUSH_USER_ID,
             hasActiveCliSession: () => userConnection.hasActiveCliSession(request.sessionId),
             sendPush: pushParams =>
               request.env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),

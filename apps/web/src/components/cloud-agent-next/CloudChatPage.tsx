@@ -20,6 +20,7 @@ import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
 import { PreparationRow } from './PreparationRow';
+import { isNoOpCompletedPreparationAttempt } from './preparation-summary';
 import { PreparationDrawer } from './PreparationDrawer';
 import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
@@ -761,6 +762,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const preparationByMessageId = useMemo(() => {
     const byMessageId = new Map<string, readonly PreparationAttempt[]>();
     for (const attempt of preparationAttempts) {
+      if (isNoOpCompletedPreparationAttempt(attempt)) continue;
       const attempts = byMessageId.get(attempt.triggerMessageId) ?? [];
       byMessageId.set(attempt.triggerMessageId, [...attempts, attempt]);
     }

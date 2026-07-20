@@ -6,8 +6,35 @@ import type {
   FencedWrapperDispatchRequest,
   WorkspaceReady,
 } from '../execution/types.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
 
 export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery';
+
+export type SessionDeletionIntent = {
+  reason: Extract<SandboxDeleteReason, 'explicit' | 'retention-expired'>;
+  startedAt: number;
+};
+
+export type AgentSandboxFailure =
+  | 'provider_not_configured'
+  | 'provider_auth_failed'
+  | 'runtime_not_running'
+  | 'runtime_creation_failed'
+  | 'runtime_configuration_drift'
+  | 'runtime_deleted_during_active_work'
+  | 'runtime_max_duration_reached'
+  | 'runtime_infrastructure_failed'
+  | 'capability_unavailable';
+
+export class AgentSandboxUnavailableError extends Error {
+  constructor(
+    message: string,
+    public readonly failure: AgentSandboxFailure = 'capability_unavailable'
+  ) {
+    super(message);
+    this.name = 'AgentSandboxUnavailableError';
+  }
+}
 
 export const WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON =
   'wrapper_discovery_list_processes_timeout';
@@ -66,7 +93,8 @@ export type StopWrappersResult =
 export type TerminalClientResult =
   | { status: 'ready'; client: TerminalWrapperClient }
   | { status: 'not-running' }
-  | { status: 'unhealthy' };
+  | { status: 'unhealthy' }
+  | { status: 'capability-unavailable'; message: string };
 
 export type WrapperLogs = {
   files: Record<string, string>;
@@ -114,4 +142,41 @@ export type AgentSandbox = {
   readWrapperLogs(): Promise<WrapperLogs | null>;
   keepAlive(): Promise<void>;
   delete(reason: SandboxDeleteReason): Promise<void>;
+};
+
+export type ProviderDeletionPlan =
+  | { kind: 'not-applicable' }
+  | { kind: 'complete' }
+  | { kind: 'deferred'; entries: Record<string, unknown> };
+
+/**
+ * Session-DO capabilities a provider lifecycle needs: durable storage for its
+ * intents/tombstones, alarm scheduling for retries, and terminal-state
+ * transitions owned by the session.
+ */
+export type AgentSandboxLifecycleHost = {
+  storage: DurableObjectStorage;
+  scheduleAlarmAtOrBefore(deadline: number): Promise<void>;
+  eraseDurableObjectState(): Promise<void>;
+  purgeDeletedSessionPayload(): Promise<void>;
+  getSessionIdForLogs(): string | undefined;
+};
+
+/**
+ * Provider-side lifecycle reconciliation for one Cloud Agent session:
+ * settling interrupted runtime creation and driving deletion to a terminal
+ * state. Methods self-guard on stored provider state, so the session can
+ * invoke them on alarm paths without knowing its provider.
+ *
+ * `planDeletion` only returns what to persist; the session commits the
+ * returned entries atomically with its own deletion-intent fence.
+ */
+export type AgentSandboxLifecycle = {
+  reconcileCreateIntent(now: number): Promise<void>;
+  planDeletion(input: {
+    metadata: SessionMetadata;
+    intent: SessionDeletionIntent;
+    now: number;
+  }): Promise<ProviderDeletionPlan>;
+  reconcilePendingDeletion(now: number): Promise<'handled' | 'none'>;
 };

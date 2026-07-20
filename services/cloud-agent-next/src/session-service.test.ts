@@ -966,6 +966,9 @@ describe('SessionService.prepareWorkspace', () => {
       'agent_test',
       { inspectContainers: true }
     );
+    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
+    expect(sandbox.createSessionMock).not.toHaveBeenCalled();
+    expect(devcontainerMocks.bringUpDevContainer).not.toHaveBeenCalled();
   });
 
   it('hydrates requested devcontainer metadata while preparing a cold DIND workspace', async () => {

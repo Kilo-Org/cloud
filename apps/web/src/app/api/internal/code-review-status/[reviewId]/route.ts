@@ -75,7 +75,13 @@ import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-sele
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
+  type CodeReviewCouncilResult,
 } from '@kilocode/db/schema-types';
+import {
+  buildCouncilReviewSection,
+  councilDecisionBlocksMerge,
+  upsertCouncilVerdictInBody,
+} from '@kilocode/worker-utils/code-review-council';
 import { isCloudAgentNextBillingErrorBody } from '@kilocode/worker-utils/cloud-agent-next-client';
 import {
   CloudAgentCallbackFailureSchema,
@@ -1051,6 +1057,9 @@ export async function POST(
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
     let analyticsCompletionApplied = false;
+    // Code-owned council outcome for a completed council run. Set on whichever completion path
+    // runs below, then used to drive the merge gate (the council LLM never sets `gateResult`).
+    let councilResult: CodeReviewCouncilResult | null = null;
 
     if (
       status === 'completed' &&
@@ -1061,6 +1070,12 @@ export async function POST(
         assistantTextWasOmitted:
           rawPayload.lastAssistantMessageText === undefined &&
           rawPayload.lastAssistantMessageTextTruncation?.retainedUtf8ByteLength === 0,
+      });
+      // Compute once here: persisted atomically with the completion claim below AND reused to
+      // drive the merge gate. `null` for standard (non-council) runs.
+      councilResult = computeCouncilResultForReview({
+        review,
+        lastAssistantMessageText: rawPayload.lastAssistantMessageText,
       });
       const completionResult = await finalizeCompletedCodeReviewWithAnalytics({
         codeReviewId: reviewId,
@@ -1073,10 +1088,7 @@ export async function POST(
         // Persist the council outcome atomically with the completion claim, so a council
         // write failure can't leave a completed council review without a result (redelivery
         // would short-circuit on the already-terminal parent). No-op for standard runs.
-        councilResult: computeCouncilResultForReview({
-          review,
-          lastAssistantMessageText: rawPayload.lastAssistantMessageText,
-        }),
+        councilResult,
       });
 
       if (completionResult.outcome !== 'applied') {
@@ -1355,7 +1367,7 @@ export async function POST(
     // is already completed by the time control reaches here, so the redelivery-retry design
     // would not hold on that path).
     if (status === 'completed' && review.review_type === 'council' && !analyticsCompletionApplied) {
-      await finalizeCouncilResultForReview({
+      councilResult = await finalizeCouncilResultForReview({
         review,
         lastAssistantMessageText: rawPayload.lastAssistantMessageText,
       });
@@ -1457,6 +1469,26 @@ export async function POST(
           )
         : undefined;
 
+    // Council decisions are code-owned (the LLM never reports a `gateResult`), so derive the gate
+    // from the computed decision. `councilGates` is the SINGLE source of truth for whether this
+    // review actually enforces a merge gate: manual runs report the decision but never block merge
+    // (GitHub has no check run; GitLab must not post a blocking commit status either). It drives
+    // BOTH the gate result and the injected section's wording, so they can never disagree.
+    // Advisory (decision `null`) never gates; a code-`block` under Unanimous/Majority fails the check.
+    const isCompletedCouncil = status === 'completed' && review.review_type === 'council';
+    const councilGates = isCompletedCouncil && !isManualReview;
+    const effectiveGateResult = isCompletedCouncil
+      ? councilGates && councilResult && councilDecisionBlocksMerge(councilResult.decision)
+        ? 'fail'
+        : 'pass'
+      : validGateResult;
+    // Code-owned Council Review section (decision, governance, per-specialist table), injected into
+    // the summary comment below alongside the footer/history update (one fetch + one update).
+    const councilSection =
+      isCompletedCouncil && councilResult
+        ? buildCouncilReviewSection(councilResult, { gates: councilGates })
+        : null;
+
     if (integration) {
       try {
         await updatePRGateCheck(
@@ -1466,7 +1498,7 @@ export async function POST(
           errorMessage,
           providerTerminalReason,
           gitlabAccessToken,
-          validGateResult
+          effectiveGateResult
         );
       } catch (gateCheckError) {
         logExceptInTest('[code-review-status] Failed to update PR gate check:', gateCheckError);
@@ -1598,8 +1630,13 @@ export async function POST(
                   appType
                 );
                 if (existing) {
+                  // Inject the code-owned Council Review section first (no-op for non-council),
+                  // then history + footer, so the whole comment updates in a single PATCH.
+                  const baseBody = councilSection
+                    ? upsertCouncilVerdictInBody(existing.body, councilSection)
+                    : existing.body;
                   const bodyWithHistory = appendPreviousReviewSummaryHistory(
-                    existing.body,
+                    baseBody,
                     review.previous_summary_body,
                     review.previous_summary_head_sha,
                     {
@@ -1686,8 +1723,13 @@ export async function POST(
                   instanceUrl
                 );
                 if (existing) {
+                  // Inject the code-owned Council Review section first (no-op for non-council),
+                  // then history + footer, so the whole note updates in a single PUT.
+                  const baseBody = councilSection
+                    ? upsertCouncilVerdictInBody(existing.body, councilSection)
+                    : existing.body;
                   const bodyWithHistory = appendPreviousReviewSummaryHistory(
-                    existing.body,
+                    baseBody,
                     review.previous_summary_body,
                     review.previous_summary_head_sha
                   );

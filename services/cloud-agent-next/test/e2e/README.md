@@ -69,6 +69,15 @@ containment flags.
 
 ## Running
 
+> **Non-zero port offset:** the commands below use the default ports
+> (`8794`/`8811`), which only match a zero-offset session. For any other
+> session, first read the offset from `pnpm dev:status --json`
+> (`portOffset` field), then prefix every driver invocation with
+> `WORKER_URL=http://localhost:<8794 + portOffset>` and
+> `FAKE_LLM_URL=http://localhost:<8811 + portOffset>`. Without these the
+> driver silently hits the wrong Worker/fake-LLM and every scenario fails
+> at connection. See the env-var table below for the full list.
+
 Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.3.54`):
 
 ```bash
@@ -137,7 +146,9 @@ in local dev, so the harness identifies each newly-created sandbox instead of
 killing every sandbox between cases. Kill scenarios only terminate the sandbox
 family created for that scenario.
 
-Per-run overrides via env vars:
+Per-run overrides via env vars. Defaults assume a zero-offset session;
+for any other offset, compute the real ports from `pnpm dev:status --json`
+(worker = `8794 + portOffset`, fake-LLM = `8811 + portOffset`):
 
 | Var | Default |
 |---|---|
@@ -263,7 +274,33 @@ the newer `start` / `send` procedures. `prepareSession` requires
   confirm kilo is hitting it.
 - **`waitForGateEngaged` timed out** — kilo never reached the fake LLM. Most
   common cause: `KILO_OPENROUTER_BASE` still points at a real provider or the
-  fake service is not running.
+  fake service is not running. Confirm with `curl -s $FAKE_LLM_URL/test/requests`
+  (expect a rising `chatCompletions` count as kilo dials the fake) and
+  `tail -f dev/logs/fake-llm.log` — a stream that stays empty while a turn is
+  "preparing" means the wrapper never started, not a fake-LLM problem.
+- **`Worker "git-token-service-dev" not found` in `cloud-agent-next.log`** —
+  the `GIT_TOKEN_SERVICE` service binding could not resolve. The Worker log
+  shows the failure as `Failed to issue Kilo session capability` and the turn
+  terminates immediately with `cloud.message.failed`. Cause: the
+  `cloudflare-git-token-service` dev process is up on its port but stale and
+  not heartbeating into the shared dev-registry (check
+  `.wrangler/dev-registry/` for a missing `git-token-service-dev` entry). Fix:
+  `pnpm dev:restart cloudflare-git-token-service`, then confirm the entry
+  reappears. The fake LLM is irrelevant here — kilo never gets far enough to
+  dial it.
+- **Matrix fails intermittently with `preparing×N` and no terminal** —
+  environmental, not a regression. The `@cloudflare/containers` library's
+  container control connection sometimes returns 503 under Docker Desktop
+  load, triggering exponential-backoff retries that consume the scenario
+  timeout. The `smoke.ts` matrix now kills stale containers before starting
+  and uses a 120s per-scenario timeout, but this is not always enough. If
+  the matrix is flaky: (1) stop any competing dev session from another
+  worktree that also runs Cloud Agent sandboxes; (2) prune stopped containers
+  (`docker ps -a --filter status=exited --format '{{.Names}}' | rg
+  workerd-cloud-agent | xargs -r docker rm -f`); (3) restart
+  `cloud-agent-next` to clear stale DO alarm timers; (4) re-run the failing
+  scenario standalone — if it passes alone, the matrix failure was Docker
+  contention, not code.
 - **`releaseGate` returned 404** — the gate already went away, usually
   because the wrapper's request was aborted (e.g. by an `interruptSession`).
   Queue-interrupt-clears tolerates this; other scenarios treat it as an

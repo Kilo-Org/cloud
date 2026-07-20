@@ -134,9 +134,9 @@ export function computeCouncilResultForReview(params: {
 export async function finalizeCouncilResultForReview(params: {
   review: CloudAgentCodeReview;
   lastAssistantMessageText: string | null | undefined;
-}): Promise<void> {
+}): Promise<CodeReviewCouncilResult | null> {
   const councilResult = computeCouncilResultForReview(params);
-  if (!councilResult) return;
+  if (!councilResult) return null;
 
   await setCodeReviewCouncilResult(params.review.id, councilResult);
 
@@ -145,4 +145,6 @@ export async function finalizeCouncilResultForReview(params: {
     decision: councilResult.decision,
     specialistCount: councilResult.specialists.length,
   });
+
+  return councilResult;
 }

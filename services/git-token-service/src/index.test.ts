@@ -1765,8 +1765,18 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
     }
   );
 
-  it('issues an opaque project-source capability for a code-review repository without exposing its token', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ id: 42 })));
+  it('issues an opaque project-source capability from a GitLab project response without exposing its token', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          id: 42,
+          name: 'widgets',
+          path_with_namespace: 'acme/widgets',
+          web_url: 'https://gitlab.com/acme/widgets',
+        })
+      )
+    );
     serviceMocks.findAuthorizedGitLabIntegrations.mockResolvedValueOnce({
       success: true,
       integrations: [

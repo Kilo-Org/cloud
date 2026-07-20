@@ -54,7 +54,12 @@ export type LifecycleArgs = {
    * surface the web UI still uses.
    */
   api?: ApiVersion;
-  /** Overall per-scenario timeout. Conservative default for cold-boot paths. */
+  /**
+   * Overall per-scenario timeout. Conservative default for cold-boot paths.
+   * 120s gives margin over the wrapper startup path (3 attempts × 30s
+   * waitForPort) plus ensureSessionReady, which can collectively approach 90s
+   * under Docker contention.
+   */
   timeoutMs?: number;
 };
 
@@ -91,7 +96,7 @@ async function snapshotSandboxIds(): Promise<Set<string>> {
  */
 export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   try {
     const knownSandboxIds = await snapshotSandboxIds();
     const sessionResult = await startSession(config, { prompt: fakeDirective(conversation) }, api);
@@ -268,7 +273,7 @@ export async function lifecycleFollowup(args: LifecycleArgs): Promise<LifecycleR
  */
 export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   const coldDirective = conversation && conversation !== '_' ? conversation : 'echo:hi';
   const hotDirectives = ['echo:hot', 'slow:3:50', 'echo:followup'];
   const events: StreamEvent[] = [];
@@ -371,7 +376,7 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
  */
 export async function lifecycleExternalKill(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   try {
     // 1. Bring a sandbox up with a warm-up echo.
     const knownSandboxIds = await snapshotSandboxIds();
@@ -462,7 +467,7 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
  */
 export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   const gateTag = 'killmid';
   try {
     const knownSandboxIds = await snapshotSandboxIds();
@@ -484,7 +489,7 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
 
     // Wait until kilo has dialed the fake LLM and the turn is parked —
     // deterministic proof the sandbox is truly mid-flight.
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       stream.close();
       return {
@@ -638,7 +643,7 @@ export async function lifecycleQueueWhileBusy(args: LifecycleArgs): Promise<Life
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       stream.close();
       return {
@@ -913,7 +918,7 @@ export async function lifecycleQueueOverflow(args: LifecycleArgs): Promise<Lifec
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       stream.close();
       return {
@@ -1041,7 +1046,7 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       stream.close();
       return {
@@ -1339,7 +1344,7 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       stream.close();
       return {
@@ -1566,7 +1571,7 @@ function callbackPayloadsForSession(
  */
 export async function lifecycleCallbackCompletion(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, conversation, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'callback-completion';
   const directive = conversation || 'echo:done';
   const expectedText = directive.startsWith('echo:') ? directive.slice('echo:'.length) : undefined;
@@ -1704,7 +1709,7 @@ export async function lifecycleCallbackBatchFollowup(
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       const events = [...stream.events];
       stream.close();
@@ -1916,7 +1921,7 @@ export async function lifecycleCallbackBatchFollowup(
  */
 export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, timeoutMs = 90_000, api = 'unified' } = args;
+  const { config, timeoutMs = 120_000, api = 'unified' } = args;
   const scenarioName = 'callback-interrupt';
   const gateTag = 'callback-interrupt';
   let sink: CallbackServerHandle | null = null;
@@ -1946,7 +1951,7 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
       };
     }
 
-    const engaged = await waitForGateEngaged(config, gateTag, 90_000);
+    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
     if (!engaged) {
       stream.close();
       return {

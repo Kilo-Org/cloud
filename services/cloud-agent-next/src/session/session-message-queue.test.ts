@@ -316,7 +316,39 @@ describe('recordPendingFlushFailure backoff progression', () => {
 });
 
 describe('flushNextPendingSessionMessage', () => {
-  it('retries a queued flush after a pre-start failure without dropping the message', async () => {
+  it('does not retry a delivery whose sandbox capability is intentionally unavailable', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'cannot deliver here',
+        createdAt: 1,
+      })
+    );
+
+    const result = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver: async () => ({
+        success: false,
+        code: 'SANDBOX_CAPABILITY_UNAVAILABLE',
+        error: 'Runtime delivery is disabled',
+      }),
+    });
+
+    expect(result).toMatchObject({
+      type: 'failure',
+      attempts: 1,
+      exhausted: true,
+      nextFlushAttemptAt: undefined,
+    });
+  });
+
+  it('retries an ordinary wrapper bootstrap failure without dropping the message', async () => {
     const storage = createMemoryStorage();
     const message = createPendingSessionMessage({
       messageId: FIRST_MESSAGE_ID,
@@ -339,8 +371,8 @@ describe('flushNextPendingSessionMessage', () => {
       .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
       .mockResolvedValueOnce({
         success: false,
-        code: 'WORKSPACE_SETUP_FAILED',
-        error: 'workspace restore failed',
+        code: 'WRAPPER_START_FAILED',
+        error: 'wrapper bootstrap failed',
       })
       .mockResolvedValueOnce({
         success: true,

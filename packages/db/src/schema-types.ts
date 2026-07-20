@@ -1492,6 +1492,12 @@ export const CodeReviewAgentConfigSchema = z.object({
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
   // Per-repository model overrides. Absent/empty = every repo uses the global model_slug.
   repository_model_overrides: z.array(RepositoryModelOverrideSchema).optional(),
+  // Per-repository council opt-in. A repository whose ID is listed here runs the COUNCIL review
+  // type on automated (webhook) reviews, using the single org-level `council` config above.
+  // Absent/empty = no repo runs council automatically. Only meaningful when the org is
+  // council-entitled and `council` is configured + active; the automated trigger re-checks both.
+  // Matched against the platform repository ID the same way as `selected_repository_ids`.
+  council_enabled_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.

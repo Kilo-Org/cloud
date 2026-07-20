@@ -551,12 +551,32 @@ describe('presets', () => {
 });
 
 describe('determineAutomatedReviewType', () => {
-  it('is a safe stub that always returns standard', () => {
-    expect(determineAutomatedReviewType({}, { councilAvailable: true })).toBe('standard');
+  const ALL_ON = {
+    councilEntitled: true,
+    councilConfigActive: true,
+    councilEnabledForRepo: true,
+  };
+
+  it('returns council only when entitled AND config active AND repo opted in', () => {
+    expect(determineAutomatedReviewType({}, ALL_ON)).toBe('council');
+  });
+
+  it('falls back to standard when any condition is missing (fail-safe)', () => {
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilEntitled: false })).toBe('standard');
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilConfigActive: false })).toBe(
+      'standard'
+    );
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilEnabledForRepo: false })).toBe(
+      'standard'
+    );
+  });
+
+  it('does not use SCM-controlled PR facts (a "council" label cannot force council)', () => {
+    // Entitlement/config/opt-in are Kilo-side; a dev-controlled label must not upgrade the type.
     expect(
       determineAutomatedReviewType(
         { isDraft: false, labels: ['council'], changedFileCount: 40 },
-        { councilAvailable: true }
+        { councilEntitled: false, councilConfigActive: false, councilEnabledForRepo: false }
       )
     ).toBe('standard');
   });

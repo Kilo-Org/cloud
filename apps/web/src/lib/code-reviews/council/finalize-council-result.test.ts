@@ -1,7 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import { COUNCIL_RESULT_MARKER_TAG } from '@kilocode/worker-utils/code-review-council';
-import type { CodeReviewCouncilConfig } from '@kilocode/db/schema-types';
-import { buildCouncilResult } from './finalize-council-result';
+import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import type { CodeReviewAgentConfig, CodeReviewCouncilConfig } from '@kilocode/db/schema-types';
+import { buildCouncilResult, computeCouncilResultForReview } from './finalize-council-result';
 
 const council: CodeReviewCouncilConfig = {
   enabled: true,
@@ -183,5 +184,50 @@ describe('buildCouncilResult', () => {
     });
     expect(result.decision).toBe('block');
     expect(result.specialists.every(s => s.vote === null)).toBe(true);
+  });
+});
+
+describe('computeCouncilResultForReview — automated (webhook) council config source', () => {
+  // Webhook council reviews carry no manual_config; the council config comes from the org config.
+  const webhookReview = {
+    review_type: 'council',
+    manual_config: null,
+  } as unknown as CloudAgentCodeReview;
+  const orgAgentConfig = { model_slug: 'base/model', council } as unknown as CodeReviewAgentConfig;
+  const manifest = manifestText([
+    { specialistId: 'security', findings: crit },
+    { specialistId: 'performance', findings: [] },
+  ]);
+
+  it('falls back to the org agent config when there is no manual_config', () => {
+    const result = computeCouncilResultForReview({
+      review: webhookReview,
+      lastAssistantMessageText: manifest,
+      orgAgentConfig,
+    });
+    expect(result?.decision).toBe('block'); // unanimous + one critical
+    expect(result?.specialists).toHaveLength(2);
+    expect(result?.specialists[0].model).toBe('anthropic/x'); // configured per-specialist model
+    expect(result?.specialists[1].model).toBe('base/model'); // inherits the org base model
+  });
+
+  it('returns null for a webhook council review when no org config is available (fail-safe)', () => {
+    expect(
+      computeCouncilResultForReview({
+        review: webhookReview,
+        lastAssistantMessageText: manifest,
+        orgAgentConfig: null,
+      })
+    ).toBeNull();
+  });
+
+  it('returns null for a non-council review even with an org council config', () => {
+    expect(
+      computeCouncilResultForReview({
+        review: { review_type: 'standard', manual_config: null } as unknown as CloudAgentCodeReview,
+        lastAssistantMessageText: manifest,
+        orgAgentConfig,
+      })
+    ).toBeNull();
   });
 });

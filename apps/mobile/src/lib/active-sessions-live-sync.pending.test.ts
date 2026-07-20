@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ActiveSessionsLiveSync,
+  makeCached,
   makeConnection,
   makeFakeQueryClient,
   makeQueryFn,
   QUERY_KEY,
+  setupNow,
   setupTimers,
   type SystemEvent,
 } from '@/lib/active-sessions-live-sync.test-helpers';
@@ -94,6 +96,72 @@ describe('ActiveSessionsLiveSync — pending-reason semantics', () => {
     expect(sync.getPendingReasons().has('cli-connected')).toBe(true);
     // Genuine failures must NOT tight-loop; only a cancellation or a new
     // reason can trigger an immediate re-kick.
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not immediately retry a failed enrichment queued by a successful fetch', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    const queryFn = makeQueryFn();
+    const { now, advance } = setupNow();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn,
+      now,
+    });
+    sync.attach();
+
+    sync.scheduleRefresh('cli-connected');
+    await sync.getFetchQueue();
+    qc.__triggerFetchResolve({ sessions: [makeCached({ id: 'a' })] });
+    await sync.getFetchCompletion();
+    await sync.getFetchQueue();
+
+    expect(sync.getPendingReasons()).toEqual(new Set(['enrichment']));
+    expect(queryFn).toHaveBeenCalledTimes(2);
+
+    qc.__triggerFetchReject(new Error('network down'));
+    await sync.getFetchCompletion();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(queryFn).toHaveBeenCalledTimes(2);
+
+    advance(10_001);
+    const heartbeat: SystemEvent = {
+      event: 'sessions.heartbeat',
+      data: {
+        connectionId: 'c1',
+        sessions: [{ id: 'a', status: 'running', title: 'A' }],
+      },
+    };
+    conn.__fireSystem(heartbeat);
+    await sync.getWriteQueue();
+    await sync.getFetchQueue();
+    expect(queryFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not schedule enrichment after a fully enriched cli-connected fetch', async () => {
+    const conn = makeConnection();
+    const qc = makeFakeQueryClient();
+    const queryFn = makeQueryFn();
+    const sync = new ActiveSessionsLiveSync({
+      connection: conn,
+      queryClient: qc,
+      queryKey: QUERY_KEY,
+      queryFn,
+    });
+    sync.attach();
+
+    sync.scheduleRefresh('cli-connected');
+    await sync.getFetchQueue();
+    qc.__triggerFetchResolve({
+      sessions: [makeCached({ id: 'a', createdOnPlatform: 'cli' })],
+    });
+    await sync.getFetchCompletion();
+
+    expect(sync.getPendingReasons()).toEqual(new Set());
     expect(queryFn).toHaveBeenCalledTimes(1);
   });
 

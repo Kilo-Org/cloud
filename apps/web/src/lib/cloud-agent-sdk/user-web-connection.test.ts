@@ -1801,6 +1801,24 @@ describe('createUserWebConnection connection-state API', () => {
     expect(listener.mock.calls.map(call => call[0])).toEqual([true, false]);
   });
 
+  it('ignores connection-state listeners registered after destroy()', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.destroy();
+    const listener = jest.fn();
+
+    const addSpy = jest.spyOn(Set.prototype, 'add');
+    try {
+      const unsubscribe = client.onConnectionChange(listener);
+      expect(addSpy).not.toHaveBeenCalled();
+      unsubscribe();
+    } finally {
+      addSpy.mockRestore();
+    }
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(client.isConnected()).toBe(false);
+  });
+
   it('flips disconnected → connected across a pong-timeout-triggered reconnect', async () => {
     jest.useFakeTimers();
     try {

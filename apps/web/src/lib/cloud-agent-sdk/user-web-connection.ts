@@ -627,6 +627,7 @@ function createUserWebConnection(
     },
     isConnected: () => connected,
     onConnectionChange(listener) {
+      if (destroyed) return () => {};
       connectionChangeListeners.add(listener);
       return () => {
         connectionChangeListeners.delete(listener);

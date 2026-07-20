@@ -269,28 +269,32 @@ export class ActiveSessionsLiveSync {
   }
 
   private maybeScheduleEnrichmentRefresh(): void {
-    const cached = this.queryClient.getQueryData<CachedActiveSessionsData>(this.queryKey);
-    const sessions = cached?.sessions ?? [];
-    if (!hasUnenrichedLiveId(sessions)) {
+    this.updateEnrichmentReason();
+    if (this.pendingReasons.has('enrichment') && !this.inFlightReasons?.has('enrichment')) {
+      this.kickFetch();
+    }
+  }
+
+  private updateEnrichmentReason(): void {
+    const cachedSessions =
+      this.queryClient.getQueryData<CachedActiveSessionsData>(this.queryKey)?.sessions ?? [];
+    if (!hasUnenrichedLiveId(cachedSessions)) {
       this.pendingReasons.delete('enrichment');
       return;
     }
 
-    // Do not interrupt an in-flight enrichment; it will either succeed or
-    // be retried via the normal pending-reason path.
     if (this.inFlightReasons?.has('enrichment')) {
       return;
     }
 
-    const now = this.now();
     if (
-      this.lastEnrichmentAttemptAt !== null &&
-      now - this.lastEnrichmentAttemptAt < ENRICHMENT_RETRY_MIN_INTERVAL_MS
+      this.lastEnrichmentAttemptAt === null ||
+      this.now() - this.lastEnrichmentAttemptAt >= ENRICHMENT_RETRY_MIN_INTERVAL_MS
     ) {
-      return;
+      this.pendingReasons.add('enrichment');
+    } else {
+      this.pendingReasons.delete('enrichment');
     }
-
-    this.scheduleRefresh('enrichment');
   }
 
   private notifyFetchStart(): void {
@@ -380,23 +384,13 @@ export class ActiveSessionsLiveSync {
       for (const r of inFlightReasons) {
         this.pendingReasons.delete(r);
       }
-    }
-    // An enrichment reason is only meaningful while the cache still has
-    // at least one unenriched live id. If it left or enriched, drop the
-    // stale reason so it cannot drive pointless retries.
-    if (this.pendingReasons.has('enrichment')) {
-      const cached = this.queryClient.getQueryData<CachedActiveSessionsData>(this.queryKey);
-      if (!hasUnenrichedLiveId(cached?.sessions ?? [])) {
-        this.pendingReasons.delete('enrichment');
-      }
+      this.updateEnrichmentReason();
     }
     const hasNewReasons = [...this.pendingReasons].some(reason => !inFlightReasons.has(reason));
     // Read via helper so control-flow analysis does not treat the field as
     // stuck at the `false` written above — other methods flip it during await.
     const wasCanceled = this.readInFlightFetchCanceled();
     this.inFlightReasons = null;
-    // Signal completion (success or failure) so tests waiting on
-    // getFetchCompletion() can inspect the updated state.
     this.notifyFetchCompletion();
     // Re-kick immediately only when a replacement fetch is genuinely
     // warranted: either the in-flight fetch was intentionally canceled by

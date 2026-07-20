@@ -2,7 +2,7 @@ import { type RemoteAttachmentPart, type ResolvedSession } from 'cloud-agent-sdk
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 
-export type BuildRemoteAttachmentPartsResult =
+type BuildRemoteAttachmentPartsResult =
   | { ok: true; parts: RemoteAttachmentPart[] }
   | { ok: false; message: string };
 

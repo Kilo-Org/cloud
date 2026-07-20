@@ -644,6 +644,20 @@ describe('buildCouncilReviewSection', () => {
     expect(section).toContain('No specialist raised a blocking finding');
   });
 
+  it('states the outvoted block count on a majority pass that still had blocking votes', () => {
+    const section = buildCouncilReviewSection(
+      councilResult('pass', ['block', 'pass', 'pass', 'pass'], 'majority'),
+      { gates: true }
+    );
+    expect(section).toContain('**Decision: Approved** (Majority governance)');
+    expect(section).toContain('1 block, 3 pass');
+    // The contradictory "No specialist raised a blocking finding" must not appear here.
+    expect(section).not.toContain('No specialist raised a blocking finding');
+    expect(section).toContain(
+      '1 specialist raised a blocking finding, but the passing votes carried the Majority decision.'
+    );
+  });
+
   it('renders an advisory section with governance info but no merge decision', () => {
     const section = buildCouncilReviewSection(councilResult(null, ['pass', 'block'], 'advisory'), {
       gates: false,

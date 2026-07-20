@@ -583,7 +583,12 @@ export function buildCouncilReviewSection(
       : 'This manual review reports the decision but does not block merge. An automated review with this decision would block merge until the blocking findings are addressed.';
   } else if (result.decision === 'pass') {
     decisionLine = `**Decision: Approved** (${governanceLabel} governance)`;
-    detailLine = 'No specialist raised a blocking finding.';
+    // Under majority governance a pass can still carry blocking votes (they were outvoted); only
+    // claim "no blocking finding" when that is actually true, otherwise state the outvoted count.
+    detailLine =
+      blockVotes > 0
+        ? `${blockVotes} specialist${blockVotes === 1 ? '' : 's'} raised a blocking finding, but the passing votes carried the ${governanceLabel} decision.`
+        : 'No specialist raised a blocking finding.';
   } else {
     // Advisory: the governance label already reads "Advisory (report only)", so don't repeat it
     // in the decision line — the governance-mode line below states it once.

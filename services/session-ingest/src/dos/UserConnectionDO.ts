@@ -20,6 +20,8 @@ type HeartbeatSession = {
   parentSessionId?: string;
 };
 
+type ConnectionCapabilities = { attachments?: boolean };
+
 type WSAttachment =
   | {
       role: 'cli';
@@ -29,6 +31,11 @@ type WSAttachment =
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
       // predates this field entirely. Both cases fall back to legacy behavior.
       protocolVersion?: string;
+      // Latest capabilities advertised by this connection. Undefined means
+      // either the CLI hasn't sent its first heartbeat, or it's a legacy
+      // build that predates the capabilities field — both surface as no
+      // opt-in features.
+      capabilities?: ConnectionCapabilities;
       // Set from the authenticated /user/cli route; undefined on sockets
       // accepted before this field existed. Needed for the session-ready push.
       kiloUserId?: string;
@@ -140,6 +147,8 @@ export class UserConnectionDO extends DurableObject<Env> {
   private connectionSessions = new Map<string, HeartbeatSession[]>();
   // Protocol version per CLI connection (from heartbeat); absent = legacy CLI
   private connectionProtocolVersion = new Map<string, string | undefined>();
+  // Capabilities per CLI connection (from heartbeat); absent = legacy CLI
+  private connectionCapabilities = new Map<string, ConnectionCapabilities | undefined>();
   // Pending command responses: correlationId → originating web socket
   private pendingCommands = new Map<
     string,
@@ -172,9 +181,10 @@ export class UserConnectionDO extends DurableObject<Env> {
 
       if (attachment.role === 'cli') {
         cliCount++;
-        const { connectionId, sessions, protocolVersion } = attachment;
+        const { connectionId, sessions, protocolVersion, capabilities } = attachment;
         this.connectionSessions.set(connectionId, sessions);
         this.connectionProtocolVersion.set(connectionId, protocolVersion);
+        this.connectionCapabilities.set(connectionId, capabilities);
         sessionCount += sessions.length;
         for (const session of sessions) {
           this.sessionOwners.set(session.id, connectionId);
@@ -376,7 +386,7 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     switch (msg.type) {
       case 'heartbeat':
-        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion);
+        this.handleHeartbeat(ws, attachment, msg.sessions, msg.protocolVersion, msg.capabilities);
         break;
       case 'event':
         this.handleCliEvent(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
@@ -391,12 +401,14 @@ export class UserConnectionDO extends DurableObject<Env> {
     ws: WebSocket,
     attachment: WSAttachment & { role: 'cli' },
     sessions: HeartbeatSession[],
-    protocolVersion: string | undefined
+    protocolVersion: string | undefined,
+    capabilities: ConnectionCapabilities | undefined
   ): void {
     const { connectionId } = attachment;
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
+    this.connectionCapabilities.set(connectionId, capabilities);
     this.scheduleNextAlarm(now);
 
     // Remove sessions this connection previously owned but no longer reports
@@ -439,6 +451,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       connectionId,
       sessions,
       protocolVersion,
+      capabilities,
       kiloUserId: attachment.kiloUserId,
     };
     ws.serializeAttachment(updatedAttachment);
@@ -460,7 +473,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       const msg: WebInboundMessage = {
         type: 'system',
         event: 'sessions.heartbeat',
-        data: { connectionId, protocolVersion, sessions },
+        data: { connectionId, protocolVersion, capabilities, sessions },
       };
       for (const ws2 of subscribers) {
         this.sendToWeb(ws2, msg);
@@ -827,6 +840,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
     this.connectionSessions.delete(connectionId);
     this.connectionProtocolVersion.delete(connectionId);
+    this.connectionCapabilities.delete(connectionId);
     this.lastHeartbeatAt.delete(connectionId);
 
     console.log('CLI socket disconnected', {
@@ -887,7 +901,11 @@ export class UserConnectionDO extends DurableObject<Env> {
   // ---------------------------------------------------------------------------
 
   getActiveSessions(): Array<
-    HeartbeatSession & { connectionId: string; protocolVersion?: string }
+    HeartbeatSession & {
+      connectionId: string;
+      protocolVersion?: string;
+      capabilities?: ConnectionCapabilities;
+    }
   > {
     this.ensureState();
     return this.aggregateSessions();
@@ -1072,7 +1090,11 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   private aggregateSessions(): Array<
-    HeartbeatSession & { connectionId: string; protocolVersion?: string }
+    HeartbeatSession & {
+      connectionId: string;
+      protocolVersion?: string;
+      capabilities?: ConnectionCapabilities;
+    }
   > {
     // Build set of connectionIds that still have a live CLI WebSocket.
     // This guards against stale entries that persist if a close event is delayed.
@@ -1082,13 +1104,25 @@ export class UserConnectionDO extends DurableObject<Env> {
       if (att?.role === 'cli') liveConnectionIds.add(att.connectionId);
     }
 
-    const result: Array<HeartbeatSession & { connectionId: string; protocolVersion?: string }> = [];
+    const result: Array<
+      HeartbeatSession & {
+        connectionId: string;
+        protocolVersion?: string;
+        capabilities?: ConnectionCapabilities;
+      }
+    > = [];
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
       const protocolVersion = this.connectionProtocolVersion.get(connectionId);
+      const capabilities = this.connectionCapabilities.get(connectionId);
       for (const session of sessions) {
         if (session.parentSessionId) continue;
-        result.push({ ...session, connectionId, ...(protocolVersion ? { protocolVersion } : {}) });
+        result.push({
+          ...session,
+          connectionId,
+          ...(protocolVersion ? { protocolVersion } : {}),
+          ...(capabilities ? { capabilities } : {}),
+        });
       }
     }
     return result;

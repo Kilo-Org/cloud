@@ -4,13 +4,19 @@ import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken } from '@/lib/tokens';
 
-const activeSessionSchema = z.object({
+export const activeSessionSchema = z.object({
   id: z.string(),
   status: z.string(),
   title: z.string(),
   connectionId: z.string(),
   gitUrl: z.string().optional(),
   gitBranch: z.string().optional(),
+  /**
+   * Capabilities advertised by the CLI connection that owns this session.
+   * Omitted when the owning connection's latest heartbeat did not include a
+   * capabilities object (legacy CLI, or a CLI that predates the field).
+   */
+  capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
 });
 
 const activeSessionsResponseSchema = z.object({

@@ -37,9 +37,11 @@ import {
   baseCloseTerminalNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
+  cloudAgentGetAttachmentDownloadUrlSchema,
 } from './cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
+  generateCloudAgentAttachmentDownloadUrl,
   generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
@@ -359,6 +361,21 @@ export const cloudAgentNextRouter = createTRPCRouter({
         contentType: input.contentType,
         contentLength: input.contentLength,
         ...(input.extension ? { extension: input.extension } : {}),
+      });
+    }),
+
+  /**
+   * Generate a presigned download URL for a stored Cloud Agent attachment.
+   * Personal scope only: the key prefix is derived from the caller (author).
+   * No org mirror — remote CLI sessions are personal.
+   */
+  getAttachmentDownloadUrl: baseProcedure
+    .input(cloudAgentGetAttachmentDownloadUrlSchema)
+    .mutation(async ({ ctx, input }) => {
+      return generateCloudAgentAttachmentDownloadUrl({
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        filename: input.filename,
       });
     }),
 

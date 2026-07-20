@@ -35,7 +35,7 @@ export const sessions = sqliteTable(
  * response WHENEVER state is `pending` (fresh insert or replay). The dispatching caller
  * flips the state to `dispatched` once the attempt reaches a terminal local decision.
  *
- * `identity` is `agent_notification:<data.id>` — the same form the ingest item table
+ * `identity` is `agent_notification/<data.id>` — the same form the ingest item table
  * uses (`getItemIdentity()` returns `agent_notification/<data.id>`; we use the typed
  * dispatch table form for clarity, but a downstream marker query joins on the
  * well-known prefix).

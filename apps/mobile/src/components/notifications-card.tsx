@@ -99,7 +99,10 @@ export function NotificationsCard() {
     isLoading: agentPushLoading,
     isError: agentPushError,
     refetch: refetchAgentPush,
-  } = useQuery(trpc.user.getNotificationPreferences.queryOptions());
+  } = useQuery({
+    ...trpc.user.getNotificationPreferences.queryOptions(),
+    enabled: isAuthenticated,
+  });
 
   const agentPushQueryKey = trpc.user.getNotificationPreferences.queryOptions().queryKey;
 

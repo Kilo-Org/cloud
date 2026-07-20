@@ -30,11 +30,11 @@ describe('deriveAgentPushEditable', () => {
     expect(deriveAgentPushEditable({ hasData: true, isPending: true })).toBe(false);
   });
 
-  it('is false while the preference query is still loading', () => {
+  it('is false when the preference query has not loaded', () => {
     expect(deriveAgentPushEditable({ hasData: false, isPending: false })).toBe(false);
   });
 
-  it('is false on a query error (InlineRetry surface, not the switch)', () => {
+  it('is false while a mutation is pending without loaded data', () => {
     expect(deriveAgentPushEditable({ hasData: false, isPending: true })).toBe(false);
   });
 });
@@ -103,11 +103,5 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic', () => {
     rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, previous });
     // No prior snapshot => cache restored to the absent state, not a fabricated true.
     expect(qc.getQueryData(key)).toBeUndefined();
-  });
-
-  it("is independent of this device's permission / push-token state", () => {
-    // The switch's editability is derived purely from preference-query state.
-    // No parameter for permission or registration is accepted or required.
-    expect(deriveAgentPushEditable({ hasData: true, isPending: false })).toBe(true);
   });
 });

@@ -849,6 +849,43 @@ describe('NotificationChannelDO.dispatchPush — agent rate limit', () => {
     expect(sixth.kind).toBe('suppressed_rate_limit');
   });
 
+  it('does not re-consume a rate-limit slot when retrying a failed no-badge agent notification', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-rl', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('send failed'));
+    const stub = getDO('user-rl-retry');
+    const input = agentInput({}, 'retry');
+
+    const first = await stub.dispatchPush(input);
+    expect(first.kind).toBe('failed');
+
+    // The failed attempt should have left the idempotency key as `pending`
+    // and consumed exactly one rate-limit slot.
+    const storedAfterFirst = await runInDurableObject(stub, async (_inst, state) => ({
+      idem: await state.storage.get<{ stage: string }>(`idem:${input.idempotencyKey}`),
+      rl: await state.storage.get<{ timestamps: number[] }>(`rl:${input.rateLimit?.key}`),
+    }));
+    expect(storedAfterFirst.idem).toMatchObject({ stage: 'pending' });
+    expect(storedAfterFirst.rl?.timestamps).toHaveLength(1);
+
+    const retry = await stub.dispatchPush(input);
+    expect(retry.kind).toBe('delivered');
+
+    // The retry should not have consumed another slot.
+    const rlAfterRetry = await runInDurableObject(stub, async (_inst, state) =>
+      state.storage.get<{ timestamps: number[] }>(`rl:${input.rateLimit?.key}`)
+    );
+    expect(rlAfterRetry?.timestamps).toHaveLength(1);
+
+    // A fresh notification id for the same session window should consume.
+    const fresh = await stub.dispatchPush(agentInput({}, 'fresh'));
+    expect(fresh.kind).toBe('delivered');
+    const rlAfterFresh = await runInDurableObject(stub, async (_inst, state) =>
+      state.storage.get<{ timestamps: number[] }>(`rl:${input.rateLimit?.key}`)
+    );
+    expect(rlAfterFresh?.timestamps).toHaveLength(2);
+  });
+
   it('a presence-suppressed attempt does not consume rate-limit quota', async () => {
     installDbMock({ tokens: [{ user_id: 'user-rl-pres', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);

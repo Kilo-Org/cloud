@@ -93,16 +93,27 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }
 
     // 3. Rate limit. Per §4.6: only attempts that pass the check consume
-    //    quota; suppressed/presence-suppressed attempts never reach this
-    //    point. A rejected attempt records its idempotency key with the
-    //    outcome so replays dedup as `duplicate` (drop, never defer).
-    if (input.rateLimit) {
+    //    quota on the first attempt; retries reuse the slot already consumed.
+    //    Suppressed/presence-suppressed attempts never reach this point.
+    //    A rejected attempt records its idempotency key with the outcome so
+    //    replays dedup as `duplicate` (drop, never defer).
+    if (input.rateLimit && !isRetry) {
       const rl = await this.checkAndConsumeRateLimit(input.rateLimit);
       if (rl.kind === 'rejected') {
         const ts = Date.now();
         await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'suppressed_rate_limit', ts });
         await this.ensureCleanupAlarm(ts);
         return { kind: 'suppressed_rate_limit' };
+      }
+
+      // Agent notifications have no badge, so the badge path below never
+      // writes a `pending` marker. A later send failure would otherwise leave
+      // the idempotency key empty and cause a replay to re-consume a quota
+      // slot. Mirror the badge path by marking `pending` before token/send.
+      if (!input.badge) {
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+        await this.ensureCleanupAlarm(ts);
       }
     }
 
@@ -162,7 +173,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       });
       await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
       await this.ensureCleanupAlarm(ts);
-      return { kind: 'delivered', tokenCount: 1 };
+      return { kind: 'delivered', tokenCount: tokens.length };
     }
 
     // 7. Send via Expo

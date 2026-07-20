@@ -77,7 +77,7 @@ type GitLabCandidateEvaluation =
   | { status: 'lookup_failed' }
   | { status: 'token_failed'; failure: GetGitLabTokenFailure };
 
-const GitLabProjectIdentitySchema = z.object({ id: z.number().int().positive() }).strict();
+const GitLabProjectIdentitySchema = z.object({ id: z.number().int().positive() });
 const MAX_PROJECT_LOOKUP_RESPONSE_BYTES = 16_000;
 
 function mapCredentialFailure(status: string, project = false): GetGitLabTokenFailure {

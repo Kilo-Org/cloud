@@ -19,6 +19,7 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { gemma_4_26b_a4b_it_free_model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
@@ -65,7 +66,13 @@ export const preferredModels = [
 ];
 
 export function isPdfSupportingModel(model: string): boolean {
-  return isClaudeModel(model) || isOpenAiModel(model) || isGrokModel(model) || isGeminiModel(model);
+  return (
+    isClaudeModel(model) ||
+    isOpenAiModel(model) ||
+    isGrokModel(model) ||
+    isGeminiModel(model) ||
+    isMuseModel(model)
+  );
 }
 
 export function isKiloExclusiveFreeModel(model: string): boolean {

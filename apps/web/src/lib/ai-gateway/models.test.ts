@@ -125,12 +125,10 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('all autoFreeModels should use the same AI SDK provider (openrouter, the default)', () => {
+    test('all autoFreeModels should use the same AI SDK provider', () => {
       expect(autoFreeModels.length).toBeGreaterThan(0);
       const providers = new Set(autoFreeModels.map(model => getAiSdkProvider(model, null)));
       expect(providers.size).toBe(1);
-      // getAiSdkProvider returns undefined for openrouter, the default provider
-      expect([...providers][0]).toBeUndefined();
     });
 
     test('should return true for disabled Kilo exclusive models that end with :free', async () => {

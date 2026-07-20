@@ -103,3 +103,78 @@ describe('organization review agent router: toggleReviewAgent', () => {
     expect(logs).toEqual([{ message: 'Enabled AI Code Review Agent for github' }]);
   });
 });
+
+describe('organization review agent router: council config', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  const activeCouncil = {
+    enabled: true as const,
+    aggregation_strategy: 'unanimous' as const,
+    specialists: [
+      {
+        id: 'security',
+        role: 'security' as const,
+        name: 'Security',
+        enabled: true,
+        required: false,
+        lens: 'x',
+      },
+      {
+        id: 'performance',
+        role: 'performance' as const,
+        name: 'Performance',
+        enabled: true,
+        required: false,
+        lens: 'y',
+      },
+    ],
+  };
+
+  it('getReviewConfig exposes council fields (null/empty by default)', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    const cfg = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+
+    expect(cfg.council).toBeNull();
+    expect(cfg.councilEnabledRepositoryIds).toEqual([]);
+  });
+
+  it('saves and reloads the council config + per-repo opt-ins for an entitled org', async () => {
+    // The fixture org has the trial bypass, which grants council entitlement (require_seats=false).
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      council: activeCouncil,
+      councilEnabledRepositoryIds: [123, 456],
+    });
+
+    const cfg = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(cfg.council?.enabled).toBe(true);
+    expect(cfg.council?.aggregation_strategy).toBe('unanimous');
+    expect(cfg.council?.specialists).toHaveLength(2);
+    expect(cfg.councilEnabledRepositoryIds).toEqual([123, 456]);
+  });
+});

@@ -584,22 +584,26 @@ export function ReviewConfigForm({
         }))
       : [];
 
-    // Council is org-only (requires an enterprise org). Persist the built config when the section
-    // is visible + enabled; otherwise clear it. Block the save if council is on but under-staffed.
-    if (councilUiEnabled && councilBelowMin) {
+    // Council lives entirely inside Advanced Settings, so turning Advanced off clears it on save
+    // (same as per-repo model overrides), matching the "every repository uses the global settings"
+    // copy. Only guard/persist council when the section is actually shown (Advanced + entitled).
+    const councilActiveForSave = perRepoOverridesEnabled && councilUiEnabled && councilEnabled;
+    if (councilActiveForSave && councilBelowMin) {
       toast.error('Council needs more specialists', {
         description: `Select at least ${COUNCIL_MIN_SPECIALISTS} council specialists.`,
       });
       return;
     }
-    const councilPayload =
-      councilUiEnabled && councilEnabled
-        ? {
-            enabled: true,
-            aggregation_strategy: councilAggregation,
-            specialists: buildCouncilSpecialists(councilSelections),
-          }
-        : null;
+    const councilPayload = councilActiveForSave
+      ? {
+          enabled: true,
+          aggregation_strategy: councilAggregation,
+          specialists: buildCouncilSpecialists(councilSelections),
+        }
+      : null;
+    const councilEnabledRepositoryIdsPayload = perRepoOverridesEnabled
+      ? Array.from(councilEnabledRepositoryIds)
+      : [];
 
     if (organizationId) {
       orgSaveMutation.mutate({
@@ -616,7 +620,7 @@ export function ReviewConfigForm({
         manuallyAddedRepositories,
         repositoryModelOverrides: repositoryModelOverridesPayload,
         council: councilPayload,
-        councilEnabledRepositoryIds: Array.from(councilEnabledRepositoryIds),
+        councilEnabledRepositoryIds: councilEnabledRepositoryIdsPayload,
         disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,

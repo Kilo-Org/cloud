@@ -12,6 +12,7 @@ const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
 const mockIsMergeCommit = jest.fn();
+const mockIsCouncilEntitledForOwner = jest.fn();
 
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: (organizationId: string, botType: string) =>
@@ -21,6 +22,10 @@ jest.mock('@/lib/bot-users/bot-user-service', () => ({
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({
   getAgentConfigForOwner: (owner: unknown, agentType: string, platform: string) =>
     mockGetAgentConfigForOwner(owner, agentType, platform),
+}));
+
+jest.mock('@/lib/code-reviews/core/council-entitlement', () => ({
+  isCouncilEntitledForOwner: (...args: unknown[]) => mockIsCouncilEntitledForOwner(...args),
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
@@ -117,6 +122,7 @@ beforeEach(() => {
   mockCancelReview.mockResolvedValue({ success: true, reviewId: 'old-review' });
   mockAddReactionToPR.mockResolvedValue(undefined);
   mockIsMergeCommit.mockResolvedValue(false);
+  mockIsCouncilEntitledForOwner.mockResolvedValue(false);
 });
 
 describe('resolvePullRequestCheckoutRef', () => {
@@ -283,6 +289,80 @@ describe('handlePullRequest', () => {
       { status: 'completed', conclusion: 'cancelled' },
       'standard'
     );
+  });
+
+  describe('automated council review type', () => {
+    const councilConfig = {
+      is_enabled: true,
+      config: {
+        council: {
+          enabled: true,
+          aggregation_strategy: 'unanimous',
+          specialists: [
+            {
+              id: 'security',
+              role: 'security',
+              name: 'Security',
+              enabled: true,
+              required: false,
+              lens: 'x',
+            },
+            {
+              id: 'performance',
+              role: 'performance',
+              name: 'Performance',
+              enabled: true,
+              required: false,
+              lens: 'y',
+            },
+          ],
+        },
+        // Repo 123 (acme/widgets, from pullRequestPayload) opted into council.
+        council_enabled_repository_ids: [123],
+      },
+    };
+
+    it('creates a council review when entitled + council active + repo opted in', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'council', repoFullName: 'acme/widgets' })
+      );
+    });
+
+    it('falls back to standard when the repo has not opted into council (entitlement not queried)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        ...councilConfig,
+        config: { ...councilConfig.config, council_enabled_repository_ids: [999] },
+      });
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+      // Entitlement is only looked up when the repo opted in + council is active.
+      expect(mockIsCouncilEntitledForOwner).not.toHaveBeenCalled();
+    });
+
+    it('falls back to standard when the org is not council-entitled', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(false);
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+      expect(mockIsCouncilEntitledForOwner).toHaveBeenCalled();
+    });
   });
 
   it('cancels superseded DB rows, interrupts queued/running only, and creates the new review', async () => {

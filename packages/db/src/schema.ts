@@ -10115,7 +10115,7 @@ export const container_usage_interval = pgTable(
       table.started_at
     ),
     uniqueIndex('UQ_container_usage_interval_single_open')
-      .on(table.instance_id)
+      .on(table.service, table.instance_id)
       .where(sql`${table.status} = 'open'`),
     check('container_usage_interval_subject_type', sql`${table.subject_type} IN ('user', 'org')`),
     check('container_usage_interval_actor_type', sql`${table.actor_type} IN ('user', 'bot')`),

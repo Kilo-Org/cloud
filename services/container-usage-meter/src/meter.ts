@@ -61,14 +61,16 @@ export class ContainerUsageMeter
     );
     const mutation = {
       operation: 'start' as const,
-      intervalId: intervalId(parsed.instanceId, parsed.startEpochMs),
+      intervalId: intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs),
       idempotencyKey: parsed.idempotencyKey,
       contextFingerprint: await usageContextFingerprint(context),
       payload: parsed,
       receivedAtMs: Date.now(),
     };
-    const shard = this.env.FAILOVER_BUFFER.getByName(failoverBufferShardName(parsed.instanceId));
-    const existing = await shard.getStartAdmission(mutation);
+    const shard = this.env.FAILOVER_BUFFER.getByName(
+      failoverBufferShardName(parsed.service, parsed.instanceId)
+    );
+    const existing = await shard.reserveStart(mutation);
     if (existing.status === 'accepted') {
       return {
         success: true,
@@ -83,7 +85,7 @@ export class ContainerUsageMeter
     }
 
     const admission = await validateStartSku(this.env, parsed.sku);
-    const decision = await shard.admitStart(mutation, admission);
+    const decision = await shard.finalizeStart(mutation, admission);
     if (decision.status === 'conflict') {
       throw new Error('Idempotency key was reused for a different usage mutation');
     }
@@ -93,6 +95,9 @@ export class ContainerUsageMeter
         error: { code: decision.code, message: decision.message },
       };
     }
+    if (decision.status === 'pending') {
+      throw new Error('Container usage start admission remains pending');
+    }
     return {
       success: true,
       ack: { intervalId: mutation.intervalId, durable: 'buffer', dedup: decision.dedup },
@@ -101,22 +106,21 @@ export class ContainerUsageMeter
 
   async recordHeartbeat(input: RecordHeartbeatInput): Promise<HeartbeatAck> {
     const parsed = recordHeartbeatInputSchema.parse(input);
-    if (parsed.context) assertContextMatches(parsed, parsed.context);
+    assertContextMatches(parsed, parsed.context);
     assertIdempotencyKey(
       parsed.idempotencyKey,
       heartbeatIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs, parsed.seq)
     );
-    const ack = await this.buffer(
+    const ack = await this.bufferAccepted(
       {
         operation: 'heartbeat',
-        intervalId: intervalId(parsed.instanceId, parsed.startEpochMs),
+        intervalId: intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs),
         idempotencyKey: parsed.idempotencyKey,
-        contextFingerprint: parsed.context
-          ? await usageContextFingerprint(parsed.context)
-          : undefined,
+        contextFingerprint: await usageContextFingerprint(parsed.context),
         payload: parsed,
         receivedAtMs: Date.now(),
       },
+      parsed.service,
       parsed.instanceId
     );
     return { ...ack, budget: { verdict: 'continue' } };
@@ -129,24 +133,32 @@ export class ContainerUsageMeter
       parsed.idempotencyKey,
       stopIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs)
     );
-    return await this.buffer(
+    return await this.bufferAccepted(
       {
         operation: 'stop',
-        intervalId: intervalId(parsed.instanceId, parsed.startEpochMs),
+        intervalId: intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs),
         idempotencyKey: parsed.idempotencyKey,
         contextFingerprint: await usageContextFingerprint(parsed.context),
         payload: parsed,
         receivedAtMs: Date.now(),
       },
+      parsed.service,
       parsed.instanceId
     );
   }
 
-  private async buffer(mutation: FailoverMutation, instanceId: string): Promise<RecordAck> {
-    const shard = this.env.FAILOVER_BUFFER.getByName(failoverBufferShardName(instanceId));
-    const result = await shard.enqueue(mutation);
-    if (result.conflict) {
+  private async bufferAccepted(
+    mutation: FailoverMutation,
+    service: string,
+    instanceId: string
+  ): Promise<RecordAck> {
+    const shard = this.env.FAILOVER_BUFFER.getByName(failoverBufferShardName(service, instanceId));
+    const result = await shard.enqueueForAcceptedInterval(mutation);
+    if (result.status === 'conflict') {
       throw new Error('Idempotency key was reused for a different usage mutation');
+    }
+    if (result.status === 'not_admitted') {
+      throw new Error('Container usage interval has not been admitted');
     }
     return { intervalId: mutation.intervalId, durable: 'buffer', dedup: result.dedup };
   }

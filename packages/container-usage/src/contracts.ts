@@ -100,7 +100,7 @@ export const recordHeartbeatInputSchema = intervalIdentitySchema
     seq: z.number().int().positive().finite(),
     usageSinceLast: z.number().int().nonnegative().finite().optional(),
     observedAt: z.number().int().nonnegative().finite().optional(),
-    context: usageContextSchema.optional(),
+    context: usageContextSchema,
   })
   .strict();
 export type RecordHeartbeatInput = z.input<typeof recordHeartbeatInputSchema>;
@@ -177,8 +177,8 @@ export type ContainerUsageRpcMethods = {
   recordStop: (input: RecordStopInput) => Promise<RecordAck>;
 };
 
-export function intervalId(instanceId: string, startEpochMs: number): string {
-  return `${instanceId}:${startEpochMs}`;
+export function intervalId(service: string, instanceId: string, startEpochMs: number): string {
+  return `${keyPart(service)}:${keyPart(instanceId)}:${startEpochMs}`;
 }
 
 function keyPart(value: string): string {

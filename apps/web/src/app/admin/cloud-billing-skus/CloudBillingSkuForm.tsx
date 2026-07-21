@@ -98,7 +98,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" aria-busy={pending}>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="sku-id">SKU ID</Label>
@@ -106,6 +106,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
             id="sku-id"
             value={raw.id}
             maxLength={80}
+            disabled={pending}
             placeholder="cloud-agent-standard-2026-07"
             aria-describedby={errors.id ? 'sku-id-help sku-id-error' : 'sku-id-help'}
             aria-invalid={Boolean(errors.id)}
@@ -130,6 +131,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
             id="sku-name"
             value={raw.name}
             maxLength={120}
+            disabled={pending}
             placeholder="Cloud Agent Standard"
             aria-describedby={errors.name ? 'sku-name-error' : undefined}
             aria-invalid={Boolean(errors.name)}
@@ -151,6 +153,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
             id="sku-description"
             value={raw.description}
             maxLength={1000}
+            disabled={pending}
             placeholder="What reports this SKU and when it should be selected."
             aria-describedby={errors.description ? 'sku-description-error' : undefined}
             aria-invalid={Boolean(errors.description)}
@@ -173,6 +176,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
             type="text"
             inputMode="decimal"
             value={raw.rate}
+            disabled={pending}
             placeholder="0.000007"
             aria-describedby={
               errors.rate_cents_per_unit ? 'sku-rate-help sku-rate-error' : 'sku-rate-help'
@@ -202,6 +206,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
             step="1"
             max="525600"
             value={raw.exampleMinutes}
+            disabled={pending}
             onChange={event =>
               setRaw(current => ({ ...current, exampleMinutes: event.target.value }))
             }

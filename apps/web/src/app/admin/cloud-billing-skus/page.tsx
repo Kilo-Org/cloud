@@ -122,6 +122,7 @@ export default function CloudBillingSkusPage() {
           ) : (
             <Button
               variant="outline"
+              disabled={createMutation.isPending}
               onClick={() => {
                 setCreating(false);
                 requestAnimationFrame(() => createButtonRef.current?.focus());

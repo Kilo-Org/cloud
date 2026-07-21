@@ -30,7 +30,7 @@ export type ClientRecordHeartbeatInput = Omit<
   RecordHeartbeatInput,
   'service' | 'idempotencyKey' | 'context'
 > & {
-  context?: ClientUsageContext;
+  context: ClientUsageContext;
 };
 export type ClientRecordStopInput = Omit<
   RecordStopInput,
@@ -114,7 +114,7 @@ export class ContainerUsageClient {
         input.startEpochMs,
         input.seq
       ),
-      context: input.context ? { ...input.context, service: this.service } : undefined,
+      context: { ...input.context, service: this.service },
     } satisfies RecordHeartbeatInput;
     return heartbeatAckSchema.parse(await this.binding.recordHeartbeat(request));
   }

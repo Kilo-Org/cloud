@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { recordHeartbeatInputSchema, recordStopInputSchema, usageContextSchema } from './contracts';
+import {
+  intervalId,
+  recordHeartbeatInputSchema,
+  recordStopInputSchema,
+  usageContextSchema,
+} from './contracts';
 
 const personalContext = {
   service: 'cloud-agent-next',
@@ -53,6 +58,7 @@ describe('container usage contracts', () => {
         idempotencyKey: 'key',
         seq: 1,
         usageSinceLast: 1.5,
+        context: personalContext,
       }).success
     ).toBe(false);
     expect(
@@ -77,5 +83,11 @@ describe('container usage contracts', () => {
         context: personalContext,
       }).success
     ).toBe(false);
+  });
+
+  it('scopes interval identity to the producer service', () => {
+    expect(intervalId('cloud-agent-next', 'shared-instance', 123)).not.toBe(
+      intervalId('gastown', 'shared-instance', 123)
+    );
   });
 });

@@ -3,13 +3,14 @@ import { and, count, eq, isNotNull, min } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../drizzle/migrations';
-import { pendingUsageMutations, rejectedStartAdmissions } from './db/sqlite-schema';
+import { pendingUsageMutations, startAdmissions } from './db/sqlite-schema';
 import {
   failoverMutationSchema,
   serializeFailoverPayload,
   startAdmissionSchema,
   type DurableStartAdmissionResult,
   type ExistingStartAdmissionResult,
+  type AdmittedMutationResult,
   type FailoverBacklog,
   type FailoverEnqueueResult,
   type FailoverMutation,
@@ -49,28 +50,59 @@ export class FailoverBufferDO extends DurableObject<Cloudflare.Env> {
 
   getStartAdmission(input: FailoverMutation): ExistingStartAdmissionResult {
     const mutation = failoverMutationSchema.parse(input);
-    const mutationStatus = this.getMutationStatus(mutation);
-    if (mutationStatus === 'match') return { status: 'accepted', dedup: true };
-    if (mutationStatus === 'conflict') return { status: 'conflict' };
     const payload = serializeFailoverPayload(mutation.payload);
-    const rejected = this.db
+    const admission = this.db
       .select({
-        intervalId: rejectedStartAdmissions.interval_id,
-        payload: rejectedStartAdmissions.payload,
-        code: rejectedStartAdmissions.error_code,
-        message: rejectedStartAdmissions.error_message,
+        intervalId: startAdmissions.interval_id,
+        contextFingerprint: startAdmissions.context_fingerprint,
+        payload: startAdmissions.payload,
+        status: startAdmissions.status,
+        code: startAdmissions.error_code,
+        message: startAdmissions.error_message,
       })
-      .from(rejectedStartAdmissions)
-      .where(eq(rejectedStartAdmissions.idempotency_key, mutation.idempotencyKey))
+      .from(startAdmissions)
+      .where(eq(startAdmissions.idempotency_key, mutation.idempotencyKey))
       .get();
-    if (!rejected) return { status: 'absent' };
-    if (rejected.intervalId !== mutation.intervalId || rejected.payload !== payload) {
+    if (!admission) return { status: 'absent' };
+    if (
+      admission.intervalId !== mutation.intervalId ||
+      admission.contextFingerprint !== mutation.contextFingerprint ||
+      admission.payload !== payload
+    ) {
       return { status: 'conflict' };
     }
-    return { status: 'rejected', code: rejected.code, message: rejected.message };
+    if (admission.status === 'pending') return { status: 'pending' };
+    if (admission.status === 'accepted') return { status: 'accepted', dedup: true };
+    if (!admission.code || !admission.message) {
+      throw new Error('Rejected start admission is missing its error details');
+    }
+    return { status: 'rejected', code: admission.code, message: admission.message };
   }
 
-  async admitStart(
+  reserveStart(input: FailoverMutation): ExistingStartAdmissionResult {
+    const mutation = failoverMutationSchema.parse(input);
+    if (mutation.operation !== 'start')
+      throw new Error('Start admission requires a start mutation');
+    if (!mutation.contextFingerprint) throw new Error('Start admission requires context');
+    const payload = serializeFailoverPayload(mutation.payload);
+    const existing = this.getStartAdmission(mutation);
+    if (existing.status !== 'absent') return existing;
+
+    this.db
+      .insert(startAdmissions)
+      .values({
+        idempotency_key: mutation.idempotencyKey,
+        interval_id: mutation.intervalId,
+        context_fingerprint: mutation.contextFingerprint,
+        payload,
+        received_at_ms: mutation.receivedAtMs,
+        status: 'pending',
+      })
+      .run();
+    return { status: 'pending' };
+  }
+
+  async finalizeStart(
     input: FailoverMutation,
     admissionInput: StartAdmission
   ): Promise<DurableStartAdmissionResult> {
@@ -78,25 +110,63 @@ export class FailoverBufferDO extends DurableObject<Cloudflare.Env> {
     if (mutation.operation !== 'start')
       throw new Error('Start admission requires a start mutation');
     const admission = startAdmissionSchema.parse(admissionInput);
-    const payload = serializeFailoverPayload(mutation.payload);
     const existing = this.getStartAdmission(mutation);
-    if (existing.status !== 'absent') return existing;
+    if (existing.status === 'absent' || existing.status === 'conflict') {
+      return { status: 'conflict' };
+    }
+    if (existing.status !== 'pending') return existing;
+    const reserved = this.db
+      .select({ receivedAtMs: startAdmissions.received_at_ms })
+      .from(startAdmissions)
+      .where(eq(startAdmissions.idempotency_key, mutation.idempotencyKey))
+      .get();
+    if (!reserved) return { status: 'conflict' };
 
     if (!admission.accepted) {
       this.db
-        .insert(rejectedStartAdmissions)
-        .values({
-          idempotency_key: mutation.idempotencyKey,
-          interval_id: mutation.intervalId,
-          payload,
+        .update(startAdmissions)
+        .set({
+          status: 'rejected',
           error_code: admission.code,
           error_message: admission.message,
           decided_at_ms: mutation.receivedAtMs,
         })
+        .where(eq(startAdmissions.idempotency_key, mutation.idempotencyKey))
         .run();
       return { status: 'rejected', code: admission.code, message: admission.message };
     }
 
+    const result = await this.enqueue({ ...mutation, receivedAtMs: reserved.receivedAtMs });
+    if (result.conflict) return { status: 'conflict' };
+    this.db
+      .update(startAdmissions)
+      .set({ status: 'accepted', decided_at_ms: mutation.receivedAtMs })
+      .where(eq(startAdmissions.idempotency_key, mutation.idempotencyKey))
+      .run();
+    return { status: 'accepted', dedup: result.dedup };
+  }
+
+  async enqueueForAcceptedInterval(input: FailoverMutation): Promise<AdmittedMutationResult> {
+    const mutation = failoverMutationSchema.parse(input);
+    if (mutation.operation === 'start') throw new Error('Use start admission for start mutations');
+    const admission = this.db
+      .select({ contextFingerprint: startAdmissions.context_fingerprint })
+      .from(startAdmissions)
+      .where(
+        and(
+          eq(startAdmissions.interval_id, mutation.intervalId),
+          eq(startAdmissions.status, 'accepted')
+        )
+      )
+      .limit(1)
+      .get();
+    if (!admission) return { status: 'not_admitted' };
+    if (
+      mutation.contextFingerprint &&
+      admission.contextFingerprint !== mutation.contextFingerprint
+    ) {
+      return { status: 'conflict' };
+    }
     const result = await this.enqueue(mutation);
     if (result.conflict) return { status: 'conflict' };
     return { status: 'accepted', dedup: result.dedup };

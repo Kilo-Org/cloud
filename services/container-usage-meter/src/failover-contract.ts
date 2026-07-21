@@ -33,6 +33,7 @@ export const startAdmissionSchema = z.discriminatedUnion('accepted', [
 ]);
 export type StartAdmission = z.infer<typeof startAdmissionSchema>;
 export type DurableStartAdmissionResult =
+  | { status: 'pending' }
   | { status: 'accepted'; dedup: boolean }
   | {
       status: 'rejected';
@@ -41,6 +42,10 @@ export type DurableStartAdmissionResult =
     }
   | { status: 'conflict' };
 export type ExistingStartAdmissionResult = DurableStartAdmissionResult | { status: 'absent' };
+export type AdmittedMutationResult =
+  | { status: 'accepted'; dedup: boolean }
+  | { status: 'not_admitted' }
+  | { status: 'conflict' };
 
 function canonicalizeJson(value: unknown): unknown {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;

@@ -9,8 +9,10 @@ function stableHash(value: string): number {
   return hash >>> 0;
 }
 
-export function failoverBufferShardName(instanceId: string): string {
-  return failoverBufferShardNameForIndex(stableHash(instanceId) % FAILOVER_BUFFER_SHARD_COUNT);
+export function failoverBufferShardName(service: string, instanceId: string): string {
+  return failoverBufferShardNameForIndex(
+    stableHash(`${service}:${instanceId}`) % FAILOVER_BUFFER_SHARD_COUNT
+  );
 }
 
 export function failoverBufferShardNameForIndex(index: number): string {

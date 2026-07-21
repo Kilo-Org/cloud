@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { startIdempotencyKey, type RecordStartInput } from '@kilocode/container-usage';
 import type {
+  AdmittedMutationResult,
   DurableStartAdmissionResult,
   ExistingStartAdmissionResult,
   StartAdmission,
@@ -23,7 +24,7 @@ vi.mock('./postgres', () => ({ validateStartSku: vi.fn() }));
 import { validateStartSku } from './postgres';
 import { ContainerUsageMeter } from './meter';
 
-const admitStart = vi.fn(
+const finalizeStart = vi.fn(
   async (_mutation: unknown, admission: StartAdmission): Promise<DurableStartAdmissionResult> =>
     admission.accepted
       ? { status: 'accepted', dedup: false }
@@ -32,11 +33,22 @@ const admitStart = vi.fn(
 const getStartAdmission = vi.fn(
   async (): Promise<ExistingStartAdmissionResult> => ({ status: 'absent' })
 );
+const reserveStart = vi.fn(
+  async (): Promise<ExistingStartAdmissionResult> => ({ status: 'pending' })
+);
+const enqueueForAcceptedInterval = vi.fn(
+  async (): Promise<AdmittedMutationResult> => ({ status: 'accepted', dedup: false })
+);
 
 function createMeter() {
   const env = {
     FAILOVER_BUFFER: {
-      getByName: vi.fn(() => ({ admitStart, getStartAdmission })),
+      getByName: vi.fn(() => ({
+        finalizeStart,
+        getStartAdmission,
+        reserveStart,
+        enqueueForAcceptedInterval,
+      })),
     },
   } as unknown as Cloudflare.Env;
   return new ContainerUsageMeter({} as ExecutionContext, env);
@@ -58,7 +70,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(validateStartSku).mockResolvedValue({ accepted: true });
   getStartAdmission.mockResolvedValue({ status: 'absent' });
-  admitStart.mockImplementation(
+  reserveStart.mockResolvedValue({ status: 'pending' });
+  enqueueForAcceptedInterval.mockResolvedValue({ status: 'accepted', dedup: false });
+  finalizeStart.mockImplementation(
     async (_mutation, admission): Promise<DurableStartAdmissionResult> =>
       admission.accepted
         ? { status: 'accepted', dedup: false }
@@ -71,10 +85,11 @@ describe('ContainerUsageMeter.recordStart', () => {
     const result = await createMeter().recordStart(validStart());
 
     expect(validateStartSku).toHaveBeenCalledWith(expect.anything(), 'cloud-agent-standard');
-    expect(admitStart).toHaveBeenCalledOnce();
+    expect(reserveStart).toHaveBeenCalledOnce();
+    expect(finalizeStart).toHaveBeenCalledOnce();
     expect(result).toEqual({
       success: true,
-      ack: { intervalId: 'instance-1:123', durable: 'buffer', dedup: false },
+      ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'buffer', dedup: false },
     });
   });
 
@@ -89,7 +104,7 @@ describe('ContainerUsageMeter.recordStart', () => {
       success: false,
       error: { code, message },
     });
-    expect(admitStart).toHaveBeenCalledOnce();
+    expect(finalizeStart).toHaveBeenCalledOnce();
   });
 
   it('returns the existing accepted decision after SKU disablement', async () => {
@@ -98,24 +113,25 @@ describe('ContainerUsageMeter.recordStart', () => {
       code: 'sku_not_accepting_new_usage',
       message: 'Billing SKU is not accepting new usage',
     });
-    getStartAdmission.mockResolvedValue({ status: 'accepted', dedup: true });
+    reserveStart.mockResolvedValue({ status: 'accepted', dedup: true });
 
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({
       success: true,
-      ack: { intervalId: 'instance-1:123', durable: 'buffer', dedup: true },
+      ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'buffer', dedup: true },
     });
     expect(validateStartSku).not.toHaveBeenCalled();
   });
 
-  it('propagates catalog infrastructure failures without buffering', async () => {
+  it('persists a pending admission before propagating catalog infrastructure failures', async () => {
     vi.mocked(validateStartSku).mockRejectedValue(new Error('postgres unavailable'));
 
     await expect(createMeter().recordStart(validStart())).rejects.toThrow('postgres unavailable');
-    expect(admitStart).not.toHaveBeenCalled();
+    expect(reserveStart).toHaveBeenCalledOnce();
+    expect(finalizeStart).not.toHaveBeenCalled();
   });
 
   it('returns a durable rejected decision without requiring Postgres', async () => {
-    getStartAdmission.mockResolvedValue({
+    reserveStart.mockResolvedValue({
       status: 'rejected',
       code: 'sku_not_accepting_new_usage',
       message: 'Billing SKU is not accepting new usage',

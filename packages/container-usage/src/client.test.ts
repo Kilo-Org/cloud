@@ -40,7 +40,12 @@ describe('ContainerUsageClient', () => {
     const client = new ContainerUsageClient(rpc, { service: 'cloud-agent-next' });
 
     await client.recordStart({ ...context, startEpochMs: 123 });
-    await client.recordHeartbeat({ instanceId: 'instance-1', startEpochMs: 123, seq: 7 });
+    await client.recordHeartbeat({
+      instanceId: 'instance-1',
+      startEpochMs: 123,
+      seq: 7,
+      context,
+    });
     await client.recordStop({
       instanceId: 'instance-1',
       startEpochMs: 123,
@@ -72,8 +77,18 @@ describe('ContainerUsageClient', () => {
     const rpc = binding();
     const client = new ContainerUsageClient(rpc, { service: 'cloud-agent-next' });
 
-    await client.recordHeartbeat({ instanceId: 'instance-1', startEpochMs: 123, seq: 1 });
-    await client.recordHeartbeat({ instanceId: 'instance-1', startEpochMs: 456, seq: 1 });
+    await client.recordHeartbeat({
+      instanceId: 'instance-1',
+      startEpochMs: 123,
+      seq: 1,
+      context,
+    });
+    await client.recordHeartbeat({
+      instanceId: 'instance-1',
+      startEpochMs: 456,
+      seq: 1,
+      context,
+    });
 
     expect(rpc.recordHeartbeat).toHaveBeenNthCalledWith(
       1,

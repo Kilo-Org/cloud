@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4b032e51-874a-47af-a574-a833624ed212",
+  "id": "f934d513-3262-4693-9740-8391f439597e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "pending_usage_mutations": {
@@ -110,8 +110,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "rejected_start_admissions": {
-      "name": "rejected_start_admissions",
+    "start_admissions": {
+      "name": "start_admissions",
       "columns": {
         "idempotency_key": {
           "name": "idempotency_key",
@@ -127,8 +127,29 @@
           "notNull": true,
           "autoincrement": false
         },
+        "context_fingerprint": {
+          "name": "context_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "payload": {
           "name": "payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "received_at_ms": {
+          "name": "received_at_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -138,25 +159,34 @@
           "name": "error_code",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "error_message": {
           "name": "error_message",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "decided_at_ms": {
           "name": "decided_at_ms",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "start_admissions_interval_status_idx": {
+          "name": "start_admissions_interval_status_idx",
+          "columns": [
+            "interval_id",
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

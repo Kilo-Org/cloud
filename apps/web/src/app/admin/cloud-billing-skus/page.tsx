@@ -174,7 +174,7 @@ export default function CloudBillingSkusPage() {
             )}
             {catalog.isSuccess && loadedSkus.length === 0 && (
               <p className="text-muted-foreground type-body">
-                No billing SKUs exist yet. A credit manager can create the first SKU.
+                No billing SKUs exist yet. An admin can create the first SKU.
               </p>
             )}
             {catalog.isSuccess && loadedSkus.length > 0 && (

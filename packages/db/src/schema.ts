@@ -10091,10 +10091,7 @@ export const container_usage_interval = pgTable(
     subject_id: text().notNull(),
     actor_type: text().$type<ContainerUsageActorType>().notNull(),
     actor_id: text().notNull(),
-    on_behalf_type: text().$type<ContainerUsageSubjectType>(),
-    on_behalf_id: text(),
     session_id: text(),
-    region: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_heartbeat_seq: integer().notNull().default(0),
@@ -10103,9 +10100,6 @@ export const container_usage_interval = pgTable(
     close_reason: text().$type<ContainerUsageCloseReason>(),
     exit_code: integer(),
     final_stop_seq: integer(),
-    // Whole confirmed seconds. Heartbeat clients carry subsecond remainder into
-    // the next segment rather than persisting fractional quantities.
-    awake_seconds: integer(),
     status: text().$type<ContainerUsageIntervalStatus>().notNull().default('open'),
     metadata: jsonb().$type<Record<string, string>>(),
   },
@@ -10127,20 +10121,12 @@ export const container_usage_interval = pgTable(
     ),
     check(
       'container_usage_interval_attribution',
-      sql`(${table.actor_type} = 'bot' AND ${table.on_behalf_type} IS NOT NULL AND ${table.on_behalf_id} IS NOT NULL AND ${table.on_behalf_type} = ${table.subject_type} AND ${table.on_behalf_id} = ${table.subject_id}) OR (${table.actor_type} = 'user' AND ${table.on_behalf_type} IS NULL AND ${table.on_behalf_id} IS NULL AND (${table.subject_type} <> 'user' OR ${table.actor_id} = ${table.subject_id}))`
-    ),
-    check(
-      'container_usage_interval_on_behalf_pair',
-      sql`(${table.on_behalf_type} IS NULL) = (${table.on_behalf_id} IS NULL)`
-    ),
-    check(
-      'container_usage_interval_on_behalf_type',
-      sql`${table.on_behalf_type} IS NULL OR ${table.on_behalf_type} IN ('user', 'org')`
+      sql`${table.actor_type} = 'bot' OR (${table.actor_type} = 'user' AND (${table.subject_type} <> 'user' OR ${table.actor_id} = ${table.subject_id}))`
     ),
     check('container_usage_interval_status', sql`${table.status} IN ('open', 'closed')`),
     check(
       'container_usage_interval_open_closed_shape',
-      sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL AND ${table.awake_seconds} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL AND ${table.awake_seconds} IS NOT NULL)`
+      sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL)`
     ),
     check(
       'container_usage_interval_time_order',
@@ -10153,10 +10139,6 @@ export const container_usage_interval = pgTable(
     check(
       'container_usage_interval_confirmed_seconds_nonnegative',
       sql`${table.confirmed_seconds} >= 0`
-    ),
-    check(
-      'container_usage_interval_awake_seconds_nonnegative',
-      sql`${table.awake_seconds} IS NULL OR ${table.awake_seconds} >= 0`
     ),
     check(
       'container_usage_interval_final_stop_seq_positive',

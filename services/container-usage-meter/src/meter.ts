@@ -41,7 +41,6 @@ function copyUsageContext(context: UsageContext): UsageContext {
     actor: context.actor,
     onBehalfOf: context.onBehalfOf,
     sessionId: context.sessionId,
-    region: context.region,
     metadata: context.metadata,
   };
 }

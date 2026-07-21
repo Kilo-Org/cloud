@@ -36,7 +36,6 @@ const usageContextBaseSchema = z
     actor: billingActorSchema,
     onBehalfOf: billingSubjectSchema.optional(),
     sessionId: z.string().min(1).max(256).optional(),
-    region: z.string().min(1).max(64).optional(),
     metadata: metadataSchema.optional(),
   })
   .strict();
@@ -222,7 +221,6 @@ export async function usageContextFingerprint(context: UsageContext): Promise<st
     actor: parsed.actor,
     onBehalfOf: parsed.onBehalfOf,
     sessionId: parsed.sessionId,
-    region: parsed.region,
     metadata: parsed.metadata
       ? Object.fromEntries(
           Object.entries(parsed.metadata).sort(([left], [right]) => left.localeCompare(right))

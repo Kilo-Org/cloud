@@ -67,10 +67,7 @@ function intervalValues(
     subject_id: context.subject.id,
     actor_type: context.actor.type,
     actor_id: context.actor.id,
-    on_behalf_type: context.onBehalfOf?.type,
-    on_behalf_id: context.onBehalfOf?.id,
     session_id: context.sessionId,
-    region: context.region,
     metadata: context.metadata,
     started_at: receivedAt,
     last_seen_at: receivedAt,
@@ -189,7 +186,6 @@ export async function applyStartWithDb(
           status: 'closed',
           close_reason: 'superseded',
           stopped_at: open.last_seen_at,
-          awake_seconds: open.confirmed_seconds,
         })
         .where(eq(container_usage_interval.id, open.id));
     }
@@ -287,7 +283,6 @@ export async function applyHeartbeatWithDb(
           status: 'open',
           stopped_at: null,
           close_reason: null,
-          awake_seconds: null,
         })
         .where(eq(container_usage_interval.id, intervalId));
     } else if (interval.status !== 'open') {
@@ -411,7 +406,6 @@ export async function applyStopWithDb(
         stopped_at: stopAt,
         last_heartbeat_seq: sql`GREATEST(${container_usage_interval.last_heartbeat_seq}, ${input.seq})`,
         confirmed_seconds: interval.confirmed_seconds + finalSeconds,
-        awake_seconds: interval.confirmed_seconds + finalSeconds,
       })
       .where(eq(container_usage_interval.id, intervalId));
     return { dedup: false };
@@ -436,7 +430,6 @@ export async function reconcileStaleIntervalsWithDb(
       status: 'closed',
       close_reason: 'unconfirmed',
       stopped_at: sql`${container_usage_interval.last_seen_at}`,
-      awake_seconds: sql`${container_usage_interval.confirmed_seconds}`,
     })
     .where(
       and(

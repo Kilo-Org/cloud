@@ -127,7 +127,6 @@ describe('container usage PostgreSQL application', () => {
       status: 'closed',
       last_heartbeat_seq: 3,
       confirmed_seconds: 27,
-      awake_seconds: 27,
       close_reason: 'exit',
     });
     const segments = await client.db
@@ -166,7 +165,7 @@ describe('container usage PostgreSQL application', () => {
       status: 'closed',
       close_reason: 'unconfirmed',
       stopped_at: stale.last_seen_at,
-      awake_seconds: 0,
+      confirmed_seconds: 0,
     });
     const lateHeartbeat = {
       service: staleContext.service,
@@ -213,7 +212,6 @@ describe('container usage PostgreSQL application', () => {
       status: 'closed',
       close_reason: 'runtime_signal',
       confirmed_seconds: 5,
-      awake_seconds: 5,
     });
     await client.db
       .delete(container_usage_interval)

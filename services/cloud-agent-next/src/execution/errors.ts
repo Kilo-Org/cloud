@@ -25,7 +25,8 @@ export type RetryableErrorCode =
 export type PermanentErrorCode =
   | 'INVALID_REQUEST' // Bad input (missing fields, invalid format)
   | 'SESSION_NOT_FOUND' // Session doesn't exist
-  | 'WRAPPER_JOB_CONFLICT'; // Wrapper busy (internal error - shouldn't happen)
+  | 'WRAPPER_JOB_CONFLICT' // Wrapper busy (internal error - shouldn't happen)
+  | 'SANDBOX_CAPABILITY_UNAVAILABLE'; // This session targets a deliberately disabled runtime capability
 
 /**
  * All possible execution error codes.
@@ -125,6 +126,13 @@ export class ExecutionError extends Error {
    */
   static wrapperJobConflict(message: string): ExecutionError {
     return new ExecutionError('WRAPPER_JOB_CONFLICT', message, { retryable: false });
+  }
+
+  static sandboxCapabilityUnavailable(message: string, cause?: unknown): ExecutionError {
+    return new ExecutionError('SANDBOX_CAPABILITY_UNAVAILABLE', message, {
+      retryable: false,
+      cause,
+    });
   }
 }
 

@@ -1,12 +1,12 @@
 import { useFocusEffect } from 'expo-router';
-import { Bot, Plus, Search } from 'lucide-react-native';
+import { Bot, Plus } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
   RefreshControl,
   SectionList,
-  TextInput,
+  type TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -19,6 +19,7 @@ import {
   type SessionListBodyModel,
 } from '@/components/agents/session-list-body-model';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
+import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
@@ -62,6 +63,13 @@ type AgentSessionListContentProps = {
   hasActiveQuery: boolean;
   isSearching: boolean;
   onClearQuery: () => void;
+  /**
+   * Narrow clear path used by the in-field X: resets the debounced search
+   * query (and the local `hasText` flag) WITHOUT touching the persisted
+   * platform/project filters. The empty-state "Clear search"/"Clear filters"
+   * CTA keeps owning the broader `onClearQuery` path.
+   */
+  onClearSearchOnly: () => void;
   onCreateSession: () => void;
   sortBy: AgentSessionSortBy;
 };
@@ -83,6 +91,7 @@ export function AgentSessionListContent({
   hasActiveQuery,
   isSearching,
   onClearQuery,
+  onClearSearchOnly,
   onCreateSession,
   sortBy,
 }: Readonly<AgentSessionListContentProps>) {
@@ -92,14 +101,35 @@ export function AgentSessionListContent({
   const { deleteSession, renameSession } = useSessionMutations();
   const [refreshing, setRefreshing] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
+  // Drives the in-field X's visibility only — the input itself stays
+  // uncontrolled (see iOS TextInput rules). Derived from `onChangeText`.
+  const [hasText, setHasText] = useState(false);
 
   // The search TextInput is uncontrolled (see iOS TextInput rules — controlled
   // `value` causes keystroke races), so clearing the query in state alone
   // wouldn't clear what's visibly typed. Imperatively clear the input too.
   const handleClearQuery = useCallback(() => {
     searchInputRef.current?.clear();
+    setHasText(false);
     onClearQuery();
   }, [onClearQuery]);
+
+  const handleSearchInputChange = useCallback(
+    (text: string) => {
+      setHasText(text.length > 0);
+      onSearchChange(text);
+    },
+    [onSearchChange]
+  );
+
+  // Narrow path used by the in-field X: clears the input, dismisses the
+  // keyboard, and resets `hasText` so the X hides — without touching filters.
+  const handleClearSearchOnly = useCallback(() => {
+    searchInputRef.current?.clear();
+    searchInputRef.current?.blur();
+    setHasText(false);
+    onClearSearchOnly();
+  }, [onClearSearchOnly]);
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
@@ -125,36 +155,22 @@ export function AgentSessionListContent({
 
   const listHeader = useMemo(
     () => (
-      <View>
-        <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
-          <Search size={18} color={colors.mutedForeground} />
-          <TextInput
-            ref={searchInputRef}
-            className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
-            placeholder="Search sessions..."
-            placeholderTextColor={colors.mutedForeground}
-            onChangeText={onSearchChange}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-        {isSearchPending ? (
-          <View className="mx-[22px] mb-[14px] flex-row items-center gap-2">
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-            <Text variant="muted" className="text-xs">
-              Searching…
-            </Text>
-          </View>
-        ) : null}
-        {bodyModel.showInlineError ? (
-          <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
-            Couldn't refresh. Pull down to try again.
-          </Text>
-        ) : null}
-      </View>
+      <SessionListSearchHeader
+        inputRef={searchInputRef}
+        hasText={hasText}
+        isSearchPending={isSearchPending}
+        showInlineError={bodyModel.showInlineError}
+        onChangeText={handleSearchInputChange}
+        onClearSearch={handleClearSearchOnly}
+      />
     ),
-    [bodyModel.showInlineError, colors.mutedForeground, isSearchPending, onSearchChange]
+    [
+      bodyModel.showInlineError,
+      handleClearSearchOnly,
+      handleSearchInputChange,
+      hasText,
+      isSearchPending,
+    ]
   );
 
   const emptyStateAction = useMemo(

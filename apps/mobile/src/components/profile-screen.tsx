@@ -3,6 +3,7 @@ import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import {
   Building2,
+  GitMerge,
   GitPullRequest,
   KeyRound,
   Lock,
@@ -30,7 +31,11 @@ import { showFeedbackPrompt } from '@/lib/feedback';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
-import { getCodeReviewerProfilePath, getProfileAgentScope } from '@/lib/profile-agent-navigation';
+import {
+  getCodeReviewerProfilePath,
+  getProfileAgentScope,
+  getPrReviewEntryPath,
+} from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -157,6 +162,23 @@ export function ProfileScreen() {
               if (agentScope) {
                 router.push(getSecurityAgentPath(agentScope));
               }
+            }}
+          />
+        </View>
+
+        {/* PR Review */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Reviews
+          </Text>
+          <ConfigureRow
+            icon={GitMerge}
+            title="PR Review"
+            subtitle="Review pull requests on mobile"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getPrReviewEntryPath());
             }}
           />
         </View>

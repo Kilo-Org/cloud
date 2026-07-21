@@ -209,6 +209,7 @@ export function NewSessionPrompt({
           <View className="ml-1">
             <VoiceInputButton
               disabled={control.voiceDisabled}
+              size="md"
               status={voiceInput.status}
               onPress={handleVoiceToggle}
             />

@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAgentSandbox } from '../../agent-sandbox/factory.js';
+import { AgentSandboxUnavailableError } from '../../agent-sandbox/protocol.js';
 import { logger, withLogTags } from '../../logger.js';
 import type { SessionId, Env } from '../../types.js';
 import { fetchSessionMetadata } from '../../session-service.js';
@@ -25,7 +26,15 @@ async function resolveWrapperClient(opts: {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
 
-  const wrapperClient = await createAgentSandbox(env, metadata).getRunningWrapper();
+  let wrapperClient: WrapperClient | null;
+  try {
+    wrapperClient = await createAgentSandbox(env, metadata).getRunningWrapper();
+  } catch (error) {
+    if (error instanceof AgentSandboxUnavailableError) {
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+    }
+    throw error;
+  }
   if (!wrapperClient) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
   }

@@ -1,9 +1,10 @@
-import { MirrorPayloadSchema } from '@kilocode/auto-routing-contracts';
+import { MirrorPayloadSchema, taxonomyRouteKey } from '@kilocode/auto-routing-contracts';
 import type {
   AutoRoutingDecision,
   AutoRoutingDecisionResponse,
   MirrorPayload,
   NormalizedClassifierInput,
+  RoutingConstraints,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import type { Handler } from 'hono';
@@ -24,13 +25,16 @@ import {
   putCachedClassification,
   putStickyDecision,
 } from './decision-cache';
-import { computeDecision } from './decision-engine';
+import type { StickyDecision } from './decision-cache';
+import { computeDecision, modelSatisfiesConstraints } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { getRoutingTable } from './routing-table';
 import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
 import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
+import { getModelCapabilities } from './model-capabilities';
+import type { ModelCapabilitiesMap } from './model-capabilities';
 
 // Isolate-scoped request counter, used to correlate latency with isolate
 // warm-up in logs.
@@ -200,14 +204,16 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
 
 // Single sink for decision telemetry: one Analytics Engine data point and
 // one `auto_routing_decision` log line per decision. Successes are sampled
-// per the KV-configured rate; fallbacks and errors always log (at warn).
+// per the KV-configured rate; fallbacks, errors, and real model switches
+// always log (failures at warn).
 function recordDecision(
   env: Env,
   ctx: DecisionContext,
   durationMs: number,
   outcome: DecisionOutcome,
   autoRoutingMode: string,
-  decision: AutoRoutingDecision | null = null
+  decision: AutoRoutingDecision | null = null,
+  incumbent: StickyDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
 
@@ -221,10 +227,21 @@ function recordDecision(
     cacheHit: summary.cacheHit,
   });
 
+  const incumbentModel = incumbent?.model ?? null;
+  const switched =
+    decision !== null && incumbentModel !== null && decision.model !== incumbentModel;
+  const routeKey = summary.classification ? taxonomyRouteKey(summary.classification) : null;
+  // Null when there is no incumbent route to compare against (no incumbent,
+  // a pre-routeKey cache entry, or no classification this request).
+  const routeChanged =
+    routeKey !== null && incumbent?.routeKey != null ? routeKey !== incumbent.routeKey : null;
+
   // Retried decisions are rare and diagnostically valuable, so they bypass
-  // sampling along with failures.
+  // sampling along with failures. Real model switches also always log:
+  // within-session switch sequences are the signal the sampled stream
+  // decimates.
   const isFailure = summary.status !== 'classified';
-  const alwaysLog = isFailure || summary.retried;
+  const alwaysLog = isFailure || summary.retried || switched;
   if (!alwaysLog && Math.random() >= ctx.successSampleRate) {
     return;
   }
@@ -262,6 +279,14 @@ function recordDecision(
       decidedSubtaskType: decision?.subtaskType ?? null,
       decisionSource: decision?.source ?? null,
       sticky: decision?.sticky ?? null,
+      incumbentModel,
+      switched,
+      switchReason: decision?.source === 'benchmark' ? (decision.switchReason ?? null) : null,
+      routeChanged,
+      contextTokens: ctx.payload.constraints?.promptTokensEstimate ?? null,
+      // False when this line bypassed the success sample rate (switch,
+      // retry, failure); downstream rate math must only scale sampled rows.
+      sampled: !alwaysLog,
       ...summary.details,
     })
   );
@@ -286,17 +311,50 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   const startedAt = performance.now();
   const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   const codingPlanPreference = await getCodingPlanPreference(c.env, payload.userId);
-  if (codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId)) {
-    const decision = codingPlanDefaultDecision(codingPlanPreference);
-    writeClassifierMetricsDataPoint(c.env, {
-      status: 'coding_plan_default',
-      classifierModel: 'coding_plan_default',
-      requestedModel: payload.input.requestedModel,
-      classifierDurationMs: performance.now() - startedAt,
-      classifierCostCredits: 0,
-      cacheHit: false,
+  const codingPlanActive =
+    codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId);
+  // Narrow once: `constraints` is only non-undefined inside the branches
+  // that already checked `hasConstraints`. This avoids a `!` non-null
+  // assertion across the closure.
+  const hasConstraints = payload.constraints !== undefined;
+  const constraints: RoutingConstraints | undefined = payload.constraints;
+
+  // Capability-aware path: when the gateway attached a `constraints` field,
+  // we must consult capability data before either (a) taking the coding-
+  // plan short-circuit or (b) making a benchmark decision. The lookup has
+  // its own 500ms sub-budget; on failure we treat it as "no capability
+  // data" and the decision-engine fails closed on required modalities.
+  //
+  // When `constraints` is absent we MUST stay byte-identical to today: no
+  // capability fetch, no routing-table fetch, no benchmark hop on the
+  // coding-plan path.
+  let capabilities: ModelCapabilitiesMap = new Map();
+  if (hasConstraints && constraints) {
+    capabilities = await getModelCapabilities(c.env, {
+      codingPlanModelId: codingPlanActive ? codingPlanPreference.modelId : null,
     });
-    return c.json({ cost: 0, decision, classifierResult: null });
+  }
+
+  if (codingPlanActive) {
+    const canTakeShortCircuit =
+      hasConstraints && constraints
+        ? modelSatisfiesConstraints(capabilities.get(codingPlanPreference.modelId), constraints)
+        : true;
+    if (canTakeShortCircuit) {
+      const decision = codingPlanDefaultDecision(codingPlanPreference);
+      writeClassifierMetricsDataPoint(c.env, {
+        status: 'coding_plan_default',
+        classifierModel: 'coding_plan_default',
+        requestedModel: payload.input.requestedModel,
+        classifierDurationMs: performance.now() - startedAt,
+        classifierCostCredits: 0,
+        cacheHit: false,
+      });
+      return c.json({ cost: 0, decision, classifierResult: null });
+    }
+    // Fall through to the normal benchmark flow because the coding-plan
+    // model cannot satisfy the constrained request. This moves the request
+    // from subscription-billed to credit-billed benchmark routing.
   }
 
   const [hashes, userIdHash, classifierModel, successSampleRate, routingTable, routingMode] =
@@ -322,7 +380,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   };
 
   // Both live in the conversation's Durable Object; fetch them together.
-  const [cached, stickyModel] = await Promise.all([
+  const [cached, sticky] = await Promise.all([
     getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
     getStickyDecision(c.env, ctx.conversationKey),
   ]);
@@ -330,12 +388,18 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const decision = computeDecision(
       cached,
       routingTable,
-      stickyModel,
+      sticky?.model ?? null,
       deniedModelIds,
-      routingMode
+      routingMode,
+      {
+        constraints: payload.constraints,
+        capabilityMap: hasConstraints ? capabilities : undefined,
+      }
     );
     if (decision) {
-      c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
+      c.executionCtx.waitUntil(
+        putStickyDecision(c.env, ctx.conversationKey, decision.model, taxonomyRouteKey(cached))
+      );
     }
     recordDecision(
       c.env,
@@ -343,7 +407,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       performance.now() - startedAt,
       { kind: 'cache_hit', classifierModel, classification: cached },
       routingMode,
-      decision
+      decision,
+      sticky
     );
     return c.json(decisionResponse(0, cached, payload.input, decision));
   }
@@ -366,14 +431,25 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     const decision = computeDecision(
       classifier.classification,
       routingTable,
-      stickyModel,
+      sticky?.model ?? null,
       deniedModelIds,
-      routingMode
+      routingMode,
+      {
+        constraints: payload.constraints,
+        capabilityMap: hasConstraints ? capabilities : undefined,
+      }
     );
     // Like the classification cache, sticky state only trusts real classifier
     // output: a heuristic fallback must not re-anchor the session's model.
     if (decision && !classifier.fallback) {
-      c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
+      c.executionCtx.waitUntil(
+        putStickyDecision(
+          c.env,
+          ctx.conversationKey,
+          decision.model,
+          taxonomyRouteKey(classifier.classification)
+        )
+      );
     }
     recordDecision(
       c.env,
@@ -381,7 +457,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       performance.now() - startedAt,
       { kind: 'model', classifier },
       routingMode,
-      decision
+      decision,
+      sticky
     );
     return c.json(
       decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input, decision)
@@ -392,7 +469,9 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       ctx,
       performance.now() - startedAt,
       { kind: 'error', error },
-      routingMode
+      routingMode,
+      null,
+      sticky
     );
     // A failed run can still have billed the first attempt (e.g. a valid-but-
     // invalid response followed by a throwing retry), so report that cost

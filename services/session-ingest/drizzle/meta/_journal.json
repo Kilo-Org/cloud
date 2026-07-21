@@ -22,6 +22,13 @@
       "when": 1780499751344,
       "tag": "0002_watery_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1782225417966,
+      "tag": "0003_free_valkyrie",
+      "breakpoints": true
     }
   ]
 }

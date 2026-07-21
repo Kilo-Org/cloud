@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentSandbox } from '../agent-sandbox/protocol.js';
+import { AgentSandboxUnavailableError, type AgentSandbox } from '../agent-sandbox/protocol.js';
 import type { Env } from '../types.js';
 import type {
   FencedWrapperDispatchRequest,
@@ -44,7 +44,7 @@ function createMemoryStorage(
   } as MemoryRuntimeStorage & DurableObjectStorage;
 }
 
-function createMetadata(): SessionMetadata {
+function createMetadata(provider: 'cloudflare' = 'cloudflare'): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
     identity: {
@@ -61,6 +61,7 @@ function createMetadata(): SessionMetadata {
     },
     workspace: {
       sandboxId: 'ses-runtime',
+      sandboxProvider: provider,
       workspacePath: '/workspace/runtime',
       sessionHome: '/home/agent_runtime',
       branchName: 'main',
@@ -104,6 +105,32 @@ function createWorkspaceReady(): WorkspaceReady {
 }
 
 describe('AgentRuntime', () => {
+  it('returns a permanent delivery failure for an intentionally unavailable sandbox capability', async () => {
+    const createSandbox = vi.fn(
+      () =>
+        ({
+          discoverSessionWrappers: async () => {
+            throw new AgentSandboxUnavailableError('Sandbox runtime is unavailable');
+          },
+        }) as unknown as AgentSandbox
+    );
+    const runtime = createAgentRuntime({
+      storage: createMemoryStorage(),
+      env: { WORKER_URL: 'http://worker.test' } as Env,
+      getMetadata: async () => createMetadata(),
+      createAgentSandbox: createSandbox,
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+    });
+
+    await expect(runtime.send(createPlan(createMetadata()))).resolves.toEqual({
+      success: false,
+      code: 'SANDBOX_CAPABILITY_UNAVAILABLE',
+      error: 'Sandbox runtime delivery is unavailable for this session',
+    });
+    expect(createSandbox).toHaveBeenCalledWith(createMetadata());
+  });
+
   it('preflights cold delivery, authorizes its physical lease, and returns the existing queue result shape', async () => {
     const storage = createMemoryStorage();
     const ready = createWorkspaceReady();
@@ -1022,6 +1049,31 @@ describe('AgentRuntime', () => {
     });
 
     await expect(runtime.interruptWrapper()).resolves.toEqual({ commandSent: false });
+  });
+
+  it('rejects delivery and suppresses keepalive when DO deletion intent fences runtime use', async () => {
+    const keepAlive = vi.fn().mockResolvedValue(undefined);
+    const execute = vi.fn().mockResolvedValue({ kiloSessionId: 'kilo_runtime' });
+    const runtime = createAgentRuntime({
+      storage: createMemoryStorage(),
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      canUseSandboxRuntime: async () => false,
+      getOrchestratorOverride: () => ({ execute }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => ({ keepAlive }) as unknown as AgentSandbox,
+    });
+
+    await expect(runtime.send(createPlan())).resolves.toEqual({
+      success: false,
+      code: 'INTERNAL',
+      error: 'Session deletion is in progress',
+    });
+    await runtime.keepSandboxAlive();
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(keepAlive).not.toHaveBeenCalled();
   });
 
   it('keeps the runtime sandbox alive through AgentSandbox transport controls', async () => {

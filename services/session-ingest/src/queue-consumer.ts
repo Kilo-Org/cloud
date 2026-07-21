@@ -350,6 +350,7 @@ async function dispatchRemoteSessionAttentionSignals(
       await dispatchRemoteSessionAttentionSignal(
         { kiloUserId, sessionId, signal },
         {
+          remoteSessionAttentionPushUserId: env.REMOTE_SESSION_ATTENTION_PUSH_USER_ID,
           hasActiveCliSession: async () => {
             const stub = getUserConnectionDO(env, { kiloUserId });
             return stub.hasActiveCliSession(sessionId);

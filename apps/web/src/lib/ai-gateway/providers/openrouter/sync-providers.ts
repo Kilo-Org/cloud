@@ -39,7 +39,7 @@ import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attri
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   openRouterToVercelInferenceProviderId,
-  VercelUserByokInferenceProviderIdSchema,
+  VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 /**
@@ -176,7 +176,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-function injectExtraUserByokModels(
+function injectExtraProviderModels(
   vercelModels: Record<string, StoredModel>,
   providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
 ) {
@@ -194,15 +194,13 @@ function injectExtraUserByokModels(
       vercelModel.endpoints
         .map(
           endpoint =>
-            VercelUserByokInferenceProviderIdSchema.safeParse(
-              endpoint.provider_name ?? endpoint.tag
-            ).data
+            VercelInferenceProviderIdSchema.safeParse(endpoint.provider_name ?? endpoint.tag).data
         )
         .filter(p => p !== undefined)
     );
 
     for (const providerData of providerModelData) {
-      const vercelProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(
+      const vercelProviderId = VercelInferenceProviderIdSchema.safeParse(
         openRouterToVercelInferenceProviderId(providerData.provider.slug)
       ).data;
       const endpoint = vercelModel.endpoints.find(e => e.provider_name === vercelProviderId);
@@ -225,7 +223,7 @@ function injectExtraUserByokModels(
           },
         };
         console.warn(
-          '[injectExtraUserByokModels] Adding missing model to user byok provider %s: %s',
+          '[injectExtraProviderModels] Adding missing model to provider %s: %s',
           providerData.provider.name,
           m.name
         );
@@ -268,7 +266,7 @@ async function syncProviders(
     )
   );
 
-  injectExtraUserByokModels(vercelModels, providerModelData);
+  injectExtraProviderModels(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {

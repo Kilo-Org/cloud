@@ -26,6 +26,18 @@ export const GitLabLegacyMetadataSchema = z
 
 export type GitLabLegacyMetadata = z.infer<typeof GitLabLegacyMetadataSchema>;
 
+export type GitLabCredentialAuthType = 'oauth' | 'pat';
+
+export function resolveGitLabCredentialAuthType(
+  metadata: GitLabLegacyMetadata,
+  integration: Pick<PlatformIntegration, 'integration_type'>
+): GitLabCredentialAuthType | undefined {
+  if (metadata.auth_type) return metadata.auth_type;
+  return integration.integration_type === 'oauth' || integration.integration_type === 'pat'
+    ? integration.integration_type
+    : undefined;
+}
+
 export function getGitLabIntegrationOwner(integration: PlatformIntegration) {
   if (integration.owned_by_user_id) {
     return { type: 'user', id: integration.owned_by_user_id } as const;
@@ -34,28 +46,4 @@ export function getGitLabIntegrationOwner(integration: PlatformIntegration) {
     return { type: 'org', id: integration.owned_by_organization_id } as const;
   }
   throw new Error('GitLab integration has no owner');
-}
-
-export function countLegacySecretFields(metadata: Record<string, unknown>): number {
-  return [
-    'access_token',
-    'refresh_token',
-    'token_expires_at',
-    'client_secret',
-    'project_tokens',
-  ].filter(key => key in metadata).length;
-}
-
-export function hasTokenBearingLegacyMetadata(metadata: Record<string, unknown>): boolean {
-  if ('access_token' in metadata || 'refresh_token' in metadata || 'client_secret' in metadata) {
-    return true;
-  }
-  if (!('project_tokens' in metadata)) return false;
-  const projectTokens = metadata.project_tokens;
-  return (
-    typeof projectTokens !== 'object' ||
-    projectTokens === null ||
-    Array.isArray(projectTokens) ||
-    Object.keys(projectTokens).length > 0
-  );
 }

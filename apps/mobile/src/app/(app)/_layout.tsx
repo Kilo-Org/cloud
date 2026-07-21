@@ -25,6 +25,12 @@ export default function AppLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="pr-review"
+                options={{
+                  headerShown: false,
+                }}
+              />
               <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/[session-id]" />
               <Stack.Screen
@@ -50,6 +56,15 @@ export default function AppLayout() {
                 options={{
                   presentation: 'formSheet',
                   sheetAllowedDetents: [0.5],
+                  sheetGrabberVisible: true,
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
+                name="agent-chat/instance-picker"
+                options={{
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: [0.5, fullSheetDetent],
                   sheetGrabberVisible: true,
                   headerShown: false,
                 }}

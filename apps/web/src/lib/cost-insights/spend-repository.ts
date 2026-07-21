@@ -128,6 +128,14 @@ type DenseHourlySpendRow = {
   is_covered: boolean;
 };
 
+type HourlyDriverSpendRow = {
+  hour_start: string | Date;
+  variable_microdollars: string | number | bigint;
+  scheduled_microdollars: string | number | bigint;
+  variable_record_count: string | number | bigint;
+  scheduled_record_count: string | number | bigint;
+};
+
 type TopDriverRow = {
   spend_category: CostInsightSpendCategory;
   source: CostInsightSpendSource;
@@ -552,6 +560,77 @@ function canonicalHourlySpend(
   return points;
 }
 
+async function getOwnerHourlyDriverSpend(
+  executor: CostInsightQueryExecutor,
+  params: {
+    owner: CostInsightSpendOwner;
+    startHour: string;
+    endHourExclusive: string;
+  }
+): Promise<Map<string, Omit<OwnerHourlySpend, 'hourStart' | 'isCovered'>>> {
+  const range = requireHourlyRange(params);
+  const owner = params.owner;
+  const result = await executor.execute<HourlyDriverSpendRow>(sql`
+    SELECT
+      ${cost_insight_owner_hour_driver_buckets.hour_start} AS hour_start,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.total_microdollars})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'variable'), 0)::text
+        AS variable_microdollars,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.total_microdollars})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'scheduled'), 0)::text
+        AS scheduled_microdollars,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'variable'), 0)::text
+        AS variable_record_count,
+      COALESCE(SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})
+        FILTER (WHERE ${cost_insight_owner_hour_driver_buckets.spend_category} = 'scheduled'), 0)::text
+        AS scheduled_record_count
+    FROM ${cost_insight_owner_hour_driver_buckets}
+    WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${range.startHour}
+      AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${range.endHourExclusive}
+      AND ${ownerPredicate(
+        owner,
+        sql`${cost_insight_owner_hour_driver_buckets.owned_by_user_id}`,
+        sql`${cost_insight_owner_hour_driver_buckets.owned_by_organization_id}`
+      )}
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `);
+
+  return new Map(
+    result.rows.map(row => {
+      const variableMicrodollars = parseSafeDatabaseInteger(
+        row.variable_microdollars,
+        'driver variable_microdollars'
+      );
+      const scheduledMicrodollars = parseSafeDatabaseInteger(
+        row.scheduled_microdollars,
+        'driver scheduled_microdollars'
+      );
+      return [
+        normalizeDatabaseTimestamp(row.hour_start, 'driver hour_start'),
+        {
+          variableMicrodollars,
+          scheduledMicrodollars,
+          totalMicrodollars: sumSafe(
+            variableMicrodollars,
+            scheduledMicrodollars,
+            'driver hourly total microdollars'
+          ),
+          variableRecordCount: parseSafeDatabaseInteger(
+            row.variable_record_count,
+            'driver variable_record_count'
+          ),
+          scheduledRecordCount: parseSafeDatabaseInteger(
+            row.scheduled_record_count,
+            'driver scheduled_record_count'
+          ),
+        },
+      ];
+    })
+  );
+}
+
 export async function loadOwnerDashboardHourlySpend(
   primaryDatabase: ExactRollingDatabase,
   params: {
@@ -579,24 +658,45 @@ export async function loadOwnerDashboardHourlySpend(
         ),
         false
       );
-      if (!hasIntervals(uncoveredIntervals)) return rollupPoints;
-
-      const canonicalPoints = await withCanonicalFallbackTelemetry(
-        'dashboard_evidence_90d',
-        uncoveredIntervals,
-        async () =>
-          canonicalHourlySpend(
-            await loadCanonicalCostInsightAggregationsByIntervals(transaction, {
-              owner: params.owner,
-              intervals: toCanonicalIntervals(uncoveredIntervals),
-            }),
-            uncoveredIntervals
+      const canonicalByHour = hasIntervals(uncoveredIntervals)
+        ? new Map(
+            (
+              await withCanonicalFallbackTelemetry(
+                'dashboard_evidence_90d',
+                uncoveredIntervals,
+                async () =>
+                  canonicalHourlySpend(
+                    await loadCanonicalCostInsightAggregationsByIntervals(transaction, {
+                      owner: params.owner,
+                      intervals: toCanonicalIntervals(uncoveredIntervals),
+                    }),
+                    uncoveredIntervals
+                  )
+              )
+            ).map(point => [point.hourStart, point])
           )
-      );
-      const canonicalByHour = new Map(canonicalPoints.map(point => [point.hourStart, point]));
-      return rollupPoints.map(point =>
+        : new Map<string, OwnerHourlySpend>();
+      const pointsWithCanonicalFallback = rollupPoints.map(point =>
         point.isCovered ? point : (canonicalByHour.get(point.hourStart) ?? point)
       );
+
+      const preCoverageEnd = effectiveCoverageStart
+        ? new Date(
+            Math.min(Date.parse(effectiveCoverageStart), Date.parse(range.endHourExclusive))
+          ).toISOString()
+        : range.endHourExclusive;
+      if (preCoverageEnd <= range.startHour) return pointsWithCanonicalFallback;
+
+      const driverSpendByHour = await getOwnerHourlyDriverSpend(transaction, {
+        owner: params.owner,
+        startHour: range.startHour,
+        endHourExclusive: preCoverageEnd,
+      });
+      return pointsWithCanonicalFallback.map(point => {
+        if (point.isCovered || point.hourStart >= preCoverageEnd) return point;
+        const driverSpend = driverSpendByHour.get(point.hourStart);
+        return driverSpend ? { ...point, ...driverSpend } : point;
+      });
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );

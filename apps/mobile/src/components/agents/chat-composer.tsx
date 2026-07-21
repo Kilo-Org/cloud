@@ -150,7 +150,10 @@ export function ChatComposer({
   });
 
   // Compute base composer disabled before the voice hook so voice can react to it.
-  const toolbarDisabled = disabled || isStreaming || isSending;
+  // `isStreaming` is intentionally NOT a composer gate (see
+  // `chat-composer-input-state.ts`); the user must remain able to type and
+  // send while the agent runs.
+  const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
   const voiceInput = useVoiceInput({
@@ -173,7 +176,6 @@ export function ChatComposer({
     hasText,
     isFocused,
     isSending,
-    isStreaming,
     voiceInputActive: voiceInput.isActive,
   });
 

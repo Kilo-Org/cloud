@@ -129,13 +129,14 @@ export function ChatComposerInputRow({
         <View className="ml-1">
           <VoiceInputButton
             disabled={voiceDisabled}
+            size="sm"
             status={voiceInputStatus}
             onPress={onToggleVoice}
           />
         </View>
       ) : null}
 
-      {isStreaming ? (
+      {isStreaming && !canSend && !isSending ? (
         <Pressable
           onPress={onStop}
           disabled={disabled}

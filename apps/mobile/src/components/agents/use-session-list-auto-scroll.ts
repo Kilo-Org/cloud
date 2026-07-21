@@ -1,8 +1,9 @@
 import { type FlashListRef } from '@shopify/flash-list';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import {
+  getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
   shouldFollowSessionContentSize,
@@ -28,6 +29,14 @@ export function useSessionListAutoScroll<ItemT>({
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
   const shouldAutoScrollRef = useRef(true);
+  // React state mirror of `shouldAutoScrollRef`'s at-bottom side, so the
+  // scroll-to-bottom button can be conditionally rendered. Updated through
+  // `setIsAtBottom` which is change-gated (functional update returning the
+  // previous value when unchanged) to avoid re-render churn on every
+  // scroll frame.
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(
+    getInitialSessionListAutoScrollVisibility().isAtBottom
+  );
   const isAutoScrollingRef = useRef(false);
   // Tracks whether the user is currently dragging or the list is still in a
   // momentum fling. While this is true we must not programmatically scroll —
@@ -75,6 +84,16 @@ export function useSessionListAutoScroll<ItemT>({
     }, 150);
   }, [clearAutoScrollResetTimeout]);
 
+  // Animated scroll for the user-initiated "scroll to bottom" button.
+  // Intentionally does NOT set `isAutoScrollingRef`: that flag suppresses
+  // `onScroll` updates inside `handleScroll`, and we *want* the scroll
+  // events produced by this animation to flow through
+  // `updateAutoScrollFromEvent` so the at-bottom detection flips and the
+  // button fades out on completion.
+  const scrollToLatestAnimated = useCallback(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
   const scheduleScrollToLatestMessage = useCallback(() => {
     if (
       !shouldScheduleSessionAutoScroll({
@@ -106,8 +125,10 @@ export function useSessionListAutoScroll<ItemT>({
   }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
 
   useEffect(() => {
-    shouldAutoScrollRef.current = true;
+    const initial = getInitialSessionListAutoScrollVisibility();
+    shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
+    setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
   }, [resetKey]);
 
   useEffect(() => {
@@ -128,12 +149,17 @@ export function useSessionListAutoScroll<ItemT>({
   const updateAutoScrollFromEvent = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-      shouldAutoScrollRef.current = isSessionListAtBottom({
+      const nextIsAtBottom = isSessionListAtBottom({
         contentHeight: contentSize.height,
         viewportHeight: layoutMeasurement.height,
         offsetY: contentOffset.y,
         thresholdPx: SESSION_LIST_BOTTOM_THRESHOLD_PX,
       });
+      shouldAutoScrollRef.current = nextIsAtBottom;
+      // Change-gate the setState: returning the previous value when
+      // unchanged is a React bail-out and avoids a re-render per scroll
+      // frame while the user holds a steady position.
+      setIsAtBottom(prev => (prev === nextIsAtBottom ? prev : nextIsAtBottom));
     },
     []
   );
@@ -225,7 +251,9 @@ export function useSessionListAutoScroll<ItemT>({
   }, [scheduleScrollToLatestMessage]);
 
   return {
+    isAtBottom,
     listRef,
+    scrollToLatestAnimated,
     handleContentSizeChange,
     handleListLayout,
     handleScroll,

@@ -275,6 +275,13 @@ describe('ExecutionError', () => {
       expect(error.code).toBe('WRAPPER_JOB_CONFLICT');
       expect(error.retryable).toBe(false);
     });
+
+    it('sandboxCapabilityUnavailable creates non-retryable error', () => {
+      const error = ExecutionError.sandboxCapabilityUnavailable('Runtime delivery is disabled');
+
+      expect(error.code).toBe('SANDBOX_CAPABILITY_UNAVAILABLE');
+      expect(error.retryable).toBe(false);
+    });
   });
 
   it('preserves cause for debugging', () => {
@@ -295,10 +302,11 @@ describe('ExecutionError', () => {
       'INVALID_REQUEST',
       'SESSION_NOT_FOUND',
       'WRAPPER_JOB_CONFLICT',
+      'SANDBOX_CAPABILITY_UNAVAILABLE',
     ];
 
     expect(retryableCodes).toHaveLength(4);
-    expect(permanentCodes).toHaveLength(3);
+    expect(permanentCodes).toHaveLength(4);
   });
 });
 

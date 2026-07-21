@@ -178,6 +178,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         config.onError?.('Session terminated');
         break;
       case 'disconnected':
+        // Clear CLI pending-message state unconditionally — including when the
+        // last turn had `completed === true`. Only `cli-live-transport.ts`
+        // emits this reason (via `wrapper_disconnected`); the clear is scoped
+        // to it, not `transport-disconnected` (see below).
+        pendingMessages.clear();
         if (completed) break;
         terminated = true;
         disconnectedSource = 'wrapper';
@@ -185,6 +190,15 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         config.onError?.('Connection to agent lost');
         break;
       case 'transport-disconnected':
+        // Do NOT clear `pendingMessages` here. Only `cloud-agent-transport.ts`
+        // emits this reason, synthesized locally on any WebSocket hiccup
+        // (frequent, purely client-side, self-recovering via reconnect) —
+        // it never fires for CLI sessions. Cloud-agent sessions genuinely
+        // populate `pendingMessages` via `cloud.message.queued`, and there is
+        // no snapshot-replay mechanism that would repopulate it afterward
+        // (unlike the CLI's always-on `session.queue.changed` replay), so
+        // clearing here would silently and permanently drop "Queued" badges
+        // for messages that are still queued server-side.
         terminated = true;
         disconnectedSource = 'transport';
         completed = false;
@@ -544,6 +558,39 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  /**
+   * CLI-only: `queue.changed` carries the authoritative FIFO snapshot of
+   * queued user-message IDs. Each emission is a full reconciliation, not a
+   * delta — entries absent from the new snapshot are dropped.
+   *
+   * `pendingMessages` is a single map shared by the whole session tree, but
+   * child/subagent sessions also forward their own `session.queue.changed`
+   * events here (see `cli-live-transport.ts`'s parent-session forwarding and
+   * `remote-sender.ts`'s always-empty replay for children). Only the root
+   * session's snapshot may reconcile this map — otherwise an empty child
+   * snapshot on reconnect would wipe a genuinely queued root message.
+   */
+  function processQueueChanged(event: Extract<ServiceEvent, { type: 'queue.changed' }>): void {
+    if (!isRootSession(event.sessionId)) return;
+    if (event.queued.length === 0) {
+      if (pendingMessages.size === 0) return;
+      pendingMessages.clear();
+      notify();
+      return;
+    }
+    const next = new Map<string, MessageDeliveryState>();
+    for (const messageId of event.queued) {
+      next.set(messageId, { status: 'queued' });
+    }
+    // Reuse the same Map identity where possible to avoid invalidating
+    // existing subscribers that hold onto the previous reference.
+    pendingMessages.clear();
+    for (const [messageId, state] of next) {
+      pendingMessages.set(messageId, state);
+    }
+    notify();
+  }
+
   function processConnected(event: Extract<ServiceEvent, { type: 'connected' }>): void {
     // Set activity from sessionStatus. When sessionStatus is absent (server
     // has no execution-derived state yet), default to idle — we know the
@@ -685,6 +732,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         break;
       case 'cloud.message.failed':
         processMessageFailed(event);
+        break;
+      case 'queue.changed':
+        processQueueChanged(event);
         break;
       case 'session.idle':
       case 'session.turn.close':

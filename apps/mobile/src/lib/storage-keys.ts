@@ -15,3 +15,5 @@ export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
+export const PR_REVIEW_RECENTS_KEY = 'pr-review-recents';
+export const PR_REVIEW_VIEWED_KEY = 'pr-review-viewed';

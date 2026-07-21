@@ -12,7 +12,8 @@ These rules apply to every session and role. Later sections do not repeat them.
 - Every reviewer and verifier invocation must be a fresh session so earlier conclusions cannot anchor later passes.
 - Choose the simplest maintainable implementation that fully satisfies the accepted requirements. Reuse existing code and contracts. Do not add abstraction or scope without evidence that it is required.
 - Make small, logically scoped commits throughout. Never squash the work into one catch-all commit unless the user explicitly requests it.
-- Repair-round limit: after three repair rounds on the same issue, the planner or orchestrator takes over, resolves the issue directly, and records the resolution. Never loop indefinitely.
+- Delegation discipline: the orchestrator is the expensive model driving cheap role agents. Its output is judgment — handoffs, steering, triage, and verification — not diffs. When the orchestrator diagnoses a problem, the diagnosis goes into a role handoff with acceptance criteria; the orchestrator does not implement the fix itself, even when it already knows it. Direct orchestrator edits are limited to trivial glue: merge-conflict resolution, one-line configuration, and the final narrowly scoped repair in the last orchestration step. Anything behavioral routes through an implementer and a fresh reviewer.
+- Escalation ladder, not takeover-by-count. When a loop iteration fails: first re-dispatch the same role with sharper steering — the diagnosis, the failing evidence, what was already tried, and a narrower goal. If the steered round also fails, restructure the work: split the slice or change the approach in the handoff. Take over directly only when a steered round produced zero new progress, and record every takeover with a one-line justification in the final report. Progress means new root-cause information, a smaller reproduction, fewer reviewer findings, or a previously failing check now passing; the same error under the same theory twice is not progress. Never loop indefinitely: a steered round with zero new progress is the floor at which takeover is required.
 - Step limits are hard ceilings: `mobile-plan-reviewer` 40, `mobile-implementer` 80, `mobile-reviewer` 50, `mobile-e2e-verifier` 100. Size every handoff below 75% of the role's limit; an implementation slice should fit in roughly 60 planned steps. Never raise a limit to fit an oversized task; split the task instead.
 
 ## Interaction Modes
@@ -46,9 +47,19 @@ Rules:
 ## Planning
 
 1. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
-2. Create the dedicated worktrees and write the complete draft plan.
-3. Run the plan review gate below.
-4. In hands-on mode, obtain explicit user approval. In hands-off mode, self-approve.
+2. Create the dedicated worktrees.
+3. For defect work, run the bug reproduction gate below before writing the plan.
+4. Write the complete draft plan.
+5. Run the plan review gate below.
+6. In hands-on mode, obtain explicit user approval. In hands-off mode, self-approve.
+
+### Bug Reproduction Gate
+
+When the work fixes a reported defect, dispatch a fresh `mobile-e2e-verifier` in repro mode on the unmodified baseline in the dedicated worktree before writing the draft plan. Its assignment is to reproduce the reported issue — not to fix anything — and return exact reproduction steps, evidence, and a failure classification. It claims iOS with `--phase prewarm`; the claimed device and warmed services carry into the planner handoff as existing resources to preserve, and the final verifier later reclaims the same device with `--phase verify`.
+
+A confirmed reproduction feeds the plan: the reproduction steps and failure classification inform the root-cause hypothesis, and the confirmed repro flow passing becomes an acceptance criterion the final verifier must rerun.
+
+`Cannot reproduce` is a blocker, not a license to fix an unconfirmed bug. In hands-on mode, return the repro attempt evidence to the user and ask how to proceed. In hands-off mode, stop with a blocker report containing that evidence: no plan, no orchestrator.
 
 ### Plan Review Gate
 
@@ -56,7 +67,7 @@ After the draft plan is complete and before approval, dispatch a fresh `mobile-p
 
 The reviewer has less context than the planner and may be wrong. Treat every finding as untrusted advice: verify each claim independently against the request, repository evidence, and applicable instructions. Fix only valid findings. Record rejected findings with a short technical rationale; a rejected finding must not reopen without new evidence. Never weaken or expand the plan merely to satisfy the reviewer.
 
-After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If the repair-round limit is reached on one issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.`
+After fixing valid findings, dispatch another fresh reviewer. Repeat until a fresh reviewer returns `No findings.` If three consecutive rounds stay stuck on the same issue, the planner resolves it directly, records the resolution, and dispatches one final fresh reviewer that must return `No findings.` This count-based floor is a deadlock-breaker for plan-text disagreement between planner and reviewer — the planner edits its own plan here, so nothing is being taken over. Delegated implementation work follows the escalation ladder in Ground Rules instead.
 
 ### Planner Handoff
 
@@ -69,6 +80,7 @@ The handoff must contain:
 - The absolute path of the accepted plan and any approved design
 - The dedicated worktree path for every repository in scope, with each worktree's current branch, commit, and working-tree state
 - Acceptance criteria, feature-state matrix, execution ledger, non-goals, and unresolved risks
+- For defect work: the reported defect, the confirmed reproduction steps and failure classification from the bug reproduction gate, and the repro run's resource manifest
 - Existing changes and resources that must be preserved
 - The completion gate: review, E2E, Git, PR, Kilobot, mergeability, and CI requirements, with a direct instruction to continue until the PR is mergeable and conflict-free with all expected CI checks green on the latest head
 - The GitHub comment rule (see GitHub Communication)
@@ -81,10 +93,10 @@ Launch the orchestrator in the current tmux session with a unique, descriptive w
 tmux new-window -t <planner-tmux-session> \
   -n <feature>-orchestrator \
   -c <dedicated-worktree>/apps/mobile \
-  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/anthropic/claude-sonnet-5 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
+  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/anthropic/claude-opus-4.8 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
 ```
 
-Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Sonnet 5 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
+Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Opus 4.8 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
 
 ## Roles
 
@@ -93,7 +105,7 @@ Use `kilo run --interactive` exactly as shown, with the message positional befor
 | `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | Denied |
 | `mobile-implementer` | Implements one bounded task from the accepted plan and runs narrow checks | Allowed where the task requires |
 | `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
-| `mobile-e2e-verifier` | Exercises accepted behavior; may create temporary state-generation fixtures in verify mode | Temporary, verify mode only |
+| `mobile-e2e-verifier` | Exercises accepted behavior; in repro mode, reproduces a reported defect on the unmodified baseline before planning; may create temporary state-generation fixtures | Temporary only |
 
 ## Execution Ledger
 
@@ -113,18 +125,20 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 1. Ingest the handoff. Split work into ledger slices.
 2. Dispatch ready independent slices in a bounded wave of at most two or three concurrent `mobile-implementer`s. Each handoff lists the other active slices and their ownership boundaries. While a wave is active, run only ownership-safe narrow checks.
 3. When every implementer in the wave has returned, treat it as a synchronization barrier: inspect each result, ownership adherence, and the combined diff; resolve integration and architecture decisions yourself; run shared mutating commands and shared checks once. If one slice failed, preserve the successful ones.
-4. Dispatch one fresh `mobile-reviewer` over the coherent wave diff. Triage findings yourself: route valid findings through a bounded repair wave and then a fresh reviewer; record rejected findings with a short rationale.
-5. After checks and review pass, create the commits at the ledger's intended per-slice boundaries. If a slice exhausts its implementer budget twice, take it over yourself.
+4. Dispatch one fresh `mobile-reviewer` over the coherent wave diff. Triage findings yourself: route valid findings through a bounded repair wave and then a fresh reviewer; record rejected findings with a short rationale. This is a loop: repeat repair wave → fresh reviewer, steering each round per the escalation ladder, until a fresh reviewer reports no valid actionable findings. Running this loop is the orchestrator's primary job, not a preamble to doing the work itself.
+5. After checks and review pass, create the commits at the ledger's intended per-slice boundaries. If a slice exhausts its implementer budget, split it or re-dispatch it with a sharper handoff; take it over yourself only per the escalation ladder.
 6. When device E2E is likely, prewarm infrastructure concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Do not judge acceptance behavior while implementation is still changing. Record a resource manifest for the final verifier.
-7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier.
+7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier. This is also a loop: repeat triage → repair wave → fresh reviewer → fresh verifier, steering each round per the escalation ladder, until a fresh verifier passes every applicable feature state. The orchestrator may reproduce a failure once to triage it; the repair itself, with the orchestrator's diagnosis and acceptance criteria attached, goes through the implementer-reviewer loop. The orchestrator never sits in an edit-run-verify loop itself.
 8. Perform the final full-diff review and repository-appropriate verification yourself. Commit any final narrowly scoped repair, push, create or update the PR, and assign it to the requesting human.
 
-### Kilobot and CI Loop
+### Reviewer and CI Loop
 
-9. Wait until Kilobot has reviewed the latest head. Fetch every Kilobot review thread, including comments that arrive after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
-10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code.
-11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable Kilobot comment is unresolved.
-12. Rerun local mobile E2E after any Kilobot repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
+Kilobot is the only reviewer whose review is waited for. Comments that other reviewers — bots or humans — have already posted get exactly the same triage, repair, reply, and resolve flow, but never wait for another reviewer to review or re-review.
+
+9. Wait until Kilobot has reviewed the latest head; do not wait for any other reviewer. Kilobot can crash: if its review or check does not arrive in a reasonable time, retrigger it by pushing an empty commit or by tagging it in a PR comment asking for a re-review, then resume waiting. Then fetch every unresolved review thread from every reviewer, including comments that arrived after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
+10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done.
+11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable comment already posted by any reviewer is unresolved.
+12. Rerun local mobile E2E after any review-driven repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
 13. When the base branch advances, integrate the current base in the dedicated worktree and push the new head. Then apply exactly one of:
     - No conflicts: do not rerun checks, E2E, or review. The merged tree matches the verified head, and CI and Kilobot run on the new SHA anyway.
     - Conflicts resolved, certainly behavior-neutral: same as above, no reruns.
@@ -156,7 +170,7 @@ Never ask a role agent to infer context from a conversation it cannot see. Keep 
 
 ## Workflow Metrics
 
-Record lightweight in-session measurements in the final report when applicable: wave count and width, budget exhaustions, ownership collisions, unmanaged listener detections, prewarm reuse or invalidation, simulator relabel or name-restoration failures, accepted-plan-to-final-E2E-start time, accepted-plan-to-merged-PR time, and review/E2E/CI repair rounds. Do not add persistent telemetry or a data store for these.
+Record lightweight in-session measurements in the final report when applicable: wave count and width, budget exhaustions, ownership collisions, unmanaged listener detections, prewarm reuse or invalidation, simulator relabel or name-restoration failures, accepted-plan-to-final-E2E-start time, accepted-plan-to-merged-PR time, review/E2E/CI repair rounds, and orchestrator takeovers with a one-line justification each. Do not add persistent telemetry or a data store for these.
 
 ## Completion Gate
 
@@ -170,7 +184,7 @@ The orchestrator may declare the work complete only when every item holds:
 - Final automated checks pass in every changed repository
 - The orchestrator has reviewed the complete diff and performed all Git and PR actions itself
 - The PR is assigned to the requesting human
-- Kilobot has reviewed the latest head and no actionable Kilobot comment is unresolved
+- Kilobot has reviewed the latest head — Kilobot is the only reviewer waited for — no actionable comment already posted by any reviewer is unresolved, and every addressed finding has an in-thread reply and a resolved thread
 - GitHub reports the exact latest head as mergeable with no conflicts
 - All expected CI checks on the latest head are in a successful terminal state; failed, cancelled, timed-out, action-required, or pending checks block completion
 - No generated E2E fixture remains tracked or untracked in any repository

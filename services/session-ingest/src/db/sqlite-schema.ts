@@ -18,6 +18,12 @@ export const ingestMeta = sqliteTable('ingest_meta', {
   value: text('value'),
 });
 
-export const sessions = sqliteTable('sessions', {
-  session_id: text('session_id').primaryKey(),
-});
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    session_id: text('session_id').primaryKey(),
+    organization_id: text('organization_id'),
+    authorization_expires_at: integer('authorization_expires_at').notNull().default(0),
+  },
+  table => [index('sessions_organization_id_idx').on(table.organization_id)]
+);

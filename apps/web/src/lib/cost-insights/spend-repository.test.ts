@@ -211,7 +211,18 @@ describe('Cost Insights spend repository', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            hour_start: '2026-06-01 00:00:00+00',
+            variable_microdollars: '5',
+            scheduled_microdollars: '3',
+            variable_record_count: '1',
+            scheduled_record_count: '1',
+          },
+        ],
+      });
     const database = {
       transaction: async (callback: (transaction: CostInsightQueryExecutor) => Promise<unknown>) =>
         await callback({ execute } as unknown as CostInsightQueryExecutor),
@@ -226,7 +237,9 @@ describe('Cost Insights spend repository', () => {
     ).resolves.toEqual([
       expect.objectContaining({
         hourStart: '2026-06-01T00:00:00.000Z',
-        totalMicrodollars: null,
+        variableMicrodollars: 5,
+        scheduledMicrodollars: 3,
+        totalMicrodollars: 8,
         isCovered: false,
       }),
       expect.objectContaining({
@@ -241,9 +254,9 @@ describe('Cost Insights spend repository', () => {
       }),
     ]);
 
-    expect(execute).toHaveBeenCalledTimes(7);
+    expect(execute).toHaveBeenCalledTimes(8);
     const canonicalQueries = execute.mock.calls
-      .slice(3)
+      .slice(3, 7)
       .map(([query]) => new PgDialect().sqlToQuery(query).params);
     expect(canonicalQueries).toEqual(
       expect.arrayContaining([
@@ -253,6 +266,10 @@ describe('Cost Insights spend repository', () => {
     for (const queryParameters of canonicalQueries) {
       expect(queryParameters).not.toContain('2026-06-01T00:00:00.000Z');
     }
+    const driverQueryParameters = new PgDialect().sqlToQuery(execute.mock.calls[7]?.[0]).params;
+    expect(driverQueryParameters).toEqual(
+      expect.arrayContaining(['2026-06-01T00:00:00.000Z', '2026-06-01T01:00:00.000Z'])
+    );
   });
 
   test('adds current-hour categories using safe integer conversion', async () => {

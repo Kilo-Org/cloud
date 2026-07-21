@@ -1,4 +1,9 @@
-import { createSessionResponseV1Schema, parseCreateSessionResponse } from './create-session';
+import {
+  createRemoteSessionOnConnection,
+  createSessionResponseV1Schema,
+  parseCreateSessionResponse,
+} from './create-session';
+import { CommandDeliveredError, UserWebCommandError } from './user-web-connection';
 
 const VALID_SESSION_ID = 'ses_12345678901234567890123456';
 
@@ -143,5 +148,80 @@ describe('parseCreateSessionResponse', () => {
     expect(parseCreateSessionResponse(undefined)).toEqual({ ok: false, reason: 'invalid' });
     expect(parseCreateSessionResponse(VALID_SESSION_ID)).toEqual({ ok: false, reason: 'invalid' });
     expect(parseCreateSessionResponse(1)).toEqual({ ok: false, reason: 'invalid' });
+  });
+});
+
+describe('createRemoteSessionOnConnection', () => {
+  function makeFakeConnection() {
+    return {
+      sendCommandToConnection: jest.fn(),
+    };
+  }
+
+  it('issues a connection-scoped create_session with protocolVersion: 1 and the expected connectionId', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      sessionID: VALID_SESSION_ID,
+    });
+
+    const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1');
+
+    expect(connection.sendCommandToConnection).toHaveBeenCalledTimes(1);
+    expect(connection.sendCommandToConnection).toHaveBeenCalledWith({
+      command: 'create_session',
+      data: { protocolVersion: 1 },
+      expectedConnectionId: 'cli-owner-1',
+    });
+    expect(parseCreateSessionResponse(result)).toEqual({
+      ok: true,
+      kiloSessionId: VALID_SESSION_ID,
+    });
+  });
+
+  it('resolves with the raw reply and lets the caller see a malformed response', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({ not: 'a v1 envelope' });
+
+    const result = await createRemoteSessionOnConnection(connection, 'cli-owner-1');
+
+    expect(parseCreateSessionResponse(result)).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('propagates a delivered bare-string error as a CommandDeliveredError', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockRejectedValue(
+      new CommandDeliveredError('Session owner not found')
+    );
+
+    await expect(createRemoteSessionOnConnection(connection, 'cli-owner-1')).rejects.toBeInstanceOf(
+      CommandDeliveredError
+    );
+  });
+
+  it('propagates a structured UserWebCommandError as itself', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockRejectedValue(
+      new UserWebCommandError({
+        code: 'CLI_UPGRADE_REQUIRED',
+        message: 'upgrade required',
+      })
+    );
+
+    await expect(createRemoteSessionOnConnection(connection, 'cli-owner-1')).rejects.toBeInstanceOf(
+      UserWebCommandError
+    );
+  });
+
+  it('propagates a transport-level rejection as a plain (non-CommandDeliveredError) Error', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockRejectedValue(new Error('Connection destroyed'));
+
+    const rejection = await createRemoteSessionOnConnection(connection, 'cli-owner-1').catch(
+      (error: unknown) => error
+    );
+    expect(rejection).toBeInstanceOf(Error);
+    expect(rejection).not.toBeInstanceOf(CommandDeliveredError);
+    expect(rejection).not.toBeInstanceOf(UserWebCommandError);
   });
 });

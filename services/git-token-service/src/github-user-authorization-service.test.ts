@@ -10,6 +10,10 @@ const database = vi.hoisted(() => ({
   deleteWinsRace: true,
   rowAfterDelete: undefined as Record<string, unknown> | undefined,
   lockExecutions: 0,
+  // When set, successive `select().limit()` calls shift from this queue,
+  // letting a test model a row that another request rotated between the
+  // outer read and the post-lock re-read.
+  selectSequence: undefined as Array<Record<string, unknown> | undefined> | undefined,
 }));
 
 vi.mock('@kilocode/db/client', () => ({
@@ -22,6 +26,9 @@ vi.mock('@kilocode/db/client', () => ({
         from: () => ({
           where: () => ({
             limit: async () => {
+              if (database.selectSequence && database.selectSequence.length > 0) {
+                return [database.selectSequence.shift()].filter(Boolean);
+              }
               if (database.deleted && !database.deleteWinsRace) {
                 return [database.rowAfterDelete].filter(Boolean);
               }
@@ -190,6 +197,28 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     await expect(
       makeService().selectUserAuthorization({ userId: 'user_1', githubRepo: 'acme/repo' })
     ).resolves.toEqual({ selected: false, reason: 'credential_unreadable' });
+  });
+
+  it('revokes the current generation when the refresh token is rejected during selection', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ error: 'bad_refresh_token' }))
+    );
+
+    const result = await makeService().selectUserAuthorization({
+      userId: 'user_1',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(result).toEqual({ selected: false, reason: 'revoked' });
+    expect(database.updates).toHaveLength(1);
+    expect(database.updates[0]).toMatchObject({
+      revoked_at: expect.any(String),
+      revocation_reason: 'github_token_rejected',
+    });
   });
 
   it('classifies an unknown envelope key id as unreadable', async () => {
@@ -474,5 +503,342 @@ describe('GitHubUserAuthorizationService disconnect', () => {
       'GitHub authorization revocation failed'
     );
     expect(database.deleted).toBe(false);
+  });
+});
+
+describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
+  beforeEach(() => {
+    database.rows = [makeRow()];
+    database.updates = [];
+    database.updatedRow = undefined;
+    database.deleted = false;
+    database.deleteWinsRace = true;
+    database.rowAfterDelete = undefined;
+    database.lockExecutions = 0;
+    database.selectSequence = undefined;
+    vi.restoreAllMocks();
+  });
+
+  it('accepts a concurrent refresh winner instead of failing when the generation moved under the lock', async () => {
+    // A rotate arrives with the stale pair (v1). Between the outer read and
+    // acquiring the lock, another request already rotated the grant to v2
+    // (healthy). The post-lock version mismatch must resolve to the current
+    // healthy credential, not a 503.
+    const rowV1 = makeRow();
+    const rowV2 = { ...makeRow(), credential_version: 2 };
+    // reads: outer getUserAccessToken read (v1), post-lock re-read (v2),
+    // final reload (v2).
+    database.selectSequence = [rowV1, rowV2, rowV2];
+    vi.stubGlobal('fetch', vi.fn());
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'authorization_1',
+      staleCredentialVersion: 1,
+    });
+
+    expect(result).toMatchObject({
+      connected: true,
+      token: 'access-token',
+      authorizationId: 'authorization_1',
+      credentialVersion: 2,
+    });
+    // No OAuth refresh happened (the winner already did it) and nothing was revoked.
+    expect(fetch).not.toHaveBeenCalled();
+    expect(database.updates).toHaveLength(0);
+  });
+
+  it('returns not_connected when no authorization row exists', async () => {
+    database.rows = [];
+    vi.stubGlobal('fetch', vi.fn());
+
+    const result = await makeService().getUserAccessToken('user_1', { op: 'fetch' });
+
+    expect(result).toEqual({ connected: false, reason: 'not_connected' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(database.updates).toHaveLength(0);
+  });
+
+  it('returns revoked when the existing row is already revoked', async () => {
+    database.rows = [{ ...makeRow(), revoked_at: new Date().toISOString() }];
+    vi.stubGlobal('fetch', vi.fn());
+
+    const result = await makeService().getUserAccessToken('user_1', { op: 'fetch' });
+
+    expect(result).toEqual({ connected: false, reason: 'revoked' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('returns the current credential for fetch without refreshing when outside the buffer', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    const result = await makeService().getUserAccessToken('user_1', { op: 'fetch' });
+
+    expect(result).toMatchObject({
+      connected: true,
+      token: 'access-token',
+      githubLogin: 'octocat',
+      authorizationId: 'authorization_1',
+      credentialVersion: 1,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(database.lockExecutions).toBe(0);
+  });
+
+  it('refreshes the credential when fetch finds the access token inside the expiry buffer', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    const refreshedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    database.updatedRow = refreshedRow;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          access_token: 'refreshed-access',
+          expires_in: 3600,
+          refresh_token: 'refreshed-refresh',
+          refresh_token_expires_in: 7200,
+        })
+      )
+    );
+
+    const result = await makeService().getUserAccessToken('user_1', { op: 'fetch' });
+
+    expect(result.connected).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://github.com/login/oauth/access_token',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(database.lockExecutions).toBe(1);
+  });
+
+  it('strips multiple trailing slashes from the configured OAuth base URL', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    const refreshedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    database.updatedRow = refreshedRow;
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await makeService({ GITHUB_OAUTH_BASE_URL: 'https://github.test///' }).getUserAccessToken(
+      'user_1',
+      { op: 'fetch' }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://github.test/login/oauth/access_token',
+      expect.anything()
+    );
+  });
+
+  it('honors the GITHUB_OAUTH_BASE_URL env seam for the refresh request', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    const refreshedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    database.updatedRow = refreshedRow;
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await makeService({ GITHUB_OAUTH_BASE_URL: 'https://github.test/' }).getUserAccessToken(
+      'user_1',
+      { op: 'fetch' }
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://github.test/login/oauth/access_token',
+      expect.anything()
+    );
+  });
+
+  it('refreshes with force when rotate matches the current authorization and version', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    database.rows = [row];
+    const refreshedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    database.updatedRow = refreshedRow;
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: 'refreshed-access',
+        expires_in: 3600,
+        refresh_token: 'refreshed-refresh',
+        refresh_token_expires_in: 7200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'authorization_1',
+      staleCredentialVersion: 1,
+    });
+
+    expect(result.connected).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(database.lockExecutions).toBe(1);
+  });
+
+  it('returns the current credential without refreshing when rotate carries a stale id', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'old_authorization',
+      staleCredentialVersion: 1,
+    });
+
+    expect(result.connected).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.lockExecutions).toBe(0);
+  });
+
+  it('returns the current credential without refreshing when rotate carries a stale credential version', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'authorization_1',
+      staleCredentialVersion: 99,
+    });
+
+    expect(result.connected).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not touch a fresh credential after a disconnect-then-reconnect rotates the id back to version 1', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const newRow = {
+      ...makeRow(),
+      id: 'authorization_2',
+      credential_version: 1,
+    };
+    database.rows = [newRow];
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'authorization_1',
+      staleCredentialVersion: 7,
+    });
+
+    expect(result).toMatchObject({
+      connected: true,
+      authorizationId: 'authorization_2',
+      credentialVersion: 1,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.lockExecutions).toBe(0);
+  });
+
+  it('revokes the matching generation when reportRejected receives the current id and version', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'reportRejected',
+      authorizationId: 'authorization_1',
+      credentialVersion: 1,
+    });
+
+    expect(result).toEqual({ connected: false, reason: 'revoked' });
+    expect(database.updates).toHaveLength(1);
+    expect(database.updates[0]).toMatchObject({
+      revocation_reason: 'github_token_rejected',
+    });
+    expect(typeof database.updates[0].revoked_at).toBe('string');
+  });
+
+  it('returns the current credential when reportRejected carries a stale id or version', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'reportRejected',
+      authorizationId: 'old_authorization',
+      credentialVersion: 1,
+    });
+
+    expect(result.connected).toBe(true);
+    expect(database.updates).toHaveLength(0);
+  });
+
+  it('revokes on terminal_rejection when the refresh grant is rejected by GitHub', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    database.rows = [row];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ error: 'bad_refresh_token' }))
+    );
+
+    const result = await makeService().getUserAccessToken('user_1', {
+      op: 'rotate',
+      staleAuthorizationId: 'authorization_1',
+      staleCredentialVersion: 1,
+    });
+
+    expect(result).toEqual({ connected: false, reason: 'revoked' });
+    expect(database.updates).toHaveLength(1);
+    expect(database.updates[0]).toMatchObject({ revocation_reason: 'github_token_rejected' });
+  });
+
+  it('does not revoke when the refresh attempt fails transiently', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
+
+    await expect(makeService().getUserAccessToken('user_1', { op: 'fetch' })).rejects.toThrow(
+      'temporarily_unavailable'
+    );
+    expect(database.updates).toHaveLength(0);
   });
 });

@@ -122,6 +122,26 @@ describe('buildCouncilOrchestratorPrompt', () => {
     expect(prompt).toContain('see the Council Review decision above');
   });
 
+  it('instructs the coordinator to GROUP same-line findings (no dedup, keep max severity, drop nothing)', () => {
+    const prompt = buildCouncilOrchestratorPrompt({
+      basePrompt: 'BASE',
+      specialists: [
+        specialist({ id: 'security', name: 'Security' }),
+        specialist({ id: 'correctness', name: 'Correctness', role: 'correctness' }),
+      ],
+      aggregationStrategy: 'unanimous',
+    });
+
+    // Distinct findings that share a line must NOT be deduped away; group and keep every lens.
+    expect(prompt).toContain('GROUP findings by file:line');
+    expect(prompt).toContain('do NOT dedup, merge away, or drop any finding');
+    expect(prompt).toContain('lists');
+    expect(prompt).toContain('HIGHEST severity among the grouped findings');
+    expect(prompt).toContain('EVERY specialist finding must');
+    // The old lossy instruction must be gone.
+    expect(prompt).not.toContain('Merge duplicate findings');
+  });
+
   it('instructs the coordinator to narrate progress (startup, per-specialist, done)', () => {
     const prompt = buildCouncilOrchestratorPrompt({
       basePrompt: 'BASE',

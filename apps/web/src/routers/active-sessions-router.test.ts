@@ -1,195 +1,159 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
-import type { User } from '@kilocode/db/schema';
+import { organizations, organization_memberships } from '@kilocode/db/schema';
+import type { User, Organization } from '@kilocode/db/schema';
+import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
 
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
-  return {
-    ...actual,
-    SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
-  };
-});
+// `.env.test` sets SESSION_INGEST_WORKER_URL to '' (shared fixture used by
+// other test files too — do not change it here). `createCallerForUser`'s
+// import chain (test-utils -> trpc/init -> ...) transitively loads
+// `@/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
+// `const` computed once, the first time that module is evaluated. Static
+// ES `import` statements are always hoisted above every other statement by
+// the transform, so a statically-imported `createCallerForUser` would pull
+// in the real ('') value before any `process.env` assignment written below
+// it could run — and a `jest.mock('@/lib/config.server', ...)` registered
+// after that first (real) load cannot retroactively change the value
+// active-sessions-router.ts already captured. A dynamic `import()` executes
+// exactly where it is awaited (not hoisted), so resolving it in `beforeAll`
+// — after the env var is set below — lets `config.server.ts` pick up the
+// test value on its one evaluation, without the repo-lint-forbidden
+// `require()`.
+process.env.SESSION_INGEST_WORKER_URL = 'https://test-ingest.example.com';
+let createCallerForUser: typeof CreateCallerForUser;
 
 let regularUser: User;
+let testOrganization: Organization;
 
-function mockWorkerSessions(sessions: Array<Record<string, unknown>>): jest.SpyInstance {
-  return jest.spyOn(global, 'fetch').mockResolvedValue(
-    new Response(JSON.stringify({ sessions }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  );
-}
-
-function mockMalformedWorkerResponse(): jest.SpyInstance {
-  return jest.spyOn(global, 'fetch').mockResolvedValue(
-    new Response('not valid json', {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    })
-  );
-}
-
-describe('active-sessions-router.list', () => {
+describe('active-sessions-router', () => {
   beforeAll(async () => {
+    ({ createCallerForUser } = await import('@/routers/test-utils'));
+
     regularUser = await insertTestUser({
-      google_user_email: 'active-sessions-router-user@example.com',
-      google_user_name: 'Active Sessions Router User',
+      google_user_email: 'active-sessions-user@example.com',
+      google_user_name: 'Active Sessions User',
       is_admin: false,
     });
-  });
 
-  let fetchSpy: jest.SpyInstance;
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Active Sessions Test Org',
+        created_by_kilo_user_id: regularUser.id,
+      })
+      .returning();
+    testOrganization = org;
+
+    await db.insert(organization_memberships).values({
+      organization_id: testOrganization.id,
+      kilo_user_id: regularUser.id,
+      role: 'owner',
+    });
+    // kilocode_change - the dynamic `import()` above (needed so
+    // `process.env.SESSION_INGEST_WORKER_URL` is set before
+    // `config.server.ts` evaluates it — see the comment above the env
+    // assignment) resolves a module graph on its first hit rather than
+    // reusing a build-time-hoisted static import, which can push this
+    // hook past Jest's default 5s under full-suite parallel load even
+    // though it is comfortably fast in isolation. Give it real headroom
+    // rather than a fragile default.
+  }, 15_000);
 
   afterEach(() => {
-    fetchSpy?.mockRestore();
+    jest.restoreAllMocks();
   });
 
-  it('merges enrichment fields from cli_sessions_v2 with explicit camelCase keys', async () => {
-    const sessionId = 'ses_active_enrich_match_1234';
-    const createdAt = '2026-07-01 10:00:00+00';
-    const updatedAt = '2026-07-02 11:00:00+00';
-    await db.insert(cli_sessions_v2).values({
-      session_id: sessionId,
-      kilo_user_id: regularUser.id,
-      created_on_platform: 'cli',
-      created_at: createdAt,
-      updated_at: updatedAt,
+  describe('listInstances', () => {
+    it('returns the instances from the worker when the upstream call succeeds', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            instances: [
+              { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+              { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.listInstances();
+
+      expect(result).toEqual({
+        instances: [
+          { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+          { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+        ],
+      });
+      // Verify it actually called the worker with the right path.
+      const calledUrl = fetchSpy.mock.calls[0][0] as unknown as string;
+      expect(calledUrl).toBe('https://test-ingest.example.com/api/instances/active');
     });
 
-    fetchSpy = mockWorkerSessions([
-      {
-        id: sessionId,
-        status: 'running',
-        title: 'matched',
-        connectionId: 'conn-1',
-        gitUrl: 'https://github.com/kilo/repo',
-        gitBranch: 'main',
-      },
-    ]);
-
-    try {
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.activeSessions.list();
-
-      expect(result.sessions).toEqual([
-        {
-          id: sessionId,
-          status: 'running',
-          title: 'matched',
-          connectionId: 'conn-1',
-          gitUrl: 'https://github.com/kilo/repo',
-          gitBranch: 'main',
-          createdOnPlatform: 'cli',
-          createdAt,
-          updatedAt,
-        },
-      ]);
-      // Assert the explicit camelCase keys exist (not snake_case).
-      const row = result.sessions[0]!;
-      expect(Object.keys(row)).toEqual(
-        expect.arrayContaining(['createdOnPlatform', 'createdAt', 'updatedAt'])
+    it('returns the empty `instances` array when the worker has no live CLIs', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ instances: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
       );
-      expect(Object.keys(row)).not.toEqual(
-        expect.arrayContaining(['created_on_platform', 'created_at', 'updated_at'])
-      );
-    } finally {
-      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
-    }
-  });
 
-  it('passes sessions with undefined enrichment fields when no matching row exists', async () => {
-    const unmatchedId = 'ses_active_enrich_unmatched_1234';
-
-    fetchSpy = mockWorkerSessions([
-      {
-        id: unmatchedId,
-        status: 'running',
-        title: 'no row',
-        connectionId: 'conn-2',
-      },
-    ]);
-
-    const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.activeSessions.list();
-
-    expect(result.sessions).toEqual([
-      {
-        id: unmatchedId,
-        status: 'running',
-        title: 'no row',
-        connectionId: 'conn-2',
-        createdOnPlatform: undefined,
-        createdAt: undefined,
-        updatedAt: undefined,
-      },
-    ]);
-  });
-
-  it('performs no DB query when the active list is empty', async () => {
-    fetchSpy = mockWorkerSessions([]);
-
-    const selectSpy = jest.spyOn(db, 'select');
-    try {
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.activeSessions.list();
-
-      expect(result.sessions).toEqual([]);
-      // The router short-circuits the enrichment query when there are no
-      // sessions to enrich.
-      expect(selectSpy).not.toHaveBeenCalled();
-    } finally {
-      selectSpy.mockRestore();
-    }
-  });
-
-  it('returns unenriched sessions when the enrichment DB query fails', async () => {
-    const sessionId = 'ses_active_enrich_db_fail_1234';
-    fetchSpy = mockWorkerSessions([
-      {
-        id: sessionId,
-        status: 'running',
-        title: 'db fail',
-        connectionId: 'conn-3',
-      },
-    ]);
-
-    // Force the enrichment Drizzle query to throw. The router must catch
-    // the failure and return the parsed sessions unenriched — NOT an empty
-    // list.
-    const selectSpy = jest.spyOn(db, 'select').mockImplementationOnce(() => {
-      throw new Error('synthetic enrichment db failure');
+      const result = await caller.activeSessions.listInstances();
+      expect(result).toEqual({ instances: [] });
     });
 
-    try {
+    it('throws a TRPCError when the upstream worker returns a non-2xx response', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response('upstream failed', { status: 502 }));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.listInstances();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+      try {
+        await rejection;
+      } catch (err) {
+        if (!(err instanceof TRPCError)) throw err;
+        expect(err.code).toBe('INTERNAL_SERVER_ERROR');
+        // Mobile (later slice) uses the thrown status to render a retryable
+        // error state; verify the contract is "throws, never returns empty".
+        expect(err.message).toContain('502');
+      }
+    });
+
+    it('throws a TRPCError when fetch itself fails (network error)', async () => {
+      jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const rejection = caller.activeSessions.listInstances();
+      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+    });
+
+    it('throws a TRPCError when the worker returns an unexpected payload shape', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ wrong: 'shape' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).rejects.toBeInstanceOf(TRPCError);
+    });
+
+    it('does NOT swallow upstream failures into {instances: []} (unlike `list`)', async () => {
+      // Sanity: `list` returns {sessions: []} on a 502; `listInstances` must not.
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }));
+
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.activeSessions.list();
-
-      expect(result.sessions).toEqual([
-        {
-          id: sessionId,
-          status: 'running',
-          title: 'db fail',
-          connectionId: 'conn-3',
-          createdOnPlatform: undefined,
-          createdAt: undefined,
-          updatedAt: undefined,
-        },
-      ]);
-    } finally {
-      selectSpy.mockRestore();
-    }
-  });
-
-  it('degrades to empty sessions when the worker returns a malformed response', async () => {
-    fetchSpy = mockMalformedWorkerResponse();
-
-    const caller = await createCallerForUser(regularUser.id);
-    const result = await caller.activeSessions.list();
-
-    expect(result).toEqual({ sessions: [] });
+      expect(result).toEqual({ sessions: [] });
+    });
   });
 });

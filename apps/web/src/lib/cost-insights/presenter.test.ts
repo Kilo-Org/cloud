@@ -628,7 +628,7 @@ describe('Cost Insights presenter', () => {
       )
     ).toEqual([
       {
-        label: '11 PM',
+        label: '23',
         periodStart: '2026-06-25T23:00:00.000Z',
         periodEndExclusive: '2026-06-26T00:00:00.000Z',
         coverage: 'partial',

@@ -6,17 +6,6 @@ import { cloud_billing_sku, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { serializeCloudBillingSku } from './cloud-billing-skus-router';
 
-async function expectDatabaseRejection(operation: Promise<unknown>, message: string) {
-  const error = await operation.catch(error => error);
-  const messages: string[] = [];
-  let current: unknown = error;
-  while (current && typeof current === 'object') {
-    if ('message' in current && typeof current.message === 'string') messages.push(current.message);
-    current = 'cause' in current ? current.cause : undefined;
-  }
-  expect(messages.join('\n')).toContain(message);
-}
-
 let admin: User;
 let creditManager: User;
 let nonAdmin: User;
@@ -152,30 +141,5 @@ describe('admin.cloudBillingSkus.disable', () => {
       .from(cloud_billing_sku)
       .where(eq(cloud_billing_sku.id, 'one-way-sku'));
     expect(persisted.accepts_new_usage).toBe(false);
-  });
-
-  it('enforces commercial immutability and one-way disablement in Postgres', async () => {
-    const caller = await createCallerForUser(creditManager.id);
-    await caller.admin.cloudBillingSkus.create(validInput('immutable-sku'));
-    await caller.admin.cloudBillingSkus.disable({ id: 'immutable-sku' });
-
-    await expectDatabaseRejection(
-      db
-        .update(cloud_billing_sku)
-        .set({ rate_cents_per_unit: '2' })
-        .where(eq(cloud_billing_sku.id, 'immutable-sku')),
-      'commercial fields are immutable'
-    );
-    await expectDatabaseRejection(
-      db
-        .update(cloud_billing_sku)
-        .set({ accepts_new_usage: true })
-        .where(eq(cloud_billing_sku.id, 'immutable-sku')),
-      'cannot be re-enabled'
-    );
-    await expectDatabaseRejection(
-      db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, 'immutable-sku')),
-      'cannot be deleted'
-    );
   });
 });

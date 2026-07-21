@@ -77,6 +77,63 @@ afterEach(async () => {
 });
 
 describe('Cost Insights spend repository integration', () => {
+  test('shows driver-bucket spend before total-rollup coverage as incomplete evidence', async () => {
+    const userId = await createUser();
+    const driver = await aiGatewayDriver('historical-model', userId);
+    await db.insert(cost_insight_rollup_coverage).values({
+      rollup_version: 1,
+      live_capture_start_hour: '2026-06-01T02:00:00.000Z',
+      coverage_start_hour: '2026-06-01T02:00:00.000Z',
+    });
+    await db.insert(cost_insight_owner_hour_driver_buckets).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-01T00:00:00.000Z',
+      spend_category: 'variable',
+      driver_key: driver.driverKey,
+      source: driver.source,
+      product_key: driver.productKey,
+      feature_key: driver.featureKey,
+      model_or_plan_key: driver.modelOrPlanKey,
+      provider_key: driver.providerKey,
+      actor_user_id: driver.actorUserId,
+      total_microdollars: 25,
+      spend_record_count: 2,
+    });
+    await db.insert(cost_insight_owner_hour_totals).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-01T02:00:00.000Z',
+      spend_category: 'variable',
+      total_microdollars: 10,
+      spend_record_count: 1,
+    });
+
+    await expect(
+      loadOwnerDashboardHourlySpend(db, {
+        owner: { type: 'user', id: userId },
+        startHour: '2026-06-01T00:00:00.000Z',
+        endHourExclusive: '2026-06-01T03:00:00.000Z',
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        hourStart: '2026-06-01T00:00:00.000Z',
+        variableMicrodollars: 25,
+        totalMicrodollars: 25,
+        isCovered: false,
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T01:00:00.000Z',
+        totalMicrodollars: null,
+        isCovered: false,
+      }),
+      expect.objectContaining({
+        hourStart: '2026-06-01T02:00:00.000Z',
+        variableMicrodollars: 10,
+        totalMicrodollars: 10,
+        isCovered: true,
+      }),
+    ]);
+  });
+
   test('replaces separated degraded dashboard hours with canonical spend', async () => {
     const userId = await createUser();
     await initializeCoverage();

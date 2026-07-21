@@ -35,6 +35,7 @@ const context = {
 };
 let client: ReturnType<typeof createDrizzleClient>;
 let fingerprint: string;
+let fixtureCreated = false;
 
 describe('container usage PostgreSQL application', () => {
   beforeAll(async () => {
@@ -46,13 +47,16 @@ describe('container usage PostgreSQL application', () => {
       unit: 'second',
       rate_cents_per_unit: '0.000001',
     });
+    fixtureCreated = true;
   });
 
   afterAll(async () => {
-    await client.db
-      .delete(container_usage_interval)
-      .where(eq(container_usage_interval.id, intervalId));
-    await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, skuId));
+    if (fixtureCreated) {
+      await client.db
+        .delete(container_usage_interval)
+        .where(eq(container_usage_interval.id, intervalId));
+      await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, skuId));
+    }
     await client.pool.end();
   });
 

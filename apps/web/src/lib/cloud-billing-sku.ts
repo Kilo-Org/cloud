@@ -22,6 +22,7 @@ export const createCloudBillingSkuInputSchema = z.object({
 });
 
 export type CreateCloudBillingSkuInput = z.infer<typeof createCloudBillingSkuInputSchema>;
+export const cloudBillingSkuIdSchema = createCloudBillingSkuInputSchema.shape.id;
 
 export function normalizeCloudBillingSkuRate(value: string): string {
   const [integer, fraction = ''] = value.split('.');

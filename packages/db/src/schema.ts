@@ -10101,6 +10101,8 @@ export const container_usage_interval = pgTable(
     stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     close_reason: text().$type<ContainerUsageCloseReason>(),
     exit_code: integer(),
+    // Whole confirmed seconds. Heartbeat clients carry subsecond remainder into
+    // the next segment rather than persisting fractional quantities.
     awake_seconds: integer(),
     status: text().$type<ContainerUsageIntervalStatus>().notNull().default('open'),
     metadata: jsonb().$type<Record<string, string>>(),
@@ -10153,6 +10155,10 @@ export const container_usage_interval = pgTable(
     check(
       'container_usage_interval_awake_seconds_nonnegative',
       sql`${table.awake_seconds} IS NULL OR ${table.awake_seconds} >= 0`
+    ),
+    check(
+      'container_usage_interval_exit_code_range',
+      sql`${table.exit_code} IS NULL OR ${table.exit_code} BETWEEN -256 AND 255`
     ),
   ]
 );

@@ -1,6 +1,7 @@
 import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
+  cloudBillingSkuIdSchema,
   createCloudBillingSkuInputSchema,
   normalizeCloudBillingSkuRate,
 } from '@/lib/cloud-billing-sku';
@@ -14,7 +15,11 @@ export type SerializedCloudBillingSku = Omit<CloudBillingSku, 'created_at'> & {
 };
 
 export function serializeCloudBillingSku(sku: CloudBillingSku): SerializedCloudBillingSku {
-  return { ...sku, created_at: new Date(sku.created_at).toISOString() };
+  return {
+    ...sku,
+    rate_cents_per_unit: normalizeCloudBillingSkuRate(sku.rate_cents_per_unit),
+    created_at: new Date(sku.created_at).toISOString(),
+  };
 }
 
 function postgresErrorCode(error: unknown): string | undefined {
@@ -44,7 +49,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
             name: input.name,
             description: input.description,
             unit: input.unit,
-            rate_cents_per_unit: normalizeCloudBillingSkuRate(input.rate_cents_per_unit),
+            rate_cents_per_unit: input.rate_cents_per_unit,
             created_by_user_id: ctx.user.id,
           })
           .returning();
@@ -58,7 +63,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     }),
 
   disable: creditManagerProcedure
-    .input(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{2,79}$/) }))
+    .input(z.object({ id: cloudBillingSkuIdSchema }))
     .mutation(async ({ input }): Promise<SerializedCloudBillingSku> => {
       const [updated] = await db
         .update(cloud_billing_sku)

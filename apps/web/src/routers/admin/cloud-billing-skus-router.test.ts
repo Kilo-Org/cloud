@@ -95,6 +95,24 @@ describe('admin.cloudBillingSkus.create', () => {
     });
   });
 
+  it('returns a canonical rate after PostgreSQL scale padding', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+
+    const created = await caller.admin.cloudBillingSkus.create({
+      ...validInput('canonical-rate-sku'),
+      rate_cents_per_unit: '1.2300',
+    });
+    const listed = await caller.admin.cloudBillingSkus.list();
+
+    expect(created.rate_cents_per_unit).toBe('1.23');
+    expect(listed.find(sku => sku.id === 'canonical-rate-sku')?.rate_cents_per_unit).toBe('1.23');
+    const [persisted] = await db
+      .select({ rate: cloud_billing_sku.rate_cents_per_unit })
+      .from(cloud_billing_sku)
+      .where(eq(cloud_billing_sku.id, 'canonical-rate-sku'));
+    expect(persisted.rate).toBe('1.230000000000');
+  });
+
   it('returns CONFLICT for a duplicate SKU ID', async () => {
     const caller = await createCallerForUser(creditManager.id);
     await caller.admin.cloudBillingSkus.create(validInput('duplicate-sku'));

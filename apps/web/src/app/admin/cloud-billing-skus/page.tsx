@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Tags, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
+import type { CreateCloudBillingSkuInput } from '@/lib/cloud-billing-sku';
 import CloudBillingSkuForm from './CloudBillingSkuForm';
 
 const breadcrumbs = (
@@ -45,7 +46,11 @@ export default function CloudBillingSkusPage() {
   const permissions = useAdminCreditManagementPermission();
   const { canManageCredits, isPermissionResolved } = permissions;
   const [creating, setCreating] = useState(false);
+  const [createErrors, setCreateErrors] = useState<
+    Partial<Record<keyof CreateCloudBillingSkuInput, string>>
+  >({});
   const [disablingId, setDisablingId] = useState<string | null>(null);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
   const listOptions = trpc.admin.cloudBillingSkus.list.queryOptions();
   const catalog = useQuery(listOptions);
   const { data: skus, isLoading } = catalog;
@@ -57,9 +62,18 @@ export default function CloudBillingSkusPage() {
       onSuccess: () => {
         toast.success('Billing SKU created');
         setCreating(false);
+        setCreateErrors({});
+        requestAnimationFrame(() => createButtonRef.current?.focus());
         void invalidateList();
       },
-      onError: error => toast.error(error.message || 'Could not create billing SKU'),
+      onError: error => {
+        const message = error.message || 'Could not create billing SKU';
+        if (error.data?.code === 'CONFLICT') {
+          setCreateErrors({ id: message });
+          return;
+        }
+        toast.error(message);
+      },
     })
   );
   const disableMutation = useMutation(
@@ -96,13 +110,23 @@ export default function CloudBillingSkusPage() {
           </div>
           {!creating ? (
             <Button
+              ref={createButtonRef}
               disabled={!isPermissionResolved || !canManageCredits}
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                setCreateErrors({});
+                setCreating(true);
+              }}
             >
               <Plus className="size-4" /> Create SKU
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => setCreating(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreating(false);
+                requestAnimationFrame(() => createButtonRef.current?.focus());
+              }}
+            >
               <X className="size-4" /> Cancel
             </Button>
           )}
@@ -120,7 +144,11 @@ export default function CloudBillingSkusPage() {
             <CardContent>
               <CloudBillingSkuForm
                 pending={createMutation.isPending}
-                onSubmit={values => createMutation.mutate(values)}
+                serverErrors={createErrors}
+                onSubmit={values => {
+                  setCreateErrors({});
+                  createMutation.mutate(values);
+                }}
               />
             </CardContent>
           </Card>
@@ -143,7 +171,9 @@ export default function CloudBillingSkusPage() {
               <Alert variant="destructive">
                 <AlertTitle>Billing SKUs could not be loaded</AlertTitle>
                 <AlertDescription>
-                  <p>{catalog.error.message}</p>
+                  <p>
+                    {catalog.error.message || 'The billing SKU catalog is temporarily unavailable.'}
+                  </p>
                   <Button
                     variant="outline"
                     size="sm"
@@ -177,7 +207,7 @@ export default function CloudBillingSkusPage() {
                       <TableRow key={sku.id}>
                         <TableCell>
                           <div className="space-y-1">
-                            <code className="font-mono type-code">{sku.id}</code>
+                            <code className="type-code">{sku.id}</code>
                             <p className="font-medium type-body">{sku.name}</p>
                             {sku.description && (
                               <p className="text-muted-foreground max-w-lg type-label">
@@ -186,7 +216,7 @@ export default function CloudBillingSkusPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono tabular-nums type-code">
+                        <TableCell className="tabular-nums type-code">
                           {sku.rate_cents_per_unit} cents/{sku.unit}
                         </TableCell>
                         <TableCell>

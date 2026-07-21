@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import {
 
 type Props = {
   pending: boolean;
+  serverErrors?: Partial<Record<keyof CreateCloudBillingSkuInput, string>>;
   onSubmit: (values: CreateCloudBillingSkuInput) => void;
 };
 
@@ -29,7 +30,7 @@ function preview(rate: string, seconds: number): string {
   return parsed.success ? `${multiplyCloudBillingRate(parsed.data, seconds)} cents` : '—';
 }
 
-export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
+export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }: Props) {
   const [raw, setRaw] = useState<RawForm>({
     id: '',
     name: '',
@@ -42,6 +43,25 @@ export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
   );
 
   const exampleMinutes = /^\d+$/.test(raw.exampleMinutes) ? Number(raw.exampleMinutes) : 0;
+
+  useEffect(() => {
+    document.getElementById('sku-id')?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!serverErrors || Object.keys(serverErrors).length === 0) return;
+    setErrors(current => ({ ...current, ...serverErrors }));
+    if (serverErrors.id) document.getElementById('sku-id')?.focus();
+  }, [serverErrors]);
+
+  const clearError = (key: keyof CreateCloudBillingSkuInput) => {
+    setErrors(current => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -87,9 +107,12 @@ export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
             value={raw.id}
             maxLength={80}
             placeholder="cloud-agent-standard-2026-07"
-            aria-describedby="sku-id-help sku-id-error"
+            aria-describedby={errors.id ? 'sku-id-help sku-id-error' : 'sku-id-help'}
             aria-invalid={Boolean(errors.id)}
-            onChange={event => setRaw(current => ({ ...current, id: event.target.value }))}
+            onChange={event => {
+              clearError('id');
+              setRaw(current => ({ ...current, id: event.target.value }));
+            }}
           />
           <p id="sku-id-help" className="text-muted-foreground type-label">
             Producer-facing constant. Use lowercase letters, numbers, and hyphens.
@@ -108,9 +131,12 @@ export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
             value={raw.name}
             maxLength={120}
             placeholder="Cloud Agent Standard"
-            aria-describedby="sku-name-error"
+            aria-describedby={errors.name ? 'sku-name-error' : undefined}
             aria-invalid={Boolean(errors.name)}
-            onChange={event => setRaw(current => ({ ...current, name: event.target.value }))}
+            onChange={event => {
+              clearError('name');
+              setRaw(current => ({ ...current, name: event.target.value }));
+            }}
           />
           {errors.name && (
             <p id="sku-name-error" className="text-destructive type-label" role="alert">
@@ -126,9 +152,12 @@ export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
             value={raw.description}
             maxLength={1000}
             placeholder="What reports this SKU and when it should be selected."
-            aria-describedby="sku-description-error"
+            aria-describedby={errors.description ? 'sku-description-error' : undefined}
             aria-invalid={Boolean(errors.description)}
-            onChange={event => setRaw(current => ({ ...current, description: event.target.value }))}
+            onChange={event => {
+              clearError('description');
+              setRaw(current => ({ ...current, description: event.target.value }));
+            }}
           />
           {errors.description && (
             <p id="sku-description-error" className="text-destructive type-label" role="alert">
@@ -145,9 +174,14 @@ export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
             inputMode="decimal"
             value={raw.rate}
             placeholder="0.000007"
-            aria-describedby="sku-rate-help sku-rate-error"
+            aria-describedby={
+              errors.rate_cents_per_unit ? 'sku-rate-help sku-rate-error' : 'sku-rate-help'
+            }
             aria-invalid={Boolean(errors.rate_cents_per_unit)}
-            onChange={event => setRaw(current => ({ ...current, rate: event.target.value }))}
+            onChange={event => {
+              clearError('rate_cents_per_unit');
+              setRaw(current => ({ ...current, rate: event.target.value }));
+            }}
           />
           <p id="sku-rate-help" className="text-muted-foreground type-label">
             Up to 12 decimal places. This exact rate is immutable after creation.
@@ -178,17 +212,17 @@ export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
       <div className="bg-surface-inset grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-3">
         <div>
           <p className="text-muted-foreground type-label">Per minute</p>
-          <p className="mt-1 font-mono tabular-nums type-code">{preview(raw.rate, 60)}</p>
+          <p className="mt-1 tabular-nums type-code">{preview(raw.rate, 60)}</p>
         </div>
         <div>
           <p className="text-muted-foreground type-label">Per hour</p>
-          <p className="mt-1 font-mono tabular-nums type-code">{preview(raw.rate, 3_600)}</p>
+          <p className="mt-1 tabular-nums type-code">{preview(raw.rate, 3_600)}</p>
         </div>
         <div>
           <p className="text-muted-foreground type-label">
             {exampleMinutes > 0 ? `${exampleMinutes} minute example` : 'Example'}
           </p>
-          <p className="mt-1 font-mono tabular-nums type-code">
+          <p className="mt-1 tabular-nums type-code">
             {exampleMinutes > 0 && exampleMinutes <= 525_600
               ? preview(raw.rate, exampleMinutes * 60)
               : '—'}

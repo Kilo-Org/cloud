@@ -13,7 +13,7 @@ export const billingContextSchema = usageContextSchema
     pendingHeartbeat: z
       .object({
         seq: z.number().int().positive().finite(),
-        usageSinceLast: z.number().nonnegative().finite(),
+        usageSinceLast: z.number().int().nonnegative().finite(),
         measuredAtMs: z.number().int().nonnegative().finite(),
       })
       .strict()
@@ -21,7 +21,7 @@ export const billingContextSchema = usageContextSchema
     pendingStop: z
       .object({
         reason: z.enum(['exit', 'runtime_signal', 'activity_expired']),
-        exitCode: z.number().int().optional(),
+        exitCode: z.number().int().min(-256).max(255).optional(),
       })
       .strict()
       .optional(),

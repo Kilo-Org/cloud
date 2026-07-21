@@ -212,6 +212,65 @@ describe('installBillingHeartbeat', () => {
     }
   });
 
+  it('carries subsecond remainder into the next acknowledged heartbeat', async () => {
+    const now = vi.spyOn(Date, 'now');
+    try {
+      now.mockReturnValue(1_000);
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+        budget: { verdict: 'continue' },
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async input => ({
+            success: true,
+            ack: {
+              intervalId: `${input.instanceId}:${input.startEpochMs}`,
+              durable: 'pg',
+              dedup: false,
+            },
+          }),
+          recordHeartbeat,
+          recordStop: async input => ({
+            intervalId: `${input.instanceId}:${input.startEpochMs}`,
+            durable: 'pg',
+            dedup: false,
+          }),
+        },
+        { service: 'cloud-agent-next' }
+      );
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        { client, storage, enforceBudgetStop: vi.fn() }
+      );
+
+      await controller.scheduleHeartbeat();
+      now.mockReturnValue(2_500);
+      await controller.billingHeartbeatTick();
+      now.mockReturnValue(3_100);
+      await controller.billingHeartbeatTick();
+
+      expect(recordHeartbeat).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ usageSinceLast: 1 })
+      );
+      expect(recordHeartbeat).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ usageSinceLast: 1 })
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('does not let a stale heartbeat acknowledgement overwrite a new interval', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

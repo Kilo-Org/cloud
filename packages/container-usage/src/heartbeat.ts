@@ -165,11 +165,14 @@ export function installBillingHeartbeat(
     const pendingHeartbeat =
       context.pendingHeartbeat ??
       (() => {
-        const measuredAtMs = Date.now();
+        const elapsedMs = Math.max(0, Date.now() - context.usageMeasuredAtMs);
+        const usageSinceLast = Math.floor(elapsedMs / 1_000);
         return {
           seq: context.nextSeq,
-          usageSinceLast: Math.max(0, (measuredAtMs - context.usageMeasuredAtMs) / 1_000),
-          measuredAtMs,
+          usageSinceLast,
+          // Advance only by billed whole seconds so subsecond remainder carries
+          // into the next heartbeat instead of being rounded away.
+          measuredAtMs: context.usageMeasuredAtMs + usageSinceLast * 1_000,
         };
       })();
     if (!context.pendingHeartbeat) {

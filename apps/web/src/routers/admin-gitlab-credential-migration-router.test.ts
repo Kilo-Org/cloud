@@ -5,6 +5,7 @@ const mockBackfillBatch = jest.fn();
 const mockScrubBatch = jest.fn();
 const mockVerifyBatch = jest.fn();
 const mockCheckKeys = jest.fn();
+const mockRepairBatch = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/gitlab/credential-migration', () => ({
   backfillGitLabCredentialBatch: (...args: unknown[]) => mockBackfillBatch(...args),
@@ -13,6 +14,9 @@ jest.mock('@/lib/integrations/platforms/gitlab/credential-migration', () => ({
 jest.mock('@/lib/integrations/platforms/gitlab/credential-migration-verify', () => ({
   verifyGitLabCredentialDecryptabilityBatch: (...args: unknown[]) => mockVerifyBatch(...args),
   checkGitLabCredentialKeysMatch: (...args: unknown[]) => mockCheckKeys(...args),
+}));
+jest.mock('@/lib/integrations/platforms/gitlab/credential-migration-repair', () => ({
+  repairGitLabCustomOAuthClientSecretsBatch: (...args: unknown[]) => mockRepairBatch(...args),
 }));
 
 import { adminGitLabCredentialMigrationRouter } from './admin-gitlab-credential-migration-router';
@@ -26,6 +30,7 @@ describe('admin GitLab credential migration router', () => {
     mockScrubBatch.mockReset();
     mockVerifyBatch.mockReset();
     mockCheckKeys.mockReset();
+    mockRepairBatch.mockReset();
   });
 
   it('uses ordinary admin protection', async () => {
@@ -33,11 +38,15 @@ describe('admin GitLab credential migration router', () => {
 
     await expect(caller.backfillNextBatch({})).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(caller.verifyDecryptability({})).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.repairCustomOAuthClientSecrets({})).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
     await expect(
       caller.scrubNextBatch({ confirmation: 'SCRUB GITLAB PLAINTEXT' })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockBackfillBatch).not.toHaveBeenCalled();
     expect(mockScrubBatch).not.toHaveBeenCalled();
+    expect(mockRepairBatch).not.toHaveBeenCalled();
   });
 
   it('passes keyset paging through to the backfill batch', async () => {
@@ -81,6 +90,33 @@ describe('admin GitLab credential migration router', () => {
       retryable: true,
     });
     await expect(admin().verifyDecryptability({})).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  });
+
+  it('passes repair paging through and maps errors by retryability', async () => {
+    mockRepairBatch.mockResolvedValueOnce({
+      kind: 'ok',
+      batch: { counts: { candidates: 4, repaired: 4 }, nextCursor: null },
+    });
+    await expect(
+      admin().repairCustomOAuthClientSecrets({
+        afterId: '00000000-0000-4000-8000-000000000001',
+        limit: 50,
+      })
+    ).resolves.toEqual({ counts: { candidates: 4, repaired: 4 }, nextCursor: null });
+    expect(mockRepairBatch).toHaveBeenCalledWith({
+      requestedByUserId: 'admin-user',
+      afterId: '00000000-0000-4000-8000-000000000001',
+      limit: 50,
+    });
+
+    mockRepairBatch.mockResolvedValueOnce({
+      kind: 'error',
+      errorCode: 'repair_unavailable',
+      retryable: true,
+    });
+    await expect(admin().repairCustomOAuthClientSecrets({})).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
     });
   });

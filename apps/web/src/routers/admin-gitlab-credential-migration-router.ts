@@ -9,6 +9,7 @@ import {
   checkGitLabCredentialKeysMatch,
   verifyGitLabCredentialDecryptabilityBatch,
 } from '@/lib/integrations/platforms/gitlab/credential-migration-verify';
+import { repairGitLabCustomOAuthClientSecretsBatch } from '@/lib/integrations/platforms/gitlab/credential-migration-repair';
 
 const SCRUB_CONFIRMATION = 'SCRUB GITLAB PLAINTEXT';
 
@@ -19,6 +20,10 @@ const BatchInputSchema = z
   })
   .strict();
 
+const RepairBatchInputSchema = BatchInputSchema.extend({
+  limit: z.number().int().min(1).max(100).default(100),
+}).strict();
+
 /**
  * Stateless GitLab credential migration. There is no job table: each procedure
  * processes one keyset page and returns `nextCursor`; the caller walks the table
@@ -26,8 +31,10 @@ const BatchInputSchema = z
  * simply stops matching the selection query.
  *
  * Operator flow: run your own SQL to audit → backfillNextBatch until done →
- * verifyDecryptability across all pages until it passes → scrubNextBatch until
- * done → re-run the audit SQL to confirm no plaintext remains.
+ * repairCustomOAuthClientSecrets until done when repairing the version-binding
+ * incident → verifyDecryptability across all pages until it passes →
+ * scrubNextBatch until done → re-run the audit SQL to confirm no plaintext
+ * remains.
  */
 export const adminGitLabCredentialMigrationRouter = createTRPCRouter({
   backfillNextBatch: adminProcedure.input(BatchInputSchema).mutation(async ({ input }) => {
@@ -45,6 +52,23 @@ export const adminGitLabCredentialMigrationRouter = createTRPCRouter({
         throw new TRPCError({
           code: result.retryable ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST',
           message: `GitLab credential decryptability verification failed: ${result.errorCode}`,
+        });
+      }
+      return result.batch;
+    }),
+
+  repairCustomOAuthClientSecrets: adminProcedure
+    .input(RepairBatchInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const result = await repairGitLabCustomOAuthClientSecretsBatch({
+        requestedByUserId: ctx.user.id,
+        afterId: input.afterId,
+        limit: input.limit,
+      });
+      if (result.kind === 'error') {
+        throw new TRPCError({
+          code: result.retryable ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST',
+          message: `GitLab credential repair failed: ${result.errorCode}`,
         });
       }
       return result.batch;

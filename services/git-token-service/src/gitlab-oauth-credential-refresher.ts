@@ -431,25 +431,36 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
         }
         if (refreshed.status !== 'available') return { status: 'temporarily_unavailable' };
         const nextVersion = credential.credential_version + 1;
-        const [accessTokenEncrypted, refreshTokenEncrypted] = await Promise.all([
-          this.encryptOAuthSecret(
-            refreshed.data.access_token,
-            credential,
-            input,
-            'access',
-            nextVersion
-          ),
-          this.encryptOAuthSecret(
-            refreshed.data.refresh_token,
-            credential,
-            input,
-            'refresh',
-            nextVersion
-          ),
-        ]);
+        const [accessTokenEncrypted, refreshTokenEncrypted, clientSecretEncrypted] =
+          await Promise.all([
+            this.encryptOAuthSecret(
+              refreshed.data.access_token,
+              credential,
+              input,
+              'access',
+              nextVersion
+            ),
+            this.encryptOAuthSecret(
+              refreshed.data.refresh_token,
+              credential,
+              input,
+              'refresh',
+              nextVersion
+            ),
+            metadata.client_id
+              ? this.encryptOAuthSecret(
+                  clientSecret,
+                  credential,
+                  input,
+                  'oauth-client-secret',
+                  nextVersion
+                )
+              : Promise.resolve(null),
+          ]);
         if (
           accessTokenEncrypted.status !== 'available' ||
-          refreshTokenEncrypted.status !== 'available'
+          refreshTokenEncrypted.status !== 'available' ||
+          (clientSecretEncrypted !== null && clientSecretEncrypted.status !== 'available')
         ) {
           return { status: 'temporarily_unavailable' };
         }
@@ -462,6 +473,9 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
             access_token_encrypted: accessTokenEncrypted.ciphertext,
             access_token_expires_at: expiresAt,
             refresh_token_encrypted: refreshTokenEncrypted.ciphertext,
+            ...(clientSecretEncrypted
+              ? { oauth_client_secret_encrypted: clientSecretEncrypted.ciphertext }
+              : {}),
             credential_version: nextVersion,
             last_used_at: now.toISOString(),
           })
@@ -566,7 +580,7 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
     plaintext: string,
     credential: z.infer<typeof GitLabOAuthCredentialRowSchema>,
     input: RefreshInput,
-    kind: 'access' | 'refresh',
+    kind: 'access' | 'refresh' | 'oauth-client-secret',
     credentialVersion: number
   ) {
     return this.crypto.encrypt({

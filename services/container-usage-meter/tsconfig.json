@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noEmit": true,
+    "lib": ["ESNext"],
+    "types": [
+      "@types/node",
+      "@cloudflare/workers-types",
+      "./worker-configuration.d.ts",
+      "vitest/globals"
+    ]
+  },
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "drizzle/migrations.js"]
+}

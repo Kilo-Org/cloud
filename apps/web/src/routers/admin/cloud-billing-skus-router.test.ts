@@ -1,0 +1,181 @@
+import { beforeEach, describe, expect, it } from '@jest/globals';
+import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { createCallerForUser } from '@/routers/test-utils';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { cloud_billing_sku, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { serializeCloudBillingSku } from './cloud-billing-skus-router';
+
+async function expectDatabaseRejection(operation: Promise<unknown>, message: string) {
+  const error = await operation.catch(error => error);
+  const messages: string[] = [];
+  let current: unknown = error;
+  while (current && typeof current === 'object') {
+    if ('message' in current && typeof current.message === 'string') messages.push(current.message);
+    current = 'cause' in current ? current.cause : undefined;
+  }
+  expect(messages.join('\n')).toContain(message);
+}
+
+let admin: User;
+let creditManager: User;
+let nonAdmin: User;
+
+beforeEach(async () => {
+  await cleanupDbForTest();
+  [admin, creditManager, nonAdmin] = await Promise.all([
+    insertTestUser({ is_admin: true }),
+    insertTestUser({ is_admin: true, can_manage_credits: true }),
+    insertTestUser(),
+  ]);
+});
+
+function validInput(id: string) {
+  return {
+    id,
+    name: 'Cloud Agent Standard',
+    description: 'Container awake time',
+    unit: 'second' as const,
+    rate_cents_per_unit: '0.123456789012',
+  };
+}
+
+describe('admin.cloudBillingSkus.list', () => {
+  it('allows admins to list SKUs and rejects non-admins', async () => {
+    await db.insert(cloud_billing_sku).values({
+      ...validInput('cloud-agent-standard'),
+      created_by_user_id: creditManager.id,
+    });
+
+    const adminCaller = await createCallerForUser(admin.id);
+    await expect(adminCaller.admin.cloudBillingSkus.list()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'cloud-agent-standard',
+        accepts_new_usage: true,
+      }),
+    ]);
+
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(nonAdminCaller.admin.cloudBillingSkus.list()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('normalizes production-shaped PostgreSQL timestamps to UTC ISO', () => {
+    const serialized = serializeCloudBillingSku({
+      id: 'timestamp-sku',
+      name: 'Timestamp SKU',
+      description: null,
+      unit: 'second',
+      rate_cents_per_unit: '0.1',
+      accepts_new_usage: true,
+      created_by_user_id: null,
+      created_at: '2026-04-29 01:16:12.945+00',
+    });
+
+    expect(serialized.created_at).toBe('2026-04-29T01:16:12.945Z');
+  });
+});
+
+describe('admin.cloudBillingSkus.create', () => {
+  it('requires credit management access', async () => {
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.cloudBillingSkus.create(validInput('restricted-sku'))
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const rows = await db.select().from(cloud_billing_sku);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('persists the exact rate and authenticated creator', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+
+    await caller.admin.cloudBillingSkus.create(validInput('exact-rate-sku'));
+
+    const [persisted] = await db
+      .select()
+      .from(cloud_billing_sku)
+      .where(eq(cloud_billing_sku.id, 'exact-rate-sku'));
+    expect(persisted).toMatchObject({
+      id: 'exact-rate-sku',
+      rate_cents_per_unit: '0.123456789012',
+      created_by_user_id: creditManager.id,
+      accepts_new_usage: true,
+    });
+  });
+
+  it('returns CONFLICT for a duplicate SKU ID', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+    await caller.admin.cloudBillingSkus.create(validInput('duplicate-sku'));
+
+    await expect(
+      caller.admin.cloudBillingSkus.create({
+        ...validInput('duplicate-sku'),
+        name: 'Replacement name',
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+});
+
+describe('admin.cloudBillingSkus.disable', () => {
+  it('requires credit management access', async () => {
+    await db.insert(cloud_billing_sku).values({
+      ...validInput('protected-sku'),
+      created_by_user_id: creditManager.id,
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.cloudBillingSkus.disable({ id: 'protected-sku' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const [persisted] = await db
+      .select({ accepts_new_usage: cloud_billing_sku.accepts_new_usage })
+      .from(cloud_billing_sku)
+      .where(eq(cloud_billing_sku.id, 'protected-sku'));
+    expect(persisted.accepts_new_usage).toBe(true);
+  });
+
+  it('only moves a SKU to disabled and remains disabled on repeated calls', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+    await caller.admin.cloudBillingSkus.create(validInput('one-way-sku'));
+
+    const disabled = await caller.admin.cloudBillingSkus.disable({ id: 'one-way-sku' });
+    const disabledAgain = await caller.admin.cloudBillingSkus.disable({ id: 'one-way-sku' });
+
+    expect(disabled.accepts_new_usage).toBe(false);
+    expect(disabledAgain.accepts_new_usage).toBe(false);
+    const [persisted] = await db
+      .select({ accepts_new_usage: cloud_billing_sku.accepts_new_usage })
+      .from(cloud_billing_sku)
+      .where(eq(cloud_billing_sku.id, 'one-way-sku'));
+    expect(persisted.accepts_new_usage).toBe(false);
+  });
+
+  it('enforces commercial immutability and one-way disablement in Postgres', async () => {
+    const caller = await createCallerForUser(creditManager.id);
+    await caller.admin.cloudBillingSkus.create(validInput('immutable-sku'));
+    await caller.admin.cloudBillingSkus.disable({ id: 'immutable-sku' });
+
+    await expectDatabaseRejection(
+      db
+        .update(cloud_billing_sku)
+        .set({ rate_cents_per_unit: '2' })
+        .where(eq(cloud_billing_sku.id, 'immutable-sku')),
+      'commercial fields are immutable'
+    );
+    await expectDatabaseRejection(
+      db
+        .update(cloud_billing_sku)
+        .set({ accepts_new_usage: true })
+        .where(eq(cloud_billing_sku.id, 'immutable-sku')),
+      'cannot be re-enabled'
+    );
+    await expectDatabaseRejection(
+      db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, 'immutable-sku')),
+      'cannot be deleted'
+    );
+  });
+});

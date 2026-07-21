@@ -1,0 +1,204 @@
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  createCloudBillingSkuInputSchema,
+  multiplyCloudBillingRate,
+  type CreateCloudBillingSkuInput,
+} from '@/lib/cloud-billing-sku';
+
+type Props = {
+  pending: boolean;
+  onSubmit: (values: CreateCloudBillingSkuInput) => void;
+};
+
+type RawForm = {
+  id: string;
+  name: string;
+  description: string;
+  rate: string;
+  exampleMinutes: string;
+};
+
+function preview(rate: string, seconds: number): string {
+  const parsed = createCloudBillingSkuInputSchema.shape.rate_cents_per_unit.safeParse(rate);
+  return parsed.success ? `${multiplyCloudBillingRate(parsed.data, seconds)} cents` : '—';
+}
+
+export default function CloudBillingSkuForm({ pending, onSubmit }: Props) {
+  const [raw, setRaw] = useState<RawForm>({
+    id: '',
+    name: '',
+    description: '',
+    rate: '',
+    exampleMinutes: '15',
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof CreateCloudBillingSkuInput, string>>>(
+    {}
+  );
+
+  const exampleMinutes = /^\d+$/.test(raw.exampleMinutes) ? Number(raw.exampleMinutes) : 0;
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const parsed = createCloudBillingSkuInputSchema.safeParse({
+      id: raw.id.trim(),
+      name: raw.name.trim(),
+      description: raw.description.trim() || null,
+      unit: 'second',
+      rate_cents_per_unit: raw.rate.trim(),
+    });
+    if (!parsed.success) {
+      const next: Partial<Record<keyof CreateCloudBillingSkuInput, string>> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path[0] as keyof CreateCloudBillingSkuInput | undefined;
+        if (key && !next[key]) next[key] = issue.message;
+      }
+      setErrors(next);
+      const firstKey = parsed.error.issues[0]?.path[0];
+      const fieldId =
+        firstKey === 'id'
+          ? 'sku-id'
+          : firstKey === 'name'
+            ? 'sku-name'
+            : firstKey === 'description'
+              ? 'sku-description'
+              : firstKey === 'rate_cents_per_unit'
+                ? 'sku-rate'
+                : undefined;
+      if (fieldId) document.getElementById(fieldId)?.focus();
+      return;
+    }
+    setErrors({});
+    onSubmit(parsed.data);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="sku-id">SKU ID</Label>
+          <Input
+            id="sku-id"
+            value={raw.id}
+            maxLength={80}
+            placeholder="cloud-agent-standard-2026-07"
+            aria-describedby="sku-id-help sku-id-error"
+            aria-invalid={Boolean(errors.id)}
+            onChange={event => setRaw(current => ({ ...current, id: event.target.value }))}
+          />
+          <p id="sku-id-help" className="text-muted-foreground type-label">
+            Producer-facing constant. Use lowercase letters, numbers, and hyphens.
+          </p>
+          {errors.id && (
+            <p id="sku-id-error" className="text-destructive type-label" role="alert">
+              {errors.id}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="sku-name">Display name</Label>
+          <Input
+            id="sku-name"
+            value={raw.name}
+            maxLength={120}
+            placeholder="Cloud Agent Standard"
+            aria-describedby="sku-name-error"
+            aria-invalid={Boolean(errors.name)}
+            onChange={event => setRaw(current => ({ ...current, name: event.target.value }))}
+          />
+          {errors.name && (
+            <p id="sku-name-error" className="text-destructive type-label" role="alert">
+              {errors.name}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5 lg:col-span-2">
+          <Label htmlFor="sku-description">Description</Label>
+          <Textarea
+            id="sku-description"
+            value={raw.description}
+            maxLength={1000}
+            placeholder="What reports this SKU and when it should be selected."
+            aria-describedby="sku-description-error"
+            aria-invalid={Boolean(errors.description)}
+            onChange={event => setRaw(current => ({ ...current, description: event.target.value }))}
+          />
+          {errors.description && (
+            <p id="sku-description-error" className="text-destructive type-label" role="alert">
+              {errors.description}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="sku-rate">Rate (cents per second)</Label>
+          <Input
+            id="sku-rate"
+            type="text"
+            inputMode="decimal"
+            value={raw.rate}
+            placeholder="0.000007"
+            aria-describedby="sku-rate-help sku-rate-error"
+            aria-invalid={Boolean(errors.rate_cents_per_unit)}
+            onChange={event => setRaw(current => ({ ...current, rate: event.target.value }))}
+          />
+          <p id="sku-rate-help" className="text-muted-foreground type-label">
+            Up to 12 decimal places. This exact rate is immutable after creation.
+          </p>
+          {errors.rate_cents_per_unit && (
+            <p id="sku-rate-error" className="text-destructive type-label" role="alert">
+              {errors.rate_cents_per_unit}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="example-minutes">Example duration (minutes)</Label>
+          <Input
+            id="example-minutes"
+            type="number"
+            min="1"
+            step="1"
+            max="525600"
+            value={raw.exampleMinutes}
+            onChange={event =>
+              setRaw(current => ({ ...current, exampleMinutes: event.target.value }))
+            }
+          />
+        </div>
+      </div>
+
+      <div className="bg-surface-inset grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-3">
+        <div>
+          <p className="text-muted-foreground type-label">Per minute</p>
+          <p className="mt-1 font-mono tabular-nums type-code">{preview(raw.rate, 60)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground type-label">Per hour</p>
+          <p className="mt-1 font-mono tabular-nums type-code">{preview(raw.rate, 3_600)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground type-label">
+            {exampleMinutes > 0 ? `${exampleMinutes} minute example` : 'Example'}
+          </p>
+          <p className="mt-1 font-mono tabular-nums type-code">
+            {exampleMinutes > 0 && exampleMinutes <= 525_600
+              ? preview(raw.rate, exampleMinutes * 60)
+              : '—'}
+          </p>
+        </div>
+      </div>
+
+      <Button type="submit" disabled={pending}>
+        {pending ? 'Creating...' : 'Create SKU'}
+      </Button>
+    </form>
+  );
+}

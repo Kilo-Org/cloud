@@ -100,7 +100,8 @@ export const adminProcedure = baseProcedure.use(async ({ ctx, next }) => {
 });
 
 export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  if (!userCanManageCredits(ctx.user)) {
+  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
+  if (!currentUser || currentUser.blocked_reason !== null || !userCanManageCredits(currentUser)) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Credit management access required',

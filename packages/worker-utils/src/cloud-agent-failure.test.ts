@@ -62,6 +62,14 @@ describe('classifyCloudAgentFailure', () => {
         workspaceSubtype: 'git_network_failed',
       })
     ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'pre_dispatch',
+        code: 'workspace_setup_failed',
+        workspaceSubtype: 'git_pack_corrupt',
+      })
+    ).toEqual({ responsibility: 'unknown', reason: 'source_control_network' });
   });
 
   it('uses provider ownership for authentication and availability failures', () => {

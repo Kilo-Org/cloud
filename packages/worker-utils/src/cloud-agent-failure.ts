@@ -147,7 +147,6 @@ function classifyWorkspaceFailure(
   switch (subtype) {
     case 'git_authentication_failed':
       return classified('user', 'source_control_authentication');
-    case 'git_pack_corrupt':
     case 'git_checkout_conflict':
     case 'git_branch_missing':
       return classified('user', 'source_control_configuration');
@@ -159,6 +158,7 @@ function classifyWorkspaceFailure(
     case 'git_clone_timeout':
     case 'git_checkout_timeout':
     case 'git_network_failed':
+    case 'git_pack_corrupt':
       return classified('unknown', 'source_control_network');
     case 'kilo_import_timeout':
     case 'kilo_import_failed':

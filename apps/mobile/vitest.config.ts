@@ -42,6 +42,7 @@ export default defineConfig({
       'src/lib/kilo-pass/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.tsx',
       'src/lib/onboarding/**/*.test.ts',
+      'src/lib/pr-review/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/components/**/*.test.ts',
     ],

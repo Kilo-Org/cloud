@@ -1570,6 +1570,11 @@ describe('api routes', () => {
       connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
     );
 
+    // The title-overlay query is best-effort: a DB hit with no matching rows
+    // keeps the heartbeat titles intact, which is what this test asserts.
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+
     const app = makeApiApp();
     const res = await app.fetch(new Request('http://local/sessions/active', { method: 'GET' }), {
       HYPERDRIVE: { connectionString: 'postgres://test' },
@@ -1577,6 +1582,15 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
     expect(getUserConnectionDO).toHaveBeenCalledWith(expect.anything(), { kiloUserId: 'usr_test' });
+    expect(fns.select).toHaveBeenCalledTimes(1);
+    expect(fns.selectWhere).toHaveBeenCalledTimes(1);
+    const predicate = fns.selectWhere.mock.calls[0]?.[0];
+    expect(predicate).toBeInstanceOf(SQL);
+    const dialect = new PgDialect();
+    const rendered = dialect.sqlToQuery(predicate as SQL);
+    expect(rendered.sql).toContain('"cli_sessions_v2"."kilo_user_id" = $1');
+    expect(rendered.sql).toContain('"cli_sessions_v2"."session_id" in ($2)');
+    expect(rendered.params).toEqual(['usr_test', 'ses_12345678901234567890123456']);
     expect(await res.json()).toEqual({
       sessions: [
         {
@@ -1597,13 +1611,175 @@ describe('api routes', () => {
       connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
     );
 
+    // No active sessions means the overlay query must not run at all
+    // (saves a DB round-trip and avoids unnecessary noise).
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+
     const app = makeApiApp();
     const res = await app.fetch(new Request('http://local/sessions/active', { method: 'GET' }), {
       HYPERDRIVE: { connectionString: 'postgres://test' },
     });
 
     expect(res.status).toBe(200);
+    expect(fns.select).not.toHaveBeenCalled();
     expect(await res.json()).toEqual({ sessions: [] });
+  });
+
+  describe('GET /sessions/active title overlay', () => {
+    const baseHeartbeat = (id: string, title: string) => ({
+      id,
+      status: 'active',
+      title,
+      connectionId: `conn-${id}`,
+    });
+
+    function setupOverlayTest(overlayRows: Array<{ session_id: string; title: unknown }>) {
+      const connectionStub = {
+        getActiveSessions: vi.fn(async () => [
+          baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+          baseHeartbeat('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb', 'Heartbeat B'),
+        ]),
+      };
+      vi.mocked(getUserConnectionDO).mockReturnValue(
+        connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+      );
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockResolvedValueOnce(overlayRows as never);
+      return { app: makeApiApp(), fns };
+    }
+
+    it('overlays a meaningful DB title onto the heartbeat session', async () => {
+      const { app, fns } = setupOverlayTest([
+        { session_id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', title: 'Renamed Title' },
+      ]);
+
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions).toEqual([
+        {
+          id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          status: 'active',
+          title: 'Renamed Title',
+          connectionId: 'conn-ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        {
+          id: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+          status: 'active',
+          title: 'Heartbeat B',
+          connectionId: 'conn-ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
+        },
+      ]);
+      // Overlay query was scoped to the authenticated user.
+      const predicate = fns.selectWhere.mock.calls[0]?.[0] as SQL;
+      const rendered = new PgDialect().sqlToQuery(predicate);
+      expect(rendered.sql).toContain('"cli_sessions_v2"."kilo_user_id" = $1');
+      expect(rendered.params).toContain('usr_test');
+      expect(rendered.params).toEqual(
+        expect.arrayContaining(['ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb'])
+      );
+    });
+
+    it('keeps the heartbeat title when no matching DB row exists', async () => {
+      const { app } = setupOverlayTest([]);
+
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A', 'Heartbeat B']);
+    });
+
+    it('keeps the heartbeat title when the DB title is null', async () => {
+      const { app } = setupOverlayTest([
+        { session_id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', title: null },
+      ]);
+
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A', 'Heartbeat B']);
+    });
+
+    it('keeps the heartbeat title when the DB title is an empty string', async () => {
+      const { app } = setupOverlayTest([
+        { session_id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', title: '' },
+      ]);
+
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A', 'Heartbeat B']);
+    });
+
+    it('keeps the heartbeat title when the DB title is whitespace-only', async () => {
+      const { app } = setupOverlayTest([
+        { session_id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', title: '   ' },
+      ]);
+
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions.map(s => s.title)).toEqual(['Heartbeat A', 'Heartbeat B']);
+    });
+
+    it('returns 200 with heartbeat titles when the overlay query throws', async () => {
+      const connectionStub = {
+        getActiveSessions: vi.fn(async () => [
+          baseHeartbeat('ses_aaaaaaaaaaaaaaaaaaaaaaaaaa', 'Heartbeat A'),
+        ]),
+      };
+      vi.mocked(getUserConnectionDO).mockReturnValue(
+        connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+      );
+      const { db, fns } = makeDbFakes();
+      vi.mocked(getWorkerDb).mockReturnValue(db);
+      fns.selectResult.mockRejectedValueOnce(new Error('db down'));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request('http://local/sessions/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { sessions: Array<{ id: string; title: string }> };
+      expect(body.sessions).toEqual([
+        {
+          id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+          status: 'active',
+          title: 'Heartbeat A',
+          connectionId: 'conn-ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to overlay active-session titles from Postgres (non-fatal)',
+        expect.objectContaining({ kiloUserId: 'usr_test', error: 'db down' })
+      );
+      warn.mockRestore();
+    });
   });
 
   it('GET /user/cli returns 426 without Upgrade header', async () => {

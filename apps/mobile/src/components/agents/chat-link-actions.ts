@@ -4,14 +4,15 @@ import { toast } from 'sonner-native';
 
 import { openExternalUrl } from '@/lib/external-link';
 
-type ChatLinkAction = 'open' | 'copy' | 'share';
+type ChatLinkAction = 'open' | 'copy' | 'share' | 'review-pr';
 
 type ChatLinkActionOption =
   | { kind: ChatLinkAction; label: string }
   | { kind: 'cancel'; label: 'Cancel' };
 
-export function buildChatLinkActionSheet() {
+export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: boolean } = {}) {
   const actions: ChatLinkActionOption[] = [
+    ...(isPrLink ? ([{ kind: 'review-pr', label: 'Review PR' }] as const) : []),
     { kind: 'open', label: 'Open link' },
     { kind: 'copy', label: 'Copy link' },
     { kind: 'share', label: 'Share link' },
@@ -25,8 +26,28 @@ export function buildChatLinkActionSheet() {
   };
 }
 
+/**
+ * The tap (not long-press) action sheet for a GitHub PR link. The accepted
+ * contract is exactly three options: Review PR, Open in browser, Cancel.
+ * This is intentionally distinct from the long-press sheet, which also
+ * offers Copy/Share.
+ */
+export function buildPrLinkTapActionSheet() {
+  const actions: ChatLinkActionOption[] = [
+    { kind: 'review-pr', label: 'Review PR' },
+    { kind: 'open', label: 'Open in browser' },
+    { kind: 'cancel', label: 'Cancel' },
+  ];
+
+  return {
+    actions,
+    options: actions.map(action => action.label),
+    cancelButtonIndex: actions.length - 1,
+  };
+}
+
 export function getSelectedChatLinkAction(
-  sheet: ReturnType<typeof buildChatLinkActionSheet>,
+  sheet: ReturnType<typeof buildChatLinkActionSheet> | ReturnType<typeof buildPrLinkTapActionSheet>,
   index: number | undefined
 ): ChatLinkAction | null {
   if (index === undefined) {

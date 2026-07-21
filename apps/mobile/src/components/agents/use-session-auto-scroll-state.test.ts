@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
+  SESSION_LIST_BOTTOM_THRESHOLD_PX,
   shouldFollowSessionContentSize,
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
@@ -49,6 +51,30 @@ describe('isSessionListAtBottom', () => {
     ).toBe(true);
   });
 
+  it('returns true for any offset when the content is shorter than the viewport', () => {
+    // The scroll-to-bottom button must never show on short/empty
+    // conversations: a content height smaller than the viewport height
+    // means the entire transcript is already visible, so the user is
+    // at the bottom by definition. Cover both the no-scroll case and
+    // a non-zero (but still-fully-visible) offset to lock the
+    // "content < viewport" branch.
+    expect(
+      isSessionListAtBottom({
+        contentHeight: 200,
+        viewportHeight: 600,
+        offsetY: 0,
+      })
+    ).toBe(true);
+    expect(
+      isSessionListAtBottom({
+        contentHeight: 400,
+        viewportHeight: 600,
+        offsetY: 50,
+      })
+    ).toBe(true);
+    expect(SESSION_LIST_BOTTOM_THRESHOLD_PX).toBe(100);
+  });
+
   it('respects a custom threshold for the bottom-stickiness band', () => {
     expect(
       isSessionListAtBottom({
@@ -66,6 +92,27 @@ describe('isSessionListAtBottom', () => {
         thresholdPx: 50,
       })
     ).toBe(true);
+  });
+});
+
+describe('getInitialSessionListAutoScrollVisibility', () => {
+  it('starts at-bottom so the scroll-to-bottom button is hidden on first render', () => {
+    // A fresh transcript is rendered anchored to the latest message, so
+    // the floating "scroll to bottom" button must never be visible until
+    // the user has actually scrolled away.
+    expect(getInitialSessionListAutoScrollVisibility()).toEqual({
+      shouldAutoScroll: true,
+      isAtBottom: true,
+    });
+  });
+
+  it('is the reset target used when the session changes', () => {
+    // The hook's `resetKey` effect calls this helper to restore both the
+    // auto-follow ref and the at-bottom React state. A new/empty session
+    // must therefore never open with the button visible.
+    const reset = getInitialSessionListAutoScrollVisibility();
+    expect(reset.isAtBottom).toBe(true);
+    expect(reset.shouldAutoScroll).toBe(true);
   });
 });
 

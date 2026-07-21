@@ -74,6 +74,7 @@
     "expo-tracking-transparency": "55.0.15",
     "expo-web-browser": "55.0.17",
     "jotai": "2.18.1",
+    "lowlight": "^3.3.0",
     "lucide-react-native": "1.7.0",
     "nativewind": "5.0.0-preview.3",
     "posthog-react-native": "^4.54.3",

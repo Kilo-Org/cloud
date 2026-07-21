@@ -86,8 +86,13 @@ function entryKey(contentHash: string, classifierModel: string): string {
 // Cannot collide with classification keys, which always contain a ':'.
 const STICKY_DECISION_KEY = 'sticky';
 
-const StickyDecisionSchema = z.object({ model: z.string().min(1) });
-type StickyDecision = z.infer<typeof StickyDecisionSchema>;
+const StickyDecisionSchema = z.object({
+  model: z.string().min(1),
+  // Taxonomy route the model was decided on, for route-change telemetry.
+  // Nullable/defaulted so entries written before the field existed parse.
+  routeKey: z.string().min(1).nullish().default(null),
+});
+export type StickyDecision = z.infer<typeof StickyDecisionSchema>;
 
 export async function getCachedClassification(
   env: DecisionCacheEnv,
@@ -112,14 +117,14 @@ export async function getCachedClassification(
 export async function getStickyDecision(
   env: DecisionCacheEnv,
   conversationKey: string
-): Promise<string | null> {
+): Promise<StickyDecision | null> {
   try {
     const value = await cacheStub(env, conversationKey).getEntry(STICKY_DECISION_KEY);
     if (!value) return null;
     // Entries may have been written by an older worker version; validate
     // before serving.
     const parsed = StickyDecisionSchema.safeParse(value);
-    return parsed.success ? parsed.data.model : null;
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
@@ -128,11 +133,13 @@ export async function getStickyDecision(
 export async function putStickyDecision(
   env: DecisionCacheEnv,
   conversationKey: string,
-  model: string
+  model: string,
+  routeKey: string
 ): Promise<void> {
   try {
     await cacheStub(env, conversationKey).putEntry(STICKY_DECISION_KEY, {
       model,
+      routeKey,
     } satisfies StickyDecision);
   } catch {
     // Sticky writes are best effort and must not fail the decision.

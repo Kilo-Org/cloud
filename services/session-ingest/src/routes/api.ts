@@ -509,6 +509,58 @@ api.get('/sessions/active', async c => {
   const kiloUserId = c.get('user_id');
   const stub = getUserConnectionDO(c.env, { kiloUserId });
   const sessions = await stub.getActiveSessions();
+
+  // Overlay the heartbeat snapshot titles with the latest persisted
+  // `cli_sessions_v2.title` for this user, so that a rename (which writes
+  // only to Postgres) is reflected on the next poll instead of waiting for
+  // the CLI's next heartbeat. The overlay is best-effort: a DB failure must
+  // not blank the entire Remote section, so we fall back to the heartbeat
+  // titles and return 200.
+  if (sessions.length > 0) {
+    const ids = sessions.map(s => s.id);
+    try {
+      const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+      const titleRows = await db
+        .select({
+          session_id: cli_sessions_v2.session_id,
+          title: cli_sessions_v2.title,
+        })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            inArray(cli_sessions_v2.session_id, ids)
+          )
+        );
+
+      const titleBySessionId = new Map<string, string>();
+      for (const row of titleRows) {
+        // `cli_sessions_v2.title` is nullable, unconstrained text, and
+        // ingest can persist `''` or whitespace. Only honor DB titles that
+        // are actually meaningful; otherwise keep the heartbeat title so we
+        // never blank a valid row.
+        if (typeof row.title === 'string' && row.title.trim().length > 0) {
+          titleBySessionId.set(row.session_id, row.title);
+        }
+      }
+
+      if (titleBySessionId.size > 0) {
+        for (const session of sessions) {
+          const dbTitle = titleBySessionId.get(session.id);
+          if (dbTitle !== undefined) {
+            session.title = dbTitle;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to overlay active-session titles from Postgres (non-fatal)', {
+        kiloUserId,
+        sessionCount: sessions.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return c.json({ sessions }, 200);
 });
 

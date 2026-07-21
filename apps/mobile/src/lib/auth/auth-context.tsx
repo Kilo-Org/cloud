@@ -17,6 +17,8 @@ import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
+import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
   AUTH_TOKEN_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -66,6 +68,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     await clearLastActiveInstance();
+    // PR-review storage is keyed by (owner, repo, number) so it's not
+    // obviously user-scoped, but the user-facing recents list absolutely
+    // is — clear it so the next signed-in account doesn't inherit the
+    // previous user's recently-opened PRs.
+    await clearRecentPrs();
+    await clearViewedFiles();
     clearAgentModelPreference();
     clearReasoningPreference();
     resetAnalyticsUser();

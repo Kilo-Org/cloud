@@ -31,6 +31,7 @@ import {
   disconnectGitHubUserAuthorization,
   getGitHubUserAuthorizationStatus,
 } from '@/lib/integrations/platforms/github/user-authorization';
+import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 
 export const githubAppsRouter = createTRPCRouter({
   // List all integrations
@@ -367,5 +368,34 @@ export const githubAppsRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  // Dev-only: seed the user's `user_github_app_tokens` row with a FAKE token
+  // so the E2E suite can hit the local mock GitHub without a real OAuth
+  // round-trip. Encryption uses the same public-key envelope the real
+  // `exchangeAndStoreGitHubUserAuthorization` path uses, so the seeded row is
+  // decryptable by the production token client.
+  devSeedUserGithubToken: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+        githubLogin: z.string().min(1),
+        githubUserId: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (process.env.NODE_ENV !== 'development') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This endpoint is only available in development mode',
+        });
+      }
+      const result = await seedUserGithubToken({
+        kiloUserId: ctx.user.id,
+        token: input.token,
+        githubLogin: input.githubLogin,
+        githubUserId: input.githubUserId,
+      });
+      return { success: result.upserted, githubLogin: result.githubLogin };
     }),
 });

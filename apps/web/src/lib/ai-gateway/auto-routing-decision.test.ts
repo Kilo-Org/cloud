@@ -13,6 +13,10 @@ jest.mock('@/lib/utils.server', () => ({
 
 import { fetchEfficientAutoDecision } from './auto-routing-decision';
 import type { EfficientDecisionParams } from './auto-routing-decision';
+import {
+  detectRequiredInputModalities,
+  estimateRoutingTokens,
+} from '@kilocode/auto-routing-contracts';
 
 const originalFetch = globalThis.fetch;
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
@@ -190,5 +194,76 @@ describe('fetchEfficientAutoDecision', () => {
     const result = await fetchEfficientAutoDecision(makeParams(), options);
 
     expect(result).toEqual({ decision: null, costUsd: 0.001 });
+  });
+
+  it('forwards requiredInputModalities=["image"] into constraints for an image-bearing body', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    const imageBody = {
+      model: 'kilo-auto/efficient',
+      stream: true,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What is in this picture?' },
+            {
+              type: 'image_url',
+              image_url: { url: 'https://example.com/cat.png' },
+            },
+          ],
+        },
+      ],
+    };
+
+    await fetchEfficientAutoDecision({ ...makeParams(), body: imageBody }, options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const body = JSON.parse(init?.body as string);
+    expect(body.constraints?.requiredInputModalities).toEqual(['image']);
+    expect(detectRequiredInputModalities(imageBody)).toEqual(['image']);
+  });
+
+  it('omits requiredInputModalities from constraints (and the whole constraints key when no other field is present) for a text-only body', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(makeParams(), options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const body = JSON.parse(init?.body as string);
+    // The default `makeParams()` body is short text that may or may not
+    // produce a positive token estimate. We only assert the modality
+    // contract here: the key must never be `[]` (i.e. empty), and when
+    // there's no prompt-token estimate either the whole `constraints`
+    // key must be absent.
+    if ('constraints' in body) {
+      expect(body.constraints.requiredInputModalities).toBeUndefined();
+    } else {
+      expect(body.constraints).toBeUndefined();
+    }
+  });
+
+  it('forwards the promptTokensEstimate returned by estimateRoutingTokens unchanged', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    const longText =
+      'Please summarize this long document. ' +
+      'The quick brown fox jumps over the lazy dog. '.repeat(200);
+    const body = {
+      model: 'kilo-auto/efficient',
+      stream: true,
+      messages: [
+        { role: 'system', content: 'You are Kilo Code.' },
+        { role: 'user', content: longText },
+      ],
+    };
+
+    await fetchEfficientAutoDecision({ ...makeParams(), body }, options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const sent = JSON.parse(init?.body as string);
+    const expected = estimateRoutingTokens(body);
+    expect(expected).toBeGreaterThan(0);
+    expect(sent.constraints?.promptTokensEstimate).toBe(expected);
   });
 });

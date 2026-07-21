@@ -6,6 +6,11 @@ import { getNewAgentSessionPath } from '@/components/agents/session-list-routes'
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import {
+  createDefaultSearchTimer,
+  createSessionSearchController,
+  type SessionSearchController,
+} from '@/components/agents/session-search-state';
+import {
   type ProjectFilterOption,
   SessionFilterChips,
   SessionFilterModal,
@@ -19,7 +24,6 @@ import {
   type StoredSessionItem,
 } from '@/components/agents/session-list-helpers';
 import { ScreenHeader } from '@/components/screen-header';
-import { clearAgentSessionNarrowingFilters } from '@/lib/agent-session-filters';
 import {
   useAgentSessions,
   useAgentSessionSearch,
@@ -45,32 +49,38 @@ export function AgentSessionListScreen() {
   } = usePersistedAgentSessionFilters();
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearchChange = useCallback((text: string) => {
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
-    searchTimerRef.current = setTimeout(() => {
-      setSearchQuery(text.trim());
-    }, 300);
-  }, []);
+  // Search debounce + clear semantics live in a pure controller so the
+  // 300ms timing and the two clear paths (search-only vs. broad) can be
+  // unit tested without react-native or real timers. The controller
+  // holds its own pending-handle state — no setTimeout leaks into React.
+  const searchControllerRef = useRef<SessionSearchController | null>(null);
+  searchControllerRef.current ??= createSessionSearchController({
+    timer: createDefaultSearchTimer(),
+    commitSearchQuery: setSearchQuery,
+  });
+  const searchController = searchControllerRef.current;
 
-  const handleClearSearch = useCallback(() => {
-    if (searchTimerRef.current) {
-      clearTimeout(searchTimerRef.current);
-    }
-    setSearchQuery('');
-  }, []);
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      searchController.scheduleSearch(text);
+    },
+    [searchController]
+  );
+
+  // Search-only clear used by the in-field X: resets the debounced
+  // query without touching the persisted platform/project narrowing
+  // filters — the broad empty-state clear still owns that.
+  const handleClearSearchOnly = useCallback(() => {
+    searchController.clearSearchOnly();
+  }, [searchController]);
 
   useEffect(
     () => () => {
-      if (searchTimerRef.current) {
-        clearTimeout(searchTimerRef.current);
-      }
+      searchController.dispose();
     },
-    []
+    [searchController]
   );
 
   const createdOnPlatform = useMemo(
@@ -264,11 +274,11 @@ export function AgentSessionListScreen() {
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
   const handleClearQuery = useCallback(() => {
-    handleClearSearch();
     // Functional update so the persisted sort preference is preserved
-    // across "Clear search" / "Clear filters".
-    setFilters(prev => clearAgentSessionNarrowingFilters(prev));
-  }, [handleClearSearch, setFilters]);
+    // across "Clear search" / "Clear filters" — the controller's
+    // clearBroadly is the single source of truth for the reset pair.
+    searchController.clearBroadly(setFilters);
+  }, [searchController, setFilters]);
 
   return (
     <View className="flex-1 bg-background">
@@ -320,6 +330,7 @@ export function AgentSessionListScreen() {
           hasActiveQuery={isSearching || hasActiveFilter}
           isSearching={isSearching}
           onClearQuery={handleClearQuery}
+          onClearSearchOnly={handleClearSearchOnly}
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}

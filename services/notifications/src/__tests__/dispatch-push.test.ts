@@ -1039,27 +1039,34 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
     const payload = sinkCall?.[1] as {
       idempotencyKey: string;
       payload: {
-        title: string;
-        body: string;
-        data: unknown;
+        titleLength: number;
+        bodyLength: number;
+        dataKeys: string[];
+        dataType: unknown;
         sound: string | null;
         priority: string;
       };
       to: string;
     };
     expect(payload.idempotencyKey).toBe(idemKey);
+    // Content-free: sizes + key names + discriminator, never the values.
     expect(payload.payload).toEqual({
-      title: 'My title',
-      body: 'My body',
-      data: { type: 'cloud_agent_session', cliSessionId: 'ses_sink' },
+      titleLength: 'My title'.length,
+      bodyLength: 'My body'.length,
+      dataKeys: ['cliSessionId', 'type'],
+      dataType: 'cloud_agent_session',
       sound: 'default',
       priority: 'high',
     });
     expect(payload.to).toBe('<redacted>');
-    // Token must never appear in the sink payload.
+    // Neither the device token nor the user/agent-controlled content may appear.
     const serialized = JSON.stringify(payload);
     expect(serialized).not.toContain('tok-real');
     expect(serialized).not.toContain('ExponentPushToken');
+    // User/agent-controlled content values must never appear (identifiers such
+    // as the idempotency key are fine and intentionally retained for tracing).
+    expect(serialized).not.toContain('My title');
+    expect(serialized).not.toContain('My body');
 
     // No receipt work created.
     expect(env.RECEIPTS_QUEUE.send).not.toHaveBeenCalled();
@@ -1158,5 +1165,56 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
     expect(result.kind).toBe('suppressed_presence');
     expect(logSpy.mock.calls.some(call => call[0] === 'agent_push_sink_payload')).toBe(false);
     logSpy.mockRestore();
+  });
+
+  it('does not double-send when the same key is dispatched concurrently (in-flight claim)', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-concurrent', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+
+    // Hold the first Expo send open so a concurrent replay of the same key
+    // interleaves while the first attempt is mid-flight — i.e. after it wrote
+    // its `pending` marker but before it recorded a terminal state. Without the
+    // in-flight claim the replay would read `pending`, treat it as a reusable
+    // retry slot, and submit a second OS push.
+    let releaseExpo: () => void = () => undefined;
+    const expoGate = new Promise<void>(resolve => {
+      releaseExpo = resolve;
+    });
+    vi.mocked(sendPushNotifications).mockImplementationOnce(async () => {
+      await expoGate;
+      return {
+        ticketTokenPairs: [{ ticketId: 't1', token: 'tok1' }],
+        staleTokens: [],
+        ticketErrors: [],
+      };
+    });
+
+    const stub = getDO('user-concurrent');
+    const input: DispatchPushInput = {
+      userId: 'user-concurrent',
+      presenceContext: null,
+      idempotencyKey: 'agent-notification:ses_cc:n-cc',
+      badge: null,
+      push: {
+        title: 'T',
+        body: 'B',
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_cc' },
+        sound: 'default',
+        priority: 'high',
+      },
+    };
+
+    const [first, second] = await runInDurableObject(stub, async instance => {
+      const p1 = instance.dispatchPush(input);
+      // Let p1 progress to the awaiting-Expo point before the replay enters.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const p2 = instance.dispatchPush(input);
+      releaseExpo();
+      return Promise.all([p1, p2]);
+    });
+
+    expect([first.kind, second.kind].sort()).toEqual(['delivered', 'duplicate']);
+    // The core guarantee: exactly one OS push submission for the key.
+    expect(sendPushNotifications).toHaveBeenCalledTimes(1);
   });
 });

@@ -43,7 +43,29 @@ const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS = 30_000;
 
 export class NotificationChannelDO extends DurableObject<Env> {
+  // In-flight claims by idempotency key. The DO serializes turns, but a turn
+  // yields the isolate on every external `await` (presence RPC, Expo send), so a
+  // concurrent replay of the same key can interleave: it would read the storage
+  // `pending` marker the first attempt left before its send, treat it as a
+  // reusable retry slot, and send a second time. This in-memory claim closes
+  // that window — a replay seeing a live claim returns `duplicate`, while a
+  // sequential post-failure retry (claim already released) still reuses the
+  // `pending` slot as before.
+  private readonly inFlight = new Set<string>();
+
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
+    if (this.inFlight.has(input.idempotencyKey)) {
+      return { kind: 'duplicate' };
+    }
+    this.inFlight.add(input.idempotencyKey);
+    try {
+      return await this.dispatchPushInner(input);
+    } finally {
+      this.inFlight.delete(input.idempotencyKey);
+    }
+  }
+
+  private async dispatchPushInner(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     // 1. Idempotency. DO is single-threaded — requests for a given
     //    user serialize on this instance. Retryable send failures leave the
     //    record at `pending` so upstream can retry the send without
@@ -160,12 +182,22 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    means the sink captured the payload, never device delivery.
     if (isPushSinkEnabled(this.env)) {
       const ts = Date.now();
+      // Content-free observability only. Title, body, and the `data` object are
+      // agent/user-controlled and can carry credentials or private customer
+      // content; logging their values would retain that in local, CI, and
+      // aggregated Worker logs. Record sizes, `data` key names, and the fixed
+      // `type` discriminator instead — enough to trace the send without content.
+      const data = input.push.data;
       console.log('agent_push_sink_payload', {
         idempotencyKey: input.idempotencyKey,
         payload: {
-          title: input.push.title,
-          body: input.push.body,
-          data: input.push.data,
+          titleLength: input.push.title.length,
+          bodyLength: input.push.body.length,
+          dataKeys: data && typeof data === 'object' ? Object.keys(data).sort() : [],
+          dataType:
+            data && typeof data === 'object' && 'type' in data
+              ? (data as { type?: unknown }).type
+              : undefined,
           sound: input.push.sound ?? null,
           priority: input.push.priority ?? 'default',
         },

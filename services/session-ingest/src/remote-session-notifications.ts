@@ -57,14 +57,12 @@ export async function dispatchRemoteSessionAttentionSignal(
   params: { kiloUserId: string; sessionId: string; signal: AttentionSignal },
   deps: DispatchRemoteSessionAttentionDeps
 ): Promise<DispatchRemoteSessionAttentionOutcome> {
-  if (deps.remoteSessionAttentionPushUserId?.trim() !== params.kiloUserId) {
-    return 'suppressed';
-  }
-
   // §4.3: `agent_notification` signals are an explicit `notify_user` tool call. The user
-  // asked for the ping, and a headless `kilo run` may exit right after emitting it — the
-  // live-CLI gate must NOT apply, or this single notification would silently be lost.
-  // Root-session eligibility is still enforced one level up by the caller.
+  // asked for the ping, and a headless `kilo run` may exit right after emitting it — neither
+  // the per-user rollout gate nor the live-CLI gate must apply, or this single notification
+  // the user explicitly requested would silently be lost. Root-session eligibility is still
+  // enforced one level up by the caller, and presence-suppression is handled downstream by
+  // the notifications service.
   if (params.signal.kind === 'agent_notification') {
     const result = await deps.sendAgentSessionNotification({
       userId: params.kiloUserId,
@@ -79,6 +77,12 @@ export async function dispatchRemoteSessionAttentionSignal(
       outcome: result.dispatched ? 'dispatched' : (result.reason ?? 'failed'),
     });
     return result.dispatched ? 'sent' : 'suppressed';
+  }
+
+  // Legacy attention pushes (completed / needs_input) remain gated behind the staged
+  // per-user rollout and the live-CLI presence check.
+  if (deps.remoteSessionAttentionPushUserId?.trim() !== params.kiloUserId) {
+    return 'suppressed';
   }
 
   if (!(await deps.hasActiveCliSession())) {

@@ -29,6 +29,13 @@
       "when": 1782225417966,
       "tag": "0003_free_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784640634084,
+      "tag": "0004_giant_deathbird",
+      "breakpoints": true
     }
   ]
 }

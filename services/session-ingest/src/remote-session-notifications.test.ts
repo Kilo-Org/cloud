@@ -69,6 +69,7 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
         remoteSessionAttentionPushUserId: 'usr_2',
         hasActiveCliSession,
         sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
       }
     );
 
@@ -87,6 +88,7 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
         remoteSessionAttentionPushUserId: ' usr_1 ',
         hasActiveCliSession,
         sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
       }
     );
 

@@ -22,3 +22,11 @@ export function getProfileAgentScope(
 export function getCodeReviewerProfilePath(scope: string): Href {
   return `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}` as Href;
 }
+
+export function getPrReviewEntryPath(): Href {
+  return '/(app)/pr-review' as Href;
+}
+
+export function getPrReviewPath(owner: string, repo: string, number: number): Href {
+  return `/(app)/pr-review/${owner}/${repo}/${number}` as Href;
+}

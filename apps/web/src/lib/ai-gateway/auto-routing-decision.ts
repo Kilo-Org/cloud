@@ -1,5 +1,7 @@
 import {
   AutoRoutingDecisionResponseSchema,
+  detectRequiredInputModalities,
+  estimateRoutingTokens,
   type AutoRoutingDecision,
   normalizeClassifierInput,
 } from '@kilocode/auto-routing-contracts';
@@ -39,11 +41,28 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
   });
   if (!normalizedInput) return null;
 
+  // Compute capability-aware routing hints from the original body (the
+  // caller mutates it after this thunk runs, so the full body is only
+  // available here). Omit each field when it carries no information, and
+  // omit `constraints` entirely when both would be absent, so today's
+  // payload shape is preserved byte-for-byte for text-only, sub-token
+  // requests.
+  const requiredInputModalities = detectRequiredInputModalities(params.body);
+  const promptTokensEstimate = estimateRoutingTokens(params.body);
+  const constraints: MirrorPayload['constraints'] =
+    requiredInputModalities.length > 0 || promptTokensEstimate > 0
+      ? {
+          ...(requiredInputModalities.length > 0 ? { requiredInputModalities } : {}),
+          ...(promptTokensEstimate > 0 ? { promptTokensEstimate } : {}),
+        }
+      : undefined;
+
   return {
     input: normalizedInput,
     ...(params.deniedModelIds?.length
       ? { routingPolicy: { deniedModelIds: [...params.deniedModelIds] } }
       : {}),
+    ...(constraints ? { constraints } : {}),
     userId: params.userId,
     organizationId: params.organizationId,
     sessionId: params.sessionId,

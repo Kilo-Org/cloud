@@ -334,6 +334,13 @@ describe('pending session messages', () => {
 
     const result = await runInDurableObject(stub, async instance => {
       let acceptedMessageId: string | undefined;
+      const volatileEvents: Array<{ streamEventType: string; payload: string }> = [];
+      (instance as any).broadcastVolatileEvent = (event: {
+        streamEventType: string;
+        payload: string;
+      }) => {
+        volatileEvents.push(event);
+      };
       (instance as any).orchestrator = {
         execute: async (plan: any) => {
           acceptedMessageId = plan.turn.messageId;
@@ -364,13 +371,21 @@ describe('pending session messages', () => {
       await instance.alarm();
       const pending = await listPendingSessionMessages(instance.ctx.storage);
       const acceptedMessages = await listNonTerminalAcceptedMessages(instance.ctx.storage);
-      return { acceptedMessageId, pending, acceptedMessages };
+      return { acceptedMessageId, pending, acceptedMessages, volatileEvents };
     });
 
     expect(result.acceptedMessageId).toBe('msg_018f1e2d3c4bFlushMsgAbCdEf');
     expect(result.pending).toHaveLength(0);
     expect(result.acceptedMessages).toHaveLength(1);
     expect(result.acceptedMessages[0]?.messageId).toBe('msg_018f1e2d3c4bFlushMsgAbCdEf');
+    expect(result.volatileEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          streamEventType: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+        }),
+      ])
+    );
   });
 
   it('flushes canonical document attachment descriptors through the durable queue plan', async () => {

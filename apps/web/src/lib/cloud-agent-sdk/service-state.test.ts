@@ -1781,4 +1781,189 @@ describe('createServiceState', () => {
       });
     });
   });
+
+  describe('queue.changed (CLI reconciliation)', () => {
+    it('adds entries on first snapshot (empty → non-empty)', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+    });
+
+    it('shrinks the snapshot by removing entries not in the new list', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2', 'm3'] });
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m2', 'm3'] });
+
+      const pending = state.getPendingMessages();
+      expect(pending.size).toBe(2);
+      expect(pending.has('m1')).toBe(false);
+      expect(pending.get('m2')).toEqual({ status: 'queued' });
+      expect(pending.get('m3')).toEqual({ status: 'queued' });
+    });
+
+    it('clears all entries when the snapshot is empty', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: [] });
+
+      expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    it('treats every event as a full snapshot, never a delta', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      // m3 was not in the prior snapshot and is not in this one either —
+      // it must NOT survive because the new event is authoritative.
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+
+      const pending = state.getPendingMessages();
+      expect(pending.size).toBe(2);
+      expect(pending.has('m1')).toBe(true);
+      expect(pending.has('m2')).toBe(true);
+    });
+
+    it('notifies subscribers on every change', () => {
+      const state = createServiceState(makeConfig());
+      const cb = jest.fn();
+      state.subscribe(cb);
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1'] });
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: [] });
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m2', 'm3'] });
+
+      expect(cb).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('stopped × pendingMessages interaction', () => {
+    it('stopped(complete) does NOT clear pendingMessages', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      state.process({ type: 'stopped', reason: 'complete' });
+
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+    });
+
+    it('stopped(disconnected) after stopped(complete) still clears pendingMessages', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1'] });
+      state.process({ type: 'stopped', reason: 'complete' });
+      // The disconnected branch is reached even when completed === true;
+      // the clear runs before the `if (completed) break` short-circuit.
+      state.process({ type: 'stopped', reason: 'disconnected' });
+
+      expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    it('stopped(disconnected) clears pendingMessages', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      state.process({ type: 'stopped', reason: 'disconnected' });
+
+      expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    it('stopped(disconnected) clears pendingMessages even when completed === true', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      state.process({ type: 'stopped', reason: 'complete' });
+      // completed is now true — a subsequent disconnect must still clear the
+      // CLI pending queue because the session can no longer dequeue from it.
+      state.process({ type: 'stopped', reason: 'disconnected' });
+
+      expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    it('stopped(transport-disconnected) does NOT clear pendingMessages (CLI queue.changed)', () => {
+      // transport-disconnected is never emitted by the CLI transport (only
+      // cli-live-transport's `disconnected`), so this case existing for a
+      // CLI-populated queue is a defensive/no-op check.
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+
+      expect(state.getPendingMessages().size).toBe(2);
+    });
+
+    it('stopped(transport-disconnected) does NOT clear pendingMessages (cloud-agent cloud.message.queued)', () => {
+      // Only cloud-agent-transport.ts emits transport-disconnected, and only
+      // on a purely client-side WebSocket blip with no backend-durable event
+      // and no snapshot-replay path that would repopulate pendingMessages
+      // afterward. Clearing here would permanently drop a "Queued" badge for
+      // a message that is still genuinely queued server-side.
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.queued', messageId: 'm2' });
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+    });
+
+    it('stopped(interrupted) does NOT clear pendingMessages — cloud.message.failed handles that', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      state.process({ type: 'stopped', reason: 'interrupted' });
+
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+    });
+
+    it('no cross-talk: a session that only receives cloud.message.* events is unaffected by queue.changed handling', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.queued', messageId: 'm2' });
+      // The cloud-agent session's pending set uses the same map shape, so an
+      // empty queue.changed snapshot (which a CLI session might receive during
+      // subscribe) would wipe it. Verify that a real cloud-agent session that
+      // never receives queue.changed keeps its own entries intact.
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+    });
+
+    it('ignores a queue.changed snapshot from a non-root (child/subagent) session', () => {
+      // Child/subagent sessions forward their own session.queue.changed
+      // events through the same shared pendingMessages map (cli-live-transport
+      // forwards events whose parentSessionId matches the root, and
+      // remote-sender always replays an empty snapshot for children on
+      // subscribe). A root session's real queued messages must survive an
+      // empty (or non-empty) snapshot that names a different sessionId.
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1', 'm2'] });
+      expect(state.getPendingMessages().size).toBe(2);
+
+      // A child session's empty snapshot must not wipe the root's entries.
+      state.process({ type: 'queue.changed', sessionId: 'child-1', queued: [] });
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+
+      // A child session's non-empty snapshot must not overwrite the root's
+      // entries with unrelated child message IDs.
+      state.process({ type: 'queue.changed', sessionId: 'child-1', queued: ['child-m1'] });
+      expect(state.getPendingMessages().size).toBe(2);
+      expect(state.getPendingMessages().has('child-m1')).toBe(false);
+    });
+  });
 });

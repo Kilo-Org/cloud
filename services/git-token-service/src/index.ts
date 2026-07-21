@@ -10,8 +10,10 @@ import {
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
   GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
+  GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { z } from 'zod';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
 import {
@@ -250,6 +252,7 @@ export type RedeemKiloSessionCapabilityResult =
   | { success: false; reason: RedeemKiloSessionCapabilityFailureReason };
 
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
+const USER_ACCESS_TOKEN_PATH = '/internal/github-user-authorizations/token';
 const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
 const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review/pull-request';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
@@ -267,6 +270,23 @@ const BitbucketEnsureWebhookHttpRequestSchema = BitbucketEnsureWebhookRequestSch
 const BitbucketDeleteWebhookHttpRequestSchema = BitbucketDeleteWebhookRequestSchema.omit({
   owner: true,
 });
+
+const UserAccessTokenFetchRequestSchema = z.object({ op: z.literal('fetch') });
+const UserAccessTokenRotateRequestSchema = z.object({
+  op: z.literal('rotate'),
+  staleAuthorizationId: z.string().min(1),
+  staleCredentialVersion: z.number().int().nonnegative(),
+});
+const UserAccessTokenReportRejectedRequestSchema = z.object({
+  op: z.literal('reportRejected'),
+  authorizationId: z.string().min(1),
+  credentialVersion: z.number().int().nonnegative(),
+});
+const UserAccessTokenRequestSchema = z.union([
+  UserAccessTokenFetchRequestSchema,
+  UserAccessTokenRotateRequestSchema,
+  UserAccessTokenReportRejectedRequestSchema,
+]);
 
 const bitbucketCodeReviewAudiences = new Map([
   [BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH, BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE],
@@ -1169,13 +1189,17 @@ export default {
     const url = new URL(request.url);
     const isGitLabCredentialAudit = url.pathname === GITLAB_CREDENTIAL_AUDIT_PATH;
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
-    const privateGitLabHeaders =
-      isGitLabCredentialAudit || isGitLabCredentialBroker
+    // Credential-bearing endpoints must never be cached, including on their
+    // shared early-return error paths (405/401/503). The GitHub user-access
+    // token endpoint joins the GitLab private endpoints here.
+    const privateNoStoreHeaders =
+      isGitLabCredentialAudit || isGitLabCredentialBroker || url.pathname === USER_ACCESS_TOKEN_PATH
         ? { 'Cache-Control': 'no-store' }
         : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
     if (
       url.pathname !== DISCONNECT_PATH &&
+      url.pathname !== USER_ACCESS_TOKEN_PATH &&
       url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
       url.pathname !== GITLAB_CREDENTIAL_BROKER_PATH &&
       !isGitLabCredentialAudit &&
@@ -1184,14 +1208,14 @@ export default {
       return new Response(null, { status: 404 });
     }
     if (request.method !== 'POST') {
-      return new Response(null, { status: 405, headers: privateGitLabHeaders });
+      return new Response(null, { status: 405, headers: privateNoStoreHeaders });
     }
 
     const token = extractBearerToken(request.headers.get('Authorization'));
     if (!token) {
       return Response.json(
         { error: 'unauthorized' },
-        { status: 401, headers: privateGitLabHeaders }
+        { status: 401, headers: privateNoStoreHeaders }
       );
     }
 
@@ -1201,13 +1225,13 @@ export default {
     } catch {
       return Response.json(
         { error: 'authentication_unavailable' },
-        { status: 503, headers: privateGitLabHeaders }
+        { status: 503, headers: privateNoStoreHeaders }
       );
     }
     if (!secret) {
       return Response.json(
         { error: 'authentication_unavailable' },
-        { status: 503, headers: privateGitLabHeaders }
+        { status: 503, headers: privateNoStoreHeaders }
       );
     }
 
@@ -1218,14 +1242,16 @@ export default {
           ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
           : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
             ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
-            : isGitLabCredentialAudit
-              ? GITLAB_CREDENTIAL_AUDIT_AUDIENCE
-              : codeReviewAudience;
+            : url.pathname === USER_ACCESS_TOKEN_PATH
+              ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
+              : isGitLabCredentialAudit
+                ? GITLAB_CREDENTIAL_AUDIT_AUDIENCE
+                : codeReviewAudience;
       authorization = await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
       return Response.json(
         { error: 'unauthorized' },
-        { status: 401, headers: privateGitLabHeaders }
+        { status: 401, headers: privateNoStoreHeaders }
       );
     }
 
@@ -1357,6 +1383,41 @@ export default {
         }
       } catch {
         return Response.json({ success: false, reason: 'temporarily_unavailable' });
+      }
+    }
+
+    if (url.pathname === USER_ACCESS_TOKEN_PATH) {
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json(
+          { error: 'invalid_request' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      const parsed = UserAccessTokenRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { error: 'invalid_request' },
+          { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      try {
+        const service = new GitHubUserAuthorizationService(env);
+        const result = await service.getUserAccessToken(authorization.kiloUserId, parsed.data);
+        return Response.json(result, { headers: { 'Cache-Control': 'no-store' } });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'temporarily_unavailable') {
+          return Response.json(
+            { error: 'temporarily_unavailable' },
+            { status: 503, headers: { 'Cache-Control': 'no-store' } }
+          );
+        }
+        return Response.json(
+          { error: 'temporarily_unavailable' },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } }
+        );
       }
     }
 

@@ -1,11 +1,14 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
 
-export type AccessibleCloudAgentSession = {
+export type AccessibleSession = {
   kiloSessionId: string;
   organizationId: string | null;
 };
+
+/** Established name used by Cloud Agent consumers. */
+export type AccessibleCloudAgentSession = AccessibleSession;
 
 type SessionAccessDb = Pick<WorkerDb, 'select'>;
 
@@ -15,23 +18,44 @@ type AccessibleCloudAgentSessionQuery = {
   expectedOrganizationId?: string | null;
 };
 
-export async function queryAccessibleCloudAgentSession(
+type AccessibleKiloSessionQuery = {
+  kiloUserId: string;
+  kiloSessionId: string;
+};
+
+type AccessibleSessionQuery = AccessibleCloudAgentSessionQuery | AccessibleKiloSessionQuery;
+
+async function queryAccessibleSession(
   db: SessionAccessDb,
-  query: AccessibleCloudAgentSessionQuery
-): Promise<AccessibleCloudAgentSession | null> {
+  query: AccessibleSessionQuery
+): Promise<AccessibleSession | null> {
   const membershipJoin = and(
     eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
     eq(organization_memberships.kilo_user_id, query.kiloUserId)
   );
+  const organizationJoin = and(
+    eq(organizations.id, cli_sessions_v2.organization_id),
+    isNull(organizations.deleted_at)
+  );
+  const expectedOrganizationId =
+    'expectedOrganizationId' in query ? query.expectedOrganizationId : undefined;
   const scopeCondition =
-    query.expectedOrganizationId === null
+    expectedOrganizationId === null
       ? isNull(cli_sessions_v2.organization_id)
-      : query.expectedOrganizationId !== undefined
+      : expectedOrganizationId !== undefined
         ? and(
-            eq(cli_sessions_v2.organization_id, query.expectedOrganizationId),
-            isNotNull(organization_memberships.id)
+            eq(cli_sessions_v2.organization_id, expectedOrganizationId),
+            isNotNull(organization_memberships.id),
+            isNotNull(organizations.id)
           )
-        : or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id));
+        : or(
+            isNull(cli_sessions_v2.organization_id),
+            and(isNotNull(organization_memberships.id), isNotNull(organizations.id))
+          );
+  const sessionCondition =
+    'cloudAgentSessionId' in query
+      ? eq(cli_sessions_v2.cloud_agent_session_id, query.cloudAgentSessionId)
+      : eq(cli_sessions_v2.session_id, query.kiloSessionId);
 
   const rows = await db
     .select({
@@ -40,14 +64,25 @@ export async function queryAccessibleCloudAgentSession(
     })
     .from(cli_sessions_v2)
     .leftJoin(organization_memberships, membershipJoin)
+    .leftJoin(organizations, organizationJoin)
     .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, query.kiloUserId),
-        eq(cli_sessions_v2.cloud_agent_session_id, query.cloudAgentSessionId),
-        scopeCondition
-      )
+      and(eq(cli_sessions_v2.kilo_user_id, query.kiloUserId), sessionCondition, scopeCondition)
     )
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function queryAccessibleCloudAgentSession(
+  db: SessionAccessDb,
+  query: AccessibleCloudAgentSessionQuery
+): Promise<AccessibleCloudAgentSession | null> {
+  return queryAccessibleSession(db, query);
+}
+
+export async function queryAccessibleKiloSession(
+  db: SessionAccessDb,
+  query: AccessibleKiloSessionQuery
+): Promise<AccessibleSession | null> {
+  return queryAccessibleSession(db, query);
 }

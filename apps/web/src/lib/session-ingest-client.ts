@@ -2,7 +2,7 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken } from '@/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -255,6 +255,44 @@ export async function shareSession(
 
   const body = ShareResponseSchema.parse(await response.json());
   return { public_id: body.public_id };
+}
+
+// ---------------------------------------------------------------------------
+// Authorization cache invalidation
+// ---------------------------------------------------------------------------
+
+export async function invalidateOrganizationSessionAccess(
+  kiloUserId: string,
+  organizationId: string
+): Promise<void> {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new Error('SESSION_INGEST_WORKER_URL is not configured');
+  }
+  if (!INTERNAL_API_SECRET) {
+    throw new Error('INTERNAL_API_SECRET is not configured');
+  }
+
+  const response = await fetch(`${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-Internal-Secret': INTERNAL_API_SECRET,
+    },
+    body: JSON.stringify({ kiloUserId, organizationId }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    const error = new Error(
+      `Session access invalidation failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
+    );
+    captureException(error, {
+      tags: { source: 'session-ingest-client', endpoint: 'invalidate-session-access' },
+      extra: { kiloUserId, organizationId, status: response.status },
+    });
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------

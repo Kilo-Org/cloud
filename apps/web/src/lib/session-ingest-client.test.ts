@@ -7,6 +7,7 @@ import {
   fetchSessionMessagesPage,
   deleteSession,
   shareSession,
+  invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
 
 // ---------------------------------------------------------------------------
@@ -19,6 +20,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
+  INTERNAL_API_SECRET: 'internal-secret',
 }));
 
 jest.mock('@/lib/tokens', () => ({
@@ -410,6 +412,82 @@ describe('shareSession', () => {
 // ---------------------------------------------------------------------------
 // fetchSessionMessages (thin wrapper)
 // ---------------------------------------------------------------------------
+
+describe('invalidateOrganizationSessionAccess', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  it('reports and throws invalidation failures', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      text: () => Promise.resolve('cache unavailable'),
+    });
+
+    await expect(
+      invalidateOrganizationSessionAccess('usr_removed', '11111111-1111-4111-8111-111111111111')
+    ).rejects.toThrow(
+      'Session access invalidation failed: 503 Service Unavailable - cache unavailable'
+    );
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'session-ingest-client', endpoint: 'invalidate-session-access' },
+        extra: {
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+          status: 503,
+        },
+      })
+    );
+  });
+
+  it('calls the secret-protected organization invalidation endpoint', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+
+    await invalidateOrganizationSessionAccess(
+      'usr_removed',
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/internal/session-access/invalidate',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          kiloUserId: 'usr_removed',
+          organizationId: '11111111-1111-4111-8111-111111111111',
+        }),
+        signal: expect.any(AbortSignal),
+      }
+    );
+  });
+
+  it('sets a 30-second invalidation deadline', async () => {
+    const signal = new AbortController().signal;
+    const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+    mockFetch.mockResolvedValue({ ok: true, status: 204 });
+
+    await invalidateOrganizationSessionAccess(
+      'usr_removed',
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(timeout).toHaveBeenCalledWith(30_000);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://ingest.test.example.com/internal/session-access/invalidate',
+      expect.objectContaining({ signal })
+    );
+    timeout.mockRestore();
+  });
+});
 
 describe('fetchSessionMessages', () => {
   beforeEach(() => {

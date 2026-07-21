@@ -225,10 +225,6 @@ function presentEvidenceBucket(points: OwnerHourlySpend[]): SpendEvidencePoint {
   if (covered.length === 0) {
     return { ...common, coverage: 'unavailable', variableUsd: null, scheduledUsd: null };
   }
-  if (covered.length !== points.length) {
-    return { ...common, coverage: 'partial', variableUsd: null, scheduledUsd: null };
-  }
-
   let variableMicrodollars = 0;
   let scheduledMicrodollars = 0;
   for (const point of covered) {
@@ -238,7 +234,7 @@ function presentEvidenceBucket(points: OwnerHourlySpend[]): SpendEvidencePoint {
   }
   return {
     ...common,
-    coverage: 'complete',
+    coverage: covered.length === points.length ? 'complete' : 'partial',
     variableUsd: microdollarsToUsd(variableMicrodollars),
     scheduledUsd: microdollarsToUsd(scheduledMicrodollars),
   };
@@ -472,7 +468,7 @@ function buildMetrics(params: {
         params.currentHourVariableMicrodollars === null
           ? 'Current-hour spend evidence is unavailable'
           : params.currentHourVariableMicrodollars >= params.anomalyThresholdMicrodollars
-            ? 'Above current alert level'
+            ? 'Unusually high for this account'
             : `Typical hour: ${money(params.anomalyBaselineMicrodollars)}`,
       tone:
         params.currentHourVariableMicrodollars !== null &&

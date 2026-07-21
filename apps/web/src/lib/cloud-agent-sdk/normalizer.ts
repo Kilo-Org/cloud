@@ -25,6 +25,7 @@ import {
   sessionErrorDataSchema,
   sessionIdleDataSchema,
   sessionTurnCloseDataSchema,
+  sessionQueueChangedDataSchema,
   questionAskedDataSchema,
   questionRepliedDataSchema,
   questionRejectedDataSchema,
@@ -179,6 +180,11 @@ export type ServiceEvent =
       error: string;
       reason: 'interrupted' | 'exhausted' | 'execution';
       attempts?: number;
+    }
+  | {
+      type: 'queue.changed';
+      sessionId: string;
+      queued: string[];
     };
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
@@ -315,6 +321,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       const r = sessionTurnCloseDataSchema.safeParse(data);
       if (!r.success) return null;
       return { type: 'session.turn.close', sessionId: r.data.sessionID, reason: r.data.reason };
+    }
+
+    case 'session.queue.changed': {
+      const r = sessionQueueChangedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'queue.changed',
+        sessionId: r.data.sessionID,
+        queued: r.data.queued,
+      };
     }
 
     case 'question.asked': {

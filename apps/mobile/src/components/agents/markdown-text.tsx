@@ -29,11 +29,20 @@ import { MarkdownTable } from './markdown-table';
 
 export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
 
+export type MarkdownLinkPressHandler = (href: string) => boolean;
+
 export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
   selectable?: boolean;
   onLongPressLink?: MarkdownLinkLongPressHandler;
+  /**
+   * Optional tap handler invoked when a rendered link is pressed. When this
+   * callback is omitted, or when it returns a falsy value, the link is opened
+   * with `openExternalUrl`. Returning `true` signals that the caller has
+   * fully handled the press and the default browser open should be skipped.
+   */
+  onPressLink?: MarkdownLinkPressHandler;
 };
 
 // The library's default `Renderer` renders code blocks with the `em` text
@@ -50,20 +59,23 @@ export type MarkdownTextProps = {
 // loses to the chat bubble's swipe-to-reply pan. We render code as a plain
 // wrapping Text and tables behind a chip instead — no horizontal ScrollView
 // ever renders inside a bubble.
+type MarkdownRendererHandlers = {
+  onLongPressLink?: MarkdownLinkLongPressHandler;
+  onPressLink?: MarkdownLinkPressHandler;
+};
+
 class MarkdownRenderer extends Renderer {
   private readonly palette: MarkdownPalette;
   private readonly selectable: boolean;
   private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
+  private readonly onPressLink?: MarkdownLinkPressHandler;
 
-  constructor(
-    palette: MarkdownPalette,
-    selectable = true,
-    onLongPressLink?: MarkdownLinkLongPressHandler
-  ) {
+  constructor(palette: MarkdownPalette, selectable: boolean, handlers: MarkdownRendererHandlers) {
     super();
     this.palette = palette;
     this.selectable = selectable;
-    this.onLongPressLink = onLongPressLink;
+    this.onLongPressLink = handlers.onLongPressLink;
+    this.onPressLink = handlers.onPressLink;
   }
 
   private textNode(children: string | ReactNode[], styles?: TextStyle): ReactNode {
@@ -128,6 +140,10 @@ class MarkdownRenderer extends Renderer {
         }}
         onLongPress={getLinkLongPressHandler(this.onLongPressLink, href)}
         onPress={() => {
+          const handled = this.onPressLink?.(href);
+          if (handled) {
+            return;
+          }
           void openExternalUrl(href, { label: accessibilityLabel });
         }}
         style={styles}
@@ -182,6 +198,7 @@ export function MarkdownText({
   variant = 'assistant',
   selectable = true,
   onLongPressLink,
+  onPressLink,
 }: Readonly<MarkdownTextProps>) {
   const colorScheme = useColorScheme();
   const colors = useThemeColors();
@@ -190,7 +207,7 @@ export function MarkdownText({
     const palette = getPalette(variant, colors);
     return {
       styles: getMarkdownStyles(palette),
-      renderer: new MarkdownRenderer(palette, selectable, onLongPressLink),
+      renderer: new MarkdownRenderer(palette, selectable, { onLongPressLink, onPressLink }),
       theme: {
         colors: {
           text: palette.textColor,
@@ -200,7 +217,7 @@ export function MarkdownText({
         },
       },
     };
-  }, [variant, colors, selectable, onLongPressLink]);
+  }, [variant, colors, selectable, onLongPressLink, onPressLink]);
 
   const elements = useMarkdown(value, {
     colorScheme,

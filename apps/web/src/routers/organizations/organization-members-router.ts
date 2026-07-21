@@ -328,6 +328,13 @@ export const organizationsMembersRouter = createTRPCRouter({
       }
 
       const result = await removeUserFromOrganization(organizationId, memberId, user.id);
+      if (result.rowCount === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Failed to remove user from organization',
+        });
+      }
+
       const removedUser = await findUserById(memberId);
       await createAuditLog({
         action: 'organization.member.remove',
@@ -337,13 +344,6 @@ export const organizationsMembersRouter = createTRPCRouter({
         message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
         organization_id: organizationId,
       });
-
-      if (result.rowCount === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Failed to remove user from organization',
-        });
-      }
 
       await revokeGatewayStateForOrganizationMember(db, organizationId, memberId);
 

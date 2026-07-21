@@ -555,7 +555,7 @@ describe('Cost Insights presenter', () => {
     ).toThrow('Covered Cost Insights evidence must include both spend categories.');
   });
 
-  it('marks aggregate evidence partial without exposing an understated covered subtotal', () => {
+  it('shows known spend in partial aggregate evidence without presenting it as a complete total', () => {
     const points = [
       {
         hourStart: '2026-06-25T22:00:00.000Z',
@@ -594,8 +594,8 @@ describe('Cost Insights presenter', () => {
         coverage: 'partial',
         coveredHours: 1,
         totalHours: 2,
-        variableUsd: null,
-        scheduledUsd: null,
+        variableUsd: 2,
+        scheduledUsd: 1,
       },
       {
         label: 'Jun 26',

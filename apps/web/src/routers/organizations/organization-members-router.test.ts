@@ -1,10 +1,19 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import type { User, Organization } from '@kilocode/db/schema';
-import { organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  organization_memberships,
+  organizations,
+  type User,
+  type Organization,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+
+jest.mock('@/lib/session-ingest-client', () => ({
+  invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Mock the email service to prevent actual API calls during tests
 jest.mock('@/lib/email', () => ({
@@ -432,6 +441,7 @@ describe('organizations members trpc router', () => {
       });
       const child = await createChildOrganization('Elevated Child Members', childOwner.id);
       await addUserToOrganization(child.id, memberUser.id, 'owner');
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
       const caller = await createCallerForUser(regularUser.id);
 
       try {
@@ -442,6 +452,7 @@ describe('organizations members trpc router', () => {
         });
 
         expect(result).toEqual({ success: true, added: [], removed: [child.id] });
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(memberUser.id, child.id);
         const [membership] = await db
           .select({ role: organization_memberships.role })
           .from(organization_memberships)
@@ -460,6 +471,10 @@ describe('organizations members trpc router', () => {
 
   describe('remove procedure', () => {
     let testMemberUser: User;
+
+    beforeEach(() => {
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+    });
 
     beforeAll(async () => {
       // Create dedicated test users for remove tests to avoid conflicts
@@ -485,9 +500,45 @@ describe('organizations members trpc router', () => {
         success: true,
         updated: testMemberUser.id,
       });
+      expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+        testMemberUser.id,
+        testOrganization.id
+      );
 
       // Add the user back for other tests
       await addUserToOrganization(testOrganization.id, testMemberUser.id, 'member');
+    });
+
+    it('should complete removal when session access invalidation fails', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'best-effort-invalidation@example.com',
+        google_user_name: 'Best Effort Invalidation User',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, user.id, 'member');
+      jest
+        .mocked(invalidateOrganizationSessionAccess)
+        .mockRejectedValueOnce(new Error('invalidation unavailable'));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.members.remove({
+          organizationId: testOrganization.id,
+          memberId: user.id,
+        })
+      ).resolves.toEqual({ success: true, updated: user.id });
+
+      const remainingMembership = await db.query.organization_memberships.findFirst({
+        where: and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, user.id)
+        ),
+      });
+      expect(remainingMembership).toBeUndefined();
+      expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+        user.id,
+        testOrganization.id
+      );
     });
 
     it('should allow system admin users to remove any member', async () => {

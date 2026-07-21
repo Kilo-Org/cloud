@@ -39,7 +39,7 @@ describe('buildRemoteSessionAttentionPushBody', () => {
 });
 
 describe('dispatchRemoteSessionAttentionSignal', () => {
-  it('suppresses pushes while remote-session presence reporting is unavailable', async () => {
+  it('suppresses pushes when no user is enabled', async () => {
     const hasActiveCliSession = vi.fn(async () => true);
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const outcome = await dispatchRemoteSessionAttentionSignal(
@@ -50,5 +50,47 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     expect(outcome).toBe('suppressed');
     expect(hasActiveCliSession).not.toHaveBeenCalled();
     expect(sendPush).not.toHaveBeenCalled();
+  });
+
+  it('suppresses pushes for users other than the rollout user', async () => {
+    const hasActiveCliSession = vi.fn(async () => true);
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
+      {
+        remoteSessionAttentionPushUserId: 'usr_2',
+        hasActiveCliSession,
+        sendPush,
+      }
+    );
+
+    expect(outcome).toBe('suppressed');
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
+    expect(sendPush).not.toHaveBeenCalled();
+  });
+
+  it('sends a push for the rollout user with an active remote CLI session', async () => {
+    const hasActiveCliSession = vi.fn(async () => true);
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+    const signal = completedSignal('Done');
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal },
+      {
+        remoteSessionAttentionPushUserId: ' usr_1 ',
+        hasActiveCliSession,
+        sendPush,
+      }
+    );
+
+    expect(outcome).toBe('sent');
+    expect(hasActiveCliSession).toHaveBeenCalledOnce();
+    expect(sendPush).toHaveBeenCalledWith({
+      userId: 'usr_1',
+      cliSessionId: 'ses_1',
+      executionId: 'remote:msg-1',
+      status: 'completed',
+      body: 'Done',
+      suppressIfViewingSession: true,
+    });
   });
 });

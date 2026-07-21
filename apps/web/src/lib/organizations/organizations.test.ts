@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from '@jest/globals';
+import { describe, test, expect, afterEach, beforeEach } from '@jest/globals';
 import { db, sql } from '@/lib/drizzle';
 import {
   organizations,
@@ -25,6 +25,11 @@ import {
 } from './organizations';
 import { fromMicrodollars } from '@/lib/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+
+jest.mock('@/lib/session-ingest-client', () => ({
+  invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
+}));
 
 describe('Organizations', () => {
   afterEach(async () => {
@@ -400,6 +405,10 @@ describe('Organizations', () => {
   });
 
   describe('removeUserFromOrganization', () => {
+    beforeEach(() => {
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+    });
+
     test('should remove user from organization', async () => {
       const owner = await insertTestUser();
       const member = await insertTestUser();
@@ -418,6 +427,7 @@ describe('Organizations', () => {
       // Verify user was removed
       memberOrgs = await getUserOrganizationsWithSeats(member.id);
       expect(memberOrgs).toHaveLength(0);
+      expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(member.id, organization.id);
     });
 
     test('should handle removing non-existent membership gracefully', async () => {
@@ -430,6 +440,23 @@ describe('Organizations', () => {
 
       expect(result).toBeDefined();
       // Should not throw error, just return empty result
+      expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+    });
+
+    test('should complete removal when session access invalidation fails', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('Test Org', owner.id);
+      await addUserToOrganization(organization.id, member.id, 'member');
+      jest
+        .mocked(invalidateOrganizationSessionAccess)
+        .mockRejectedValueOnce(new Error('invalidation unavailable'));
+
+      await expect(removeUserFromOrganization(organization.id, member.id)).resolves.toBeDefined();
+
+      const memberOrgs = await getUserOrganizationsWithSeats(member.id);
+      expect(memberOrgs).toHaveLength(0);
+      expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(member.id, organization.id);
     });
 
     test('should remove specific user without affecting others', async () => {

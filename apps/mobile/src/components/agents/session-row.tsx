@@ -6,6 +6,7 @@ import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 type StoredSessionRowProps = {
@@ -38,35 +39,17 @@ type RemoteSessionRowProps = {
     title: string;
     status: string;
     gitBranch?: string;
+    /**
+     * Backend-reported platform for this live session (e.g. `'cli'` for a
+     * `kilo remote` connection, `'vscode'` for the extension). Legacy CLIs
+     * predating the platform field never report one; in that case the
+     * row falls back to the `'cloud-agent'` label so behavior is
+     * byte-identical to the previous hardcode.
+     */
+    platform?: string;
   };
   onPress: () => void;
 };
-
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label
- * for the row eyebrow. The row's hue is hashed from this label.
- */
-function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
 
 function formatMeta(timestamp: string): string {
   return timeAgo(parseTimestamp(timestamp)).toUpperCase();
@@ -235,11 +218,17 @@ export function StoredSessionRow({
 
 export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRowProps>) {
   const title = session.title.length > 0 ? session.title : 'Untitled session';
+  // Platform present → real label via the shared helper. Platform absent
+  // (legacy CLI) → fall through to `'cloud-agent'`, which the helper
+  // renders as the same "CLOUD AGENT" string the row hardcoded before
+  // this slice. Keeping the literal in the helper (not a magic constant
+  // here) means future per-platform tweaks still apply to the legacy case.
+  const agentLabel = platformLabel(session.platform ?? 'cloud-agent');
 
   return (
     <Pressable onPress={onPress} accessibilityLabel={title} className="active:opacity-70">
       <SessionRow
-        agentLabel="CLOUD AGENT"
+        agentLabel={agentLabel}
         title={title}
         subtitle={session.gitBranch}
         meta={session.status.toUpperCase()}

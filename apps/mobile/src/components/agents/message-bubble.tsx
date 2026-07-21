@@ -1,7 +1,11 @@
-import { type StoredMessage } from 'cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
+import { Clock } from 'lucide-react-native';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { Bubble } from '@/components/ui/bubble';
+import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
@@ -18,6 +22,8 @@ type MessageBubbleProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
+  /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
+  deliveryState?: MessageDeliveryState;
 };
 
 export function MessageBubble({
@@ -27,9 +33,11 @@ export function MessageBubble({
   getChildMessages,
   defaultReasoningExpanded,
   onOpenChildSession,
+  deliveryState,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
+  const colors = useThemeColors();
 
   const handleLongPress = () => {
     void copyMessage(message);
@@ -61,6 +69,7 @@ export function MessageBubble({
       .map(p => p.text)
       .join('');
     const fileParts = message.parts.filter(isFilePart);
+    const showQueuedBadge = deliveryState?.status === 'queued';
 
     return (
       <Pressable
@@ -72,14 +81,28 @@ export function MessageBubble({
         accessibilityActions={copyAccessibilityActions}
         onAccessibilityAction={handleAccessibilityAction}
       >
-        <Bubble side="user">
-          {textContent ? (
-            <ChatMarkdownText value={textContent} variant="user" selectable={false} />
+        <View className="items-end gap-1">
+          <Bubble side="user">
+            {textContent ? (
+              <ChatMarkdownText value={textContent} variant="user" selectable={false} />
+            ) : null}
+            {fileParts.map(part => (
+              <FilePartRenderer key={part.id} part={part} />
+            ))}
+          </Bubble>
+          {showQueuedBadge ? (
+            <Animated.View
+              entering={FadeIn.duration(150)}
+              exiting={FadeOut.duration(120)}
+              accessibilityRole="text"
+              accessibilityLabel="Message queued"
+              className="flex-row items-center gap-1 self-end pr-1"
+            >
+              <Clock size={12} color={colors.mutedForeground} />
+              <Text className="text-xs text-muted-foreground">Queued</Text>
+            </Animated.View>
           ) : null}
-          {fileParts.map(part => (
-            <FilePartRenderer key={part.id} part={part} />
-          ))}
-        </Bubble>
+        </View>
       </Pressable>
     );
   }

@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS "gitlab_credential_migration_jobs" CASCADE;

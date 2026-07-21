@@ -39,14 +39,21 @@ import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js'
 // Types
 // ---------------------------------------------------------------------------
 
-export type WrapperClientOptions = {
-  /** Sandbox session for exec/writeFile operations */
-  session: ExecutionSession;
-  /** Wrapper HTTP port (typically 5xxx) */
-  port: number;
-  /** Transport for wrapper HTTP requests. Defaults to curl through session.exec. */
-  transport?: WrapperTransport;
-};
+export type WrapperClientOptions =
+  | {
+      /** Sandbox session for exec/writeFile operations */
+      session: ExecutionSession;
+      /** Wrapper HTTP port (typically 5xxx) */
+      port: number;
+      /** Transport for wrapper HTTP requests. Defaults to curl through session.exec. */
+      transport?: WrapperTransport;
+    }
+  | {
+      /** Protocol-only transport for providers without a public wrapper port. */
+      transport: WrapperTransport;
+      session?: never;
+      port?: never;
+    };
 
 export type EnsureRunningOptions = {
   agentSessionId: string;
@@ -365,10 +372,16 @@ export class ContainerFetchWrapperTransport implements WrapperTransport {
 // ---------------------------------------------------------------------------
 
 export class WrapperClient {
-  private readonly session: ExecutionSession;
-  private readonly port: number;
-  private readonly baseUrl: string;
+  private readonly cloudflareRuntime?: { session: ExecutionSession; port: number };
   private readonly transport: WrapperTransport;
+
+  private get session(): ExecutionSession {
+    return this.requireCloudflareRuntime().session;
+  }
+
+  private get port(): number {
+    return this.requireCloudflareRuntime().port;
+  }
 
   /**
    * Wrap a wrapper-start command line so it runs inside the dev container via
@@ -479,16 +492,30 @@ export class WrapperClient {
   }
 
   constructor(options: WrapperClientOptions) {
-    this.session = options.session;
-    this.port = options.port;
-    this.baseUrl = `http://127.0.0.1:${this.port}`;
-    this.transport =
-      options.transport ??
-      new ExecCurlWrapperTransport({
-        session: options.session,
-        baseUrl: this.baseUrl,
-        shellQuote: value => this.shellQuote(value),
-      });
+    if (options.session !== undefined && options.port !== undefined) {
+      this.cloudflareRuntime = { session: options.session, port: options.port };
+    }
+    if (options.transport) {
+      this.transport = options.transport;
+      return;
+    }
+    const runtime = this.requireCloudflareRuntime();
+    this.transport = new ExecCurlWrapperTransport({
+      session: runtime.session,
+      baseUrl: `http://127.0.0.1:${runtime.port}`,
+      shellQuote: value => this.shellQuote(value),
+    });
+  }
+
+  private requireCloudflareRuntime(): { session: ExecutionSession; port: number } {
+    if (!this.cloudflareRuntime) {
+      throw new WrapperNotReadyError('Wrapper lifecycle requires a Cloudflare execution session');
+    }
+    return this.cloudflareRuntime;
+  }
+
+  private protocolDiagnosticFields(): { port?: number } {
+    return this.cloudflareRuntime ? { port: this.cloudflareRuntime.port } : {};
   }
 
   /**
@@ -520,7 +547,13 @@ export class WrapperClient {
         const errorCode = readyError?.error ?? parsed.error ?? `HTTP_${response.status}`;
         const statusCode = ERROR_STATUS_CODES[errorCode] ?? response.status ?? 500;
         logger
-          .withFields({ method, path, port: this.port, errorCode, statusCode })
+          .withFields({
+            method,
+            path,
+            ...this.protocolDiagnosticFields(),
+            errorCode,
+            statusCode,
+          })
           .warn('Wrapper HTTP request returned an application error');
 
         if (errorCode === 'NO_JOB') {
@@ -555,12 +588,12 @@ export class WrapperClient {
         .withFields({
           method,
           path,
-          port: this.port,
+          ...this.protocolDiagnosticFields(),
           responseBytes: responseText.length,
           statusCode: response.status,
         })
         .error('Failed to parse wrapper HTTP response');
-      throw new WrapperError(`Failed to parse response: ${responseText}`, 'PARSE_ERROR', 500);
+      throw new WrapperError('Failed to parse wrapper response', 'PARSE_ERROR', 500);
     }
   }
 
@@ -576,6 +609,7 @@ export class WrapperClient {
    * Port retry on EADDRINUSE is handled by the static ensureWrapper() method.
    */
   async ensureRunning(options: EnsureRunningOptions): Promise<{ started: boolean }> {
+    this.requireCloudflareRuntime();
     const {
       agentSessionId,
       userId,

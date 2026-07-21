@@ -87,6 +87,12 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   verbosity: 'high',
 };
 
+// INVARIANT: the efficient static fallback must remain image-capable.
+// The capability-aware routing filter relies on this guarantee to make
+// image requests succeed even when no benchmark candidate is capable.
+// Whoever changes this model constant must re-verify image support
+// (via live OpenRouter data or the `model_stats` table) before
+// swapping it — do not assume parity with the prior value.
 export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
   model: QWEN37_PLUS_MODEL_ID,
   reasoning: { enabled: true },

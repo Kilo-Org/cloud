@@ -25,6 +25,83 @@ describe('CLIOutboundMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: 'laptop-1', projectName: 'kilo', version: '0.1.2' },
+      sessions: [
+        {
+          id: 'ses_1',
+          status: 'busy',
+          title: 'Remote session',
+          platform: 'darwin',
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.instance).toEqual({
+        name: 'laptop-1',
+        projectName: 'kilo',
+        version: '0.1.2',
+      });
+      expect(result.data.sessions[0]).toMatchObject({ platform: 'darwin' });
+    }
+  });
+
+  it('parses instance without version (optional field)', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: 'laptop-1', projectName: 'kilo' },
+      sessions: [],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.instance).toEqual({ name: 'laptop-1', projectName: 'kilo' });
+    }
+  });
+
+  it('rejects instance with empty name', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: '', projectName: 'kilo' },
+      sessions: [],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('rejects instance with oversize name', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: 'x'.repeat(65), projectName: 'kilo' },
+      sessions: [],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('rejects per-session platform that exceeds the 32-char cap', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_1', status: 'busy', title: 't', platform: 'x'.repeat(33) }],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('parses legacy heartbeat without instance or platform (backward compat regression)', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_1', status: 'busy', title: 'Legacy' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.instance).toBeUndefined();
+      expect(result.data.sessions[0]).not.toHaveProperty('platform');
+    }
+  });
+
   it('parses heartbeat with parentSessionId on sessions', () => {
     const msg = {
       type: 'heartbeat',

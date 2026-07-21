@@ -10056,7 +10056,6 @@ export const cloud_billing_sku = pgTable(
   table => [
     check('cloud_billing_sku_id_format', sql`${table.id} ~ '^[a-z0-9][a-z0-9-]{2,79}$'`),
     check('cloud_billing_sku_name_nonempty', sql`length(btrim(${table.name})) > 0`),
-    check('cloud_billing_sku_unit', sql`${table.unit} IN ('second')`),
     check('cloud_billing_sku_rate_positive', sql`${table.rate_cents_per_unit} > 0`),
   ]
 );
@@ -10083,6 +10082,7 @@ export const container_usage_interval = pgTable(
     id: text().primaryKey().notNull(),
     service: text().notNull(),
     instance_id: text().notNull(),
+    start_epoch_ms: bigint({ mode: 'number' }).notNull(),
     cloud_billing_sku_id: text()
       .notNull()
       .references(() => cloud_billing_sku.id),
@@ -10098,9 +10098,11 @@ export const container_usage_interval = pgTable(
     started_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_seen_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     last_heartbeat_seq: integer().notNull().default(0),
+    confirmed_seconds: integer().notNull().default(0),
     stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     close_reason: text().$type<ContainerUsageCloseReason>(),
     exit_code: integer(),
+    final_stop_seq: integer(),
     // Whole confirmed seconds. Heartbeat clients carry subsecond remainder into
     // the next segment rather than persisting fractional quantities.
     awake_seconds: integer(),
@@ -10137,10 +10139,6 @@ export const container_usage_interval = pgTable(
     ),
     check('container_usage_interval_status', sql`${table.status} IN ('open', 'closed')`),
     check(
-      'container_usage_interval_close_reason',
-      sql`${table.close_reason} IS NULL OR ${table.close_reason} IN ('exit', 'runtime_signal', 'activity_expired', 'reconciled', 'unconfirmed', 'superseded')`
-    ),
-    check(
       'container_usage_interval_open_closed_shape',
       sql`(${table.status} = 'open' AND ${table.stopped_at} IS NULL AND ${table.close_reason} IS NULL AND ${table.awake_seconds} IS NULL) OR (${table.status} = 'closed' AND ${table.stopped_at} IS NOT NULL AND ${table.close_reason} IS NOT NULL AND ${table.awake_seconds} IS NOT NULL)`
     ),
@@ -10153,15 +10151,50 @@ export const container_usage_interval = pgTable(
       sql`${table.last_heartbeat_seq} >= 0`
     ),
     check(
+      'container_usage_interval_confirmed_seconds_nonnegative',
+      sql`${table.confirmed_seconds} >= 0`
+    ),
+    check(
       'container_usage_interval_awake_seconds_nonnegative',
       sql`${table.awake_seconds} IS NULL OR ${table.awake_seconds} >= 0`
     ),
     check(
-      'container_usage_interval_exit_code_range',
-      sql`${table.exit_code} IS NULL OR ${table.exit_code} BETWEEN -256 AND 255`
+      'container_usage_interval_final_stop_seq_positive',
+      sql`${table.final_stop_seq} IS NULL OR ${table.final_stop_seq} > 0`
     ),
   ]
 );
 
 export type ContainerUsageInterval = typeof container_usage_interval.$inferSelect;
 export type NewContainerUsageInterval = typeof container_usage_interval.$inferInsert;
+
+export const container_usage_segment = pgTable(
+  'container_usage_segment',
+  {
+    interval_id: text()
+      .notNull()
+      .references(() => container_usage_interval.id, { onDelete: 'cascade' }),
+    seq: integer().notNull(),
+    idempotency_key: text().notNull().unique(),
+    reported_seconds: integer().notNull(),
+    usage_seconds: integer().notNull(),
+    received_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.interval_id, table.seq] }),
+    index('IDX_container_usage_segment_received').on(table.received_at),
+    check('container_usage_segment_seq_positive', sql`${table.seq} > 0`),
+    check(
+      'container_usage_segment_reported_seconds_nonnegative',
+      sql`${table.reported_seconds} >= 0`
+    ),
+    check('container_usage_segment_usage_seconds_nonnegative', sql`${table.usage_seconds} >= 0`),
+    check(
+      'container_usage_segment_usage_within_reported',
+      sql`${table.usage_seconds} <= ${table.reported_seconds}`
+    ),
+  ]
+);
+
+export type ContainerUsageSegment = typeof container_usage_segment.$inferSelect;
+export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;

@@ -19,7 +19,6 @@
     "logs": { "enabled": true, "head_sampling_rate": 1 },
     "traces": { "enabled": true, "head_sampling_rate": 0.01 },
   },
-  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "triggers": {
     "crons": ["*/5 * * * *"],
   },
@@ -28,20 +27,6 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
-    },
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "FAILOVER_BUFFER",
-        "class_name": "FailoverBufferDO",
-      },
-    ],
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["FailoverBufferDO"],
     },
   ],
 }

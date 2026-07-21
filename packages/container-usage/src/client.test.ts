@@ -49,6 +49,8 @@ describe('ContainerUsageClient', () => {
     await client.recordStop({
       instanceId: 'instance-1',
       startEpochMs: 123,
+      seq: 8,
+      usageSinceLast: 3,
       reason: 'runtime_signal',
       context,
     });
@@ -110,7 +112,7 @@ describe('ContainerUsageClient', () => {
       .mockRejectedValueOnce(new Error('unavailable'))
       .mockResolvedValue({
         success: true,
-        ack: { intervalId: 'instance-1:123', durable: 'buffer', dedup: true },
+        ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: true },
       });
     const client = new ContainerUsageClient(binding({ recordStart }), {
       service: 'cloud-agent-next',
@@ -118,7 +120,7 @@ describe('ContainerUsageClient', () => {
     });
 
     await expect(client.recordStart({ ...context, startEpochMs: 123 })).resolves.toMatchObject({
-      durable: 'buffer',
+      durable: 'pg',
       dedup: true,
     });
     expect(recordStart).toHaveBeenCalledTimes(2);

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { startIdempotencyKey, type RecordStartInput } from '@kilocode/container-usage';
-import type {
-  AdmittedMutationResult,
-  DurableStartAdmissionResult,
-  ExistingStartAdmissionResult,
-  StartAdmission,
-} from './failover-contract';
+import {
+  heartbeatIdempotencyKey,
+  startIdempotencyKey,
+  stopIdempotencyKey,
+  type RecordHeartbeatInput,
+  type RecordStartInput,
+  type RecordStopInput,
+} from '@kilocode/container-usage';
 
 vi.mock('cloudflare:workers', () => ({
   WorkerEntrypoint: class WorkerEntrypoint {
@@ -19,125 +20,89 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-vi.mock('./postgres', () => ({ validateStartSku: vi.fn() }));
+vi.mock('./postgres', () => ({
+  applyStart: vi.fn(),
+  applyHeartbeat: vi.fn(),
+  applyStop: vi.fn(),
+}));
 
-import { validateStartSku } from './postgres';
+import { applyHeartbeat, applyStart, applyStop } from './postgres';
 import { ContainerUsageMeter } from './meter';
 
-const finalizeStart = vi.fn(
-  async (_mutation: unknown, admission: StartAdmission): Promise<DurableStartAdmissionResult> =>
-    admission.accepted
-      ? { status: 'accepted', dedup: false }
-      : { status: 'rejected', code: admission.code, message: admission.message }
-);
-const getStartAdmission = vi.fn(
-  async (): Promise<ExistingStartAdmissionResult> => ({ status: 'absent' })
-);
-const reserveStart = vi.fn(
-  async (): Promise<ExistingStartAdmissionResult> => ({ status: 'pending' })
-);
-const enqueueForAcceptedInterval = vi.fn(
-  async (): Promise<AdmittedMutationResult> => ({ status: 'accepted', dedup: false })
-);
+const context = {
+  service: 'cloud-agent-next',
+  instanceId: 'instance-1',
+  sku: 'cloud-agent-standard',
+  subject: { type: 'user' as const, id: 'user-1' },
+  actor: { type: 'user' as const, id: 'user-1' },
+};
 
 function createMeter() {
-  const env = {
-    FAILOVER_BUFFER: {
-      getByName: vi.fn(() => ({
-        finalizeStart,
-        getStartAdmission,
-        reserveStart,
-        enqueueForAcceptedInterval,
-      })),
-    },
-  } as unknown as Cloudflare.Env;
-  return new ContainerUsageMeter({} as ExecutionContext, env);
+  return new ContainerUsageMeter({} as ExecutionContext, {} as Cloudflare.Env);
 }
 
 function validStart(): RecordStartInput {
   return {
-    service: 'cloud-agent-next',
-    instanceId: 'instance-1',
+    ...context,
     startEpochMs: 123,
-    sku: 'cloud-agent-standard',
-    subject: { type: 'user', id: 'user-1' },
-    actor: { type: 'user', id: 'user-1' },
-    idempotencyKey: startIdempotencyKey('cloud-agent-next', 'instance-1', 123),
+    idempotencyKey: startIdempotencyKey(context.service, context.instanceId, 123),
+  };
+}
+
+function validHeartbeat(): RecordHeartbeatInput {
+  return {
+    service: context.service,
+    instanceId: context.instanceId,
+    startEpochMs: 123,
+    idempotencyKey: heartbeatIdempotencyKey(context.service, context.instanceId, 123, 1),
+    seq: 1,
+    usageSinceLast: 300,
+    context,
+  };
+}
+
+function validStop(): RecordStopInput {
+  return {
+    service: context.service,
+    instanceId: context.instanceId,
+    startEpochMs: 123,
+    idempotencyKey: stopIdempotencyKey(context.service, context.instanceId, 123),
+    seq: 2,
+    usageSinceLast: 15,
+    reason: 'exit',
+    exitCode: 0,
+    context,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(validateStartSku).mockResolvedValue({ accepted: true });
-  getStartAdmission.mockResolvedValue({ status: 'absent' });
-  reserveStart.mockResolvedValue({ status: 'pending' });
-  enqueueForAcceptedInterval.mockResolvedValue({ status: 'accepted', dedup: false });
-  finalizeStart.mockImplementation(
-    async (_mutation, admission): Promise<DurableStartAdmissionResult> =>
-      admission.accepted
-        ? { status: 'accepted', dedup: false }
-        : { status: 'rejected', code: admission.code, message: admission.message }
-  );
+  vi.mocked(applyStart).mockResolvedValue({ accepted: true });
+  vi.mocked(applyHeartbeat).mockResolvedValue({ dedup: false });
+  vi.mocked(applyStop).mockResolvedValue({ dedup: false });
 });
 
-describe('ContainerUsageMeter.recordStart', () => {
-  it('admits an active per-second SKU and buffers the start', async () => {
-    const result = await createMeter().recordStart(validStart());
-
-    expect(validateStartSku).toHaveBeenCalledWith(expect.anything(), 'cloud-agent-standard');
-    expect(reserveStart).toHaveBeenCalledOnce();
-    expect(finalizeStart).toHaveBeenCalledOnce();
-    expect(result).toEqual({
-      success: true,
-      ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'buffer', dedup: false },
-    });
-  });
-
-  it.each([
-    ['sku_not_found' as const, 'Billing SKU not found'],
-    ['sku_unit_mismatch' as const, 'Billing SKU is not measured in seconds'],
-    ['sku_not_accepting_new_usage' as const, 'Billing SKU is not accepting new usage'],
-  ])('returns structured permanent admission failure %s', async (code, message) => {
-    vi.mocked(validateStartSku).mockResolvedValue({ accepted: false, code, message });
-
+describe('ContainerUsageMeter', () => {
+  it('writes an admitted start directly to PostgreSQL', async () => {
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({
-      success: false,
-      error: { code, message },
+      success: true,
+      ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'pg', dedup: false },
     });
-    expect(finalizeStart).toHaveBeenCalledOnce();
+    expect(applyStart).toHaveBeenCalledWith(
+      expect.anything(),
+      validStart(),
+      'cloud-agent-next:instance-1:123',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.any(Number)
+    );
   });
 
-  it('returns the existing accepted decision after SKU disablement', async () => {
-    vi.mocked(validateStartSku).mockResolvedValue({
+  it('returns permanent SKU admission failures', async () => {
+    vi.mocked(applyStart).mockResolvedValue({
       accepted: false,
       code: 'sku_not_accepting_new_usage',
       message: 'Billing SKU is not accepting new usage',
     });
-    reserveStart.mockResolvedValue({ status: 'accepted', dedup: true });
-
-    await expect(createMeter().recordStart(validStart())).resolves.toEqual({
-      success: true,
-      ack: { intervalId: 'cloud-agent-next:instance-1:123', durable: 'buffer', dedup: true },
-    });
-    expect(validateStartSku).not.toHaveBeenCalled();
-  });
-
-  it('persists a pending admission before propagating catalog infrastructure failures', async () => {
-    vi.mocked(validateStartSku).mockRejectedValue(new Error('postgres unavailable'));
-
-    await expect(createMeter().recordStart(validStart())).rejects.toThrow('postgres unavailable');
-    expect(reserveStart).toHaveBeenCalledOnce();
-    expect(finalizeStart).not.toHaveBeenCalled();
-  });
-
-  it('returns a durable rejected decision without requiring Postgres', async () => {
-    reserveStart.mockResolvedValue({
-      status: 'rejected',
-      code: 'sku_not_accepting_new_usage',
-      message: 'Billing SKU is not accepting new usage',
-    });
-    vi.mocked(validateStartSku).mockRejectedValue(new Error('postgres unavailable'));
-
     await expect(createMeter().recordStart(validStart())).resolves.toEqual({
       success: false,
       error: {
@@ -145,6 +110,31 @@ describe('ContainerUsageMeter.recordStart', () => {
         message: 'Billing SKU is not accepting new usage',
       },
     });
-    expect(validateStartSku).not.toHaveBeenCalled();
+  });
+
+  it('writes heartbeats directly and returns the shadow budget verdict', async () => {
+    await expect(createMeter().recordHeartbeat(validHeartbeat())).resolves.toEqual({
+      intervalId: 'cloud-agent-next:instance-1:123',
+      durable: 'pg',
+      dedup: false,
+      budget: { verdict: 'continue' },
+    });
+    expect(applyHeartbeat).toHaveBeenCalledOnce();
+  });
+
+  it('writes stops directly to PostgreSQL', async () => {
+    await expect(createMeter().recordStop(validStop())).resolves.toEqual({
+      intervalId: 'cloud-agent-next:instance-1:123',
+      durable: 'pg',
+      dedup: false,
+    });
+    expect(applyStop).toHaveBeenCalledOnce();
+  });
+
+  it('propagates transient PostgreSQL failures for bounded client retry', async () => {
+    vi.mocked(applyHeartbeat).mockRejectedValue(new Error('postgres unavailable'));
+    await expect(createMeter().recordHeartbeat(validHeartbeat())).rejects.toThrow(
+      'postgres unavailable'
+    );
   });
 });

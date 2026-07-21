@@ -1,7 +1,6 @@
-export { FailoverBufferDO } from './failover-buffer';
 export { ContainerUsageMeter } from './meter';
 
-import { CONTAINER_USAGE_RECONCILIATION_CRON, runReconciliationScaffold } from './reconciliation';
+import { CONTAINER_USAGE_RECONCILIATION_CRON, runReconciliation } from './reconciliation';
 
 export default {
   async fetch(): Promise<Response> {
@@ -19,6 +18,6 @@ export default {
       );
       return;
     }
-    await runReconciliationScaffold(env);
+    await runReconciliation(env);
   },
 } satisfies ExportedHandler<Cloudflare.Env>;

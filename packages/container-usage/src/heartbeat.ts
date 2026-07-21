@@ -93,7 +93,17 @@ export function installBillingHeartbeat(
       return undefined;
     }
     if (!context.pendingStop) {
-      await updateBillingContext(dependencies.storage, { ...context, pendingStop: params });
+      const pendingHeartbeat = context.pendingHeartbeat;
+      const elapsedMs = Math.max(0, Date.now() - context.usageMeasuredAtMs);
+      const stopSegment = pendingHeartbeat ?? {
+        seq: context.nextSeq,
+        usageSinceLast: Math.floor(elapsedMs / 1_000),
+        measuredAtMs: context.usageMeasuredAtMs + Math.floor(elapsedMs / 1_000) * 1_000,
+      };
+      await updateBillingContext(dependencies.storage, {
+        ...context,
+        pendingStop: { ...params, ...stopSegment },
+      });
       const current = await getBillingContext(dependencies.storage);
       if (!current || !isSameBillingGeneration(current, context)) return undefined;
       context = current;
@@ -103,6 +113,8 @@ export function installBillingHeartbeat(
     const ack = await dependencies.client.recordStop({
       instanceId: context.instanceId,
       startEpochMs: context.startEpochMs,
+      seq: stopIntent.seq,
+      usageSinceLast: stopIntent.usageSinceLast,
       reason: stopIntent.reason,
       exitCode: stopIntent.exitCode,
       context: contextForHeartbeat(context),

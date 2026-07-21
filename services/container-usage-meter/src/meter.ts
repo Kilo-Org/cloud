@@ -17,13 +17,11 @@ import {
   type RecordStopInput,
   type UsageContext,
 } from '@kilocode/container-usage';
-import type { FailoverMutation } from './failover-contract';
-import { failoverBufferShardName } from './sharding';
-import { validateStartSku } from './postgres';
+import { applyHeartbeat, applyStart, applyStop } from './postgres';
 
 function assertContextMatches(
   input: RecordHeartbeatInput | RecordStopInput,
-  context: NonNullable<RecordHeartbeatInput['context']>
+  context: UsageContext
 ): void {
   if (context.service !== input.service || context.instanceId !== input.instanceId) {
     throw new Error('Usage context must match the interval identity');
@@ -54,53 +52,25 @@ export class ContainerUsageMeter
 {
   async recordStart(input: RecordStartInput): Promise<RecordStartResult> {
     const parsed = recordStartInputSchema.parse(input);
-    const context = copyUsageContext(parsed);
     assertIdempotencyKey(
       parsed.idempotencyKey,
       startIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs)
     );
-    const mutation = {
-      operation: 'start' as const,
-      intervalId: intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs),
-      idempotencyKey: parsed.idempotencyKey,
-      contextFingerprint: await usageContextFingerprint(context),
-      payload: parsed,
-      receivedAtMs: Date.now(),
-    };
-    const shard = this.env.FAILOVER_BUFFER.getByName(
-      failoverBufferShardName(parsed.service, parsed.instanceId)
+    const context = copyUsageContext(parsed);
+    const id = intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs);
+    const result = await applyStart(
+      this.env,
+      parsed,
+      id,
+      await usageContextFingerprint(context),
+      Date.now()
     );
-    const existing = await shard.reserveStart(mutation);
-    if (existing.status === 'accepted') {
-      return {
-        success: true,
-        ack: { intervalId: mutation.intervalId, durable: 'buffer', dedup: true },
-      };
-    }
-    if (existing.status === 'rejected') {
-      return { success: false, error: { code: existing.code, message: existing.message } };
-    }
-    if (existing.status === 'conflict') {
-      throw new Error('Idempotency key was reused for a different usage mutation');
-    }
-
-    const admission = await validateStartSku(this.env, parsed.sku);
-    const decision = await shard.finalizeStart(mutation, admission);
-    if (decision.status === 'conflict') {
-      throw new Error('Idempotency key was reused for a different usage mutation');
-    }
-    if (decision.status === 'rejected') {
-      return {
-        success: false,
-        error: { code: decision.code, message: decision.message },
-      };
-    }
-    if (decision.status === 'pending') {
-      throw new Error('Container usage start admission remains pending');
+    if ('accepted' in result && !result.accepted) {
+      return { success: false, error: { code: result.code, message: result.message } };
     }
     return {
       success: true,
-      ack: { intervalId: mutation.intervalId, durable: 'buffer', dedup: decision.dedup },
+      ack: { intervalId: id, durable: 'pg', dedup: 'dedup' in result && result.dedup },
     };
   }
 
@@ -111,19 +81,20 @@ export class ContainerUsageMeter
       parsed.idempotencyKey,
       heartbeatIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs, parsed.seq)
     );
-    const ack = await this.bufferAccepted(
-      {
-        operation: 'heartbeat',
-        intervalId: intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs),
-        idempotencyKey: parsed.idempotencyKey,
-        contextFingerprint: await usageContextFingerprint(parsed.context),
-        payload: parsed,
-        receivedAtMs: Date.now(),
-      },
-      parsed.service,
-      parsed.instanceId
+    const id = intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs);
+    const result = await applyHeartbeat(
+      this.env,
+      parsed,
+      id,
+      await usageContextFingerprint(parsed.context),
+      Date.now()
     );
-    return { ...ack, budget: { verdict: 'continue' } };
+    return {
+      intervalId: id,
+      durable: 'pg',
+      dedup: result.dedup,
+      budget: { verdict: 'continue' },
+    };
   }
 
   async recordStop(input: RecordStopInput): Promise<RecordAck> {
@@ -133,33 +104,14 @@ export class ContainerUsageMeter
       parsed.idempotencyKey,
       stopIdempotencyKey(parsed.service, parsed.instanceId, parsed.startEpochMs)
     );
-    return await this.bufferAccepted(
-      {
-        operation: 'stop',
-        intervalId: intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs),
-        idempotencyKey: parsed.idempotencyKey,
-        contextFingerprint: await usageContextFingerprint(parsed.context),
-        payload: parsed,
-        receivedAtMs: Date.now(),
-      },
-      parsed.service,
-      parsed.instanceId
+    const id = intervalId(parsed.service, parsed.instanceId, parsed.startEpochMs);
+    const result = await applyStop(
+      this.env,
+      parsed,
+      id,
+      await usageContextFingerprint(parsed.context),
+      Date.now()
     );
-  }
-
-  private async bufferAccepted(
-    mutation: FailoverMutation,
-    service: string,
-    instanceId: string
-  ): Promise<RecordAck> {
-    const shard = this.env.FAILOVER_BUFFER.getByName(failoverBufferShardName(service, instanceId));
-    const result = await shard.enqueueForAcceptedInterval(mutation);
-    if (result.status === 'conflict') {
-      throw new Error('Idempotency key was reused for a different usage mutation');
-    }
-    if (result.status === 'not_admitted') {
-      throw new Error('Container usage interval has not been admitted');
-    }
-    return { intervalId: mutation.intervalId, durable: 'buffer', dedup: result.dedup };
+    return { intervalId: id, durable: 'pg', dedup: result.dedup };
   }
 }

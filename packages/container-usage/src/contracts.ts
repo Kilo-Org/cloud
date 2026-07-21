@@ -97,8 +97,8 @@ export type RecordStartInput = z.input<typeof recordStartInputSchema>;
 export const recordHeartbeatInputSchema = intervalIdentitySchema
   .extend({
     idempotencyKey: z.string().min(1).max(1_024),
-    seq: z.number().int().positive().finite(),
-    usageSinceLast: z.number().int().nonnegative().finite().optional(),
+    seq: z.number().int().positive().max(2_147_483_647),
+    usageSinceLast: z.number().int().nonnegative().max(2_147_483_647).optional(),
     observedAt: z.number().int().nonnegative().finite().optional(),
     context: usageContextSchema,
   })
@@ -108,6 +108,8 @@ export type RecordHeartbeatInput = z.input<typeof recordHeartbeatInputSchema>;
 export const recordStopInputSchema = intervalIdentitySchema
   .extend({
     idempotencyKey: z.string().min(1).max(1_024),
+    seq: z.number().int().positive().max(2_147_483_647),
+    usageSinceLast: z.number().int().nonnegative().max(2_147_483_647),
     reason: z.enum(['exit', 'runtime_signal', 'activity_expired']),
     exitCode: z.number().int().min(-256).max(255).optional(),
     stoppedAt: z.number().int().nonnegative().finite().optional(),
@@ -119,7 +121,7 @@ export type RecordStopInput = z.input<typeof recordStopInputSchema>;
 export const recordAckSchema = z
   .object({
     intervalId: intervalIdSchema,
-    durable: z.enum(['pg', 'buffer']),
+    durable: z.literal('pg'),
     dedup: z.boolean(),
   })
   .strict();

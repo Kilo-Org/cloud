@@ -137,7 +137,7 @@ describe('installBillingHeartbeat', () => {
       .mockRejectedValueOnce(new Error('ack lost'))
       .mockResolvedValue({
         intervalId: 'instance-1:123',
-        durable: 'buffer',
+        durable: 'pg',
         dedup: true,
         budget: { verdict: 'continue' },
       });
@@ -392,7 +392,7 @@ describe('installBillingHeartbeat', () => {
       .mockRejectedValueOnce(new Error('ack lost'))
       .mockRejectedValueOnce(new Error('ack lost'))
       .mockRejectedValueOnce(new Error('ack lost'))
-      .mockResolvedValue({ intervalId: 'instance-1:123', durable: 'buffer', dedup: true });
+      .mockResolvedValue({ intervalId: 'instance-1:123', durable: 'pg', dedup: true });
     const recordHeartbeat = vi.fn(async () => ({
       intervalId: 'instance-1:123',
       durable: 'pg' as const,

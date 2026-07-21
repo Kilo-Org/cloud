@@ -8,22 +8,18 @@
     "types": "wrangler types --include-runtime=false",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/container-usage-meter/src",
-    "test": "vitest run && vitest run --config vitest.workers.config.ts",
-    "test:unit": "vitest run",
-    "test:integration": "vitest run --config vitest.workers.config.ts"
+    "test": "vitest run",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts"
   },
   "dependencies": {
     "@kilocode/container-usage": "workspace:*",
     "@kilocode/db": "workspace:*",
-    "drizzle-orm": "catalog:",
-    "zod": "catalog:"
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "drizzle-kit": "catalog:",
     "jsonc-parser": "3.3.1",
     "typescript": "catalog:",
     "vitest": "catalog:",

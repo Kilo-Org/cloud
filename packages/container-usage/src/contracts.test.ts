@@ -44,6 +44,8 @@ describe('container usage contracts', () => {
         instanceId: 'instance-1',
         startEpochMs: 123,
         idempotencyKey: 'key',
+        seq: 2,
+        usageSinceLast: 3,
         reason: 'exit',
       }).success
     ).toBe(false);
@@ -67,6 +69,8 @@ describe('container usage contracts', () => {
         instanceId: 'instance-1',
         startEpochMs: 123,
         idempotencyKey: 'key',
+        seq: 2,
+        usageSinceLast: 3,
         reason: 'exit',
         exitCode: 255,
         context: personalContext,

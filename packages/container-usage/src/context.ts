@@ -8,18 +8,21 @@ export const billingContextSchema = usageContextSchema
     startEpochMs: z.number().int().nonnegative().finite(),
     generation: z.uuid(),
     measurementStarted: z.boolean(),
-    nextSeq: z.number().int().positive().finite().default(1),
+    nextSeq: z.number().int().positive().max(2_147_483_647).default(1),
     usageMeasuredAtMs: z.number().int().nonnegative().finite(),
     pendingHeartbeat: z
       .object({
         seq: z.number().int().positive().finite(),
-        usageSinceLast: z.number().int().nonnegative().finite(),
+        usageSinceLast: z.number().int().nonnegative().max(2_147_483_647),
         measuredAtMs: z.number().int().nonnegative().finite(),
       })
       .strict()
       .optional(),
     pendingStop: z
       .object({
+        seq: z.number().int().positive().max(2_147_483_647),
+        usageSinceLast: z.number().int().nonnegative().max(2_147_483_647),
+        measuredAtMs: z.number().int().nonnegative().finite(),
         reason: z.enum(['exit', 'runtime_signal', 'activity_expired']),
         exitCode: z.number().int().min(-256).max(255).optional(),
       })

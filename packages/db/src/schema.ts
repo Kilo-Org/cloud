@@ -5601,6 +5601,31 @@ export type CloudAgentSessionFailureCode =
   | 'initial_queue_full'
   | 'invalid_initial_intent'
   | 'do_rpc_outcome_unknown';
+export type CloudAgentFailureResponsibility = 'platform' | 'user' | 'unknown';
+export type CloudAgentFailureReason =
+  | 'insufficient_credits'
+  | 'rate_limited'
+  | 'model_unavailable'
+  | 'provider_authentication'
+  | 'setup_command'
+  | 'source_control_authentication'
+  | 'source_control_configuration'
+  | 'sandbox_capacity'
+  | 'sandbox_connectivity'
+  | 'runtime_startup'
+  | 'wrapper_liveness'
+  | 'delivery'
+  | 'managed_provider_unavailable'
+  | 'managed_provider_authentication'
+  | 'managed_model_configuration'
+  | 'provider_unavailable'
+  | 'source_control_network'
+  | 'assistant_unknown'
+  | 'workspace_unknown'
+  | 'session_coordination'
+  | 'initial_request_invalid'
+  | 'initial_admission_unknown'
+  | 'unclassified';
 
 export const cloud_agent_sessions = pgTable(
   'cloud_agent_sessions',
@@ -5613,6 +5638,8 @@ export const cloud_agent_sessions = pgTable(
     failure_at: timestamp({ withTimezone: true, mode: 'string' }),
     failure_stage: text().$type<CloudAgentSessionFailureStage>(),
     failure_code: text().$type<CloudAgentSessionFailureCode>(),
+    failure_responsibility: text().$type<CloudAgentFailureResponsibility>(),
+    failure_reason: text().$type<CloudAgentFailureReason>(),
     error_message_redacted: text(),
     error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
@@ -5709,6 +5736,8 @@ export const cloud_agent_session_runs = pgTable(
     terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
     failure_stage: text().$type<CloudAgentSessionRunFailureStage>(),
     failure_code: text().$type<CloudAgentSessionRunFailureCode>(),
+    failure_responsibility: text().$type<CloudAgentFailureResponsibility>(),
+    failure_reason: text().$type<CloudAgentFailureReason>(),
     error_message_redacted: text(),
     error_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
@@ -5729,21 +5758,15 @@ export const cloud_agent_session_runs = pgTable(
       table.failure_code,
       table.terminal_at
     ),
+    index('IDX_cloud_agent_session_runs_responsibility_reason_terminal')
+      .on(table.failure_responsibility, table.failure_reason, table.terminal_at)
+      .where(sql`${table.status} = 'failed'`),
     index('IDX_cloud_agent_session_runs_error_expires_at')
       .on(table.error_expires_at)
       .where(isNotNull(table.error_expires_at)),
     check(
       'cloud_agent_session_runs_status_check',
       sql`${table.status} IN ('queued', 'accepted', 'completed', 'failed', 'interrupted')`
-    ),
-    check(
-      'cloud_agent_session_runs_failure_classification_check',
-      sql`(${table.failure_stage} IS NULL AND ${table.failure_code} IS NULL) OR
-        (${table.failure_stage} = 'pre_dispatch' AND ${table.failure_code} IN ('sandbox_connect_failed', 'workspace_setup_failed', 'kilo_server_failed', 'wrapper_start_failed', 'invalid_delivery_request', 'session_metadata_missing', 'model_missing', 'delivery_failure_unknown')) OR
-        (${table.failure_stage} = 'post_dispatch_no_activity' AND ${table.failure_code} IN ('wrapper_disconnected', 'wrapper_no_output', 'wrapper_ping_timeout', 'wrapper_error_before_activity', 'missing_assistant_reply')) OR
-        (${table.failure_stage} = 'agent_activity' AND ${table.failure_code} IN ('assistant_error', 'wrapper_error_after_activity')) OR
-        (${table.failure_stage} = 'interruption' AND ${table.failure_code} IN ('user_interrupt', 'container_shutdown', 'system_interrupt')) OR
-        (${table.failure_stage} = 'unknown' AND ${table.failure_code} = 'unclassified')`
     ),
     check(
       'cloud_agent_session_runs_error_message_bounded_check',

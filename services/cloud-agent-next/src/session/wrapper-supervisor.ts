@@ -9,7 +9,10 @@ import type {
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
-import { classifyAssistantFailureMessage } from './safe-failure-projection.js';
+import {
+  classifyAssistantFailure,
+  classifyAssistantFailureMessage,
+} from './safe-failure-projection.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import type { SessionMessageQueue } from './session-message-queue.js';
 import {
@@ -962,6 +965,7 @@ export function createWrapperSupervisor(
         : null;
       const assistantError = getAssistantErrorMessage(assistantMessage?.info.error);
       if (assistantError !== undefined) {
+        const assistantFailure = classifyAssistantFailure(assistantError);
         failedTerminalObserved = true;
         await observeCorrelatedAgentActivity?.(messageId);
         await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
@@ -970,8 +974,10 @@ export function createWrapperSupervisor(
           error: assistantError,
           completionSource: 'idle_reconciliation',
           failureStage: 'agent_activity',
-          failureCode: 'assistant_error',
-          safeFailureMessage: classifyAssistantFailureMessage(assistantError),
+          failureCode: assistantFailure.terminalCode ?? 'assistant_error',
+          assistantFailureReason: assistantFailure.reason,
+          providerOwnership: assistantFailure.providerOwnership,
+          safeFailureMessage: assistantFailure.safeMessage,
         });
       } else if (assistantMessage) {
         await observeCorrelatedAgentActivity?.(messageId);
@@ -1363,14 +1369,18 @@ export function createWrapperSupervisor(
       for (const message of acceptedMessages) {
         if (status === 'failed') {
           if (errorSource === 'assistant') {
+            const assistantFailure = classifyAssistantFailure(error);
             await messageSettlementOutbox.terminalizeSessionMessageOnce(message.messageId, {
               kind: 'failed',
               reason: 'assistant_error',
               error: error ?? 'Assistant request failed',
               completionSource: 'wrapper_failure',
               failureStage: 'agent_activity',
-              failureCode: terminalFailureCode ?? 'assistant_error',
-              safeFailureMessage: classifyAssistantFailureMessage(error),
+              failureCode:
+                terminalFailureCode ?? assistantFailure.terminalCode ?? 'assistant_error',
+              assistantFailureReason: assistantFailure.reason,
+              providerOwnership: assistantFailure.providerOwnership,
+              safeFailureMessage: assistantFailure.safeMessage,
               ...(persistedModelNotFoundDiagnostics
                 ? { modelNotFoundRuntimeDiagnostics: persistedModelNotFoundDiagnostics }
                 : {}),

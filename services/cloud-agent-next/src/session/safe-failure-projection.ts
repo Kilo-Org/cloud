@@ -2,6 +2,8 @@ import {
   CLOUD_AGENT_SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   CloudAgentSafeFailureSchema,
   type CloudAgentFailureCode,
+  type CloudAgentAssistantFailureReason,
+  type CloudAgentProviderOwnership,
   type CloudAgentSafeFailure,
   type WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
@@ -69,34 +71,81 @@ export function workspaceFailureMessage(subtype: WorkspaceFailureSubtype): strin
   return WORKSPACE_FAILURE_MESSAGES[subtype];
 }
 
-export function classifyAssistantFailureMessage(source: unknown): string {
+export type AssistantFailureClassification = {
+  reason: CloudAgentAssistantFailureReason;
+  safeMessage: string;
+  providerOwnership: CloudAgentProviderOwnership;
+  terminalCode?: 'payment_required' | 'model_missing';
+};
+
+export function classifyAssistantFailure(
+  source: unknown,
+  defaultProviderOwnership: CloudAgentProviderOwnership = 'unknown'
+): AssistantFailureClassification {
   const message = extractErrorMessage(source).toLocaleLowerCase();
-  if (
-    /\b(payment required|insufficient (?:credits?|balance|funds)|usage[_ -]?limit[_ -]?exceeded)\b/.test(
-      message
-    )
-  ) {
-    return 'Assistant request failed: insufficient credits';
+  const providerOwnership = /\[byok\]/i.test(message) ? 'byok' : defaultProviderOwnership;
+  if (/\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message)) {
+    return {
+      reason: 'insufficient_credits',
+      safeMessage: 'Assistant request failed: insufficient credits',
+      providerOwnership,
+      terminalCode: 'payment_required',
+    };
   }
   if (/\b(model (?:was )?not found|unknown model|invalid model)\b/.test(message)) {
-    return 'Assistant request failed: model not found';
+    return {
+      reason: 'model_unavailable',
+      safeMessage: 'Assistant request failed: model not found',
+      providerOwnership,
+      terminalCode: 'model_missing',
+    };
   }
-  if (/\b(rate limit|rate_limit|too many requests|429)\b/.test(message)) {
-    return 'Assistant request was rate limited';
+  if (
+    /\b(rate limit|rate_limit|usage[_ -]?limit[_ -]?exceeded|too many requests|429)\b/.test(message)
+  ) {
+    return {
+      reason: 'rate_limited',
+      safeMessage: 'Assistant request was rate limited',
+      providerOwnership,
+    };
   }
   if (/\b(timed? out|timeout|deadline exceeded)\b/.test(message)) {
-    return 'Assistant request timed out';
+    return {
+      reason: 'timeout',
+      safeMessage: 'Assistant request timed out',
+      providerOwnership,
+    };
   }
   if (/\b(unauthorized|forbidden|authorization|authentication|401|403)\b/.test(message)) {
-    return 'Assistant request was not authorized';
+    return {
+      reason: 'provider_authentication',
+      safeMessage: 'Assistant request was not authorized',
+      providerOwnership,
+    };
   }
   if (/\b(invalid request|bad request|malformed request|400)\b/.test(message)) {
-    return 'Assistant request was invalid';
+    return {
+      reason: 'invalid_request',
+      safeMessage: 'Assistant request was invalid',
+      providerOwnership,
+    };
   }
   if (/\b(service unavailable|temporarily unavailable|overloaded|502|503|504)\b/.test(message)) {
-    return 'Assistant service is unavailable';
+    return {
+      reason: 'provider_unavailable',
+      safeMessage: 'Assistant service is unavailable',
+      providerOwnership,
+    };
   }
-  return GENERIC_FAILURE_MESSAGES.assistant_error;
+  return {
+    reason: 'unknown',
+    safeMessage: GENERIC_FAILURE_MESSAGES.assistant_error,
+    providerOwnership,
+  };
+}
+
+export function classifyAssistantFailureMessage(source: unknown): string {
+  return classifyAssistantFailure(source).safeMessage;
 }
 
 function extractErrorMessage(source: unknown): string {

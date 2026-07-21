@@ -2,33 +2,27 @@
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
+import {
+  healthErrorSessionsInput,
+  type CloudAgentHealthError,
+  type CloudAgentHealthInterval,
+} from './health-query-input';
 
-type CloudAgentNextFilters = {
-  /** Inclusive ISO datetime lower bound for observed-outcome reporting. */
-  startDate: string;
-  /** Exclusive ISO datetime upper bound for observed-outcome reporting. */
-  endDate: string;
-};
+export type CloudAgentNextHealthFilters = CloudAgentHealthInterval;
+export type CloudAgentFailureResponsibilityFilter = 'all' | 'platform' | 'user' | 'unknown';
 
-export type CloudAgentNextHealthFilters = CloudAgentNextFilters;
-
-type CloudAgentNextHealthError = {
-  source: 'setup' | 'run';
-  stage: string;
-  code: string;
-};
-
-function enabledForInterval(params: CloudAgentNextFilters) {
+function enabledForInterval(params: CloudAgentNextHealthFilters) {
   return Boolean(params.startDate && params.endDate);
 }
 
 export function useCloudAgentNextHealthOverview(
   params: CloudAgentNextHealthFilters,
-  enabled = true
+  enabled = true,
+  responsibility: CloudAgentFailureResponsibilityFilter = 'all'
 ) {
   const trpc = useTRPC();
   return useQuery({
-    ...trpc.admin.cloudAgentNext.getHealthOverview.queryOptions(params),
+    ...trpc.admin.cloudAgentNext.getHealthOverview.queryOptions({ ...params, responsibility }),
     enabled: enabled && enabledForInterval(params),
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
@@ -38,17 +32,13 @@ export function useCloudAgentNextHealthOverview(
 
 export function useCloudAgentNextHealthErrorSessions(
   params: CloudAgentNextHealthFilters,
-  error: CloudAgentNextHealthError | null
+  error: CloudAgentHealthError | null
 ) {
   const trpc = useTRPC();
   return useQuery({
-    ...trpc.admin.cloudAgentNext.listHealthErrorSessions.queryOptions({
-      startDate: params.startDate,
-      endDate: params.endDate,
-      source: error?.source ?? 'run',
-      stage: error?.stage ?? 'not-selected',
-      code: error?.code ?? 'not-selected',
-    }),
+    ...trpc.admin.cloudAgentNext.listHealthErrorSessions.queryOptions(
+      healthErrorSessionsInput(params, error)
+    ),
     enabled: enabledForInterval(params) && Boolean(error),
   });
 }

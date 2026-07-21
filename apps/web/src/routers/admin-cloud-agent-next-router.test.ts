@@ -58,6 +58,8 @@ describe('adminCloudAgentNextRouter', () => {
         failure_at: at(0, 6),
         failure_stage: 'initial_admission',
         failure_code: 'initial_admission_rejected',
+        failure_responsibility: 'unknown',
+        failure_reason: 'initial_admission_unknown',
       },
       {
         cloud_agent_session_id: ids.setupFailedLater,
@@ -66,7 +68,9 @@ describe('adminCloudAgentNextRouter', () => {
         created_at: at(5),
         failure_at: at(5, 1),
         failure_stage: 'initial_admission',
-        failure_code: 'initial_admission_rejected',
+        failure_code: 'invalid_initial_intent',
+        failure_responsibility: 'user',
+        failure_reason: 'initial_request_invalid',
       },
       {
         cloud_agent_session_id: ids.unmapped,
@@ -94,7 +98,9 @@ describe('adminCloudAgentNextRouter', () => {
         status: 'failed',
         terminal_at: at(2, 2),
         failure_stage: 'pre_dispatch',
-        failure_code: 'workspace_setup_failed',
+        failure_code: 'sandbox_connect_failed',
+        failure_responsibility: 'platform',
+        failure_reason: 'sandbox_connectivity',
       },
       {
         cloud_agent_session_id: ids.setupFailed,
@@ -102,7 +108,9 @@ describe('adminCloudAgentNextRouter', () => {
         status: 'failed',
         terminal_at: at(3, 0, 40),
         failure_stage: 'agent_activity',
-        failure_code: 'assistant_error',
+        failure_code: 'payment_required',
+        failure_responsibility: 'user',
+        failure_reason: 'insufficient_credits',
       },
       {
         cloud_agent_session_id: ids.unmapped,
@@ -145,7 +153,9 @@ describe('adminCloudAgentNextRouter', () => {
         ...interval(),
         source: 'run',
         stage: 'pre_dispatch',
-        code: 'workspace_setup_failed',
+        code: 'sandbox_connect_failed',
+        responsibility: 'platform',
+        reason: 'sandbox_connectivity',
       })
     ).rejects.toThrow('Admin access required');
     await expect(
@@ -171,6 +181,11 @@ describe('adminCloudAgentNextRouter', () => {
       failedRuns: 2,
       interruptedRuns: 1,
       setupFailures: 2,
+      platformFailures: 1,
+      userFailures: 2,
+      unknownFailures: 1,
+      platformFailureRate: 0.5,
+      allFailureRate: 0.8,
     });
     expect(health.topErrors).toEqual(
       expect.arrayContaining([
@@ -178,10 +193,26 @@ describe('adminCloudAgentNextRouter', () => {
           source: 'setup',
           stage: 'initial_admission',
           code: 'initial_admission_rejected',
-          count: 2,
+          responsibility: 'unknown',
+          reason: 'initial_admission_unknown',
+          count: 1,
         },
-        { source: 'run', stage: 'pre_dispatch', code: 'workspace_setup_failed', count: 1 },
-        { source: 'run', stage: 'agent_activity', code: 'assistant_error', count: 1 },
+        {
+          source: 'run',
+          stage: 'pre_dispatch',
+          code: 'sandbox_connect_failed',
+          responsibility: 'platform',
+          reason: 'sandbox_connectivity',
+          count: 1,
+        },
+        {
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'payment_required',
+          responsibility: 'user',
+          reason: 'insufficient_credits',
+          count: 1,
+        },
       ])
     );
     expect(JSON.stringify(health.topErrors)).not.toContain('user_interrupt');
@@ -195,6 +226,36 @@ describe('adminCloudAgentNextRouter', () => {
     expect(health.summary.failedRuns).toBe(2);
     expect(health.summary.completedRuns).toBe(1);
     expect(JSON.stringify(health.topErrors)).not.toContain('wrapper_start_failed');
+  });
+
+  it('filters top errors by responsibility without changing visible summary counts', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview({
+      ...interval(),
+      responsibility: 'platform',
+    });
+
+    expect(health.summary).toMatchObject({
+      platformFailures: 1,
+      userFailures: 2,
+      unknownFailures: 1,
+    });
+    expect(health.topErrors).toEqual([
+      expect.objectContaining({
+        responsibility: 'platform',
+        reason: 'sandbox_connectivity',
+      }),
+    ]);
+  });
+
+  it('returns null rates when there are no assessed outcomes', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview({
+      startDate: '2035-01-12T00:00:00.000Z',
+      endDate: '2035-01-13T00:00:00.000Z',
+    });
+    expect(health.summary.platformFailureRate).toBeNull();
+    expect(health.summary.allFailureRate).toBeNull();
   });
 
   it('lists affected sessions for an exact top-error source and occurrence interval', async () => {
@@ -213,6 +274,26 @@ describe('adminCloudAgentNextRouter', () => {
         failure_stage: 'unknown',
         failure_code: 'unclassified',
       },
+      {
+        cloud_agent_session_id: ids.mapped,
+        message_id: 'msg_admin_managed_provider_unavailable',
+        status: 'failed',
+        terminal_at: at(7, 1),
+        failure_stage: 'agent_activity',
+        failure_code: 'assistant_error',
+        failure_responsibility: 'platform',
+        failure_reason: 'managed_provider_unavailable',
+      },
+      {
+        cloud_agent_session_id: ids.unmapped,
+        message_id: 'msg_admin_user_rate_limited',
+        status: 'failed',
+        terminal_at: at(7, 2),
+        failure_stage: 'agent_activity',
+        failure_code: 'assistant_error',
+        failure_responsibility: 'user',
+        failure_reason: 'rate_limited',
+      },
     ]);
     const caller = await createCallerForUser(adminUser.id);
     const setupSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
@@ -220,21 +301,35 @@ describe('adminCloudAgentNextRouter', () => {
       source: 'setup',
       stage: 'initial_admission',
       code: 'initial_admission_rejected',
+      responsibility: 'unknown',
+      reason: 'initial_admission_unknown',
     });
     const runSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
       ...interval(),
       source: 'run',
       stage: 'pre_dispatch',
-      code: 'workspace_setup_failed',
+      code: 'sandbox_connect_failed',
+      responsibility: 'platform',
+      reason: 'sandbox_connectivity',
     });
     const unclassifiedSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
       ...interval(),
       source: 'run',
       stage: 'unknown',
       code: 'unclassified',
+      responsibility: 'unknown',
+      reason: 'unclassified',
+    });
+    const managedProviderSessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
+      ...interval(),
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      responsibility: 'platform',
+      reason: 'managed_provider_unavailable',
     });
 
-    expect(setupSessions.totalSessions).toBe(2);
+    expect(setupSessions.totalSessions).toBe(1);
     expect(setupSessions.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -243,15 +338,11 @@ describe('adminCloudAgentNextRouter', () => {
           occurredAt: at(0, 6),
           matchingEvents: 1,
         }),
-        expect.objectContaining({
-          cloudAgentSessionId: ids.setupFailedLater,
-          kiloSessionId: 'ses_admin_setup_failed_later',
-          matchingEvents: 1,
-        }),
       ])
     );
     expect(runSessions).toMatchObject({
       totalSessions: 1,
+      limit: 100,
       rows: [
         expect.objectContaining({
           cloudAgentSessionId: ids.mapped,
@@ -277,5 +368,10 @@ describe('adminCloudAgentNextRouter', () => {
         }),
       ])
     );
+    expect(managedProviderSessions).toMatchObject({
+      totalSessions: 1,
+      rows: [expect.objectContaining({ cloudAgentSessionId: ids.mapped, matchingEvents: 1 })],
+    });
+    expect(JSON.stringify(managedProviderSessions)).not.toContain(ids.unmapped);
   });
 });

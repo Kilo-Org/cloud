@@ -34,7 +34,10 @@ import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
-import { classifyAssistantFailureMessage } from '../session/safe-failure-projection.js';
+import {
+  classifyAssistantFailure,
+  classifyAssistantFailureMessage,
+} from '../session/safe-failure-projection.js';
 import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 import {
   cloudStatusForPreparingEvent,
@@ -780,6 +783,7 @@ export function createIngestHandler(
             if (parentMessageId !== undefined) {
               await doContext.observeCorrelatedAgentActivity?.(parentMessageId);
               if (assistantError !== undefined) {
+                const assistantFailure = classifyAssistantFailure(assistantError);
                 await doContext.terminalizeSessionMessageOnce(
                   parentMessageId,
                   {
@@ -787,7 +791,11 @@ export function createIngestHandler(
                     assistantMessageId: typeof info?.id === 'string' ? info.id : undefined,
                     reason: 'assistant_error',
                     error: assistantError,
-                    safeFailureMessage: classifyAssistantFailureMessage(assistantError),
+                    failureStage: 'agent_activity',
+                    failureCode: assistantFailure.terminalCode ?? 'assistant_error',
+                    assistantFailureReason: assistantFailure.reason,
+                    providerOwnership: assistantFailure.providerOwnership,
+                    safeFailureMessage: assistantFailure.safeMessage,
                     completionSource: 'assistant_message_event',
                   },
                   wrapperRunId

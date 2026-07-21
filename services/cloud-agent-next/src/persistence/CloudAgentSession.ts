@@ -924,7 +924,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           await this.terminalizeSessionMessageOnce(
             messageId,
             params.kind === 'failed'
-              ? { ...params, failureStage: 'agent_activity', failureCode: 'assistant_error' }
+              ? {
+                  ...params,
+                  failureStage: params.failureStage ?? 'agent_activity',
+                  failureCode: params.failureCode ?? 'assistant_error',
+                }
               : params
           );
         },

@@ -1041,6 +1041,10 @@ describe('createIngestHandler', () => {
           assistantMessageId: 'asst_333',
           completionSource: 'assistant_message_event',
           error: secretError,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          assistantFailureReason: 'rate_limited',
+          providerOwnership: 'unknown',
           safeFailureMessage: 'Assistant request was rate limited',
         }),
         WRAPPER_RUN_ID

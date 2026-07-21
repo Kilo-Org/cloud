@@ -4,6 +4,7 @@ import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   SafeFailureProjectionSchema,
   classifyAssistantFailureMessage,
+  classifyAssistantFailure,
   genericFailureMessage,
   projectSafeFailure,
 } from './safe-failure-projection.js';
@@ -102,7 +103,7 @@ describe('projectSafeFailure', () => {
 describe('classifyAssistantFailureMessage', () => {
   it.each([
     ['Payment Required: token=secret', 'Assistant request failed: insufficient credits'],
-    ['usage_limit_exceeded for account secret', 'Assistant request failed: insufficient credits'],
+    ['usage_limit_exceeded for account secret', 'Assistant request was rate limited'],
     ['Model not found: private/provider-model', 'Assistant request failed: model not found'],
     ['429 Too Many Requests: provider body', 'Assistant request was rate limited'],
     ['upstream request timed out: private body', 'Assistant request timed out'],
@@ -124,5 +125,33 @@ describe('classifyAssistantFailureMessage', () => {
         data: { message: 'deadline exceeded: Bearer private-provider-token' },
       })
     ).toBe('Assistant request timed out');
+  });
+});
+
+describe('classifyAssistantFailure', () => {
+  it('retains safe structured reason and explicit BYOK ownership without source text', () => {
+    expect(classifyAssistantFailure('[BYOK] 401 token=secret')).toEqual({
+      reason: 'provider_authentication',
+      safeMessage: 'Assistant request was not authorized',
+      providerOwnership: 'byok',
+    });
+  });
+
+  it('returns explicit terminal codes for balance and model failures', () => {
+    expect(classifyAssistantFailure('402 payment required')).toMatchObject({
+      reason: 'insufficient_credits',
+      terminalCode: 'payment_required',
+    });
+    expect(classifyAssistantFailure('unknown model')).toMatchObject({
+      reason: 'model_unavailable',
+      terminalCode: 'model_missing',
+    });
+  });
+
+  it('does not guess ownership for an unmarked provider outage', () => {
+    expect(classifyAssistantFailure('503 Service Unavailable')).toMatchObject({
+      reason: 'provider_unavailable',
+      providerOwnership: 'unknown',
+    });
   });
 });

@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import {
   CloudAgentFailureCodeSchema,
+  CloudAgentFailureReasonSchema,
+  CloudAgentFailureResponsibilitySchema,
   CloudAgentFailureStageSchema,
+  WorkspaceFailureSubtypeSchema,
 } from './cloud-agent-failure.js';
 
 export const CloudAgentRunStatuses = [
@@ -26,7 +29,11 @@ export const CloudAgentRunFailureClassifications = [
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_ping_timeout' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_error_before_activity' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'missing_assistant_reply' },
+  { failureStage: 'post_dispatch_no_activity', failureCode: 'payment_required' },
+  { failureStage: 'post_dispatch_no_activity', failureCode: 'model_missing' },
   { failureStage: 'agent_activity', failureCode: 'assistant_error' },
+  { failureStage: 'agent_activity', failureCode: 'payment_required' },
+  { failureStage: 'agent_activity', failureCode: 'model_missing' },
   { failureStage: 'agent_activity', failureCode: 'wrapper_error_after_activity' },
   { failureStage: 'interruption', failureCode: 'user_interrupt' },
   { failureStage: 'interruption', failureCode: 'container_shutdown' },
@@ -69,6 +76,9 @@ const CloudAgentRunStateSchema = z
     terminalAt: IsoTimestampSchema.optional(),
     failureStage: CloudAgentFailureStageSchema.optional(),
     failureCode: CloudAgentFailureCodeSchema.optional(),
+    workspaceFailureSubtype: WorkspaceFailureSubtypeSchema.optional(),
+    failureResponsibility: CloudAgentFailureResponsibilitySchema.optional(),
+    failureReason: CloudAgentFailureReasonSchema.optional(),
     diagnostic: CloudAgentFailedRunDiagnosticSchema.optional(),
   })
   .strict()
@@ -88,6 +98,22 @@ const CloudAgentRunStateSchema = z
         code: 'custom',
         message: 'failureStage and failureCode must be reported together',
         path: ['failureCode'],
+      });
+    }
+
+    if ((run.failureResponsibility === undefined) !== (run.failureReason === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'failureResponsibility and failureReason must be reported together',
+        path: ['failureReason'],
+      });
+    }
+
+    if (run.workspaceFailureSubtype !== undefined && run.failureCode !== 'workspace_setup_failed') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Workspace failure subtype requires workspace_setup_failed failure code',
+        path: ['workspaceFailureSubtype'],
       });
     }
 
@@ -131,6 +157,14 @@ const CloudAgentRunStateSchema = z
         code: 'custom',
         message: 'A completed run cannot contain failure facts',
         path: ['failureStage'],
+      });
+    }
+
+    if (run.status !== 'failed' && run.failureResponsibility !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Failure responsibility is permitted only on failed runs',
+        path: ['failureResponsibility'],
       });
     }
 

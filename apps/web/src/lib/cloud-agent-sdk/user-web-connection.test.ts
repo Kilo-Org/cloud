@@ -1851,15 +1851,10 @@ describe('createUserWebConnection connection-state API', () => {
 
       open(sockets[1]);
       expect(client.isConnected()).toBe(false);
-      inbound(
-        { type: 'system', event: 'sessions.list', data: { sessions: [] } },
-        sockets[1]
-      );
+      inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } }, sockets[1]);
       expect(client.isConnected()).toBe(true);
 
-      const transitions = listener.mock.calls
-        .slice(callsAfterFirstConnect)
-        .map(call => call[0]);
+      const transitions = listener.mock.calls.slice(callsAfterFirstConnect).map(call => call[0]);
       expect(transitions).toEqual([false, true]);
 
       release();

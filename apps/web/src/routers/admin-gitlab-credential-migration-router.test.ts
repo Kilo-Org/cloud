@@ -1,140 +1,120 @@
 import type { User } from '@kilocode/db/schema';
 import { createCallerFactory } from '@/lib/trpc/init';
 
-const mockCreateJob = jest.fn();
-const mockAcquireJobLease = jest.fn();
-const mockAdvanceJob = jest.fn();
-const mockReleaseJobLease = jest.fn();
+const mockBackfillBatch = jest.fn();
+const mockScrubBatch = jest.fn();
+const mockVerifyBatch = jest.fn();
+const mockCheckKeys = jest.fn();
 
-jest.mock('@/lib/integrations/platforms/gitlab/credential-migration-job-repository', () => ({
-  acquireGitLabCredentialMigrationJobLease: (...args: unknown[]) => mockAcquireJobLease(...args),
-  createGitLabCredentialMigrationJob: (...args: unknown[]) => mockCreateJob(...args),
-  cancelGitLabCredentialMigrationJob: jest.fn(),
-  failGitLabCredentialMigrationJob: jest.fn(),
-  getGitLabCredentialMigrationJob: jest.fn(),
-  listRecentGitLabCredentialMigrationJobs: jest.fn(),
-  releaseGitLabCredentialMigrationJobLease: (...args: unknown[]) => mockReleaseJobLease(...args),
-  GitLabCredentialMigrationJobConflictError: class GitLabCredentialMigrationJobConflictError extends Error {},
+jest.mock('@/lib/integrations/platforms/gitlab/credential-migration', () => ({
+  backfillGitLabCredentialBatch: (...args: unknown[]) => mockBackfillBatch(...args),
+  scrubGitLabCredentialBatch: (...args: unknown[]) => mockScrubBatch(...args),
 }));
-jest.mock('@/lib/integrations/platforms/gitlab/credential-migration-job', () => ({
-  advanceGitLabCredentialMigrationJob: (...args: unknown[]) => mockAdvanceJob(...args),
+jest.mock('@/lib/integrations/platforms/gitlab/credential-migration-verify', () => ({
+  verifyGitLabCredentialDecryptabilityBatch: (...args: unknown[]) => mockVerifyBatch(...args),
+  checkGitLabCredentialKeysMatch: (...args: unknown[]) => mockCheckKeys(...args),
 }));
 
 import { adminGitLabCredentialMigrationRouter } from './admin-gitlab-credential-migration-router';
 
 const createCaller = createCallerFactory(adminGitLabCredentialMigrationRouter);
-
-const job = {
-  id: '00000000-0000-4000-8000-000000000001',
-  requested_mode: 'backfill' as const,
-  phase: 'backfill' as const,
-  status: 'queued' as const,
-  requested_by_user_id: 'admin-user',
-  cursor: null,
-  lease_token: null,
-  lease_expires_at: null,
-  scanned_integrations: 0,
-  mutated_integrations: 0,
-  public_audit_counts: {
-    legacyTokenBearingIntegrations: 0,
-    oauthMissingCredentials: 0,
-    patMissingCredentials: 0,
-    projectMissingCredentials: 0,
-    credentialProfileMismatches: 0,
-    providerMetadataMismatches: 0,
-    crossTablePrimaryCredentialDuplicates: 0,
-    malformedMetadata: 0,
-    unmappableLegacyEntries: 0,
-    integrationTypeDisagreements: 0,
-    legacySecretFields: 0,
-  },
-  private_audit_counts: {
-    credentials: 0,
-    secrets: 0,
-    passedCredentials: 0,
-    profileFailures: 0,
-    configurationFailures: 0,
-    parseFailures: 0,
-    unknownKeyFailures: 0,
-    decryptOrAadFailures: 0,
-  },
-  private_audit_key_id: null,
-  private_audit_public_key_sha256: null,
-  retry_count: 0,
-  issue_integration_ids: [],
-  error_code: null,
-  started_at: null,
-  completed_at: null,
-  created_at: '2026-07-16T00:00:00.000Z',
-  updated_at: '2026-07-16T00:00:00.000Z',
-};
+const admin = () => createCaller({ user: { id: 'admin-user', is_admin: true } as User });
 
 describe('admin GitLab credential migration router', () => {
   beforeEach(() => {
-    mockCreateJob.mockReset();
-    mockAcquireJobLease.mockReset();
-    mockAdvanceJob.mockReset();
-    mockReleaseJobLease.mockReset();
+    mockBackfillBatch.mockReset();
+    mockScrubBatch.mockReset();
+    mockVerifyBatch.mockReset();
+    mockCheckKeys.mockReset();
   });
 
   it('uses ordinary admin protection', async () => {
     const caller = createCaller({ user: { id: 'user', is_admin: false } as User });
 
-    await expect(caller.startGitLabCredentialMigrationJob({ mode: 'audit' })).rejects.toMatchObject(
-      { code: 'FORBIDDEN' }
-    );
-    await expect(caller.runGitLabCredentialMigrationJob()).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-    });
-    expect(mockCreateJob).not.toHaveBeenCalled();
-    expect(mockAcquireJobLease).not.toHaveBeenCalled();
-  });
-
-  it('requires exact confirmation and takes the requester only from auth context', async () => {
-    const caller = createCaller({ user: { id: 'admin-user', is_admin: true } as User });
+    await expect(caller.backfillNextBatch({})).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.verifyDecryptability({})).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(
-      caller.startGitLabCredentialMigrationJob({ mode: 'backfill' })
+      caller.scrubNextBatch({ confirmation: 'SCRUB GITLAB PLAINTEXT' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockBackfillBatch).not.toHaveBeenCalled();
+    expect(mockScrubBatch).not.toHaveBeenCalled();
+  });
+
+  it('passes keyset paging through to the backfill batch', async () => {
+    mockBackfillBatch.mockResolvedValue({
+      processed: 2,
+      mutated: 2,
+      unmappable: 0,
+      nextCursor: '00000000-0000-4000-8000-00000000000a',
+    });
+
+    await expect(
+      admin().backfillNextBatch({ afterId: '00000000-0000-4000-8000-000000000001', limit: 50 })
+    ).resolves.toMatchObject({ processed: 2, nextCursor: '00000000-0000-4000-8000-00000000000a' });
+    expect(mockBackfillBatch).toHaveBeenCalledWith({
+      limit: 50,
+      afterId: '00000000-0000-4000-8000-000000000001',
+    });
+  });
+
+  it('returns the verification batch and maps errors by retryability', async () => {
+    mockVerifyBatch.mockResolvedValueOnce({
+      kind: 'ok',
+      batch: { keyMatches: true, batchPasses: true },
+    });
+    await expect(admin().verifyDecryptability({})).resolves.toEqual({
+      keyMatches: true,
+      batchPasses: true,
+    });
+    expect(mockVerifyBatch).toHaveBeenCalledWith({ requestedByUserId: 'admin-user', cursor: null });
+
+    mockVerifyBatch.mockResolvedValueOnce({
+      kind: 'error',
+      errorCode: 'private_public_key_mismatch',
+      retryable: false,
+    });
+    await expect(admin().verifyDecryptability({})).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    mockVerifyBatch.mockResolvedValueOnce({
+      kind: 'error',
+      errorCode: 'audit_unavailable',
+      retryable: true,
+    });
+    await expect(admin().verifyDecryptability({})).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  });
+
+  it('refuses to scrub without exact confirmation', async () => {
+    await expect(admin().scrubNextBatch({ confirmation: 'nope' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockCheckKeys).not.toHaveBeenCalled();
+    expect(mockScrubBatch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to scrub when the web and service keys do not match', async () => {
+    mockCheckKeys.mockResolvedValue({ ok: false, errorCode: 'private_public_key_mismatch' });
+
+    await expect(
+      admin().scrubNextBatch({ confirmation: 'SCRUB GITLAB PLAINTEXT' })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-
-    mockCreateJob.mockResolvedValue(job);
-    await caller.startGitLabCredentialMigrationJob({
-      mode: 'backfill',
-      confirmation: 'BACKFILL GITLAB CREDENTIALS',
-    });
-    expect(mockCreateJob).toHaveBeenCalledWith({
-      mode: 'backfill',
-      requestedByUserId: 'admin-user',
-    });
+    expect(mockCheckKeys).toHaveBeenCalledWith('admin-user');
+    expect(mockScrubBatch).not.toHaveBeenCalled();
   });
 
-  it('returns noop when no migration job is available', async () => {
-    const caller = createCaller({ user: { id: 'admin-user', is_admin: true } as User });
-    mockAcquireJobLease.mockResolvedValue(null);
-
-    await expect(caller.runGitLabCredentialMigrationJob()).resolves.toEqual({
-      status: 'noop',
-      job: null,
+  it('scrubs a batch once confirmation and the key match pass', async () => {
+    mockCheckKeys.mockResolvedValue({ ok: true });
+    mockScrubBatch.mockResolvedValue({
+      processed: 1,
+      scrubbed: 1,
+      skipped: 0,
+      nextCursor: null,
     });
-    expect(mockAdvanceJob).not.toHaveBeenCalled();
-  });
 
-  it('advances exactly one batch and releases its lease', async () => {
-    const caller = createCaller({ user: { id: 'admin-user', is_admin: true } as User });
-    const leasedJob = {
-      ...job,
-      lease_token: '00000000-0000-4000-8000-000000000002',
-      lease_expires_at: '2026-07-16T00:05:00.000Z',
-      status: 'running' as const,
-    };
-    mockAcquireJobLease.mockResolvedValue(leasedJob);
-    mockAdvanceJob.mockResolvedValue({ kind: 'advanced', job: leasedJob });
-
-    await expect(caller.runGitLabCredentialMigrationJob()).resolves.toMatchObject({
-      status: 'advanced',
-      job: { id: job.id, status: 'running' },
-    });
-    expect(mockAdvanceJob).toHaveBeenCalledTimes(1);
-    expect(mockAdvanceJob).toHaveBeenCalledWith(leasedJob);
-    expect(mockReleaseJobLease).toHaveBeenCalledWith(job.id, leasedJob.lease_token);
+    await expect(
+      admin().scrubNextBatch({ confirmation: 'SCRUB GITLAB PLAINTEXT', limit: 10 })
+    ).resolves.toEqual({ processed: 1, scrubbed: 1, skipped: 0, nextCursor: null });
+    expect(mockScrubBatch).toHaveBeenCalledWith({ limit: 10, afterId: null });
   });
 });

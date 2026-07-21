@@ -18,6 +18,7 @@ import {
 } from './credential-encryption';
 import {
   getGitLabIntegrationOwner,
+  resolveGitLabCredentialAuthType,
   type GitLabLegacyMetadata,
 } from './credential-migration-legacy';
 import { normalizeGitLabInstanceUrl } from './instance-url';
@@ -30,7 +31,6 @@ type ExistingCredentialRows = {
 
 export type GitLabBackfillResult = {
   mutated: boolean;
-  unmappableProjects: number;
 };
 
 export async function backfillMissingGitLabCredentials(
@@ -41,11 +41,12 @@ export async function backfillMissingGitLabCredentials(
 ): Promise<GitLabBackfillResult> {
   const owner = getGitLabIntegrationOwner(integration);
   const providerBaseUrl = normalizeGitLabInstanceUrl(metadata.gitlab_instance_url);
+  const authType = resolveGitLabCredentialAuthType(metadata, integration);
   let mutated = false;
   let primaryInserted = false;
 
   if (
-    metadata.auth_type === 'oauth' &&
+    authType === 'oauth' &&
     metadata.access_token &&
     metadata.refresh_token &&
     integration.platform_account_id &&
@@ -88,7 +89,7 @@ export async function backfillMissingGitLabCredentials(
     primaryInserted = inserted.length === 1;
     mutated ||= primaryInserted;
   } else if (
-    metadata.auth_type === 'pat' &&
+    authType === 'pat' &&
     metadata.access_token &&
     !existing.primaryAccess &&
     !existing.oauth
@@ -125,19 +126,18 @@ export async function backfillMissingGitLabCredentials(
     mutated ||= primaryInserted;
   }
 
-  if (primaryInserted && metadata.auth_type !== integration.integration_type) {
+  if (primaryInserted && authType && authType !== integration.integration_type) {
     await tx
       .update(platform_integrations)
-      .set({ integration_type: metadata.auth_type, updated_at: new Date().toISOString() })
+      .set({ integration_type: authType, updated_at: new Date().toISOString() })
       .where(eq(platform_integrations.id, integration.id));
   }
 
   const integrationType = primaryInserted
-    ? metadata.auth_type
+    ? authType
     : integration.integration_type === 'oauth' || integration.integration_type === 'pat'
       ? integration.integration_type
       : null;
-  let unmappableProjects = 0;
   const existingProjectIds = new Set(
     existing.access.flatMap(row =>
       row.provider_credential_type === 'project_access_token' && row.provider_resource_id
@@ -148,7 +148,6 @@ export async function backfillMissingGitLabCredentials(
   for (const [projectId, projectToken] of Object.entries(metadata.project_tokens ?? {})) {
     if (existingProjectIds.has(projectId)) continue;
     if (!integrationType || !/^[1-9][0-9]*$/.test(projectId)) {
-      unmappableProjects += 1;
       continue;
     }
     const credentialId = randomUUID();
@@ -184,5 +183,5 @@ export async function backfillMissingGitLabCredentials(
     mutated ||= inserted.length === 1;
   }
 
-  return { mutated, unmappableProjects };
+  return { mutated };
 }

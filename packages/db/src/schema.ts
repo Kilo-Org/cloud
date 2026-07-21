@@ -5760,6 +5760,7 @@ export const cloud_agent_session_runs = pgTable(
     ),
     index('IDX_cloud_agent_session_runs_responsibility_reason_terminal')
       .on(table.failure_responsibility, table.failure_reason, table.terminal_at)
+      .concurrently()
       .where(sql`${table.status} = 'failed'`),
     index('IDX_cloud_agent_session_runs_error_expires_at')
       .on(table.error_expires_at)

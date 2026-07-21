@@ -1,5 +1,5 @@
 {
-  "id": "49694925-54d5-4190-bb7b-8ec48e27ed60",
+  "id": "3044197c-ff0e-4bbd-baa6-09bbfcd37f0c",
   "prevId": "dddcd3d7-c8b2-4005-9597-f7a2ac07451a",
   "version": "7",
   "dialect": "postgresql",
@@ -5532,7 +5532,7 @@
           ],
           "isUnique": false,
           "where": "\"cloud_agent_session_runs\".\"status\" = 'failed'",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

@@ -812,6 +812,61 @@ export class SoftDeletePreconditionError extends Error {
   }
 }
 
+type SoftDeleteExecutor = typeof db | DrizzleTransaction;
+
+async function assertNoLiveSubscriptionsForSoftDelete(
+  userId: string,
+  executor: SoftDeleteExecutor
+): Promise<void> {
+  const activeSubscriptions = await executor
+    .select({ id: kilo_pass_subscriptions.id })
+    .from(kilo_pass_subscriptions)
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.kilo_user_id, userId),
+        eq(kilo_pass_subscriptions.status, 'active'),
+        eq(kilo_pass_subscriptions.cancel_at_period_end, false)
+      )
+    );
+
+  if (activeSubscriptions.length > 0) {
+    throw new SoftDeletePreconditionError(
+      `User ${userId} has an active Kilo Pass subscription. Cancel the subscription before deleting the account.`
+    );
+  }
+
+  // Block soft-delete for any live KiloClaw subscription. This includes
+  // trialing — the user may have a running Fly instance, and deleting the
+  // row without destroying the instance would orphan it.
+  const liveClawSubscriptions = await executor
+    .select({
+      id: kiloclaw_subscriptions.id,
+      status: kiloclaw_subscriptions.status,
+    })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
+      )
+    );
+
+  if (liveClawSubscriptions.length > 0) {
+    throw new SoftDeletePreconditionError(
+      `User ${userId} has a live KiloClaw subscription (${liveClawSubscriptions[0].status}). Cancel the subscription before deleting the account.`
+    );
+  }
+}
+
+/**
+ * Reject account deletion before external cleanup when the user has a
+ * subscription that must be cancelled first. softDeleteUser repeats this
+ * assertion in its transaction as the authoritative race-safe check.
+ */
+export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> {
+  await assertNoLiveSubscriptionsForSoftDelete(userId, db);
+}
+
 /**
  * Soft-delete a user: anonymize PII, scrub related data, but keep the
  * user row and financial/billing records intact.
@@ -896,44 +951,7 @@ export async function softDeleteUser(userId: string) {
 
   await db.transaction(async tx => {
     // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
-    const activeSubscriptions = await tx
-      .select({ id: kilo_pass_subscriptions.id })
-      .from(kilo_pass_subscriptions)
-      .where(
-        and(
-          eq(kilo_pass_subscriptions.kilo_user_id, userId),
-          eq(kilo_pass_subscriptions.status, 'active'),
-          eq(kilo_pass_subscriptions.cancel_at_period_end, false)
-        )
-      );
-
-    if (activeSubscriptions.length > 0) {
-      throw new SoftDeletePreconditionError(
-        `User ${userId} has an active Kilo Pass subscription. Cancel the subscription before deleting the account.`
-      );
-    }
-
-    // Block soft-delete for any live KiloClaw subscription. This includes
-    // trialing — the user may have a running Fly instance, and deleting the
-    // row without destroying the instance would orphan it.
-    const liveClawSubscriptions = await tx
-      .select({
-        id: kiloclaw_subscriptions.id,
-        status: kiloclaw_subscriptions.status,
-      })
-      .from(kiloclaw_subscriptions)
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, userId),
-          inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid', 'trialing'])
-        )
-      );
-
-    if (liveClawSubscriptions.length > 0) {
-      throw new SoftDeletePreconditionError(
-        `User ${userId} has a live KiloClaw subscription (${liveClawSubscriptions[0].status}). Cancel the subscription before deleting the account.`
-      );
-    }
+    await assertNoLiveSubscriptionsForSoftDelete(userId, tx);
 
     const activeClawInstances = await tx
       .select({ id: kiloclaw_instances.id })

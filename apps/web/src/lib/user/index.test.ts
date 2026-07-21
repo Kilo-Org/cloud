@@ -109,6 +109,7 @@ import {
 import { eq, count, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
+  assertUserCanBeSoftDeleted,
   SoftDeletePreconditionError,
   findUserById,
   findUsersByIds,
@@ -3422,6 +3423,9 @@ describe('User', () => {
         cancel_at_period_end: false,
       });
 
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       // User should not be modified
       const userAfter = await findUserById(user.id);
@@ -3858,6 +3862,9 @@ describe('User', () => {
         cancel_at_period_end: false,
       });
 
+      await expect(assertUserCanBeSoftDeleted(user.id)).rejects.toThrow(
+        SoftDeletePreconditionError
+      );
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       // User should not be modified
       const userAfter = await findUserById(user.id);

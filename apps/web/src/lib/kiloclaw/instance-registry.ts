@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import {
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   type KiloClawSubscriptionChangeActor,
@@ -20,6 +20,12 @@ export type ActiveKiloClawInstance = {
 export type EnsureActiveInstanceResult = {
   instance: ActiveKiloClawInstance;
   created: boolean;
+};
+
+export type GdprDestroyedInstanceBatch = {
+  destroyedAt: string;
+  instanceIds: string[];
+  userId: string;
 };
 
 type InstanceRegistryExecutor = typeof db | DrizzleTransaction;
@@ -197,6 +203,73 @@ export async function restoreDestroyedInstance(instanceId: string): Promise<void
 }
 
 /**
+ * Marks an exact active, user-owned batch destroyed for GDPR worker cleanup.
+ * This intentionally changes only kiloclaw_instances.destroyed_at and never
+ * collapses personal subscription lineage or writes subscription change logs.
+ */
+export async function markActiveInstanceBatchDestroyedForGdpr(
+  userId: string,
+  instanceIds: string[]
+): Promise<GdprDestroyedInstanceBatch> {
+  const uniqueInstanceIds = [...new Set(instanceIds)];
+  if (uniqueInstanceIds.length === 0) {
+    throw new Error('GDPR instance batch must include at least one instance ID');
+  }
+
+  const destroyedAt = new Date().toISOString();
+  return await db.transaction(async tx => {
+    const rows = await tx
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: destroyedAt })
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, userId),
+          inArray(kiloclaw_instances.id, uniqueInstanceIds),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
+      )
+      .returning({ id: kiloclaw_instances.id, destroyedAt: kiloclaw_instances.destroyed_at });
+
+    if (rows.length !== uniqueInstanceIds.length) {
+      throw new Error('GDPR instance batch did not match the exact active user-owned ID set');
+    }
+
+    const batchDestroyedAt = rows[0]?.destroyedAt;
+    if (!batchDestroyedAt) {
+      throw new Error('GDPR instance batch did not receive a destruction timestamp');
+    }
+
+    return { destroyedAt: batchDestroyedAt, instanceIds: uniqueInstanceIds, userId };
+  });
+}
+
+/**
+ * Restores precisely a GDPR batch after its worker teardown fails. The
+ * timestamp guard prevents undoing a later lifecycle transition.
+ */
+export async function restoreGdprDestroyedInstanceBatch(
+  batch: GdprDestroyedInstanceBatch
+): Promise<void> {
+  await db.transaction(async tx => {
+    const rows = await tx
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: null })
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, batch.userId),
+          inArray(kiloclaw_instances.id, batch.instanceIds),
+          eq(kiloclaw_instances.destroyed_at, batch.destroyedAt)
+        )
+      )
+      .returning({ id: kiloclaw_instances.id });
+
+    if (rows.length !== batch.instanceIds.length) {
+      throw new Error('GDPR instance batch restore did not match the exact destroyed ID set');
+    }
+  });
+}
+
+/**
  * Fetch the user's active personal KiloClaw instance (read-only, no upsert).
  *
  * Finds the active row for this user without filtering by sandboxId format.
@@ -295,18 +368,7 @@ export async function getActiveOrgInstance(
  * getActiveOrgInstance which use LIMIT 1 + ORDER BY created_at.
  */
 export async function listAllActiveInstances(userId: string): Promise<ActiveKiloClawInstance[]> {
-  const rows = await db
-    .select({
-      id: kiloclaw_instances.id,
-      userId: kiloclaw_instances.user_id,
-      sandboxId: kiloclaw_instances.sandbox_id,
-      organizationId: kiloclaw_instances.organization_id,
-      name: kiloclaw_instances.name,
-      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-    })
-    .from(kiloclaw_instances)
-    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
-    .orderBy(kiloclaw_instances.created_at);
+  const rows = await listAllActiveInstanceRows(userId);
 
   // Deduplicate: keep only the oldest row per context (personal = null orgId,
   // org = specific orgId). Historical legacy races left duplicate active rows;
@@ -318,6 +380,25 @@ export async function listAllActiveInstances(userId: string): Promise<ActiveKilo
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * List every active instance row for a user without resolving duplicate
+ * contexts. Destructive maintenance paths use this to clean up legacy rows.
+ */
+export async function listAllActiveInstanceRows(userId: string): Promise<ActiveKiloClawInstance[]> {
+  return db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+    .orderBy(kiloclaw_instances.created_at);
 }
 
 /**

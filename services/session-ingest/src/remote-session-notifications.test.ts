@@ -6,7 +6,9 @@ import {
   isEligibleForRemoteSessionAttention,
 } from './remote-session-notifications';
 
-function completedSignal(messageExcerpt: string): Extract<AttentionSignal, { messageExcerpt: string }> {
+function completedSignal(
+  messageExcerpt: string
+): Extract<AttentionSignal, { messageExcerpt: string }> {
   return { signalId: 'msg-1', kind: 'completed' as const, messageExcerpt };
 }
 
@@ -14,10 +16,9 @@ function needsInputSignal(): Extract<AttentionSignal, { messageExcerpt: string }
   return { signalId: 'status:question:123', kind: 'needs_input' as const, messageExcerpt: '' };
 }
 
-function agentNotificationSignal(message: string): Extract<
-  AttentionSignal,
-  { kind: 'agent_notification' }
-> {
+function agentNotificationSignal(
+  message: string
+): Extract<AttentionSignal, { kind: 'agent_notification' }> {
   return { kind: 'agent_notification' as const, notificationId: 'n-1', message };
 }
 

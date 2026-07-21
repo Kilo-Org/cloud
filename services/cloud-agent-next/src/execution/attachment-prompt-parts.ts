@@ -15,17 +15,49 @@ type R2AttachmentDownloadEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
 };
 
-const PROMPT_MIME_BY_SUFFIX: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.pdf': 'application/pdf',
-  '.txt': 'text/plain',
-  '.md': 'text/plain',
-  '.csv': 'text/plain',
+/**
+ * Canonical extension → MIME table (no leading dot). The stored extension is
+ * the single source of truth for the prompt MIME. Mirrors the web-side
+ * `CLOUD_AGENT_ATTACHMENT_EXTENSION_TO_MIME` constant; the wrapper
+ * `getPromptMime` resolves this exact table for the same filename suffix.
+ */
+export const PROMPT_MIME_BY_EXTENSION: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  md: 'text/plain',
+  csv: 'text/plain',
+  log: 'text/plain',
+  json: 'text/plain',
+  xml: 'text/plain',
+  yaml: 'text/plain',
+  yml: 'text/plain',
+  toml: 'text/plain',
+  ini: 'text/plain',
+  html: 'text/plain',
+  css: 'text/plain',
+  js: 'text/plain',
+  jsx: 'text/plain',
+  ts: 'text/plain',
+  tsx: 'text/plain',
+  py: 'text/plain',
+  rb: 'text/plain',
+  go: 'text/plain',
+  rs: 'text/plain',
+  java: 'text/plain',
+  c: 'text/plain',
+  h: 'text/plain',
+  cpp: 'text/plain',
+  hpp: 'text/plain',
+  sh: 'text/plain',
+  sql: 'text/plain',
 };
+
+export const PROMPT_MIME_FALLBACK = 'application/octet-stream';
 
 export function assertR2AttachmentDownloadConfigured<T extends R2AttachmentDownloadEnv>(
   env: T
@@ -92,10 +124,9 @@ export async function buildSignedPromptAttachments({
 
 function getPromptMime(filename: string): string {
   const dotIndex = filename.lastIndexOf('.');
-  const suffix = dotIndex >= 0 ? filename.slice(dotIndex).toLowerCase() : '';
-  const mime = PROMPT_MIME_BY_SUFFIX[suffix];
-  if (!mime) {
-    throw new Error('Invalid attachment filename');
-  }
-  return mime;
+  const extension = dotIndex >= 0 ? filename.slice(dotIndex + 1).toLowerCase() : '';
+  // No MIME-based extension inference anywhere: an unknown / missing /
+  // invalid extension (including the legacy `bin` no-extension fallback) is
+  // always treated as `application/octet-stream`.
+  return PROMPT_MIME_BY_EXTENSION[extension] ?? PROMPT_MIME_FALLBACK;
 }

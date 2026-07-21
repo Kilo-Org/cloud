@@ -37,6 +37,7 @@ const SETUP_COMMAND_ERROR_OUTPUT_MAX_BYTES = 4_096;
 const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const MAX_ATTACHMENT_BYTES = 5_242_880;
+const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
 
 function cleanTerminalOutput(text: string): string {
   return stripAnsi(text)
@@ -64,6 +65,16 @@ function boundedUtf8Tail(text: string, maxBytes: number): string {
     .subarray(bytes.length - maxBytes)
     .toString('utf8')
     .replace(/^\uFFFD/, '');
+}
+
+/**
+ * True for MIME classes that the prompt must surface as a `file://` part. Any
+ * other class (generic binary) is materialized to disk and exposed to the
+ * agent as an explanatory text part with the absolute path, filename, MIME,
+ * and size.
+ */
+function isPromptFileMime(mime: string): boolean {
+  return mime.startsWith('text/') || mime.startsWith('image/') || mime === 'application/pdf';
 }
 
 function createSetupOutputReporter(
@@ -807,53 +818,188 @@ function createSetupCommandDiagnostic(command: string, result: ExecResult): stri
   return parts.join(', ');
 }
 
-async function downloadAttachment(
+async function safeUnlink(filePath: string): Promise<void> {
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      logToFile(`attachment: failed to remove partial file ${filePath}: ${String(error)}`);
+    }
+  }
+}
+
+/**
+ * Bounded streaming read. We never trust the server's `content-length` header
+ * alone: the response body is pulled at most `MAX_ATTACHMENT_DOWNLOAD_BYTES`
+ * bytes. If the producer keeps producing after the cap, the read is aborted,
+ * the partial file is removed, and a typed overflow error is thrown.
+ */
+async function downloadBounded(
+  filePath: string,
+  response: Response
+): Promise<{ bytesWritten: number }> {
+  const body = response.body;
+  if (!body) {
+    throw new Error('Attachment download failed: empty body');
+  }
+
+  const handle = await fs.open(filePath, 'w');
+  let bytesWritten = 0;
+  let overflowed = false;
+  try {
+    const reader = body.getReader();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      const remaining = MAX_ATTACHMENT_DOWNLOAD_BYTES - bytesWritten;
+      if (value.byteLength >= remaining) {
+        const writable = MAX_ATTACHMENT_BYTES - bytesWritten;
+        await handle.write(value.subarray(0, writable));
+        bytesWritten += writable;
+        overflowed = true;
+        try {
+          await reader.cancel();
+        } catch {
+          // Ignore: we're tearing the connection down anyway.
+        }
+        break;
+      }
+      await handle.write(value);
+      bytesWritten += value.byteLength;
+    }
+  } catch (error) {
+    await safeUnlink(filePath);
+    throw error;
+  } finally {
+    await handle.close();
+  }
+
+  if (overflowed) {
+    await safeUnlink(filePath);
+    throw new Error('Attachment too large: bytes exceeded the 5 MiB cap');
+  }
+
+  return { bytesWritten };
+}
+
+export type DownloadResult =
+  | { kind: 'ok'; part: WrapperPromptPart; bytesWritten: number }
+  | { kind: 'failed'; part: WrapperPromptPart };
+
+/**
+ * Download a single attachment. Per-file failure (non-2xx response,
+ * read/timeout error, overflow) is converted to an explanatory text part so
+ * the rest of the prompt can still proceed; the whole-message abort path is
+ * reserved for non-attachment failures.
+ */
+async function downloadAndMaterializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
-  writeResponse: (filePath: string, response: Response) => Promise<number>
-): Promise<WrapperPromptPart> {
+  abortController: AbortController
+): Promise<DownloadResult> {
   await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
-  const response = await fetchImpl(attachment.signedUrl, {
-    signal: AbortSignal.timeout(120_000),
-  });
+
+  let response: Response;
+  try {
+    response = await fetchImpl(attachment.signedUrl, {
+      signal: abortController.signal,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      kind: 'failed',
+      part: {
+        type: 'text',
+        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
+      },
+    };
+  }
+
   if (!response.ok) {
-    throw new Error(`Attachment download failed: ${attachment.filename}`);
+    return {
+      kind: 'failed',
+      part: {
+        type: 'text',
+        text: `attachment ${attachment.filename} could not be retrieved (HTTP ${response.status})`,
+      },
+    };
   }
-  const contentLength = response.headers.get('content-length');
-  if (contentLength && Number(contentLength) > MAX_ATTACHMENT_BYTES) {
-    throw new Error(`Attachment too large: ${attachment.filename}`);
+
+  let result: { bytesWritten: number };
+  try {
+    result = await downloadBounded(attachment.localPath, response);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      kind: 'failed',
+      part: {
+        type: 'text',
+        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
+      },
+    };
   }
-  await writeResponse(attachment.localPath, response);
+
+  if (isPromptFileMime(attachment.mime)) {
+    return {
+      kind: 'ok',
+      part: {
+        type: 'file',
+        mime: attachment.mime,
+        url: `file://${attachment.localPath}`,
+        filename: attachment.filename,
+      },
+      bytesWritten: result.bytesWritten,
+    };
+  }
+
+  // Generic binary: surface as a text part with the absolute path so the
+  // agent can use shell tools against the file instead of receiving a
+  // `file://` part the Kilo SDK may not handle.
   return {
-    type: 'file',
-    mime: attachment.mime,
-    url: `file://${attachment.localPath}`,
-    filename: attachment.filename,
+    kind: 'ok',
+    part: {
+      type: 'text',
+      text: `binary attachment saved: filename=${attachment.filename} mime=${attachment.mime} size=${result.bytesWritten} path=${attachment.localPath}`,
+    },
+    bytesWritten: result.bytesWritten,
   };
 }
 
+export type MaterializeDeps = {
+  fetch?: typeof fetch;
+};
+
 export async function materializePromptAttachments(
   prompt: WrapperPromptRequest,
-  deps: {
-    fetch?: typeof fetch;
-    writeResponse?: (filePath: string, response: Response) => Promise<number>;
-  } = {}
+  deps: MaterializeDeps = {}
 ): Promise<WrapperPromptRequest> {
   if (!prompt.message.attachments?.length) return prompt;
   const fetchImpl = deps.fetch ?? fetch;
-  const writeResponse =
-    deps.writeResponse ?? ((filePath: string, response: Response) => Bun.write(filePath, response));
-  const fileParts: WrapperPromptPart[] = [];
+
+  const parts: WrapperPromptPart[] = [];
   for (const attachment of prompt.message.attachments) {
-    fileParts.push(await downloadAttachment(attachment, fetchImpl, writeResponse));
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+      () => abortController.abort(new Error('attachment download timeout')),
+      120_000
+    );
+    let result: DownloadResult;
+    try {
+      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, abortController);
+    } finally {
+      clearTimeout(timeout);
+    }
+    parts.push(result.part);
   }
+
   return {
     ...prompt,
     message: {
       ...prompt.message,
       parts: [
         ...(prompt.message.parts ?? [{ type: 'text', text: prompt.message.prompt ?? '' }]),
-        ...fileParts,
+        ...parts,
       ],
       prompt: undefined,
       attachments: undefined,

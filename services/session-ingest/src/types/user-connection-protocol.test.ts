@@ -197,6 +197,69 @@ describe('CLIOutboundMessageSchema', () => {
   });
 });
 
+describe('CLIOutboundMessageSchema capabilities', () => {
+  const baseSession = { id: 'ses_cap_1', status: 'busy', title: 'cap' };
+
+  it('accepts capabilities.attachments: true on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      protocolVersion: '1',
+      capabilities: { attachments: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: true });
+    }
+  });
+
+  it('accepts capabilities.attachments: false on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: false },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: false });
+    }
+  });
+
+  it('accepts an absent capabilities field on a heartbeat (legacy CLI)', () => {
+    const msg = { type: 'heartbeat', sessions: [baseSession] };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toBeUndefined();
+    }
+  });
+
+  it('accepts an empty capabilities object on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: {},
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({});
+    }
+  });
+
+  it('rejects a non-boolean capabilities.attachments value', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: 'yes' },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('CLIInboundMessageSchema', () => {
   it('parses valid subscribe', () => {
     const msg = { type: 'subscribe', sessionId: validSessionId };

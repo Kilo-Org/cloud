@@ -231,14 +231,18 @@ function sendHeartbeat(
     title: string;
     platform?: string;
   }>,
-  protocolVersion?: string,
-  instance?: { name: string; projectName: string; version?: string }
+  options: {
+    protocolVersion?: string;
+    capabilities?: { attachments?: boolean };
+    instance?: { name: string; projectName: string; version?: string };
+  } = {}
 ) {
   const msg = JSON.stringify({
     type: 'heartbeat',
     sessions,
-    ...(protocolVersion ? { protocolVersion } : {}),
-    ...(instance ? { instance } : {}),
+    ...(options.protocolVersion ? { protocolVersion: options.protocolVersion } : {}),
+    ...(options.capabilities ? { capabilities: options.capabilities } : {}),
+    ...(options.instance ? { instance: options.instance } : {}),
   });
   doInstance.webSocketMessage(cliWs as never, msg);
 }
@@ -528,11 +532,11 @@ describe('UserConnectionDO', () => {
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
-      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], '1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], { protocolVersion: '1' });
       sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
-      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], '1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], { protocolVersion: '1' });
 
       expect(parseSent(webWs)).toMatchObject({
         type: 'system',
@@ -604,6 +608,179 @@ describe('UserConnectionDO', () => {
 
       const msgs = allSent(cliWs);
       expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
+    });
+
+    // -----------------------------------------------------------------------
+    // capabilities transitions (decision 8): exercise true→absent, true→false,
+    // and absent/false→true through the actual DO event path and assert the
+    // projected value in BOTH aggregateSessions() and the sessions.heartbeat
+    // event rows, including omission when the latest heartbeat omits
+    // capabilities.
+    // -----------------------------------------------------------------------
+
+    it('projects capabilities.attachments=true on every aggregateSessions row when the owning CLI advertises it', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: true },
+      });
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.capabilities).toEqual({ attachments: true });
+      }
+    });
+
+    it('projects capabilities.attachments=true on every session row of the sessions.heartbeat event', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      // Establish ownership and subscription first so the heartbeat broadcast
+      // is targeted at this web socket.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+      sendSubscribe(doInstance, webWs, 's1');
+      webWs.send.mockClear();
+
+      // Now advertise capabilities: the broadcast heartbeat must carry the
+      // capabilities on the message envelope, but each session row only
+      // carries its own owning-connection identity (capabilities is read from
+      // the connection, not the per-session row of the broadcast). The S3b
+      // SDK consumer re-attaches capabilities per-row in the consumer layer.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: true },
+      });
+
+      const sent = parseSent(webWs) as { data: { capabilities?: unknown; sessions: unknown[] } };
+      expect(sent.data.capabilities).toEqual({ attachments: true });
+      expect(sent.data.sessions).toHaveLength(2);
+
+      // aggregateSessions() must still surface the latest capabilities, which
+      // is the S3b consumer's source of truth for the per-row projection.
+      const rows = doInstance.getActiveSessions();
+      for (const row of rows) {
+        expect(row.capabilities).toEqual({ attachments: true });
+      }
+    });
+
+    it('omits capabilities from aggregateSessions rows when the latest heartbeat omits the field (legacy CLI)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // First heartbeat with capabilities
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+      // Second heartbeat omits capabilities (CLI rollback / legacy)
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).not.toHaveProperty('capabilities');
+    });
+
+    it('omits capabilities from sessions.heartbeat event envelope when the latest heartbeat omits the field', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+      sendSubscribe(doInstance, webWs, 's1');
+      webWs.send.mockClear();
+
+      // Latest heartbeat omits capabilities.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const sent = parseSent(webWs) as { data: Record<string, unknown> };
+      expect(sent.data).not.toHaveProperty('capabilities');
+    });
+
+    it('flips capabilities.attachments from true to false on the next heartbeat (CLI revocation)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+      expect(doInstance.getActiveSessions()[0].capabilities).toEqual({ attachments: true });
+
+      // CLI advertises attachments=false (e.g. feature gated, profile change)
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: false },
+      });
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].capabilities).toEqual({ attachments: false });
+    });
+
+    it('flips capabilities.attachments from absent to true when a legacy CLI starts advertising it', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // Legacy heartbeat — no capabilities field
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      const legacy = doInstance.getActiveSessions();
+      expect(legacy[0]).not.toHaveProperty('capabilities');
+
+      // Upgraded CLI starts advertising attachments=true
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+
+      const upgraded = doInstance.getActiveSessions();
+      expect(upgraded[0].capabilities).toEqual({ attachments: true });
+    });
+
+    it('flips capabilities.attachments from false to true on the next heartbeat', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: false },
+      });
+      expect(doInstance.getActiveSessions()[0].capabilities).toEqual({ attachments: false });
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')], {
+        capabilities: { attachments: true },
+      });
+
+      expect(doInstance.getActiveSessions()[0].capabilities).toEqual({ attachments: true });
+    });
+
+    it('projects the same owning-connection capabilities on every session row of a multi-session heartbeat', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: false },
+      });
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(2);
+      expect(rows[0].capabilities).toEqual({ attachments: false });
+      expect(rows[1].capabilities).toEqual({ attachments: false });
+    });
+
+    it('reconstructs capabilities from a hibernated CLI attachment', () => {
+      const { doInstance, mockCtx } = setup();
+      // Pre-existing attachment with capabilities — simulates a socket that
+      // was accepted before the DO was evicted.
+      const cliWs = createMockWs(['cli'], {
+        role: 'cli',
+        connectionId: 'cli-hiber',
+        sessions: [makeSession('s1')],
+        capabilities: { attachments: true },
+      });
+      mockCtx.addSocket(cliWs);
+
+      const rows = doInstance.getActiveSessions();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].capabilities).toEqual({ attachments: true });
     });
   });
 
@@ -2916,7 +3093,9 @@ describe('UserConnectionDO', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
-      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')], '1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'busy', 'Fix bug')], {
+        protocolVersion: '1',
+      });
 
       const result = doInstance.getActiveSessions();
       expect(result).toEqual([
@@ -3082,10 +3261,9 @@ describe('UserConnectionDO', () => {
     it('persists `instance` in the WS attachment across heartbeats', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
-      sendHeartbeat(doInstance, cliWs, [], '1', {
-        name: 'laptop-1',
-        projectName: 'kilo',
-        version: '0.1.0',
+      sendHeartbeat(doInstance, cliWs, [], {
+        protocolVersion: '1',
+        instance: { name: 'laptop-1', projectName: 'kilo', version: '0.1.0' },
       });
 
       const att = cliWs.deserializeAttachment() as { instance?: { name: string } };
@@ -3096,9 +3274,8 @@ describe('UserConnectionDO', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       // First heartbeat: with instance.
-      sendHeartbeat(doInstance, cliWs, [], undefined, {
-        name: 'laptop-1',
-        projectName: 'kilo',
+      sendHeartbeat(doInstance, cliWs, [], {
+        instance: { name: 'laptop-1', projectName: 'kilo' },
       });
       // Second heartbeat: instance removed (legacy fallback). The DO must not
       // keep a stale `instance` value in the attachment.

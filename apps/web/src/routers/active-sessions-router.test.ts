@@ -6,6 +6,13 @@ import { organizations, organization_memberships } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
 
+// NOTE: `activeSessionSchema` validation is covered in the sibling
+// `active-sessions-router.schema.test.ts`. It is deliberately NOT imported
+// here: a static import of the router module evaluates `config.server.ts`
+// (and freezes `SESSION_INGEST_WORKER_URL` at the empty `.env.test` value)
+// before the `beforeAll` below can set the env — which is exactly what the
+// dynamic-import dance is designed to avoid.
+
 // `.env.test` sets SESSION_INGEST_WORKER_URL to '' (shared fixture used by
 // other test files too — do not change it here). `createCallerForUser`'s
 // import chain (test-utils -> trpc/init -> ...) transitively loads

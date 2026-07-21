@@ -4,6 +4,26 @@ import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import type { SandboxId } from '../types.js';
 
 /**
+ * Attachment filename extension deny-list shared by every worker-layer
+ * validator (persistence schema, runtime download helper). Centralized here
+ * so the worker never ships a path that the storage layer would later
+ * reject.
+ */
+export const CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS = [
+  'exe',
+  'dll',
+  'msi',
+  'com',
+  'scr',
+  'apk',
+  'ipa',
+  'dmg',
+  'pkg',
+] as const;
+
+const CLOUD_AGENT_DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
+
+/**
  * Schema for callback target configuration.
  * Defined here to avoid circular dependency with router/schemas.ts.
  */
@@ -21,14 +41,31 @@ const attachmentMessageUuidSchema = z
   .uuid()
   .describe('Bare message upload UUID; service prefix is derived by the worker');
 
+/**
+ * Filename regex shape for stored attachments. The relaxed post-S2 surface
+ * accepts any `^[a-z0-9]{1,16}$` suffix after the UUID prefix. The deny-list
+ * is enforced as a refinement.
+ */
+const ATTACHMENT_RELAXED_FILENAME_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.[a-z0-9]{1,16}$/;
+
 const attachmentFilenameSchema = z
   .string()
   .min(1)
   .max(128)
   .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/,
-    'Attachment filename must be a UUID with extension png, jpg, jpeg, webp, gif, pdf, txt, md, or csv'
-  );
+    ATTACHMENT_RELAXED_FILENAME_REGEX,
+    'Attachment filename must be a UUID with a 1-16 character lowercase alphanumeric extension'
+  )
+  .superRefine((filename, ctx) => {
+    const suffix = filename.slice(filename.lastIndexOf('.') + 1).toLowerCase();
+    if (CLOUD_AGENT_DENIED_EXTENSION_SET.has(suffix)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Attachment extension "${suffix}" is not allowed`,
+      });
+    }
+  });
 
 export const AttachmentsSchema = z.object({
   path: attachmentMessageUuidSchema,

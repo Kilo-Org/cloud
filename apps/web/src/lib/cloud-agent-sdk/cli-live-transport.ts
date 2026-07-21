@@ -52,6 +52,15 @@ type CliLiveTransportConfig = {
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
+  /**
+   * Fired whenever the per-session capabilities advertised by the owning
+   * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
+   * reconnect, or absent). The payload is the latest capabilities — `undefined`
+   * means the CLI has not reported any (older CLIs, mid-reconnect, or a CLI
+   * whose session list dropped this session). The session manager uses this
+   * to recompute the `supportsAttachments` gate.
+   */
+  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
 };
 
 // How long after a reconnect to re-fetch the snapshot a second time. Covers
@@ -83,6 +92,21 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     let sessionStopped = false;
     let ownerConnectionId: string | null = null;
     let lastForwardedHeartbeatStatus: string | null = null;
+    /**
+     * Latest per-session capabilities observed in a `sessions.heartbeat` or
+     * `sessions.list` payload for this session. `undefined` means the CLI
+     * has not reported any (older CLIs, mid-reconnect, or a heartbeat/list
+     * payload that omitted this session). Compared structurally on every
+     * new observation; only emitted on a real change.
+     */
+    let currentCapabilities: { attachments?: boolean } | undefined = undefined;
+    function publishCapabilities(next: { attachments?: boolean } | undefined): void {
+      const previousAttachments = currentCapabilities?.attachments;
+      const nextAttachments = next?.attachments;
+      if (previousAttachments === nextAttachments) return;
+      currentCapabilities = next;
+      config.onCapabilitiesChange?.(next);
+    }
     let catalogRequestGeneration = 0;
     let catalogRequestInFlight: { ownerConnectionId: string; generation: number } | null = null;
     // Command catalog discovery runs on its own generation so it stays
@@ -176,6 +200,11 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           commands: snapshotCommands(),
         });
       }
+      // A CLI handoff or a permanent drop invalidates whatever the prior
+      // owner reported — the new owner has to re-advertise before any
+      // capability re-enables. Empty currentCapabilities also drives the
+      // existing 'idle' reset on the consumer side.
+      publishCapabilities(undefined);
       config.onCapabilityChange?.();
 
       if (nextOwnerConnectionId) {
@@ -502,6 +531,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           setOwnerConnectionId(session.connectionId);
           sessionStopped = false;
           forwardHeartbeatStatus(session.status);
+          publishCapabilities(session.capabilities);
           return;
         }
 
@@ -519,6 +549,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           setOwnerConnectionId(parsed.data.connectionId);
           sessionStopped = false;
           forwardHeartbeatStatus(session.status);
+          publishCapabilities(session.capabilities);
           return;
         }
 
@@ -615,6 +646,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         catalogRequestInFlight = null;
         commandCatalogRequestGeneration += 1;
         commandCatalogRequestInFlight = null;
+        publishCapabilities(undefined);
         publishRemoteModelState({
           ownerConnectionId: null,
           protocol: 'unknown',
@@ -748,6 +780,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           handleSystemMessage(msg.event, msg.data);
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
+          // Recompute the capability gate fail-closed immediately. The prior
+          // owner may have been attachment-capable, but after a reconnect we
+          // must wait for the next heartbeat / sessions.list to re-advertise.
+          publishCapabilities(undefined);
           replayCurrentSnapshot(false);
           // The snapshot store lags the live stream, and the CLI only forwards
           // events "from now" after a resubscribe — parts finalized while the
@@ -848,9 +884,28 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         }
         const payload = input.payload;
         const remoteModel = getRemoteModelFields(input);
+        const parts: Array<
+          | { type: 'text'; text: string }
+          | {
+              type: 'file';
+              mime: string;
+              filename: string;
+              url: string;
+            }
+        > = [{ type: 'text', text: payload.prompt }];
+        if (input.attachmentParts && input.attachmentParts.length > 0) {
+          for (const part of input.attachmentParts) {
+            parts.push({
+              type: 'file',
+              mime: part.mime,
+              filename: part.filename,
+              url: part.url,
+            });
+          }
+        }
         return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
-          parts: [{ type: 'text', text: payload.prompt }],
+          parts,
           ...(payload.mode ? { agent: payload.mode } : {}),
           ...(remoteModel.kind === 'none'
             ? {}

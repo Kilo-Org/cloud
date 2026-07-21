@@ -35,6 +35,7 @@ import type {
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
+import type { RemoteAttachmentPart } from './transport';
 import type { NormalizedEvent } from './normalizer';
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,7 @@ const mockSessionCallbacks: {
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onTransportCapabilityChange?: () => void;
+  onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
@@ -150,6 +152,7 @@ jest.mock('./session', () => ({
       onRemoteModelStateChange?: (state: RemoteModelState) => void;
       onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
       onTransportCapabilityChange?: () => void;
+      onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
       onEvent?: (event: NormalizedEvent) => void;
       onMessageQueued?: (messageId: string) => void;
       onMessageCompleted?: (messageId: string) => void;
@@ -220,6 +223,8 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onRemoteModelStateChange = sessionConfig.onRemoteModelStateChange;
       mockSessionCallbacks.onRemoteCommandStateChange = sessionConfig.onRemoteCommandStateChange;
       mockSessionCallbacks.onTransportCapabilityChange = sessionConfig.onTransportCapabilityChange;
+      mockSessionCallbacks.onTransportCapabilitiesChange =
+        sessionConfig.onTransportCapabilitiesChange;
       mockSessionCallbacks.onEvent = sessionConfig.onEvent;
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
       mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
@@ -415,6 +420,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onResolved = undefined;
     mockSessionCallbacks.onRemoteModelStateChange = undefined;
     mockSessionCallbacks.onTransportCapabilityChange = undefined;
+    mockSessionCallbacks.onTransportCapabilitiesChange = undefined;
     mockSessionCallbacks.onEvent = undefined;
     mockSessionCallbacks.onMessageQueued = undefined;
     mockSessionCallbacks.onMessageCompleted = undefined;
@@ -4103,5 +4109,221 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(
       atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
     ).toEqual(['msg-current']);
+  });
+
+  // -------------------------------------------------------------------------
+  // supportsAttachments gate
+  // -------------------------------------------------------------------------
+
+  describe('supportsAttachments gate', () => {
+    it('heartbeat absent -> true upgrade flips supportsAttachments true', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+    });
+
+    it('true -> false downgrade flips supportsAttachments false', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+    });
+
+    it('true -> absent flips supportsAttachments false', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
+
+      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // send attachment gating
+  // -------------------------------------------------------------------------
+
+  describe('send attachment gating', () => {
+    it('cloud-agent send with attachments forwards to session.send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const attachments = {
+        path: '12345678-1234-4234-9234-123456789abc',
+        files: ['87654321-4321-4321-8321-cba987654321.md'],
+      };
+      mockSession.send.mockResolvedValue(undefined);
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments,
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
+        },
+        attachments,
+        images: undefined,
+      });
+    });
+
+    it('cloud-agent send with attachments: undefined drops the field', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockResolvedValue(undefined);
+
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments: undefined,
+      });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
+        },
+        images: undefined,
+      });
+      expect(
+        (
+          mockSession.send.mock.calls[0] as [
+            {
+              attachments?: unknown;
+            },
+          ]
+        )[0].attachments
+      ).toBeUndefined();
+    });
+
+    it('non-capable remote + non-empty attachmentParts rejects before transport send', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const attachmentParts: RemoteAttachmentPart[] = [
+        {
+          type: 'file',
+          mime: 'text/plain',
+          filename: 'file.txt',
+          url: 'https://example.com/file.txt',
+        },
+      ];
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachmentParts,
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        expect.any(String),
+        expect.objectContaining({
+          message: 'Only capable remote CLI sessions support attachments',
+        })
+      );
+    });
+
+    it('non-cloud + attachments rejects before transport send', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachments: {
+          path: '12345678-1234-4234-9234-123456789abc',
+          files: ['87654321-4321-4321-8321-cba987654321.md'],
+        },
+      });
+
+      expect(accepted).toBe(false);
+      expect(mockSession.send).not.toHaveBeenCalled();
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('Hello');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'Hello',
+        expect.any(String),
+        expect.objectContaining({
+          message: 'Only Cloud Agent sessions support attachments',
+        })
+      );
+    });
+
+    it('capable remote + attachmentParts forwards to session.send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const attachmentParts: RemoteAttachmentPart[] = [
+        {
+          type: 'file',
+          mime: 'text/plain',
+          filename: 'file.txt',
+          url: 'https://example.com/file.txt',
+        },
+      ];
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        attachmentParts,
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+        },
+        images: undefined,
+        attachmentParts,
+      });
+    });
   });
 });

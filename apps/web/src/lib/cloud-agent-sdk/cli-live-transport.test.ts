@@ -15,6 +15,7 @@ import {
 } from './user-web-connection';
 import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
+import type { RemoteAttachmentPart } from './transport';
 
 const KILO_SESSION_ID = kiloId('kilo-ses-1');
 const NEW_KILO_SESSION_ID = 'ses_12345678901234567890123456';
@@ -156,6 +157,7 @@ function createTransportWithSinks(opts?: {
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
   onCapabilityChange?: () => void;
+  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
 }) {
   const userWebConnection = opts?.connection ?? createConnection();
   const chatEvents: ChatEvent[] = [];
@@ -169,6 +171,7 @@ function createTransportWithSinks(opts?: {
     onRemoteModelStateChange: opts?.onRemoteModelStateChange,
     onRemoteCommandStateChange: opts?.onRemoteCommandStateChange,
     onCapabilityChange: opts?.onCapabilityChange,
+    onCapabilitiesChange: opts?.onCapabilitiesChange,
   })({
     onChatEvent: event => chatEvents.push(event),
     onServiceEvent: event => serviceEvents.push(event),
@@ -201,6 +204,22 @@ function emitMessageUpdated(connection: FakeUserWebConnection, sessionId = KILO_
     data: {
       info: { id: 'msg-live', sessionID: sessionId, role: 'assistant', time: { created: 1 } },
     },
+  });
+}
+
+function emitHeartbeat(
+  connection: FakeUserWebConnection,
+  sessions: Array<{
+    id: string;
+    status: string;
+    title: string;
+    capabilities?: { attachments?: boolean };
+  }>,
+  connectionId = 'owner'
+): void {
+  connection.emitSystem({
+    event: 'sessions.heartbeat',
+    data: { connectionId, sessions },
   });
 }
 
@@ -3120,6 +3139,215 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     expect(onError).not.toHaveBeenCalled();
     expect(chatEvents).toHaveLength(1);
     expect(getReplayCompleteCount()).toBeGreaterThanOrEqual(2);
+    transport.destroy();
+  });
+});
+
+describe('CliLiveTransport remote attachment capabilities', () => {
+  it('publishes heartbeat attachments: true via onCapabilitiesChange', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const capabilities: ({ attachments?: boolean } | undefined)[] = [];
+    const { transport, userWebConnection } = createTransportWithSinks({
+      connection,
+      onCapabilitiesChange: capability => capabilities.push(capability),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    emitHeartbeat(userWebConnection, [
+      {
+        id: KILO_SESSION_ID,
+        status: 'active',
+        title: 'Tracked',
+        capabilities: { attachments: true },
+      },
+    ]);
+
+    expect(capabilities.at(-1)).toEqual({ attachments: true });
+
+    emitHeartbeat(userWebConnection, [
+      {
+        id: KILO_SESSION_ID,
+        status: 'active',
+        title: 'Tracked',
+        capabilities: { attachments: false },
+      },
+    ]);
+
+    expect(capabilities.at(-1)).toEqual({ attachments: false });
+    transport.destroy();
+  });
+
+  it('publishes sessions.list capability changes via onCapabilitiesChange', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const capabilities: ({ attachments?: boolean } | undefined)[] = [];
+    const { transport, userWebConnection } = createTransportWithSinks({
+      connection,
+      onCapabilitiesChange: capability => capabilities.push(capability),
+    });
+
+    transport.connect();
+    userWebConnection.emitSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          {
+            id: KILO_SESSION_ID,
+            status: 'active',
+            title: 'Tracked',
+            connectionId: 'owner',
+            capabilities: { attachments: true },
+          },
+        ],
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(capabilities.at(-1)).toEqual({ attachments: true });
+
+    userWebConnection.emitSystem({
+      event: 'sessions.list',
+      data: {
+        sessions: [
+          {
+            id: KILO_SESSION_ID,
+            status: 'active',
+            title: 'Tracked',
+            connectionId: 'owner',
+            capabilities: { attachments: false },
+          },
+        ],
+      },
+    });
+
+    expect(capabilities.at(-1)).toEqual({ attachments: false });
+    transport.destroy();
+  });
+
+  it('publishes undefined on reconnect then re-advertises via heartbeat', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const capabilities: ({ attachments?: boolean } | undefined)[] = [];
+    const { transport, userWebConnection } = createTransportWithSinks({
+      connection,
+      onCapabilitiesChange: capability => capabilities.push(capability),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    emitHeartbeat(userWebConnection, [
+      {
+        id: KILO_SESSION_ID,
+        status: 'active',
+        title: 'Tracked',
+        capabilities: { attachments: true },
+      },
+    ]);
+    expect(capabilities.at(-1)).toEqual({ attachments: true });
+
+    userWebConnection.emitReconnect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The gate must close immediately on reconnect, before the next
+    // heartbeat/sessions.list has a chance to re-advertise.
+    expect(capabilities.at(-1)).toBeUndefined();
+
+    emitHeartbeat(userWebConnection, [
+      {
+        id: KILO_SESSION_ID,
+        status: 'active',
+        title: 'Tracked',
+        capabilities: { attachments: true },
+      },
+    ]);
+    expect(capabilities.at(-1)).toEqual({ attachments: true });
+
+    transport.destroy();
+  });
+});
+
+describe('CliLiveTransport send_message parts', () => {
+  it('appends file parts after the text part in send_message', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : { ok: true })
+      );
+    const { userWebConnection, transport } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+
+    const attachmentParts: RemoteAttachmentPart[] = [
+      {
+        type: 'file',
+        mime: 'text/plain',
+        filename: 'msg-uuid.txt',
+        url: 'https://r2.example.com/msg-uuid.txt',
+      },
+      {
+        type: 'file',
+        mime: 'image/png',
+        filename: 'msg-uuid.png',
+        url: 'https://r2.example.com/msg-uuid.png',
+      },
+    ];
+
+    await transport.send?.({
+      payload: { type: 'prompt', prompt: 'look at these files' },
+      attachmentParts,
+    });
+
+    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      'send_message',
+      {
+        sessionID: KILO_SESSION_ID,
+        parts: [
+          { type: 'text', text: 'look at these files' },
+          {
+            type: 'file',
+            mime: 'text/plain',
+            filename: 'msg-uuid.txt',
+            url: 'https://r2.example.com/msg-uuid.txt',
+          },
+          {
+            type: 'file',
+            mime: 'image/png',
+            filename: 'msg-uuid.png',
+            url: 'https://r2.example.com/msg-uuid.png',
+          },
+        ],
+      },
+      'owner'
+    );
     transport.destroy();
   });
 });

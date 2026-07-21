@@ -24,6 +24,10 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
     // Absent on CLI builds older than the protocolVersion field itself — treat
     // a missing value as a legacy CLI with no negotiated wire protocol.
     protocolVersion: z.string().optional(),
+    // Per-connection capabilities advertised by the CLI. Absent on CLIs that
+    // predate the field — treated as a legacy CLI with no opt-in features
+    // (e.g. attachment uploads from the mobile viewer).
+    capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
     // Optional identity of the spawning CLI process. Absent on legacy CLIs
     // (which are not spawned by `kilo remote`). When present, the DO
     // persists it in the WebSocket attachment and exposes it via

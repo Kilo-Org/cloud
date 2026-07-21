@@ -63,6 +63,26 @@ function asFetch(
   return Object.assign(fn, { preconnect: fetch.preconnect });
 }
 
+function makeByteStream(totalBytes: number): ReadableStream<Uint8Array> {
+  const chunk = new Uint8Array(64 * 1024);
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      let pushed = 0;
+      while (pushed < totalBytes) {
+        const remaining = totalBytes - pushed;
+        if (remaining >= chunk.byteLength) {
+          controller.enqueue(chunk);
+          pushed += chunk.byteLength;
+        } else {
+          controller.enqueue(chunk.subarray(0, remaining));
+          pushed += remaining;
+        }
+      }
+      controller.close();
+    },
+  });
+}
+
 async function createCompleteGitWorkspace(workspacePath: string): Promise<void> {
   const gitPath = path.join(workspacePath, '.git');
   await fsp.mkdir(gitPath, { recursive: true });
@@ -1324,10 +1344,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(async () => new Response('image-bytes', { status: 200 })),
-      writeResponse: async (filePath, response) => {
-        await fsp.writeFile(filePath, await response.text());
-        return 11;
-      },
     });
 
     expect(result.message.parts).toEqual([
@@ -1339,6 +1355,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         filename: 'diagram.png',
       },
     ]);
+    expect(await fsp.readFile(path.join(tmpDir, 'diagram.png'), 'utf8')).toBe('image-bytes');
     expect(result.message.attachments).toBeUndefined();
   });
 
@@ -1368,11 +1385,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(async () => new Response('pdf-bytes', { status: 200 })),
-      writeResponse: async (filePath, response) => {
-        const bytes = await response.text();
-        await fsp.writeFile(filePath, bytes);
-        return bytes.length;
-      },
     });
 
     expect(result.message.parts).toEqual([
@@ -1384,6 +1396,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         filename: 'spec.pdf',
       },
     ]);
+    expect(await fsp.readFile(pdfPath, 'utf8')).toBe('pdf-bytes');
   });
 
   it.each([
@@ -1415,11 +1428,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(async () => new Response(content, { status: 200 })),
-      writeResponse: async (filePath, response) => {
-        const bytes = await response.text();
-        await fsp.writeFile(filePath, bytes);
-        return bytes.length;
-      },
     });
 
     expect(result.message.parts).toContainEqual({
@@ -1428,20 +1436,20 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       url: `file://${localPath}`,
       filename,
     });
+    expect(await fsp.readFile(localPath, 'utf8')).toBe(content);
   });
 
-  it('rejects attachments with an oversized content-length before writing', async () => {
-    const localPath = path.join(tmpDir, 'too-large.pdf');
-    const writeResponse = mock(async () => 0);
+  it('replaces an oversized attachment with an explanatory text part and deletes the partial file', async () => {
+    const localPath = path.join(tmpDir, 'too-large.bin');
     const prompt: WrapperPromptRequest = {
       message: {
-        id: 'msg_header_limit',
-        prompt: 'Read this PDF',
+        id: 'msg_overflow',
+        prompt: 'Process this binary',
         attachments: [
           {
-            filename: 'too-large.pdf',
-            mime: 'application/pdf',
-            signedUrl: 'https://r2.example.com/too-large.pdf',
+            filename: 'too-large.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/too-large.bin',
             localPath,
           },
         ],
@@ -1455,24 +1463,316 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
-    let error: Error | undefined;
-    try {
-      await materializePromptAttachments(prompt, {
-        fetch: asFetch(
-          async () =>
-            new Response('not-written', {
-              status: 200,
-              headers: { 'content-length': '5242881' },
-            })
-        ),
-        writeResponse,
-      });
-    } catch (caught) {
-      error = caught instanceof Error ? caught : new Error(String(caught));
-    }
+    // Stream 6 MiB of bytes (one more than the 5 MiB + 1 cap) so the
+    // bounded reader triggers the overflow branch deterministically.
+    const total = 6 * 1024 * 1024;
+    const chunk = new Uint8Array(64 * 1024);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        let pushed = 0;
+        while (pushed < total) {
+          const remaining = total - pushed;
+          if (remaining >= chunk.byteLength) {
+            controller.enqueue(chunk);
+            pushed += chunk.byteLength;
+          } else {
+            controller.enqueue(chunk.subarray(0, remaining));
+            pushed += remaining;
+          }
+        }
+        controller.close();
+      },
+    });
 
-    expect(error?.message).toBe('Attachment too large: too-large.pdf');
-    expect(writeResponse).not.toHaveBeenCalled();
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response(body, { status: 200 })),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this binary' },
+      {
+        type: 'text',
+        text: 'attachment too-large.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+      },
+    ]);
     expect(fs.existsSync(localPath)).toBe(false);
+  });
+
+  it('materializes a file exactly at the 5 MiB cap as a binary text part', async () => {
+    const localPath = path.join(tmpDir, 'exactly-5-mib.bin');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_exact',
+        prompt: 'Process this file',
+        attachments: [
+          {
+            filename: 'exactly-5-mib.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/exactly-5-mib.bin',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response(makeByteStream(5 * 1024 * 1024), { status: 200 })),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this file' },
+      {
+        type: 'text',
+        text: `binary attachment saved: filename=exactly-5-mib.bin mime=application/octet-stream size=${5 * 1024 * 1024} path=${localPath}`,
+      },
+    ]);
+    expect(fs.existsSync(localPath)).toBe(true);
+  });
+
+  it('rejects a file one byte over the 5 MiB cap and deletes the partial file', async () => {
+    const localPath = path.join(tmpDir, 'one-byte-over.bin');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_over',
+        prompt: 'Process this file',
+        attachments: [
+          {
+            filename: 'one-byte-over.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/one-byte-over.bin',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(
+        async () => new Response(makeByteStream(5 * 1024 * 1024 + 1), { status: 200 })
+      ),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this file' },
+      {
+        type: 'text',
+        text: 'attachment one-byte-over.bin could not be retrieved (Attachment too large: bytes exceeded the 5 MiB cap)',
+      },
+    ]);
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
+
+  it('deletes the partial file when a mid-transfer read fails', async () => {
+    const localPath = path.join(tmpDir, 'interrupted.bin');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_interrupted',
+        prompt: 'Process this file',
+        attachments: [
+          {
+            filename: 'interrupted.bin',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/interrupted.bin',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const chunk = new Uint8Array(64 * 1024);
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(chunk);
+        controller.error(new Error('stream reset'));
+      },
+    });
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response(body, { status: 200 })),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Process this file' },
+      {
+        type: 'text',
+        text: 'attachment interrupted.bin could not be retrieved (stream reset)',
+      },
+    ]);
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
+
+  it('continues with text-only parts when a non-2xx response aborts one attachment', async () => {
+    const okPath = path.join(tmpDir, 'ok.png');
+    const failPath = path.join(tmpDir, 'missing.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_403',
+        prompt: 'Show me both',
+        attachments: [
+          {
+            filename: 'missing.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/missing.png',
+            localPath: failPath,
+          },
+          {
+            filename: 'ok.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/ok.png',
+            localPath: okPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async input => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        if (url === 'https://r2.example.com/missing.png') {
+          return new Response('forbidden', { status: 403 });
+        }
+        return new Response('png-bytes', { status: 200 });
+      }),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Show me both' },
+      {
+        type: 'text',
+        text: 'attachment missing.png could not be retrieved (HTTP 403)',
+      },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${okPath}`,
+        filename: 'ok.png',
+      },
+    ]);
+    expect(fs.existsSync(failPath)).toBe(false);
+    expect(await fsp.readFile(okPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('converts a network/timeout failure into an explanatory text part and continues', async () => {
+    const okPath = path.join(tmpDir, 'ok.json');
+    const failPath = path.join(tmpDir, 'bad.json');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_network',
+        prompt: 'Read both',
+        attachments: [
+          {
+            filename: 'bad.json',
+            mime: 'text/plain',
+            signedUrl: 'https://r2.example.com/bad.json',
+            localPath: failPath,
+          },
+          {
+            filename: 'ok.json',
+            mime: 'text/plain',
+            signedUrl: 'https://r2.example.com/ok.json',
+            localPath: okPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async input => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        if (url === 'https://r2.example.com/bad.json') {
+          throw new Error('socket hang up');
+        }
+        return new Response('{"ok":true}', { status: 200 });
+      }),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Read both' },
+      {
+        type: 'text',
+        text: 'attachment bad.json could not be retrieved (socket hang up)',
+      },
+      {
+        type: 'file',
+        mime: 'text/plain',
+        url: `file://${okPath}`,
+        filename: 'ok.json',
+      },
+    ]);
+    expect(fs.existsSync(failPath)).toBe(false);
+    expect(await fsp.readFile(okPath, 'utf8')).toBe('{"ok":true}');
+  });
+
+  it('materializes a generic binary attachment as a text part describing the saved file', async () => {
+    const localPath = path.join(tmpDir, 'payload.zip');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_zip',
+        prompt: 'Extract the archive',
+        attachments: [
+          {
+            filename: 'payload.zip',
+            mime: 'application/octet-stream',
+            signedUrl: 'https://r2.example.com/payload.zip',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => new Response('zip-payload', { status: 200 })),
+    });
+
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Extract the archive' },
+      {
+        type: 'text',
+        text: `binary attachment saved: filename=payload.zip mime=application/octet-stream size=11 path=${localPath}`,
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('zip-payload');
   });
 });

@@ -10,6 +10,24 @@ import type { Images } from '@/lib/images-schema';
 import type { CloudAgentSessionId, KiloSessionId } from './types';
 import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
 
+/**
+ * Ready-to-render file part for a remote-CLI `send_message` call. Distinct
+ * from the cloud-only `attachments` field on {@link TransportSendInput}:
+ * the remote CLI fetches these from the `url` and classifies them by
+ * their `filename` (which MUST be the server-issued `<uuid>.<ext>`) and
+ * `mime` (which the caller derives from the validated extension).
+ *
+ * Deliberately the minimum the CLI needs: `id` / `sessionID` / `messageID`
+ * are not part of the send payload because the CLI assigns them when it
+ * materializes the user message.
+ */
+type RemoteAttachmentPart = {
+  type: 'file';
+  mime: string;
+  filename: string;
+  url: string;
+};
+
 type CloudAgentStreamTicket = {
   ticket: string;
   /** Unix timestamp in seconds when the ticket expires. */
@@ -67,6 +85,15 @@ type TransportSendInput = {
   attachments?: CloudAgentAttachments;
   images?: Images;
   remoteModelOverride?: RemoteModelOverride;
+  /**
+   * Ready file parts to append to the remote CLI's `send_message` `parts`
+   * array (after the text part). Distinct from the cloud-only `attachments`
+   * field: this path is for CAPABLE remote CLI sessions (the session
+   * advertised `capabilities.attachments: true` in its most recent
+   * heartbeat). Transports that don't support the path (cloud-agent, read-
+   * only, non-capable remote) ignore it.
+   */
+  attachmentParts?: RemoteAttachmentPart[];
 };
 
 /** Lifecycle interface for a transport. */
@@ -141,6 +168,7 @@ export type {
   CloudAgentSendPayload,
   CloudAgentStreamTicket,
   CloudAgentStreamTicketResult,
+  RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
   Transport,

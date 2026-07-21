@@ -1,4 +1,3 @@
-import { formatFileSize } from '@kilocode/kilo-chat';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { AlertCircle, File as FileIcon, X } from 'lucide-react-native';
 
@@ -7,6 +6,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -29,19 +29,27 @@ function AttachmentChip({
   const isImage = attachment.kind === 'image';
   const isUploading = attachment.status === 'pending' || attachment.status === 'uploading';
   const isErrored = attachment.status === 'error';
+  const description = describeAttachmentChip({
+    filename: attachment.filename,
+    size: attachment.size,
+    status: attachment.status,
+    progress: attachment.progress,
+    terminal: attachment.terminal,
+  });
 
   return (
     <Pressable
-      onPress={isErrored ? onRetry : undefined}
-      disabled={!isErrored}
+      onPress={description.showRetry ? onRetry : undefined}
+      disabled={!description.showRetry}
       className={cn(
         'relative mr-2 overflow-hidden rounded-md border border-border bg-card',
         isImage ? 'h-16 w-20' : 'h-12 w-48 flex-row items-center gap-2 px-2',
-        isErrored && 'border-destructive active:opacity-70'
+        description.showRetry && 'border-destructive active:opacity-70',
+        isErrored && !description.showRetry && 'border-destructive/60'
       )}
-      accessibilityRole={isErrored ? 'button' : undefined}
+      accessibilityRole={description.showRetry ? 'button' : undefined}
       accessibilityLabel={
-        isErrored
+        description.showRetry
           ? `Retry uploading ${attachment.filename}`
           : `${attachment.filename}, ${attachment.status}`
       }
@@ -62,10 +70,10 @@ function AttachmentChip({
           )}
           <View className="min-w-0 flex-1">
             <Text numberOfLines={1} className="text-xs text-foreground">
-              {attachment.filename}
+              {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {formatFileSize(attachment.size)}
+              {description.message ?? `${description.sizeText} · ${description.progressText}`}
             </Text>
           </View>
         </View>
@@ -83,15 +91,17 @@ function AttachmentChip({
         </View>
       ) : null}
 
-      <Pressable
-        onPress={onRemove}
-        hitSlop={REMOVE_HIT_SLOP}
-        className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={`Remove attachment ${attachment.filename}`}
-      >
-        <X size={14} color={colors.foreground} />
-      </Pressable>
+      {description.showRemove ? (
+        <Pressable
+          onPress={onRemove}
+          hitSlop={REMOVE_HIT_SLOP}
+          className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={`Remove attachment ${attachment.filename}`}
+        >
+          <X size={14} color={colors.foreground} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -107,6 +117,7 @@ export function AttachmentPreviewStrip({ attachments, onRemove, onRetry }: Reado
       className="mb-2"
       contentContainerClassName="items-center"
       keyboardShouldPersistTaps="handled"
+      accessibilityRole="summary"
     >
       {attachments.map(attachment => (
         <AttachmentChip

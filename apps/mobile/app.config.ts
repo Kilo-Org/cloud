@@ -42,6 +42,11 @@ const config: ExpoConfig = {
       AdAttributionKit: {
         PostbackCopyURL: 'https://appsflyer-skadnetwork.com/',
       },
+      // Make the app's Documents directory user-visible in the iOS Files
+      // app so downloaded any-file attachments (uploaded via the cloud-agent
+      // composer) can be opened in place.
+      UIFileSharingEnabled: true,
+      LSSupportsOpeningDocumentsInPlace: true,
     },
   },
   splash: {

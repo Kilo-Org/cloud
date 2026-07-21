@@ -38,6 +38,7 @@ import { BlurBar } from '@/components/ui/blur-bar';
 import { VoiceInputStatus } from '@/components/voice-input-control';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
+  type AgentAttachmentSubmissionPayload,
   type AgentAttachmentWire,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -59,7 +60,11 @@ const TEXT_INPUT_MAX_HEIGHT =
 const TEXT_INPUT_FONT_SIZE = 16;
 
 type ChatComposerProps = {
-  onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
+  onSend: (
+    text: string,
+    attachments?: AgentAttachmentWire,
+    submission?: AgentAttachmentSubmissionPayload
+  ) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
   onExitCli: (onAccepted: () => void) => Promise<void>;
@@ -249,7 +254,7 @@ export function ChatComposer({
           onExitCli,
           confirmExitCli: showRemoteCliExitConfirmation,
           onSendPrompt: async prompt => {
-            await onSend(prompt, upload.toWirePayload());
+            await onSend(prompt, upload.toWirePayload(), upload.toSubmissionPayload());
           },
         },
         {
@@ -315,7 +320,10 @@ export function ChatComposer({
   const { addCandidates, removeAttachment, retryAttachment } = upload;
 
   const handleAddAttachment = useCallback(async () => {
-    addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
+    // Fire-and-forget: the upload hook owns its own progress + error toasts,
+    // and the composer's send flow consults `upload.isUploading` /
+    // `upload.hasFailedAttachments` to gate admission.
+    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
   }, [addCandidates, showActionSheetWithOptions]);
 
   const textInputStyle: TextStyle = {

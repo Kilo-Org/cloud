@@ -210,7 +210,10 @@ export default function NewSessionScreen() {
 
   const { addCandidates } = attachments;
   const handleAddAttachment = useCallback(async () => {
-    addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
+    // Fire-and-forget: the upload hook owns its own progress + error toasts,
+    // and `canCreate` (computed from `attachments.isUploading` /
+    // `attachments.hasFailedAttachments`) gates the start-session button.
+    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
   }, [addCandidates, showActionSheetWithOptions]);
 
   // Cloud-Agent vs. remote-instance submit safety.

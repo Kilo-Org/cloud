@@ -116,7 +116,9 @@ export class ContainerUsageClient {
       ),
       context: { ...input.context, service: this.service },
     } satisfies RecordHeartbeatInput;
-    return heartbeatAckSchema.parse(await this.binding.recordHeartbeat(request));
+    return await this.withRetry(async () =>
+      heartbeatAckSchema.parse(await this.binding.recordHeartbeat(request))
+    );
   }
 
   async recordStop(input: ClientRecordStopInput): Promise<RecordAck> {

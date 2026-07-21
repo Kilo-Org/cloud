@@ -129,7 +129,7 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
   });
 
-  it('retries an unacknowledged heartbeat with the same segment payload', async () => {
+  it('immediately retries an unacknowledged heartbeat with the same segment payload', async () => {
     const storage = memoryStorage();
     await storedContext(storage);
     const recordHeartbeat = vi
@@ -162,11 +162,11 @@ describe('installBillingHeartbeat', () => {
       { client, storage, enforceBudgetStop: vi.fn() }
     );
 
-    await expect(controller.billingHeartbeatTick()).rejects.toThrow('ack lost');
     await controller.billingHeartbeatTick();
 
     expect(recordHeartbeat).toHaveBeenCalledTimes(2);
     expect(recordHeartbeat.mock.calls[1]?.[0]).toEqual(recordHeartbeat.mock.calls[0]?.[0]);
+    expect(schedule).toHaveBeenCalledOnce();
   });
 
   it('starts measuring usage when onStart schedules the heartbeat', async () => {

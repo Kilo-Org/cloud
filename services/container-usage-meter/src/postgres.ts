@@ -17,6 +17,7 @@ import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
 
 const POSTGRES_TIMEOUT_MS = 2_500;
 const STALE_INTERVAL_GRACE_MS = 15 * 60 * 1_000;
+const SINGLE_OPEN_INTERVAL_CONSTRAINT = 'UQ_container_usage_interval_single_open';
 
 export class UsageMutationConflictError extends Error {
   constructor(message: string) {
@@ -44,6 +45,19 @@ export type StartSkuAdmission =
   | { kind: 'rejected'; code: RecordStartFailureCode; message: string };
 
 export type ApplyResult = { kind: 'applied'; dedup: boolean };
+
+function isPostgresConstraintError(error: unknown, code: string, constraint: string): boolean {
+  if (!error || typeof error !== 'object') return false;
+  if (
+    'code' in error &&
+    error.code === code &&
+    'constraint' in error &&
+    error.constraint === constraint
+  ) {
+    return true;
+  }
+  return 'cause' in error && isPostgresConstraintError(error.cause, code, constraint);
+}
 
 function timestamp(receivedAtMs: number): string {
   return new Date(receivedAtMs).toISOString();
@@ -233,7 +247,7 @@ export async function applyHeartbeatWithDb(
   contextFingerprint: string,
   receivedAtMs: number
 ): Promise<ApplyResult> {
-  return db.transaction(async tx => {
+  const operation: Promise<ApplyResult> = db.transaction(async tx => {
     const [interval] = await tx
       .select()
       .from(container_usage_interval)
@@ -309,6 +323,12 @@ export async function applyHeartbeatWithDb(
       })
       .where(eq(container_usage_interval.id, intervalId));
     return { kind: 'applied', dedup: false };
+  });
+  return operation.catch(error => {
+    if (isPostgresConstraintError(error, '23505', SINGLE_OPEN_INTERVAL_CONSTRAINT)) {
+      throw new UsageMutationConflictError('Cannot reopen while another usage interval is open');
+    }
+    throw error;
   });
 }
 

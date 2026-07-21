@@ -54,7 +54,7 @@ describe('container usage PostgreSQL application', () => {
     if (fixtureCreated) {
       await client.db
         .delete(container_usage_interval)
-        .where(eq(container_usage_interval.id, intervalId));
+        .where(eq(container_usage_interval.cloud_billing_sku_id, skuId));
       await client.db.delete(cloud_billing_sku).where(eq(cloud_billing_sku.id, skuId));
     }
     await client.pool.end();
@@ -260,4 +260,85 @@ describe('container usage PostgreSQL application', () => {
       .delete(container_usage_interval)
       .where(eq(container_usage_interval.id, newerId));
   });
+
+  it('maps a single-open constraint collision during reopen to a usage conflict', async () => {
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: true })
+      .where(eq(cloud_billing_sku.id, skuId));
+    const raceContext = { ...context, instanceId: `reopen-race-${suffix}` };
+    const raceFingerprint = await usageContextFingerprint(raceContext);
+    const targetId = `cloud-agent-next:${raceContext.instanceId}:456`;
+    const competingId = `cloud-agent-next:${raceContext.instanceId}:100`;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...raceContext,
+        startEpochMs: 456,
+        idempotencyKey: startIdempotencyKey(raceContext.service, raceContext.instanceId, 456),
+      },
+      targetId,
+      raceFingerprint,
+      1_000
+    );
+    await client.db
+      .update(container_usage_interval)
+      .set({ status: 'closed', close_reason: 'unconfirmed', stopped_at: timestamp(1_000) })
+      .where(eq(container_usage_interval.id, targetId));
+    await applyStartWithDb(
+      client.db,
+      {
+        ...raceContext,
+        startEpochMs: 100,
+        idempotencyKey: startIdempotencyKey(raceContext.service, raceContext.instanceId, 100),
+      },
+      competingId,
+      raceFingerprint,
+      2_000
+    );
+
+    await expect(
+      applyHeartbeatWithDb(
+        client.db,
+        {
+          service: raceContext.service,
+          instanceId: raceContext.instanceId,
+          startEpochMs: 456,
+          idempotencyKey: heartbeatIdempotencyKey(
+            raceContext.service,
+            raceContext.instanceId,
+            456,
+            1
+          ),
+          seq: 1,
+          usageSinceLast: 1,
+          context: raceContext,
+        },
+        targetId,
+        raceFingerprint,
+        3_000
+      )
+    ).rejects.toThrow('Cannot reopen while another usage interval is open');
+
+    const [target] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, targetId));
+    expect(target).toMatchObject({ status: 'closed', close_reason: 'unconfirmed' });
+    const targetSegments = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, targetId));
+    expect(targetSegments).toHaveLength(0);
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, competingId));
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, targetId));
+  });
 });
+
+function timestamp(milliseconds: number): string {
+  return new Date(milliseconds).toISOString();
+}

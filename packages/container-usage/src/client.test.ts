@@ -129,6 +129,34 @@ describe('ContainerUsageClient', () => {
     );
   });
 
+  it('retries recordHeartbeat with the same request', async () => {
+    const recordHeartbeat = vi
+      .fn<ContainerUsageRpcMethods['recordHeartbeat']>()
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValue({
+        intervalId: 'instance-1:123',
+        durable: 'pg',
+        dedup: true,
+        budget: { verdict: 'continue' },
+      });
+    const client = new ContainerUsageClient(binding({ recordHeartbeat }), {
+      service: 'cloud-agent-next',
+      retry: { attempts: 2, initialDelayMs: 0 },
+    });
+
+    await expect(
+      client.recordHeartbeat({
+        instanceId: 'instance-1',
+        startEpochMs: 123,
+        seq: 7,
+        usageSinceLast: 3,
+        context,
+      })
+    ).resolves.toMatchObject({ durable: 'pg', dedup: true });
+    expect(recordHeartbeat).toHaveBeenCalledTimes(2);
+    expect(recordHeartbeat.mock.calls[0]?.[0]).toEqual(recordHeartbeat.mock.calls[1]?.[0]);
+  });
+
   it('throws a structured SKU rejection without retrying', async () => {
     const recordStart = vi.fn<ContainerUsageRpcMethods['recordStart']>().mockResolvedValue({
       success: false,

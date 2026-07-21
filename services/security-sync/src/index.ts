@@ -12,6 +12,12 @@ import {
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { agent_configs } from '@kilocode/db/schema';
+import {
+  buildScheduledJobFailureEvent,
+  buildScheduledJobSuccessEvent,
+  createScheduledJobRun,
+  emitScheduledJobEvent,
+} from '@kilocode/worker-utils/scheduled-job-observability';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
@@ -165,6 +171,13 @@ function isStrictTrueRolloutFlag(value: string | undefined, name: string): boole
   return false;
 }
 
+function getEnvironment(env: CloudflareEnv): string | undefined {
+  if ('ENVIRONMENT' in env && typeof env.ENVIRONMENT === 'string') {
+    return env.ENVIRONMENT;
+  }
+  return undefined;
+}
+
 const QUEUE_SEND_BATCH_LIMIT = 100;
 const SECURITY_SYNC_COMMAND_MAX_ATTEMPTS = 4;
 
@@ -306,19 +319,6 @@ async function enqueueOwners(
   }
 
   return messages.length;
-}
-
-async function sendBetterStackHeartbeat(
-  heartbeatUrl: string | undefined,
-  failed: boolean
-): Promise<void> {
-  if (!heartbeatUrl) return;
-  const url = failed ? `${heartbeatUrl}/fail` : heartbeatUrl;
-  try {
-    await fetch(url, { signal: AbortSignal.timeout(5000) });
-  } catch {
-    // best-effort
-  }
 }
 
 function resolveOwner(
@@ -596,9 +596,41 @@ export default {
     return jsonResponse({ success: false, error: 'Not found' }, 404);
   },
 
-  async scheduled(controller: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: CloudflareEnv) {
+    const environment = getEnvironment(env);
     if (controller.cron === '15 * * * *') {
-      await runSecurityNotificationSweep(env);
+      const run = createScheduledJobRun({
+        jobName: 'security_sync.notification_sweep',
+        environment,
+      });
+      try {
+        const result = await runSecurityNotificationSweep(env);
+        emitScheduledJobEvent(
+          buildScheduledJobSuccessEvent(run, {
+            scheduled_time: controller.scheduledTime,
+            schedule: controller.cron,
+            recovered: result.recovered,
+            staged_recovered: result.stagedRecovered,
+            cancelled: result.cancelled,
+            materialized: result.materialized,
+            reactivated: result.reactivated,
+            processed: result.processed,
+            sent: result.sent,
+            retried: result.retried,
+            failed: result.failed,
+            deferred: result.deferred,
+            dispatch_cap_reached: result.dispatchCapReached,
+            materialization_cap_reached: result.materializationCapReached,
+          })
+        );
+      } catch (error) {
+        emitScheduledJobEvent({
+          ...buildScheduledJobFailureEvent(run, error),
+          scheduled_time: controller.scheduledTime,
+          schedule: controller.cron,
+        });
+        throw error;
+      }
       return;
     }
     if (controller.cron !== '0 */6 * * *') {
@@ -607,7 +639,11 @@ export default {
     }
 
     const runId = crypto.randomUUID();
-    let failed = false;
+    const run = createScheduledJobRun({
+      jobName: 'security_sync.dispatch',
+      runId,
+      environment,
+    });
 
     try {
       const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
@@ -643,15 +679,25 @@ export default {
         ownerCount: owners.length,
         enqueuedMessages,
       });
+      emitScheduledJobEvent(
+        buildScheduledJobSuccessEvent(run, {
+          scheduled_time: controller.scheduledTime,
+          schedule: controller.cron,
+          owner_count: owners.length,
+          enqueued_message_count: enqueuedMessages,
+        })
+      );
     } catch (error) {
-      failed = true;
       console.error('Security sync scheduled dispatch failed', {
         runId,
-        error: error instanceof Error ? error.message : String(error),
+        error_type: error instanceof Error ? error.name : 'UnknownError',
+      });
+      emitScheduledJobEvent({
+        ...buildScheduledJobFailureEvent(run, error),
+        scheduled_time: controller.scheduledTime,
+        schedule: controller.cron,
       });
       throw error;
-    } finally {
-      ctx.waitUntil(sendBetterStackHeartbeat(env.SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL, failed));
     }
   },
 

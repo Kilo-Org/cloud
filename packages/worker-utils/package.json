@@ -31,7 +31,8 @@
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
     "./client-error": "./src/client-error.ts",
     "./review-agents": "./src/review-agents.ts",
-    "./code-review-council": "./src/code-review-council.ts"
+    "./code-review-council": "./src/code-review-council.ts",
+    "./scheduled-job-observability": "./src/scheduled-job-observability.ts"
   },
   "scripts": {
     "test": "vitest run",

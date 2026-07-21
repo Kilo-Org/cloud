@@ -87,7 +87,6 @@ declare type CloudflareEnv = {
   SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED: string | undefined;
   MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED: string | undefined;
   NEXT_PUBLIC_POSTHOG_KEY: string | undefined;
-  BETTERSTACK_HEARTBEAT_URL: string | undefined;
 };
 
 declare type GitTokenLookupFailureReason = Extract<

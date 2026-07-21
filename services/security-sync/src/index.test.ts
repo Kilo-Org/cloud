@@ -83,6 +83,7 @@ describe('collectScheduledSyncOwners', () => {
 
 describe('scheduled sync dispatch', () => {
   it('enqueues enabled owners and processes the scheduled queue message', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const queuedBatches: MessageSendRequest<SecuritySyncQueueMessage>[][] = [];
     vi.mocked(getWorkerDb)
       .mockReturnValueOnce({
@@ -107,7 +108,7 @@ describe('scheduled sync dispatch', () => {
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
 
     await worker.scheduled(
-      { cron: '0 */6 * * *' } as ScheduledController,
+      { cron: '0 */6 * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
       {
         HYPERDRIVE: { connectionString: 'postgres://worker' },
         SYNC_QUEUE: {
@@ -115,8 +116,7 @@ describe('scheduled sync dispatch', () => {
             queuedBatches.push(batch);
           },
         },
-      } as CloudflareEnv,
-      { waitUntil: vi.fn() } as unknown as ExecutionContext
+      } as CloudflareEnv
     );
 
     const queuedMessage = queuedBatches[0]?.[0]?.body;
@@ -125,6 +125,21 @@ describe('scheduled sync dispatch', () => {
       trigger: 'scheduled',
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
     });
+    const terminalEvent = JSON.parse(
+      info.mock.calls.find(
+        ([message]) => typeof message === 'string' && message.includes('scheduled_job.completed')
+      )?.[0] ?? '{}'
+    );
+    expect(terminalEvent).toMatchObject({
+      schedule: '0 */6 * * *',
+      scheduled_time: 1_700_000_000_000,
+      event_name: 'scheduled_job.completed',
+      job_name: 'security_sync.dispatch',
+      outcome: 'succeeded',
+      owner_count: 1,
+      enqueued_message_count: 1,
+    });
+    info.mockRestore();
 
     const ack = vi.fn();
     const retry = vi.fn();
@@ -147,19 +162,124 @@ describe('scheduled sync dispatch', () => {
   });
 
   it('runs notification sweep on hourly notification cron without sync dispatch', async () => {
-    const waitUntil = vi.fn();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://worker' },
       SYNC_QUEUE: { sendBatch: vi.fn() },
+      ENVIRONMENT: 'development',
     } as unknown as CloudflareEnv;
+    vi.mocked(runSecurityNotificationSweep).mockResolvedValue({
+      recovered: 1,
+      stagedRecovered: 2,
+      cancelled: 3,
+      materialized: 4,
+      reactivated: 5,
+      processed: 6,
+      sent: 7,
+      retried: 8,
+      failed: 9,
+      deferred: 10,
+      dispatchCapReached: true,
+      materializationCapReached: false,
+    } as never);
 
-    await worker.scheduled({ cron: '15 * * * *' } as ScheduledController, env, {
-      waitUntil,
-    } as unknown as ExecutionContext);
+    await worker.scheduled(
+      { cron: '15 * * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
+      env
+    );
 
     expect(runSecurityNotificationSweep).toHaveBeenCalledWith(env);
     expect(getWorkerDb).not.toHaveBeenCalled();
-    expect(waitUntil).not.toHaveBeenCalled();
+    expect(
+      JSON.parse(
+        info.mock.calls.find(
+          ([message]) => typeof message === 'string' && message.includes('scheduled_job.completed')
+        )?.[0] ?? '{}'
+      )
+    ).toMatchObject({
+      job_name: 'security_sync.notification_sweep',
+      outcome: 'succeeded',
+      environment: 'development',
+      scheduled_time: 1_700_000_000_000,
+      schedule: '15 * * * *',
+      staged_recovered: 2,
+      dispatch_cap_reached: true,
+      materialization_cap_reached: false,
+    });
+    info.mockRestore();
+  });
+
+  it('emits a dispatch failure event before rethrowing', async () => {
+    const error = new Error('database unavailable');
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(getWorkerDb).mockReturnValueOnce({
+      select: () => ({
+        from: () => ({
+          where: async () => {
+            throw error;
+          },
+        }),
+      }),
+    } as never);
+
+    await expect(
+      worker.scheduled(
+        { cron: '0 */6 * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
+        { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+      )
+    ).rejects.toThrow(error);
+    expect(
+      JSON.parse(
+        errorLog.mock.calls.find(
+          ([message]) => typeof message === 'string' && message.includes('scheduled_job.completed')
+        )?.[0] ?? '{}'
+      )
+    ).toMatchObject({
+      job_name: 'security_sync.dispatch',
+      outcome: 'failed',
+      exception_name: 'Error',
+    });
+    errorLog.mockRestore();
+  });
+
+  it('emits a notification sweep failure event before rethrowing', async () => {
+    const error = new Error('notification database unavailable');
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(runSecurityNotificationSweep).mockRejectedValue(error);
+
+    await expect(
+      worker.scheduled(
+        { cron: '15 * * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
+        { ENVIRONMENT: 'development' } as unknown as CloudflareEnv
+      )
+    ).rejects.toThrow(error);
+    expect(
+      JSON.parse(
+        errorLog.mock.calls.find(
+          ([message]) => typeof message === 'string' && message.includes('scheduled_job.completed')
+        )?.[0] ?? '{}'
+      )
+    ).toMatchObject({
+      job_name: 'security_sync.notification_sweep',
+      outcome: 'failed',
+      exception_name: 'Error',
+    });
+    errorLog.mockRestore();
+  });
+
+  it('does not emit a terminal event for an unknown cron expression', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    await worker.scheduled(
+      { cron: '30 * * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
+      {} as CloudflareEnv
+    );
+
+    expect(info).toHaveBeenCalledWith('Ignoring unknown Security Sync cron expression', {
+      cron: '30 * * * *',
+    });
+    expect(info).not.toHaveBeenCalledWith(expect.stringContaining('scheduled_job.completed'));
+    info.mockRestore();
   });
 });
 

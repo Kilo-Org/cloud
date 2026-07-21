@@ -10,27 +10,12 @@ import { startManualRemediation } from './remediation.js';
 import { dispatchDueOwners } from './dispatcher.js';
 import worker from './index.js';
 
-const loggerMock = vi.hoisted(() => {
-  const logger = {
-    withTags: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-  };
-  logger.withTags.mockReturnValue(logger);
-  return logger;
-});
-
 vi.mock('@kilocode/db', () => ({
   createSecurityAgentCommand: vi.fn(),
   markSecurityAgentCommandQueueAdmissionFailed: vi.fn(),
 }));
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./dispatcher.js', () => ({ dispatchDueOwners: vi.fn() }));
-vi.mock('./logger.js', () => ({
-  logger: loggerMock,
-  sanitizedExceptionName: (error: unknown) =>
-    error instanceof Error ? error.name : 'UnknownError',
-}));
 vi.mock('./remediation.js', async importOriginal => ({
   ...(await importOriginal<typeof RemediationModule>()),
   startManualRemediation: vi.fn(),
@@ -39,7 +24,6 @@ vi.mock('./remediation.js', async importOriginal => ({
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
-  loggerMock.withTags.mockReturnValue(loggerMock);
   vi.mocked(getWorkerDb).mockReturnValue({} as never);
   vi.mocked(dispatchDueOwners).mockResolvedValue({
     dispatchId: 'dispatch-123',
@@ -98,29 +82,6 @@ async function remediationCallbackTokenFor(
   });
 }
 
-function scheduledEnv(heartbeatUrl: string | undefined): CloudflareEnv {
-  return {
-    BETTERSTACK_HEARTBEAT_URL: heartbeatUrl,
-    ENVIRONMENT: 'test',
-    CF_VERSION_METADATA: { id: 'version-123', tag: '', timestamp: '' },
-  } as CloudflareEnv;
-}
-
-async function runScheduled(env: CloudflareEnv): Promise<{
-  scheduledResult: Promise<void>;
-  heartbeatPromise: Promise<unknown>;
-}> {
-  let heartbeatPromise: Promise<unknown> | undefined;
-  const scheduledResult = worker.scheduled({} as ScheduledController, env, {
-    waitUntil(promise) {
-      heartbeatPromise = promise;
-    },
-  } as ExecutionContext);
-  await scheduledResult.catch(() => undefined);
-  if (!heartbeatPromise) throw new Error('Expected heartbeat waitUntil promise');
-  return { scheduledResult, heartbeatPromise };
-}
-
 function manualRemediationRequest(): Request {
   return new Request('https://security-auto-analysis/internal/remediation/start', {
     method: 'POST',
@@ -137,119 +98,23 @@ function manualRemediationRequest(): Request {
   });
 }
 
-describe('scheduled dispatcher heartbeat', () => {
-  it('delivers successful dispatch heartbeats and logs attempted and successful outcomes', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(null, { status: 204 }));
-
-    const { scheduledResult, heartbeatPromise } = await runScheduled(
-      scheduledEnv('https://heartbeat.example/secret')
-    );
-    await expect(scheduledResult).resolves.toBeUndefined();
-    await heartbeatPromise;
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://heartbeat.example/secret',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
-    const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
-    expect(dispatchId).toEqual(expect.any(String));
-    expect(heartbeatTags()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ dispatch_id: dispatchId })])
-    );
-    expect(heartbeatOutcomes()).toEqual(['attempted', 'succeeded']);
-    expect(JSON.stringify(loggerMock.withTags.mock.calls)).not.toContain('heartbeat.example');
+describe('scheduled dispatcher', () => {
+  it('resolves after a successful dispatch', async () => {
+    await expect(
+      worker.scheduled({} as ScheduledController, {} as CloudflareEnv)
+    ).resolves.toBeUndefined();
+    expect(dispatchDueOwners).toHaveBeenCalledWith({}, expect.any(String));
   });
 
-  it('selects /fail, rethrows dispatcher errors, and preserves them across heartbeat failure', async () => {
-    const dispatcherError = new Error('original dispatcher failure');
+  it('rejects when dispatch fails', async () => {
+    const dispatcherError = new Error('dispatcher failed');
     vi.mocked(dispatchDueOwners).mockRejectedValueOnce(dispatcherError);
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValueOnce(new Error('heartbeat-url credential network failure'));
 
-    const { scheduledResult, heartbeatPromise } = await runScheduled(
-      scheduledEnv('https://heartbeat.example/secret')
+    await expect(worker.scheduled({} as ScheduledController, {} as CloudflareEnv)).rejects.toBe(
+      dispatcherError
     );
-    await expect(scheduledResult).rejects.toBe(dispatcherError);
-    await expect(heartbeatPromise).resolves.toBeUndefined();
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://heartbeat.example/secret/fail',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
-    const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
-    expect(dispatchId).toEqual(expect.any(String));
-    expect(heartbeatTags()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ dispatch_id: dispatchId })])
-    );
-    expect(heartbeatOutcomes()).toEqual(['attempted', 'failed']);
-    const failureTags = heartbeatTags().at(-1);
-    expect(failureTags).toMatchObject({
-      exception_name: 'Error',
-      error_message: 'Heartbeat network failure',
-      heartbeat_kind: 'failure',
-    });
-    expect(JSON.stringify(loggerMock.withTags.mock.calls)).not.toContain('credential');
-  });
-
-  it('logs skipped delivery when heartbeat binding is absent', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch');
-
-    const { scheduledResult, heartbeatPromise } = await runScheduled(scheduledEnv(undefined));
-    await expect(scheduledResult).resolves.toBeUndefined();
-    await heartbeatPromise;
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(heartbeatOutcomes()).toEqual(['skipped']);
-  });
-
-  it('treats non-2xx responses as delivery failures without failing dispatch', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 503 }));
-
-    const { scheduledResult, heartbeatPromise } = await runScheduled(
-      scheduledEnv('https://heartbeat.example/secret')
-    );
-    await expect(scheduledResult).resolves.toBeUndefined();
-    await heartbeatPromise;
-
-    expect(heartbeatOutcomes()).toEqual(['attempted', 'failed']);
-    expect(heartbeatTags().at(-1)).toMatchObject({
-      response_status: 503,
-      response_status_class: '5xx',
-    });
-  });
-
-  it('logs heartbeat timeouts without failing dispatch', async () => {
-    const timeout = new Error('heartbeat URL timed out');
-    timeout.name = 'TimeoutError';
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(timeout);
-
-    const { scheduledResult, heartbeatPromise } = await runScheduled(
-      scheduledEnv('https://heartbeat.example/secret')
-    );
-    await expect(scheduledResult).resolves.toBeUndefined();
-    await heartbeatPromise;
-
-    expect(heartbeatOutcomes()).toEqual(['attempted', 'timeout']);
-    expect(heartbeatTags().at(-1)).toMatchObject({
-      exception_name: 'TimeoutError',
-      error_message: 'Heartbeat delivery timed out',
-    });
-    expect(JSON.stringify(loggerMock.withTags.mock.calls)).not.toContain('heartbeat URL');
   });
 });
-
-function heartbeatTags(): Array<Record<string, unknown>> {
-  return loggerMock.withTags.mock.calls
-    .map(([tags]) => tags)
-    .filter(tags => tags.event_name === 'security_auto_analysis.heartbeat_delivery');
-}
-
-function heartbeatOutcomes(): unknown[] {
-  return heartbeatTags().map(tags => tags.outcome);
-}
 
 describe('manual remediation ingress', () => {
   it('returns HTTP 409 with analysis_required for a policy rejection', async () => {

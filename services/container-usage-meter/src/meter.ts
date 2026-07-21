@@ -64,13 +64,15 @@ export class ContainerUsageMeter
       await usageContextFingerprint(context),
       Date.now()
     );
-    if ('accepted' in result && !result.accepted) {
-      return { success: false, error: { code: result.code, message: result.message } };
+    switch (result.kind) {
+      case 'rejected':
+        return { success: false, error: { code: result.code, message: result.message } };
+      case 'applied':
+        return {
+          success: true,
+          ack: { intervalId: id, durable: 'pg', dedup: result.dedup },
+        };
     }
-    return {
-      success: true,
-      ack: { intervalId: id, durable: 'pg', dedup: 'dedup' in result && result.dedup },
-    };
   }
 
   async recordHeartbeat(input: RecordHeartbeatInput): Promise<HeartbeatAck> {

@@ -89,6 +89,33 @@ describe('container usage contracts', () => {
     ).toBe(false);
   });
 
+  it('rejects producer timestamps because billing uses meter receive time', () => {
+    expect(
+      recordHeartbeatInputSchema.safeParse({
+        service: 'cloud-agent-next',
+        instanceId: 'instance-1',
+        startEpochMs: 123,
+        idempotencyKey: 'key',
+        seq: 1,
+        observedAt: 456,
+        context: personalContext,
+      }).success
+    ).toBe(false);
+    expect(
+      recordStopInputSchema.safeParse({
+        service: 'cloud-agent-next',
+        instanceId: 'instance-1',
+        startEpochMs: 123,
+        idempotencyKey: 'key',
+        seq: 2,
+        usageSinceLast: 3,
+        reason: 'exit',
+        stoppedAt: 456,
+        context: personalContext,
+      }).success
+    ).toBe(false);
+  });
+
   it('scopes interval identity to the producer service', () => {
     expect(intervalId('cloud-agent-next', 'shared-instance', 123)).not.toBe(
       intervalId('gastown', 'shared-instance', 123)

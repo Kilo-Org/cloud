@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,17 +41,17 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
   const [errors, setErrors] = useState<Partial<Record<keyof CreateCloudBillingSkuInput, string>>>(
     {}
   );
+  const idRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const rateRef = useRef<HTMLInputElement>(null);
 
   const exampleMinutes = /^\d+$/.test(raw.exampleMinutes) ? Number(raw.exampleMinutes) : 0;
 
   useEffect(() => {
-    document.getElementById('sku-id')?.focus();
-  }, []);
-
-  useEffect(() => {
     if (!serverErrors || Object.keys(serverErrors).length === 0) return;
     setErrors(current => ({ ...current, ...serverErrors }));
-    if (serverErrors.id) document.getElementById('sku-id')?.focus();
+    if (serverErrors.id) idRef.current?.focus();
   }, [serverErrors]);
 
   const clearError = (key: keyof CreateCloudBillingSkuInput) => {
@@ -80,17 +80,10 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
       }
       setErrors(next);
       const firstKey = parsed.error.issues[0]?.path[0];
-      const fieldId =
-        firstKey === 'id'
-          ? 'sku-id'
-          : firstKey === 'name'
-            ? 'sku-name'
-            : firstKey === 'description'
-              ? 'sku-description'
-              : firstKey === 'rate_cents_per_unit'
-                ? 'sku-rate'
-                : undefined;
-      if (fieldId) document.getElementById(fieldId)?.focus();
+      if (firstKey === 'id') idRef.current?.focus();
+      if (firstKey === 'name') nameRef.current?.focus();
+      if (firstKey === 'description') descriptionRef.current?.focus();
+      if (firstKey === 'rate_cents_per_unit') rateRef.current?.focus();
       return;
     }
     setErrors({});
@@ -104,6 +97,8 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
           <Label htmlFor="sku-id">SKU ID</Label>
           <Input
             id="sku-id"
+            ref={idRef}
+            autoFocus
             value={raw.id}
             maxLength={80}
             disabled={pending}
@@ -129,6 +124,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
           <Label htmlFor="sku-name">Display name</Label>
           <Input
             id="sku-name"
+            ref={nameRef}
             value={raw.name}
             maxLength={120}
             disabled={pending}
@@ -151,6 +147,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
           <Label htmlFor="sku-description">Description</Label>
           <Textarea
             id="sku-description"
+            ref={descriptionRef}
             value={raw.description}
             maxLength={1000}
             disabled={pending}
@@ -173,6 +170,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
           <Label htmlFor="sku-rate">Rate (cents per second)</Label>
           <Input
             id="sku-rate"
+            ref={rateRef}
             type="text"
             inputMode="decimal"
             value={raw.rate}

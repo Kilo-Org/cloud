@@ -40,10 +40,10 @@ export function getContainerUsageDb(env: Cloudflare.Env): WorkerDb {
 }
 
 export type StartSkuAdmission =
-  | { accepted: true }
-  | { accepted: false; code: RecordStartFailureCode; message: string };
+  | ApplyResult
+  | { kind: 'rejected'; code: RecordStartFailureCode; message: string };
 
-export type ApplyResult = { dedup: boolean };
+export type ApplyResult = { kind: 'applied'; dedup: boolean };
 
 function timestamp(receivedAtMs: number): string {
   return new Date(receivedAtMs).toISOString();
@@ -111,7 +111,7 @@ export async function applyStart(
   intervalId: string,
   contextFingerprint: string,
   receivedAtMs: number
-): Promise<ApplyResult | StartSkuAdmission> {
+): Promise<StartSkuAdmission> {
   return applyStartWithDb(
     getContainerUsageDb(env),
     input,
@@ -127,7 +127,7 @@ export async function applyStartWithDb(
   intervalId: string,
   contextFingerprint: string,
   receivedAtMs: number
-): Promise<ApplyResult | StartSkuAdmission> {
+): Promise<StartSkuAdmission> {
   return db.transaction(async tx => {
     const [existing] = await tx
       .select()
@@ -136,7 +136,7 @@ export async function applyStartWithDb(
       .limit(1);
     if (existing) {
       assertMatchingContext(existing, input, contextFingerprint);
-      return { dedup: true };
+      return { kind: 'applied', dedup: true };
     }
 
     const [sku] = await tx
@@ -147,17 +147,17 @@ export async function applyStartWithDb(
       .from(cloud_billing_sku)
       .where(eq(cloud_billing_sku.id, input.sku))
       .limit(1);
-    if (!sku) return { accepted: false, code: 'sku_not_found', message: 'Billing SKU not found' };
+    if (!sku) return { kind: 'rejected', code: 'sku_not_found', message: 'Billing SKU not found' };
     if (sku.unit !== 'second') {
       return {
-        accepted: false,
+        kind: 'rejected',
         code: 'sku_unit_mismatch',
         message: 'Billing SKU is not measured in seconds',
       };
     }
     if (!sku.acceptsNewUsage) {
       return {
-        accepted: false,
+        kind: 'rejected',
         code: 'sku_not_accepting_new_usage',
         message: 'Billing SKU is not accepting new usage',
       };
@@ -204,9 +204,9 @@ export async function applyStartWithDb(
         .limit(1);
       if (!winner) throw new Error('Container usage interval insert lost without a winner');
       assertMatchingContext(winner, input, contextFingerprint);
-      return { dedup: true };
+      return { kind: 'applied', dedup: true };
     }
-    return { accepted: true };
+    return { kind: 'applied', dedup: false };
   });
 }
 
@@ -260,7 +260,7 @@ export async function applyHeartbeatWithDb(
       ) {
         throw new UsageMutationConflictError('Heartbeat sequence has conflicting payload');
       }
-      return { dedup: true };
+      return { kind: 'applied', dedup: true };
     }
     if (interval.status === 'closed' && interval.close_reason === 'unconfirmed') {
       const [newerGeneration] = await tx
@@ -308,7 +308,7 @@ export async function applyHeartbeatWithDb(
         confirmed_seconds: sql`${container_usage_interval.confirmed_seconds} + ${appliedSeconds}`,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { dedup: false };
+    return { kind: 'applied', dedup: false };
   });
 }
 
@@ -333,7 +333,7 @@ export async function applyStopWithDb(
   input: RecordStopInput,
   intervalId: string,
   contextFingerprint: string,
-  _receivedAtMs: number
+  receivedAtMs: number
 ): Promise<ApplyResult> {
   const finalSegmentKey = heartbeatIdempotencyKey(
     input.service,
@@ -371,7 +371,7 @@ export async function applyStopWithDb(
       ) {
         throw new UsageMutationConflictError('Closed interval has conflicting stop details');
       }
-      return { dedup: true };
+      return { kind: 'applied', dedup: true };
     }
     let finalSeconds = 0;
     if (existingSegment) {
@@ -382,18 +382,18 @@ export async function applyStopWithDb(
         throw new UsageMutationConflictError('Final usage segment has conflicting payload');
       }
     } else {
-      finalSeconds = appliedUsageSeconds(interval, input.usageSinceLast, _receivedAtMs);
+      finalSeconds = appliedUsageSeconds(interval, input.usageSinceLast, receivedAtMs);
       await tx.insert(container_usage_segment).values({
         interval_id: intervalId,
         seq: input.seq,
         idempotency_key: finalSegmentKey,
         reported_seconds: input.usageSinceLast,
         usage_seconds: finalSeconds,
-        received_at: timestamp(_receivedAtMs),
+        received_at: timestamp(receivedAtMs),
       });
     }
 
-    const stopAt = timestamp(Math.max(new Date(interval.last_seen_at).getTime(), _receivedAtMs));
+    const stopAt = timestamp(Math.max(new Date(interval.last_seen_at).getTime(), receivedAtMs));
 
     await tx
       .update(container_usage_interval)
@@ -408,7 +408,7 @@ export async function applyStopWithDb(
         confirmed_seconds: interval.confirmed_seconds + finalSeconds,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { dedup: false };
+    return { kind: 'applied', dedup: false };
   });
 }
 

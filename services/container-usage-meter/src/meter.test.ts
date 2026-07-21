@@ -77,9 +77,9 @@ function validStop(): RecordStopInput {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(applyStart).mockResolvedValue({ accepted: true });
-  vi.mocked(applyHeartbeat).mockResolvedValue({ dedup: false });
-  vi.mocked(applyStop).mockResolvedValue({ dedup: false });
+  vi.mocked(applyStart).mockResolvedValue({ kind: 'applied', dedup: false });
+  vi.mocked(applyHeartbeat).mockResolvedValue({ kind: 'applied', dedup: false });
+  vi.mocked(applyStop).mockResolvedValue({ kind: 'applied', dedup: false });
 });
 
 describe('ContainerUsageMeter', () => {
@@ -99,7 +99,7 @@ describe('ContainerUsageMeter', () => {
 
   it('returns permanent SKU admission failures', async () => {
     vi.mocked(applyStart).mockResolvedValue({
-      accepted: false,
+      kind: 'rejected',
       code: 'sku_not_accepting_new_usage',
       message: 'Billing SKU is not accepting new usage',
     });

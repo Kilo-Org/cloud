@@ -64,7 +64,7 @@ describe('container usage PostgreSQL application', () => {
     };
     await expect(
       applyStartWithDb(client.db, start, intervalId, fingerprint, 1_000)
-    ).resolves.toEqual({ accepted: true });
+    ).resolves.toEqual({ kind: 'applied', dedup: false });
 
     await client.db
       .update(cloud_billing_sku)
@@ -72,7 +72,7 @@ describe('container usage PostgreSQL application', () => {
       .where(eq(cloud_billing_sku.id, skuId));
     await expect(
       applyStartWithDb(client.db, start, intervalId, fingerprint, 1_500)
-    ).resolves.toEqual({ dedup: true });
+    ).resolves.toEqual({ kind: 'applied', dedup: true });
 
     const heartbeat = (seq: number, seconds: number) => ({
       service: context.service,
@@ -85,13 +85,13 @@ describe('container usage PostgreSQL application', () => {
     });
     await expect(
       applyHeartbeatWithDb(client.db, heartbeat(2, 10), intervalId, fingerprint, 21_000)
-    ).resolves.toEqual({ dedup: false });
+    ).resolves.toEqual({ kind: 'applied', dedup: false });
     await expect(
       applyHeartbeatWithDb(client.db, heartbeat(1, 10), intervalId, fingerprint, 11_000)
-    ).resolves.toEqual({ dedup: false });
+    ).resolves.toEqual({ kind: 'applied', dedup: false });
     await expect(
       applyHeartbeatWithDb(client.db, heartbeat(1, 10), intervalId, fingerprint, 11_500)
-    ).resolves.toEqual({ dedup: true });
+    ).resolves.toEqual({ kind: 'applied', dedup: true });
     await expect(
       applyHeartbeatWithDb(client.db, heartbeat(1, 11), intervalId, fingerprint, 11_500)
     ).rejects.toBeInstanceOf(UsageMutationConflictError);
@@ -111,10 +111,10 @@ describe('container usage PostgreSQL application', () => {
     };
     await expect(
       applyStopWithDb(client.db, stop, intervalId, fingerprint, 29_000)
-    ).resolves.toEqual({ dedup: false });
+    ).resolves.toEqual({ kind: 'applied', dedup: false });
     await expect(
       applyStopWithDb(client.db, stop, intervalId, fingerprint, 30_000)
-    ).resolves.toEqual({ dedup: true });
+    ).resolves.toEqual({ kind: 'applied', dedup: true });
     await expect(
       applyStopWithDb(client.db, { ...stop, usageSinceLast: 8 }, intervalId, fingerprint, 30_000)
     ).rejects.toBeInstanceOf(UsageMutationConflictError);

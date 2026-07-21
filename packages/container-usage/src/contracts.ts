@@ -98,7 +98,6 @@ export const recordHeartbeatInputSchema = intervalIdentitySchema
     idempotencyKey: z.string().min(1).max(1_024),
     seq: z.number().int().positive().max(2_147_483_647),
     usageSinceLast: z.number().int().nonnegative().max(2_147_483_647).optional(),
-    observedAt: z.number().int().nonnegative().finite().optional(),
     context: usageContextSchema,
   })
   .strict();
@@ -111,7 +110,6 @@ export const recordStopInputSchema = intervalIdentitySchema
     usageSinceLast: z.number().int().nonnegative().max(2_147_483_647),
     reason: z.enum(['exit', 'runtime_signal', 'activity_expired']),
     exitCode: z.number().int().min(-256).max(255).optional(),
-    stoppedAt: z.number().int().nonnegative().finite().optional(),
     context: usageContextSchema,
   })
   .strict();
@@ -163,14 +161,6 @@ export const heartbeatAckSchema = recordAckSchema
   })
   .strict();
 export type HeartbeatAck = z.infer<typeof heartbeatAckSchema>;
-
-export const containerLivenessResultSchema = z
-  .object({
-    status: z.enum(['running', 'stopped', 'unknown']),
-    exitCode: z.number().int().optional(),
-  })
-  .strict();
-export type ContainerLivenessResult = z.infer<typeof containerLivenessResultSchema>;
 
 export type ContainerUsageRpcMethods = {
   recordStart: (input: RecordStartInput) => Promise<RecordStartResult>;

@@ -194,12 +194,15 @@ export function normalizeCostInsightTimestamp(value: string | Date): string {
   return new Date(value).toISOString();
 }
 
-function requireCoveredAmounts(point: OwnerHourlySpend): {
+function knownAmounts(point: OwnerHourlySpend): {
   variableMicrodollars: number;
   scheduledMicrodollars: number;
-} {
+} | null {
   if (point.variableMicrodollars === null || point.scheduledMicrodollars === null) {
-    throw new Error('Covered Cost Insights evidence must include both spend categories.');
+    if (point.isCovered) {
+      throw new Error('Covered Cost Insights evidence must include both spend categories.');
+    }
+    return null;
   }
   return {
     variableMicrodollars: point.variableMicrodollars,
@@ -215,6 +218,10 @@ function presentEvidenceBucket(points: OwnerHourlySpend[]): SpendEvidencePoint {
   }
 
   const covered = points.filter(point => point.isCovered);
+  const known = points.flatMap(point => {
+    const amounts = knownAmounts(point);
+    return amounts ? [{ point, amounts }] : [];
+  });
   const common = {
     label: formatDayLabel(first.hourStart),
     periodStart: normalizeCostInsightTimestamp(first.hourStart),
@@ -222,13 +229,12 @@ function presentEvidenceBucket(points: OwnerHourlySpend[]): SpendEvidencePoint {
     coveredHours: covered.length,
     totalHours: points.length,
   };
-  if (covered.length === 0) {
+  if (known.length === 0) {
     return { ...common, coverage: 'unavailable', variableUsd: null, scheduledUsd: null };
   }
   let variableMicrodollars = 0;
   let scheduledMicrodollars = 0;
-  for (const point of covered) {
-    const amounts = requireCoveredAmounts(point);
+  for (const { amounts } of known) {
     variableMicrodollars += amounts.variableMicrodollars;
     scheduledMicrodollars += amounts.scheduledMicrodollars;
   }
@@ -268,7 +274,8 @@ export function formatSpendEvidence(
         coveredHours: point.isCovered ? 1 : 0,
         totalHours: 1,
       };
-      if (!point.isCovered) {
+      const amounts = knownAmounts(point);
+      if (!amounts) {
         return {
           ...common,
           coverage: 'unavailable' as const,
@@ -276,10 +283,9 @@ export function formatSpendEvidence(
           scheduledUsd: null,
         };
       }
-      const amounts = requireCoveredAmounts(point);
       return {
         ...common,
-        coverage: 'complete' as const,
+        coverage: point.isCovered ? ('complete' as const) : ('partial' as const),
         variableUsd: microdollarsToUsd(amounts.variableMicrodollars),
         scheduledUsd: microdollarsToUsd(amounts.scheduledMicrodollars),
       };

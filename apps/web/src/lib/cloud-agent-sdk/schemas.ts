@@ -643,6 +643,19 @@ export const sessionTurnCloseDataSchema = z
   .passthrough();
 export type SessionTurnCloseData = z.infer<typeof sessionTurnCloseDataSchema>;
 
+/**
+ * `session.queue.changed` — CLI-only event carrying the authoritative FIFO
+ * snapshot of user-message IDs that are queued but not yet running. Replayed
+ * on every (re)subscribe, so each occurrence is a full reconciliation.
+ */
+export const sessionQueueChangedDataSchema = z
+  .object({
+    sessionID: z.string(),
+    queued: z.array(z.string()),
+  })
+  .passthrough();
+export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
+
 export const questionAskedDataSchema = z.object({
   id: z.string(),
   tool: z.object({ callID: z.string() }).optional(),

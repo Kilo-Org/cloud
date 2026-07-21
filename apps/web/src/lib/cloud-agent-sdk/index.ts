@@ -62,7 +62,11 @@ export type { CliHistoricalTransportConfig } from './cli-historical-transport';
 export { createCliLiveTransport } from './cli-live-transport';
 export type { CliLiveTransportConfig } from './cli-live-transport';
 
-export { createUserWebConnection, UserWebCommandError } from './user-web-connection';
+export {
+  createUserWebConnection,
+  CommandDeliveredError,
+  UserWebCommandError,
+} from './user-web-connection';
 export type {
   UserWebConnection,
   UserWebConnectionConfig,
@@ -72,6 +76,8 @@ export type {
   UserWebCliEvent,
   UserWebSystemEvent,
 } from './user-web-connection';
+
+export { createRemoteSessionOnConnection } from './create-session';
 
 export {
   REMOTE_MODEL_IDENTITY_MAX_LENGTH,

@@ -656,6 +656,71 @@ describe('normalize', () => {
     });
   });
 
+  describe('session.queue.changed', () => {
+    it('normalizes a populated snapshot with sessionId and queued list', () => {
+      const result = normalize(
+        createRaw('session.queue.changed', {
+          sessionID: 'ses-1',
+          queued: ['m1', 'm2', 'm3'],
+        })
+      );
+      expect(result).toEqual({
+        type: 'queue.changed',
+        sessionId: 'ses-1',
+        queued: ['m1', 'm2', 'm3'],
+      });
+    });
+
+    it('normalizes an empty snapshot (replay-on-subscribe empty case)', () => {
+      const result = normalize(
+        createRaw('session.queue.changed', { sessionID: 'ses-1', queued: [] })
+      );
+      expect(result).toEqual({
+        type: 'queue.changed',
+        sessionId: 'ses-1',
+        queued: [],
+      });
+    });
+
+    it('returns null when sessionID is missing', () => {
+      expect(normalize(createRaw('session.queue.changed', { queued: ['m1'] }))).toBeNull();
+    });
+
+    it('returns null when sessionID is not a string', () => {
+      expect(
+        normalize(createRaw('session.queue.changed', { sessionID: 42, queued: [] }))
+      ).toBeNull();
+    });
+
+    it('returns null when queued is missing', () => {
+      expect(normalize(createRaw('session.queue.changed', { sessionID: 'ses-1' }))).toBeNull();
+    });
+
+    it('returns null when queued is not an array', () => {
+      expect(
+        normalize(createRaw('session.queue.changed', { sessionID: 'ses-1', queued: 'm1' }))
+      ).toBeNull();
+    });
+
+    it('is classified as a ServiceEvent, not a ChatEvent', () => {
+      const result = normalize(
+        createRaw('session.queue.changed', { sessionID: 'ses-1', queued: ['m1'] })
+      );
+      expect(result).not.toBeNull();
+      expect(isChatEvent(result!)).toBe(false);
+    });
+
+    it('normalizes via normalizeCliEvent without a CloudAgentEvent envelope', () => {
+      expect(
+        normalizeCliEvent('session.queue.changed', { sessionID: 'ses-1', queued: ['m1'] })
+      ).toEqual({
+        type: 'queue.changed',
+        sessionId: 'ses-1',
+        queued: ['m1'],
+      });
+    });
+  });
+
   describe('question.asked', () => {
     it('extracts requestId and questions from tool.callID', () => {
       const data = {

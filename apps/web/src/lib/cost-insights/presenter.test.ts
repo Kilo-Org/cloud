@@ -610,6 +610,36 @@ describe('Cost Insights presenter', () => {
     ]);
   });
 
+  it('shows driver-backed spend from an uncovered hour as partial evidence', () => {
+    expect(
+      formatSpendEvidence(
+        [
+          {
+            hourStart: '2026-06-25T23:00:00.000Z',
+            variableMicrodollars: 4_000_000,
+            scheduledMicrodollars: 1_000_000,
+            totalMicrodollars: 5_000_000,
+            variableRecordCount: 2,
+            scheduledRecordCount: 1,
+            isCovered: false,
+          },
+        ],
+        '24h'
+      )
+    ).toEqual([
+      {
+        label: '23',
+        periodStart: '2026-06-25T23:00:00.000Z',
+        periodEndExclusive: '2026-06-26T00:00:00.000Z',
+        coverage: 'partial',
+        coveredHours: 0,
+        totalHours: 1,
+        variableUsd: 4,
+        scheduledUsd: 1,
+      },
+    ]);
+  });
+
   it('retains period boundaries and sums only fully covered 90-day buckets', () => {
     const points = Array.from({ length: 2 }, (_, index) => ({
       hourStart: `2026-06-25T${String(22 + index).padStart(2, '0')}:00:00.000Z`,

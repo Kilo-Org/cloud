@@ -338,10 +338,17 @@ export function SessionDetailContent({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: SessionTranscriptItem }) =>
-      item.type === 'preparation' ? (
-        <PreparationGroup attempt={item.attempt} />
-      ) : (
+    ({ item }: { item: SessionTranscriptItem }) => {
+      if (item.type === 'preparation') {
+        return <PreparationGroup attempt={item.attempt} />;
+      }
+      // Look up delivery state by message id. The map is keyed by user-message
+      // id and may briefly contain an entry before the bubble has rendered
+      // (ServiceEvents can be applied while chat events are still buffered),
+      // so a plain lookup is enough — no render-order guard.
+      const deliveryState =
+        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+      return (
         <MessageBubble
           message={item.message}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
@@ -349,14 +356,17 @@ export function SessionDetailContent({
           getChildMessages={getChildMessages}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
+          deliveryState={deliveryState}
         />
-      ),
+      );
+    },
     [
       lastAssistantMessageId,
       isStreaming,
       getChildMessages,
       reasoningDefaultExpanded,
       handleOpenChildSession,
+      pendingMessages,
     ]
   );
 

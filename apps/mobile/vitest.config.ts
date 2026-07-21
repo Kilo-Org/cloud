@@ -21,6 +21,21 @@ export default defineConfig({
       'cloud-agent-sdk/remote-command-catalog': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/remote-command-catalog.ts', import.meta.url)
       ),
+      // kilocode_change - K1/C2: narrow subpaths for the `kilo remote` spawn
+      // hook. These two files have a self-contained import graph (schemas,
+      // base-connection, runtime, types — no `@/...` web-app-alias imports),
+      // unlike the full barrel (`cloud-agent-sdk` below), which transitively
+      // pulls in `cloud-agent-connection.ts` -> `cloud-agent-transport.ts` ->
+      // `@/lib/cloud-agent-next/event-types`, a web-only `@` alias that does
+      // not resolve under the mobile app's own `@` alias. Runtime imports of
+      // `CommandDeliveredError`/`UserWebCommandError`/`createRemoteSessionOnConnection`
+      // must go through these subpaths, not the barrel.
+      'cloud-agent-sdk/user-web-connection': fileURLToPath(
+        new URL('../../apps/web/src/lib/cloud-agent-sdk/user-web-connection.ts', import.meta.url)
+      ),
+      'cloud-agent-sdk/create-session': fileURLToPath(
+        new URL('../../apps/web/src/lib/cloud-agent-sdk/create-session.ts', import.meta.url)
+      ),
       'cloud-agent-sdk/preparation-attempts': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/preparation-attempts.ts', import.meta.url)
       ),

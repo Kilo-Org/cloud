@@ -136,7 +136,7 @@ export function ChatComposerInputRow({
         </View>
       ) : null}
 
-      {isStreaming ? (
+      {isStreaming && !canSend && !isSending ? (
         <Pressable
           onPress={onStop}
           disabled={disabled}

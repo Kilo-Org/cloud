@@ -14,6 +14,7 @@
  */
 import { createSessionResponseV1Schema, type CreateSessionResponseV1 } from './schemas';
 import type { KiloSessionId } from './types';
+import type { UserWebConnection } from './user-web-connection';
 
 export { createSessionResponseV1Schema } from './schemas';
 export type { CreateSessionResponseV1 } from './schemas';
@@ -34,4 +35,39 @@ export function parseCreateSessionResponse(raw: unknown): CreateSessionParseResu
   const parsed = createSessionResponseV1Schema.safeParse(raw);
   if (!parsed.success) return { ok: false, reason: 'invalid' };
   return { ok: true, kiloSessionId: parsed.data.sessionID };
+}
+
+/**
+ * Result of `createRemoteSessionOnConnection` — the raw, unparsed
+ * `create_session` reply. Callers should run it through
+ * `parseCreateSessionResponse` to obtain a `KiloSessionId`. Exposed for
+ * consistency with other SDK helpers that return the raw reply; success
+ * here only means "the relay accepted and answered", not "the body is valid".
+ */
+export type CreateRemoteSessionRawResult = unknown;
+
+/**
+ * Connection-scoped `create_session` for the `kilo remote` process-per-session
+ * spawn flow. Unlike the session-scoped `createSession` in
+ * `cli-live-transport.ts` (which fences the command to a known Kilo sessionId),
+ * this helper targets a specific CLI viewer connection and omits any
+ * `sessionId` on the wire — the CLI is expected to provision a fresh
+ * `KiloSessionId` for the new cloud-agent session.
+ *
+ * The returned promise resolves with the raw reply; the caller is responsible
+ * for parsing the response shape. A delivered error response (string or
+ * structured `UserWebCommandError`) rejects the promise; transport failures
+ * (timeout, destroyed connection) reject with a plain `Error`. See
+ * `CommandDeliveredError` and `UserWebCommandError` for the rejection
+ * subclass contract.
+ */
+export async function createRemoteSessionOnConnection(
+  connection: Pick<UserWebConnection, 'sendCommandToConnection'>,
+  connectionId: string
+): Promise<CreateRemoteSessionRawResult> {
+  return connection.sendCommandToConnection({
+    command: 'create_session',
+    data: { protocolVersion: 1 },
+    expectedConnectionId: connectionId,
+  });
 }

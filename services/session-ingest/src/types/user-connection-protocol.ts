@@ -6,12 +6,29 @@ import { z } from 'zod';
 
 // -- CLI → DO (CLIOutbound) ---------------------------------------------------
 
+// Identity of the CLI process (kilo remote spawner) attached to this WebSocket.
+// Newer CLIs include this on every heartbeat; legacy CLIs that predate the
+// `kilo remote` spawner omit it entirely. The DO persists the latest value
+// in the WebSocket attachment and uses it for `getConnectedInstances()`.
+const instanceSchema = z.object({
+  name: z.string().min(1).max(64),
+  projectName: z.string().min(1).max(64),
+  version: z.string().max(32).optional(),
+});
+
+export type Instance = z.infer<typeof instanceSchema>;
+
 export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('heartbeat'),
     // Absent on CLI builds older than the protocolVersion field itself — treat
     // a missing value as a legacy CLI with no negotiated wire protocol.
     protocolVersion: z.string().optional(),
+    // Optional identity of the spawning CLI process. Absent on legacy CLIs
+    // (which are not spawned by `kilo remote`). When present, the DO
+    // persists it in the WebSocket attachment and exposes it via
+    // `getConnectedInstances()`.
+    instance: instanceSchema.optional(),
     sessions: z.array(
       z.object({
         id: z.string(),
@@ -20,6 +37,9 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
         gitUrl: z.string().optional(),
         gitBranch: z.string().optional(),
         parentSessionId: z.string().optional(),
+        // Platform the session is running on (e.g. "darwin", "linux", "vscode").
+        // Optional for backward compatibility with legacy CLIs.
+        platform: z.string().max(32).optional(),
       })
     ),
   }),

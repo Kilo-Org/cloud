@@ -1854,4 +1854,52 @@ describe('api routes', () => {
     expect(forwardedUrl.pathname).toBe('/web');
     expect(forwardedUrl.searchParams.get('connectionId')).toBe('viewer-1');
   });
+
+  // -------------------------------------------------------------------------
+  // GET /api/instances/active (W3)
+  // -------------------------------------------------------------------------
+
+  describe('GET /instances/active', () => {
+    it('returns connected instances from the UserConnectionDO', async () => {
+      const getConnectedInstances = vi.fn(async () => ({
+        instances: [
+          { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+          { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+        ],
+      }));
+      vi.mocked(getUserConnectionDO).mockReturnValue({
+        getConnectedInstances,
+      } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request('http://local/instances/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(getConnectedInstances).toHaveBeenCalledTimes(1);
+      expect(await res.json()).toEqual({
+        instances: [
+          { connectionId: 'cli-A', name: 'laptop-A', projectName: 'kilo', version: '0.1.2' },
+          { connectionId: 'cli-B', name: 'laptop-B', projectName: 'kilo' },
+        ],
+      });
+    });
+
+    it('returns 200 with an empty `instances` array when no CLIs are connected', async () => {
+      vi.mocked(getUserConnectionDO).mockReturnValue({
+        getConnectedInstances: vi.fn(async () => ({ instances: [] })),
+      } as never);
+
+      const app = makeApiApp();
+      const res = await app.fetch(
+        new Request('http://local/instances/active', { method: 'GET' }),
+        makeTestEnv()
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ instances: [] });
+    });
+  });
 });

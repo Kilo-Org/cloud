@@ -245,7 +245,13 @@ export function AgentSessionListContent({
       }
       return (
         <RemoteSessionRow
-          session={item.session}
+          session={{
+            id: item.session.id,
+            title: item.session.title,
+            status: item.session.status,
+            gitBranch: item.session.gitBranch,
+            platform: item.session.platform,
+          }}
           onPress={() => {
             onSessionPress(item.session.id, organizationIdBySessionId.get(item.session.id));
           }}

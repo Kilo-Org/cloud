@@ -12,52 +12,13 @@ import {
 } from '@kilocode/worker-utils/gitlab-credential';
 import { getGitLabIntegrationOwner } from './credential-migration-legacy';
 
-export type GitLabCredentialAuditCounts = {
-  legacyTokenBearingIntegrations: number;
-  oauthMissingCredentials: number;
-  patMissingCredentials: number;
-  projectMissingCredentials: number;
-  credentialProfileMismatches: number;
-  providerMetadataMismatches: number;
-  crossTablePrimaryCredentialDuplicates: number;
-  malformedMetadata: number;
-  unmappableLegacyEntries: number;
-  integrationTypeDisagreements: number;
-  legacySecretFields: number;
-};
-
-export function emptyGitLabCredentialAuditCounts(): GitLabCredentialAuditCounts {
-  return {
-    legacyTokenBearingIntegrations: 0,
-    oauthMissingCredentials: 0,
-    patMissingCredentials: 0,
-    projectMissingCredentials: 0,
-    credentialProfileMismatches: 0,
-    providerMetadataMismatches: 0,
-    crossTablePrimaryCredentialDuplicates: 0,
-    malformedMetadata: 0,
-    unmappableLegacyEntries: 0,
-    integrationTypeDisagreements: 0,
-    legacySecretFields: 0,
-  };
-}
-
-export function hasBlockingGitLabCredentialAuditIssues(
-  counts: GitLabCredentialAuditCounts
-): boolean {
-  return (
-    counts.oauthMissingCredentials > 0 ||
-    counts.patMissingCredentials > 0 ||
-    counts.projectMissingCredentials > 0 ||
-    counts.credentialProfileMismatches > 0 ||
-    counts.providerMetadataMismatches > 0 ||
-    counts.crossTablePrimaryCredentialDuplicates > 0 ||
-    counts.malformedMetadata > 0 ||
-    counts.unmappableLegacyEntries > 0 ||
-    counts.integrationTypeDisagreements > 0
-  );
-}
-
+/**
+ * Compares an integration's encrypted credential rows against its parent
+ * integration and the GitLab row schemas. Used as the per-row safety guard
+ * before scrubbing: a non-zero mismatch count means the encrypted rows are not a
+ * faithful, well-formed copy of the legacy plaintext, so the plaintext must not
+ * be deleted.
+ */
 export function auditGitLabCredentialProfiles(
   integration: PlatformIntegration,
   providerBaseUrl: string,

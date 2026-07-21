@@ -2,120 +2,72 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
-  acquireGitLabCredentialMigrationJobLease,
-  cancelGitLabCredentialMigrationJob,
-  createGitLabCredentialMigrationJob,
-  failGitLabCredentialMigrationJob,
-  getGitLabCredentialMigrationJob,
-  GitLabCredentialMigrationJobConflictError,
-  listRecentGitLabCredentialMigrationJobs,
-  releaseGitLabCredentialMigrationJobLease,
-  type GitLabCredentialMigrationJobRecord,
-} from '@/lib/integrations/platforms/gitlab/credential-migration-job-repository';
-import { advanceGitLabCredentialMigrationJob } from '@/lib/integrations/platforms/gitlab/credential-migration-job';
+  backfillGitLabCredentialBatch,
+  scrubGitLabCredentialBatch,
+} from '@/lib/integrations/platforms/gitlab/credential-migration';
+import {
+  checkGitLabCredentialKeysMatch,
+  verifyGitLabCredentialDecryptabilityBatch,
+} from '@/lib/integrations/platforms/gitlab/credential-migration-verify';
 
-const StartInputSchema = z
+const SCRUB_CONFIRMATION = 'SCRUB GITLAB PLAINTEXT';
+
+const BatchInputSchema = z
   .object({
-    mode: z.enum(['audit', 'backfill', 'scrub']),
-    confirmation: z.string().optional(),
+    afterId: z.uuid().nullable().default(null),
+    limit: z.number().int().min(1).max(500).default(100),
   })
   .strict();
 
-function safeJob(job: GitLabCredentialMigrationJobRecord) {
-  return {
-    id: job.id,
-    requestedMode: job.requested_mode,
-    phase: job.phase,
-    status: job.status,
-    cursorPresent: job.cursor !== null,
-    scannedIntegrations: job.scanned_integrations,
-    mutatedIntegrations: job.mutated_integrations,
-    publicAuditCounts: job.public_audit_counts,
-    privateAuditCounts: job.private_audit_counts,
-    issueIntegrationIds: job.issue_integration_ids,
-    errorCode: job.error_code,
-    startedAt: job.started_at,
-    completedAt: job.completed_at,
-    createdAt: job.created_at,
-    updatedAt: job.updated_at,
-    cancellationNote:
-      job.status === 'cancelled'
-        ? 'Cancellation does not undo completed backfill or restore scrubbed plaintext.'
-        : undefined,
-  };
-}
-
+/**
+ * Stateless GitLab credential migration. There is no job table: each procedure
+ * processes one keyset page and returns `nextCursor`; the caller walks the table
+ * by passing it back until it is null. State lives in the data — a migrated row
+ * simply stops matching the selection query.
+ *
+ * Operator flow: run your own SQL to audit → backfillNextBatch until done →
+ * verifyDecryptability across all pages until it passes → scrubNextBatch until
+ * done → re-run the audit SQL to confirm no plaintext remains.
+ */
 export const adminGitLabCredentialMigrationRouter = createTRPCRouter({
-  startGitLabCredentialMigrationJob: adminProcedure
-    .input(StartInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const requiredConfirmation =
-        input.mode === 'backfill'
-          ? 'BACKFILL GITLAB CREDENTIALS'
-          : input.mode === 'scrub'
-            ? 'SCRUB GITLAB PLAINTEXT'
-            : undefined;
-      if (requiredConfirmation && input.confirmation !== requiredConfirmation) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Exact migration confirmation is required',
-        });
-      }
-      try {
-        return safeJob(
-          await createGitLabCredentialMigrationJob({
-            mode: input.mode,
-            requestedByUserId: ctx.user.id,
-          })
-        );
-      } catch (error) {
-        if (error instanceof GitLabCredentialMigrationJobConflictError) {
-          throw new TRPCError({ code: 'CONFLICT', message: error.message });
-        }
-        throw error;
-      }
-    }),
-  runGitLabCredentialMigrationJob: adminProcedure.mutation(async () => {
-    const job = await acquireGitLabCredentialMigrationJobLease();
-    if (!job) return { status: 'noop' as const, job: null };
-
-    const leaseToken = job.lease_token;
-    try {
-      const step = await advanceGitLabCredentialMigrationJob(job);
-      if (step.kind === 'advanced' || step.kind === 'retryable') {
-        await releaseGitLabCredentialMigrationJobLease(job.id, leaseToken);
-      }
-      const updatedJob =
-        step.kind === 'advanced' ? step.job : await getGitLabCredentialMigrationJob(job.id);
-      return { status: step.kind, job: updatedJob ? safeJob(updatedJob) : null };
-    } catch {
-      await failGitLabCredentialMigrationJob(job.id, leaseToken, 'migration_runner_failed');
-      const failedJob = await getGitLabCredentialMigrationJob(job.id);
-      return { status: 'failed' as const, job: failedJob ? safeJob(failedJob) : null };
-    }
+  backfillNextBatch: adminProcedure.input(BatchInputSchema).mutation(async ({ input }) => {
+    return backfillGitLabCredentialBatch({ limit: input.limit, afterId: input.afterId });
   }),
-  getGitLabCredentialMigrationJob: adminProcedure
-    .input(z.object({ id: z.uuid() }).strict())
-    .query(async ({ input }) => {
-      const job = await getGitLabCredentialMigrationJob(input.id);
-      if (!job) throw new TRPCError({ code: 'NOT_FOUND', message: 'Migration job not found' });
-      return safeJob(job);
-    }),
-  listGitLabCredentialMigrationJobs: adminProcedure
-    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }).strict())
-    .query(async ({ input }) => {
-      return (await listRecentGitLabCredentialMigrationJobs(input.limit)).map(safeJob);
-    }),
-  cancelGitLabCredentialMigrationJob: adminProcedure
-    .input(z.object({ id: z.uuid() }).strict())
-    .mutation(async ({ input }) => {
-      const job = await cancelGitLabCredentialMigrationJob(input.id);
-      if (!job) {
+
+  verifyDecryptability: adminProcedure
+    .input(z.object({ cursor: z.string().nullable().default(null) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      const result = await verifyGitLabCredentialDecryptabilityBatch({
+        requestedByUserId: ctx.user.id,
+        cursor: input.cursor,
+      });
+      if (result.kind === 'error') {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Migration job is not active or was not found',
+          code: result.retryable ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST',
+          message: `GitLab credential decryptability verification failed: ${result.errorCode}`,
         });
       }
-      return safeJob(job);
+      return result.batch;
+    }),
+
+  scrubNextBatch: adminProcedure
+    .input(BatchInputSchema.extend({ confirmation: z.string() }).strict())
+    .mutation(async ({ ctx, input }) => {
+      if (input.confirmation !== SCRUB_CONFIRMATION) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Exact scrub confirmation is required',
+        });
+      }
+      // Guard the catastrophic keypair-mismatch case on every call. Full decrypt
+      // coverage is the operator's responsibility via verifyDecryptability first.
+      const keyMatch = await checkGitLabCredentialKeysMatch(ctx.user.id);
+      if (!keyMatch.ok) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Refusing to scrub GitLab plaintext: ${keyMatch.errorCode}`,
+        });
+      }
+      return scrubGitLabCredentialBatch({ limit: input.limit, afterId: input.afterId });
     }),
 });

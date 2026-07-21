@@ -6,6 +6,12 @@ import {
 } from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { verifyCallbackToken } from '@kilocode/worker-utils';
+import {
+  buildScheduledJobFailureEvent,
+  buildScheduledJobSuccessEvent,
+  createScheduledJobRun,
+  emitScheduledJobEvent,
+} from '@kilocode/worker-utils/scheduled-job-observability';
 import { consumeOwnerBatch } from './consumer.js';
 import { dispatchDueOwners } from './dispatcher.js';
 import {
@@ -337,9 +343,37 @@ export default {
     return handleFetch(request, env);
   },
 
-  async scheduled(_controller: ScheduledController, env: CloudflareEnv): Promise<void> {
+  async scheduled(controller: ScheduledController, env: CloudflareEnv): Promise<void> {
     const dispatchId = randomUUID();
-    await dispatchDueOwners(env, dispatchId);
+    const run = createScheduledJobRun({
+      jobName: 'security_auto_analysis.dispatch',
+      runId: dispatchId,
+      environment: env.ENVIRONMENT,
+    });
+    const scheduleMetadata = {
+      schedule: controller.cron,
+      scheduled_time: controller.scheduledTime,
+      dispatch_id: dispatchId,
+    };
+
+    try {
+      const result = await dispatchDueOwners(env, dispatchId);
+      emitScheduledJobEvent(
+        buildScheduledJobSuccessEvent(run, {
+          ...scheduleMetadata,
+          discovered_owner_count: result.discoveredOwners,
+          enqueued_owner_message_count: result.enqueuedMessages,
+          discovered_remediation_attempt_count: result.discoveredRemediationAttempts,
+          enqueued_remediation_message_count: result.enqueuedRemediationMessages,
+        })
+      );
+    } catch (error) {
+      emitScheduledJobEvent({
+        ...buildScheduledJobFailureEvent(run, error),
+        ...scheduleMetadata,
+      });
+      throw error;
+    }
   },
 
   async queue(batch: MessageBatch<unknown>, env: CloudflareEnv): Promise<void> {

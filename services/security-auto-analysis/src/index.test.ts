@@ -99,20 +99,78 @@ function manualRemediationRequest(): Request {
 }
 
 describe('scheduled dispatcher', () => {
-  it('resolves after a successful dispatch', async () => {
+  it('emits a canonical success event with dispatch counters and schedule metadata', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.mocked(dispatchDueOwners).mockResolvedValueOnce({
+      dispatchId: 'dispatch-123',
+      discoveredOwners: 2,
+      enqueuedMessages: 2,
+      discoveredRemediationAttempts: 3,
+      enqueuedRemediationMessages: 3,
+    });
+
     await expect(
-      worker.scheduled({} as ScheduledController, {} as CloudflareEnv)
+      worker.scheduled(
+        { cron: '* * * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
+        { ENVIRONMENT: 'development' } as CloudflareEnv
+      )
     ).resolves.toBeUndefined();
-    expect(dispatchDueOwners).toHaveBeenCalledWith({}, expect.any(String));
+    const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
+    expect(dispatchDueOwners).toHaveBeenCalledWith(
+      expect.objectContaining({ ENVIRONMENT: 'development' }),
+      dispatchId
+    );
+    expect(
+      JSON.parse(
+        info.mock.calls.find(
+          ([message]) => typeof message === 'string' && message.includes('scheduled_job.completed')
+        )?.[0] ?? '{}'
+      )
+    ).toMatchObject({
+      event_name: 'scheduled_job.completed',
+      job_name: 'security_auto_analysis.dispatch',
+      run_id: dispatchId,
+      dispatch_id: dispatchId,
+      outcome: 'succeeded',
+      environment: 'development',
+      schedule: '* * * * *',
+      scheduled_time: 1_700_000_000_000,
+      discovered_owner_count: 2,
+      enqueued_owner_message_count: 2,
+      discovered_remediation_attempt_count: 3,
+      enqueued_remediation_message_count: 3,
+    });
   });
 
-  it('rejects when dispatch fails', async () => {
+  it('emits a canonical failure event before rethrowing', async () => {
     const dispatcherError = new Error('dispatcher failed');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.mocked(dispatchDueOwners).mockRejectedValueOnce(dispatcherError);
 
-    await expect(worker.scheduled({} as ScheduledController, {} as CloudflareEnv)).rejects.toBe(
-      dispatcherError
-    );
+    await expect(
+      worker.scheduled(
+        { cron: '* * * * *', scheduledTime: 1_700_000_000_000 } as ScheduledController,
+        { ENVIRONMENT: 'production' } as CloudflareEnv
+      )
+    ).rejects.toBe(dispatcherError);
+    const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
+    expect(
+      JSON.parse(
+        error.mock.calls.find(
+          ([message]) => typeof message === 'string' && message.includes('scheduled_job.completed')
+        )?.[0] ?? '{}'
+      )
+    ).toMatchObject({
+      event_name: 'scheduled_job.completed',
+      job_name: 'security_auto_analysis.dispatch',
+      run_id: dispatchId,
+      dispatch_id: dispatchId,
+      outcome: 'failed',
+      environment: 'production',
+      schedule: '* * * * *',
+      scheduled_time: 1_700_000_000_000,
+      exception_name: 'Error',
+    });
   });
 });
 

@@ -41,6 +41,7 @@ During verification:
 - Capture concise evidence: screenshots, exact visible state, and bounded log excerpts, never credentials.
 - Never create proxies, redirects, tunnels, NAT rules, or listeners to compensate for stale Expo state, including tools not covered by the explicit `socat` denial. An unmanaged listener invalidates a `prewarm` handoff.
 - Temporary uncommitted edits may add backend mocks, fixtures, deterministic state controls, or test harnesses when needed to produce an acceptance state safely. Use the smallest localized change and record every touched file.
+- LLM and agent responses are excluded from that mocking allowance. When a flow needs an agent or LLM to respond, drive a real model call on `kilo-auto/efficient`, falling back to `kilo-auto/free`. Use the fake-llm server or any other LLM mock only when a real call cannot produce the required state (for example, a specific provider failure); report each use with the mock named and a justification for why a real call could not produce it.
 - Temporary edits must not change the behavior under test, bypass provenance or security checks, or fix or conceal a product failure. If producing a state requires changing the behavior being judged, report that state as blocked.
 
 Classify every failure as exactly one of:

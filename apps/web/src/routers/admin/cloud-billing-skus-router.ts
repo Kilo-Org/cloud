@@ -1,4 +1,4 @@
-import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
   cloudBillingSkuIdSchema,
@@ -38,7 +38,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     return rows.map(serializeCloudBillingSku);
   }),
 
-  create: creditManagerProcedure
+  create: adminProcedure
     .input(createCloudBillingSkuInputSchema)
     .mutation(async ({ input, ctx }): Promise<SerializedCloudBillingSku> => {
       try {
@@ -62,7 +62,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       }
     }),
 
-  disable: creditManagerProcedure
+  disable: adminProcedure
     .input(z.object({ id: cloudBillingSkuIdSchema }))
     .mutation(async ({ input }): Promise<SerializedCloudBillingSku> => {
       const [updated] = await db

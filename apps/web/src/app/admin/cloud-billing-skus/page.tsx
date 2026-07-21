@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Tags, X } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminPage from '@/app/admin/components/AdminPage';
-import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -43,8 +42,6 @@ const breadcrumbs = (
 export default function CloudBillingSkusPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const permissions = useAdminCreditManagementPermission();
-  const { canManageCredits, isPermissionResolved } = permissions;
   const [creating, setCreating] = useState(false);
   const [createErrors, setCreateErrors] = useState<
     Partial<Record<keyof CreateCloudBillingSkuInput, string>>
@@ -97,21 +94,10 @@ export default function CloudBillingSkusPage() {
               Immutable usage products reported by cloud services. A price change requires a new SKU
               and a producer deployment.
             </p>
-            {isPermissionResolved && !canManageCredits && (
-              <p className="text-status-warning mt-2 type-label">
-                Credit management access is required to create or disable SKUs.
-              </p>
-            )}
-            {permissions.isError && (
-              <p className="text-destructive mt-2 type-label" role="alert">
-                Permissions could not be loaded. Reload this page before changing SKUs.
-              </p>
-            )}
           </div>
           {!creating ? (
             <Button
               ref={createButtonRef}
-              disabled={!isPermissionResolved || !canManageCredits}
               onClick={() => {
                 setCreateErrors({});
                 setCreating(true);
@@ -235,7 +221,7 @@ export default function CloudBillingSkusPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  disabled={!canManageCredits || disablingId === sku.id}
+                                  disabled={disablingId === sku.id}
                                 >
                                   Disable
                                 </Button>

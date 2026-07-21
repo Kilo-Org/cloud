@@ -7,16 +7,11 @@ import { eq } from 'drizzle-orm';
 import { serializeCloudBillingSku } from './cloud-billing-skus-router';
 
 let admin: User;
-let creditManager: User;
 let nonAdmin: User;
 
 beforeEach(async () => {
   await cleanupDbForTest();
-  [admin, creditManager, nonAdmin] = await Promise.all([
-    insertTestUser({ is_admin: true }),
-    insertTestUser({ is_admin: true, can_manage_credits: true }),
-    insertTestUser(),
-  ]);
+  [admin, nonAdmin] = await Promise.all([insertTestUser({ is_admin: true }), insertTestUser()]);
 });
 
 function validInput(id: string) {
@@ -33,7 +28,7 @@ describe('admin.cloudBillingSkus.list', () => {
   it('allows admins to list SKUs and rejects non-admins', async () => {
     await db.insert(cloud_billing_sku).values({
       ...validInput('cloud-agent-standard'),
-      created_by_user_id: creditManager.id,
+      created_by_user_id: admin.id,
     });
 
     const adminCaller = await createCallerForUser(admin.id);
@@ -67,8 +62,8 @@ describe('admin.cloudBillingSkus.list', () => {
 });
 
 describe('admin.cloudBillingSkus.create', () => {
-  it('requires credit management access', async () => {
-    const caller = await createCallerForUser(admin.id);
+  it('requires admin access', async () => {
+    const caller = await createCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.cloudBillingSkus.create(validInput('restricted-sku'))
@@ -79,7 +74,7 @@ describe('admin.cloudBillingSkus.create', () => {
   });
 
   it('persists the exact rate and authenticated creator', async () => {
-    const caller = await createCallerForUser(creditManager.id);
+    const caller = await createCallerForUser(admin.id);
 
     await caller.admin.cloudBillingSkus.create(validInput('exact-rate-sku'));
 
@@ -90,13 +85,13 @@ describe('admin.cloudBillingSkus.create', () => {
     expect(persisted).toMatchObject({
       id: 'exact-rate-sku',
       rate_cents_per_unit: '0.123456789012',
-      created_by_user_id: creditManager.id,
+      created_by_user_id: admin.id,
       accepts_new_usage: true,
     });
   });
 
   it('returns a canonical rate after PostgreSQL scale padding', async () => {
-    const caller = await createCallerForUser(creditManager.id);
+    const caller = await createCallerForUser(admin.id);
 
     const created = await caller.admin.cloudBillingSkus.create({
       ...validInput('canonical-rate-sku'),
@@ -114,7 +109,7 @@ describe('admin.cloudBillingSkus.create', () => {
   });
 
   it('returns CONFLICT for a duplicate SKU ID', async () => {
-    const caller = await createCallerForUser(creditManager.id);
+    const caller = await createCallerForUser(admin.id);
     await caller.admin.cloudBillingSkus.create(validInput('duplicate-sku'));
 
     await expect(
@@ -127,12 +122,12 @@ describe('admin.cloudBillingSkus.create', () => {
 });
 
 describe('admin.cloudBillingSkus.disable', () => {
-  it('requires credit management access', async () => {
+  it('requires admin access', async () => {
     await db.insert(cloud_billing_sku).values({
       ...validInput('protected-sku'),
-      created_by_user_id: creditManager.id,
+      created_by_user_id: admin.id,
     });
-    const caller = await createCallerForUser(admin.id);
+    const caller = await createCallerForUser(nonAdmin.id);
 
     await expect(
       caller.admin.cloudBillingSkus.disable({ id: 'protected-sku' })
@@ -146,7 +141,7 @@ describe('admin.cloudBillingSkus.disable', () => {
   });
 
   it('only moves a SKU to disabled and remains disabled on repeated calls', async () => {
-    const caller = await createCallerForUser(creditManager.id);
+    const caller = await createCallerForUser(admin.id);
     await caller.admin.cloudBillingSkus.create(validInput('one-way-sku'));
 
     const disabled = await caller.admin.cloudBillingSkus.disable({ id: 'one-way-sku' });

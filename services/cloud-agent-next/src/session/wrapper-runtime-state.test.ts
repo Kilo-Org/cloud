@@ -298,6 +298,51 @@ describe('WrapperLease', () => {
     expect(nextSandboxRecoveryDeadline(retrying)).toBe(2_300);
   });
 
+  it('checkpoints a completed isolated destroy and keeps it across retry recording', () => {
+    const expectedLease = {
+      target: { kind: 'session' as const },
+      requestedAt: 100,
+      nextInstanceGeneration: 3,
+    };
+    const prepared = reduceSandboxRecoveryState(undefined, {
+      type: 'prepare_post_exhaustion',
+      recovery: {
+        kind: 'isolated-destroy',
+        sourceSandboxId: 'ses-abcdef' as SandboxId,
+        expectedLease,
+        attempts: 0,
+        nextAttemptAt: 300,
+      },
+    });
+
+    const destroyed = reduceSandboxRecoveryState(prepared, {
+      type: 'record_post_exhaustion_destroy',
+      expectedLease,
+      destroyedAt: 400,
+    });
+    expect(destroyed).toMatchObject({
+      postExhaustionRecovery: { kind: 'isolated-destroy', destroyedAt: 400 },
+    });
+    expect(
+      reduceSandboxRecoveryState(destroyed, {
+        type: 'record_post_exhaustion_destroy',
+        expectedLease: { ...expectedLease, requestedAt: 99 },
+        destroyedAt: 500,
+      })
+    ).toEqual(destroyed);
+
+    const retried = reduceSandboxRecoveryState(destroyed, {
+      type: 'record_post_exhaustion_retry',
+      expectedLease,
+      expectedAttempts: 0,
+      nextAttemptAt: 2_400,
+      error: 'settlement failed',
+    });
+    expect(retried).toMatchObject({
+      postExhaustionRecovery: { destroyedAt: 400, attempts: 1, nextAttemptAt: 2_400 },
+    });
+  });
+
   it('clears only the exhausted lease captured by completed sandbox recovery', () => {
     const requested = reduceWrapperLease(
       { state: 'none', nextInstanceGeneration: 3 },

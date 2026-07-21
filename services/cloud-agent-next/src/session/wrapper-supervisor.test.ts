@@ -2530,6 +2530,59 @@ describe('WrapperSupervisor', () => {
     expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
   });
 
+  it('settles a recorded isolated destruction without destroying the sandbox again', async () => {
+    const metadata = {
+      ...createMetadata(),
+      workspace: { sandboxId: 'ses-abcdef' as SandboxId },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 4,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 100,
+            nextAttemptAt: 3_153_600_000_100,
+            attempts: 5,
+            exhaustedAt: 100,
+          },
+        ],
+        [
+          'sandbox_recovery_state',
+          {
+            listProcessesTimeouts: 0,
+            postExhaustionRecovery: {
+              kind: 'isolated-destroy',
+              sourceSandboxId: 'ses-abcdef',
+              destroyedAt: 950,
+              expectedLease: {
+                target: { kind: 'session' },
+                requestedAt: 100,
+                nextInstanceGeneration: 4,
+              },
+              attempts: 1,
+              nextAttemptAt: 1_000,
+            },
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.destroyIsolatedSandbox).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toEqual({
+      state: 'none',
+      nextInstanceGeneration: 4,
+    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toBeUndefined();
+    expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
   it('moves an exhausted shared session to failover without destroying shared compute', async () => {
     const routeKey = `usr-${'f'.repeat(48)}` as SandboxId;
     const replacementSandboxId = await deriveSharedSandboxId(

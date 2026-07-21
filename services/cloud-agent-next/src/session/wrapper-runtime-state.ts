@@ -61,6 +61,7 @@ const postExhaustionRecoverySchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('isolated-destroy'),
     sourceSandboxId: SandboxIdSchema,
+    destroyedAt: z.number().int().nonnegative().optional(),
     ...postExhaustionRecoveryCommonSchema,
   }),
   z.object({
@@ -191,6 +192,11 @@ export type SandboxRecoveryEvent =
       routeKey: SandboxId;
       replacementSandboxId: SandboxId;
       routeSuffix: 'shared-slot-v1';
+    }
+  | {
+      type: 'record_post_exhaustion_destroy';
+      expectedLease: ExhaustedWrapperLeaseIdentity;
+      destroyedAt: number;
     }
   | {
       type: 'record_post_exhaustion_retry';
@@ -400,6 +406,20 @@ export function reduceSandboxRecoveryState(
           replacementSandboxId: event.replacementSandboxId,
           routeSuffix: event.routeSuffix,
         },
+      };
+    }
+    case 'record_post_exhaustion_destroy': {
+      const recovery = state?.postExhaustionRecovery;
+      if (
+        !state ||
+        recovery?.kind !== 'isolated-destroy' ||
+        !isSameExhaustedWrapperLeaseIdentity(recovery.expectedLease, event.expectedLease)
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        postExhaustionRecovery: { ...recovery, destroyedAt: event.destroyedAt },
       };
     }
     case 'record_post_exhaustion_retry': {

@@ -1246,7 +1246,20 @@ export function createWrapperSupervisor(
 
     try {
       if (recovery.kind === 'isolated-destroy') {
-        await destroyIsolatedSandbox(metadata);
+        if (recovery.destroyedAt === undefined) {
+          await destroyIsolatedSandbox(metadata);
+          const latest = await getSandboxRecoveryState(storage);
+          const withDestroy = reduceSandboxRecoveryState(latest, {
+            type: 'record_post_exhaustion_destroy',
+            expectedLease: recovery.expectedLease,
+            destroyedAt: Date.now(),
+          });
+          if (!withDestroy) return;
+          await putSandboxRecoveryState(storage, withDestroy);
+          const destroyedRecovery = withDestroy.postExhaustionRecovery;
+          if (destroyedRecovery?.kind !== 'isolated-destroy') return;
+          recovery = destroyedRecovery;
+        }
       } else {
         let replacementSandboxId = recovery.replacementSandboxId;
         let routeSuffix = recovery.routeSuffix;

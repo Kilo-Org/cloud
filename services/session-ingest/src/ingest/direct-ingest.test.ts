@@ -66,7 +66,7 @@ function makeReadableStream(bytes: Uint8Array): ReadableStream<Uint8Array> {
 
 function makeRequest(params: {
   items: unknown[];
-  sessionRow: { parentSessionId: string | null } | null;
+  sessionRow: { parentSessionId: string | null; createdOnPlatform?: string | null } | null;
   sessionLookupError?: Error;
   ingest?: ReturnType<typeof vi.fn>;
   sendAgentSessionNotification?: ReturnType<typeof vi.fn>;
@@ -98,7 +98,14 @@ function makeRequest(params: {
   } as never);
 
   const sessionRows =
-    params.sessionRow === null ? [] : [{ parentSessionId: params.sessionRow.parentSessionId }];
+    params.sessionRow === null
+      ? []
+      : [
+          {
+            parentSessionId: params.sessionRow.parentSessionId,
+            createdOnPlatform: params.sessionRow.createdOnPlatform ?? null,
+          },
+        ];
   const limit = vi.fn(async () => {
     if (params.sessionLookupError) throw params.sessionLookupError;
     return sessionRows;
@@ -146,6 +153,44 @@ function makeRequest(params: {
 }
 
 describe('agent_notification direct ingest', () => {
+  it('suppresses completed signals owned by a cloud-agent-web session', async () => {
+    const ingest = vi.fn(async () => ({
+      accepted: true,
+      changes: [],
+      attentionSignals: [{ kind: 'completed' as const, signalId: 'sig_1', messageExcerpt: 'Done' }],
+    }));
+    const { request, hasActiveCliSession, sendCloudAgentSessionNotification } = makeRequest({
+      items: [{ type: 'message', data: { id: 'msg_1' } }],
+      sessionRow: { parentSessionId: null, createdOnPlatform: 'cloud-agent-web' },
+      ingest,
+    });
+
+    const result = await handleDirectIngestRequest(request);
+
+    expect(result.status).toBe(200);
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
+    expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
+  });
+
+  it('continues dispatching completed signals for ordinary remote CLI sessions', async () => {
+    const ingest = vi.fn(async () => ({
+      accepted: true,
+      changes: [],
+      attentionSignals: [{ kind: 'completed' as const, signalId: 'sig_1', messageExcerpt: 'Done' }],
+    }));
+    const { request, hasActiveCliSession, sendCloudAgentSessionNotification } = makeRequest({
+      items: [{ type: 'message', data: { id: 'msg_1' } }],
+      sessionRow: { parentSessionId: null, createdOnPlatform: 'cli' },
+      ingest,
+    });
+
+    const result = await handleDirectIngestRequest(request);
+
+    expect(result.status).toBe(200);
+    expect(hasActiveCliSession).toHaveBeenCalledWith('ses_agent');
+    expect(sendCloudAgentSessionNotification).toHaveBeenCalledOnce();
+  });
+
   it('dispatches a valid agent_notification and marks it dispatched', async () => {
     const { request, sendAgentSessionNotification, markAgentNotificationDispatched } = makeRequest({
       items: [{ type: 'agent_notification', data: { id: 'note_1', message: 'Build done' } }],

@@ -305,6 +305,32 @@ describe('MessageSettlementOutbox', () => {
     expect(persisted?.terminalEffects?.push?.disposition).toBe('suppressed');
   });
 
+  it('suppresses only the push effect when requested and does not re-arm it during repair', async () => {
+    const harness = createHarness({ metadata: pushMetadata });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/suppressed-push' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(
+      firstMessageId,
+      { kind: 'completed', completionSource: 'idle_reconciliation' },
+      { suppressPush: true }
+    );
+    await harness.outbox.repairTerminalEffects();
+
+    expect(harness.events).toHaveLength(1);
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.pushJobs).toEqual([]);
+    await expect(getSessionMessageState(harness.storage, firstMessageId)).resolves.toMatchObject({
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'accounted' },
+        push: { disposition: 'suppressed' },
+      },
+    });
+  });
+
   it('keeps terminal persistence successful when report scheduling throws', async () => {
     const storage = createMemoryStorage();
     await putSessionMessageState(storage, acceptedMessageState(firstMessageId));

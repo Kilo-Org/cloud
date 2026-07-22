@@ -20,6 +20,7 @@ import {
   listNonTerminalAcceptedMessages,
   type SessionMessageState,
   type SessionMessageStorage,
+  type TerminalizeParams,
 } from './session-message-state.js';
 import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
@@ -120,6 +121,12 @@ export type WrapperTerminalEvent = {
 
 type SealedBatchSettlementResult = {
   failedTerminalObserved: boolean;
+};
+
+type ProjectedSealedBatchSettlement = {
+  message: SessionMessageState;
+  params?: TerminalizeParams;
+  observeCorrelatedActivity: boolean;
 };
 
 export type WrapperSupervisorStorage = DurableObjectStorage &
@@ -951,56 +958,110 @@ export function createWrapperSupervisor(
     const metadata = await getMetadata();
     if (!metadata) return null;
     const kiloSessionId = metadata.auth.kiloSessionId;
-    let failedTerminalObserved = wrapperRunMessages.some(
-      message =>
-        sealedSet.has(message.messageId) &&
-        (message.status === 'failed' || message.status === 'interrupted')
-    );
-
+    const projectedSettlements: ProjectedSealedBatchSettlement[] = [];
     for (const messageId of sealedMessageIds) {
       const message = wrapperRunMessagesById.get(messageId);
-      if (!message || message.status !== 'accepted') continue;
+      if (!message) continue;
+      if (message.status !== 'accepted') {
+        projectedSettlements.push({ message, observeCorrelatedActivity: false });
+        continue;
+      }
       const assistantMessage = kiloSessionId
         ? getAssistantMessageForUserMessage(metadata.identity.sessionId, kiloSessionId, messageId)
         : null;
       const assistantError = getAssistantErrorMessage(assistantMessage?.info.error);
       if (assistantError !== undefined) {
         const assistantFailure = classifyAssistantFailure(assistantError);
-        failedTerminalObserved = true;
-        await observeCorrelatedAgentActivity?.(messageId);
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
-          kind: 'failed',
-          reason: 'assistant_error',
-          error: assistantError,
-          completionSource: 'idle_reconciliation',
-          failureStage: 'agent_activity',
-          failureCode: assistantFailure.terminalCode ?? 'assistant_error',
-          assistantFailureReason: assistantFailure.reason,
-          providerOwnership: assistantFailure.providerOwnership,
-          safeFailureMessage: assistantFailure.safeMessage,
+        projectedSettlements.push({
+          message,
+          observeCorrelatedActivity: true,
+          params: {
+            kind: 'failed',
+            reason: 'assistant_error',
+            error: assistantError,
+            completionSource: 'idle_reconciliation',
+            failureStage: 'agent_activity',
+            failureCode: assistantFailure.terminalCode ?? 'assistant_error',
+            assistantFailureReason: assistantFailure.reason,
+            providerOwnership: assistantFailure.providerOwnership,
+            safeFailureMessage: assistantFailure.safeMessage,
+          },
         });
       } else if (assistantMessage) {
-        await observeCorrelatedAgentActivity?.(messageId);
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
-          kind: 'completed',
-          assistantMessageId: assistantMessage.info.id,
-          completionSource: 'idle_reconciliation',
+        projectedSettlements.push({
+          message,
+          observeCorrelatedActivity: true,
+          params: {
+            kind: 'completed',
+            assistantMessageId: assistantMessage.info.id,
+            completionSource: 'idle_reconciliation',
+          },
         });
       } else if (!isPromptMessage(message)) {
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
-          kind: 'completed',
-          completionSource: 'idle_reconciliation',
+        projectedSettlements.push({
+          message,
+          observeCorrelatedActivity: false,
+          params: { kind: 'completed', completionSource: 'idle_reconciliation' },
         });
       } else {
-        failedTerminalObserved = true;
-        await messageSettlementOutbox.terminalizeSessionMessageOnce(messageId, {
-          kind: 'failed',
-          reason: 'missing_assistant_reply',
-          error: 'No assistant reply found during wrapper completion',
-          completionSource: 'idle_reconciliation',
-          failureStage: 'post_dispatch_no_activity',
-          failureCode: 'missing_assistant_reply',
+        projectedSettlements.push({
+          message,
+          observeCorrelatedActivity: false,
+          params: {
+            kind: 'failed',
+            reason: 'missing_assistant_reply',
+            error: 'No assistant reply found during wrapper completion',
+            completionSource: 'idle_reconciliation',
+            failureStage: 'post_dispatch_no_activity',
+            failureCode: 'missing_assistant_reply',
+          },
         });
+      }
+    }
+
+    const successfulCompletions = projectedSettlements.filter(
+      settlement =>
+        settlement.message.status === 'completed' || settlement.params?.kind === 'completed'
+    );
+    const representativeMessageId = successfulCompletions.at(-1)?.message.messageId;
+    const failedOrInterruptedCount = projectedSettlements.filter(
+      settlement =>
+        settlement.message.status === 'failed' ||
+        settlement.message.status === 'interrupted' ||
+        settlement.params?.kind === 'failed' ||
+        settlement.params?.kind === 'interrupted'
+    ).length;
+    const failedTerminalObserved = failedOrInterruptedCount > 0;
+
+    if (representativeMessageId) {
+      logger
+        .withFields({
+          wrapperRunId,
+          sealedMessageCount: sealedMessageIds.length,
+          projectedCompletionCount: successfulCompletions.length,
+          suppressedCompletionPushCount: successfulCompletions.length - 1,
+          representativeMessageId,
+          failedOrInterruptedCount,
+        })
+        .info('Selected sealed batch completion push representative');
+    }
+
+    for (const settlement of projectedSettlements) {
+      if (!settlement.params) continue;
+      if (settlement.observeCorrelatedActivity) {
+        await observeCorrelatedAgentActivity?.(settlement.message.messageId);
+      }
+      if (settlement.params.kind === 'completed') {
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(
+          settlement.message.messageId,
+          settlement.params,
+          { suppressPush: settlement.message.messageId !== representativeMessageId }
+        );
+      } else {
+        await messageSettlementOutbox.terminalizeSessionMessageOnce(
+          settlement.message.messageId,
+          settlement.params
+        );
       }
     }
 

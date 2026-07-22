@@ -1124,7 +1124,7 @@ describe('remote session attention notifications', () => {
   const attentionSignal = { signalId: 'msg_1', kind: 'completed', messageExcerpt: 'All done' };
 
   function setUpAttentionTest(params: {
-    sessionRow: { parent_session_id: string | null };
+    sessionRow: { parent_session_id: string | null; created_on_platform?: string | null };
     activeCliSession?: boolean;
     ingest?: ReturnType<typeof vi.fn>;
     stagedItems?: unknown[];
@@ -1199,9 +1199,9 @@ describe('remote session attention notifications', () => {
     return { ack, retry };
   }
 
-  it.skip('dispatches a push notification for an active root session', async () => {
+  it('dispatches a push notification for an active ordinary remote CLI root session', async () => {
     const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
-      sessionRow: { parent_session_id: null },
+      sessionRow: { parent_session_id: null, created_on_platform: 'cli' },
       activeCliSession: true,
     });
 
@@ -1219,7 +1219,7 @@ describe('remote session attention notifications', () => {
     });
   });
 
-  it.skip('suppresses the push when no active CLI owns the root session', async () => {
+  it('suppresses the push when no active CLI owns the root session', async () => {
     const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
       sessionRow: { parent_session_id: null },
       activeCliSession: false,
@@ -1228,6 +1228,18 @@ describe('remote session attention notifications', () => {
     await runAttentionQueue(env);
 
     expect(hasActiveCliSession).toHaveBeenCalledWith('ses_remote');
+    expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
+  });
+
+  it('suppresses cloud-agent-web completed signals before checking active CLI state', async () => {
+    const { env, hasActiveCliSession, sendCloudAgentSessionNotification } = setUpAttentionTest({
+      sessionRow: { parent_session_id: null, created_on_platform: 'cloud-agent-web' },
+      activeCliSession: true,
+    });
+
+    await runAttentionQueue(env);
+
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
     expect(sendCloudAgentSessionNotification).not.toHaveBeenCalled();
   });
 

@@ -43,6 +43,7 @@ const WRAPPER_RUN_ID = 'wr_supervisor';
 const WRAPPER_CONNECTION_ID = 'conn_supervisor';
 const MESSAGE_ID = 'msg_018f1e2d3c4bSupvMsgAbCdEfG';
 const NEWER_MESSAGE_ID = 'msg_018f1e2d3c4bNewerMsgAbCdEF';
+const NEWEST_MESSAGE_ID = 'msg_018f1e2d3c4bNewestMsgAbCdE';
 const OWNED_WRAPPER_LEASE: [string, unknown] = [
   'wrapper_lease',
   {
@@ -129,6 +130,7 @@ function createHarness(
   const storage = options?.storage ?? createMemoryStorage(initialEntries, options?.storageHooks);
   const events: MessageEvent[] = [];
   const callbackJobs: CallbackJob[] = [];
+  const pushJobs: Array<{ executionId: string; status: string }> = [];
   const sentPings: string[] = [];
   const stops: string[] = [];
   const stopWrappers = vi.fn().mockResolvedValue({ status: 'absent' });
@@ -144,7 +146,10 @@ function createHarness(
         callbackJobs.push(job);
       },
     }),
-    sendPushNotification: async () => ({ dispatched: true }),
+    sendPushNotification: async params => {
+      pushJobs.push({ executionId: params.executionId, status: params.status });
+      return { dispatched: true };
+    },
     hasConnectedStreamClients: () => false,
     getAssistantMessageForUserMessage: () => null,
     ensureTerminalMessageEvent: event => {
@@ -185,6 +190,7 @@ function createHarness(
     storage,
     events,
     callbackJobs,
+    pushJobs,
     sentPings,
     stops,
     stopWrappers,
@@ -1325,6 +1331,141 @@ describe('WrapperSupervisor', () => {
       status: 'completed',
     });
     expect(harness.requestPendingDrainIfNeeded).toHaveBeenCalledOnce();
+  });
+
+  it('coalesces successful sealed batch pushes to the newest admitted message', async () => {
+    const assistantMessageIds = new Map([
+      [MESSAGE_ID, 'ase_batch_oldest'],
+      [NEWER_MESSAGE_ID, 'ase_batch_newer'],
+      [NEWEST_MESSAGE_ID, 'ase_batch_newest'],
+    ]);
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      metadata: {
+        ...createMetadata(),
+        identity: { ...createMetadata().identity, createdOnPlatform: 'cloud-agent-web' },
+      },
+      getAssistantMessageForUserMessage: (_sessionId, _kiloSessionId, messageId) =>
+        ({
+          info: { id: assistantMessageIds.get(messageId) ?? '', role: 'assistant' },
+          parts: [],
+        }) as unknown as LatestAssistantMessage,
+    });
+    for (const messageId of [MESSAGE_ID, NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID]) {
+      await putSessionMessageState(harness.storage, {
+        ...acceptedMessage(messageId),
+        callbackRequired: true,
+        callbackTarget: { url: `https://example.com/${messageId}` },
+      });
+    }
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID, NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID],
+    });
+
+    for (const messageId of [MESSAGE_ID, NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID]) {
+      await expect(getSessionMessageState(harness.storage, messageId)).resolves.toMatchObject({
+        status: 'completed',
+        assistantMessageId: assistantMessageIds.get(messageId),
+        completionSource: 'idle_reconciliation',
+      });
+    }
+    expect(harness.events).toHaveLength(3);
+    expect(harness.pushJobs).toEqual([{ executionId: NEWEST_MESSAGE_ID, status: 'completed' }]);
+    expect(harness.callbackJobs).toHaveLength(1);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      terminalEffects: { push: { disposition: 'suppressed' } },
+    });
+    await expect(getSessionMessageState(harness.storage, NEWER_MESSAGE_ID)).resolves.toMatchObject({
+      terminalEffects: { push: { disposition: 'suppressed' } },
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID, NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID],
+    });
+
+    expect(harness.pushJobs).toEqual([{ executionId: NEWEST_MESSAGE_ID, status: 'completed' }]);
+  });
+
+  it('keeps the newest already-completed sealed member as the replay representative', async () => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      getAssistantMessageForUserMessage: (_sessionId, _kiloSessionId, messageId) =>
+        ({
+          info: { id: `ase_${messageId}`, role: 'assistant' },
+          parts: [],
+        }) as unknown as LatestAssistantMessage,
+    });
+    await putSessionMessageState(harness.storage, acceptedMessage(MESSAGE_ID));
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(NEWER_MESSAGE_ID),
+      status: 'completed',
+      terminalAt: 3_000,
+      completionSource: 'idle_reconciliation',
+      terminalEffects: {
+        event: 'accounted',
+        callback: { disposition: 'not-required' },
+        push: { disposition: 'accounted' },
+      },
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID, NEWER_MESSAGE_ID],
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      terminalEffects: { push: { disposition: 'suppressed' } },
+    });
+    expect(harness.pushJobs).toEqual([]);
+  });
+
+  it('keeps failure pushes while coalescing successful sealed batch members', async () => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      metadata: {
+        ...createMetadata(),
+        identity: { ...createMetadata().identity, createdOnPlatform: 'cloud-agent-web' },
+      },
+      getAssistantMessageForUserMessage: (_sessionId, _kiloSessionId, messageId) =>
+        ({
+          info:
+            messageId === NEWEST_MESSAGE_ID
+              ? { id: 'ase_batch_failed', role: 'assistant', error: 'assistant failed' }
+              : { id: `ase_${messageId}`, role: 'assistant' },
+          parts: [],
+        }) as unknown as LatestAssistantMessage,
+    });
+    for (const messageId of [MESSAGE_ID, NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID]) {
+      await putSessionMessageState(harness.storage, acceptedMessage(messageId));
+    }
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID, NEWER_MESSAGE_ID, NEWEST_MESSAGE_ID],
+    });
+
+    expect(harness.pushJobs).toEqual([
+      { executionId: NEWER_MESSAGE_ID, status: 'completed' },
+      { executionId: NEWEST_MESSAGE_ID, status: 'failed' },
+    ]);
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      terminalEffects: { push: { disposition: 'suppressed' } },
+    });
+    await expect(getSessionMessageState(harness.storage, NEWEST_MESSAGE_ID)).resolves.toMatchObject(
+      {
+        status: 'failed',
+        terminalEffects: { push: { disposition: 'accounted' } },
+      }
+    );
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      reason: 'terminal-failed',
+    });
   });
 
   it('settles current accepted work from a legacy complete without sealed membership', async () => {

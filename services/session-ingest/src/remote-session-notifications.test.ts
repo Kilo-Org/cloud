@@ -52,7 +52,7 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const signal = completedSignal('Done');
     const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal },
+      { kiloUserId: 'usr_1', sessionId: 'ses_1', createdOnPlatform: null, signal },
       {
         hasActiveCliSession,
         sendPush,
@@ -76,7 +76,12 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     const hasActiveCliSession = vi.fn(async () => false);
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: null,
+        signal: completedSignal('Done'),
+      },
       {
         hasActiveCliSession,
         sendPush,
@@ -96,7 +101,12 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const sendAgentSessionNotification = vi.fn(async () => ({ dispatched: true }));
     const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: agentNotificationSignal('Build done') },
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: 'cloud-agent-web',
+        signal: agentNotificationSignal('Build done'),
+      },
       { hasActiveCliSession, sendPush, sendAgentSessionNotification }
     );
 
@@ -120,7 +130,12 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     });
     await expect(
       dispatchRemoteSessionAttentionSignal(
-        { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: agentNotificationSignal('hi') },
+        {
+          kiloUserId: 'usr_1',
+          sessionId: 'ses_1',
+          createdOnPlatform: 'cloud-agent-web',
+          signal: agentNotificationSignal('hi'),
+        },
         { hasActiveCliSession, sendPush, sendAgentSessionNotification }
       )
     ).rejects.toThrow('transport down');
@@ -136,8 +151,77 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
       })
     );
     const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: agentNotificationSignal('hi') },
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: 'cloud-agent-web',
+        signal: agentNotificationSignal('hi'),
+      },
       { hasActiveCliSession, sendPush, sendAgentSessionNotification }
+    );
+
+    expect(outcome).toBe('suppressed');
+  });
+
+  it('suppresses cloud-agent-web completed signals before checking active CLI state', async () => {
+    const hasActiveCliSession = vi.fn(async () => true);
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: 'cloud-agent-web',
+        signal: completedSignal('Done'),
+      },
+      {
+        hasActiveCliSession,
+        sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
+    );
+
+    expect(outcome).toBe('suppressed');
+    expect(hasActiveCliSession).not.toHaveBeenCalled();
+    expect(sendPush).not.toHaveBeenCalled();
+  });
+
+  it('still sends cloud-agent-web needs-input signals when the CLI is active', async () => {
+    const hasActiveCliSession = vi.fn(async () => true);
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: 'cloud-agent-web',
+        signal: needsInputSignal(),
+      },
+      {
+        hasActiveCliSession,
+        sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
+    );
+
+    expect(outcome).toBe('sent');
+    expect(hasActiveCliSession).toHaveBeenCalledOnce();
+    expect(sendPush).toHaveBeenCalledOnce();
+  });
+
+  it('returns suppressed when the notifications service declines a legacy push', async () => {
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: 'unknown',
+        signal: completedSignal('Done'),
+      },
+      {
+        hasActiveCliSession: vi.fn(async () => true),
+        sendPush: vi.fn(async () => ({ dispatched: false, reason: 'missing_session' }) as const),
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
     );
 
     expect(outcome).toBe('suppressed');

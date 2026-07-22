@@ -423,6 +423,7 @@ async function runDirectPostCommitTasks(
       const [session] = await db
         .select({
           parentSessionId: cli_sessions_v2.parent_session_id,
+          createdOnPlatform: cli_sessions_v2.created_on_platform,
         })
         .from(cli_sessions_v2)
         .where(
@@ -437,7 +438,12 @@ async function runDirectPostCommitTasks(
         for (const signal of legacySignals) {
           try {
             await dispatchRemoteSessionAttentionSignal(
-              { kiloUserId: request.kiloUserId, sessionId: request.sessionId, signal },
+              {
+                kiloUserId: request.kiloUserId,
+                sessionId: request.sessionId,
+                createdOnPlatform: session.createdOnPlatform,
+                signal,
+              },
               {
                 hasActiveCliSession: () => userConnection.hasActiveCliSession(request.sessionId),
                 sendPush: pushParams =>

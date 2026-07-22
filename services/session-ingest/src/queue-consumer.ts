@@ -87,6 +87,7 @@ async function processMessage(
 type IngestSessionRow = {
   session_id: string;
   parent_session_id: string | null;
+  created_on_platform: string | null;
 };
 
 /**
@@ -105,6 +106,7 @@ async function loadSessionOrCleanupStaging(
     .select({
       session_id: cli_sessions_v2.session_id,
       parent_session_id: cli_sessions_v2.parent_session_id,
+      created_on_platform: cli_sessions_v2.created_on_platform,
     })
     .from(cli_sessions_v2)
     .where(
@@ -370,10 +372,17 @@ function scheduleAttentionSignalDispatch(
           kiloUserId: msg.kiloUserId,
           sessionId: msg.sessionId,
         });
-        await dispatchRemoteSessionAttentionSignals(env, msg.kiloUserId, msg.sessionId, signals, {
-          markAgentNotificationDispatched: (notificationId: string) =>
-            sessionDO.markAgentNotificationDispatched(notificationId),
-        });
+        await dispatchRemoteSessionAttentionSignals(
+          env,
+          msg.kiloUserId,
+          msg.sessionId,
+          sessionRow.created_on_platform,
+          signals,
+          {
+            markAgentNotificationDispatched: (notificationId: string) =>
+              sessionDO.markAgentNotificationDispatched(notificationId),
+          }
+        );
       } catch (error) {
         console.error('Failed to dispatch remote session attention signals (non-fatal)', {
           sessionId: msg.sessionId,
@@ -412,6 +421,7 @@ async function dispatchRemoteSessionAttentionSignals(
   env: Env,
   kiloUserId: string,
   sessionId: string,
+  createdOnPlatform: string | null,
   signals: AttentionSignal[],
   deps: {
     markAgentNotificationDispatched: (notificationId: string) => unknown;
@@ -428,7 +438,7 @@ async function dispatchRemoteSessionAttentionSignals(
   for (const signal of legacySignals) {
     try {
       await dispatchRemoteSessionAttentionSignal(
-        { kiloUserId, sessionId, signal },
+        { kiloUserId, sessionId, createdOnPlatform, signal },
         {
           hasActiveCliSession: async () => {
             const stub = getUserConnectionDO(env, { kiloUserId });

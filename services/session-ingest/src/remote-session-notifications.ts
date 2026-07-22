@@ -53,48 +53,83 @@ export type DispatchRemoteSessionAttentionOutcome = 'sent' | 'suppressed';
  * `isEligibleForRemoteSessionAttention` for the owning session.
  */
 export async function dispatchRemoteSessionAttentionSignal(
-  params: { kiloUserId: string; sessionId: string; signal: AttentionSignal },
+  params: {
+    kiloUserId: string;
+    sessionId: string;
+    createdOnPlatform: string | null;
+    signal: AttentionSignal;
+  },
   deps: DispatchRemoteSessionAttentionDeps
 ): Promise<DispatchRemoteSessionAttentionOutcome> {
+  const signal = params.signal;
   // §4.3: `agent_notification` signals are an explicit `notify_user` tool call. The user
   // asked for the ping, and a headless `kilo run` may exit right after emitting it — neither
   // the per-user rollout gate nor the live-CLI gate must apply, or this single notification
   // the user explicitly requested would silently be lost. Root-session eligibility is still
   // enforced one level up by the caller, and presence-suppression is handled downstream by
   // the notifications service.
-  if (params.signal.kind === 'agent_notification') {
+  if (signal.kind === 'agent_notification') {
     const result = await deps.sendAgentSessionNotification({
       userId: params.kiloUserId,
       cliSessionId: params.sessionId,
-      notificationId: params.signal.notificationId,
-      message: params.signal.message,
+      notificationId: signal.notificationId,
+      message: signal.message,
     });
     console.log({
       event: 'agent_push_outcome',
       cliSessionId: params.sessionId,
-      notificationId: params.signal.notificationId,
+      notificationId: signal.notificationId,
       outcome: result.dispatched ? 'dispatched' : (result.reason ?? 'failed'),
     });
     return result.dispatched ? 'sent' : 'suppressed';
   }
 
-  // Legacy attention pushes (completed / needs_input) remain gated behind the live-CLI
-  // presence check.
-  if (!(await deps.hasActiveCliSession())) {
+  if (signal.kind === 'completed' && params.createdOnPlatform === 'cloud-agent-web') {
+    logLegacyAttentionOutcome(params, signal, 'suppressed_cloud_agent_completion_owner');
     return 'suppressed';
   }
 
-  await deps.sendPush({
+  // Legacy attention pushes (completed / needs_input) remain gated behind the live-CLI
+  // presence check.
+  if (!(await deps.hasActiveCliSession())) {
+    logLegacyAttentionOutcome(params, signal, 'suppressed_no_active_cli');
+    return 'suppressed';
+  }
+
+  const result = await deps.sendPush({
     userId: params.kiloUserId,
     cliSessionId: params.sessionId,
-    executionId: `remote:${params.signal.signalId}`,
+    executionId: `remote:${signal.signalId}`,
     // The push status enum has no needs_input value and the notifications service ignores
     // status when building the push — the body carries the real semantics. Extending the
     // enum would fail validation on a notifications worker deployed with the old schema.
     status: 'completed',
-    body: buildRemoteSessionAttentionPushBody(params.signal),
+    body: buildRemoteSessionAttentionPushBody(signal),
     suppressIfViewingSession: true,
   });
 
-  return 'sent';
+  logLegacyAttentionOutcome(
+    params,
+    signal,
+    result.dispatched ? 'dispatched' : (result.reason ?? 'failed')
+  );
+  return result.dispatched ? 'sent' : 'suppressed';
+}
+
+function logLegacyAttentionOutcome(
+  params: {
+    sessionId: string;
+    createdOnPlatform: string | null;
+  },
+  signal: ExcerptAttentionSignal,
+  outcome: string
+): void {
+  console.log({
+    event: 'remote_session_attention_outcome',
+    sessionId: params.sessionId,
+    signalId: signal.signalId,
+    signalKind: signal.kind,
+    createdOnPlatform: params.createdOnPlatform,
+    outcome,
+  });
 }

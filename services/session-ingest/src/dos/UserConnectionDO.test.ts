@@ -691,7 +691,7 @@ describe('UserConnectionDO', () => {
       }
     });
 
-    it('projects capabilities.attachments=true on every session row of the sessions.heartbeat event', () => {
+    it('projects the latest connection capabilities onto every sessions.heartbeat row', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -702,25 +702,40 @@ describe('UserConnectionDO', () => {
       sendSubscribe(doInstance, webWs, 's1');
       webWs.send.mockClear();
 
-      // Now advertise capabilities: the broadcast heartbeat must carry the
-      // capabilities on the message envelope, but each session row only
-      // carries its own owning-connection identity (capabilities is read from
-      // the connection, not the per-session row of the broadcast). The S3b
-      // SDK consumer re-attaches capabilities per-row in the consumer layer.
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
         capabilities: { attachments: true },
       });
 
-      const sent = parseSent(webWs) as { data: { capabilities?: unknown; sessions: unknown[] } };
-      expect(sent.data.capabilities).toEqual({ attachments: true });
-      expect(sent.data.sessions).toHaveLength(2);
+      expect(parseSent(webWs)).toMatchObject({
+        data: {
+          sessions: [
+            { id: 's1', capabilities: { attachments: true } },
+            { id: 's2', capabilities: { attachments: true } },
+          ],
+        },
+      });
 
-      // aggregateSessions() must still surface the latest capabilities, which
-      // is the S3b consumer's source of truth for the per-row projection.
-      const rows = doInstance.getActiveSessions();
-      for (const row of rows) {
-        expect(row.capabilities).toEqual({ attachments: true });
-      }
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')]);
+      expect(parseSent(webWs)).toMatchObject({
+        data: { sessions: [{ id: 's1' }, { id: 's2' }] },
+      });
+      const legacyRows = (parseSent(webWs) as { data: { sessions: Record<string, unknown>[] } })
+        .data.sessions;
+      expect(legacyRows.every(row => !Object.hasOwn(row, 'capabilities'))).toBe(true);
+
+      webWs.send.mockClear();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2')], {
+        capabilities: { attachments: false },
+      });
+      expect(parseSent(webWs)).toMatchObject({
+        data: {
+          sessions: [
+            { id: 's1', capabilities: { attachments: false } },
+            { id: 's2', capabilities: { attachments: false } },
+          ],
+        },
+      });
     });
 
     it('omits capabilities from aggregateSessions rows when the latest heartbeat omits the field (legacy CLI)', () => {

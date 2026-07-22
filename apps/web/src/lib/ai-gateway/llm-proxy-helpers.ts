@@ -45,7 +45,6 @@ import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
-export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
@@ -93,6 +92,18 @@ export function temporarilyUnavailableResponse() {
       error: 'Service Unavailable',
       error_type: ProxyErrorType.temporarily_unavailable,
       message: 'The service is temporarily unavailable. Please try again later.',
+    },
+    { status: 503 }
+  );
+}
+
+export function upstreamDisconnectResponse() {
+  const error = 'The upstream provider disconnected before sending a response.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.upstream_disconnect,
+      message: error,
     },
     { status: 503 }
   );

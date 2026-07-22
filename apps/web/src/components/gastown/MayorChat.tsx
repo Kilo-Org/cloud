@@ -49,7 +49,12 @@ export function MayorChat({ townId }: MayorChatProps) {
   // Reset on townId change so ensureMayor fires for each town
   const ensuredTownRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!billingQuery.isSuccess || billingQuery.data.enabled) return;
+    if (
+      !billingQuery.isSuccess ||
+      billingQuery.data.enabled ||
+      billingQuery.data.runPolicy === 'paused_by_user'
+    )
+      return;
     if (ensuredTownRef.current === townId) return;
     ensuredTownRef.current = townId;
     ensureMayor.mutate({ townId });
@@ -73,6 +78,7 @@ export function MayorChat({ townId }: MayorChatProps) {
     agentId: mayorAgentId,
     enabled:
       billingQuery.isSuccess &&
+      billingQuery.data.runPolicy === 'automatic' &&
       (!billingQuery.data.enabled ||
         billingQuery.data.state === 'running' ||
         billingQuery.data.state === 'warning' ||

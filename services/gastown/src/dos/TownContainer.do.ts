@@ -4,6 +4,7 @@ import {
   getContainerUsageService,
   isGastownBillingEnabled,
   USAGE_HEARTBEAT_INTERVAL_MS,
+  type ContainerRunPolicy,
   type GastownBillingStatus,
   type UsageContext,
 } from '../billing/container-usage.billing';
@@ -16,6 +17,7 @@ import {
 const TC_LOG = '[TownContainer.do]';
 const BILLING_CONTEXT_KEY = 'billing:context';
 const BILLING_STATE_KEY = 'billing:state';
+const RUN_POLICY_KEY = 'container:runPolicy';
 
 /**
  * TownContainer — a Cloudflare Container per town.
@@ -96,6 +98,10 @@ export class TownContainerDO extends Container<Env> {
 
   override async onStart(): Promise<void> {
     console.log(`${TC_LOG} container started for DO id=${this.ctx.id.toString()}`);
+    if ((await this.getRunPolicy()) === 'paused_by_user') {
+      await this.stop();
+      return;
+    }
     if (!isGastownBillingEnabled(this.env)) return;
 
     try {
@@ -126,9 +132,11 @@ export class TownContainerDO extends Container<Env> {
    * triggered a cold start.
    */
   async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
+    await this.assertAutomaticStartsEnabled();
     if (isGastownBillingEnabled(this.env)) {
       await this.ensureBillingInterval();
     }
+    await this.assertAutomaticStartsEnabled();
     if (this.ctx.container?.running === true) {
       // Runtime-level fast path only. TownDO's /health probe is the
       // application-level liveness source and may still recover a wedged
@@ -171,7 +179,6 @@ export class TownContainerDO extends Container<Env> {
           ...state,
           phase: 'stopping',
           stopReason: 'activity_expired',
-          stopObservedAt: Date.now(),
         } satisfies OpenUsageInterval);
       }
     }
@@ -183,9 +190,11 @@ export class TownContainerDO extends Container<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
+    await this.assertAutomaticStartsEnabled();
     if (isGastownBillingEnabled(this.env)) {
       await this.ensureBillingInterval();
     }
+    await this.assertAutomaticStartsEnabled();
     return super.fetch(request);
   }
 
@@ -198,11 +207,15 @@ export class TownContainerDO extends Container<Env> {
   }
 
   async getBillingStatus(): Promise<GastownBillingStatus> {
-    return toBillingStatus(isGastownBillingEnabled(this.env), await this.getUsageState());
+    return toBillingStatus(
+      isGastownBillingEnabled(this.env),
+      await this.getUsageState(),
+      await this.getRunPolicy()
+    );
   }
 
   async recordUsageHeartbeat(): Promise<GastownBillingStatus> {
-    if (!isGastownBillingEnabled(this.env)) return { enabled: false, state: 'idle' };
+    if (!isGastownBillingEnabled(this.env)) return this.getBillingStatus();
 
     let state = await this.getUsageState();
     if (state.phase === 'starting') {
@@ -227,8 +240,17 @@ export class TownContainerDO extends Container<Env> {
         throw error;
       }
     }
-    if (state.phase === 'idle') return toBillingStatus(true, state);
+    const runPolicy = await this.getRunPolicy();
+    if (state.phase === 'idle') return toBillingStatus(true, state, runPolicy);
     if (state.phase === 'stopping') {
+      const stoppingRuntimeState = await this.getState();
+      if (
+        stoppingRuntimeState.status === 'running' ||
+        stoppingRuntimeState.status === 'healthy' ||
+        stoppingRuntimeState.status === 'stopping'
+      ) {
+        return toBillingStatus(true, state, runPolicy);
+      }
       await this.closeBillingInterval(state.stopReason ?? 'runtime_signal');
       return this.getBillingStatus();
     }
@@ -241,15 +263,15 @@ export class TownContainerDO extends Container<Env> {
 
     const observedAt = Date.now();
     if (observedAt - state.lastReportedAt < USAGE_HEARTBEAT_INTERVAL_MS) {
-      return toBillingStatus(true, state);
+      return toBillingStatus(true, state, runPolicy);
     }
 
     try {
       const updated = await this.captureHeartbeat(state, observedAt);
-      return toBillingStatus(true, updated);
+      return toBillingStatus(true, updated, runPolicy);
     } catch (error) {
       console.error(`${TC_LOG} billing heartbeat failed`, error);
-      const status = toBillingStatus(true, state);
+      const status = toBillingStatus(true, state, runPolicy);
       return { ...status, state: 'degraded' };
     }
   }
@@ -263,7 +285,6 @@ export class TownContainerDO extends Container<Env> {
           ...state,
           phase: 'stopping',
           stopReason: 'runtime_signal',
-          stopObservedAt: Date.now(),
         } satisfies OpenUsageInterval);
       }
     }
@@ -278,14 +299,32 @@ export class TownContainerDO extends Container<Env> {
           ...state,
           phase: 'stopping',
           stopReason: 'activity_expired',
-          stopObservedAt: Date.now(),
         } satisfies OpenUsageInterval);
       }
     }
     await this.stop();
   }
 
+  async setRunPolicy(policy: ContainerRunPolicy): Promise<GastownBillingStatus> {
+    await this.ctx.storage.put(RUN_POLICY_KEY, policy);
+    if (policy === 'paused_by_user') {
+      const state = await this.getUsageState();
+      const canCloseBillingInterval =
+        state.phase === 'running' || (state.phase === 'starting' && state.startRecorded);
+      if (isGastownBillingEnabled(this.env) && canCloseBillingInterval) {
+        await this.ctx.storage.put(BILLING_STATE_KEY, {
+          ...state,
+          phase: 'stopping',
+          stopReason: 'runtime_signal',
+        } satisfies OpenUsageInterval);
+      }
+      await this.stop();
+    }
+    return this.getBillingStatus();
+  }
+
   private async ensureBillingInterval(): Promise<StoredUsageState> {
+    await this.assertAutomaticStartsEnabled();
     if (!isGastownBillingEnabled(this.env)) return { phase: 'idle' };
 
     const existing = await this.getUsageState();
@@ -321,6 +360,7 @@ export class TownContainerDO extends Container<Env> {
         startRecorded: false,
         seq: 0,
         lastReportedAt: observedAt,
+        reportedUsageSeconds: 0,
       };
       await transaction.put(BILLING_STATE_KEY, starting);
       return starting;
@@ -561,12 +601,14 @@ export class TownContainerDO extends Container<Env> {
 
     const latest = await this.getUsageState();
     if (latest.phase === 'idle' || latest.startEpochMs !== interval.startEpochMs) return latest;
+    if (latest.seq >= pending.seq) return latest;
 
     const updated: OpenUsageInterval = {
       ...latest,
       phase: latest.phase === 'starting' ? 'running' : latest.phase,
       seq: pending.seq,
       lastReportedAt: pending.observedAt,
+      reportedUsageSeconds: (latest.reportedUsageSeconds ?? 0) + pending.usageSinceLast,
       latestBudget: ack.budget,
     };
     delete updated.pendingHeartbeat;
@@ -581,7 +623,15 @@ export class TownContainerDO extends Container<Env> {
     const selected = await this.ctx.storage.transaction(async transaction => {
       const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
       if (!latest || latest.phase === 'idle') return null;
-      if (latest.phase === 'stopping') return latest;
+      if (latest.phase === 'stopping') {
+        if (latest.stopObservedAt !== undefined) return latest;
+        const stopping = {
+          ...latest,
+          stopObservedAt: observedAtOverride ?? Date.now(),
+        } satisfies OpenUsageInterval;
+        await transaction.put(BILLING_STATE_KEY, stopping);
+        return stopping;
+      }
 
       const stopping: OpenUsageInterval = {
         ...latest,
@@ -624,11 +674,21 @@ export class TownContainerDO extends Container<Env> {
 
       const latest = await this.getUsageState();
       if (latest.phase !== 'idle' && latest.startEpochMs === stopping.startEpochMs) {
+        const estimatedCharge =
+          stopping.estimatedHourlyCharge === undefined
+            ? undefined
+            : ((stopping.reportedUsageSeconds ?? 0) / 3600) * stopping.estimatedHourlyCharge;
         await this.ctx.storage.put(BILLING_STATE_KEY, {
           phase: 'idle',
           context: stopping.context,
           blocked: stopping.latestBudget?.verdict === 'stop',
           latestBudget: stopping.latestBudget,
+          lastRun: {
+            startedAt: stopping.startEpochMs,
+            stoppedAt: stopObservedAt,
+            usageSeconds: stopping.reportedUsageSeconds ?? 0,
+            ...(estimatedCharge === undefined ? {} : { estimatedCharge }),
+          },
         } satisfies StoredUsageState);
       }
     } catch (error) {
@@ -638,6 +698,19 @@ export class TownContainerDO extends Container<Env> {
 
   private async getUsageState(): Promise<StoredUsageState> {
     return (await this.ctx.storage.get<StoredUsageState>(BILLING_STATE_KEY)) ?? { phase: 'idle' };
+  }
+
+  private async getRunPolicy(): Promise<ContainerRunPolicy> {
+    return (await this.ctx.storage.get<ContainerRunPolicy>(RUN_POLICY_KEY)) ?? 'automatic';
+  }
+
+  private async assertAutomaticStartsEnabled(): Promise<void> {
+    if ((await this.getRunPolicy()) === 'paused_by_user') {
+      throw new ContainerBillingError(
+        'CONTAINER_PAUSED',
+        'Automatic starts are paused for this Gas Town'
+      );
+    }
   }
 }
 

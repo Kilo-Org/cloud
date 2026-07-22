@@ -552,14 +552,27 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         }[];
         billing: {
           enabled: boolean;
-          state: 'blocked' | 'degraded' | 'idle' | 'running' | 'starting' | 'stopping' | 'warning';
-          payer?: {
-            type: 'org' | 'user';
-            id: string;
-          } | undefined;
+          state:
+            | 'blocked'
+            | 'degraded'
+            | 'idle'
+            | 'paused'
+            | 'running'
+            | 'starting'
+            | 'stopping'
+            | 'warning';
+          runPolicy: 'automatic' | 'paused_by_user';
+          payer?:
+            | {
+                type: 'org' | 'user';
+                id: string;
+              }
+            | undefined;
           remaining?: number | undefined;
           minimumRequired?: number | undefined;
           estimatedHourlyCharge?: number | undefined;
+          estimatedRunCharge?: number | undefined;
+          runUsageSeconds?: number | undefined;
           intervalStartedAt?: number | undefined;
           lastReportedAt?: number | undefined;
         };
@@ -572,14 +585,60 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         enabled: boolean;
-        state: 'blocked' | 'degraded' | 'idle' | 'running' | 'starting' | 'stopping' | 'warning';
-        payer?: {
-          type: 'org' | 'user';
-          id: string;
-        } | undefined;
+        state:
+          | 'blocked'
+          | 'degraded'
+          | 'idle'
+          | 'paused'
+          | 'running'
+          | 'starting'
+          | 'stopping'
+          | 'warning';
+        runPolicy: 'automatic' | 'paused_by_user';
+        payer?:
+          | {
+              type: 'org' | 'user';
+              id: string;
+            }
+          | undefined;
         remaining?: number | undefined;
         minimumRequired?: number | undefined;
         estimatedHourlyCharge?: number | undefined;
+        estimatedRunCharge?: number | undefined;
+        runUsageSeconds?: number | undefined;
+        intervalStartedAt?: number | undefined;
+        lastReportedAt?: number | undefined;
+      };
+      meta: object;
+    }>;
+    setContainerRunPolicy: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+        policy: 'automatic' | 'paused_by_user';
+      };
+      output: {
+        enabled: boolean;
+        state:
+          | 'blocked'
+          | 'degraded'
+          | 'idle'
+          | 'paused'
+          | 'running'
+          | 'starting'
+          | 'stopping'
+          | 'warning';
+        runPolicy: 'automatic' | 'paused_by_user';
+        payer?:
+          | {
+              type: 'org' | 'user';
+              id: string;
+            }
+          | undefined;
+        remaining?: number | undefined;
+        minimumRequired?: number | undefined;
+        estimatedHourlyCharge?: number | undefined;
+        estimatedRunCharge?: number | undefined;
+        runUsageSeconds?: number | undefined;
         intervalStartedAt?: number | undefined;
         lastReportedAt?: number | undefined;
       };
@@ -2222,17 +2281,23 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 | 'blocked'
                 | 'degraded'
                 | 'idle'
+                | 'paused'
                 | 'running'
                 | 'starting'
                 | 'stopping'
                 | 'warning';
-              payer?: {
-                type: 'org' | 'user';
-                id: string;
-              } | undefined;
+              runPolicy: 'automatic' | 'paused_by_user';
+              payer?:
+                | {
+                    type: 'org' | 'user';
+                    id: string;
+                  }
+                | undefined;
               remaining?: number | undefined;
               minimumRequired?: number | undefined;
               estimatedHourlyCharge?: number | undefined;
+              estimatedRunCharge?: number | undefined;
+              runUsageSeconds?: number | undefined;
               intervalStartedAt?: number | undefined;
               lastReportedAt?: number | undefined;
             };
@@ -2249,17 +2314,56 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               | 'blocked'
               | 'degraded'
               | 'idle'
+              | 'paused'
               | 'running'
               | 'starting'
               | 'stopping'
               | 'warning';
-            payer?: {
-              type: 'org' | 'user';
-              id: string;
-            } | undefined;
+            runPolicy: 'automatic' | 'paused_by_user';
+            payer?:
+              | {
+                  type: 'org' | 'user';
+                  id: string;
+                }
+              | undefined;
             remaining?: number | undefined;
             minimumRequired?: number | undefined;
             estimatedHourlyCharge?: number | undefined;
+            estimatedRunCharge?: number | undefined;
+            runUsageSeconds?: number | undefined;
+            intervalStartedAt?: number | undefined;
+            lastReportedAt?: number | undefined;
+          };
+          meta: object;
+        }>;
+        setContainerRunPolicy: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+            policy: 'automatic' | 'paused_by_user';
+          };
+          output: {
+            enabled: boolean;
+            state:
+              | 'blocked'
+              | 'degraded'
+              | 'idle'
+              | 'paused'
+              | 'running'
+              | 'starting'
+              | 'stopping'
+              | 'warning';
+            runPolicy: 'automatic' | 'paused_by_user';
+            payer?:
+              | {
+                  type: 'org' | 'user';
+                  id: string;
+                }
+              | undefined;
+            remaining?: number | undefined;
+            minimumRequired?: number | undefined;
+            estimatedHourlyCharge?: number | undefined;
+            estimatedRunCharge?: number | undefined;
+            runUsageSeconds?: number | undefined;
             intervalStartedAt?: number | undefined;
             lastReportedAt?: number | undefined;
           };

@@ -80,14 +80,27 @@ export type ContainerUsageService = {
 
 export type GastownBillingStatus = {
   enabled: boolean;
-  state: 'idle' | 'starting' | 'running' | 'warning' | 'stopping' | 'blocked' | 'degraded';
+  state:
+    | 'idle'
+    | 'starting'
+    | 'running'
+    | 'warning'
+    | 'stopping'
+    | 'blocked'
+    | 'paused'
+    | 'degraded';
+  runPolicy: ContainerRunPolicy;
   payer?: { type: 'user' | 'org'; id: string };
   remaining?: number;
   minimumRequired?: number;
   estimatedHourlyCharge?: number;
+  estimatedRunCharge?: number;
+  runUsageSeconds?: number;
   intervalStartedAt?: number;
   lastReportedAt?: number;
 };
+
+export type ContainerRunPolicy = 'automatic' | 'paused_by_user';
 
 export const GASTOWN_CONTAINER_SKU = 'cloudflare-container-standard-4';
 export const USAGE_HEARTBEAT_INTERVAL_MS = 5 * 60_000;

@@ -104,11 +104,23 @@ export const MayorStatusOutput = z.object({
 
 export const BillingStatusOutput = z.object({
   enabled: z.boolean(),
-  state: z.enum(['idle', 'starting', 'running', 'warning', 'stopping', 'blocked', 'degraded']),
+  state: z.enum([
+    'idle',
+    'starting',
+    'running',
+    'warning',
+    'stopping',
+    'blocked',
+    'paused',
+    'degraded',
+  ]),
+  runPolicy: z.enum(['automatic', 'paused_by_user']),
   payer: z.object({ type: z.enum(['user', 'org']), id: z.string() }).optional(),
   remaining: z.number().optional(),
   minimumRequired: z.number().optional(),
   estimatedHourlyCharge: z.number().optional(),
+  estimatedRunCharge: z.number().optional(),
+  runUsageSeconds: z.number().optional(),
   intervalStartedAt: z.number().optional(),
   lastReportedAt: z.number().optional(),
 });

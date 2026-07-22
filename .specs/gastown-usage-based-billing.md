@@ -357,6 +357,19 @@ server admission remains authoritative.
 | `blocked` | Replace reconnect loops with a paused state explaining the required balance. Primary action: **Add credits**; after funding, **Resume Gas Town**. |
 | `degraded` | Keep running. Avoid alarming the user for a transient buffered write; show service degradation only if action is required or the delay is prolonged. |
 
+### User circuit breaker
+
+Every billing-enabled town MUST expose a durable `automatic | paused_by_user` container run policy.
+Turning automatic starts off MUST persist `paused_by_user` before stopping the container, stop new
+dispatch, gracefully save active work, leave queued work pending, and prevent every cold-start path
+from restarting the container. The Town scheduler and Town Container boundary MUST both enforce the
+policy. Credit top-ups, alarms, PTY reconnects, and health checks MUST NOT clear a user pause.
+
+The UI MUST confirm before pausing and show the estimated charge accumulated by the current runtime.
+Turning automatic starts back on removes the circuit breaker but MUST NOT itself boot an idle
+container; pending eligible work or an explicit user start may boot it afterward. A user pause is
+distinct from an insufficient-credit block and uses different recovery copy and controls.
+
 Recommended copy:
 
 - Before start: `Container usage is billed at an estimated {rate}/hour while Gas Town is running.`
@@ -464,6 +477,11 @@ stops, and counts of `warn` and `stop` verdicts.
    graceful-save window.
 
 ## Changelog
+
+### 2026-07-22 -- User circuit breaker
+
+- Added a durable user-controlled automatic-start policy, forced graceful shutdown, and per-run cost
+  estimate.
 
 ### 2026-07-21 -- Technical design expansion
 

@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useGastownTRPC, gastownWsUrl, type GastownOutputs } from '@/lib/gastown/trpc';
 
 import { useSidebar } from '@/components/ui/sidebar';
+import { Switch } from '@/components/ui/switch';
+import { useConfirm } from '@/components/ui/confirm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
@@ -42,6 +44,7 @@ import {
   CircleDollarSign,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import styles from './TerminalBar.module.css';
 
 type TerminalBarProps = {
@@ -58,6 +61,7 @@ type BillingStatus = GastownOutputs['gastown']['getBillingStatus'];
  * Can be positioned at bottom/top/right/left with drag-to-resize.
  */
 export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarProps) {
+  const trpc = useGastownTRPC();
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const { state: sidebarState, isMobile } = useSidebar();
   const {
@@ -145,6 +149,11 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     onAgentStatus: handleAgentStatus,
     onUiAction: handleUiAction,
   });
+  const billingQuery = useQuery({
+    ...trpc.gastown.getBillingStatus.queryOptions({ townId }),
+    refetchInterval: 5_000,
+  });
+  const billing = billingQuery.data ?? alarmWs.data?.billing;
 
   const sidebarLeft = isMobile ? '0px' : sidebarState === 'expanded' ? '16rem' : '3rem';
   const horizontal = isHorizontal(position);
@@ -362,7 +371,8 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setCollapsed={setCollapsed}
               setPosition={setPosition}
               closeTab={closeTab}
-              billing={alarmWs.data?.billing}
+              billing={billing}
+              townId={townId}
             />
             <TerminalContent
               activeTab={activeTab}
@@ -371,6 +381,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              billing={billing}
               fullscreen={isFullscreen}
             />
           </>
@@ -384,6 +395,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              billing={billing}
               fullscreen={isFullscreen}
             />
             <TabBar
@@ -397,7 +409,8 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setCollapsed={setCollapsed}
               setPosition={setPosition}
               closeTab={closeTab}
-              billing={alarmWs.data?.billing}
+              billing={billing}
+              townId={townId}
             />
             {!collapsed && (
               <div
@@ -432,7 +445,8 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setCollapsed={setCollapsed}
               setPosition={setPosition}
               closeTab={closeTab}
-              billing={alarmWs.data?.billing}
+              billing={billing}
+              townId={townId}
             />
             <TerminalContent
               activeTab={activeTab}
@@ -441,6 +455,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              billing={billing}
               fullscreen={isFullscreen}
             />
           </>
@@ -458,7 +473,8 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               setCollapsed={setCollapsed}
               setPosition={setPosition}
               closeTab={closeTab}
-              billing={alarmWs.data?.billing}
+              billing={billing}
+              townId={townId}
             />
             <TerminalContent
               activeTab={activeTab}
@@ -467,6 +483,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              billing={billing}
               fullscreen={isFullscreen}
             />
             {!collapsed && (
@@ -506,6 +523,7 @@ function TabBar({
   setPosition,
   closeTab,
   billing,
+  townId,
 }: {
   allTabs: TabDef[];
   effectiveActiveId: string;
@@ -518,8 +536,66 @@ function TabBar({
   setPosition: (position: TerminalPosition) => void;
   closeTab: (tabId: string) => void;
   billing?: BillingStatus;
+  townId: string;
 }) {
   const borderClass = horizontal ? 'border-b border-white/[0.06]' : 'border-r border-white/[0.06]';
+  const trpc = useGastownTRPC();
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const runPolicyMutation = useMutation(
+    trpc.gastown.setContainerRunPolicy.mutationOptions({
+      onSuccess: status => {
+        queryClient.setQueryData(trpc.gastown.getBillingStatus.queryKey({ townId }), status);
+      },
+      onError: error => toast.error(error.message),
+    })
+  );
+
+  const setAutomaticStarts = async (enabled: boolean) => {
+    if (!enabled) {
+      const accepted = await confirm({
+        title: 'Pause Gas Town?',
+        description:
+          'Active work will be saved and the container will shut down. Scheduled work stays queued until automatic starts are enabled again.',
+        confirmLabel: 'Save and pause',
+        cancelLabel: 'Keep running',
+      });
+      if (!accepted) return;
+    }
+    runPolicyMutation.mutate({
+      townId,
+      policy: enabled ? 'automatic' : 'paused_by_user',
+    });
+  };
+  const billingSummary = (() => {
+    if (!billing) return '';
+    if (billing.state === 'stopping') {
+      return `Saving and pausing${billing.estimatedRunCharge === undefined ? '' : ` · $${billing.estimatedRunCharge.toFixed(2)} this run`}`;
+    }
+    if (billing.runPolicy === 'paused_by_user') {
+      return `Automatic starts paused${billing.estimatedRunCharge === undefined ? '' : ` · $${billing.estimatedRunCharge.toFixed(2)} last run`}`;
+    }
+    if (billing.state === 'warning') {
+      return `Credits low${billing.estimatedRunCharge === undefined ? '' : ` · $${billing.estimatedRunCharge.toFixed(2)} this run`}`;
+    }
+    if (billing.estimatedRunCharge !== undefined && billing.state === 'running') {
+      return `$${billing.estimatedRunCharge.toFixed(2)} this run`;
+    }
+    if (billing.state === 'blocked') return 'Usage paused';
+    return billing.estimatedHourlyCharge === undefined
+      ? 'Usage billing active'
+      : `$${billing.estimatedHourlyCharge.toFixed(2)}/hr active`;
+  })();
+  const billingAnnouncement =
+    billing?.state === 'warning'
+      ? 'Credits are running low.'
+      : billing?.state === 'blocked'
+        ? 'Gas Town is paused because credits are unavailable.'
+        : billing?.state === 'stopping'
+          ? 'Gas Town is saving work and pausing.'
+          : billing?.runPolicy === 'paused_by_user'
+            ? 'Automatic container starts are paused.'
+            : '';
 
   return (
     <div
@@ -603,7 +679,11 @@ function TabBar({
         </AnimatePresence>
       </div>
 
-      {horizontal && billing?.enabled && billing.state !== 'idle' && (
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {billingAnnouncement}
+      </span>
+
+      {horizontal && billing && (billing.enabled || billing.runPolicy === 'paused_by_user') && (
         <div
           className={`mr-2 flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] tabular-nums ${
             billing.state === 'warning'
@@ -612,16 +692,9 @@ function TabBar({
                 ? 'border-status-blue-500/30 text-status-blue-300'
                 : 'border-border text-muted-foreground'
           }`}
-          aria-live={billing.state === 'warning' || billing.state === 'blocked' ? 'polite' : 'off'}
         >
           <CircleDollarSign className="size-3" />
-          {billing.state === 'warning'
-            ? 'Credits running low'
-            : billing.state === 'blocked' || billing.state === 'stopping'
-              ? 'Usage paused'
-              : billing.estimatedHourlyCharge === undefined
-                ? 'Usage billing active'
-                : `$${billing.estimatedHourlyCharge.toFixed(2)}/hr active`}
+          {billingSummary}
           {billing.state === 'warning' && (
             <Link
               href={
@@ -632,6 +705,27 @@ function TabBar({
               Add credits
             </Link>
           )}
+          <span className="text-border">|</span>
+          <span>Allow automatic starts</span>
+          <Switch
+            checked={billing.runPolicy === 'automatic'}
+            disabled={runPolicyMutation.isPending}
+            onCheckedChange={value => void setAutomaticStarts(value)}
+            aria-label="Allow automatic container starts"
+            className="scale-75"
+          />
+        </div>
+      )}
+
+      {!horizontal && billing && (billing.enabled || billing.runPolicy === 'paused_by_user') && (
+        <div className="flex justify-center py-2" title="Allow automatic container starts">
+          <Switch
+            checked={billing.runPolicy === 'automatic'}
+            disabled={runPolicyMutation.isPending}
+            onCheckedChange={value => void setAutomaticStarts(value)}
+            aria-label="Allow automatic container starts"
+            className="scale-75"
+          />
         </div>
       )}
 
@@ -756,6 +850,7 @@ function TerminalContent({
   size,
   townId,
   alarmWs,
+  billing,
   fullscreen,
 }: {
   activeTab: TabDef;
@@ -764,6 +859,7 @@ function TerminalContent({
   size: number;
   townId: string;
   alarmWs: AlarmWsResult;
+  billing?: BillingStatus;
   fullscreen?: boolean;
 }) {
   if (collapsed) return null;
@@ -780,19 +876,11 @@ function TerminalContent({
         className={`overflow-hidden ${horizontal ? '' : 'h-full'} ${fullscreen ? 'h-full' : ''}`}
       >
         {activeTab.kind === 'mayor' ? (
-          <MayorTerminalPane
-            townId={townId}
-            collapsed={collapsed}
-            billing={alarmWs.data?.billing}
-          />
+          <MayorTerminalPane townId={townId} collapsed={collapsed} billing={billing} />
         ) : activeTab.kind === 'status' ? (
           <AlarmStatusPane townId={townId} alarmWs={alarmWs} horizontal={horizontal} />
         ) : (
-          <AgentTerminalPane
-            townId={townId}
-            agentId={activeTab.agentId}
-            billing={alarmWs.data?.billing}
-          />
+          <AgentTerminalPane townId={townId} agentId={activeTab.agentId} billing={billing} />
         )}
       </motion.div>
     </AnimatePresence>
@@ -1280,10 +1368,18 @@ function MayorTerminalPane({
       },
     })
   );
+  const runPolicyMutation = useMutation(
+    trpc.gastown.setContainerRunPolicy.mutationOptions({
+      onSuccess: status => {
+        queryClient.setQueryData(trpc.gastown.getBillingStatus.queryKey({ townId }), status);
+      },
+      onError: error => toast.error(error.message),
+    })
+  );
 
   const ensuredTownRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!billing || billing.enabled) return;
+    if (!billing || billing.enabled || billing.runPolicy === 'paused_by_user') return;
     if (ensuredTownRef.current === townId) return;
     ensuredTownRef.current = townId;
     ensureMayor.mutate({ townId });
@@ -1300,10 +1396,13 @@ function MayorTerminalPane({
   });
 
   const mayorAgentId = statusQuery.data?.session?.agentId ?? null;
-  const billingPaused =
+  const userPaused = billing?.runPolicy === 'paused_by_user';
+  const userPauseStopping = userPaused && billing?.state === 'stopping';
+  const creditPaused =
     billing?.enabled && (billing.state === 'blocked' || billing.state === 'stopping');
   const terminalEnabled =
     billing !== undefined &&
+    billing.runPolicy === 'automatic' &&
     (!billing.enabled ||
       billing.state === 'running' ||
       billing.state === 'warning' ||
@@ -1317,6 +1416,7 @@ function MayorTerminalPane({
   const firstTaskSentRef = useRef(false);
   useEffect(() => {
     if (firstTaskSentRef.current) return;
+    if (!billing || billing.runPolicy === 'paused_by_user') return;
     const storageKey = `${FIRST_TASK_STORAGE_PREFIX}${townId}`;
     try {
       const msg = localStorage.getItem(storageKey);
@@ -1327,7 +1427,7 @@ function MayorTerminalPane({
     } catch {
       // localStorage unavailable
     }
-  }, [townId]);
+  }, [billing, townId]);
 
   const { terminalRef, connectionStatus, status, fitAddonRef } = useXtermPty({
     townId,
@@ -1351,22 +1451,32 @@ function MayorTerminalPane({
     <div className="relative h-full">
       <TerminalStatusBadge connectionStatus={connectionStatus} status={status} />
       <div ref={terminalRef} className="h-full overflow-hidden px-1" />
-      {billing?.enabled && !terminalEnabled && (
+      {billing && !terminalEnabled && (
         <div className="bg-surface-inset absolute inset-0 flex items-center justify-center p-6">
           <div className="border-border bg-surface-raised max-w-md rounded-xl border p-6 text-center">
             <CircleDollarSign className="text-status-blue-400 mx-auto size-5" />
             <p className="text-foreground mt-3 text-sm font-semibold">
-              {billingPaused ? 'Gas Town is paused' : 'Start the Mayor when you are ready'}
+              {userPaused
+                ? userPauseStopping
+                  ? 'Saving work and pausing Gas Town...'
+                  : 'Automatic starts are paused'
+                : creditPaused
+                  ? 'Gas Town is paused'
+                  : 'Start the Mayor when you are ready'}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
-              {billingPaused
-                ? 'Add credits to the billing account, then resume. Your town state is preserved.'
-                : billing.estimatedHourlyCharge === undefined
-                  ? 'Container usage is charged only while Gas Town is running.'
-                  : `Estimated container charge: $${billing.estimatedHourlyCharge.toFixed(2)}/hour while running.`}
+              {userPaused
+                ? userPauseStopping
+                  ? `The container is still shutting down and may continue accumulating usage briefly.${billing.estimatedRunCharge === undefined ? '' : ` Estimated this run: $${billing.estimatedRunCharge.toFixed(2)}.`}`
+                  : `The container is stopped and scheduled work remains queued.${billing.estimatedRunCharge === undefined ? '' : ` Estimated last run: $${billing.estimatedRunCharge.toFixed(2)}.`} Enable automatic starts when you are ready to continue.`
+                : creditPaused
+                  ? 'Add credits to the billing account, then resume. Your town state is preserved.'
+                  : billing.estimatedHourlyCharge === undefined
+                    ? 'Container usage is charged only while Gas Town is running.'
+                    : `Estimated container charge: $${billing.estimatedHourlyCharge.toFixed(2)}/hour while running.`}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {billingPaused && (
+              {creditPaused && !userPaused && (
                 <Link
                   href={creditsHref}
                   className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring inline-flex h-9 items-center rounded-md px-4 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none"
@@ -1374,18 +1484,29 @@ function MayorTerminalPane({
                   Add credits
                 </Link>
               )}
-              <button
-                type="button"
-                disabled={ensureMayor.isPending || billing.state === 'stopping'}
-                onClick={() => ensureMayor.mutate({ townId })}
-                className={`${billingPaused ? 'border-border bg-secondary text-secondary-foreground hover:bg-surface-hover border' : 'bg-primary text-primary-foreground hover:bg-primary-hover'} focus-visible:ring-ring h-9 rounded-md px-4 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                {ensureMayor.isPending
-                  ? 'Starting Gas Town...'
-                  : billingPaused
-                    ? 'Resume Gas Town'
-                    : 'Start Mayor'}
-              </button>
+              {userPaused ? (
+                <button
+                  type="button"
+                  disabled={runPolicyMutation.isPending || userPauseStopping}
+                  onClick={() => runPolicyMutation.mutate({ townId, policy: 'automatic' })}
+                  className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring h-9 rounded-md px-4 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {runPolicyMutation.isPending ? 'Enabling...' : 'Enable automatic starts'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={ensureMayor.isPending || billing.state === 'stopping'}
+                  onClick={() => ensureMayor.mutate({ townId })}
+                  className={`${creditPaused ? 'border-border bg-secondary text-secondary-foreground hover:bg-surface-hover border' : 'bg-primary text-primary-foreground hover:bg-primary-hover'} focus-visible:ring-ring h-9 rounded-md px-4 text-xs font-medium focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  {ensureMayor.isPending
+                    ? 'Starting Gas Town...'
+                    : creditPaused
+                      ? 'Resume Gas Town'
+                      : 'Start Mayor'}
+                </button>
+              )}
             </div>
             {ensureMayor.error && (
               <p role="alert" className="text-destructive mt-3 text-xs">
@@ -1412,6 +1533,7 @@ function AgentTerminalPane({
 }) {
   const enabled =
     billing !== undefined &&
+    billing.runPolicy === 'automatic' &&
     (!billing.enabled || billing.state === 'running' || billing.state === 'warning');
   const { terminalRef, connectionStatus, status } = useXtermPty({
     townId,

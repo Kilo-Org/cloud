@@ -21,7 +21,7 @@ describe('toBillingStatus', () => {
         blocked: true,
         latestBudget: { verdict: 'stop', remaining: 0 },
       })
-    ).toEqual({ enabled: false, state: 'idle' });
+    ).toEqual({ enabled: false, state: 'idle', runPolicy: 'automatic' });
   });
 
   it('returns a payer-aware blocked state', () => {
@@ -35,6 +35,7 @@ describe('toBillingStatus', () => {
     ).toEqual({
       enabled: true,
       state: 'blocked',
+      runPolicy: 'automatic',
       payer: { type: 'org', id: 'org-1' },
       remaining: 0.25,
     });
@@ -57,17 +58,49 @@ describe('toBillingStatus', () => {
       latestBudget: { verdict, remaining: 4 },
       minimumRequired: 1,
       estimatedHourlyCharge: 1.2,
+      reportedUsageSeconds: 900,
     };
 
-    expect(toBillingStatus(true, state)).toMatchObject({
+    expect(toBillingStatus(true, state, 'automatic', 2_000)).toMatchObject({
       enabled: true,
       state: expectedState,
+      runPolicy: 'automatic',
       payer: context.subject,
       remaining: 4,
       minimumRequired: 1,
       estimatedHourlyCharge: 1.2,
       intervalStartedAt: 1_000,
       lastReportedAt: 2_000,
+      runUsageSeconds: 900,
+      estimatedRunCharge: 0.3,
+    });
+  });
+
+  it('reports a user pause separately from a credit block', () => {
+    expect(
+      toBillingStatus(
+        true,
+        {
+          phase: 'idle',
+          context,
+          blocked: false,
+          lastRun: {
+            startedAt: 1_000,
+            stoppedAt: 2_000,
+            usageSeconds: 900,
+            estimatedCharge: 0.3,
+          },
+        },
+        'paused_by_user',
+        2_000
+      )
+    ).toMatchObject({
+      enabled: true,
+      state: 'paused',
+      runPolicy: 'paused_by_user',
+      payer: context.subject,
+      estimatedRunCharge: 0.3,
+      runUsageSeconds: 900,
     });
   });
 });

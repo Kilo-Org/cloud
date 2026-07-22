@@ -97,6 +97,9 @@ function mapContainerBillingError(error: unknown): TRPCError | null {
   if (code === 'INSUFFICIENT_CREDITS' || message.includes('in credits to start')) {
     return new TRPCError({ code: 'PRECONDITION_FAILED', message, cause: error });
   }
+  if (code === 'CONTAINER_PAUSED') {
+    return new TRPCError({ code: 'PRECONDITION_FAILED', message, cause: error });
+  }
   if (code === 'BILLING_UNAVAILABLE' || message.includes('billing')) {
     return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message, cause: error });
   }
@@ -1030,6 +1033,40 @@ export const gastownRouter = router({
     .query(async ({ ctx, input }) => {
       await verifyTownOwnership(ctx.env, ctx, input.townId);
       return getTownDOStub(ctx.env, input.townId).getBillingStatus();
+    }),
+
+  setContainerRunPolicy: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        policy: z.enum(['automatic', 'paused_by_user']),
+      })
+    )
+    .output(RpcBillingStatusOutput)
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot pause containers for towns they do not own',
+        });
+      }
+
+      const town = getTownDOStub(ctx.env, input.townId);
+      if (ownership.type === 'org') {
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const townConfig = await town.getTownConfig();
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === townConfig.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can change automatic starts',
+          });
+        }
+      }
+
+      return town.setContainerRunPolicy(input.policy);
     }),
 
   ensureMayor: gastownProcedure

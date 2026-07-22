@@ -1216,6 +1216,7 @@ describe('remote session attention notifications', () => {
       status: 'completed',
       body: 'All done',
       suppressIfViewingSession: true,
+      category: 'status',
     });
   });
 
@@ -1555,6 +1556,7 @@ describe('agent_notification attention signals', () => {
       status: 'completed',
       body: 'All done',
       suppressIfViewingSession: true,
+      category: 'status',
     });
     expect(markAgentNotificationDispatched).not.toHaveBeenCalled();
   });

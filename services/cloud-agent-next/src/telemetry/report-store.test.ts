@@ -315,6 +315,40 @@ describe('cloud agent reporting store', () => {
     });
   });
 
+  it.each([
+    ['agent_activity', 'payment_required'],
+    ['agent_activity', 'model_missing'],
+    ['post_dispatch_no_activity', 'payment_required'],
+    ['post_dispatch_no_activity', 'model_missing'],
+  ] as const)('persists the explicit %s/%s classification', async (failureStage, failureCode) => {
+    const fake = makeDb([[{ createdAt: occurredAt }], []]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    await store.saveReport(
+      {
+        version: 1,
+        type: 'run.state',
+        occurredAt,
+        session: { cloudAgentSessionId },
+        run: {
+          messageId: `msg_${failureStage}_${failureCode}`,
+          status: 'failed',
+          terminalAt: occurredAt,
+          failureStage,
+          failureCode,
+        },
+      },
+      occurredAt
+    );
+
+    expect(
+      fake.inserts.find(call => call.table === cloud_agent_session_runs)?.values
+    ).toMatchObject({
+      failure_stage: failureStage,
+      failure_code: failureCode,
+    });
+  });
+
   it('keeps established terminal outcomes and earliest observed dispatch on replay', async () => {
     const fake = makeDb([
       [{ createdAt: occurredAt }],

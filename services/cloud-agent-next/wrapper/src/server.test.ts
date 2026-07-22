@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createServer as createNetServer } from 'node:net';
+import { readFileSync, rmSync } from 'node:fs';
 import { WrapperState } from './state';
 import {
   bindSessionContext,
@@ -45,6 +46,7 @@ function createTestFetch(overrides?: {
   deleteCalls?: string[];
   runtimeEnvironmentUpdates?: Array<Record<string, string>>;
   resizeError?: Error;
+  toolCgroupHealth?: () => never;
 }) {
   const ptyCalls = overrides?.ptyCalls ?? [];
   const resizeCalls = overrides?.resizeCalls ?? [];
@@ -98,6 +100,7 @@ function createTestFetch(overrides?: {
       updateRuntimeEnvironment: async env => {
         runtimeEnvironmentUpdates.push(env);
       },
+      ...(overrides?.toolCgroupHealth ? { toolCgroupHealth: overrides.toolCgroupHealth } : {}),
     },
     () => {}
   );
@@ -337,6 +340,44 @@ describe('wrapper health', () => {
       wrapperInstanceId: 'instance_test',
       wrapperInstanceGeneration: 8,
     });
+  });
+
+  it('returns a bounded correlated error when a health dependency throws', async () => {
+    const previousLogPath = process.env.WRAPPER_LOG_PATH;
+    const logPath = `/tmp/wrapper-health-${crypto.randomUUID()}.log`;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    const localError = 'tool cgroup probe failed locally';
+
+    try {
+      const { fetchHandler } = createTestFetch({
+        toolCgroupHealth: () => {
+          throw new Error(localError);
+        },
+      });
+      const requestId = 'health-request-correlation-123';
+      const response = await fetchHandler(
+        new Request('http://wrapper.test/health', {
+          headers: { 'x-kilo-request-id': requestId },
+        })
+      );
+      if (!response) throw new Error('Expected health response');
+
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body).toEqual({
+        error: 'HEALTH_CHECK_FAILED',
+        message: 'Wrapper health check failed',
+        requestId,
+      });
+      expect(JSON.stringify(body)).not.toContain(localError);
+      const log = readFileSync(logPath, 'utf8');
+      expect(log).toContain(`HTTP GET /health requestId=${requestId}`);
+      expect(log).toContain(`requestId=${requestId} path=/health error=${localError}`);
+    } finally {
+      if (previousLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = previousLogPath;
+      rmSync(logPath, { force: true });
+    }
   });
 });
 

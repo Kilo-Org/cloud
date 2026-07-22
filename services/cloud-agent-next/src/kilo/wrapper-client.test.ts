@@ -360,7 +360,13 @@ describe('WrapperClient', () => {
       );
 
       expect(result.kiloSessionId).toBe('kilo_sess_1');
-      expect(transport.request).toHaveBeenNthCalledWith(1, 'POST', '/session/ready', readyRequest);
+      expect(transport.request).toHaveBeenNthCalledWith(
+        1,
+        'POST',
+        '/session/ready',
+        readyRequest,
+        expect.any(String)
+      );
       expect(transport.request).toHaveBeenNthCalledWith(
         2,
         'POST',
@@ -381,7 +387,8 @@ describe('WrapperClient', () => {
             condenseOnComplete: false,
           },
           session: binding,
-        })
+        }),
+        expect.any(String)
       );
       expect('executeSession' in client).toBe(false);
       expect(session.exec).not.toHaveBeenCalled();
@@ -2280,6 +2287,91 @@ describe('WrapperClient', () => {
       const client = new WrapperClient({ session, port: defaultPort });
 
       await expect(client.health()).rejects.toThrow(WrapperError);
+    });
+
+    it('retains the actual curl status and content type for malformed health diagnostics', async () => {
+      const session = createMockSession(command => {
+        const marker = command.match(/__KILO_WRAPPER_RESPONSE_[A-Za-z0-9-]+__/)?.[0];
+        if (!marker) throw new Error('Missing curl response metadata marker');
+        return {
+          exitCode: 0,
+          stdout: `<html>private-wrapper-error</html>\n${marker}500\ttext/html`,
+        };
+      });
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const logError = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.health()).rejects.toMatchObject({ code: 'PARSE_ERROR' });
+
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: '/health',
+          statusCode: 500,
+          contentType: 'text/html',
+        })
+      );
+      expect(JSON.stringify(withFields.mock.calls)).not.toContain('private-wrapper-error');
+      withFields.mockRestore();
+      logError.mockRestore();
+    });
+
+    it('fingerprints malformed health responses without retaining their body', async () => {
+      const body = '<html>token=secret-health-body</html>';
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          new Response(body, {
+            status: 500,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          })
+        ),
+      };
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const logError = vi.spyOn(logger, 'error').mockImplementation(() => logger);
+      const client = new WrapperClient({
+        session: createMockSession(createSuccessResponse({})),
+        port: defaultPort,
+        transport,
+      });
+
+      const expectedHash = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))),
+        byte => byte.toString(16).padStart(2, '0')
+      ).join('');
+      let thrown: unknown;
+      try {
+        await client.health();
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toMatchObject({
+        message: 'Failed to parse wrapper response',
+        code: 'PARSE_ERROR',
+      });
+      expect(String(thrown)).not.toContain(body);
+      expect(withFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'GET',
+          path: '/health',
+          requestId: expect.any(String),
+          contentType: 'text/html; charset=utf-8',
+          responseBytes: new TextEncoder().encode(body).byteLength,
+          responseSha256: expectedHash,
+          statusCode: 500,
+        })
+      );
+      expect(JSON.stringify(withFields.mock.calls)).not.toContain('secret-health-body');
+      expect(logError).toHaveBeenCalledWith('Failed to parse wrapper HTTP response');
+      expect(transport.request).toHaveBeenCalledWith(
+        'GET',
+        '/health',
+        undefined,
+        expect.any(String)
+      );
+
+      withFields.mockRestore();
+      logError.mockRestore();
     });
 
     it('handles curl exit codes', async () => {

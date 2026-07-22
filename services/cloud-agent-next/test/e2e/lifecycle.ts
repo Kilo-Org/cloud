@@ -18,9 +18,11 @@ import {
   type DriverConfig,
   type StreamEvent,
 } from './client.js';
+import { waitForStoredRunFailure } from './auth.js';
 import { startCallbackServer, type CallbackServerHandle } from './callback-server.js';
 import {
   killSandboxFamily,
+  listSandboxesForAgentSession,
   listSandboxContainers,
   readKiloCliLog,
   readWrapperLog,
@@ -79,6 +81,34 @@ function hasEventOfType(events: StreamEvent[], type: string): boolean {
   return events.some(e => e.streamEventType === type);
 }
 
+const WARM_VERIFICATION_PREPARATION_STEPS = new Set([
+  'sandbox_provision',
+  'sandbox_boot',
+  'kilo_server',
+]);
+
+/**
+ * Return live preparation steps that prove a supposedly warm turn did cold work.
+ * Snapshot and attempt-level events are expected on warm stream connections.
+ */
+export function unexpectedColdPreparationSteps(events: StreamEvent[]): string[] {
+  const unexpected = new Set<string>();
+  for (const event of events) {
+    if (event.streamEventType !== 'preparing') continue;
+
+    const { version, action, step } = event.data;
+    if (version !== 2) {
+      unexpected.add(`legacy:${typeof step === 'string' ? step : 'unknown'}`);
+      continue;
+    }
+    if (action !== 'step_started') continue;
+
+    const stepName = typeof step === 'string' ? step : 'unknown';
+    if (!WARM_VERIFICATION_PREPARATION_STEPS.has(stepName)) unexpected.add(stepName);
+  }
+  return [...unexpected];
+}
+
 async function snapshotSandboxIds(): Promise<Set<string>> {
   const containers = await listSandboxContainers();
   return new Set(containers.map(container => container.id));
@@ -103,7 +133,11 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
     const stream = openStream(config, sessionResult.cloudAgentSessionId, { replay: false });
 
     // Per-session dev sandboxes should create a new container for this session.
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      sessionResult.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -186,7 +220,11 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     const warmupPrompt = fakeDirective('echo:warmup');
     const session = await startSession(config, { prompt: warmupPrompt }, api);
     const warmupStream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    const warmupSandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const warmupSandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!warmupSandbox) {
       warmupStream.close();
       return {
@@ -202,7 +240,6 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     warmupStream.close();
 
     // Send follow-up prompt. Should land on the same (hot) sandbox.
-    const sandboxIdsBeforeFollowup = await snapshotSandboxIds();
     const followPrompt = fakeDirective(conversation);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
     await sendMessage(
@@ -221,20 +258,22 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
     const { terminal, events } = await collectUntilTerminal(stream, timeoutMs);
     stream.close();
 
-    const sandboxesAfter = await listSandboxContainers();
-    const noPrepare = !hasEventOfType(events, 'preparing');
+    const sessionSandboxesAfter = await listSandboxesForAgentSession(session.cloudAgentSessionId);
+    const coldPreparationSteps = unexpectedColdPreparationSteps(events);
 
     const sameContainers =
-      sandboxesAfter.some(sandbox => sandbox.id === warmupSandbox.id) &&
-      sandboxesAfter.every(sandbox => sandboxIdsBeforeFollowup.has(sandbox.id));
+      sessionSandboxesAfter.length === 1 && sessionSandboxesAfter[0]?.id === warmupSandbox.id;
 
     const terminalName = terminal?.streamEventType ?? 'none';
-    const ok = (conversation === 'hang' ? !terminal : !!terminal) && noPrepare && sameContainers;
+    const ok =
+      (conversation === 'hang' ? !terminal : !!terminal) &&
+      coldPreparationSteps.length === 0 &&
+      sameContainers;
     return {
       name: 'hot',
       conversation,
       ok,
-      message: `terminal=${terminalName}, firstKilocode=${firstKilocode ? `${firstKilocodeLatency}ms` : 'none'}, noPrepare=${noPrepare}, sameContainers=${sameContainers}`,
+      message: `terminal=${terminalName}, firstKilocode=${firstKilocode ? `${firstKilocodeLatency}ms` : 'none'}, coldPreparation=${coldPreparationSteps.join(',') || 'none'}, sameContainers=${sameContainers}`,
       events,
       durationMs: Date.now() - start,
     };
@@ -282,7 +321,11 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
     const knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective(coldDirective) }, api);
     const coldStream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       coldStream.close();
       return {
@@ -311,7 +354,6 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
 
     const hotSummaries: string[] = [];
     for (const directive of hotDirectives) {
-      const sandboxIdsBeforeFollowup = await snapshotSandboxIds();
       const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
       await sendMessage(
         config,
@@ -326,25 +368,24 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       events.push(...hotResult.events);
       stream.close();
 
-      const sandboxesAfter = await listSandboxContainers();
+      const sessionSandboxesAfter = await listSandboxesForAgentSession(session.cloudAgentSessionId);
       const completed = hotResult.terminal?.streamEventType === 'complete';
-      const noPrepare = !hasEventOfType(hotResult.events, 'preparing');
+      const coldPreparationSteps = unexpectedColdPreparationSteps(hotResult.events);
       const sameContainers =
-        sandboxesAfter.some(candidate => candidate.id === sandbox.id) &&
-        sandboxesAfter.every(candidate => sandboxIdsBeforeFollowup.has(candidate.id));
-      if (!completed || !noPrepare || !sameContainers) {
+        sessionSandboxesAfter.length === 1 && sessionSandboxesAfter[0]?.id === sandbox.id;
+      if (!completed || coldPreparationSteps.length > 0 || !sameContainers) {
         return {
           name: 'cold-hot',
           conversation,
           ok: false,
-          message: `${directive}: terminal=${hotResult.terminal?.streamEventType ?? 'none'}, firstKilocode=${firstKilocode ? `${firstKilocodeLatency}ms` : 'none'}, noPrepare=${noPrepare}, sameContainers=${sameContainers}`,
+          message: `${directive}: terminal=${hotResult.terminal?.streamEventType ?? 'none'}, firstKilocode=${firstKilocode ? `${firstKilocodeLatency}ms` : 'none'}, coldPreparation=${coldPreparationSteps.join(',') || 'none'}, sameContainers=${sameContainers}`,
           events,
           durationMs: Date.now() - start,
         };
       }
 
       hotSummaries.push(
-        `${directive}:${hotResult.terminal.streamEventType}/${firstKilocode ? `${firstKilocodeLatency}ms` : 'no-kilocode'}`
+        `${directive}:${hotResult.terminal?.streamEventType ?? 'none'}/${firstKilocode ? `${firstKilocodeLatency}ms` : 'no-kilocode'}`
       );
     }
 
@@ -382,7 +423,11 @@ export async function lifecycleExternalKill(args: LifecycleArgs): Promise<Lifecy
     const knownSandboxIds = await snapshotSandboxIds();
     const session = await startSession(config, { prompt: fakeDirective('echo:warmup') }, api);
     const firstStream = openStream(config, session.cloudAgentSessionId, { replay: false });
-    const firstSandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const firstSandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!firstSandbox) {
       firstStream.close();
       return {
@@ -474,7 +519,11 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -630,7 +679,11 @@ export async function lifecycleQueueWhileBusy(args: LifecycleArgs): Promise<Life
     cleanupSessionId = gate.cloudAgentSessionId;
     const stream = openStream(config, gate.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      gate.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -802,7 +855,11 @@ export async function lifecycleQueueRapidFireNoGate(args: LifecycleArgs): Promis
       api
     );
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      first.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -905,7 +962,11 @@ export async function lifecycleQueueOverflow(args: LifecycleArgs): Promise<Lifec
     const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     const stream = openStream(config, gate.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      gate.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1033,7 +1094,11 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
     const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     const stream = openStream(config, gate.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      gate.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1146,7 +1211,11 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
     const session = await startSession(config, { prompt: fakeDirective(`error:${errorMsg}`) }, api);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1189,6 +1258,90 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
   }
 }
 
+/** Verify classified terminal provider failures reach the persisted run report unchanged. */
+export async function lifecycleClassifiedFailureReport(
+  args: LifecycleArgs
+): Promise<LifecycleResult> {
+  const start = Date.now();
+  const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
+  const expected =
+    conversation === 'payment'
+      ? {
+          directive: 'error:Payment Required: balance is -$12.34',
+          code: 'payment_required',
+          diagnostic: 'Model request failed: insufficient credits',
+        }
+      : conversation === 'model'
+        ? {
+            directive: 'model-missing',
+            code: 'model_missing',
+            diagnostic: 'No model is available for this run',
+          }
+        : null;
+  if (!expected) {
+    return {
+      name: 'classified-failure-report',
+      conversation,
+      ok: false,
+      message: 'conversation must be payment or model',
+      events: [],
+      durationMs: Date.now() - start,
+    };
+  }
+
+  try {
+    const session = await startSession(config, { prompt: fakeDirective(expected.directive) }, api);
+    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    const terminal = await stream.waitFor(
+      event =>
+        event.streamEventType === 'cloud.message.failed' &&
+        messageIdFromEvent(event) === session.messageId,
+      timeoutMs
+    );
+    const events = [...stream.events];
+    stream.close();
+    if (!terminal) {
+      return {
+        name: 'classified-failure-report',
+        conversation,
+        ok: false,
+        message: `no matching cloud.message.failed within ${timeoutMs}ms`,
+        events,
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const row = await waitForStoredRunFailure(
+      config.databaseUrl,
+      session.cloudAgentSessionId,
+      session.messageId
+    );
+    const ok =
+      row?.failureStage === 'agent_activity' &&
+      row.failureCode === expected.code &&
+      row.errorMessageRedacted === expected.diagnostic;
+    return {
+      name: 'classified-failure-report',
+      conversation,
+      ok,
+      message: row
+        ? `stored stage=${row.failureStage} code=${row.failureCode} diagnostic=${JSON.stringify(row.errorMessageRedacted)}`
+        : 'failed run report was not persisted within 20s',
+      events,
+      durationMs: Date.now() - start,
+    };
+  } catch (err) {
+    return {
+      name: 'classified-failure-report',
+      conversation,
+      ok: false,
+      message: `threw: ${err instanceof Error ? err.message : String(err)}`,
+      events: [],
+      durationMs: Date.now() - start,
+    };
+  }
+}
+
 /**
  * chunked-streaming: drives `__fake__:slow:<n>:<ms>` (defaults 5:50). The fake
  * emits <n> assistant content chunks separated by <ms>ms delays. Assert
@@ -1204,7 +1357,11 @@ export async function lifecycleChunkedStreaming(args: LifecycleArgs): Promise<Li
     const session = await startSession(config, { prompt: fakeDirective(directive) }, api);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1269,7 +1426,11 @@ export async function lifecycleEmptyResponse(args: LifecycleArgs): Promise<Lifec
     const session = await startSession(config, { prompt: fakeDirective('idle') }, api);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1331,7 +1492,11 @@ export async function lifecycleInterruptMidStream(args: LifecycleArgs): Promise<
     const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1474,7 +1639,11 @@ export async function lifecycleWaitersClean(args: LifecycleArgs): Promise<Lifecy
     const session = await startSession(config, { prompt: fakeDirective(convo) }, api);
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1589,7 +1758,11 @@ export async function lifecycleCallbackCompletion(args: LifecycleArgs): Promise<
     );
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1696,7 +1869,11 @@ export async function lifecycleCallbackBatchFollowup(
     cleanupSessionId = first.cloudAgentSessionId;
     const stream = openStream(config, first.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      first.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -1938,7 +2115,11 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
     );
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
-    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    const sandbox = await waitForNewSandboxPresent(
+      knownSandboxIds,
+      60_000,
+      session.cloudAgentSessionId
+    );
     if (!sandbox) {
       stream.close();
       return {
@@ -2041,6 +2222,7 @@ export const LIFECYCLE_SCENARIOS: Record<
   'queue-overflow': lifecycleQueueOverflow,
   'queue-interrupt-clears': lifecycleQueueInterruptClears,
   'llm-error': lifecycleLlmError,
+  'classified-failure-report': lifecycleClassifiedFailureReport,
   'chunked-streaming': lifecycleChunkedStreaming,
   'empty-response': lifecycleEmptyResponse,
   'interrupt-mid-stream': lifecycleInterruptMidStream,

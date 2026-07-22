@@ -479,7 +479,7 @@
           "image_vars": {
             "KILOCODE_CLI_VERSION": "7.3.54",
           },
-          "max_instances": 2,
+          "max_instances": 16,
           "rollout_active_grace_period": 60,
         },
         {

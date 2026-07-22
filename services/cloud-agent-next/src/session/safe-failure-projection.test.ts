@@ -184,6 +184,39 @@ describe('classifyAssistantFailureMessage', () => {
       })
     ).toBe('Assistant request timed out');
   });
+
+  it.each([
+    [
+      'Payment Required: {"error":{"message":"Insufficient credits","balance":-0.01,"url":"https://gateway.test/private"}}',
+      'payment_required',
+      'Assistant request failed: insufficient credits',
+    ],
+    [
+      'Account balance is -$0.25 for tenant secret',
+      'payment_required',
+      'Assistant request failed: insufficient credits',
+    ],
+    ['load balance is -1 for shard secret', undefined, 'Assistant request failed'],
+    [
+      'model_not_found: provider/private-model',
+      'model_missing',
+      'Assistant request failed: model not found',
+    ],
+    ['429 Too Many Requests', undefined, 'Assistant request was rate limited'],
+    ['upstream timeout', undefined, 'Assistant request timed out'],
+    ['403 Forbidden', undefined, 'Assistant request was not authorized'],
+    ['400 malformed request', undefined, 'Assistant request was invalid'],
+    ['504 upstream unavailable', undefined, 'Assistant service is unavailable'],
+    ['unknown provider failure', undefined, 'Assistant request failed'],
+  ] as const)(
+    'returns a structured terminal classification for %s',
+    (source, terminalCode, safeMessage) => {
+      const result = classifyAssistantFailure(source);
+
+      expect(result.safeMessage).toBe(safeMessage);
+      expect(result.terminalCode).toBe(terminalCode);
+    }
+  );
 });
 
 describe('classifyAssistantFailure', () => {

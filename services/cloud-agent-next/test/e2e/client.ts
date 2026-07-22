@@ -30,6 +30,8 @@ export type CallbackTarget = {
 
 export type DriverConfig = {
   workerUrl: string;
+  /** Postgres URL used by scenarios that verify persisted report rows. */
+  databaseUrl?: string;
   user: TestUser;
   nextAuthSecret: string;
   /**
@@ -55,6 +57,8 @@ export type DriverConfig = {
    * `/test/release`, `/test/gate-status`, and `/test/requests`.
    */
   fakeLlmUrl: string;
+  /** Matrix-only hook for row-scoped Durable Object cleanup. */
+  onSessionCreated?: (cloudAgentSessionId: string) => void;
 };
 
 export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
@@ -146,8 +150,12 @@ export async function startSession(
   args: StartSessionArgs,
   api: ApiVersion = 'unified'
 ): Promise<StartSessionResult> {
-  if (api === 'legacy') return startSessionLegacy(config, args);
-  return startSessionUnified(config, args);
+  const result =
+    api === 'legacy'
+      ? await startSessionLegacy(config, args)
+      : await startSessionUnified(config, args);
+  config.onSessionCreated?.(result.cloudAgentSessionId);
+  return result;
 }
 
 async function startSessionUnified(
@@ -298,6 +306,51 @@ export async function interruptSession(
   sessionId: string
 ): Promise<InterruptResult> {
   return trpcCall<InterruptResult>(config, 'interruptSession', { sessionId });
+}
+
+export async function cleanupSession(
+  config: DriverConfig,
+  sessionId: string
+): Promise<{ success: true; message?: string }> {
+  if (!config.internalApiSecret) {
+    throw new Error('cleanupSession requires INTERNAL_API_SECRET from .dev.vars');
+  }
+  return trpcCall(
+    config,
+    'cleanupSession',
+    { sessionId },
+    {
+      internalApiSecret: config.internalApiSecret,
+    }
+  );
+}
+
+export async function cleanupSessionUntilSettled(
+  config: DriverConfig,
+  sessionId: string,
+  options: {
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+    now?: () => number;
+    sleep?: (ms: number) => Promise<void>;
+  } = {}
+): Promise<{ success: true; message?: string }> {
+  const {
+    timeoutMs = 30_000,
+    pollIntervalMs = 1_000,
+    now = Date.now,
+    sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  } = options;
+  const deadline = now() + timeoutMs;
+  while (true) {
+    try {
+      return await cleanupSession(config, sessionId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('"retryable":true') || now() >= deadline) throw error;
+      await sleep(Math.max(0, Math.min(pollIntervalMs, deadline - now())));
+    }
+  }
 }
 
 export async function answerPermission(

@@ -159,6 +159,7 @@ async function main(): Promise<void> {
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
     internalApiSecret: devVars.INTERNAL_API_SECRET,
     workerUrl: process.env.WORKER_URL ?? DEFAULT_CONFIG.workerUrl,
+    databaseUrl: process.env.DATABASE_URL,
     gitUrl: process.env.E2E_GIT_URL ?? DEFAULT_CONFIG.gitUrl,
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
   };

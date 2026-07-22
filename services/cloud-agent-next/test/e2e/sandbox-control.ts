@@ -17,6 +17,17 @@ const execFileAsync = promisify(execFile);
 
 export type DockerCommandExecutor = (args: string[]) => Promise<{ stdout: string }>;
 
+export type SandboxCleanupQuiescenceOptions = {
+  timeoutMs: number;
+  stableMs: number;
+  /** Reap delayed recreations only after the Sandbox runtime has released ownership. */
+  reapPostBaseline?: boolean;
+  pollIntervalMs?: number;
+  executeDocker?: DockerCommandExecutor;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
 const executeDockerCommand: DockerCommandExecutor = async args => {
   const { stdout } = await execFileAsync('docker', args);
   return { stdout };
@@ -34,9 +45,15 @@ export type SandboxContainer = {
  * callers can kill them together with their primary.
  */
 export async function listSandboxContainers(
-  executeDocker: DockerCommandExecutor = executeDockerCommand
+  executeDocker: DockerCommandExecutor = executeDockerCommand,
+  includeStopped = false
 ): Promise<SandboxContainer[]> {
-  const { stdout } = await executeDocker(['ps', '--format', '{{.ID}}\t{{.Names}}\t{{.Image}}']);
+  const { stdout } = await executeDocker([
+    'ps',
+    ...(includeStopped ? ['-a'] : []),
+    '--format',
+    '{{.ID}}\t{{.Names}}\t{{.Image}}',
+  ]);
   const result: SandboxContainer[] = [];
   for (const line of stdout.trim().split('\n')) {
     if (!line) continue;
@@ -73,16 +90,36 @@ export async function killContainer(
   }
 }
 
+async function removeContainer(
+  idOrName: string,
+  executeDocker: DockerCommandExecutor
+): Promise<void> {
+  try {
+    await executeDocker(['rm', '-f', idOrName]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('No such container')) return;
+    throw error;
+  }
+}
+
 /** Block until a primary sandbox appears that was not present in `knownIds`. */
 export async function waitForNewSandboxPresent(
   knownIds: Set<string>,
-  timeoutMs: number
+  timeoutMs: number,
+  agentSessionId?: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<SandboxContainer | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const containers = await listSandboxContainers();
-    const primary = containers.find(c => !c.isProxy && !knownIds.has(c.id));
-    if (primary) return primary;
+    if (agentSessionId) {
+      const [reused] = await listSandboxesForAgentSession(agentSessionId, executeDocker);
+      if (reused) return reused;
+    } else {
+      const containers = await listSandboxContainers(executeDocker);
+      const primary = containers.find(c => !c.isProxy && !knownIds.has(c.id));
+      if (primary) return primary;
+    }
     await new Promise(r => setTimeout(r, 500));
   }
   return null;
@@ -170,6 +207,28 @@ export async function killSandboxFamily(
   return killed;
 }
 
+/** Remove a matrix-owned sandbox family, including stopped container corpses. */
+export async function removeSandboxFamily(
+  sandbox: SandboxContainer,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<string[]> {
+  const familyNames = sandboxFamilyNames(sandbox);
+  const containers = await listSandboxContainers(executeDocker, true);
+  const removed: string[] = [];
+  for (const container of containers) {
+    if (!familyNames.has(container.name)) continue;
+    try {
+      await executeDocker(['rm', '-f', container.id]);
+      removed.push(container.name);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('No such container')) continue;
+      throw error;
+    }
+  }
+  return removed;
+}
+
 /** Block until a sandbox container and its proxy sibling are gone. */
 export async function waitForSandboxFamilyGone(
   sandbox: SandboxContainer,
@@ -183,6 +242,53 @@ export async function waitForSandboxFamilyGone(
     await new Promise(r => setTimeout(r, 500));
   }
   return false;
+}
+
+/**
+ * Wait until post-baseline sandboxes remain absent for one continuous window.
+ * Optional reaping is reserved for containment after supported teardown fails.
+ */
+export async function waitForSandboxCleanupQuiescence(
+  baselineSandboxIds: Set<string>,
+  options: SandboxCleanupQuiescenceOptions
+): Promise<boolean> {
+  const {
+    timeoutMs,
+    stableMs,
+    reapPostBaseline = false,
+    pollIntervalMs = 250,
+    executeDocker = executeDockerCommand,
+    now = Date.now,
+    sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  } = options;
+  const deadline = now() + timeoutMs;
+  let absentSince: number | undefined;
+
+  while (true) {
+    const containers = await listSandboxContainers(executeDocker);
+    const observedAt = now();
+    if (observedAt > deadline) return false;
+
+    const postBaselineSandboxes = containers.filter(
+      container => !baselineSandboxIds.has(container.id)
+    );
+    if (postBaselineSandboxes.length > 0) {
+      absentSince = undefined;
+      if (reapPostBaseline) {
+        for (const container of postBaselineSandboxes) {
+          await killContainer(container.id, executeDocker);
+          await removeContainer(container.id, executeDocker);
+        }
+      }
+    } else {
+      absentSince ??= observedAt;
+      if (observedAt - absentSince >= stableMs) return true;
+    }
+
+    const remainingMs = deadline - now();
+    if (remainingMs <= 0) return false;
+    await sleep(Math.min(pollIntervalMs, remainingMs));
+  }
 }
 
 /**

@@ -93,7 +93,10 @@ export function classifyAssistantFailure(
 ): AssistantFailureClassification {
   const message = extractErrorMessage(source).toLocaleLowerCase();
   const providerOwnership = /\[byok\]/i.test(message) ? 'byok' : defaultProviderOwnership;
-  if (/\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message)) {
+  if (
+    /\b(payment required|insufficient (?:credits?|balance|funds))\b/.test(message) ||
+    /\b(?:account|credit)s?\b[\s\S]{0,80}?\bbalance(?: is|:)?\s*-\s*\$?\d/.test(message)
+  ) {
     return {
       reason: 'insufficient_credits',
       safeMessage: 'Assistant request failed: insufficient credits',
@@ -101,7 +104,11 @@ export function classifyAssistantFailure(
       terminalCode: 'payment_required',
     };
   }
-  if (/\b(model (?:was )?not found|unknown model|invalid model)\b/.test(message)) {
+  if (
+    /\b(model (?:was )?not found|model[_ -]?not[_ -]?found|unknown model|invalid model|model .+ does not exist)\b/.test(
+      message
+    )
+  ) {
     return {
       reason: 'model_unavailable',
       safeMessage: 'Assistant request failed: model not found',

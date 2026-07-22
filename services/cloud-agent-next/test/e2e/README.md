@@ -140,11 +140,36 @@ Matrix (runs the default regression suite):
 tsx services/cloud-agent-next/test/e2e/smoke.ts
 ```
 
+The dev `SandboxSmall` capacity is 16 because this matrix creates fourteen
+isolated sessions. Lowering it below the matrix demand turns later cold rows
+into local capacity probes rather than Cloud Agent health checks.
+
 The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
 runs several hot same-session turns. Fresh sessions use per-session sandboxes
 in local dev, so the harness identifies each newly-created sandbox instead of
 killing every sandbox between cases. Kill scenarios only terminate the sandbox
 family created for that scenario.
+
+Warm-reuse scenarios allow preparation snapshots and the live sandbox/Kilo
+verification steps that occur on every delivery. They fail only when a live
+cold-path preparation step starts or the sandbox identity changes, so a warm
+turn's expected preparation chatter does not hide a real reprovisioning
+regression or create a false failure.
+
+Between matrix rows, the harness deletes every session created by that row
+through the trusted `cleanupSession` control plane. For local per-session
+`ses-*` sandboxes, deletion destroys the isolated sandbox Durable Object; a
+shared sandbox would retain the container and delete only the named session.
+Pool ownership is released first through trusted Worker/Sandbox cleanup. Only
+retryable `physical wrapper cleanup pending` responses are polled for up to 30
+seconds so intentional kill scenarios can converge; product scenarios are not
+rerun. Only after cleanup succeeds does the harness remove the row's exact post-baseline
+Docker primary/proxy family, which contains local runtime leftovers without
+bypassing live pool bookkeeping. It then requires five seconds of stable
+absence. A cold session may reuse a warm container, so readiness is proven by
+finding that session's wrapper marker rather than accepting any new Docker ID.
+If trusted cleanup or Docker quiescence fails, the matrix reports
+`matrix-cleanup` and stops.
 
 Per-run overrides via env vars. Defaults assume a zero-offset session;
 for any other offset, compute the real ports from `pnpm dev:status --json`
@@ -240,6 +265,7 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 | `queue-overflow` | Block on `gate:overflow`, fill the pending queue until enqueue fails with HTTP 429, release gate, drain. |
 | `queue-interrupt-clears` | Block on `gate:<tag>`, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each. |
 | `llm-error` | Return fake provider HTTP 402 and assert the turn reaches a failed terminal event instead of hanging. |
+| `classified-failure-report` | With `payment` or `model`, assert the terminal classification and safe diagnostic are persisted in the run report. |
 | `chunked-streaming` | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive. |
 | `empty-response` | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted. |
 | `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |

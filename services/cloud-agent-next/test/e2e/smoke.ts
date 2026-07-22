@@ -16,13 +16,19 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
-import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
+import {
+  cleanupSessionUntilSettled,
+  DEFAULT_CONFIG,
+  type ApiVersion,
+  type DriverConfig,
+} from './client.js';
 import { LIFECYCLE_SCENARIOS, type LifecycleResult } from './lifecycle.js';
 import { printResult } from './run.js';
 import {
-  killSandboxFamily,
   listSandboxContainers,
-  waitForSandboxFamilyGone,
+  removeSandboxFamily,
+  sandboxFamilyKey,
+  waitForSandboxCleanupQuiescence,
   type SandboxContainer,
 } from './sandbox-control.js';
 
@@ -50,6 +56,8 @@ const DEFAULT_MATRIX: Case[] = [
 
   // Failure, streaming, and fake-server cleanup edge cases.
   { lifecycle: 'llm-error', conversation: 'boom' },
+  { lifecycle: 'classified-failure-report', conversation: 'payment' },
+  { lifecycle: 'classified-failure-report', conversation: 'model' },
   { lifecycle: 'chunked-streaming', conversation: 'slow:5:50' },
   { lifecycle: 'empty-response', conversation: '_' },
   { lifecycle: 'interrupt-mid-stream', conversation: '_' },
@@ -69,11 +77,7 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'kill-mid-flight', conversation: 'hang' },
 ];
 
-function sandboxFamilyKey(container: SandboxContainer): string {
-  return container.isProxy ? container.name.replace(/-proxy$/, '') : container.name;
-}
-
-async function cleanupMatrixSandboxes(baselineSandboxIds: Set<string>): Promise<void> {
+async function cleanupMatrixSandboxes(baselineSandboxIds: Set<string>): Promise<string | null> {
   const createdSandboxes = (await listSandboxContainers()).filter(
     container => !baselineSandboxIds.has(container.id)
   );
@@ -81,18 +85,24 @@ async function cleanupMatrixSandboxes(baselineSandboxIds: Set<string>): Promise<
   for (const container of createdSandboxes) {
     const key = sandboxFamilyKey(container);
     const existing = sandboxFamilies.get(key);
-    if (!existing || (existing.isProxy && !container.isProxy)) {
-      sandboxFamilies.set(key, container);
-    }
+    if (!existing || (existing.isProxy && !container.isProxy)) sandboxFamilies.set(key, container);
   }
+  for (const sandbox of sandboxFamilies.values()) await removeSandboxFamily(sandbox);
 
-  for (const sandbox of sandboxFamilies.values()) {
-    await killSandboxFamily(sandbox);
-    const gone = await waitForSandboxFamilyGone(sandbox, 30_000);
-    if (!gone) {
-      console.warn(`smoke: sandbox family ${sandboxFamilyKey(sandbox)} remained after cleanup`);
-    }
-  }
+  const quiescent = await waitForSandboxCleanupQuiescence(baselineSandboxIds, {
+    timeoutMs: 30_000,
+    stableMs: 5_000,
+    reapPostBaseline: true,
+  });
+  if (quiescent) return null;
+
+  const remainingSandboxes = (await listSandboxContainers()).filter(
+    container => !baselineSandboxIds.has(container.id)
+  );
+  const remaining = remainingSandboxes.map(container => container.name);
+  return remaining.length > 0
+    ? `post-cleanup Docker state did not quiesce: ${remaining.join(', ')}`
+    : 'sandbox cleanup did not remain stable for 5s';
 }
 
 async function main(): Promise<void> {
@@ -109,6 +119,7 @@ async function main(): Promise<void> {
     nextAuthSecret: devVars.NEXTAUTH_SECRET ?? '',
     internalApiSecret: devVars.INTERNAL_API_SECRET,
     workerUrl: process.env.WORKER_URL ?? DEFAULT_CONFIG.workerUrl,
+    databaseUrl: process.env.DATABASE_URL,
     gitUrl: process.env.E2E_GIT_URL ?? DEFAULT_CONFIG.gitUrl,
     model: process.env.E2E_MODEL ?? DEFAULT_CONFIG.model,
   };
@@ -141,12 +152,54 @@ async function main(): Promise<void> {
       continue;
     }
     console.log(`\n=== ${lifecycle}/${conversation} [api=${api}] ===`);
+    const rowSessionIds = new Set<string>();
+    const rowConfig: DriverConfig = {
+      ...config,
+      onSessionCreated: sessionId => rowSessionIds.add(sessionId),
+    };
+    let cleanupFailure: LifecycleResult | null = null;
     try {
-      const result = await scenarioFn({ config, conversation, api });
+      const result = await scenarioFn({ config: rowConfig, conversation, api });
       printResult(result);
       results.push(result);
     } finally {
-      await cleanupMatrixSandboxes(baselineSandboxIds);
+      const cleanupStartedAt = Date.now();
+      const cleanupErrors: string[] = [];
+      for (const sessionId of rowSessionIds) {
+        try {
+          await cleanupSessionUntilSettled(rowConfig, sessionId);
+        } catch (error) {
+          cleanupErrors.push(
+            `cleanup ${sessionId} threw: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+      try {
+        const message = await cleanupMatrixSandboxes(baselineSandboxIds);
+        if (message) cleanupErrors.push(message);
+      } catch (error) {
+        cleanupErrors.push(
+          `sandbox cleanup threw: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      if (cleanupErrors.length > 0) {
+        cleanupFailure = {
+          name: 'matrix-cleanup',
+          conversation: `${lifecycle}/${conversation}`,
+          ok: false,
+          message: cleanupErrors.join('; '),
+          events: [],
+          durationMs: Date.now() - cleanupStartedAt,
+        };
+      }
+    }
+    if (cleanupFailure) {
+      printResult(cleanupFailure);
+      results.push(cleanupFailure);
+      console.error(
+        'smoke: stopping because the next row would inherit contaminated sandbox state'
+      );
+      break;
     }
   }
 

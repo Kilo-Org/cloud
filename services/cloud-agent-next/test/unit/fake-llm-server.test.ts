@@ -291,6 +291,15 @@ describe('fake-llm-server HTTP', () => {
     expect(body.error.type).toBe('insufficient_quota');
   });
 
+  it('model-missing scenario returns a terminal provider error', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:model-missing');
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: { message: string; type: string } };
+    expect(body.error.message).toBe('Model not found: kilo/fake-deterministic');
+    expect(body.error.type).toBe('model_not_found');
+  });
+
   it('unknown scenario returns HTTP 402', async () => {
     const h = await start();
     const res = await postChat(h.url, '__fake__:nosuch');

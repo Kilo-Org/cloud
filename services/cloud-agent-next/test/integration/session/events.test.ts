@@ -136,6 +136,46 @@ describe('Event Storage', () => {
     expect(result.combined).toHaveLength(2);
   });
 
+  it('finds entity prefixes literally without SQLite pattern matching', async () => {
+    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:literal_entity_prefix');
+    const stub = env.CLOUD_AGENT_SESSION.get(id);
+
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const events = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
+      );
+      const longPrefix = `long/${'x'.repeat(2048)}`;
+      const entityIds = [
+        'preparation/attempt/one',
+        'literal%/one',
+        'literalX/one',
+        'literal_/one',
+        'literalY/one',
+        `${longPrefix}/one`,
+      ];
+      entityIds.forEach((entityId, index) => {
+        events.upsert({
+          executionId: 'exc_prefix',
+          sessionId: 'sess_prefix',
+          streamEventType: 'preparing',
+          payload: JSON.stringify({ entityId }),
+          timestamp: index,
+          entityId,
+        });
+      });
+
+      return {
+        normal: events.findByEntityPrefix('preparation/').map(event => event.timestamp),
+        percent: events.findByEntityPrefix('literal%/').map(event => event.timestamp),
+        underscore: events.findByEntityPrefix('literal_/').map(event => event.timestamp),
+        long: events.findByEntityPrefix(longPrefix).map(event => event.timestamp),
+      };
+    });
+
+    expect(result).toEqual({ normal: [0], percent: [1], underscore: [3], long: [5] });
+  });
+
   it('should delete events older than timestamp', async () => {
     const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_3');
     const stub = env.CLOUD_AGENT_SESSION.get(id);

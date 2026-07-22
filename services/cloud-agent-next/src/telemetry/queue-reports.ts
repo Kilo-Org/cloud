@@ -5,7 +5,10 @@ import {
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../logger.js';
-import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
+import {
+  classifyAssistantFailure,
+  workspaceFailureMessage,
+} from '../session/safe-failure-projection.js';
 import { admittedAgentModel, type SessionMessageState } from '../session/session-message-state.js';
 import {
   classifyCloudAgentFailure,
@@ -22,12 +25,6 @@ type ReportLogContext = {
   status: string;
 };
 
-const INSUFFICIENT_CREDIT_TERMINAL_ERRORS = new Set([
-  'insufficient credits',
-  'insufficient credits: payment_required',
-  'insufficient credits: insufficient_funds',
-  'payment required',
-]);
 const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
   Record<NonNullable<SessionMessageState['failureCode']>, string>
 > = {
@@ -68,7 +65,7 @@ function isKnownInsufficientCreditFailure(state: SessionMessageState): boolean {
     return false;
   }
   if (state.error === undefined) return false;
-  return INSUFFICIENT_CREDIT_TERMINAL_ERRORS.has(state.error.trim().toLowerCase());
+  return classifyAssistantFailure(state.error).terminalCode === 'payment_required';
 }
 
 function diagnosticForFailedRun(

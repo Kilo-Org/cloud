@@ -371,6 +371,10 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     writeJsonError(ctx.res, 402, message, 'insufficient_quota');
   },
 
+  'model-missing'(_args, ctx) {
+    writeJsonError(ctx.res, 404, 'Model not found: kilo/fake-deterministic', 'model_not_found');
+  },
+
   gate(args, ctx) {
     const rawArg = args[0] ?? '';
     // Kilo augments the user message with `<environment_details>...` and other

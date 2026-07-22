@@ -30,6 +30,7 @@ import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isRepositorySectionVisible } from '@/lib/is-repository-section-visible';
 import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
@@ -264,17 +265,7 @@ export default function NewSessionScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="New session" />
 
-      {isRemoteTargetSelected ? (
-        <RemoteSpawnComposer
-          runOnInstance={runOnInstance}
-          instanceList={instanceList}
-          isLoadingInstances={isLoadingInstances}
-          onChangeRunOnInstance={handleRunOnInstanceChange}
-          isSpawningRemote={remoteSpawn.isSpawningRemote}
-          isStartDisabled={isStartDisabled}
-          onStart={handleStartSession}
-        />
-      ) : (
+      {isRepositorySectionVisible(runOnInstance) ? (
         <ScrollView
           className="flex-1"
           contentContainerClassName="flex-grow px-4 pb-8 pt-4"
@@ -309,23 +300,6 @@ export default function NewSessionScreen() {
             voiceInputSettlerRef={voiceInputSettlerRef}
           />
 
-          <NewSessionRepositorySection
-            disabled={isCreating}
-            isError={isReposError}
-            isLoading={isLoadingRepos}
-            isRefetching={isRefetchingRepos}
-            onChange={setSelectedRepo}
-            onOpenGitHubIntegration={() => {
-              void handleOpenGitHubIntegration();
-            }}
-            onRefetch={() => {
-              void refetchRepos();
-            }}
-            repositories={repositories}
-            showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
-            value={selectedRepo}
-          />
-
           {showRunOnSelector ? (
             <View className="mt-5">
               <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
@@ -344,6 +318,23 @@ export default function NewSessionScreen() {
             </View>
           ) : null}
 
+          <NewSessionRepositorySection
+            disabled={isCreating}
+            isError={isReposError}
+            isLoading={isLoadingRepos}
+            isRefetching={isRefetchingRepos}
+            onChange={setSelectedRepo}
+            onOpenGitHubIntegration={() => {
+              void handleOpenGitHubIntegration();
+            }}
+            onRefetch={() => {
+              void refetchRepos();
+            }}
+            repositories={repositories}
+            showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
+            value={selectedRepo}
+          />
+
           <Button
             size="lg"
             className="mt-6"
@@ -357,6 +348,16 @@ export default function NewSessionScreen() {
             )}
           </Button>
         </ScrollView>
+      ) : (
+        <RemoteSpawnComposer
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          onChangeRunOnInstance={handleRunOnInstanceChange}
+          isSpawningRemote={remoteSpawn.isSpawningRemote}
+          isStartDisabled={isStartDisabled}
+          onStart={handleStartSession}
+        />
       )}
     </View>
   );

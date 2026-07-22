@@ -184,6 +184,7 @@
     "@types/jsonwebtoken": "catalog:",
     "@types/linkify-it": "5.0.0",
     "@types/node": "catalog:",
+    "@types/pg": "8.18.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "catalog:",

@@ -77,7 +77,7 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     const hasActiveCliSession = vi.fn(async () => true);
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: needsInputSignal() },
+      { kiloUserId: 'usr_1', sessionId: 'ses_1', createdOnPlatform: null, signal: needsInputSignal() },
       {
         hasActiveCliSession,
         sendPush,

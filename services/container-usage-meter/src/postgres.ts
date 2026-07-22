@@ -59,6 +59,13 @@ function isPostgresConstraintError(error: unknown, code: string, constraint: str
   return 'cause' in error && isPostgresConstraintError(error.cause, code, constraint);
 }
 
+function mapSingleOpenIntervalConflict(error: unknown): never {
+  if (isPostgresConstraintError(error, '23505', SINGLE_OPEN_INTERVAL_CONSTRAINT)) {
+    throw new UsageMutationConflictError('Another usage interval is already open');
+  }
+  throw error;
+}
+
 function timestamp(receivedAtMs: number): string {
   return new Date(receivedAtMs).toISOString();
 }
@@ -142,7 +149,7 @@ export async function applyStartWithDb(
   contextFingerprint: string,
   receivedAtMs: number
 ): Promise<StartSkuAdmission> {
-  return db.transaction(async tx => {
+  const operation: Promise<StartSkuAdmission> = db.transaction(async tx => {
     const [existing] = await tx
       .select()
       .from(container_usage_interval)
@@ -222,6 +229,7 @@ export async function applyStartWithDb(
     }
     return { kind: 'applied', dedup: false };
   });
+  return operation.catch(mapSingleOpenIntervalConflict);
 }
 
 export async function applyHeartbeat(
@@ -324,12 +332,7 @@ export async function applyHeartbeatWithDb(
       .where(eq(container_usage_interval.id, intervalId));
     return { kind: 'applied', dedup: false };
   });
-  return operation.catch(error => {
-    if (isPostgresConstraintError(error, '23505', SINGLE_OPEN_INTERVAL_CONSTRAINT)) {
-      throw new UsageMutationConflictError('Cannot reopen while another usage interval is open');
-    }
-    throw error;
-  });
+  return operation.catch(mapSingleOpenIntervalConflict);
 }
 
 export async function applyStop(

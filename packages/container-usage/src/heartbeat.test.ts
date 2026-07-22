@@ -322,7 +322,7 @@ describe('installBillingHeartbeat', () => {
     expect(await getBillingContext(storage)).toEqual(replacement);
   });
 
-  it('does not let a stale same-interval acknowledgement clear a newer segment', async () => {
+  it('serializes overlapping heartbeat ticks', async () => {
     const storage = memoryStorage();
     await storedContext(storage);
     const resolvers: Array<(ack: HeartbeatAck) => void> = [];
@@ -351,8 +351,9 @@ describe('installBillingHeartbeat', () => {
 
     const first = controller.billingHeartbeatTick();
     await vi.waitFor(() => expect(recordHeartbeat).toHaveBeenCalledOnce());
-    const stale = controller.billingHeartbeatTick();
-    await vi.waitFor(() => expect(recordHeartbeat).toHaveBeenCalledTimes(2));
+    const second = controller.billingHeartbeatTick();
+    await Promise.resolve();
+    expect(recordHeartbeat).toHaveBeenCalledOnce();
     resolvers[0]?.({
       intervalId: 'instance-1:123',
       durable: 'pg',
@@ -360,28 +361,74 @@ describe('installBillingHeartbeat', () => {
       budget: { verdict: 'continue' },
     });
     await first;
-
-    const next = controller.billingHeartbeatTick();
-    await vi.waitFor(() => expect(recordHeartbeat).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(recordHeartbeat).toHaveBeenCalledTimes(2));
     resolvers[1]?.({
-      intervalId: 'instance-1:123',
-      durable: 'pg',
-      dedup: true,
-      budget: { verdict: 'continue' },
-    });
-    await stale;
-
-    expect(await getBillingContext(storage)).toMatchObject({
-      nextSeq: 2,
-      pendingHeartbeat: { seq: 2 },
-    });
-    resolvers[2]?.({
       intervalId: 'instance-1:123',
       durable: 'pg',
       dedup: false,
       budget: { verdict: 'continue' },
     });
-    await next;
+    await second;
+
+    expect(recordHeartbeat).toHaveBeenNthCalledWith(1, expect.objectContaining({ seq: 1 }));
+    expect(recordHeartbeat).toHaveBeenNthCalledWith(2, expect.objectContaining({ seq: 2 }));
+  });
+
+  it('serializes an external stop behind an in-flight heartbeat', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    let resolveHeartbeat = (_result: HeartbeatAck): void => undefined;
+    let resolveStop = (_result: RecordAck): void => undefined;
+    const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(
+      () =>
+        new Promise(resolve => {
+          resolveHeartbeat = resolve;
+        })
+    );
+    const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(
+      () =>
+        new Promise(resolve => {
+          resolveStop = resolve;
+        })
+    );
+    const client = new ContainerUsageClient(
+      {
+        recordStart: async () => ({
+          success: true,
+          ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+        }),
+        recordHeartbeat,
+        recordStop,
+      },
+      { service: 'cloud-agent-next' }
+    );
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client, storage, enforceBudgetStop: vi.fn() }
+    );
+
+    const heartbeat = controller.billingHeartbeatTick();
+    await vi.waitFor(() => expect(recordHeartbeat).toHaveBeenCalledOnce());
+    const stopping = controller.recordStop({ reason: 'exit', exitCode: 0 });
+    await Promise.resolve();
+    expect(recordStop).not.toHaveBeenCalled();
+
+    resolveHeartbeat({
+      intervalId: 'instance-1:123',
+      durable: 'pg',
+      dedup: false,
+      budget: { verdict: 'continue' },
+    });
+    await heartbeat;
+    await vi.waitFor(() => expect(recordStop).toHaveBeenCalledOnce());
+    expect(recordHeartbeat).toHaveBeenCalledWith(expect.objectContaining({ seq: 1 }));
+    expect(recordStop).toHaveBeenCalledWith(expect.objectContaining({ seq: 2 }));
+    resolveStop({ intervalId: 'instance-1:123', durable: 'pg', dedup: false });
+    await stopping;
   });
 
   it('retries the first persisted stop intent before another heartbeat', async () => {

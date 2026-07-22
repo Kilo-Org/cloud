@@ -261,6 +261,76 @@ describe('container usage PostgreSQL application', () => {
       .where(eq(container_usage_interval.id, newerId));
   });
 
+  it('maps a concurrent first-start collision to a usage conflict', async () => {
+    const raceContext = { ...context, instanceId: `start-race-${suffix}` };
+    const raceFingerprint = await usageContextFingerprint(raceContext);
+    const blockerId = `cloud-agent-next:${raceContext.instanceId}:100`;
+    const contenderId = `cloud-agent-next:${raceContext.instanceId}:456`;
+    let releaseBlocker = (): void => undefined;
+    let blockerInserted = (): void => undefined;
+    const blockerReady = new Promise<void>(resolve => {
+      blockerInserted = resolve;
+    });
+    const blockerRelease = new Promise<void>(resolve => {
+      releaseBlocker = resolve;
+    });
+    const blocker = client.db.transaction(async tx => {
+      await tx.insert(container_usage_interval).values({
+        id: blockerId,
+        service: raceContext.service,
+        instance_id: raceContext.instanceId,
+        start_epoch_ms: 100,
+        cloud_billing_sku_id: skuId,
+        context_fingerprint: raceFingerprint,
+        subject_type: raceContext.subject.type,
+        subject_id: raceContext.subject.id,
+        actor_type: raceContext.actor.type,
+        actor_id: raceContext.actor.id,
+        started_at: timestamp(1_000),
+        last_seen_at: timestamp(1_000),
+      });
+      blockerInserted();
+      await blockerRelease;
+    });
+    await blockerReady;
+
+    const contender = applyStartWithDb(
+      client.db,
+      {
+        ...raceContext,
+        startEpochMs: 456,
+        idempotencyKey: startIdempotencyKey(raceContext.service, raceContext.instanceId, 456),
+      },
+      contenderId,
+      raceFingerprint,
+      2_000
+    );
+    await expect
+      .poll(async () => {
+        const result = await client.pool.query<{ count: string }>(
+          `SELECT count(*)
+             FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND wait_event_type = 'Lock'
+              AND query LIKE 'insert into "container_usage_interval"%'`
+        );
+        return Number(result.rows[0]?.count ?? 0);
+      })
+      .toBeGreaterThan(0);
+    releaseBlocker();
+    await blocker;
+
+    await expect(contender).rejects.toThrow('Another usage interval is already open');
+    const contenders = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, contenderId));
+    expect(contenders).toHaveLength(0);
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, blockerId));
+  });
+
   it('maps a single-open constraint collision during reopen to a usage conflict', async () => {
     await client.db
       .update(cloud_billing_sku)
@@ -318,7 +388,7 @@ describe('container usage PostgreSQL application', () => {
         raceFingerprint,
         3_000
       )
-    ).rejects.toThrow('Cannot reopen while another usage interval is open');
+    ).rejects.toThrow('Another usage interval is already open');
 
     const [target] = await client.db
       .select()

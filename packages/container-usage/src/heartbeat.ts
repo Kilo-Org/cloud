@@ -51,6 +51,16 @@ export function installBillingHeartbeat(
     throw new Error('Billing heartbeat interval must be positive');
   }
 
+  let lifecycleTail: Promise<void> = Promise.resolve();
+  const runLifecycleExclusive = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = lifecycleTail.then(operation, operation);
+    lifecycleTail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  };
+
   const cancelHeartbeat = () => {
     container.deleteSchedules(BILLING_HEARTBEAT_CALLBACK);
   };
@@ -127,9 +137,9 @@ export function installBillingHeartbeat(
   };
 
   const recordStop: BillingHeartbeatController['recordStop'] = params =>
-    recordStopForGeneration(params);
+    runLifecycleExclusive(() => recordStopForGeneration(params));
 
-  const billingHeartbeatTick = async (generation?: string) => {
+  const billingHeartbeatTickForGeneration = async (generation?: string) => {
     let context = await getBillingContext(dependencies.storage);
     if (!context) {
       cancelHeartbeat();
@@ -158,10 +168,13 @@ export function installBillingHeartbeat(
     context = currentAfterState;
     if (state.status === 'stopped' || state.status === 'stopped_with_code') {
       try {
-        await recordStop({
-          reason: 'runtime_signal',
-          exitCode: state.status === 'stopped_with_code' ? state.exitCode : undefined,
-        });
+        await recordStopForGeneration(
+          {
+            reason: 'runtime_signal',
+            exitCode: state.status === 'stopped_with_code' ? state.exitCode : undefined,
+          },
+          context.generation
+        );
       } catch (error) {
         await rescheduleIfCurrent(context);
         throw error;
@@ -233,6 +246,8 @@ export function installBillingHeartbeat(
       throw error;
     }
   };
+  const billingHeartbeatTick = (generation?: string) =>
+    runLifecycleExclusive(() => billingHeartbeatTickForGeneration(generation));
 
   Object.defineProperty(container, BILLING_HEARTBEAT_CALLBACK, {
     configurable: true,

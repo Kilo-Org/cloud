@@ -151,8 +151,9 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
       )}
 
       <p className="text-muted-foreground text-center text-xs">
-        Drag and drop a skill folder <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a new skill.
-        Up to {MAX_COMPANION_FILES} companion files per skill.
+        Drag and drop a skill folder{' '}
+        <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a new
+        skill. Up to {MAX_COMPANION_FILES} companion files per skill.
       </p>
 
       {skills.length === 0 && !isAdding && !importing && (

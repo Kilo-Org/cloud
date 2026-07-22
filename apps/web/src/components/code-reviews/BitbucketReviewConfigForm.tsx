@@ -555,7 +555,7 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
                   className="resize-none"
                 />
                 <p className="text-muted-foreground text-sm">
-                  Custom instructions is planned for deprecation. Move this guidance into a
+                  Custom Instructions is planned for deprecation. Move these guidelines into a
                   REVIEW.md file in your repository instead.{' '}
                   <Link
                     href={`/organizations/${organizationId}/code-reviews/review-md`}

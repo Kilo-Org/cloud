@@ -6,7 +6,7 @@ import {
   type InstanceLifecycleEvent,
   type ScheduledActionEvent,
 } from './notification-events';
-import { pushDataSchema } from './push-data';
+import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
 
 export {
   instanceLifecycleEventSchema,
@@ -31,6 +31,7 @@ export type SendPushForConversationInput = z.infer<typeof sendPushForConversatio
 export const perRecipientOutcomeSchema = z.enum([
   'delivered',
   'suppressed_presence',
+  'suppressed_preference',
   'no_tokens',
   'duplicate',
   'failed',
@@ -101,6 +102,7 @@ export const sendInstanceLifecycleNotificationOutputSchema = z.object({
   sent: z.number().int().nonnegative(),
   staleTokens: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
+  suppressedByPreference: z.boolean().optional(),
   ticketErrors: z.object({
     total: z.number().int().nonnegative(),
     retryable: z.number().int().nonnegative(),
@@ -129,6 +131,7 @@ export const sendScheduledActionNoticeOutputSchema = z.object({
   sent: z.number().int().nonnegative(),
   staleTokens: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
+  suppressedByPreference: z.boolean().optional(),
 });
 export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
@@ -144,6 +147,8 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   status: cloudAgentSessionPushStatusSchema,
   body: z.string(),
   suppressIfViewingSession: z.boolean().optional(),
+  // Absent category is treated as 'status' at the enforcement read site.
+  category: cloudAgentSessionCategorySchema.optional(),
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
   typeof sendCloudAgentSessionNotificationInputSchema
@@ -151,7 +156,7 @@ export type SendCloudAgentSessionNotificationParams = z.infer<
 
 export const sendCloudAgentSessionNotificationOutputSchema = z.object({
   dispatched: z.boolean(),
-  reason: z.enum(['missing_session', 'dispatch_failed']).optional(),
+  reason: z.enum(['missing_session', 'dispatch_failed', 'suppressed_preference']).optional(),
 });
 export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema

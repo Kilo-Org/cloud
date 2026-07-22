@@ -4,6 +4,13 @@ import { instanceLifecycleEventSchema, scheduledActionEventSchema } from './noti
 
 const nonEmptyStringSchema = z.string().min(1);
 
+// Discriminates between attention-requiring and status-only cloud agent
+// session notifications. Optional everywhere it appears so old producers
+// in a rolling deploy still validate; the default ('status') is applied
+// at the enforcement read site.
+export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
+export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
+
 /**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
@@ -29,6 +36,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
+    category: cloudAgentSessionCategorySchema.optional(),
   }),
 ]);
 

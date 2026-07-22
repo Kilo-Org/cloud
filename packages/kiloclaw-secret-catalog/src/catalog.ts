@@ -231,29 +231,24 @@ const SECRET_CATALOG_RAW = [
     category: 'tool',
     icon: 'plug',
     order: 6,
-    allFieldsRequired: true,
     fields: [
       {
-        key: 'composioUserApiKey',
-        label: 'User API Key',
-        placeholder: 'uak_...',
-        placeholderConfigured: 'Enter new user API key to replace',
-        envVar: 'COMPOSIO_USER_API_KEY',
-        validationPattern: '^uak_[A-Za-z0-9_-]{16,}$',
-        validationMessage: 'Composio user API keys start with uak_.',
-        maxLength: 300,
-      },
-      {
-        key: 'composioOrg',
-        label: 'Organization ID or Name',
-        placeholder: 'username_workspace',
-        placeholderConfigured: 'Enter new organization ID, name, or slug to replace',
-        envVar: 'COMPOSIO_ORG',
+        key: 'composioConsumerKey',
+        label: 'Consumer Key',
+        placeholder: 'ck_...',
+        placeholderConfigured: 'Enter new consumer key to replace',
+        envVar: 'COMPOSIO_CONSUMER_KEY',
+        // Deliberately loose: Composio's own CLI performs no prefix or length
+        // check on its keys, so anything stricter than "looks like a consumer
+        // key" risks rejecting a valid credential we have not seen yet.
+        validationPattern: '^ck_[A-Za-z0-9_-]{8,}$',
+        validationMessage: 'Composio consumer keys start with ck_.',
         maxLength: 300,
       },
     ],
-    helpText: 'Used to sign the Composio CLI into this sandbox.',
-    helpUrl: 'https://docs.composio.dev/docs/cli',
+    helpText:
+      'Connects this instance to your Composio toolkits. Copy a consumer key from the AI Clients page in the Composio dashboard.',
+    helpUrl: 'https://dashboard.composio.dev',
   },
 ] as const satisfies readonly SecretCatalogEntry[];
 

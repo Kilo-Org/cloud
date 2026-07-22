@@ -1795,6 +1795,117 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
   };
 }
 
+describe('Composio Connect MCP server', () => {
+  const KEY = 'ck_FAKE_TEST_KEY_1234567890';
+
+  function composioServer(config: Record<string, any>) {
+    return config.mcp?.servers?.composio;
+  }
+
+  it('registers the remote server with the consumer key header when the key is set', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config)).toEqual({
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      headers: { 'x-consumer-api-key': KEY },
+    });
+  });
+
+  it('does not define the server when no key is configured', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toBeUndefined();
+  });
+
+  it('trims surrounding whitespace off a pasted key', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: `  ${KEY}  ` },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
+  });
+
+  it('replaces a stale key on the next boot', () => {
+    const existing = JSON.stringify({
+      mcp: {
+        servers: {
+          composio: {
+            transport: 'streamable-http',
+            url: 'https://connect.composio.dev/mcp',
+            headers: { 'x-consumer-api-key': 'ck_OLD_KEY_0987654321' },
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
+  });
+
+  // openclaw.json lives on the volume, so removing the credential in Settings
+  // only revokes access if the server definition goes with it.
+  it('removes its own server definition once the key is cleared', () => {
+    const existing = JSON.stringify({
+      mcp: {
+        servers: {
+          composio: {
+            transport: 'streamable-http',
+            url: 'https://connect.composio.dev/mcp',
+            headers: { 'x-consumer-api-key': KEY },
+          },
+          other: { url: 'https://mcp.example.com/mcp' },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toBeUndefined();
+    expect(config.mcp.servers.other).toEqual({ url: 'https://mcp.example.com/mcp' });
+  });
+
+  // Users wired Composio up by hand long before this field existed. Their
+  // config is not ours to delete.
+  it('leaves a hand-rolled composio server alone when no key is configured', () => {
+    const handRolled = {
+      transport: 'stdio',
+      command: 'composio',
+      args: ['mcp', 'serve'],
+    };
+    const { deps } = fakeDeps(JSON.stringify({ mcp: { servers: { composio: handRolled } } }));
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toEqual(handRolled);
+  });
+
+  it('leaves a differently-authenticated remote composio server alone', () => {
+    const oauthServer = {
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      auth: 'oauth',
+    };
+    const { deps } = fakeDeps(JSON.stringify({ mcp: { servers: { composio: oauthServer } } }));
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toEqual(oauthServer);
+  });
+});
+
 describe('writeMcporterConfig', () => {
   it('adds Linear MCP server when LINEAR_API_KEY is set', () => {
     const { deps, written } = mcporterFakeDeps();

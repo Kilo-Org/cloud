@@ -25,6 +25,8 @@ type RawForm = {
   exampleMinutes: string;
 };
 
+const RATE_WHITESPACE_ERROR = 'Remove leading or trailing spaces.';
+
 function preview(rate: string, seconds: number): string {
   const parsed = createCloudBillingSkuInputSchema.shape.rate_cents_per_unit.safeParse(rate);
   return parsed.success ? `${multiplyCloudBillingRate(parsed.data, seconds)} cents` : '—';
@@ -47,6 +49,8 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
   const rateRef = useRef<HTMLInputElement>(null);
 
   const exampleMinutes = /^\d+$/.test(raw.exampleMinutes) ? Number(raw.exampleMinutes) : 0;
+  const rateError =
+    raw.rate !== raw.rate.trim() ? RATE_WHITESPACE_ERROR : errors.rate_cents_per_unit;
 
   useEffect(() => {
     if (!serverErrors || Object.keys(serverErrors).length === 0) return;
@@ -70,7 +74,7 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
       name: raw.name.trim(),
       description: raw.description.trim() || null,
       unit: 'second',
-      rate_cents_per_unit: raw.rate.trim(),
+      rate_cents_per_unit: raw.rate,
     });
     if (!parsed.success) {
       const next: Partial<Record<keyof CreateCloudBillingSkuInput, string>> = {};
@@ -176,10 +180,8 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
             value={raw.rate}
             disabled={pending}
             placeholder="0.000007"
-            aria-describedby={
-              errors.rate_cents_per_unit ? 'sku-rate-help sku-rate-error' : 'sku-rate-help'
-            }
-            aria-invalid={Boolean(errors.rate_cents_per_unit)}
+            aria-describedby={rateError ? 'sku-rate-help sku-rate-error' : 'sku-rate-help'}
+            aria-invalid={Boolean(rateError)}
             onChange={event => {
               clearError('rate_cents_per_unit');
               setRaw(current => ({ ...current, rate: event.target.value }));
@@ -188,9 +190,9 @@ export default function CloudBillingSkuForm({ pending, serverErrors, onSubmit }:
           <p id="sku-rate-help" className="text-muted-foreground type-label">
             Up to 12 decimal places. This exact rate is immutable after creation.
           </p>
-          {errors.rate_cents_per_unit && (
+          {rateError && (
             <p id="sku-rate-error" className="text-destructive type-label" role="alert">
-              {errors.rate_cents_per_unit}
+              {rateError}
             </p>
           )}
         </div>

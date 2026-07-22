@@ -30,6 +30,8 @@ describe('cloudBillingSkuRateSchema', () => {
     '1000000000000',
     '0.0000000000001',
     ' 0.1 ',
+    ' 0.03342',
+    '0.03342 ',
   ])('rejects non-canonical or out-of-range rate %s', rate => {
     expect(cloudBillingSkuRateSchema.safeParse(rate).success).toBe(false);
   });

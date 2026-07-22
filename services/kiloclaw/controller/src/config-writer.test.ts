@@ -1811,6 +1811,7 @@ describe('Composio Connect MCP server', () => {
     );
 
     expect(composioServer(config)).toEqual({
+      kiloclawManaged: true,
       transport: 'streamable-http',
       url: 'https://connect.composio.dev/mcp',
       headers: { 'x-consumer-api-key': KEY },
@@ -1840,6 +1841,7 @@ describe('Composio Connect MCP server', () => {
       mcp: {
         servers: {
           composio: {
+            kiloclawManaged: true,
             transport: 'streamable-http',
             url: 'https://connect.composio.dev/mcp',
             headers: { 'x-consumer-api-key': 'ck_OLD_KEY_0987654321' },
@@ -1857,6 +1859,57 @@ describe('Composio Connect MCP server', () => {
     expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
   });
 
+  // Taking over an existing definition must not inherit its connection fields.
+  it('replaces a hand-rolled stdio server outright rather than merging into it', () => {
+    const { deps } = fakeDeps(
+      JSON.stringify({
+        mcp: {
+          servers: {
+            composio: { transport: 'stdio', command: 'composio', args: ['mcp', 'serve'] },
+          },
+        },
+      })
+    );
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config)).toEqual({
+      kiloclawManaged: true,
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      headers: { 'x-consumer-api-key': KEY },
+    });
+  });
+
+  // A surviving `auth: 'oauth'` makes OpenClaw drop request headers entirely,
+  // so the pasted key would authenticate nothing and report no error.
+  it('drops a pre-existing oauth mode so the consumer key header is actually sent', () => {
+    const { deps } = fakeDeps(
+      JSON.stringify({
+        mcp: {
+          servers: {
+            composio: {
+              transport: 'streamable-http',
+              url: 'https://connect.composio.dev/mcp',
+              auth: 'oauth',
+            },
+          },
+        },
+      })
+    );
+    const config = generateBaseConfig(
+      { ...minimalEnv(), COMPOSIO_CONSUMER_KEY: KEY },
+      '/tmp/openclaw.json',
+      deps
+    );
+
+    expect(composioServer(config).auth).toBeUndefined();
+    expect(composioServer(config).headers).toEqual({ 'x-consumer-api-key': KEY });
+  });
+
   // openclaw.json lives on the volume, so removing the credential in Settings
   // only revokes access if the server definition goes with it.
   it('removes its own server definition once the key is cleared', () => {
@@ -1864,6 +1917,7 @@ describe('Composio Connect MCP server', () => {
       mcp: {
         servers: {
           composio: {
+            kiloclawManaged: true,
             transport: 'streamable-http',
             url: 'https://connect.composio.dev/mcp',
             headers: { 'x-consumer-api-key': KEY },
@@ -1877,6 +1931,22 @@ describe('Composio Connect MCP server', () => {
 
     expect(composioServer(config)).toBeUndefined();
     expect(config.mcp.servers.other).toEqual({ url: 'https://mcp.example.com/mcp' });
+  });
+
+  // The rollout hazard: before this feature, the only way to use Composio
+  // Connect was to configure it by hand — same URL, same header, no marker.
+  // The first boot after rollout, before the user fills in the new Settings
+  // field, must not delete that working server.
+  it('leaves an unmarked Composio Connect server (same URL and header) alone when no key is set', () => {
+    const handConfigured = {
+      transport: 'streamable-http',
+      url: 'https://connect.composio.dev/mcp',
+      headers: { 'x-consumer-api-key': 'ck_users_own_key_123456' },
+    };
+    const { deps } = fakeDeps(JSON.stringify({ mcp: { servers: { composio: handConfigured } } }));
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(composioServer(config)).toEqual(handConfigured);
   });
 
   // Users wired Composio up by hand long before this field existed. Their

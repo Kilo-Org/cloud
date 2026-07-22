@@ -1049,16 +1049,31 @@ export const COMPOSIO_CONNECT_MCP_URL = 'https://connect.composio.dev/mcp';
 export const COMPOSIO_CONNECT_HEADER = 'x-consumer-api-key';
 /** `mcp.servers` key we manage. */
 export const COMPOSIO_MCP_SERVER_NAME = 'composio';
+/**
+ * Marks the server definition as written by KiloClaw.
+ *
+ * Ownership cannot be inferred from the definition's contents: the URL and
+ * header are Composio's own published values, so a user who wired Composio
+ * Connect up by hand produces a byte-identical server. OpenClaw's
+ * McpServerSchema is `.catchall(z.unknown())`, so this extra key validates
+ * and round-trips untouched.
+ */
+export const COMPOSIO_MANAGED_MARKER = 'kiloclawManaged';
 
 /**
  * Add, update, or remove the Composio Connect MCP server definition.
  *
+ * Setting a consumer key hands the whole definition to KiloClaw: it is
+ * replaced outright rather than merged. Merging would carry foreign fields
+ * from a hand-rolled server into ours, and a surviving `auth: 'oauth'` is
+ * worse than untidy — OpenClaw drops the request headers entirely for OAuth
+ * servers, so the pasted key would be silently ignored.
+ *
  * Removal on an absent key is what makes clearing the credential in Settings
- * actually revoke access, since openclaw.json lives on the volume and survives
- * redeploys. But users configured Composio by hand long before this field
- * existed, so we only remove a definition that matches the one we write —
- * a hand-rolled server on a different URL, transport, or auth mode is left
- * alone rather than silently deleted out from under its owner.
+ * actually revoke access, since openclaw.json lives on the volume and
+ * survives redeploys. Only a definition we marked as ours is removed; a
+ * server the user configured themselves is left alone even when it points at
+ * the same endpoint.
  */
 export function applyComposioConnectConfig(
   config: ConfigObject,
@@ -1070,7 +1085,7 @@ export function applyComposioConnectConfig(
     config.mcp = config.mcp ?? {};
     config.mcp.servers = config.mcp.servers ?? {};
     config.mcp.servers[COMPOSIO_MCP_SERVER_NAME] = {
-      ...(config.mcp.servers[COMPOSIO_MCP_SERVER_NAME] ?? {}),
+      [COMPOSIO_MANAGED_MARKER]: true,
       transport: 'streamable-http',
       url: COMPOSIO_CONNECT_MCP_URL,
       headers: { [COMPOSIO_CONNECT_HEADER]: key },
@@ -1082,13 +1097,7 @@ export function applyComposioConnectConfig(
   const existing = config.mcp?.servers?.[COMPOSIO_MCP_SERVER_NAME];
   if (!existing) return;
 
-  const isOurs =
-    existing.url === COMPOSIO_CONNECT_MCP_URL &&
-    !!existing.headers &&
-    typeof existing.headers === 'object' &&
-    COMPOSIO_CONNECT_HEADER in existing.headers;
-
-  if (!isOurs) {
+  if (existing[COMPOSIO_MANAGED_MARKER] !== true) {
     console.log('Leaving user-managed Composio MCP server untouched');
     return;
   }

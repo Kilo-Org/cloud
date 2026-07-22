@@ -53,9 +53,9 @@ Kilo MUST NOT provision managed Composio identities, create managed Connect Link
 
 ### Instance Configuration
 
-12. When a consumer key is present, the controller MUST define Composio Connect as a remote MCP server in the instance's OpenClaw configuration. It MUST NOT install software, spawn a login subprocess, or perform any network call on the user's behalf to establish the connection.
+12. When a consumer key is present, the controller MUST define Composio Connect as a remote MCP server in the instance's OpenClaw configuration, replacing any existing definition of that server outright. It MUST NOT install software, spawn a login subprocess, or perform any network call on the user's behalf to establish the connection. Carrying fields over from a previous definition risks retaining an authentication mode that suppresses the configured credential.
 13. When no consumer key is present, the controller MUST remove the server definition it manages, because instance configuration persists across redeploys and a stale definition would otherwise outlive the credential's removal from Settings.
-14. Removal MUST be limited to a definition matching the one KiloClaw writes. A Composio server the user configured themselves — a different endpoint, transport, or authentication mode — MUST be left intact.
+14. Removal MUST be limited to a definition KiloClaw explicitly marked as managed when it wrote it. Ownership MUST NOT be inferred from a definition's endpoint, transport, headers, or any other value published by Composio, because a user configuring the same product by hand produces an identical definition. An unmarked Composio server MUST be left intact.
 15. Configuring Composio MUST NOT prevent controller startup. An unreachable or unauthorized endpoint surfaces at tool-call time and MUST NOT be treated as a boot failure.
 16. The instance MAY continue to contain the Composio CLI, and legacy CLI credentials MUST continue to reach the instance so that a sign-in a user performed themselves is not broken by an upgrade.
 17. Agent-facing documentation MUST describe the MCP surface and MUST NOT instruct the agent to sign the CLI in, because doing so cannot change which tools the configured credential reaches.
@@ -77,7 +77,7 @@ Kilo MUST NOT provision managed Composio identities, create managed Connect Link
 
 - Replaced the CLI user API key and organization fields with a single consumer key field.
 - Defined Composio Connect as a remote MCP server written into instance configuration, replacing controller-run CLI sign-in as the supported path.
-- Scoped managed removal so hand-configured Composio servers are not deleted.
+- Scoped managed removal to definitions KiloClaw marks as its own, so hand-configured Composio servers are not deleted.
 - Kept legacy CLI credentials flowing to instances, and the CLI installed, so existing manual sign-ins survive.
 
 ### 2026-05-27 -- Retained manual configuration only

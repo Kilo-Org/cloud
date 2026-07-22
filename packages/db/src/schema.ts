@@ -7592,6 +7592,7 @@ export const cloud_agent_feedback = pgTable(
       onUpdate: 'cascade',
     }),
     cloud_agent_session_id: text(),
+    session_type: text(),
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'set null',
     }),

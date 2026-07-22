@@ -564,6 +564,13 @@ api.get('/sessions/active', async c => {
   return c.json({ sessions }, 200);
 });
 
+api.get('/instances/active', async c => {
+  const kiloUserId = c.get('user_id');
+  const stub = getUserConnectionDO(c.env, { kiloUserId });
+  const { instances } = await stub.getConnectedInstances();
+  return c.json({ instances }, 200);
+});
+
 // CLI connects to /api/user/cli without userId in the path — userId comes from the JWT.
 api.get('/user/cli', async c => {
   if (c.req.header('Upgrade') !== 'websocket') {

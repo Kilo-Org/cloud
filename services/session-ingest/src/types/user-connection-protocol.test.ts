@@ -25,6 +25,83 @@ describe('CLIOutboundMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: 'laptop-1', projectName: 'kilo', version: '0.1.2' },
+      sessions: [
+        {
+          id: 'ses_1',
+          status: 'busy',
+          title: 'Remote session',
+          platform: 'darwin',
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.instance).toEqual({
+        name: 'laptop-1',
+        projectName: 'kilo',
+        version: '0.1.2',
+      });
+      expect(result.data.sessions[0]).toMatchObject({ platform: 'darwin' });
+    }
+  });
+
+  it('parses instance without version (optional field)', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: 'laptop-1', projectName: 'kilo' },
+      sessions: [],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.instance).toEqual({ name: 'laptop-1', projectName: 'kilo' });
+    }
+  });
+
+  it('rejects instance with empty name', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: '', projectName: 'kilo' },
+      sessions: [],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('rejects instance with oversize name', () => {
+    const msg = {
+      type: 'heartbeat',
+      instance: { name: 'x'.repeat(65), projectName: 'kilo' },
+      sessions: [],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('rejects per-session platform that exceeds the 32-char cap', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_1', status: 'busy', title: 't', platform: 'x'.repeat(33) }],
+    };
+    expect(CLIOutboundMessageSchema.safeParse(msg).success).toBe(false);
+  });
+
+  it('parses legacy heartbeat without instance or platform (backward compat regression)', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_1', status: 'busy', title: 'Legacy' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.instance).toBeUndefined();
+      expect(result.data.sessions[0]).not.toHaveProperty('platform');
+    }
+  });
+
   it('parses heartbeat with parentSessionId on sessions', () => {
     const msg = {
       type: 'heartbeat',
@@ -115,6 +192,69 @@ describe('CLIOutboundMessageSchema', () => {
 
   it('rejects unknown type', () => {
     const msg = { type: 'unknown' };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('CLIOutboundMessageSchema capabilities', () => {
+  const baseSession = { id: 'ses_cap_1', status: 'busy', title: 'cap' };
+
+  it('accepts capabilities.attachments: true on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      protocolVersion: '1',
+      capabilities: { attachments: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: true });
+    }
+  });
+
+  it('accepts capabilities.attachments: false on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: false },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: false });
+    }
+  });
+
+  it('accepts an absent capabilities field on a heartbeat (legacy CLI)', () => {
+    const msg = { type: 'heartbeat', sessions: [baseSession] };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toBeUndefined();
+    }
+  });
+
+  it('accepts an empty capabilities object on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: {},
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({});
+    }
+  });
+
+  it('rejects a non-boolean capabilities.attachments value', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: 'yes' },
+      sessions: [baseSession],
+    };
     const result = CLIOutboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(false);
   });

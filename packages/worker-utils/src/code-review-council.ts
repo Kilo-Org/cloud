@@ -583,7 +583,12 @@ export function buildCouncilReviewSection(
       : 'This manual review reports the decision but does not block merge. An automated review with this decision would block merge until the blocking findings are addressed.';
   } else if (result.decision === 'pass') {
     decisionLine = `**Decision: Approved** (${governanceLabel} governance)`;
-    detailLine = 'No specialist raised a blocking finding.';
+    // Under majority governance a pass can still carry blocking votes (they were outvoted); only
+    // claim "no blocking finding" when that is actually true, otherwise state the outvoted count.
+    detailLine =
+      blockVotes > 0
+        ? `${blockVotes} specialist${blockVotes === 1 ? '' : 's'} raised a blocking finding, but the passing votes carried the ${governanceLabel} decision.`
+        : 'No specialist raised a blocking finding.';
   } else {
     // Advisory: the governance label already reads "Advisory (report only)", so don't repeat it
     // in the decision line — the governance-mode line below states it once.
@@ -716,20 +721,30 @@ export type AutomatedReviewPrFacts = {
 };
 
 /**
- * Determines the review type for an AUTOMATED (webhook) run from PR facts.
+ * Determines the review type for an AUTOMATED (webhook) run.
  *
- * STUB (intentional, phased plan): the real standard-vs-council determination is later
- * work — it must be configured/evaluated Kilo-side and resistant to SCM-side abuse (a
- * dev must not be able to force paid council reviews via a PR label). For now this is a
- * safe stub that always returns `'standard'`, so automated reviews behave exactly as
- * they do today. The plumbing (passing full PR facts + `councilAvailable`) is defined
- * here so the logic can be filled in at the webhook step without further wiring.
+ * Plan A: an automated review runs the COUNCIL type only when ALL of these hold, otherwise it
+ * falls back to `'standard'` (fail-safe — a bad or missing council config never blocks reviews):
+ * - `councilEntitled` — the org is council-entitled (enterprise + active entitlement). This is
+ *   the abuse-resistant gate: it is decided Kilo-side, never from an SCM-controlled signal.
+ * - `councilConfigActive` — the org has a configured, active council (>= min specialists).
+ * - `councilEnabledForRepo` — the target repo explicitly opted in
+ *   (`config.council_enabled_repository_ids`). Council is per-repo opt-in, not org-wide.
  *
- * Manual runs never call this — they carry an explicit user-selected review type.
+ * PR-facts based gating (draft/size/labels) is intentionally NOT applied yet: every PR on an
+ * opted-in repo gets a council review. `prFacts` is threaded through so that policy can be added
+ * here later without re-wiring the webhook handlers. Manual runs never call this — they carry an
+ * explicit user-selected review type.
  */
 export function determineAutomatedReviewType(
   _prFacts: AutomatedReviewPrFacts,
-  _options: { councilAvailable: boolean }
+  options: {
+    councilEntitled: boolean;
+    councilConfigActive: boolean;
+    councilEnabledForRepo: boolean;
+  }
 ): CodeReviewType {
-  return 'standard';
+  const useCouncil =
+    options.councilEntitled && options.councilConfigActive && options.councilEnabledForRepo;
+  return useCouncil ? 'council' : 'standard';
 }

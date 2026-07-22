@@ -276,11 +276,22 @@ export async function handleDirectIngestRequest(
     return { status: 404, body: { success: false, error: 'session_not_found' } };
   }
 
+  // §4.10: the agent_notification branch of runDirectPostCommitTasks intentionally
+  // re-throws RPC/transport errors so the dispatch marker stays `pending`. Wrap the
+  // whole post-commit promise so `waitUntil` (or an awaited caller) only sees a logged
+  // failure — ingest itself never fails because of a dispatch error.
   const postCommitPromise = runDirectPostCommitTasks(
     request,
     ingestResult.changes,
     ingestResult.attentionSignals ?? []
-  );
+  ).catch(error => {
+    console.error({
+      event: 'direct_ingest_post_commit_error',
+      ingestRequestId: request.ingestRequestId,
+      sessionId: request.sessionId,
+      error: errorMessage(error),
+    });
+  });
   if (request.executionContext) {
     request.executionContext.waitUntil(postCommitPromise);
   } else {
@@ -371,51 +382,154 @@ async function runDirectPostCommitTasks(
   await runMetadataProjection(request, changes);
   if (attentionSignals.length === 0) return;
 
-  try {
-    const db = getWorkerDb(request.env.HYPERDRIVE.connectionString);
-    const [session] = await db
-      .select({
-        parentSessionId: cli_sessions_v2.parent_session_id,
-      })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, request.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, request.kiloUserId)
-        )
-      )
-      .limit(1);
-    if (!session || !isEligibleForRemoteSessionAttention(session)) return;
-
-    const userConnection = getUserConnectionDO(request.env, { kiloUserId: request.kiloUserId });
-    for (const signal of attentionSignals) {
-      try {
-        await dispatchRemoteSessionAttentionSignal(
-          { kiloUserId: request.kiloUserId, sessionId: request.sessionId, signal },
-          {
-            remoteSessionAttentionPushUserId: request.env.REMOTE_SESSION_ATTENTION_PUSH_USER_ID,
-            hasActiveCliSession: () => userConnection.hasActiveCliSession(request.sessionId),
-            sendPush: pushParams =>
-              request.env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),
-          }
-        );
-      } catch (error) {
-        console.error({
-          event: 'direct_ingest_attention_error',
-          ingestRequestId: request.ingestRequestId,
-          sessionId: request.sessionId,
-          signalId: signal.signalId,
-          error: errorMessage(error),
-        });
-      }
+  // §4.10: reacquire the DO stub at the post-commit dispatch boundary — the ingest-time
+  // stub is no longer in scope. Every agent_notification identity whose dispatch
+  // decision is local (ineligibility, missing session, or RPC returned any result) is
+  // marked here so it does not re-emit on a future replay.
+  const sessionDO = getSessionIngestDO(request.env, {
+    kiloUserId: request.kiloUserId,
+    sessionId: request.sessionId,
+  });
+  const markAgentNotificationDispatched = async (notificationId: string) => {
+    try {
+      await sessionDO.markAgentNotificationDispatched(notificationId);
+    } catch (error) {
+      console.error({
+        event: 'direct_ingest_agent_notification_mark_error',
+        ingestRequestId: request.ingestRequestId,
+        sessionId: request.sessionId,
+        notificationId,
+        error: errorMessage(error),
+      });
     }
-  } catch (error) {
-    console.error({
-      event: 'direct_ingest_attention_error',
-      ingestRequestId: request.ingestRequestId,
-      sessionId: request.sessionId,
-      error: errorMessage(error),
+  };
+
+  // Separate the agent_notification flow so its thrown RPC/transport errors can
+  // propagate to the outer `waitUntil` boundary (the legacy per-signal catch below
+  // would otherwise mask them and leave the marker logically stale).
+  const agentNotificationSignals = attentionSignals.filter(
+    (s): s is Extract<AttentionSignal, { kind: 'agent_notification' }> =>
+      s.kind === 'agent_notification'
+  );
+  const legacySignals = attentionSignals.filter(s => s.kind !== 'agent_notification');
+
+  // Dispatch legacy signals first, independently of agent_notification. The legacy
+  // per-signal catches keep needs_input/completed dispatch best-effort. A thrown
+  // agent_notification RPC must not skip legacy dispatch nor mark the agent identity
+  // dispatched (§4.10).
+  if (legacySignals.length > 0) {
+    try {
+      const db = getWorkerDb(request.env.HYPERDRIVE.connectionString);
+      const [session] = await db
+        .select({
+          parentSessionId: cli_sessions_v2.parent_session_id,
+        })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, request.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, request.kiloUserId)
+          )
+        )
+        .limit(1);
+      if (session && isEligibleForRemoteSessionAttention(session)) {
+        const userConnection = getUserConnectionDO(request.env, { kiloUserId: request.kiloUserId });
+        for (const signal of legacySignals) {
+          try {
+            await dispatchRemoteSessionAttentionSignal(
+              { kiloUserId: request.kiloUserId, sessionId: request.sessionId, signal },
+              {
+                remoteSessionAttentionPushUserId: request.env.REMOTE_SESSION_ATTENTION_PUSH_USER_ID,
+                hasActiveCliSession: () => userConnection.hasActiveCliSession(request.sessionId),
+                sendPush: pushParams =>
+                  request.env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),
+                sendAgentSessionNotification: pushParams =>
+                  request.env.NOTIFICATIONS.sendAgentSessionNotification(pushParams),
+              }
+            );
+          } catch (error) {
+            console.error({
+              event: 'direct_ingest_attention_error',
+              ingestRequestId: request.ingestRequestId,
+              sessionId: request.sessionId,
+              signalId: signal.signalId,
+              error: errorMessage(error),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error({
+        event: 'direct_ingest_attention_error',
+        ingestRequestId: request.ingestRequestId,
+        sessionId: request.sessionId,
+        error: errorMessage(error),
+      });
+    }
+  }
+
+  if (agentNotificationSignals.length > 0) {
+    await dispatchAgentNotificationSignals(
+      request,
+      agentNotificationSignals,
+      markAgentNotificationDispatched
+    );
+  }
+}
+
+/**
+ * §4.10: the agent_notification path is intentionally NOT wrapped in a try/catch around
+ * the RPC call — a thrown RPC/transport error MUST propagate so the caller's dispatch
+ * marker stays `pending` and a later replay can re-emit. The outer `waitUntil` boundary
+ * in `handleDirectIngestRequest` logs the propagated error (non-fatal ingest semantics).
+ *
+ * The session lookup is also intentionally unguarded: a THROWN lookup error propagates
+ * without marking any identity, leaving the marker `pending` for replay. Only a
+ * SUCCESSFUL lookup returning no row or an ineligible (child) session marks the
+ * identities `dispatched`.
+ */
+async function dispatchAgentNotificationSignals(
+  request: DirectIngestRequest,
+  signals: Array<Extract<AttentionSignal, { kind: 'agent_notification' }>>,
+  markAgentNotificationDispatched: (notificationId: string) => Promise<void>
+): Promise<void> {
+  const db = getWorkerDb(request.env.HYPERDRIVE.connectionString);
+  const [session] = await db
+    .select({
+      parentSessionId: cli_sessions_v2.parent_session_id,
+    })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, request.sessionId),
+        eq(cli_sessions_v2.kilo_user_id, request.kiloUserId)
+      )
+    )
+    .limit(1);
+
+  if (!session || !isEligibleForRemoteSessionAttention(session)) {
+    // Confirmed missing or ineligible root: mark the identities so a replay does not re-emit.
+    for (const signal of signals) {
+      await markAgentNotificationDispatched(signal.notificationId);
+    }
+    return;
+  }
+
+  for (const signal of signals) {
+    // No try/catch — a thrown RPC/transport error must propagate to the outer boundary.
+    const result = await request.env.NOTIFICATIONS.sendAgentSessionNotification({
+      userId: request.kiloUserId,
+      cliSessionId: request.sessionId,
+      notificationId: signal.notificationId,
+      message: signal.message,
     });
+    console.log({
+      event: 'agent_push_outcome',
+      cliSessionId: request.sessionId,
+      notificationId: signal.notificationId,
+      outcome: result.dispatched ? 'dispatched' : (result.reason ?? 'failed'),
+    });
+    await markAgentNotificationDispatched(signal.notificationId);
   }
 }
 

@@ -1,5 +1,6 @@
+/* eslint-disable max-lines -- S4 adds the Agent notifications row (query + optimistic mutation + state), pushing this card past the 300-line cap; an extracted subcomponent would re-encode the same hooks. The card stays a single rendered surface. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, MessageSquare, RefreshCw } from 'lucide-react-native';
+import { Bell, Bot, MessageSquare, RefreshCw } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -7,6 +8,12 @@ import { toast } from 'sonner-native';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import {
+  applyAgentPushOptimistic,
+  deriveAgentPushEditable,
+  readAgentPushPreference,
+  rollbackAgentPushOptimistic,
+} from '@/lib/hooks/agent-push-preference';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import * as Notifications from 'expo-notifications';
@@ -87,9 +94,22 @@ export function NotificationsCard() {
   const serverRegistered =
     deviceToken != null && (pushTokens ?? []).some(t => t.token === deviceToken);
 
+  const {
+    data: agentPushPreference,
+    isLoading: agentPushLoading,
+    isError: agentPushError,
+    refetch: refetchAgentPush,
+  } = useQuery({
+    ...trpc.user.getNotificationPreferences.queryOptions(),
+    enabled: isAuthenticated,
+  });
+
+  const agentPushQueryKey = trpc.user.getNotificationPreferences.queryOptions().queryKey;
+
   const invalidateAll = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: pushTokensQueryKey });
-  }, [queryClient, pushTokensQueryKey]);
+    void queryClient.invalidateQueries({ queryKey: agentPushQueryKey });
+  }, [queryClient, pushTokensQueryKey, agentPushQueryKey]);
 
   const registerToken = useMutation(
     trpc.user.registerPushToken.mutationOptions({
@@ -139,6 +159,42 @@ export function NotificationsCard() {
   );
 
   const chatTogglePending = registerToken.isPending || unregisterToken.isPending;
+
+  const setAgentPushPreference = useMutation(
+    trpc.user.setNotificationPreferences.mutationOptions({
+      onMutate: async ({ agentPushEnabled }) => {
+        const { previous } = await applyAgentPushOptimistic({
+          queryClient,
+          queryKey: agentPushQueryKey,
+          next: agentPushEnabled,
+        });
+        return { previous };
+      },
+      onError: (error, _vars, context) => {
+        rollbackAgentPushOptimistic({
+          queryClient,
+          queryKey: agentPushQueryKey,
+          previous: context?.previous,
+        });
+        toast.error(error.message);
+      },
+      onSettled: () => {
+        void queryClient.invalidateQueries({ queryKey: agentPushQueryKey });
+      },
+    })
+  );
+
+  const agentPushTogglePending = setAgentPushPreference.isPending;
+  const agentPushEditable = deriveAgentPushEditable({
+    hasData: agentPushPreference != null,
+    isPending: agentPushTogglePending,
+  });
+  // Reflects the optimistic value while a mutation is in flight; falls back to
+  // the default-ON semantics (no row ⇒ enabled) when the cache is empty.
+  const agentPushDisplayedValue = agentPushTogglePending
+    ? readAgentPushPreference(queryClient, agentPushQueryKey)
+    : (agentPushPreference?.agentPushEnabled ??
+      readAgentPushPreference(queryClient, agentPushQueryKey));
 
   // Re-check permission on foreground resume
   const { isActive } = useAppLifecycle();
@@ -281,6 +337,46 @@ export function NotificationsCard() {
                   return;
                 }
                 void handleToggleChatMessages(value);
+              }}
+            />
+          </>
+        )}
+      </View>
+
+      {/* Agent notifications — per-user preference; editable regardless of
+          this device's OS permission or push-token registration (the card's
+          existing rows above already convey those states). */}
+      <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+        <Bot size={18} color={colors.secondaryForeground} />
+        <View className="flex-1">
+          <Text className="text-sm font-medium">Agent notifications</Text>
+          <Text variant="muted" className="mt-0.5 text-xs">
+            Pings and milestone alerts your agent sends mid-run
+          </Text>
+        </View>
+        {agentPushLoading && <Skeleton className="h-8 w-12 rounded-full" />}
+        {!agentPushLoading && agentPushError && (
+          <InlineRetry
+            label="Retry loading agent notification preference"
+            color={colors.destructive}
+            onPress={() => void refetchAgentPush()}
+          />
+        )}
+        {!agentPushLoading && !agentPushError && (
+          <>
+            {agentPushTogglePending && (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            )}
+            <Switch
+              value={agentPushDisplayedValue}
+              disabled={!agentPushEditable}
+              accessibilityLabel="Agent notifications"
+              accessibilityState={{ disabled: !agentPushEditable, busy: agentPushTogglePending }}
+              onValueChange={value => {
+                if (!agentPushEditable) {
+                  return;
+                }
+                setAgentPushPreference.mutate({ agentPushEnabled: value });
               }}
             />
           </>

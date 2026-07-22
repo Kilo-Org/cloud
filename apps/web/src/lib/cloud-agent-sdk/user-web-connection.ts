@@ -36,6 +36,24 @@ class UserWebCommandError extends Error {
   }
 }
 
+/**
+ * Error class used to wrap a *delivered* (non-structured, bare-string) command
+ * error response. The message is preserved verbatim so generic `catch (e)`
+ * consumers see the same string the relay/CLI emitted; the new class only
+ * lets downstream callers distinguish a delivered error from a transport-level
+ * failure (timeout, connection destroyed, socket gone — those stay plain
+ * `Error`).
+ *
+ * Structured `UserWebCommandError` responses (relay envelopes with a `.code`)
+ * are NOT wrapped — they already carry enough info.
+ */
+class CommandDeliveredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CommandDeliveredError';
+  }
+}
+
 type UserWebConnectionConfig = {
   websocketUrl: string;
   getAuthToken: () => string | Promise<string>;
@@ -51,13 +69,26 @@ type SendCommandToConnectionInput = {
 };
 
 type UserWebConnection = {
-  /** New connection owners use this lease; optional on injected legacy clients until they migrate. */
-  retain?: () => () => void;
+  retain: () => () => void;
   /** @deprecated Retain the connection explicitly with retain() instead. */
   connect: () => void;
   /** @deprecated Release the function returned by retain() instead. */
   disconnect: () => void;
   destroy: () => void;
+  /**
+   * Returns the current high-level transport readiness. `true` once the base
+   * connection has reported its first successful message after open (or
+   * re-open); `false` otherwise — including during reconnect attempts and
+   * after a final release or `destroy()`.
+   */
+  isConnected: () => boolean;
+  /**
+   * Subscribes to transport-readiness transitions. The listener fires only
+   * when the boolean value actually changes. The returned function
+   * unsubscribes. Safe to call on a destroyed connection: the listener is
+   * never invoked and the unsubscribe is a no-op.
+   */
+  onConnectionChange: (listener: (connected: boolean) => void) => () => void;
   subscribeToCliSession: (sessionId: string) => () => void;
   sendCommand: (
     sessionId: string,
@@ -82,8 +113,20 @@ type UserWebConnection = {
   ) => () => void;
 };
 
+/**
+ * Resolve a delivered command-error payload into an `Error` subclass.
+ *
+ * - A bare-string delivered error is wrapped in `CommandDeliveredError` so
+ *   downstream consumers can distinguish it from transport-level failures
+ *   (which stay plain `Error`).
+ * - A structured relay envelope that matches `userWebCommandErrorDataSchema`
+ *   becomes a `UserWebCommandError` (already has a `.code`).
+ * - A malformed structured payload collapses to a plain `Error('Command failed')`
+ *   — the relay envelope wasn't trustworthy so this is not a real "delivered"
+ *   message.
+ */
 function parseCommandError(error: unknown): Error {
-  if (typeof error === 'string') return new Error(error);
+  if (typeof error === 'string') return new CommandDeliveredError(error);
 
   const parsed = userWebCommandErrorDataSchema.safeParse(error);
   if (parsed.success) return new UserWebCommandError(parsed.data);
@@ -129,6 +172,17 @@ function createUserWebConnection(
     reject: (reason: Error) => void;
     timer: ReturnType<typeof setTimeout>;
   }>();
+  // Wrapper-owned transport-readiness state. The base connection deliberately
+  // emits no callback on `destroy()`, so transitions around full release /
+  // destroy are driven here rather than from base-connection callbacks.
+  let connected = false;
+  const connectionChangeListeners = new Set<(connected: boolean) => void>();
+
+  function setConnected(value: boolean): void {
+    if (connected === value) return;
+    connected = value;
+    for (const listener of connectionChangeListeners) listener(value);
+  }
 
   function hasLifetime(): boolean {
     return retainCount > 0;
@@ -387,8 +441,11 @@ function createUserWebConnection(
         for (const sessionId of subscriptionCounts.keys()) sendSubscribe(sessionId);
         startLiveness();
       },
-      onConnected: () => {},
+      onConnected: () => {
+        setConnected(true);
+      },
       onReconnected: () => {
+        setConnected(true);
         config.onReconnect?.();
         for (const listener of reconnectListeners) listener();
       },
@@ -398,9 +455,11 @@ function createUserWebConnection(
       onDisconnected: () => {
         currentWs = null;
         clearLiveness();
+        setConnected(false);
       },
       onUnexpectedDisconnect: () => {
         rejectPending('Connection lost during reconnect');
+        setConnected(false);
       },
       onError: config.onError,
       isAuthFailure: event => event.code === 4001 || event.code === 1008,
@@ -461,6 +520,10 @@ function createUserWebConnection(
     rejectPending(message);
     baseConnection?.destroy();
     baseConnection = null;
+    // `base-connection.destroy()` deliberately emits no `onDisconnected`
+    // callback, so the wrapper must drive the disconnected transition itself
+    // before the next `startConnection()` reopens from a false baseline.
+    setConnected(false);
   }
 
   function connect(): void {
@@ -560,6 +623,15 @@ function createUserWebConnection(
       systemListeners.clear();
       reconnectListeners.clear();
       sessionListeners.clear();
+      connectionChangeListeners.clear();
+    },
+    isConnected: () => connected,
+    onConnectionChange(listener) {
+      if (destroyed) return () => {};
+      connectionChangeListeners.add(listener);
+      return () => {
+        connectionChangeListeners.delete(listener);
+      };
     },
     subscribeToCliSession(sessionId) {
       if (destroyed) return () => {};
@@ -628,7 +700,7 @@ function createUserWebConnection(
   };
 }
 
-export { createUserWebConnection, UserWebCommandError };
+export { createUserWebConnection, CommandDeliveredError, UserWebCommandError };
 export type {
   SendCommandToConnectionInput,
   UserWebConnection,

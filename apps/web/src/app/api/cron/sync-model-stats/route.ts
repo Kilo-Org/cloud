@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import {
+  buildScheduledJobFailureEvent,
+  buildScheduledJobSuccessEvent,
+  createScheduledJobRun,
+  emitScheduledJobEvent,
+} from '@kilocode/worker-utils/scheduled-job-observability';
+import {
   getRawOpenRouterModels,
   getEnhancedOpenRouterModels,
 } from '@/lib/ai-gateway/providers/openrouter';
@@ -11,9 +17,6 @@ import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { CRON_SECRET } from '@/lib/config.server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
-
-const BETTERSTACK_HEARTBEAT_URL =
-  'https://uptime.betterstack.com/api/v1/heartbeat/1zuL4cAH8Ui6JF9j8M3L8oAD';
 
 /**
  * Vercel Cron Job: Sync Model Stats
@@ -28,12 +31,17 @@ const BETTERSTACK_HEARTBEAT_URL =
  * Note: Models are never automatically deactivated - only users can deactivate models.
  */
 export async function GET(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const authHeader = request.headers.get('authorization');
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
+  const run = createScheduledJobRun({
+    jobName: 'web.sync_model_stats',
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+  });
+
+  try {
     console.log('[sync-model-stats] Starting model stats sync...');
     const startTime = Date.now();
 
@@ -92,14 +100,24 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    console.log('[sync-model-stats] Sync completed:', summary);
-
-    // Send heartbeat to BetterStack on success
-    await fetch(BETTERSTACK_HEARTBEAT_URL);
+    console.log('[sync-model-stats] Sync completed', {
+      duration,
+      newModelCount: newModels.length,
+      totalProcessed,
+      updatedModelCount: updatedModels.length,
+    });
+    emitScheduledJobEvent(
+      buildScheduledJobSuccessEvent(run, {
+        preferred_model_count: preferredModelData.length,
+        total_processed: totalProcessed,
+        new_model_count: newModels.length,
+        updated_model_count: updatedModels.length,
+      })
+    );
 
     return NextResponse.json(summary);
   } catch (error) {
-    console.error('[sync-model-stats] Error syncing model stats:', error);
+    console.error('[sync-model-stats] Error syncing model stats');
     captureException(error, {
       tags: { endpoint: 'cron/sync-model-stats' },
       extra: {
@@ -107,8 +125,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Send failure heartbeat to BetterStack
-    await fetch(`${BETTERSTACK_HEARTBEAT_URL}/fail`);
+    emitScheduledJobEvent(buildScheduledJobFailureEvent(run, error));
 
     return NextResponse.json(
       {

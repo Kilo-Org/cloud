@@ -1,5 +1,5 @@
 import type { R2Client } from '@kilocode/worker-utils';
-import type { Attachments } from '../router/schemas.js';
+import { CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS, type Attachments } from '../router/schemas.js';
 
 export type AttachmentService = 'app-builder' | 'cloud-agent';
 
@@ -11,8 +11,16 @@ export type PresignedAttachment = {
 
 const MESSAGE_UUID_REGEX =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const ATTACHMENT_FILENAME_REGEX =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/;
+
+/**
+ * Relaxed post-S2 filename regex: UUID + any 1-16 character lowercase
+ * alphanumeric extension. The deny-list is enforced as a second pass in
+ * `validateAttachments`.
+ */
+const ATTACHMENT_RELAXED_FILENAME_REGEX =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.[a-z0-9]{1,16}$/;
+
+const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
 export function deriveAttachmentService(createdOnPlatform?: string): AttachmentService {
   return createdOnPlatform === 'app-builder' ? 'app-builder' : 'cloud-agent';
@@ -32,8 +40,12 @@ function validateAttachments(attachments: Attachments): void {
   }
 
   for (const filename of attachments.files) {
-    if (!ATTACHMENT_FILENAME_REGEX.test(filename)) {
+    if (!ATTACHMENT_RELAXED_FILENAME_REGEX.test(filename)) {
       throw new Error('Invalid attachment filename');
+    }
+    const suffix = filename.slice(filename.lastIndexOf('.') + 1).toLowerCase();
+    if (DENIED_EXTENSION_SET.has(suffix)) {
+      throw new Error(`Attachment extension "${suffix}" is not allowed`);
     }
   }
 }

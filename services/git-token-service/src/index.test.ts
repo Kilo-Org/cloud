@@ -20,6 +20,7 @@ const serviceMocks = vi.hoisted(() => ({
   listBitbucketRepositories: vi.fn(),
   resolveBitbucketToken: vi.fn(),
   runGitLabCredentialAudit: vi.fn(),
+  runGitLabCredentialRepair: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -104,6 +105,10 @@ vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
 
 vi.mock('./gitlab-credential-audit-handler.js', () => ({
   runGitLabCredentialAudit: serviceMocks.runGitLabCredentialAudit,
+}));
+
+vi.mock('./gitlab-credential-repair-handler.js', () => ({
+  runGitLabCredentialRepair: serviceMocks.runGitLabCredentialRepair,
 }));
 
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
@@ -462,6 +467,103 @@ describe('GitLab credential audit HTTP authorization', () => {
     expect(response.status).toBe(400);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(serviceMocks.runGitLabCredentialAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitLab credential repair HTTP authorization', () => {
+  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
+  const path = 'https://git-token-service.test/internal/gitlab/credential-repair';
+
+  beforeEach(() => {
+    serviceMocks.runGitLabCredentialRepair.mockReset().mockResolvedValue({
+      authorized: true,
+      result: {
+        counts: {
+          candidates: 1,
+          repaired: 1,
+          alreadyHealthy: 0,
+          profileFailures: 0,
+          configurationFailures: 0,
+          parseFailures: 0,
+          unknownKeyFailures: 0,
+          unrepairableFailures: 0,
+          writeConflicts: 0,
+        },
+        failures: {
+          profile: [],
+          configuration: [],
+          parse: [],
+          unknownKey: [],
+          unrepairable: [],
+          writeConflict: [],
+        },
+        nextCursor: null,
+      },
+    });
+  });
+
+  async function authorization(audience?: string) {
+    return signKiloToken({
+      userId: 'admin-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      ...(audience ? { audience } : {}),
+    });
+  }
+
+  it('requires its dedicated audience and returns only the no-store repair result', async () => {
+    const { token } = await authorization('git-token-service:gitlab-credential-repair');
+    const response = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ limit: 10 }),
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const result = await response.json();
+    expect(result).toEqual(expect.objectContaining({ nextCursor: null }));
+    expect(JSON.stringify(result)).not.toMatch(/plaintext|ciphertext|token_encrypted/i);
+    expect(serviceMocks.runGitLabCredentialRepair).toHaveBeenCalledWith(
+      expect.anything(),
+      'admin-1',
+      { limit: 10 }
+    );
+  });
+
+  it('rejects audit-audience tokens and invalid requests before repair runs', async () => {
+    const { token: wrongAudience } = await authorization(
+      'git-token-service:gitlab-credential-audit'
+    );
+    const unauthorized = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${wrongAudience}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+    expect(unauthorized.status).toBe(401);
+
+    const { token } = await authorization('git-token-service:gitlab-credential-repair');
+    const invalid = await gitTokenServiceWorker.fetch(
+      new Request(path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 101 }),
+      }),
+      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
+    );
+    expect(invalid.status).toBe(400);
+    expect(invalid.headers.get('Cache-Control')).toBe('no-store');
+    expect(serviceMocks.runGitLabCredentialRepair).not.toHaveBeenCalled();
   });
 });
 

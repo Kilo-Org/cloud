@@ -8,6 +8,10 @@ declare global {
     EVENT_SERVICE: Fetcher & {
       isUserInContext(userId: string, context: string): Promise<boolean>;
     };
+    // Local dev / E2E push sink mode. Absent from `wrangler.jsonc` (which
+    // is single-config production); supplied via `.dev.vars` by
+    // `pnpm dev:env`. The runtime check is string equality on `'log'`.
+    PUSH_SINK_MODE?: string;
   }
 }
 

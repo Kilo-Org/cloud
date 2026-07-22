@@ -56,6 +56,7 @@ import {
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
+  user_notification_preferences,
   security_advisor_scans,
   credit_campaigns,
   agent_environment_profiles,
@@ -3094,6 +3095,22 @@ describe('User', () => {
         .from(user_push_tokens)
         .where(eq(user_push_tokens.user_id, user.id));
       expect(tokens).toHaveLength(0);
+    });
+
+    it('should delete user_notification_preferences', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_notification_preferences).values({
+        user_id: user.id,
+        agent_push_enabled: false,
+      });
+
+      await softDeleteUser(user.id);
+
+      const rows = await db
+        .select()
+        .from(user_notification_preferences)
+        .where(eq(user_notification_preferences.user_id, user.id));
+      expect(rows).toHaveLength(0);
     });
 
     it('should delete Coding Plan availability notification intents', async () => {

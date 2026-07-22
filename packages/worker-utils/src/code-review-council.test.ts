@@ -551,12 +551,34 @@ describe('presets', () => {
 });
 
 describe('determineAutomatedReviewType', () => {
-  it('is a safe stub that always returns standard', () => {
-    expect(determineAutomatedReviewType({}, { councilAvailable: true })).toBe('standard');
+  const ALL_ON = {
+    councilEntitled: true,
+    councilConfigActive: true,
+    councilEnabledForRepo: true,
+  };
+
+  it('returns council only when entitled AND config active AND repo opted in', () => {
+    expect(determineAutomatedReviewType({}, ALL_ON)).toBe('council');
+  });
+
+  it('falls back to standard when any condition is missing (fail-safe)', () => {
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilEntitled: false })).toBe(
+      'standard'
+    );
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilConfigActive: false })).toBe(
+      'standard'
+    );
+    expect(determineAutomatedReviewType({}, { ...ALL_ON, councilEnabledForRepo: false })).toBe(
+      'standard'
+    );
+  });
+
+  it('does not use SCM-controlled PR facts (a "council" label cannot force council)', () => {
+    // Entitlement/config/opt-in are Kilo-side; a dev-controlled label must not upgrade the type.
     expect(
       determineAutomatedReviewType(
         { isDraft: false, labels: ['council'], changedFileCount: 40 },
-        { councilAvailable: true }
+        { councilEntitled: false, councilConfigActive: false, councilEnabledForRepo: false }
       )
     ).toBe('standard');
   });
@@ -620,6 +642,20 @@ describe('buildCouncilReviewSection', () => {
     expect(section).toContain('**Decision: Approved** (Majority governance)');
     expect(section).toContain('1 pass, 1 no result');
     expect(section).toContain('No specialist raised a blocking finding');
+  });
+
+  it('states the outvoted block count on a majority pass that still had blocking votes', () => {
+    const section = buildCouncilReviewSection(
+      councilResult('pass', ['block', 'pass', 'pass', 'pass'], 'majority'),
+      { gates: true }
+    );
+    expect(section).toContain('**Decision: Approved** (Majority governance)');
+    expect(section).toContain('1 block, 3 pass');
+    // The contradictory "No specialist raised a blocking finding" must not appear here.
+    expect(section).not.toContain('No specialist raised a blocking finding');
+    expect(section).toContain(
+      '1 specialist raised a blocking finding, but the passing votes carried the Majority decision.'
+    );
   });
 
   it('renders an advisory section with governance info but no merge decision', () => {

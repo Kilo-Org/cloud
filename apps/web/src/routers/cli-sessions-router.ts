@@ -30,6 +30,7 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
+import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
 export const BLOB_TYPES = [
   'api_conversation_history',
@@ -37,20 +38,6 @@ export const BLOB_TYPES = [
   'ui_messages',
   'git_state',
 ] as const satisfies readonly FileName[];
-
-/** Known platform values that have dedicated filters. "Other" is everything else. */
-export const KNOWN_PLATFORMS = [
-  'cloud-agent',
-  'cloud-agent-web',
-  'cli',
-  'vscode',
-  'agent-manager',
-  'app-builder',
-  'slack',
-  'github',
-  'linear',
-  'gastown',
-] as const;
 
 const PAGE_SIZE = 10;
 

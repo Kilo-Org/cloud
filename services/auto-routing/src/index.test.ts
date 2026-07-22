@@ -582,6 +582,7 @@ describe('auto routing worker', () => {
         tableVersion: 'bench-run-1',
         reasoningEffort: null,
         sticky: false,
+        switchReason: null,
       },
       classifierResult: {
         classification: mockClassification,
@@ -626,6 +627,12 @@ describe('auto routing worker', () => {
       uaPrefix: 'Kilo-Code/4.106.0',
       bodyBytes: 2048,
       sticky: false,
+      incumbentModel: null,
+      switched: false,
+      switchReason: null,
+      routeChanged: null,
+      contextTokens: null,
+      sampled: true,
     });
     // The raw user id (which embeds the client IP for anonymous users) must
     // never reach persisted logs.
@@ -947,7 +954,10 @@ describe('auto routing worker', () => {
     // The classification is not re-cached; only the served model is
     // remembered for session stickiness.
     expect(cachePutEntry).toHaveBeenCalledTimes(1);
-    expect(cachePutEntry).toHaveBeenCalledWith('sticky', { model: expect.any(String) });
+    expect(cachePutEntry).toHaveBeenCalledWith('sticky', {
+      model: expect.any(String),
+      routeKey: 'implementation/feature_development',
+    });
     expect(writeDataPoint).toHaveBeenCalledWith(
       expect.objectContaining({
         doubles: [0, 0, mockClassification.confidence, 1],
@@ -1010,6 +1020,59 @@ describe('auto routing worker', () => {
         subtaskType: 'feature_development',
         sticky: true,
       },
+    });
+  });
+
+  it('always logs decisions that switch away from the incumbent, marking them unsampled', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // 0.99 >= the 0.01 default sample rate: a routine decision would be
+    // dropped, but a real switch must always be observed.
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    // Incumbent off the current route: the decision switches away from it.
+    cacheGetEntry.mockImplementation(async (key: string) =>
+      key === 'sticky' ? { model: 'gone/model', routeKey: 'planning_design/system_design' } : null
+    );
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = logSpy.mock.calls[0] ?? [];
+    expect(JSON.parse(String(logMessage))).toMatchObject({
+      event: 'auto_routing_decision',
+      incumbentModel: 'gone/model',
+      switched: true,
+      switchReason: 'threshold',
+      routeChanged: true,
+      sampled: false,
+    });
+  });
+
+  it('drops routine non-switch decisions outside the sample rate', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it('leaves routeChanged unknown for sticky entries written before routeKey existed', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    cacheGetEntry.mockImplementation(async (key: string) =>
+      key === 'sticky' ? { model: 'gone/model' } : null
+    );
+
+    const response = await decideRequest(mirrorPayload());
+
+    expect(response.status).toBe(200);
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const [logMessage] = logSpy.mock.calls[0] ?? [];
+    expect(JSON.parse(String(logMessage))).toMatchObject({
+      switched: true,
+      routeChanged: null,
     });
   });
 

@@ -1,13 +1,21 @@
 import { z } from 'zod';
 
-export type AttentionSignalKind = 'completed' | 'needs_input';
+export type AttentionSignalKind = 'completed' | 'needs_input' | 'agent_notification';
 
-export type AttentionSignal = {
-  signalId: string;
-  kind: AttentionSignalKind;
-  /** Push-ready excerpt: whitespace-collapsed and capped to fit a notification body. */
-  messageExcerpt: string;
-};
+export type AttentionSignal =
+  | {
+      signalId: string;
+      kind: 'completed' | 'needs_input';
+      /** Push-ready excerpt: whitespace-collapsed and capped to fit a notification body. */
+      messageExcerpt: string;
+    }
+  | {
+      kind: 'agent_notification';
+      /** Stable id from the ingested `agent_notification` item's `data.id`. */
+      notificationId: string;
+      /** Full message body (1–500 chars) — not the 100-char `messageExcerpt` cap. */
+      message: string;
+    };
 
 const NEEDS_INPUT_STATUSES = new Set(['question', 'permission']);
 

@@ -92,6 +92,7 @@ describe('computeDecision', () => {
       tableVersion: 'run-1',
       reasoningEffort: null,
       sticky: false,
+      switchReason: null,
     });
   });
   it('defaults to the best accuracy per dollar candidate', () => {
@@ -108,11 +109,12 @@ describe('computeDecision', () => {
       tableVersion: 'run-1',
       reasoningEffort: null,
       sticky: false,
+      switchReason: null,
     });
   });
   it('does not keep a lower-accuracy incumbent in best accuracy mode', () => {
     const decision = computeDecision(classification, table, 'mid/chat', new Set(), 'best_accuracy');
-    expect(decision).toMatchObject({ model: 'pricey/chat', sticky: false });
+    expect(decision).toMatchObject({ model: 'pricey/chat', sticky: false, switchReason: 'cost' });
   });
   it('keeps a best-accuracy incumbent when the fresh pick is less than five points better', () => {
     const nearTieTable: RoutingTable = {
@@ -199,6 +201,7 @@ describe('computeDecision', () => {
       tableVersion: 'run-1',
       reasoningEffort: 'medium',
       sticky: false,
+      switchReason: null,
     });
   });
   it('skips virtual auto-model candidates', () => {
@@ -251,6 +254,7 @@ describe('computeDecision', () => {
         // The incumbent's benchmarked effort, not the fresh pick's.
         reasoningEffort: 'medium',
         sticky: true,
+        switchReason: null,
       });
     });
     it('keeps the incumbent at the exact switch-cost boundary', () => {
@@ -280,23 +284,35 @@ describe('computeDecision', () => {
     it('switches when the fresh pick is cheaper by more than the factor', () => {
       // pricey/chat at 0.02 vs fresh 0.002 * 3 = 0.006: switch pays off.
       const decision = computeDecision(classification, table, 'pricey/chat');
-      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
+      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false, switchReason: 'cost' });
     });
     it('does not keep a denied incumbent', () => {
       const decision = computeDecision(classification, table, 'mid/chat', new Set(['mid/chat']));
-      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
+      expect(decision).toMatchObject({
+        model: 'cheap/chat',
+        sticky: false,
+        switchReason: 'threshold',
+      });
     });
     it('switches when the incumbent no longer meets the route threshold', () => {
       const decision = computeDecision(classification, table, 'weak/chat');
-      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
+      expect(decision).toMatchObject({
+        model: 'cheap/chat',
+        sticky: false,
+        switchReason: 'threshold',
+      });
     });
     it('serves the fresh pick when the incumbent is not in the route', () => {
       const decision = computeDecision(classification, table, 'gone/model');
-      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
+      expect(decision).toMatchObject({
+        model: 'cheap/chat',
+        sticky: false,
+        switchReason: 'threshold',
+      });
     });
     it('is not sticky when the incumbent is the fresh pick', () => {
       const decision = computeDecision(classification, table, 'cheap/chat');
-      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false });
+      expect(decision).toMatchObject({ model: 'cheap/chat', sticky: false, switchReason: null });
     });
   });
 
@@ -444,7 +460,11 @@ describe('computeDecision', () => {
           capabilityMap: caps,
         }
       );
-      expect(decision).toMatchObject({ model: 'vision/chat', sticky: false });
+      expect(decision).toMatchObject({
+        model: 'vision/chat',
+        sticky: false,
+        switchReason: 'capability',
+      });
     });
 
     it('a fitting lower-ranked candidate wins over a provably-too-small top candidate', () => {
@@ -531,7 +551,11 @@ describe('computeDecision', () => {
           capabilityMap: caps,
         }
       );
-      expect(decision).toMatchObject({ model: 'huge/chat', sticky: false });
+      expect(decision).toMatchObject({
+        model: 'huge/chat',
+        sticky: false,
+        switchReason: 'capability',
+      });
     });
 
     it('falls back to the max-known-context candidate when every known context is too small', () => {

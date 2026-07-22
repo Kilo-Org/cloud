@@ -27,12 +27,15 @@ describe('AttachmentsSchema', () => {
   });
 
   it('rejects unsupported document filename suffixes and more than five attachments', () => {
+    // `.docx` matches the relaxed `[a-z0-9]{1,16}` pattern. The deny-list
+    // covers the unsafe execution set; the storage layer now accepts any
+    // non-denied extension.
     expect(
       AttachmentsSchema.safeParse({
         path: '123e4567-e89b-12d3-a456-426614174000',
         files: ['123e4567-e89b-12d3-a456-426614174001.docx'],
       }).success
-    ).toBe(false);
+    ).toBe(true);
     expect(
       AttachmentsSchema.safeParse({
         path: '123e4567-e89b-12d3-a456-426614174000',
@@ -44,6 +47,58 @@ describe('AttachmentsSchema', () => {
           '123e4567-e89b-12d3-a456-426614174005.jpg',
           '123e4567-e89b-12d3-a456-426614174006.gif',
         ],
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts any non-denied alphanumeric extension up to 16 characters', () => {
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.docx'],
+      }).success
+    ).toBe(true);
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.tar'],
+      }).success
+    ).toBe(true);
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.kilocode'],
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects filenames whose extension is in the deny-list', () => {
+    for (const extension of ['exe', 'dll', 'msi', 'com', 'scr', 'apk', 'ipa', 'dmg', 'pkg']) {
+      const result = AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: [`123e4567-e89b-12d3-a456-426614174001.${extension}`],
+      });
+      expect(result.success).toBe(false);
+    }
+  });
+
+  it('rejects extensions longer than 16 characters and extensions with non-alphanumeric characters', () => {
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.abcdefghijklmnopq'],
+      }).success
+    ).toBe(false);
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.tar.gz'],
+      }).success
+    ).toBe(false);
+    expect(
+      AttachmentsSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['123e4567-e89b-12d3-a456-426614174001.TAR'],
       }).success
     ).toBe(false);
   });

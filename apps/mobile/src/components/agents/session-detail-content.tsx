@@ -27,6 +27,11 @@ import {
   SessionContextMetrics,
 } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
+import {
+  buildRemoteAttachmentPartsWithRetryableFeedback,
+  resolveSendAttachmentKind,
+} from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
@@ -58,6 +63,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import {
   type AnalyticsSurface,
@@ -338,10 +344,17 @@ export function SessionDetailContent({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: SessionTranscriptItem }) =>
-      item.type === 'preparation' ? (
-        <PreparationGroup attempt={item.attempt} />
-      ) : (
+    ({ item }: { item: SessionTranscriptItem }) => {
+      if (item.type === 'preparation') {
+        return <PreparationGroup attempt={item.attempt} />;
+      }
+      // Look up delivery state by message id. The map is keyed by user-message
+      // id and may briefly contain an entry before the bubble has rendered
+      // (ServiceEvents can be applied while chat events are still buffered),
+      // so a plain lookup is enough — no render-order guard.
+      const deliveryState =
+        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+      return (
         <MessageBubble
           message={item.message}
           isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
@@ -349,14 +362,17 @@ export function SessionDetailContent({
           getChildMessages={getChildMessages}
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
+          deliveryState={deliveryState}
         />
-      ),
+      );
+    },
     [
       lastAssistantMessageId,
       isStreaming,
       getChildMessages,
       reasoningDefaultExpanded,
       handleOpenChildSession,
+      pendingMessages,
     ]
   );
 
@@ -450,10 +466,41 @@ export function SessionDetailContent({
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
-    async (text: string, attachments?: AgentAttachmentWire) => {
+    async (
+      text: string,
+      attachments?: AgentAttachmentWire,
+      submission?: AgentAttachmentSubmissionPayload
+    ) => {
       if (requiresModel && !currentModel) {
         toast.error('Select a model before sending');
         return;
+      }
+      // Pick the wire shape via the same pure helper the unit test covers:
+      //   - cloud-agent → unchanged `{path, files}` (S3a)
+      //   - remote + supportsAttachments → materialize presigned GETs and
+      //     forward as `attachmentParts` (S3b)
+      //   - everything else → no attachment field on the wire
+      const kind = resolveSendAttachmentKind(
+        activeSessionType,
+        supportsAttachments,
+        attachments !== undefined
+      );
+      let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
+        undefined;
+      if (kind === 'remote-capable' && submission) {
+        const result = await buildRemoteAttachmentPartsWithRetryableFeedback(
+          submission,
+          buildRemoteAttachmentParts
+        );
+        if (!result.ok) {
+          // Retryable presign failure: the manager never reached send(), so
+          // its onSendFailed toast does not fire. Surface the retryable message
+          // through the same toast channel and throw so the composer keeps the
+          // draft/attachments for a retry.
+          toast.error(result.message);
+          throw new Error(result.message);
+        }
+        attachmentParts = result.parts;
       }
       // manager.send() reports failures via its own return value (and toasts
       // through the manager's onSendFailed hook) rather than rejecting — it
@@ -468,7 +515,8 @@ export function SessionDetailContent({
           model: currentModel,
           variant: currentVariant || undefined,
         },
-        ...(supportsAttachments && attachments ? { attachments } : {}),
+        ...(kind === 'cloud' && attachments ? { attachments } : {}),
+        ...(kind === 'remote-capable' && attachmentParts ? { attachmentParts } : {}),
       });
       if (!sent) {
         throw new Error('Failed to send message');
@@ -481,6 +529,7 @@ export function SessionDetailContent({
       currentModel,
       currentVariant,
       requiresModel,
+      activeSessionType,
       supportsAttachments,
       analyticsSurface,
     ]

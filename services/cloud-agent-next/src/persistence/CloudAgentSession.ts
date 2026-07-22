@@ -66,6 +66,8 @@ import {
   type IngestHandler,
   type IngestDOContext,
 } from '../websocket/ingest.js';
+import type { AttentionEvent } from '../websocket/ingest-attention-classifier.js';
+import { dispatchCloudAgentAttentionPush } from '../websocket/ingest-attention-classifier.js';
 import type { StoredEvent } from '../websocket/types.js';
 import type { WrapperCommand, CloudStatusData } from '../shared/protocol.js';
 import {
@@ -671,6 +673,43 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.messageSettlementOutbox;
   }
 
+  /**
+   * Best-effort push for a root-session `question.asked`/`permission.asked`
+   * event. Mirrors the terminal push gates in
+   * `MessageSettlementOutbox.settlePushNotificationEffect`:
+   *   - metadata present,
+   *   - source event is from the root kilocode session (not a child),
+   *   - the run was created on the cloud-agent-web platform,
+   *   - no /stream clients are currently connected.
+   *
+   * Runs under `ctx.waitUntil`; any failure is logged and swallowed so the
+   * ingest path is never broken. Replay dedup is owned by the notifications
+   * service via the stable `executionId: attention:{requestId}` key.
+   *
+   * Gate + dispatch logic lives in `dispatchCloudAgentAttentionPush` so it
+   * is unit-testable without constructing this DO. This method is the
+   * thin DO-specific adapter: fetch metadata, inject stream-client + push
+   * dependencies, and log on dispatch failure.
+   */
+  private async handleAttentionEvent(event: AttentionEvent): Promise<void> {
+    try {
+      const metadata = await this.getMetadata();
+      await dispatchCloudAgentAttentionPush(event, metadata, {
+        hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,
+        sendPush: params => this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),
+      });
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          requestId: event.requestId,
+          kind: event.kind,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Cloud agent attention push notification dispatch failed');
+    }
+  }
+
   private getAgentRuntime(): AgentRuntime {
     if (!this.agentRuntime) {
       this.agentRuntime = createAgentRuntime({
@@ -888,6 +927,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               ? { ...params, failureStage: 'agent_activity', failureCode: 'assistant_error' }
               : params
           );
+        },
+        // Best-effort attention push: dispatch under ctx.waitUntil so ingest
+        // remains non-blocking. Duplicate replays invoke this each time;
+        // dedup is the notifications service's job (executionId is stable
+        // per raise: `attention:{requestId}`).
+        onAttentionEvent: event => {
+          this.ctx.waitUntil(this.handleAttentionEvent(event));
         },
       };
 

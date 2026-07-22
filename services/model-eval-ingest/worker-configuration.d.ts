@@ -28,5 +28,5 @@ declare type CloudflareEnv = {
   HYPERDRIVE: Hyperdrive;
   BENCH_DASHBOARD: BenchDashboardService;
   INTERNAL_API_SECRET: SecretBinding | string;
-  BETTERSTACK_HEARTBEAT_URL: string | undefined;
+  ENVIRONMENT: string;
 };

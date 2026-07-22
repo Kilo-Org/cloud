@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import type {
+  CodeReviewAgentConfig,
   CodeReviewCouncilConfig,
   CodeReviewCouncilResult,
   CouncilResultSpecialist,
@@ -101,10 +102,16 @@ export function buildCouncilResult(params: {
 export function computeCouncilResultForReview(params: {
   review: CloudAgentCodeReview;
   lastAssistantMessageText: string | null | undefined;
+  // Council-config source for AUTOMATED (webhook) reviews, which carry no `manual_config`.
+  // Manual reviews resolve their council from `manual_config` and ignore this. Resolved + passed
+  // by the caller (the status callback) because this function is pure/DB-free and also runs inside
+  // the analytics completion transaction. Absent → automated council reviews persist no result.
+  orgAgentConfig?: CodeReviewAgentConfig | null;
 }): CodeReviewCouncilResult | null {
   const { review, lastAssistantMessageText } = params;
   if (review.review_type !== 'council') return null;
-  const agentConfig = getManualCodeReviewConfig(review)?.agentConfig;
+  const agentConfig =
+    getManualCodeReviewConfig(review)?.agentConfig ?? params.orgAgentConfig ?? null;
   const council = agentConfig?.council;
   if (!council) return null;
 
@@ -134,6 +141,7 @@ export function computeCouncilResultForReview(params: {
 export async function finalizeCouncilResultForReview(params: {
   review: CloudAgentCodeReview;
   lastAssistantMessageText: string | null | undefined;
+  orgAgentConfig?: CodeReviewAgentConfig | null;
 }): Promise<CodeReviewCouncilResult | null> {
   const councilResult = computeCouncilResultForReview(params);
   if (!councilResult) return null;

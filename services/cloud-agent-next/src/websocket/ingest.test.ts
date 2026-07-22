@@ -1653,4 +1653,218 @@ describe('createIngestHandler', () => {
       expect(await response.text()).toBe('Missing wrapperRunId parameter');
     });
   });
+
+  describe('handleIngestMessage — onAttentionEvent hook', () => {
+    const SOURCE_SESSION_ID = 'kilo_session_source';
+
+    function makeKilocodeData(
+      eventName: string,
+      props: Record<string, unknown>,
+      options: { spreadId?: boolean } = {}
+    ): Record<string, unknown> {
+      return options.spreadId
+        ? { ...props, event: eventName, type: eventName, properties: props }
+        : { event: eventName, type: eventName, properties: props };
+    }
+
+    function makeKilocodeMessageFromData(data: Record<string, unknown>): string {
+      return JSON.stringify({
+        streamEventType: 'kilocode',
+        data,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    function createAttentionContext(): {
+      doContext: IngestDOContext;
+      onAttentionEvent: ReturnType<typeof vi.fn>;
+    } {
+      const doContext = createFakeDOContext();
+      const onAttentionEvent = vi.fn();
+      return { doContext: { ...doContext, onAttentionEvent }, onAttentionEvent };
+    }
+
+    it.each([
+      { eventName: 'question.asked', kind: 'question' as const },
+      { eventName: 'permission.asked', kind: 'permission' as const },
+    ])('invokes onAttentionEvent for qualifying $eventName', async ({ eventName, kind }) => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessageFromData(
+          makeKilocodeData(eventName, { id: 'req_nested', sessionID: SOURCE_SESSION_ID })
+        )
+      );
+      expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(onAttentionEvent).toHaveBeenCalledWith({
+        requestId: 'req_nested',
+        kind,
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it('invokes onAttentionEvent for top-level-spread data shape', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessageFromData(
+          makeKilocodeData(
+            'question.asked',
+            { id: 'req_direct', sessionID: SOURCE_SESSION_ID },
+            { spreadId: true }
+          )
+        )
+      );
+      expect(onAttentionEvent).toHaveBeenCalledTimes(1);
+      expect(onAttentionEvent).toHaveBeenCalledWith({
+        requestId: 'req_direct',
+        kind: 'question',
+        sourceKiloSessionId: SOURCE_SESSION_ID,
+      });
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it.each(['session.diff', 'message.part.delta', 'session.completed'])(
+      'does not invoke onAttentionEvent for non-attention kilocode event %s',
+      async eventName => {
+        const { doContext, onAttentionEvent } = createAttentionContext();
+        const broadcastFn = vi.fn();
+        const handler = createIngestHandler(
+          createFakeState(),
+          createFakeEventQueries(),
+          SESSION_ID,
+          broadcastFn,
+          doContext
+        );
+        const ws = createFakeWebSocket(makeAttachment());
+        await handler.handleIngestMessage(
+          ws,
+          makeKilocodeMessageFromData(
+            makeKilocodeData(eventName, { id: 'req_1', sessionID: SOURCE_SESSION_ID })
+          )
+        );
+        expect(onAttentionEvent).not.toHaveBeenCalled();
+        expect(broadcastFn).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+        );
+      }
+    );
+
+    it('does not invoke onAttentionEvent for resolve events', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessageFromData(
+          makeKilocodeData('question.replied', {
+            id: 'req_x',
+            requestID: 'req_x',
+            sessionID: SOURCE_SESSION_ID,
+          })
+        )
+      );
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+    });
+
+    it('does not invoke onAttentionEvent when id is missing', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessageFromData({
+          event: 'question.asked',
+          type: 'question.asked',
+          properties: { sessionID: SOURCE_SESSION_ID },
+        })
+      );
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it('does not invoke onAttentionEvent when source sessionID is missing', async () => {
+      const { doContext, onAttentionEvent } = createAttentionContext();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessageFromData(makeKilocodeData('question.asked', { id: 'req_no_session' }))
+      );
+      expect(onAttentionEvent).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it('does not throw when onAttentionEvent is not registered', async () => {
+      const doContext = createFakeDOContext(); // no onAttentionEvent
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      await expect(
+        handler.handleIngestMessage(
+          ws,
+          makeKilocodeMessageFromData(
+            makeKilocodeData('question.asked', { id: 'req_1', sessionID: SOURCE_SESSION_ID })
+          )
+        )
+      ).resolves.toBeUndefined();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+  });
 });

@@ -8,7 +8,15 @@
   "workers_dev": false,
   "observability": {
     "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": false,
+    },
   },
+  "logpush": true,
   "routes": [
     {
       "pattern": "security-sync.kilosessions.ai",
@@ -22,6 +30,7 @@
     "ip": "0.0.0.0",
   },
   "vars": {
+    "ENVIRONMENT": "production",
     "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
     "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
     "BACKEND_API_URL": "https://app.kilo.ai",
@@ -73,6 +82,7 @@
     "dev": {
       "name": "cloudflare-security-sync-dev",
       "vars": {
+        "ENVIRONMENT": "development",
         "MANUAL_SYNC_COMMAND_ROUTING_ENABLED": "true",
         "DISMISS_FINDING_COMMAND_ROUTING_ENABLED": "true",
         "BACKEND_API_URL": "http://localhost:3000",

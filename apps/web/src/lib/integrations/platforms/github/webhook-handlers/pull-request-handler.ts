@@ -13,6 +13,11 @@ import {
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import {
+  determineAutomatedReviewType,
+  isCouncilActive,
+} from '@kilocode/worker-utils/code-review-council';
+import { isCouncilEntitledForOwner } from '@/lib/code-reviews/core/council-entitlement';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
@@ -297,9 +302,25 @@ export async function handlePullRequestCodeReview(
       );
     }
 
+    // 6b. Decide standard vs council for this automated review. Council is a per-repo opt-in and
+    // requires an active council config + entitlement. The entitlement lookup is a DB call, so it
+    // is gated behind the two cheap local checks (most webhooks are standard and skip it). Falls
+    // back to 'standard' if any condition is missing, so a bad/absent council config never blocks.
+    const councilConfigActive = isCouncilActive(config.council);
+    const councilEnabledForRepo =
+      Array.isArray(config.council_enabled_repository_ids) &&
+      config.council_enabled_repository_ids.includes(repository.id);
+    const councilEntitled =
+      councilConfigActive && councilEnabledForRepo ? await isCouncilEntitledForOwner(owner) : false;
+    const reviewType = determineAutomatedReviewType(
+      { isDraft: pull_request.draft ?? false, author: pull_request.user.login },
+      { councilEntitled, councilConfigActive, councilEnabledForRepo }
+    );
+
     // 7. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
       owner,
+      reviewType,
       platformIntegrationId: integration.id,
       repoFullName: repository.full_name,
       prNumber: pull_request.number,

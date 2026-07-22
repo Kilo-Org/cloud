@@ -19,6 +19,7 @@ import {
   user_auth_provider,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
@@ -886,4 +887,32 @@ export const userRouter = createTRPCRouter({
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
   }),
+
+  // ─── Notification Preferences ──────────────────────────────────────
+
+  getNotificationPreferences: baseProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ agent_push_enabled: user_notification_preferences.agent_push_enabled })
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, ctx.user.id))
+      .limit(1);
+    return { agentPushEnabled: row?.agent_push_enabled ?? true };
+  }),
+
+  setNotificationPreferences: baseProcedure
+    .input(
+      z.object({
+        agentPushEnabled: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(user_notification_preferences)
+        .values({ user_id: ctx.user.id, agent_push_enabled: input.agentPushEnabled })
+        .onConflictDoUpdate({
+          target: user_notification_preferences.user_id,
+          set: { agent_push_enabled: input.agentPushEnabled, updated_at: sql`now()` },
+        });
+      return { agentPushEnabled: input.agentPushEnabled };
+    }),
 });

@@ -8,7 +8,8 @@
     "./utils": "./src/utils.ts",
     "./security-agent": "./src/security-agent/index.ts",
     "./code-review": "./src/code-review/index.ts",
-    "./organizations": "./src/organizations/index.ts"
+    "./organizations": "./src/organizations/index.ts",
+    "./platforms": "./src/platforms.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

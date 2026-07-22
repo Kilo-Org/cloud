@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GITLAB_CREDENTIAL_AUDIT_AUDIENCE as RootGitLabCredentialAuditAudience,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE as RootGitLabCredentialBrokerAudience,
+  GITLAB_CREDENTIAL_REPAIR_AUDIENCE as RootGitLabCredentialRepairAudience,
 } from './index.js';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
@@ -10,6 +11,7 @@ import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
+  GITLAB_CREDENTIAL_REPAIR_AUDIENCE,
 } from './internal-service-token-audiences.js';
 
 describe('internal service token audiences', () => {
@@ -40,5 +42,12 @@ describe('internal service token audiences', () => {
     expect(GITLAB_CREDENTIAL_AUDIT_AUDIENCE).toBe('git-token-service:gitlab-credential-audit');
     expect(GITLAB_CREDENTIAL_AUDIT_AUDIENCE).not.toBe(GITLAB_CREDENTIAL_BROKER_AUDIENCE);
     expect(RootGitLabCredentialAuditAudience).toBe(GITLAB_CREDENTIAL_AUDIT_AUDIENCE);
+  });
+
+  it('exports a distinct purpose-bound GitLab credential repair audience', () => {
+    expect(GITLAB_CREDENTIAL_REPAIR_AUDIENCE).toBe('git-token-service:gitlab-credential-repair');
+    expect(GITLAB_CREDENTIAL_REPAIR_AUDIENCE).not.toBe(GITLAB_CREDENTIAL_AUDIT_AUDIENCE);
+    expect(GITLAB_CREDENTIAL_REPAIR_AUDIENCE).not.toBe(GITLAB_CREDENTIAL_BROKER_AUDIENCE);
+    expect(RootGitLabCredentialRepairAudience).toBe(GITLAB_CREDENTIAL_REPAIR_AUDIENCE);
   });
 });

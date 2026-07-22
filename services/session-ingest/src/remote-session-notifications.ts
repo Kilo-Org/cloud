@@ -1,4 +1,6 @@
 import type {
+  SendAgentSessionNotificationParams,
+  SendAgentSessionNotificationResult,
   SendCloudAgentSessionNotificationParams,
   SendCloudAgentSessionNotificationResult,
 } from '@kilocode/notifications';
@@ -16,9 +18,13 @@ export function isEligibleForRemoteSessionAttention(session: RemoteSessionInfo):
 const NEEDS_INPUT_BODY = 'Kilo needs your input.';
 const DEFAULT_COMPLETED_BODY = 'Task completed';
 
-export function buildRemoteSessionAttentionPushBody(
-  signal: Pick<AttentionSignal, 'kind' | 'messageExcerpt'>
-): string {
+/** Attention signals that carry the 100-char `messageExcerpt` (completed / needs_input). */
+export type ExcerptAttentionSignal = Extract<
+  AttentionSignal,
+  { kind: 'completed' | 'needs_input' }
+>;
+
+export function buildRemoteSessionAttentionPushBody(signal: ExcerptAttentionSignal): string {
   if (signal.kind === 'needs_input') return NEEDS_INPUT_BODY;
   return signal.messageExcerpt.length > 0 ? signal.messageExcerpt : DEFAULT_COMPLETED_BODY;
 }
@@ -29,6 +35,14 @@ export type DispatchRemoteSessionAttentionDeps = {
   sendPush: (
     params: SendCloudAgentSessionNotificationParams
   ) => Promise<SendCloudAgentSessionNotificationResult>;
+  /**
+   * RPC for the explicit `notify_user` tool path (§4.4, §4.10). Thrown transport/DO errors
+   * must propagate so the caller's dispatch marker stays `pending` — the dedicated
+   * branch below never catches.
+   */
+  sendAgentSessionNotification: (
+    params: SendAgentSessionNotificationParams
+  ) => Promise<SendAgentSessionNotificationResult>;
 };
 
 export type DispatchRemoteSessionAttentionOutcome = 'sent' | 'suppressed';
@@ -43,6 +57,30 @@ export async function dispatchRemoteSessionAttentionSignal(
   params: { kiloUserId: string; sessionId: string; signal: AttentionSignal },
   deps: DispatchRemoteSessionAttentionDeps
 ): Promise<DispatchRemoteSessionAttentionOutcome> {
+  // §4.3: `agent_notification` signals are an explicit `notify_user` tool call. The user
+  // asked for the ping, and a headless `kilo run` may exit right after emitting it — neither
+  // the per-user rollout gate nor the live-CLI gate must apply, or this single notification
+  // the user explicitly requested would silently be lost. Root-session eligibility is still
+  // enforced one level up by the caller, and presence-suppression is handled downstream by
+  // the notifications service.
+  if (params.signal.kind === 'agent_notification') {
+    const result = await deps.sendAgentSessionNotification({
+      userId: params.kiloUserId,
+      cliSessionId: params.sessionId,
+      notificationId: params.signal.notificationId,
+      message: params.signal.message,
+    });
+    console.log({
+      event: 'agent_push_outcome',
+      cliSessionId: params.sessionId,
+      notificationId: params.signal.notificationId,
+      outcome: result.dispatched ? 'dispatched' : (result.reason ?? 'failed'),
+    });
+    return result.dispatched ? 'sent' : 'suppressed';
+  }
+
+  // Legacy attention pushes (completed / needs_input) remain gated behind the staged
+  // per-user rollout and the live-CLI presence check.
   if (deps.remoteSessionAttentionPushUserId?.trim() !== params.kiloUserId) {
     return 'suppressed';
   }

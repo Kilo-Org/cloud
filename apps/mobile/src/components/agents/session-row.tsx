@@ -1,12 +1,23 @@
 import * as Haptics from 'expo-haptics';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
+import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import {
+  isAttentionAcked,
+  reconcileSessionAttention,
+  shouldShowNeedsInput,
+  useSessionAttentionRevision,
+} from '@/lib/session-attention';
+import { formatMeta, platformLabel, remoteAgentLabel, remoteMeta } from './session-list-helpers';
+import {
+  formatSpokenTimeAgo,
+  sessionRowAccessibilityLabel,
+} from './session-row-accessibility-label';
 
 type StoredSessionRowProps = {
   session: {
@@ -19,8 +30,8 @@ type StoredSessionRowProps = {
     updated_at: string;
     git_branch: string | null;
     status: string | null;
+    status_updated_at: string | null;
   };
-  isLive: boolean;
   /**
    * Which timestamp drives the row's relative meta label. The list
    * section the session lands in and the timestamp shown here are
@@ -33,44 +44,9 @@ type StoredSessionRowProps = {
 };
 
 type RemoteSessionRowProps = {
-  session: {
-    id: string;
-    title: string;
-    status: string;
-    gitBranch?: string;
-  };
+  session: ActiveSession;
   onPress: () => void;
 };
-
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label
- * for the row eyebrow. The row's hue is hashed from this label.
- */
-function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
-
-function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
-}
 
 function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -103,7 +79,6 @@ function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => 
 
 export function StoredSessionRow({
   session,
-  isLive,
   sortBy,
   onPress,
   onDelete,
@@ -114,6 +89,18 @@ export function StoredSessionRow({
   const [renameVisible, setRenameVisible] = useState(false);
   const renameTextRef = useRef(title);
   const agentLabel = platformLabel(session.created_on_platform);
+  const timestamp = getAgentSessionTimestamp(session, sortBy);
+
+  const revision = useSessionAttentionRevision();
+  const raiseId = session.status_updated_at ?? session.status ?? null;
+  const needsInput = shouldShowNeedsInput({
+    status: session.status,
+    raiseId,
+    isAcked: isAttentionAcked(session.session_id, raiseId),
+  });
+  useEffect(() => {
+    reconcileSessionAttention(session.session_id, session.status, session.status_updated_at);
+  }, [session.session_id, session.status, session.status_updated_at, revision]);
 
   const handleRenameConfirm = () => {
     const newName = renameTextRef.current.trim();
@@ -162,20 +149,31 @@ export function StoredSessionRow({
     }
   };
 
+  // Spoken meta mirrors the visible meta for the same inputs the row
+  // already uses to render `formatMeta(timestamp)`. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
+  // so the label omits it.
+  const spokenMeta = needsInput ? null : formatSpokenTimeAgo(timestamp);
+
   return (
     <>
       <Pressable
         onPress={onPress}
         onLongPress={handleLongPress}
-        accessibilityLabel={title}
+        accessibilityLabel={sessionRowAccessibilityLabel({
+          title,
+          needsInput,
+          badge: agentLabel,
+          meta: spokenMeta,
+        })}
         className="active:opacity-70"
       >
         <SessionRow
           agentLabel={agentLabel}
           title={title}
           subtitle={session.git_branch}
-          meta={formatMeta(getAgentSessionTimestamp(session, sortBy))}
-          live={isLive}
+          meta={formatMeta(timestamp)}
+          needsInput={needsInput}
           stripMode="inline"
           className="pl-[22px] pr-[22px]"
         />
@@ -236,14 +234,50 @@ export function StoredSessionRow({
 export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRowProps>) {
   const title = session.title.length > 0 ? session.title : 'Untitled session';
 
+  const revision = useSessionAttentionRevision();
+  const raiseId = session.status;
+  const needsInput = shouldShowNeedsInput({
+    status: session.status,
+    raiseId,
+    isAcked: isAttentionAcked(session.id, raiseId),
+  });
+  useEffect(() => {
+    reconcileSessionAttention(session.id, session.status, null);
+  }, [session.id, session.status, revision]);
+
+  // Spoken meta mirrors the visible meta the row renders. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
+  // so the label omits it. The remote row's `live` eyebrow (`live-and-meta`)
+  // renders the timestamp when `updatedAt` is present, otherwise the
+  // uppercased status. For speech we expand the timestamp via
+  // `formatSpokenTimeAgo` and lowercase/underscore-strip the status so
+  // VoiceOver doesn't read it letter-by-letter.
+  let spokenMeta: string | null = null;
+  if (!needsInput) {
+    spokenMeta = session.updatedAt
+      ? formatSpokenTimeAgo(session.updatedAt)
+      : session.status.toLowerCase().replaceAll('_', ' ');
+  }
+
   return (
-    <Pressable onPress={onPress} accessibilityLabel={title} className="active:opacity-70">
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={sessionRowAccessibilityLabel({
+        title,
+        needsInput,
+        badge: remoteAgentLabel(session.createdOnPlatform),
+        meta: spokenMeta,
+      })}
+      className="active:opacity-70"
+    >
       <SessionRow
-        agentLabel="CLOUD AGENT"
+        agentLabel={remoteAgentLabel(session.platform ?? session.createdOnPlatform)}
         title={title}
-        subtitle={session.gitBranch}
-        meta={session.status.toUpperCase()}
+        subtitle={session.gitBranch ?? null}
+        meta={remoteMeta(session)}
         live
+        needsInput={needsInput}
+        metaWhileLive
         stripMode="inline"
         className="pl-[22px] pr-[22px]"
       />

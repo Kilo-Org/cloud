@@ -123,9 +123,12 @@ describe('session transport routing', () => {
       );
       const release = jest.fn();
       const userWebConnection = {
+        retain: jest.fn(() => jest.fn()),
         connect: jest.fn(),
         disconnect: jest.fn(),
         destroy: jest.fn(),
+        isConnected: jest.fn(() => false),
+        onConnectionChange: jest.fn(() => jest.fn()),
         subscribeToCliSession: jest.fn(() => release),
         sendCommand: jest.fn(() => Promise.resolve()),
         sendCommandToConnection: jest.fn(() => Promise.resolve()),
@@ -214,6 +217,8 @@ describe('session transport routing', () => {
           connect: jest.fn(),
           disconnect: jest.fn(),
           destroy: jest.fn(),
+          isConnected: jest.fn(() => false),
+          onConnectionChange: jest.fn(() => jest.fn()),
           subscribeToCliSession: jest.fn(() => subscribeRelease),
           sendCommand: jest.fn(() => Promise.resolve()),
           sendCommandToConnection: jest.fn(() => Promise.resolve()),

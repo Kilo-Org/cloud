@@ -369,9 +369,12 @@ describe('remote session transport state', () => {
     const onRemoteModelStateChange = jest.fn<void, [RemoteModelState]>();
     const onTransportCapabilityChange = jest.fn();
     const userWebConnection = {
+      retain: jest.fn(() => jest.fn()),
       connect: jest.fn(),
       disconnect: jest.fn(),
       destroy: jest.fn(),
+      isConnected: jest.fn(() => false),
+      onConnectionChange: jest.fn(() => jest.fn()),
       subscribeToCliSession: jest.fn(() => jest.fn()),
       sendCommand: jest.fn(() =>
         Promise.resolve({
@@ -439,9 +442,12 @@ describe('remote session create and retry commands', () => {
   function createRemoteSessionFixture() {
     let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
     const userWebConnection = {
+      retain: jest.fn(() => jest.fn()),
       connect: jest.fn(),
       disconnect: jest.fn(),
       destroy: jest.fn(),
+      isConnected: jest.fn(() => false),
+      onConnectionChange: jest.fn(() => jest.fn()),
       subscribeToCliSession: jest.fn(() => jest.fn()),
       sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?]>(() =>
         Promise.resolve({

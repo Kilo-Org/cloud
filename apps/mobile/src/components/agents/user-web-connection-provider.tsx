@@ -1,5 +1,14 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
-import { createUserWebConnection, type UserWebConnection } from 'cloud-agent-sdk';
+import { type UserWebConnection } from 'cloud-agent-sdk';
+// kilocode_change - K1/C2: `createUserWebConnection` must come from its
+// narrow subpath, not the `cloud-agent-sdk` barrel. The barrel's index.ts
+// also re-exports web-only transport code that imports a web-app `@/...`
+// alias unresolved under the mobile app's own `@` alias — this previously
+// went unnoticed because nothing under `apps/mobile` had a test that
+// actually imported this provider (and thus the barrel) at runtime until
+// the `kilo remote` spawn hook test did. See the matching
+// vitest.config.ts aliases for the full explanation.
+import { createUserWebConnection } from 'cloud-agent-sdk/user-web-connection';
 
 import { SESSION_INGEST_WS_URL } from '@/lib/config';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';

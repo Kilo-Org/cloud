@@ -42,11 +42,11 @@ declare type ExecutionContext = {
 };
 
 declare type CloudflareEnv = {
-  SECURITY_SYNC_BETTERSTACK_HEARTBEAT_URL: string | undefined;
   INTERNAL_API_SECRET: SecretBinding;
   SYNC_QUEUE: Queue<import('./src/index').SecuritySyncQueueMessage>;
   HYPERDRIVE: Hyperdrive;
   GIT_TOKEN_SERVICE: GitTokenService;
+  ENVIRONMENT: string;
   MANUAL_SYNC_COMMAND_ROUTING_ENABLED: string | undefined;
   DISMISS_FINDING_COMMAND_ROUTING_ENABLED: string | undefined;
   BACKEND_API_URL: string | undefined;

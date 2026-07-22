@@ -56,7 +56,7 @@ export type GitLabCredentialPrivateAuditClientResult =
   | { kind: 'terminal_error'; errorCode: string }
   | { kind: 'retryable_error'; errorCode: string };
 
-async function readBoundedJson(response: Response): Promise<unknown> {
+export async function readBoundedGitLabCredentialResponse(response: Response): Promise<unknown> {
   if (!response.body) throw new Error('invalid_response');
   if (
     response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !==
@@ -141,7 +141,7 @@ export async function requestGitLabCredentialPrivateAudit(input: {
   if (!response.ok) return { kind: 'terminal_error', errorCode: 'audit_invalid_response' };
   try {
     const audit = GitLabCredentialPrivateAuditResponseSchema.safeParse(
-      await readBoundedJson(response)
+      await readBoundedGitLabCredentialResponse(response)
     );
     return audit.success
       ? { kind: 'success', audit: audit.data }

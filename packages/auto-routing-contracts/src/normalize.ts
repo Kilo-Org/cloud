@@ -390,11 +390,15 @@ function collectModalities(value: unknown, out: Set<string>): void {
   }
 
   // Guards against callers that omit the `type` discriminator — the
-  // presence of a known media field is itself sufficient signal.
+  // presence of a known media field is itself sufficient signal. We do NOT
+  // treat a bare `file` key as a signal: it collides with ordinary tool
+  // output (e.g. a `read_file` result whose `content` is `{ file: ... }`),
+  // and the typed `file`/`input_file`/`document` cases above already cover
+  // the real Responses/Anthropic file shapes.
   if ('image_url' in value || 'input_image' in value) {
     out.add('image');
   }
-  if ('input_file' in value || 'file' in value) {
+  if ('input_file' in value) {
     out.add('file');
   }
 }

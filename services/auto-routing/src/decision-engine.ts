@@ -9,7 +9,7 @@ import {
   type RoutingConstraints,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
-import type { ModelCapabilitiesMap } from './model-capabilities';
+import type { ModelCapabilities, ModelCapabilitiesMap } from './model-capabilities';
 
 // Modalities the worker actively enforces against `model_stats.input_modalities`.
 // Required modalities outside this set are intentionally ignored: they pass
@@ -20,6 +20,52 @@ import type { ModelCapabilitiesMap } from './model-capabilities';
 // `text | image | file | audio | video`), mirrored verbatim into
 // `model_stats.inputModalities` (`apps/web/src/lib/model-stats/sync-openrouter.ts:77,95,124`).
 export const ENFORCED_MODALITIES: ReadonlyArray<string> = ['image', 'file'];
+
+// Single source of the constraint policy shared by benchmark routing
+// (`applyCapabilityFilters`) and the coding-plan short-circuit in `decide.ts`.
+// Keeping these in one place stops the two paths from silently diverging when
+// the policy changes.
+
+// A required+enforced modality the model does not (or might not) support fails
+// closed: unknown capability data is treated as unsupported.
+export function satisfiesRequiredModalities(
+  caps: ModelCapabilities | undefined,
+  constraints: RoutingConstraints
+): boolean {
+  const enforcedAndRequired = (constraints.requiredInputModalities ?? []).filter(m =>
+    ENFORCED_MODALITIES.includes(m)
+  );
+  if (enforcedAndRequired.length === 0) return true;
+  if (!caps) return false;
+  return enforcedAndRequired.every(modality => caps.inputModalities.has(modality));
+}
+
+// True only when the model has a known context length provably smaller than the
+// estimate. Unknown context length is NOT proof of unfitness (keeps its rank).
+export function contextProvablyTooSmall(
+  caps: ModelCapabilities | undefined,
+  constraints: RoutingConstraints
+): boolean {
+  const estimate = constraints.promptTokensEstimate;
+  return (
+    typeof estimate === 'number' &&
+    !!caps &&
+    typeof caps.contextLength === 'number' &&
+    caps.contextLength < estimate
+  );
+}
+
+// Combined fitness used by the coding-plan short-circuit, which needs a single
+// yes/no. Benchmark routing calls the two predicates separately because a
+// modality miss drops the candidate while a too-small context only demotes it.
+export function modelSatisfiesConstraints(
+  caps: ModelCapabilities | undefined,
+  constraints: RoutingConstraints
+): boolean {
+  return (
+    satisfiesRequiredModalities(caps, constraints) && !contextProvablyTooSmall(caps, constraints)
+  );
+}
 
 function pickFreshCandidate(
   candidates: ReadonlyArray<RankedCandidate>,
@@ -67,34 +113,17 @@ function applyCapabilityFilters(
     return { filtered: candidates, reason: 'no_constraints' };
   }
 
-  const required = constraints.requiredInputModalities ?? [];
-  const enforcedAndRequired = required.filter(m => ENFORCED_MODALITIES.includes(m));
-
-  const modalityOk = (model: string): boolean => {
-    if (enforcedAndRequired.length === 0) return true;
-    const caps = capabilityMap?.get(model);
-    if (!caps) return false;
-    for (const modality of enforcedAndRequired) {
-      if (!caps.inputModalities.has(modality)) return false;
-    }
-    return true;
-  };
-
-  const afterModality = candidates.filter(c => modalityOk(c.model));
+  const afterModality = candidates.filter(c =>
+    satisfiesRequiredModalities(capabilityMap?.get(c.model), constraints)
+  );
   if (afterModality.length === 0) {
     return { filtered: [], reason: 'empty' };
-  }
-
-  const estimate = constraints.promptTokensEstimate;
-  if (typeof estimate !== 'number') {
-    return { filtered: afterModality, reason: 'ok' };
   }
 
   const eligible: RankedCandidate[] = [];
   const provablyTooSmall: RankedCandidate[] = [];
   for (const candidate of afterModality) {
-    const caps = capabilityMap?.get(candidate.model);
-    if (caps && typeof caps.contextLength === 'number' && caps.contextLength < estimate) {
+    if (contextProvablyTooSmall(capabilityMap?.get(candidate.model), constraints)) {
       provablyTooSmall.push(candidate);
     } else {
       eligible.push(candidate);
@@ -179,9 +208,11 @@ export function computeDecision(
       tableVersion: table.version,
       reasoningEffort: incumbent.reasoningEffort ?? null,
       sticky: true,
+      switchReason: null,
     };
   }
 
+  const switched = incumbentModel !== null && incumbentModel !== freshPick.model;
   return {
     model: freshPick.model,
     taskType: classification.taskType,
@@ -190,5 +221,18 @@ export function computeDecision(
     tableVersion: table.version,
     reasoningEffort: freshPick.reasoningEffort ?? null,
     sticky: false,
+    // 'cost': the incumbent was eligible but the mode's switch condition
+    // (cost factor / accuracy gap) made the fresh pick worth it;
+    // 'capability': the modality/context filters ejected it from the route;
+    // 'threshold': it is denied, off the route, or below the accuracy bar.
+    switchReason: !switched
+      ? null
+      : incumbent
+        ? incumbent.meetsThreshold
+          ? 'cost'
+          : 'threshold'
+        : routeCandidates.some(c => c.model === incumbentModel)
+          ? 'capability'
+          : 'threshold',
   };
 }

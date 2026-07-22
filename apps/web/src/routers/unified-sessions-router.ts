@@ -4,7 +4,7 @@ import * as z from 'zod';
 import { db } from '@/lib/drizzle';
 import { sql, type SQL } from 'drizzle-orm';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
-import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
+import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const PAGE_SIZE = 10;

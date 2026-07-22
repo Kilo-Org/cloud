@@ -1,21 +1,17 @@
+import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
+
+import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { parseTimestamp, timeAgo } from '@/lib/utils';
 
-export type StoredSessionItem = {
-  kind: 'stored';
-  session: StoredSession;
-  isLive: boolean;
-};
-
-export type RemoteSessionItem = {
-  kind: 'remote';
-  session: ActiveSession;
-};
-
-export type SessionItem = StoredSessionItem | RemoteSessionItem;
-
+/**
+ * One stored-history section. Exclusivity against the "Active now" tray is
+ * enforced on the history side via `excludeActiveFromGroups`; active sessions
+ * no longer appear as `SessionItem`s in any section.
+ */
 export type SessionSection = {
   title: string;
-  data: SessionItem[];
+  data: StoredSession[];
 };
 
 const platformExpansion: Record<string, string[]> = {
@@ -60,9 +56,117 @@ export function formatGitUrlProject(gitUrl: string): string {
   return gitUrl;
 }
 
-export function matchesSearch(query: string, title: string | null, gitUrl: string | null): boolean {
-  const q = query.toLowerCase();
-  return (
-    (title?.toLowerCase().includes(q) ?? false) || (gitUrl?.toLowerCase().includes(q) ?? false)
-  );
+/**
+ * Map backend `created_on_platform` strings to a pretty uppercase label
+ * for the row eyebrow. The row's hue is hashed from this label.
+ */
+export function platformLabel(platform: string): string {
+  switch (platform) {
+    case 'cloud-agent':
+    case 'cloud-agent-web': {
+      return 'CLOUD AGENT';
+    }
+    case 'vscode':
+    case 'agent-manager': {
+      return 'VSCODE';
+    }
+    case 'slack': {
+      return 'SLACK';
+    }
+    case 'cli': {
+      return 'CLI';
+    }
+    default: {
+      return platform.toUpperCase();
+    }
+  }
+}
+
+export function formatMeta(timestamp: string): string {
+  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
+}
+
+/**
+ * Pinned-tray label for an active session. Reuses `platformLabel` when the
+ * platform is known, otherwise falls back to 'LIVE'.
+ */
+export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
+  return createdOnPlatform ? platformLabel(createdOnPlatform) : 'LIVE';
+}
+
+/**
+ * Pinned-tray meta line for an active session. Mirrors `formatMeta` when an
+ * `updatedAt` timestamp is available, otherwise falls back to the uppercased
+ * status string (matches the legacy RemoteSessionRow behavior).
+ */
+export function remoteMeta(session: { status: string; updatedAt?: string }): string {
+  return session.updatedAt ? formatMeta(session.updatedAt) : session.status.toUpperCase();
+}
+
+const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
+
+/**
+ * Select which active sessions appear in the pinned "Active now" tray.
+ *
+ * Free-text search is not a parameter: the pinned set ignores search by
+ * construction. Filters mirror the server-side platform/project narrowing
+ * used by the stored-session list so the tray never shows a session that
+ * the user has explicitly filtered out.
+ *
+ * No dedup against stored pages is performed here — exclusivity is enforced
+ * on the history side by Task 3, so this helper stays pure and symmetric.
+ */
+export function selectPinnedActiveSessions(params: {
+  activeSessions: ActiveSession[];
+  projectFilter: string[];
+  platformFilter: string[];
+}): ActiveSession[] {
+  const { activeSessions, projectFilter, platformFilter } = params;
+  const projectActive = projectFilter.length > 0;
+  const platformActive = platformFilter.length > 0;
+
+  const concretePlatforms = platformFilter.filter(p => p !== 'other');
+  const includeOther = platformFilter.includes('other');
+  const expanded = expandPlatformFilter(concretePlatforms);
+  return activeSessions.filter(session => {
+    if (projectActive && (!session.gitUrl || !projectFilter.includes(session.gitUrl))) {
+      return false;
+    }
+
+    if (platformActive) {
+      if (!session.createdOnPlatform) {
+        return false;
+      }
+      const knownMatch = expanded.includes(session.createdOnPlatform);
+      const otherMatch = includeOther && !KNOWN_PLATFORM_VALUES.includes(session.createdOnPlatform);
+      if (!knownMatch && !otherMatch) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Drop sessions whose `session_id` is in the active set from date-bucketed
+ * groups, and drop any groups that become empty as a result. Preserves the
+ * original group order.
+ *
+ * The generic is constrained to the intersection of what the helper needs
+ * (`session_id`) and what `AgentSessionDateGroup` itself requires
+ * (`created_at`/`updated_at`); the Task 3 caller passes
+ * `AgentSessionDateGroup<StoredSession>[]` which satisfies both bounds.
+ */
+export function excludeActiveFromGroups<
+  T extends { session_id: string; created_at: string; updated_at: string },
+>(groups: AgentSessionDateGroup<T>[], activeSessionIds: Set<string>): AgentSessionDateGroup<T>[] {
+  const result: AgentSessionDateGroup<T>[] = [];
+  for (const group of groups) {
+    const remaining = group.sessions.filter(s => !activeSessionIds.has(s.session_id));
+    if (remaining.length > 0) {
+      result.push({ label: group.label, sessions: remaining });
+    }
+  }
+  return result;
 }

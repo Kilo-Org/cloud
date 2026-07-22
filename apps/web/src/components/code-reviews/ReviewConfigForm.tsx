@@ -33,6 +33,23 @@ import {
 
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
+import { CouncilSpecialistPicker } from './CouncilSpecialistPicker';
+import {
+  buildCouncilSpecialists,
+  councilSelectionsFromConfig,
+  countEnabledSelections,
+  defaultCouncilSelections,
+  type CouncilSpecialistSelection,
+} from '@/lib/code-reviews/core/council-selection';
+import {
+  COUNCIL_AGGREGATION_STRATEGIES,
+  DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
+  type CouncilAggregationStrategy,
+} from '@kilocode/db/schema-types';
+import {
+  COUNCIL_MIN_SPECIALISTS,
+  formatAggregationStrategy,
+} from '@kilocode/worker-utils/code-review-council';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
@@ -70,6 +87,8 @@ export type ReviewConfigFormProps = {
   organizationId?: string;
   platform?: Platform;
   gitlabStatusData?: GitLabStatusData;
+  /** Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag. */
+  councilUiEnabled?: boolean;
 };
 
 // Labels/descriptions stay web-local; the ids/values themselves are derived
@@ -116,6 +135,7 @@ export function ReviewConfigForm({
   organizationId,
   platform = 'github',
   gitlabStatusData,
+  councilUiEnabled = false,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -234,8 +254,17 @@ export function ReviewConfigForm({
   const [repositoryModelOverrides, setRepositoryModelOverrides] = useState<
     Map<number, RepositoryModelOverrideValue>
   >(new Map());
-  // Opt-in toggle for the per-repository model section.
-  const [overridesEnabled, setOverridesEnabled] = useState(false);
+  // Org-level council config (shared by every council-enabled repo) + per-repo opt-in set.
+  // Council is "on" when at least one repo opts in — there is no separate global toggle.
+  const [councilAggregation, setCouncilAggregation] = useState<CouncilAggregationStrategy>(
+    DEFAULT_COUNCIL_AGGREGATION_STRATEGY
+  );
+  const [councilSelections, setCouncilSelections] = useState<
+    Record<string, CouncilSpecialistSelection>
+  >(() => defaultCouncilSelections());
+  const [councilEnabledRepositoryIds, setCouncilEnabledRepositoryIds] = useState<Set<number>>(
+    new Set()
+  );
   const [useReviewMd, setUseReviewMd] = useState(true);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
@@ -365,7 +394,20 @@ export function ReviewConfigForm({
         }
       }
       setRepositoryModelOverrides(overridesMap);
-      setOverridesEnabled(overridesMap.size > 0);
+      const loadedCouncil = configData.council ?? null;
+      setCouncilAggregation(
+        loadedCouncil?.aggregation_strategy ?? DEFAULT_COUNCIL_AGGREGATION_STRATEGY
+      );
+      setCouncilSelections(
+        loadedCouncil ? councilSelectionsFromConfig(loadedCouncil) : defaultCouncilSelections()
+      );
+      setCouncilEnabledRepositoryIds(
+        new Set(
+          (configData.councilEnabledRepositoryIds ?? []).filter(
+            (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+          )
+        )
+      );
       setUseReviewMd(!(configData.disableReviewMd ?? false));
     }
   }, [configData, isGitLab]);
@@ -494,6 +536,41 @@ export function ReviewConfigForm({
     }
   };
 
+  // Master "Simple vs Advanced" switch: Advanced reveals per-repository overrides (repo selection,
+  // per-repo model/effort, per-repo council). GitLab has no "all" mode, so it is always Advanced.
+  const perRepoOverridesEnabled = isGitLab || repositorySelectionMode === 'selected';
+  const handlePerRepoOverridesToggle = (enabled: boolean) => {
+    setRepositorySelectionMode(enabled ? 'selected' : 'all');
+  };
+
+  // Council is on when 1+ *currently selected* repos opt in; the shared specialist picker then
+  // applies to all of them. A council opt-in only counts while its repository is still selected:
+  // removing a repo from the Repositories list stops rendering its council toggle, so without this
+  // intersection a stale id would keep the picker open, block save on the minimum-specialist check,
+  // and persist to council_enabled_repository_ids (silently re-activating council if the repo were
+  // re-added). Deriving from the live selection instead of mutating the set means re-selecting the
+  // repo within the same edit restores its prior opt-in.
+  const councilEnabledSelectedRepositoryIds = selectedRepositoryIds.filter(id =>
+    councilEnabledRepositoryIds.has(id)
+  );
+  const councilEnabled = councilEnabledSelectedRepositoryIds.length > 0;
+  const councilEnabledCount = countEnabledSelections(councilSelections);
+  const councilBelowMin = councilEnabled && councilEnabledCount < COUNCIL_MIN_SPECIALISTS;
+  // Only repositories the user actually selected can be configured per-repo (model + council),
+  // so the per-repo pickers never offer a repo that isn't being reviewed.
+  const selectedRepositories = selectableRepositories.filter(repo =>
+    selectedRepositoryIds.includes(repo.id)
+  );
+
+  const handleCouncilRepoToggle = (repositoryId: number, enabled: boolean) => {
+    setCouncilEnabledRepositoryIds(prev => {
+      const next = new Set(prev);
+      if (enabled) next.add(repositoryId);
+      else next.delete(repositoryId);
+      return next;
+    });
+  };
+
   const handleSave = () => {
     // Clear previous webhook sync result
     setWebhookSyncResult(null);
@@ -507,13 +584,40 @@ export function ReviewConfigForm({
     // Overrides are independent of the trigger selection mode — they apply whether
     // reviews run on all or selected repositories. Sent only when the per-repository
     // section is toggled on; toggling it off clears the overrides on save.
-    const repositoryModelOverridesPayload = overridesEnabled
+    const repositoryModelOverridesPayload = perRepoOverridesEnabled
       ? Array.from(repositoryModelOverrides.entries()).map(([repositoryId, value]) => ({
           repositoryId,
           repoFullName: value.repoFullName,
           modelSlug: value.modelSlug,
           thinkingEffort: value.thinkingEffort,
         }))
+      : [];
+
+    // Council lives entirely inside Advanced Settings, so turning Advanced off clears it on save
+    // (same as per-repo model overrides), matching the "every repository uses the global settings"
+    // copy. Only guard/persist council when the section is actually shown (Advanced + entitled).
+    const councilActiveForSave = perRepoOverridesEnabled && councilUiEnabled && councilEnabled;
+    if (councilActiveForSave && councilBelowMin) {
+      toast.error('Council needs more specialists', {
+        description: `Select at least ${COUNCIL_MIN_SPECIALISTS} council specialists.`,
+      });
+      return;
+    }
+    const councilPayload = councilActiveForSave
+      ? {
+          enabled: true,
+          aggregation_strategy: councilAggregation,
+          specialists: buildCouncilSpecialists(councilSelections),
+        }
+      : null;
+    // Gate on `councilActiveForSave` (not just `perRepoOverridesEnabled`) so `council` and its
+    // per-repo opt-ins are always written or cleared as a unit. Otherwise, if council becomes
+    // UI-unavailable (entitlement lapses or the flag is turned off) while Advanced stays on, an
+    // unrelated save would persist `council: null` alongside a non-empty opt-in list, leaving
+    // orphaned ids that would silently re-activate council if it were later re-enabled. When
+    // active, still persist only opt-ins for repos that are currently selected.
+    const councilEnabledRepositoryIdsPayload = councilActiveForSave
+      ? councilEnabledSelectedRepositoryIds
       : [];
 
     if (organizationId) {
@@ -530,6 +634,8 @@ export function ReviewConfigForm({
         selectedRepositoryIds,
         manuallyAddedRepositories,
         repositoryModelOverrides: repositoryModelOverridesPayload,
+        council: councilPayload,
+        councilEnabledRepositoryIds: councilEnabledRepositoryIdsPayload,
         disableReviewMd: !useReviewMd,
         // GitLab-specific: auto-configure webhooks
         autoConfigureWebhooks: isGitLab ? autoConfigureWebhooks : undefined,
@@ -621,6 +727,14 @@ export function ReviewConfigForm({
 
           {/* Configuration Fields */}
           <div className={cn('space-y-8', !isEnabled && 'pointer-events-none opacity-50')}>
+            {/* Global Settings — defaults inherited by every repository unless overridden below. */}
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold">Global Settings</h3>
+              <p className="text-muted-foreground text-sm">
+                Defaults applied to every repository unless overridden per repository below.
+              </p>
+            </div>
+
             {/* Default AI Model Selection */}
             <ModelCombobox
               label="Default AI Model"
@@ -725,135 +839,253 @@ export function ReviewConfigForm({
               />
             </div>
 
-            {/* Repository Selection */}
+            {/* Focus Areas (global) */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Repository Selection</Label>
-                  <p className="text-muted-foreground text-sm">
-                    Choose which repositories should trigger automatic code reviews
-                  </p>
-                </div>
-                {repositoriesData?.integrationInstalled && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs">
-                      Last synced:{' '}
-                      {repositoriesData.syncedAt
-                        ? formatDistanceToNow(new Date(repositoriesData.syncedAt), {
-                            addSuffix: true,
-                          })
-                        : 'Never'}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={refreshRepositories}
-                      disabled={isRefreshingRepos || isLoadingRepositories}
-                    >
-                      <RefreshCw className={cn('h-4 w-4', isRefreshingRepos && 'animate-spin')} />
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {isLoadingRepositories ? (
-                <div className="rounded-md border border-gray-600 bg-gray-800/50 p-3">
-                  <p className="text-sm text-gray-400">Loading repositories...</p>
-                </div>
-              ) : repositoriesError ? (
-                <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3">
-                  <p className="text-sm text-red-200">
-                    Failed to load repositories. Please try refreshing the page.
-                  </p>
-                </div>
-              ) : !repositoriesData?.integrationInstalled ? (
-                <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
-                  <p className="text-sm text-yellow-200">
-                    {repositoriesData?.errorMessage ||
-                      `${platformLabel} integration is not connected. Please connect ${platformLabel} in the Integrations page to configure repository selection.`}
-                  </p>
-                </div>
-              ) : selectableRepositories.length === 0 ? (
-                <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
-                  <p className="text-sm text-yellow-200">
-                    No repositories found. Please ensure the {platformLabel}{' '}
-                    {isGitLab ? 'integration' : 'App'} has access to your repositories.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* For GitLab, only show "Selected repositories" since "All" is not supported */}
-                  {!isGitLab && (
-                    <RadioGroup
-                      value={repositorySelectionMode}
-                      onValueChange={value =>
-                        setRepositorySelectionMode(value as 'all' | 'selected')
-                      }
-                      className="space-y-3"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="all" id="all-repos" />
-                        <Label htmlFor="all-repos" className="cursor-pointer font-normal">
-                          All repositories ({repositoriesData.repositories.length})
-                        </Label>
-                      </div>
-                      <div className="flex items-start space-x-3">
-                        <RadioGroupItem value="selected" id="selected-repos" className="mt-1" />
-                        <Label htmlFor="selected-repos" className="cursor-pointer font-normal">
-                          Selected repositories
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  )}
-
-                  {/* For GitLab, always show the multi-select; for GitHub, only when 'selected' mode */}
-                  {(isGitLab || repositorySelectionMode === 'selected') && (
-                    <div className="mt-4">
-                      <RepositoryMultiSelect
-                        repositories={selectableRepositories}
-                        selectedIds={selectedRepositoryIds}
-                        onSelectionChange={setSelectedRepositoryIds}
-                      />
+              <Label>Focus Areas</Label>
+              <p className="text-muted-foreground mb-3 text-sm">
+                Select specific areas for the agent to pay special attention to
+              </p>
+              <div className="space-y-3">
+                {FOCUS_AREAS.map(area => (
+                  <div key={area.id} className="flex items-start space-x-3">
+                    <Checkbox
+                      id={area.id}
+                      checked={focusAreas.includes(area.id)}
+                      onCheckedChange={() => handleFocusAreaToggle(area.id)}
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label
+                        htmlFor={area.id}
+                        className="cursor-pointer leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {area.label}
+                      </Label>
+                      <p className="text-muted-foreground text-sm">{area.description}</p>
                     </div>
-                  )}
-                </>
-              )}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Per-repository model overrides — independent of the trigger selection
-                mode above; applies whether reviews run on all or selected repos. */}
-            {repositoriesData?.integrationInstalled && selectableRepositories.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="per-repo-models" className="text-base font-semibold">
-                      Per-repository models
-                    </Label>
-                    <p className="text-muted-foreground text-sm">
-                      Run specific repositories&apos; reviews on a different model than the default.
-                    </p>
-                  </div>
-                  <Switch
-                    id="per-repo-models"
-                    checked={overridesEnabled}
-                    onCheckedChange={setOverridesEnabled}
-                    disabled={!isEnabled}
-                  />
+            {/* Custom Instructions (global) */}
+            <div className="space-y-3">
+              <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
+              <Textarea
+                id="custom-instructions"
+                placeholder="e.g., 'Always check for TypeScript strict mode compliance' or 'Focus on React best practices'"
+                value={customInstructions}
+                onChange={e => setCustomInstructions(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+              <p className="text-muted-foreground text-sm">
+                Add specific guidelines for your team's code review standards
+              </p>
+            </div>
+
+            {/* Advanced Settings — one card holding the switch and, when on, the per-repository
+                settings. GitLab has no "all" mode, so it is always Advanced (switch hidden). */}
+            <div className="space-y-6 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="advanced-settings" className="text-base font-semibold">
+                    Advanced Settings
+                  </Label>
+                  <p className="text-muted-foreground text-sm">
+                    Choose specific repositories and override the global defaults for each (model,
+                    thinking effort, and council review). Off means every repository uses the global
+                    settings above.
+                  </p>
                 </div>
-                {overridesEnabled && (
-                  <RepositoryModelOverrides
-                    availableRepositories={selectableRepositories}
-                    models={modelOptions}
-                    isLoadingModels={isLoadingModels}
-                    overrides={repositoryModelOverrides}
-                    defaultModelSlug={selectedModel}
-                    onSet={handleRepositoryModelOverrideSet}
-                    onRemove={handleRepositoryModelOverrideRemove}
+                {!isGitLab && (
+                  <Switch
+                    id="advanced-settings"
+                    checked={perRepoOverridesEnabled}
+                    onCheckedChange={handlePerRepoOverridesToggle}
                     disabled={!isEnabled}
                   />
                 )}
               </div>
-            )}
+
+              {/* Repository Selection (Advanced) — which repositories to review + configure. */}
+              {perRepoOverridesEnabled && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Repositories</Label>
+                      <p className="text-muted-foreground text-sm">
+                        Choose which repositories to review and configure below. Others are not
+                        reviewed.
+                      </p>
+                    </div>
+                    {repositoriesData?.integrationInstalled && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-xs">
+                          Last synced:{' '}
+                          {repositoriesData.syncedAt
+                            ? formatDistanceToNow(new Date(repositoriesData.syncedAt), {
+                                addSuffix: true,
+                              })
+                            : 'Never'}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={refreshRepositories}
+                          disabled={isRefreshingRepos || isLoadingRepositories}
+                        >
+                          <RefreshCw
+                            className={cn('h-4 w-4', isRefreshingRepos && 'animate-spin')}
+                          />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {isLoadingRepositories ? (
+                    <div className="rounded-md border border-gray-600 bg-gray-800/50 p-3">
+                      <p className="text-sm text-gray-400">Loading repositories...</p>
+                    </div>
+                  ) : repositoriesError ? (
+                    <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3">
+                      <p className="text-sm text-red-200">
+                        Failed to load repositories. Please try refreshing the page.
+                      </p>
+                    </div>
+                  ) : !repositoriesData?.integrationInstalled ? (
+                    <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
+                      <p className="text-sm text-yellow-200">
+                        {repositoriesData?.errorMessage ||
+                          `${platformLabel} integration is not connected. Please connect ${platformLabel} in the Integrations page to configure repository selection.`}
+                      </p>
+                    </div>
+                  ) : selectableRepositories.length === 0 ? (
+                    <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
+                      <p className="text-sm text-yellow-200">
+                        No repositories found. Please ensure the {platformLabel}{' '}
+                        {isGitLab ? 'integration' : 'App'} has access to your repositories.
+                      </p>
+                    </div>
+                  ) : (
+                    <RepositoryMultiSelect
+                      repositories={selectableRepositories}
+                      selectedIds={selectedRepositoryIds}
+                      onSelectionChange={setSelectedRepositoryIds}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Per-repository model overrides — independent of the trigger selection
+                mode above; applies whether reviews run on all or selected repos. */}
+              {perRepoOverridesEnabled &&
+                repositoriesData?.integrationInstalled &&
+                selectedRepositories.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="space-y-0.5">
+                      <Label className="text-base font-semibold">Per-repository model</Label>
+                      <p className="text-muted-foreground text-sm">
+                        Optionally run specific repositories&apos; reviews on a different model or
+                        effort than the global default.
+                      </p>
+                    </div>
+                    <RepositoryModelOverrides
+                      availableRepositories={selectedRepositories}
+                      models={modelOptions}
+                      isLoadingModels={isLoadingModels}
+                      overrides={repositoryModelOverrides}
+                      defaultModelSlug={selectedModel}
+                      onSet={handleRepositoryModelOverrideSet}
+                      onRemove={handleRepositoryModelOverrideRemove}
+                      disabled={!isEnabled}
+                    />
+
+                    {/* Per-repository council opt-in + the shared specialist config it applies. */}
+                    {councilUiEnabled &&
+                      perRepoOverridesEnabled &&
+                      selectedRepositories.length > 0 && (
+                        <div className="space-y-4 rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <Label className="text-base font-semibold">Council review</Label>
+                            <p className="text-muted-foreground text-sm">
+                              Choose which repositories run the council review (multiple
+                              specialists, combined into one decision) on every pull request. Others
+                              use the standard single reviewer.
+                            </p>
+                          </div>
+                          <div className="divide-y rounded-md border">
+                            {selectedRepositories.map(repo => (
+                              <div
+                                key={repo.id}
+                                className="flex items-center justify-between gap-3 p-3"
+                              >
+                                <span className="truncate text-sm" title={repo.full_name}>
+                                  {repo.full_name}
+                                </span>
+                                <Switch
+                                  checked={councilEnabledRepositoryIds.has(repo.id)}
+                                  onCheckedChange={checked =>
+                                    handleCouncilRepoToggle(repo.id, checked)
+                                  }
+                                  disabled={!isEnabled || orgSaveMutation.isPending}
+                                  aria-label={`Enable council review for ${repo.full_name}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Shared specialists + governance — applied to every council-enabled repo. */}
+                          {councilEnabled && (
+                            <div className="space-y-4 border-t pt-4">
+                              <p className="text-sm font-medium">
+                                Specialists (applied to all council-enabled repositories)
+                              </p>
+                              <CouncilSpecialistPicker
+                                selections={councilSelections}
+                                onChange={setCouncilSelections}
+                                modelOptions={modelOptions}
+                                isLoadingModels={isLoadingModels}
+                                disabled={orgSaveMutation.isPending}
+                                defaultModelSlug={selectedModel}
+                              />
+                              <div className="space-y-2">
+                                <Label htmlFor="council-aggregation">Governance decision</Label>
+                                <Select
+                                  value={councilAggregation}
+                                  onValueChange={value =>
+                                    setCouncilAggregation(value as CouncilAggregationStrategy)
+                                  }
+                                  disabled={orgSaveMutation.isPending}
+                                >
+                                  <SelectTrigger id="council-aggregation" className="w-full">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {COUNCIL_AGGREGATION_STRATEGIES.map(strategy => (
+                                      <SelectItem key={strategy} value={strategy}>
+                                        {formatAggregationStrategy(strategy)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p
+                                  className={
+                                    councilBelowMin
+                                      ? 'text-destructive text-sm'
+                                      : 'text-muted-foreground text-sm'
+                                  }
+                                >
+                                  Select {COUNCIL_MIN_SPECIALISTS}–4 specialists.{' '}
+                                  {councilEnabledCount} selected.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                  </div>
+                )}
+            </div>
 
             {/* GitLab Webhook Configuration */}
             {isGitLab &&
@@ -1071,50 +1303,6 @@ export function ReviewConfigForm({
                   </div>
                 </div>
               )}
-
-            {/* Focus Areas */}
-            <div className="space-y-3">
-              <Label>Focus Areas</Label>
-              <p className="text-muted-foreground mb-3 text-sm">
-                Select specific areas for the agent to pay special attention to
-              </p>
-              <div className="space-y-3">
-                {FOCUS_AREAS.map(area => (
-                  <div key={area.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={area.id}
-                      checked={focusAreas.includes(area.id)}
-                      onCheckedChange={() => handleFocusAreaToggle(area.id)}
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label
-                        htmlFor={area.id}
-                        className="cursor-pointer leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {area.label}
-                      </Label>
-                      <p className="text-muted-foreground text-sm">{area.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Instructions */}
-            <div className="space-y-3">
-              <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
-              <Textarea
-                id="custom-instructions"
-                placeholder="e.g., 'Always check for TypeScript strict mode compliance' or 'Focus on React best practices'"
-                value={customInstructions}
-                onChange={e => setCustomInstructions(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-              <p className="text-muted-foreground text-sm">
-                Add specific guidelines for your team's code review standards
-              </p>
-            </div>
 
             {/* Save Button */}
             <div className="flex justify-end pt-2">

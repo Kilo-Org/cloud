@@ -4,6 +4,7 @@ import { user_push_tokens } from '@kilocode/db/schema';
 import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
+import { isPushSinkEnabled } from '../lib/push-sink';
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
 
@@ -13,7 +14,7 @@ type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 // repeat. `accepted` means Expo accepted at least one push and only post-send
 // bookkeeping may be retried. Terminal stages make later attempts duplicates.
 type TerminalIdemRecord = {
-  stage: 'pending' | 'delivered' | 'suppressed' | 'no_tokens' | 'failed';
+  stage: 'pending' | 'delivered' | 'suppressed' | 'suppressed_rate_limit' | 'no_tokens' | 'failed';
   ts: number;
 };
 
@@ -27,14 +28,44 @@ type AcceptedDeliveryIdemRecord = {
 
 type IdemRecord = TerminalIdemRecord | AcceptedDeliveryIdemRecord;
 
+// Per-key sliding-window rate-limit record. Correctness comes from
+// prune-on-read (§4.6); this stored shape is only used for GC scheduling.
+type RateLimitRecord = {
+  expiresAt: number;
+  timestamps: number[];
+};
+
 const IDEM_PREFIX = 'idem:';
 const BUCKET_PREFIX = 'bucket:';
+const RL_PREFIX = 'rl:';
 const TOTAL_KEY = 'total';
 const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 const ACCEPTED_BOOKKEEPING_RETRY_DELAY_MS = 30_000;
 
 export class NotificationChannelDO extends DurableObject<Env> {
+  // In-flight claims by idempotency key. The DO serializes turns, but a turn
+  // yields the isolate on every external `await` (presence RPC, Expo send), so a
+  // concurrent replay of the same key can interleave: it would read the storage
+  // `pending` marker the first attempt left before its send, treat it as a
+  // reusable retry slot, and send a second time. This in-memory claim closes
+  // that window — a replay seeing a live claim returns `duplicate`, while a
+  // sequential post-failure retry (claim already released) still reuses the
+  // `pending` slot as before.
+  private readonly inFlight = new Set<string>();
+
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
+    if (this.inFlight.has(input.idempotencyKey)) {
+      return { kind: 'duplicate' };
+    }
+    this.inFlight.add(input.idempotencyKey);
+    try {
+      return await this.dispatchPushInner(input);
+    } finally {
+      this.inFlight.delete(input.idempotencyKey);
+    }
+  }
+
+  private async dispatchPushInner(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     // 1. Idempotency. DO is single-threaded — requests for a given
     //    user serialize on this instance. Retryable send failures leave the
     //    record at `pending` so upstream can retry the send without
@@ -52,6 +83,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     if (
       existing?.stage === 'delivered' ||
       existing?.stage === 'suppressed' ||
+      existing?.stage === 'suppressed_rate_limit' ||
       existing?.stage === 'no_tokens' ||
       existing?.stage === 'failed'
     ) {
@@ -82,9 +114,34 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
     }
 
+    // 3. Rate limit. Per §4.6: only attempts that pass the check consume
+    //    quota on the first attempt; retries reuse the slot already consumed.
+    //    Suppressed/presence-suppressed attempts never reach this point.
+    //    A rejected attempt records its idempotency key with the outcome so
+    //    replays dedup as `duplicate` (drop, never defer).
+    if (input.rateLimit && !isRetry) {
+      const rl = await this.checkAndConsumeRateLimit(input.rateLimit);
+      if (rl.kind === 'rejected') {
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'suppressed_rate_limit', ts });
+        await this.ensureCleanupAlarm(ts);
+        return { kind: 'suppressed_rate_limit' };
+      }
+
+      // Agent notifications have no badge, so the badge path below never
+      // writes a `pending` marker. A later send failure would otherwise leave
+      // the idempotency key empty and cause a replay to re-consume a quota
+      // slot. Mirror the badge path by marking `pending` before token/send.
+      if (!input.badge) {
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+        await this.ensureCleanupAlarm(ts);
+      }
+    }
+
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    // 3. Badge math. On a retry the badge was already incremented during
+    // 4. Badge math. On a retry the badge was already incremented during
     //    the prior attempt; re-applying the delta would double-count.
     //    The total is recomputed in either case (other writers may have
     //    advanced it).
@@ -104,7 +161,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
     }
 
-    // 4. Tokens. Missing Expo tokens only means no OS push can be sent; the
+    // 5. Tokens. Missing Expo tokens only means no OS push can be sent; the
     //    in-app badge state above is still authoritative for client hydration.
     const tokens = await db
       .select({ token: user_push_tokens.token })
@@ -118,7 +175,40 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return { kind: 'no_tokens' };
     }
 
-    // 5. Send via Expo
+    // 6. Local push sink (dev/E2E-only, §4.15). Only runs after a non-empty
+    //    token lookup, so a missing token row still exits as `no_tokens`.
+    //    Replaces the Expo send with a redacted payload recording + terminal
+    //    `delivered` state. No receipt work is created; `delivered` here
+    //    means the sink captured the payload, never device delivery.
+    if (isPushSinkEnabled(this.env)) {
+      const ts = Date.now();
+      // Content-free observability only. Title, body, and the `data` object are
+      // agent/user-controlled and can carry credentials or private customer
+      // content; logging their values would retain that in local, CI, and
+      // aggregated Worker logs. Record sizes, `data` key names, and the fixed
+      // `type` discriminator instead — enough to trace the send without content.
+      const data = input.push.data;
+      console.log('agent_push_sink_payload', {
+        idempotencyKey: input.idempotencyKey,
+        payload: {
+          titleLength: input.push.title.length,
+          bodyLength: input.push.body.length,
+          dataKeys: data && typeof data === 'object' ? Object.keys(data).sort() : [],
+          dataType:
+            data && typeof data === 'object' && 'type' in data
+              ? (data as { type?: unknown }).type
+              : undefined,
+          sound: input.push.sound ?? null,
+          priority: input.push.priority ?? 'default',
+        },
+        to: '<redacted>',
+      });
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
+      await this.ensureCleanupAlarm(ts);
+      return { kind: 'delivered', tokenCount: tokens.length };
+    }
+
+    // 7. Send via Expo
     const messages: ExpoPushMessage[] = tokens.map(
       ({ token }) =>
         ({
@@ -283,8 +373,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     const now = Date.now();
-    const entries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
-    const expired: string[] = [];
+    const idemEntries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
+    const expiredIdem: string[] = [];
     let nextAlarmAt: number | undefined;
     const requestAlarmAtOrBefore = (deadline: number) => {
       if (nextAlarmAt === undefined || deadline < nextAlarmAt) {
@@ -292,7 +382,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
     };
 
-    for (const [key, rec] of entries) {
+    for (const [key, rec] of idemEntries) {
       if (rec.stage === 'accepted') {
         const bookkeepingError = await this.completeAcceptedDelivery(key, rec);
         if (bookkeepingError) {
@@ -305,12 +395,28 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
 
       if (now - rec.ts > IDEM_TTL_MS) {
-        expired.push(key);
+        expiredIdem.push(key);
       } else {
         requestAlarmAtOrBefore(rec.ts + IDEM_TTL_MS);
       }
     }
-    if (expired.length > 0) await this.ctx.storage.delete(expired);
+
+    // Rate-limit GC: delete expired `rl:` records and reschedule the alarm
+    // to the earliest remaining unexpired record across both prefixes.
+    // Correctness does not depend on this sweep — prune-on-read handles
+    // hot-path accuracy — this is purely storage reclamation (§4.6).
+    const rlEntries = await this.ctx.storage.list<RateLimitRecord>({ prefix: RL_PREFIX });
+    const expiredRl: string[] = [];
+    for (const [key, rec] of rlEntries) {
+      if (rec.expiresAt <= now) {
+        expiredRl.push(key);
+      } else {
+        requestAlarmAtOrBefore(rec.expiresAt);
+      }
+    }
+
+    const toDelete = [...expiredIdem, ...expiredRl];
+    if (toDelete.length > 0) await this.ctx.storage.delete(toDelete);
     if (nextAlarmAt !== undefined) {
       await this.ctx.storage.setAlarm(nextAlarmAt);
     }
@@ -318,11 +424,56 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   // Schedule cleanup `IDEM_TTL_MS` from `refTs` only if no alarm is pending.
   // `setAlarm` replaces any existing alarm; calling it unconditionally would
-  // push cleanup forward indefinitely on a busy user.
+  // push cleanup forward indefinitely on a busy user. The alarm sweep
+  // (`alarm()`) reschedules to the earliest unexpired record across both
+  // `idem:` and `rl:` prefixes.
   private async ensureCleanupAlarm(refTs: number): Promise<void> {
     if ((await this.ctx.storage.getAlarm()) === null) {
       await this.ctx.storage.setAlarm(refTs + IDEM_TTL_MS);
     }
+  }
+
+  // Sliding-window rate-limit check (§4.6). Prune-on-read is the
+  // correctness mechanism — the persisted record is only used for GC
+  // scheduling and to amortize repeated prunes within the same window.
+  // Returns `rejected` without consuming quota; the caller is responsible
+  // for recording the idempotency outcome on rejection.
+  private async checkAndConsumeRateLimit(rateLimit: {
+    key: string;
+    limit: number;
+    windowSeconds: number;
+  }): Promise<{ kind: 'allowed' } | { kind: 'rejected' }> {
+    const now = Date.now();
+    const windowMs = rateLimit.windowSeconds * 1000;
+    const storageKey = `${RL_PREFIX}${rateLimit.key}`;
+    const existing = await this.ctx.storage.get<RateLimitRecord>(storageKey);
+    const pruned = (existing?.timestamps ?? []).filter(ts => now - ts < windowMs);
+
+    if (pruned.length >= rateLimit.limit) {
+      // Reject without consuming quota. Persist the pruned state so a
+      // later read within the same window doesn't redo the prune and so
+      // the alarm sweep knows the window is still active. Drop empty
+      // records so they don't linger as alarm anchors.
+      if (pruned.length > 0) {
+        await this.ctx.storage.put<RateLimitRecord>(storageKey, {
+          expiresAt: now + windowMs,
+          timestamps: pruned,
+        });
+        await this.ensureCleanupAlarm(now);
+      } else if (existing) {
+        await this.ctx.storage.delete(storageKey);
+      }
+      return { kind: 'rejected' };
+    }
+
+    // Consume quota: append the current attempt's timestamp.
+    const newTimestamps = [...pruned, now];
+    await this.ctx.storage.put<RateLimitRecord>(storageKey, {
+      expiresAt: now + windowMs,
+      timestamps: newTimestamps,
+    });
+    await this.ensureCleanupAlarm(now);
+    return { kind: 'allowed' };
   }
 
   // Read-modify-write of a bucket counter. The DO is single-threaded, so

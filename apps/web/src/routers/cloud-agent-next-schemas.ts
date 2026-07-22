@@ -1,8 +1,13 @@
 import * as z from 'zod';
 import {
   CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES,
+  CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
+  CLOUD_AGENT_ATTACHMENT_EXTENSION_REGEX,
+  CLOUD_AGENT_ATTACHMENT_MAX_CONTENT_TYPE_LENGTH,
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
+  CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
+  CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
   CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
@@ -40,16 +45,107 @@ const cloudAgentAttachmentFilenameSchema = z
     /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$/
   );
 
+const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
+
+/**
+ * Shared relaxed-filename regex for the post-S2 world: a UUID with any
+ * `^[a-z0-9]{1,16}$` suffix. The deny-list is enforced separately by
+ * `cloudAgentRelaxedAttachmentFilenameSchema` so callers that need a
+ * deny-list-validated basename (download presign, attachment list) can use
+ * the same regex without re-implementing the check.
+ */
+const cloudAgentRelaxedAttachmentFilenameShapeSchema = z
+  .string()
+  .regex(CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX);
+
+/**
+ * Filename schema that combines the relaxed regex with the deny-list check.
+ * Used by every layer that accepts an R2 object basename.
+ */
+export const cloudAgentRelaxedAttachmentFilenameSchema = z.string().superRefine((value, ctx) => {
+  const shape = cloudAgentRelaxedAttachmentFilenameShapeSchema.safeParse(value);
+  if (!shape.success) {
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        'Attachment filename must be a UUID with a 1-16 character lowercase alphanumeric extension',
+      path: [],
+    });
+    return;
+  }
+  const suffix = value.slice(value.lastIndexOf('.') + 1).toLowerCase();
+  if (DENIED_EXTENSION_SET.has(suffix)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Attachment extension "${suffix}" is not allowed`,
+      path: [],
+    });
+  }
+});
+
 export const cloudAgentAttachmentsSchema = z.object({
   path: z.uuid(),
   files: z.array(cloudAgentAttachmentFilenameSchema).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
-export const cloudAgentGetAttachmentUploadUrlSchema = z.object({
+/**
+ * Upload-presign input. When `extension` is provided, the caller is opting
+ * into the relaxed surface: `contentType` only needs to match the
+ * `type/subtype` shape (≤128 chars) and the R2 key suffix is derived from the
+ * validated extension, not from `contentType`. When `extension` is absent,
+ * the legacy behavior is preserved: `contentType` must be one of the
+ * existing allowed MIMEs and the suffix derives from the legacy MIME map.
+ */
+export const cloudAgentGetAttachmentUploadUrlSchema = z
+  .object({
+    messageUuid: z.uuid(),
+    attachmentId: z.uuid(),
+    contentType: z.string().min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_CONTENT_TYPE_LENGTH),
+    contentLength: z.number().int().positive().max(CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES),
+    extension: z
+      .string()
+      .regex(CLOUD_AGENT_ATTACHMENT_EXTENSION_REGEX)
+      .superRefine((extension, ctx) => {
+        if (DENIED_EXTENSION_SET.has(extension.toLowerCase())) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Attachment extension "${extension}" is not allowed`,
+            path: [],
+          });
+        }
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.extension) {
+      // Relaxed surface: contentType only needs the type/subtype shape.
+      if (!CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX.test(data.contentType)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['contentType'],
+          message: 'contentType must match type/subtype',
+        });
+      }
+    } else if (
+      !(CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES as readonly string[]).includes(data.contentType)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contentType'],
+        message: `contentType must be one of: ${CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES.join(', ')}`,
+      });
+    }
+  });
+
+/**
+ * Download-presign input. The presign helper re-validates the filename with
+ * the same relaxed regex + deny-list combination so the key prefix can never
+ * accept an unsafe basename. There is intentionally no org mirror — remote
+ * CLI sessions are personal.
+ */
+export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
   messageUuid: z.uuid(),
-  attachmentId: z.uuid(),
-  contentType: z.enum(CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES),
-  contentLength: z.number().int().positive().max(CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES),
+  filename: cloudAgentRelaxedAttachmentFilenameSchema,
 });
 
 function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {

@@ -107,6 +107,8 @@ import {
   getManualCodeReviewConfig,
   shouldPublishCodeReviewToProvider,
 } from '@/lib/code-reviews/manual-config';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import type { CodeReviewAgentConfig } from '@kilocode/db/schema-types';
 
 const CallbackTextTruncationSchema = z
   .object({
@@ -533,6 +535,25 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
 function isSupersededReview(review: CloudAgentCodeReview): boolean {
   return review.terminal_reason === 'superseded';
+}
+
+/**
+ * Resolves the org/user Code Reviewer config for a review, used as the council-config source for
+ * AUTOMATED (webhook) council reviews, which carry no `manual_config`. Manual reviews resolve
+ * their council from `manual_config` and never need this. Returns null on any gap (no owner, no
+ * config) so council finalization fails safe rather than throwing.
+ */
+async function resolveOrgCodeReviewAgentConfig(
+  review: CloudAgentCodeReview
+): Promise<CodeReviewAgentConfig | null> {
+  const owner = review.owned_by_organization_id
+    ? ({ type: 'org', id: review.owned_by_organization_id } as const)
+    : review.owned_by_user_id
+      ? ({ type: 'user', id: review.owned_by_user_id } as const)
+      : null;
+  if (!owner) return null;
+  const agentConfig = await getAgentConfigForOwner(owner, 'code_review', review.platform);
+  return agentConfig ? (agentConfig.config as CodeReviewAgentConfig) : null;
 }
 
 async function resolveTerminalOwner(
@@ -1060,6 +1081,15 @@ export async function POST(
     // Code-owned council outcome for a completed council run. Set on whichever completion path
     // runs below, then used to drive the merge gate (the council LLM never sets `gateResult`).
     let councilResult: CodeReviewCouncilResult | null = null;
+    // Council-config source for AUTOMATED (webhook) council reviews, which carry no `manual_config`.
+    // Fetched once (only for completed council reviews without a manual config) and reused on
+    // whichever completion path runs. Manual/standard reviews skip the lookup.
+    const councilOrgAgentConfig: CodeReviewAgentConfig | null =
+      status === 'completed' &&
+      review.review_type === 'council' &&
+      getManualCodeReviewConfig(review) === null
+        ? await resolveOrgCodeReviewAgentConfig(review)
+        : null;
 
     if (
       status === 'completed' &&
@@ -1076,6 +1106,7 @@ export async function POST(
       councilResult = computeCouncilResultForReview({
         review,
         lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+        orgAgentConfig: councilOrgAgentConfig,
       });
       const completionResult = await finalizeCompletedCodeReviewWithAnalytics({
         codeReviewId: reviewId,
@@ -1370,6 +1401,7 @@ export async function POST(
       councilResult = await finalizeCouncilResultForReview({
         review,
         lastAssistantMessageText: rawPayload.lastAssistantMessageText,
+        orgAgentConfig: councilOrgAgentConfig,
       });
     }
 

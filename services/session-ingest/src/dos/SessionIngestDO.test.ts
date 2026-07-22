@@ -291,6 +291,26 @@ describe('SessionIngestDO session-ready push', () => {
   it('pushes on first claim and never again', async () => {
     const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
 
+    durableObject.claimSessionReadyPush('usr_push', 'ses_push', 'My title');
+    await settle();
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
+    expect(sendSessionReadyNotification).toHaveBeenCalledWith({
+      userId: 'usr_push',
+      cliSessionId: 'ses_push',
+      title: 'My title',
+    });
+
+    // Re-claims (CLI reconnect, UserConnectionDO eviction) must not re-push.
+    durableObject.claimSessionReadyPush('usr_push', 'ses_push', 'My title');
+    await settle();
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards an undefined title when none is supplied', async () => {
+    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+
     durableObject.claimSessionReadyPush('usr_push', 'ses_push');
     await settle();
 
@@ -298,13 +318,8 @@ describe('SessionIngestDO session-ready push', () => {
     expect(sendSessionReadyNotification).toHaveBeenCalledWith({
       userId: 'usr_push',
       cliSessionId: 'ses_push',
+      title: undefined,
     });
-
-    // Re-claims (CLI reconnect, UserConnectionDO eviction) must not re-push.
-    durableObject.claimSessionReadyPush('usr_push', 'ses_push');
-    await settle();
-
-    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
   });
 
   it('never pushes for a deleted session', async () => {

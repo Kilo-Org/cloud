@@ -213,6 +213,8 @@ export const personalReviewAgentRouter = createTRPCRouter({
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           repositoryModelOverrides: [],
+          council: null,
+          councilEnabledRepositoryIds: [],
           disableReviewMd: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -245,6 +247,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: cfg.disable_review_md ?? true,
+        // Council is org-only; personal configs never set it, but expose it so the query shape
+        // matches the org query (the form's `configData` is a union of the two).
+        council: cfg.council ?? null,
+        councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
         reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
       };

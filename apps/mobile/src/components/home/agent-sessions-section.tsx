@@ -13,37 +13,11 @@ import {
   type StoredSession,
   useAgentSessions,
 } from '@/lib/hooks/use-agent-sessions';
+import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
-
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label.
- * The row's hue is hashed from the label in `SessionRow`, so no agent
- * key needs to be emitted here.
- */
-function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
 
 function repoNameFromGitUrl(gitUrl: string | null | undefined): string | null {
   if (!gitUrl) {
@@ -153,7 +127,12 @@ function storedSessionMeta(session: StoredSession): string {
 
 function activeSessionLabel(session: ActiveSession): string {
   const repo = repoNameFromGitUrl(session.gitUrl);
-  return repo ? repo.toUpperCase() : platformLabel('cloud-agent');
+  // kilocode_change - K1/C3a: derive the fallback label from the live
+  // per-session `platform` heartbeat field instead of a hardcoded
+  // 'cloud-agent' guess, so a `kilo remote`-spawned session shows "CLI"
+  // (via platformLabel) instead of being mislabeled "CLOUD AGENT". Entries
+  // without `platform` (legacy senders) keep today's exact fallback.
+  return repo ? repo.toUpperCase() : platformLabel(session.platform ?? 'cloud-agent');
 }
 
 function storedSessionLabel(session: StoredSession): string {

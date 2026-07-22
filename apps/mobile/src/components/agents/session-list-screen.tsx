@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
+import { ActiveNowSection } from '@/components/agents/active-now-section';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
@@ -16,12 +17,11 @@ import {
   SessionFilterModal,
 } from '@/components/agents/platform-filter-modal';
 import {
+  excludeActiveFromGroups,
   expandPlatformFilter,
   formatGitUrlProject,
-  matchesSearch,
-  type RemoteSessionItem,
+  selectPinnedActiveSessions,
   type SessionSection,
-  type StoredSessionItem,
 } from '@/components/agents/session-list-helpers';
 import { ScreenHeader } from '@/components/screen-header';
 import {
@@ -98,8 +98,9 @@ export function AgentSessionListScreen() {
     dateGroups,
     activeSessions,
     activeSessionIds,
+    activeIsError,
     isLoading,
-    isError,
+    storedIsError,
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
@@ -125,20 +126,31 @@ export function AgentSessionListScreen() {
     enabled: ready,
   });
 
-  // While searching, only the search query's own error/pending state matters —
-  // it's the one actually driving what's on screen. Retrying should hit
-  // whichever query is really in error instead of always refetching the base
-  // list underneath a failed search.
-  const contentIsError = isSearching ? search.isError : isError;
+  // The body's error/empty state is driven only by the query that actually
+  // fills the body: the search query while searching, otherwise the stored
+  // (history) list. A transient active-poll blip must never fold into this —
+  // it surfaces solely through the inline "Couldn't refresh" line via
+  // `activeIsError`. Retrying still hits whichever query is really in error
+  // instead of always refetching the base list underneath a failed search;
+  // an active-only failure during search additionally retries the active poll
+  // so the inline staleness line clears.
+  const contentIsError = isSearching ? search.isError : storedIsError;
   const isSearchPending = isSearching && search.isPending;
   const searchRefetch = search.refetch;
   const handleRetry = useCallback(() => {
-    if (isSearching) {
-      void searchRefetch();
-    } else {
+    if (!isSearching) {
       void refetch();
+      return;
     }
-  }, [isSearching, searchRefetch, refetch]);
+    if (activeIsError) {
+      // search is the body, active is the tray — retry both.
+      void (async () => {
+        await Promise.all([searchRefetch(), refetch()]);
+      })();
+      return;
+    }
+    void searchRefetch();
+  }, [activeIsError, isSearching, refetch, searchRefetch]);
 
   // Pull-to-refresh must also retry the search query while one is active —
   // it's the query actually driving what's on screen.
@@ -190,69 +202,33 @@ export function AgentSessionListScreen() {
   // `isSearchPending` drives a lightweight inline indicator instead.
   const effectiveSearchQuery = isSearchPending ? '' : searchQuery;
 
+  // Pinned "Active now" tray. Free-text search is intentionally NOT a
+  // narrowing input here — the tray persists while the user types. The
+  // helper applies only the platform/project filters so the tray never
+  // shows a session the user has explicitly filtered out.
+  const pinnedActive = useMemo(
+    () => selectPinnedActiveSessions({ activeSessions, projectFilter, platformFilter }),
+    [activeSessions, platformFilter, projectFilter]
+  );
+  const hasPinnedActive = pinnedActive.length > 0;
+
+  const organizationIdBySessionId = useMemo(
+    () => new Map(storedSessions.map(s => [s.session_id, s.organization_id])),
+    [storedSessions]
+  );
+
+  // History sections only. The pinned tray takes over for active sessions
+  // and `excludeActiveFromGroups` keeps history exclusivity.
   const sections = useMemo<SessionSection[]>(() => {
-    const result: SessionSection[] = [];
-    const storedSessionIds = new Set(storedSessions.map(session => session.session_id));
-
-    const filteredActive = activeSessions.filter(session => {
-      if (storedSessionIds.has(session.id)) {
-        return false;
-      }
-
-      if (projectFilter.length > 0 && !session.gitUrl) {
-        return false;
-      }
-
-      if (projectFilter.length > 0 && session.gitUrl && !projectFilter.includes(session.gitUrl)) {
-        return false;
-      }
-
-      return effectiveSearchQuery
-        ? matchesSearch(effectiveSearchQuery, session.title, session.gitUrl ?? null)
-        : true;
-    });
-
-    if (filteredActive.length > 0) {
-      result.push({
-        title: 'Remote',
-        data: filteredActive.map(
-          (session): RemoteSessionItem => ({
-            kind: 'remote',
-            session,
-          })
-        ),
-      });
-    }
-
     // Stored sessions are cursor-paginated, so a client-side filter would only
     // see the loaded pages. When a query is active, use the server search
     // results (which cover the full history) instead.
     const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
-    for (const group of storedGroups) {
-      if (group.sessions.length > 0) {
-        result.push({
-          title: group.label,
-          data: group.sessions.map(
-            (session): StoredSessionItem => ({
-              kind: 'stored',
-              session,
-              isLive: activeSessionIds.has(session.session_id),
-            })
-          ),
-        });
-      }
-    }
-
-    return result;
-  }, [
-    activeSessionIds,
-    activeSessions,
-    dateGroups,
-    effectiveSearchQuery,
-    projectFilter,
-    search.dateGroups,
-    storedSessions,
-  ]);
+    return excludeActiveFromGroups(storedGroups, activeSessionIds).map(group => ({
+      title: group.label,
+      data: group.sessions,
+    }));
+  }, [activeSessionIds, dateGroups, effectiveSearchQuery, search.dateGroups]);
 
   const navigateToSession = useCallback(
     (sessionId: string, sessionOrgId?: string | null) => {
@@ -313,14 +289,20 @@ export function AgentSessionListScreen() {
           }}
         />
       </Animated.View>
+      <ActiveNowSection
+        pinned={pinnedActive}
+        organizationIdBySessionId={organizationIdBySessionId}
+        onSessionPress={navigateToSession}
+      />
       <Animated.View layout={LinearTransition} className="flex-1">
         <AgentSessionListContent
           sections={sections}
-          storedSessions={storedSessions}
           hasAnySessions={hasAnySessions}
+          hasPinnedActive={hasPinnedActive}
           isLoading={isLoading || !ready}
           isSearchPending={isSearchPending}
           isError={contentIsError}
+          activeIsError={activeIsError}
           isFetchingNextPage={isFetchingNextPage}
           refetch={handleRefetch}
           onRetry={handleRetry}

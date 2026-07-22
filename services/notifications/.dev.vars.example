@@ -1,2 +1,11 @@
 # Local worker auth must match Kilo JWTs minted by the Next.js dev server.
 WORKER_ENV=development
+
+# Opt-in local dev / E2E push sink mode. When set to "log", the
+# NotificationChannelDO records outgoing agent-push payloads (token
+# redacted) instead of calling Expo, so simulator E2E can drive the full
+# chain to a `dispatched` outcome without a real APNs token. Absent from
+# `wrangler.jsonc` (which is single-config production) and default-off.
+# Set to `log` here to enable; leave unset / empty to keep the real Expo
+# send path.
+PUSH_SINK_MODE=

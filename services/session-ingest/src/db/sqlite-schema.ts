@@ -27,3 +27,21 @@ export const sessions = sqliteTable(
   },
   table => [index('sessions_organization_id_idx').on(table.organization_id)]
 );
+
+/**
+ * Durable per-identity dispatch state for `agent_notification` items (§4.10).
+ *
+ * Insert-if-absent on ingest; the DO emits the `agent_notification` signal in the ingest
+ * response WHENEVER state is `pending` (fresh insert or replay). The dispatching caller
+ * flips the state to `dispatched` once the attempt reaches a terminal local decision.
+ *
+ * `identity` is `agent_notification/<data.id>` — the same form the ingest item table
+ * uses (`getItemIdentity()` returns `agent_notification/<data.id>`; we use the typed
+ * dispatch table form for clarity, but a downstream marker query joins on the
+ * well-known prefix).
+ */
+export const agentNotificationDispatch = sqliteTable('agent_notification_dispatch', {
+  identity: text('identity').primaryKey(),
+  state: text('state', { enum: ['pending', 'dispatched'] }).notNull(),
+  created_at: integer('created_at').notNull(),
+});

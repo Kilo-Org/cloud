@@ -195,6 +195,11 @@ function slimItemForR2Reference(item: SessionDataItem): SessionDataItem {
       return { type: 'message', data: { id: item.data.id } };
     case 'part':
       return { type: 'part', data: { id: item.data.id, messageID: item.data.messageID } };
+    case 'agent_notification':
+      // Bounded: id ≤64 + message ≤500 ⇒ well under MAX_INGEST_ITEM_BYTES, so the slim
+      // path is never triggered for this kind. Return the item unchanged to keep the
+      // signal's `message` available to the DO's in-batch capture.
+      return item;
     case 'session': {
       const data: Record<string, unknown> = {};
       if ('title' in item.data) data.title = item.data.title;
@@ -305,6 +310,11 @@ function createIngestChunker(
  * ingest (completed assistant turn, or waiting for input). Suppressed for sessions without
  * a live CLI owner and for child sessions. Viewing suppression is delegated to notifications.
  * Never throws — a dispatch failure must not block ack'ing (or retrying) the message.
+ *
+ * §4.10 — agent_notification exception: RPC/transport errors for this kind propagate out of
+ * the dispatch loop so the outer `waitUntil` boundary logs AFTER the marker acknowledgement
+ * was skipped (i.e. the identity stays `pending` and a later replay can re-emit). Ingest
+ * itself never fails due to a dispatch error.
  */
 function scheduleAttentionSignalDispatch(
   env: Env,
@@ -323,29 +333,99 @@ function scheduleAttentionSignalDispatch(
       parentSessionId,
     })
   ) {
+    // §4.10: child sessions never receive attention pushes, but an agent_notification
+    // identity that is locally ineligible must still be marked dispatched so a replay
+    // does not re-emit it forever.
+    const agentNotificationSignals = signals.filter(
+      (s): s is Extract<AttentionSignal, { kind: 'agent_notification' }> =>
+        s.kind === 'agent_notification'
+    );
+    if (agentNotificationSignals.length > 0) {
+      ctx.waitUntil(
+        markIneligibleAgentNotificationsDispatched(env, msg, agentNotificationSignals).catch(
+          error => {
+            console.error(
+              'Failed to mark ineligible agent_notification identities dispatched (non-fatal)',
+              {
+                sessionId: msg.sessionId,
+                kiloUserId: msg.kiloUserId,
+                error: error instanceof Error ? error.message : String(error),
+              }
+            );
+          }
+        )
+      );
+    }
     return;
   }
 
   ctx.waitUntil(
-    dispatchRemoteSessionAttentionSignals(env, msg.kiloUserId, msg.sessionId, signals).catch(
-      error => {
+    (async () => {
+      try {
+        // §4.10: reacquire the DO stub at the post-commit dispatch boundary — the
+        // ingest-time stub is no longer in scope. The dispatch function receives the
+        // marker callback so each successful (or non-throwing) agent_notification
+        // attempt can flip its identity to `dispatched`.
+        const sessionDO = getSessionIngestDO(env, {
+          kiloUserId: msg.kiloUserId,
+          sessionId: msg.sessionId,
+        });
+        await dispatchRemoteSessionAttentionSignals(env, msg.kiloUserId, msg.sessionId, signals, {
+          markAgentNotificationDispatched: (notificationId: string) =>
+            sessionDO.markAgentNotificationDispatched(notificationId),
+        });
+      } catch (error) {
         console.error('Failed to dispatch remote session attention signals (non-fatal)', {
           sessionId: msg.sessionId,
           kiloUserId: msg.kiloUserId,
           error: error instanceof Error ? error.message : String(error),
         });
       }
-    )
+    })()
   );
+}
+
+async function markIneligibleAgentNotificationsDispatched(
+  env: Env,
+  msg: IngestQueueMessage,
+  signals: Array<Extract<AttentionSignal, { kind: 'agent_notification' }>>
+): Promise<void> {
+  const sessionDO = getSessionIngestDO(env, {
+    kiloUserId: msg.kiloUserId,
+    sessionId: msg.sessionId,
+  });
+  for (const signal of signals) {
+    try {
+      await sessionDO.markAgentNotificationDispatched(signal.notificationId);
+    } catch (error) {
+      console.error('Failed to mark ineligible agent_notification dispatched (non-fatal)', {
+        sessionId: msg.sessionId,
+        kiloUserId: msg.kiloUserId,
+        notificationId: signal.notificationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 async function dispatchRemoteSessionAttentionSignals(
   env: Env,
   kiloUserId: string,
   sessionId: string,
-  signals: AttentionSignal[]
+  signals: AttentionSignal[],
+  deps: {
+    markAgentNotificationDispatched: (notificationId: string) => unknown;
+  }
 ): Promise<void> {
-  for (const signal of signals) {
+  const agentNotificationSignals = signals.filter(
+    (s): s is Extract<AttentionSignal, { kind: 'agent_notification' }> =>
+      s.kind === 'agent_notification'
+  );
+  const legacySignals = signals.filter(s => s.kind !== 'agent_notification');
+
+  // Dispatch legacy signals first, independently; per-signal errors are logged but do not
+  // prevent remaining legacy signals or agent notifications from proceeding.
+  for (const signal of legacySignals) {
     try {
       await dispatchRemoteSessionAttentionSignal(
         { kiloUserId, sessionId, signal },
@@ -356,6 +436,8 @@ async function dispatchRemoteSessionAttentionSignals(
             return stub.hasActiveCliSession(sessionId);
           },
           sendPush: pushParams => env.NOTIFICATIONS.sendCloudAgentSessionNotification(pushParams),
+          sendAgentSessionNotification: pushParams =>
+            env.NOTIFICATIONS.sendAgentSessionNotification(pushParams),
         }
       );
     } catch (error) {
@@ -364,6 +446,36 @@ async function dispatchRemoteSessionAttentionSignals(
         kiloUserId,
         signalId: signal.signalId,
         kind: signal.kind,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // Dispatch agent notifications after legacy signals. A thrown RPC/transport error
+  // propagates so the marker stays `pending` and a later replay can re-emit.
+  for (const signal of agentNotificationSignals) {
+    const result = await env.NOTIFICATIONS.sendAgentSessionNotification({
+      userId: kiloUserId,
+      cliSessionId: sessionId,
+      notificationId: signal.notificationId,
+      message: signal.message,
+    });
+    console.log({
+      event: 'agent_push_outcome',
+      cliSessionId: sessionId,
+      notificationId: signal.notificationId,
+      outcome: result.dispatched ? 'dispatched' : (result.reason ?? 'failed'),
+    });
+    try {
+      await deps.markAgentNotificationDispatched(signal.notificationId);
+    } catch (error) {
+      // The marker is best-effort: a failed mark leaves the identity `pending` and
+      // a future replay could re-emit. Idempotency on the RPC side (1h TTL) dedups
+      // within the window; the recorded duplicate edge in §4.10 is accepted.
+      console.error('Failed to mark agent_notification dispatched (non-fatal)', {
+        sessionId,
+        kiloUserId,
+        notificationId: signal.notificationId,
         error: error instanceof Error ? error.message : String(error),
       });
     }

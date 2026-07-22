@@ -255,6 +255,23 @@ describe('detectRequiredInputModalities', () => {
     ).toEqual(['image']);
   });
 
+  it('does not treat a bare `file` key in tool output as a file request', () => {
+    // A `read_file`-style tool result whose `content` is a structured object
+    // with a `file` property must not be misdetected as a document request.
+    expect(
+      detectRequiredInputModalities({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'user', content: 'Read src/webhook.ts' },
+          {
+            role: 'tool',
+            content: [{ type: 'tool_result', content: { file: 'src/webhook.ts', lines: 42 } }],
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
   it('does not claim support for Gemini native contents[].parts[] bodies', () => {
     // Native Gemini request bodies never reach this helper: the gateway only
     // invokes auto-routing for chat_completions / responses / messages shapes,

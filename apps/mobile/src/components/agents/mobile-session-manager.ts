@@ -9,19 +9,17 @@ import {
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
-  type TransportSendPayload,
   type UserWebConnection,
 } from 'cloud-agent-sdk';
-import { normalizeAgentMode } from '@/components/agents/mode-options';
+import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
 import {
   formatSafeCloudAgentFailureDiagnostic,
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
-import { trpcClient } from '@/lib/trpc';
 import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import { trpcClient } from '@/lib/trpc';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
-import { type SendMessagePayload } from '@/lib/cloud-agent-next/types';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
 type CreateMobileAgentSessionManagerOptions = {
@@ -33,31 +31,6 @@ type CreateMobileAgentSessionManagerOptions = {
 type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
 
 const skipBatchOptions = { context: { skipBatch: true } };
-
-function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePayload {
-  if (payload.type === 'prompt') {
-    if (!payload.model) {
-      throw new Error('Model is required');
-    }
-    if (payload.model.providerID !== 'kilo') {
-      throw new Error('Cloud Agent only supports Kilo models');
-    }
-
-    return {
-      type: 'prompt',
-      prompt: payload.prompt,
-      mode: normalizeAgentMode(payload.mode),
-      model: payload.model.modelID,
-      variant: payload.variant,
-    };
-  }
-
-  return {
-    type: 'command',
-    command: payload.command,
-    arguments: payload.arguments,
-  };
-}
 
 export function createMobileAgentSessionManager({
   store,
@@ -84,8 +57,21 @@ export function createMobileAgentSessionManager({
         };
       }
       const active = await trpcClient.activeSessions.list.query();
-      const isRemote = active.sessions.some(s => s.id === kiloSessionId);
-      return { type: isRemote ? 'remote' : 'read-only', kiloSessionId };
+      const activeSession = active.sessions.find(s => s.id === kiloSessionId);
+      if (!activeSession) {
+        return { type: 'read-only', kiloSessionId };
+      }
+      // Surface the owning CLI's per-session capabilities so the initial
+      // `supportsAttachments` gate reflects whatever the mobile adapter
+      // observed at resolution time. Heartbeat upgrades / downgrades
+      // arrive later via `onTransportCapabilitiesChange` from the
+      // cli-live-transport; the seed here just covers the window before
+      // the first heartbeat lands.
+      return {
+        type: 'remote',
+        kiloSessionId,
+        ...(activeSession.capabilities ? { capabilities: activeSession.capabilities } : {}),
+      };
     },
     getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
       const ticket = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {

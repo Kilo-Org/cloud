@@ -436,3 +436,77 @@ describe('onStdoutLine callback', () => {
     expect(supervisor.getState()).toBe('running');
   });
 });
+
+describe('createSupervisor beforeSpawn', () => {
+  /** beforeSpawn is awaited, so a restart needs an extra turn to reach spawn. */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 4; i += 1) {
+      await Promise.resolve();
+    }
+  }
+
+  it('runs before every spawn, including crash restarts', async () => {
+    const { spawnImpl, children } = createSpawnHarness();
+    const beforeSpawn = vi.fn();
+    const supervisor = createSupervisor({
+      args: ['gateway'],
+      spawnImpl: spawnImpl as never,
+      backoffInitialMs: 1_000,
+      beforeSpawn,
+    });
+
+    await supervisor.start();
+    await settle();
+    expect(beforeSpawn).toHaveBeenCalledTimes(1);
+
+    // A crash-looping gateway must re-run the hook each attempt, otherwise a
+    // config it refuses to boot can never be repaired without a manual reboot.
+    children[0].emit('exit', 1, null);
+    vi.advanceTimersByTime(1_000);
+    await settle();
+
+    expect(beforeSpawn).toHaveBeenCalledTimes(2);
+    expect(spawnImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs the hook before spawning, not after', async () => {
+    const order: string[] = [];
+    const { children } = createSpawnHarness();
+    const spawnImpl = vi.fn(() => {
+      order.push('spawn');
+      const child = new FakeChildProcess(1);
+      children.push(child);
+      queueMicrotask(() => child.emit('spawn'));
+      return child as never;
+    });
+    const supervisor = createSupervisor({
+      args: ['gateway'],
+      spawnImpl: spawnImpl as never,
+      beforeSpawn: () => {
+        order.push('repair');
+      },
+    });
+
+    await supervisor.start();
+    await settle();
+
+    expect(order).toEqual(['repair', 'spawn']);
+  });
+
+  it('still spawns when the hook throws', async () => {
+    const { spawnImpl } = createSpawnHarness();
+    const supervisor = createSupervisor({
+      args: ['gateway'],
+      spawnImpl: spawnImpl as never,
+      beforeSpawn: () => {
+        throw new Error('repair exploded');
+      },
+    });
+
+    await supervisor.start();
+    await settle();
+
+    expect(spawnImpl).toHaveBeenCalledTimes(1);
+    expect(supervisor.getStats().state).not.toBe('stopped');
+  });
+});

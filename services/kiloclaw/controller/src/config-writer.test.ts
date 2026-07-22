@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   backupConfigFile,
+  ensureHookSessionKeyPrefixes,
   ensureInboundEmailHookFlags,
   generateBaseConfig,
+  hookSessionKeyPrefixViolation,
+  repairPersistedHookInvariants,
   setNestedValue,
   writeBaseConfig,
   writeMcporterConfig,
@@ -1867,5 +1870,148 @@ describe('writeMcporterConfig', () => {
     const config = JSON.parse(written[0].data);
     // The header should contain the literal string ${LINEAR_API_KEY}, not the actual value
     expect(config.mcpServers.linear.headers.Authorization).toBe('Bearer ${LINEAR_API_KEY}');
+  });
+});
+
+/** Config shaped like the one that bricked a live instance: templated hook
+ * sessionKey, `allowRequestSessionKey` set, but no prefix allow-list. */
+function bootBlockingConfig(): {
+  hooks: {
+    enabled: boolean;
+    token: string;
+    path: string;
+    allowRequestSessionKey: boolean;
+    allowedSessionKeyPrefixes?: unknown;
+    mappings: { id: string; action: string; sessionKey: string }[];
+  };
+} {
+  return {
+    hooks: {
+      enabled: true,
+      token: 'local-token',
+      path: '/hooks',
+      allowRequestSessionKey: true,
+      mappings: [
+        {
+          id: 'cloudflare-email-inbound',
+          action: 'agent',
+          sessionKey: '{{payload.sessionKey}}',
+        },
+      ],
+    },
+  };
+}
+
+describe('ensureHookSessionKeyPrefixes', () => {
+  it('adds the required prefixes when a mapping sessionKey is templated', () => {
+    const config = bootBlockingConfig();
+    expect(ensureHookSessionKeyPrefixes(config)).toBe(true);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
+  });
+
+  it('is idempotent', () => {
+    const config = bootBlockingConfig();
+    ensureHookSessionKeyPrefixes(config);
+    expect(ensureHookSessionKeyPrefixes(config)).toBe(false);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
+  });
+
+  it('preserves operator-added prefixes while appending the required ones', () => {
+    const config = bootBlockingConfig();
+    (config.hooks as Record<string, unknown>).allowedSessionKeyPrefixes = ['custom:'];
+    expect(ensureHookSessionKeyPrefixes(config)).toBe(true);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['custom:', 'hook:', 'inbound-email:']);
+  });
+
+  it('leaves configs without a templated sessionKey untouched', () => {
+    const config = {
+      hooks: {
+        enabled: true,
+        mappings: [{ id: 'static', action: 'agent', sessionKey: 'hook:fixed' }],
+      },
+    };
+    expect(ensureHookSessionKeyPrefixes(config)).toBe(false);
+    expect(config.hooks).not.toHaveProperty('allowedSessionKeyPrefixes');
+  });
+
+  it('ignores configs with no hooks block', () => {
+    const config: Record<string, unknown> = { gateway: { port: 3001 } };
+    expect(ensureHookSessionKeyPrefixes(config)).toBe(false);
+  });
+});
+
+describe('hookSessionKeyPrefixViolation', () => {
+  it('reports a config that would stop the gateway from starting', () => {
+    expect(hookSessionKeyPrefixViolation(bootBlockingConfig())).toMatch(
+      /hooks\.allowedSessionKeyPrefixes is required/
+    );
+  });
+
+  it('returns null once the prefixes are present', () => {
+    const config = bootBlockingConfig();
+    ensureHookSessionKeyPrefixes(config);
+    expect(hookSessionKeyPrefixViolation(config)).toBeNull();
+  });
+
+  it('treats a blank-only allow-list as missing', () => {
+    const config = bootBlockingConfig();
+    (config.hooks as Record<string, unknown>).allowedSessionKeyPrefixes = ['   '];
+    expect(hookSessionKeyPrefixViolation(config)).not.toBeNull();
+  });
+
+  it('returns null when hooks are disabled', () => {
+    const config = bootBlockingConfig();
+    config.hooks.enabled = false;
+    expect(hookSessionKeyPrefixViolation(config)).toBeNull();
+  });
+});
+
+describe('repairPersistedHookInvariants', () => {
+  it('rewrites a bricking config and reports the repair', () => {
+    const { deps, written, renamed, chmodded } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(true);
+
+    expect(written).toHaveLength(1);
+    expect(JSON.parse(written[0].data).hooks.allowedSessionKeyPrefixes).toEqual([
+      'hook:',
+      'inbound-email:',
+    ]);
+    // Written to a temp path, tightened, then renamed over the live config.
+    expect(written[0].path).not.toBe('/root/.openclaw/openclaw.json');
+    expect(chmodded[0].mode).toBe(0o600);
+    expect(renamed[0].to).toBe('/root/.openclaw/openclaw.json');
+  });
+
+  it('does not rewrite a config that is already valid', () => {
+    const config = bootBlockingConfig();
+    ensureHookSessionKeyPrefixes(config);
+    const { deps, written } = fakeDeps(JSON.stringify(config));
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+    expect(written).toHaveLength(0);
+  });
+
+  it('returns false instead of throwing when the config is unreadable', () => {
+    const { deps, written } = fakeDeps('{ not json');
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+    expect(written).toHaveLength(0);
+  });
+
+  it('returns false when there is no config yet', () => {
+    const { deps } = fakeDeps();
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+  });
+
+  it('cleans up the temp file when the rename fails', () => {
+    const { deps, unlinked } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+    deps.renameSync = vi.fn(() => {
+      throw new Error('EXDEV');
+    });
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+    expect(unlinked).toHaveLength(1);
+    expect(unlinked[0]).toContain('.kilorepair.');
   });
 });

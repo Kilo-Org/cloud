@@ -234,6 +234,94 @@ const INBOUND_EMAIL_HOOK_MAPPING = {
   deliver: false,
 };
 
+/** A hook mapping `sessionKey` that interpolates request data, e.g. `{{payload.sessionKey}}`. */
+function hasTemplatedSessionKey(mapping: unknown): boolean {
+  if (typeof mapping !== 'object' || mapping === null) {
+    return false;
+  }
+  const sessionKey = (mapping as ConfigObject).sessionKey;
+  return typeof sessionKey === 'string' && sessionKey.includes('{{');
+}
+
+/**
+ * Guarantee `hooks.allowedSessionKeyPrefixes` whenever a hook mapping derives
+ * its `sessionKey` from a template.
+ *
+ * OpenClaw's gateway (2026.6.11+) refuses to start when a templated mapping is
+ * present without this allow-list — `hooks.allowRequestSessionKey: true` is NOT
+ * sufficient. A config in that state fails at the `config.normalize` phase on
+ * every start, and because the gateway supervisor only restarts the process (it
+ * does not re-derive config), the instance crash-loops indefinitely.
+ *
+ * Deliberately keyed off the *persisted config* rather than the environment:
+ * the mapping that trips the check lives in the config and outlives any single
+ * boot, so the repair must not be gated on `KILOCLAW_HOOKS_TOKEN` (or any other
+ * env var) being set on the boot that happens to observe it.
+ *
+ * Idempotent. Returns true when the config was modified.
+ */
+export function ensureHookSessionKeyPrefixes(config: ConfigObject): boolean {
+  const hooks = config.hooks;
+  if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks)) {
+    return false;
+  }
+  if (!Array.isArray(hooks.mappings) || !hooks.mappings.some(hasTemplatedSessionKey)) {
+    return false;
+  }
+
+  const existing: unknown = hooks.allowedSessionKeyPrefixes;
+  const prefixes: string[] = Array.isArray(existing)
+    ? existing.filter((value): value is string => typeof value === 'string')
+    : [];
+  const missing = [DEFAULT_HOOK_SESSION_KEY_PREFIX, INBOUND_EMAIL_SESSION_KEY_PREFIX].filter(
+    prefix => !prefixes.includes(prefix)
+  );
+
+  // Preserve any operator-added prefixes; only append what OpenClaw requires.
+  if (missing.length === 0 && Array.isArray(existing)) {
+    return false;
+  }
+  hooks.allowedSessionKeyPrefixes = [...prefixes, ...missing];
+  return true;
+}
+
+/**
+ * Report why OpenClaw's gateway would refuse to start with this config, or null
+ * when the hook config is startable.
+ *
+ * Pure counterpart to {@link ensureHookSessionKeyPrefixes}, for write paths that
+ * must reject a bricking config rather than silently rewriting the caller's
+ * content. Intentionally a local structural check rather than a shell out to
+ * `openclaw config validate`: it runs on every write, and this specific failure
+ * is unrecoverable without a manual reboot, so it is enforced even when the
+ * caller opts out of advisory validation.
+ */
+export function hookSessionKeyPrefixViolation(config: ConfigObject): string | null {
+  const hooks = config.hooks;
+  if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks)) {
+    return null;
+  }
+  if (hooks.enabled !== true || !Array.isArray(hooks.mappings)) {
+    return null;
+  }
+  if (!hooks.mappings.some(hasTemplatedSessionKey)) {
+    return null;
+  }
+  const prefixes: unknown = hooks.allowedSessionKeyPrefixes;
+  const hasPrefixes =
+    Array.isArray(prefixes) &&
+    prefixes.some(value => typeof value === 'string' && value.trim().length > 0);
+  if (hasPrefixes) {
+    return null;
+  }
+  return (
+    'hooks.allowedSessionKeyPrefixes is required when a hook mapping sessionKey uses ' +
+    'templates (for example "{{payload.sessionKey}}"). Without it the OpenClaw gateway ' +
+    'refuses to start and the instance cannot recover on its own. Add the prefixes your ' +
+    'mappings use, for example ["hook:", "inbound-email:"].'
+  );
+}
+
 type ExecFileOptions = { env?: NodeJS.ProcessEnv; stdio?: 'inherit' | 'pipe' };
 
 export type ConfigWriterDeps = {
@@ -638,23 +726,6 @@ export function generateBaseConfig(
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
     ensureInboundEmailHookFlags(config);
-    config.hooks.allowedSessionKeyPrefixes = Array.isArray(config.hooks.allowedSessionKeyPrefixes)
-      ? config.hooks.allowedSessionKeyPrefixes
-      : [];
-    if (
-      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
-        DEFAULT_HOOK_SESSION_KEY_PREFIX
-      )
-    ) {
-      (config.hooks.allowedSessionKeyPrefixes as string[]).push(DEFAULT_HOOK_SESSION_KEY_PREFIX);
-    }
-    if (
-      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
-        INBOUND_EMAIL_SESSION_KEY_PREFIX
-      )
-    ) {
-      (config.hooks.allowedSessionKeyPrefixes as string[]).push(INBOUND_EMAIL_SESSION_KEY_PREFIX);
-    }
 
     config.hooks.mappings = Array.isArray(config.hooks.mappings)
       ? config.hooks.mappings.map((mapping: ConfigObject) => migrateHookMapping(mapping))
@@ -679,6 +750,12 @@ export function generateBaseConfig(
     }
     console.log('Hooks enabled with inbound email mapping (dedicated token)');
   }
+
+  // Runs outside the KILOCLAW_HOOKS_TOKEN branch on purpose: a config that
+  // already carries a templated hook mapping (from an earlier boot, a restored
+  // backup, or a hand-edit) must get the prefixes that OpenClaw requires even
+  // on a boot where the branch above is skipped. See the function's comment.
+  ensureHookSessionKeyPrefixes(config);
 
   // Vector memory configuration — configures OpenClaw's builtin memory search
   // to use the Kilo Gateway embeddings endpoint via the OpenAI-compatible adapter.
@@ -893,6 +970,69 @@ export function backupConfigFile(
   }
 
   pruneOldConfigBackups(dir, base, deps);
+}
+
+/**
+ * Re-apply controller-managed hook invariants to the persisted config.
+ *
+ * Called before every gateway spawn so a config that would refuse to boot is
+ * repaired instead of crash-looping. `generateBaseConfig` only runs during
+ * bootstrap, so without this any writer that drops the prefixes — a restored
+ * backup, a hand-edit, a whole-file API write — bricks the instance until
+ * someone reboots it by hand.
+ *
+ * Best-effort by contract: returns false and never throws, because a repair
+ * failure must not be the reason the gateway does not start.
+ */
+export function repairPersistedHookInvariants(
+  configPath = DEFAULT_CONFIG_PATH,
+  deps: ConfigWriterDeps = defaultDeps
+): boolean {
+  try {
+    if (!deps.existsSync(configPath)) {
+      return false;
+    }
+    const raw = deps.readFileSync(configPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return false;
+    }
+
+    const config = parsed as ConfigObject;
+    if (!ensureHookSessionKeyPrefixes(config)) {
+      return false;
+    }
+
+    // Reuse the onboard temp-file convention so a crash mid-write leaves the
+    // live config untouched rather than truncated.
+    const dir = path.dirname(configPath);
+    const base = path.basename(configPath);
+    const tmpPath = path.join(dir, `.${base}.kilorepair.${crypto.randomBytes(6).toString('hex')}`);
+    try {
+      deps.writeFileSync(tmpPath, JSON.stringify(config, null, 2));
+      deps.chmodSync(tmpPath, 0o600);
+      deps.renameSync(tmpPath, configPath);
+    } catch (error) {
+      try {
+        deps.unlinkSync(tmpPath);
+      } catch {
+        // Temp file may not exist; nothing to clean up.
+      }
+      throw error;
+    }
+
+    console.warn(
+      '[controller] Repaired hooks.allowedSessionKeyPrefixes before gateway start ' +
+        '(config had a templated hook sessionKey without the required prefix allow-list)'
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      '[controller] Failed to repair hook invariants, starting gateway anyway:',
+      error instanceof Error ? error.message : String(error)
+    );
+    return false;
+  }
 }
 
 /**

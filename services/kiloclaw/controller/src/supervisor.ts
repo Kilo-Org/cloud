@@ -56,6 +56,12 @@ type SupervisorOptions = {
   setTimeoutImpl?: typeof setTimeout;
   clearTimeoutImpl?: typeof clearTimeout;
   onStdoutLine?: (line: string) => void;
+  /**
+   * Runs immediately before every spawn, including restarts. Use for
+   * self-healing work that must happen on each attempt rather than once at
+   * bootstrap. Failures are logged and ignored so the spawn still proceeds.
+   */
+  beforeSpawn?: () => void | Promise<void>;
 };
 
 export function createSupervisor(options: SupervisorOptions): Supervisor {
@@ -72,6 +78,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
     setTimeoutImpl = setTimeout,
     clearTimeoutImpl = clearTimeout,
     onStdoutLine,
+    beforeSpawn,
   } = options;
 
   let state: SupervisorState = 'stopped';
@@ -182,6 +189,22 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
 
     state = 'starting';
     stopRequested = false;
+
+    if (beforeSpawn) {
+      try {
+        await beforeSpawn();
+      } catch (error) {
+        console.error(
+          '[supervisor] beforeSpawn hook failed, spawning anyway:',
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+      // The hook yields to the event loop, so re-check the flags it may have
+      // raced with; shutdown/stop must win over a spawn that is now stale.
+      if (child || shuttingDown || manualStop) {
+        return;
+      }
+    }
 
     const spawned = spawnImpl(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],

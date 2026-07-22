@@ -3,10 +3,16 @@ import { Hono } from 'hono';
 import { registerConfigRoutes } from './config';
 import type { Supervisor } from '../supervisor';
 
-vi.mock('../config-writer', () => ({
-  backupConfigFile: vi.fn(),
-  writeBaseConfig: vi.fn(),
-}));
+// Keep the real hookSessionKeyPrefixViolation: it is pure, and the replace
+// route depends on it to reject configs the gateway could not boot.
+vi.mock('../config-writer', async importOriginal => {
+  const actual = await importOriginal<typeof import('../config-writer')>();
+  return {
+    ...actual,
+    backupConfigFile: vi.fn(),
+    writeBaseConfig: vi.fn(),
+  };
+});
 
 vi.mock('../bootstrap', async importOriginal => {
   const actual = await importOriginal<typeof import('../bootstrap')>();
@@ -609,6 +615,34 @@ describe('/_kilo/config/replace routes', () => {
             expect(mock).toHaveBeenCalledOnce();
             const written = JSON.parse(mock.mock.calls[0][1] as string);
             expect(written).toEqual(newConfig);
+          },
+        },
+      },
+    });
+  });
+
+  it('refuses a config the gateway could not boot, without writing or backing up', async () => {
+    const bricking = {
+      hooks: {
+        enabled: true,
+        mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
+      },
+    };
+
+    await test({
+      route: '/_kilo/config/replace',
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ config: bricking }),
+      expect: {
+        status: 422,
+        mocks: {
+          // The live config must be left exactly as it was.
+          backup: mock => {
+            expect(mock).not.toHaveBeenCalled();
+          },
+          write: mock => {
+            expect(mock).not.toHaveBeenCalled();
           },
         },
       },

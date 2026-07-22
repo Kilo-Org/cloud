@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { atomicWrite } from '../atomic-write';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
-import { backupConfigFile, writeBaseConfig } from '../config-writer';
+import { backupConfigFile, hookSessionKeyPrefixViolation, writeBaseConfig } from '../config-writer';
 import { GOG_SECTION_CONFIG, seedExecApprovalsDefaults, updateToolsMdSection } from '../bootstrap';
 import { getBearerToken } from './gateway';
 import { registerAgentConfigRoutes } from './config-agents';
@@ -161,6 +161,13 @@ export function registerConfigRoutes(
             409
           );
         }
+      }
+
+      // Same guard as the raw-file editor: never persist a config that stops
+      // the gateway from starting, since the instance cannot recover on its own.
+      const bootBlocker = hookSessionKeyPrefixViolation(config);
+      if (bootBlocker) {
+        return c.json({ code: 'openclaw_config_would_not_boot', error: bootBlocker }, 422);
       }
 
       backupConfigFile(CONFIG_PATH);

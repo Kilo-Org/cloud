@@ -24,21 +24,20 @@ describe('upstreamRequest timeout', () => {
     const controller = new AbortController();
     controller.abort();
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-        signal: controller.signal,
-      })
-    ).rejects.toThrow();
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+      signal: controller.signal,
+    });
 
+    expect(result.type).toBe('error');
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
@@ -50,19 +49,19 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(timeoutError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-      })
-    ).rejects.toBe(timeoutError);
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+    });
+
+    expect(result.type).toBe('error');
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -86,20 +85,19 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-      })
-    ).rejects.toBe(fetchError);
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+    });
 
+    expect(result.type).toBe('error');
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
@@ -118,22 +116,22 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '?trace=search-secret',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'body-secret-content' }],
-        },
-        extraHeaders: {},
-        provider: {
-          ...PROVIDERS.OPENROUTER,
-          apiUrl: 'https://gateway.example.test/v1?token=url-secret',
-        },
-      })
-    ).rejects.toBe(fetchError);
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '?trace=search-secret',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'body-secret-content' }],
+      },
+      extraHeaders: {},
+      provider: {
+        ...PROVIDERS.OPENROUTER,
+        apiUrl: 'https://gateway.example.test/v1?token=url-secret',
+      },
+    });
+
+    expect(result.type).toBe('error');
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -167,19 +165,19 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-      })
-    ).rejects.toBe(fetchError);
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+    });
+
+    expect(result.type).toBe('error');
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'TypeError', message: 'fetch failed' }),
@@ -195,7 +193,7 @@ describe('upstreamRequest timeout', () => {
     );
   });
 
-  it('rethrows provider fetch failures and captures safe timeout metadata', async () => {
+  it('captures safe timeout metadata on provider fetch failures', async () => {
     const timeoutCause = Object.assign(new Error('Headers Timeout Error'), {
       code: 'UND_ERR_HEADERS_TIMEOUT',
       name: 'HeadersTimeoutError',
@@ -204,23 +202,23 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '?trace=search-secret',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'body-secret-content' }],
-        },
-        extraHeaders: { 'x-safe-extra-header': 'extra-header-secret' },
-        provider: {
-          ...PROVIDERS.OPENROUTER,
-          apiUrl: 'https://gateway.example.test/v1?token=url-secret',
-          apiKey: 'provider-api-key-secret',
-        },
-      })
-    ).rejects.toBe(fetchError);
+    const result = await upstreamRequest({
+      path: '/chat/completions',
+      search: '?trace=search-secret',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'body-secret-content' }],
+      },
+      extraHeaders: { 'x-safe-extra-header': 'extra-header-secret' },
+      provider: {
+        ...PROVIDERS.OPENROUTER,
+        apiUrl: 'https://gateway.example.test/v1?token=url-secret',
+        apiKey: 'provider-api-key-secret',
+      },
+    });
+
+    expect(result.type).toBe('error');
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'TypeError', message: 'fetch failed' }),

@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
 import { WastelandOriginLink } from './WastelandOriginLink';
-import { buildRelatedBeads, type BeadLike } from './buildRelatedBeads';
+import { buildRelatedBeads } from './buildRelatedBeads';
 
 import { format, formatDistanceToNow } from 'date-fns';
 import {

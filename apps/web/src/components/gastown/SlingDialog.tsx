@@ -46,7 +46,9 @@ function getStoredTab(): string {
 function storeTab(tab: string) {
   try {
     localStorage.setItem(TAB_STORAGE_KEY, tab);
-  } catch {}
+  } catch {
+    // Storage may be unavailable in privacy-restricted browser contexts.
+  }
 }
 
 export function SlingDialog({ rigId, isOpen, onClose }: SlingDialogProps) {

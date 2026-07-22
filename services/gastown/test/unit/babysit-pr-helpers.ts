@@ -140,7 +140,10 @@ export function registerCheckPRStatusTests() {
       const ctx = mockSCMContext({
         getTownConfig: async () => ({ git_auth: { gitlab_token: 'glpat_test' } }) as TownConfig,
       });
-      const outcome = await checkPRStatus(ctx, 'https://gitlab.com/group/project/-/merge_requests/5');
+      const outcome = await checkPRStatus(
+        ctx,
+        'https://gitlab.com/group/project/-/merge_requests/5'
+      );
       expect(outcome.ok).toBe(true);
       if (outcome.ok) {
         expect(outcome.result.status).toBe('open');
@@ -161,7 +164,10 @@ export function registerCheckPRStatusTests() {
       const ctx = mockSCMContext({
         getTownConfig: async () => ({ git_auth: { gitlab_token: 'glpat_test' } }) as TownConfig,
       });
-      const outcome = await checkPRStatus(ctx, 'https://gitlab.com/group/project/-/merge_requests/5');
+      const outcome = await checkPRStatus(
+        ctx,
+        'https://gitlab.com/group/project/-/merge_requests/5'
+      );
       expect(outcome.ok).toBe(true);
       if (outcome.ok) {
         expect(outcome.result.status).toBe('merged');
@@ -180,7 +186,10 @@ export function registerCheckPRStatusTests() {
       const ctx = mockSCMContext({
         getTownConfig: async () => ({ git_auth: { gitlab_token: 'glpat_test' } }) as TownConfig,
       });
-      const outcome = await checkPRStatus(ctx, 'https://gitlab.com/group/project/-/merge_requests/5');
+      const outcome = await checkPRStatus(
+        ctx,
+        'https://gitlab.com/group/project/-/merge_requests/5'
+      );
       expect(outcome.ok).toBe(true);
       if (outcome.ok) {
         expect(outcome.result.status).toBe('closed');

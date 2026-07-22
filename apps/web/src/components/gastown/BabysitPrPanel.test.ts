@@ -39,8 +39,7 @@ function buildMutationArgs(
   prUrl: string,
   titleOverride: string,
   bodyOverride: string,
-  forcePushAllowed: boolean,
-  preview: PreviewPrResult
+  forcePushAllowed: boolean
 ) {
   return {
     rigId,
@@ -51,7 +50,7 @@ function buildMutationArgs(
   };
 }
 
-function getDefaultTitle(preview: PreviewPrResult | null | undefined, prUrl: string): string {
+function getDefaultTitle(preview: PreviewPrResult | null | undefined): string {
   return preview?.title ? `Babysit: ${preview.title}` : '';
 }
 
@@ -149,22 +148,13 @@ describe('BabysitPrPanel: preview status', () => {
 });
 
 describe('BabysitPrPanel: mutation args', () => {
-  const preview: PreviewPrResult = {
-    state: 'open',
-    head_branch: 'feature/x',
-    base_branch: 'main',
-    title: 'My PR',
-    repo_matches: true,
-  };
-
   it('happy path: builds correct mutation args with defaults', () => {
     const args = buildMutationArgs(
       'rig-1',
       'https://github.com/owner/repo/pull/123',
       '',
       '',
-      false,
-      preview
+      false
     );
     expect(args).toEqual({
       rigId: 'rig-1',
@@ -176,14 +166,7 @@ describe('BabysitPrPanel: mutation args', () => {
   });
 
   it('plumbs forcePushAllowed through to mutation', () => {
-    const args = buildMutationArgs(
-      'rig-1',
-      'https://github.com/owner/repo/pull/123',
-      '',
-      '',
-      true,
-      preview
-    );
+    const args = buildMutationArgs('rig-1', 'https://github.com/owner/repo/pull/123', '', '', true);
     expect(args.forcePushAllowed).toBe(true);
   });
 
@@ -193,8 +176,7 @@ describe('BabysitPrPanel: mutation args', () => {
       'https://github.com/owner/repo/pull/123',
       'Custom title',
       'Custom body',
-      false,
-      preview
+      false
     );
     expect(args.title).toBe('Custom title');
     expect(args.body).toBe('Custom body');
@@ -206,8 +188,7 @@ describe('BabysitPrPanel: mutation args', () => {
       '  https://github.com/owner/repo/pull/123  ',
       '  Custom title  ',
       '  Custom body  ',
-      false,
-      preview
+      false
     );
     expect(args.prUrl).toBe('https://github.com/owner/repo/pull/123');
     expect(args.title).toBe('Custom title');
@@ -222,14 +203,12 @@ describe('BabysitPrPanel: default values', () => {
       title: 'Fix login bug',
       repo_matches: true,
     };
-    expect(getDefaultTitle(preview, 'https://github.com/o/r/pull/1')).toBe(
-      'Babysit: Fix login bug'
-    );
+    expect(getDefaultTitle(preview)).toBe('Babysit: Fix login bug');
   });
 
   it('default title is empty when preview has no title', () => {
     const preview: PreviewPrResult = { state: 'open', repo_matches: true };
-    expect(getDefaultTitle(preview, 'https://github.com/o/r/pull/1')).toBe('');
+    expect(getDefaultTitle(preview)).toBe('');
   });
 
   it('default body is "Monitoring PR: <url>" when preview exists', () => {

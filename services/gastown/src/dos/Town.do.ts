@@ -2751,8 +2751,6 @@ export class TownDO extends DurableObject<Env> {
     };
   }
 
-
-
   /**
    * Create an open bead with the given labels, without arming the reconciler alarm.
    * The caller is responsible for including `gt:held` in the labels if the bead

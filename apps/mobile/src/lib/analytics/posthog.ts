@@ -1,4 +1,5 @@
 import PostHog from 'posthog-react-native';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { POSTHOG_API_KEY } from '@/lib/config';
 
@@ -27,7 +28,17 @@ export const KILO_PASS_PURCHASE_FAILED_EVENT = 'kilo_pass_purchase_failed';
 
 export type AnalyticsSurface = 'claw' | 'cloud-agent' | 'remote-session';
 
+// PostHog feature flags. The project is shared with web, so mobile-only flags
+// are prefixed to avoid colliding with web flag keys.
+export const FEATURE_FLAG_PR_REVIEW = 'mobile-pr-review';
+
 let client: PostHog | null = null;
+
+// `useFeatureFlag` subscribers register here rather than on `client`, because
+// the client is created lazily (after consent) — a component that mounts before
+// init would otherwise subscribe to a null client and never re-render when
+// flags later load. init wires the client's single update into this registry.
+const flagListeners = new Set<() => void>();
 
 export function initPostHog(): void {
   if (client) {
@@ -41,6 +52,11 @@ export function initPostHog(): void {
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.
   void client.register({ platform: 'mobile' });
+  client.onFeatureFlags(() => {
+    for (const listener of flagListeners) {
+      listener();
+    }
+  });
 }
 
 export function captureEvent(
@@ -56,8 +72,31 @@ export function captureScreen(name: string): void {
 
 export function identifyUser(email: string): void {
   client?.identify(email, { email });
+  // Pull the freshly-identified user's flags so gated UI resolves promptly.
+  void client?.reloadFeatureFlags();
 }
 
 export function resetAnalyticsUser(): void {
   client?.reset();
+}
+
+function isFeatureEnabled(key: string, defaultValue: boolean): boolean {
+  const value = client?.getFeatureFlag(key);
+  return value === undefined ? defaultValue : value === true;
+}
+
+/**
+ * Reactively read a boolean feature flag. Fails open: while the client is
+ * disabled (dev builds), uninitialized, or flags have not loaded yet, returns
+ * `defaultValue`. Flags only ever flip UI off on an explicit `false`.
+ */
+export function useFeatureFlag(key: string, defaultValue = false): boolean {
+  const subscribe = useCallback((onChange: () => void) => {
+    flagListeners.add(onChange);
+    return () => {
+      flagListeners.delete(onChange);
+    };
+  }, []);
+  const getSnapshot = useCallback(() => isFeatureEnabled(key, defaultValue), [key, defaultValue]);
+  return useSyncExternalStore(subscribe, getSnapshot);
 }

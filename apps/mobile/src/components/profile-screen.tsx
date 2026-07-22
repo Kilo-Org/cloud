@@ -26,6 +26,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -50,6 +51,7 @@ export function ProfileScreen() {
   const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const {
     data,
     isLoading,
@@ -167,21 +169,23 @@ export function ProfileScreen() {
         </View>
 
         {/* PR Review */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Reviews
-          </Text>
-          <ConfigureRow
-            icon={GitMerge}
-            title="PR Review"
-            subtitle="Review pull requests on mobile"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push(getPrReviewEntryPath());
-            }}
-          />
-        </View>
+        {prReviewEnabled && (
+          <View className="mt-6 gap-3">
+            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+              Reviews
+            </Text>
+            <ConfigureRow
+              icon={GitMerge}
+              title="PR Review"
+              subtitle="Review pull requests on mobile"
+              className="rounded-lg bg-secondary px-3"
+              last
+              onPress={() => {
+                router.push(getPrReviewEntryPath());
+              }}
+            />
+          </View>
+        )}
 
         {/* Organization */}
         {organizationId != null && (

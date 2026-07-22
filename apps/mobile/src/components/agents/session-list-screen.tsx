@@ -3,14 +3,12 @@ import { View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { ActiveNowSection } from '@/components/agents/active-now-section';
+import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
-import {
-  createDefaultSearchTimer,
-  createSessionSearchController,
-  type SessionSearchController,
-} from '@/components/agents/session-search-state';
+import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import {
   type ProjectFilterOption,
   SessionFilterChips,
@@ -49,39 +47,15 @@ export function AgentSessionListScreen() {
   } = usePersistedAgentSessionFilters();
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Search debounce + clear semantics live in a pure controller so the
-  // 300ms timing and the two clear paths (search-only vs. broad) can be
-  // unit tested without react-native or real timers. The controller
-  // holds its own pending-handle state — no setTimeout leaks into React.
-  const searchControllerRef = useRef<SessionSearchController | null>(null);
-  searchControllerRef.current ??= createSessionSearchController({
-    timer: createDefaultSearchTimer(),
-    commitSearchQuery: setSearchQuery,
-  });
-  const searchController = searchControllerRef.current;
-
-  const handleSearchChange = useCallback(
-    (text: string) => {
-      searchController.scheduleSearch(text);
-    },
-    [searchController]
-  );
-
-  // Search-only clear used by the in-field X: resets the debounced
-  // query without touching the persisted platform/project narrowing
-  // filters — the broad empty-state clear still owns that.
-  const handleClearSearchOnly = useCallback(() => {
-    searchController.clearSearchOnly();
-  }, [searchController]);
-
-  useEffect(
-    () => () => {
-      searchController.dispose();
-    },
-    [searchController]
-  );
+  const {
+    searchQuery,
+    searchInputRef,
+    hasText,
+    handleSearchInputChange,
+    handleClearSearchInput,
+    clearSearchInput,
+    searchController,
+  } = useSessionSearchInput();
 
   const createdOnPlatform = useMemo(
     () => (platformFilter.length > 0 ? expandPlatformFilter(platformFilter) : undefined),
@@ -249,12 +223,28 @@ export function AgentSessionListScreen() {
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
   const hasAnySessions = storedSessions.length > 0 || activeSessions.length > 0;
 
+  // Search header is rendered at the screen level (above the pinned tray)
+  // so it's always visible. Recompute the body's `showInlineError` here
+  // via the SAME pure selector, with the same inputs, so the inline
+  // "Couldn't refresh" line stays identical and the body-model test keeps
+  // covering it.
+  const showInlineError = useMemo(
+    () =>
+      selectSessionListBodyModel({
+        hasHistoryContent: sections.length > 0,
+        hasPinnedActive,
+        hasActiveQuery: isSearching || hasActiveFilter,
+        isSearching,
+        isError: contentIsError,
+        activeIsError,
+      }).showInlineError,
+    [activeIsError, contentIsError, hasActiveFilter, hasPinnedActive, isSearching, sections]
+  );
+
   const handleClearQuery = useCallback(() => {
-    // Functional update so the persisted sort preference is preserved
-    // across "Clear search" / "Clear filters" — the controller's
-    // clearBroadly is the single source of truth for the reset pair.
+    clearSearchInput();
     searchController.clearBroadly(setFilters);
-  }, [searchController, setFilters]);
+  }, [clearSearchInput, searchController, setFilters]);
 
   return (
     <View className="flex-1 bg-background">
@@ -289,6 +279,16 @@ export function AgentSessionListScreen() {
           }}
         />
       </Animated.View>
+      {hasAnySessions ? (
+        <SessionListSearchHeader
+          inputRef={searchInputRef}
+          hasText={hasText}
+          isSearchPending={isSearchPending}
+          showInlineError={showInlineError}
+          onChangeText={handleSearchInputChange}
+          onClearSearch={handleClearSearchInput}
+        />
+      ) : null}
       <ActiveNowSection
         pinned={pinnedActive}
         organizationIdBySessionId={organizationIdBySessionId}
@@ -300,7 +300,6 @@ export function AgentSessionListScreen() {
           hasAnySessions={hasAnySessions}
           hasPinnedActive={hasPinnedActive}
           isLoading={isLoading || !ready}
-          isSearchPending={isSearchPending}
           isError={contentIsError}
           activeIsError={activeIsError}
           isFetchingNextPage={isFetchingNextPage}
@@ -308,11 +307,9 @@ export function AgentSessionListScreen() {
           onRetry={handleRetry}
           onEndReached={handleEndReached}
           onSessionPress={navigateToSession}
-          onSearchChange={handleSearchChange}
           hasActiveQuery={isSearching || hasActiveFilter}
           isSearching={isSearching}
           onClearQuery={handleClearQuery}
-          onClearSearchOnly={handleClearSearchOnly}
           onCreateSession={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}

@@ -1,12 +1,11 @@
 import { useFocusEffect } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
   RefreshControl,
   SectionList,
-  type TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -19,7 +18,6 @@ import {
   type SessionListBodyModel,
 } from '@/components/agents/session-list-body-model';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
-import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
@@ -34,9 +32,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
-// Height of the hidden-by-default search bar (mt-3 12 + border 1 + py-1.5 12 + line-20 + border 1 + mb-14 14 = 60).
-const SEARCH_BAR_HEIGHT = 60;
-
 type AgentSessionListContentProps = {
   sections: SessionSection[];
   hasAnySessions: boolean;
@@ -46,7 +41,6 @@ type AgentSessionListContentProps = {
    * thing on screen. */
   hasPinnedActive: boolean;
   isLoading: boolean;
-  isSearchPending: boolean;
   /** Body-driving error flag — a search failure (when searching) OR a
    * stored/history failure. Active-only failures are surfaced separately
    * via the body's `showInlineError` output, NEVER as the empty-state
@@ -59,17 +53,9 @@ type AgentSessionListContentProps = {
   onRetry: () => void;
   onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
-  onSearchChange: (text: string) => void;
   hasActiveQuery: boolean;
   isSearching: boolean;
   onClearQuery: () => void;
-  /**
-   * Narrow clear path used by the in-field X: resets the debounced search
-   * query (and the local `hasText` flag) WITHOUT touching the persisted
-   * platform/project filters. The empty-state "Clear search"/"Clear filters"
-   * CTA keeps owning the broader `onClearQuery` path.
-   */
-  onClearSearchOnly: () => void;
   onCreateSession: () => void;
   sortBy: AgentSessionSortBy;
 };
@@ -79,7 +65,6 @@ export function AgentSessionListContent({
   hasAnySessions,
   hasPinnedActive,
   isLoading,
-  isSearchPending,
   isError,
   activeIsError,
   isFetchingNextPage,
@@ -87,11 +72,9 @@ export function AgentSessionListContent({
   onRetry,
   onEndReached,
   onSessionPress,
-  onSearchChange,
   hasActiveQuery,
   isSearching,
   onClearQuery,
-  onClearSearchOnly,
   onCreateSession,
   sortBy,
 }: Readonly<AgentSessionListContentProps>) {
@@ -100,36 +83,7 @@ export function AgentSessionListContent({
   const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
   const [refreshing, setRefreshing] = useState(false);
-  const searchInputRef = useRef<TextInput>(null);
-  // Drives the in-field X's visibility only — the input itself stays
-  // uncontrolled (see iOS TextInput rules). Derived from `onChangeText`.
-  const [hasText, setHasText] = useState(false);
 
-  // The search TextInput is uncontrolled (see iOS TextInput rules — controlled
-  // `value` causes keystroke races), so clearing the query in state alone
-  // wouldn't clear what's visibly typed. Imperatively clear the input too.
-  const handleClearQuery = useCallback(() => {
-    searchInputRef.current?.clear();
-    setHasText(false);
-    onClearQuery();
-  }, [onClearQuery]);
-
-  const handleSearchInputChange = useCallback(
-    (text: string) => {
-      setHasText(text.length > 0);
-      onSearchChange(text);
-    },
-    [onSearchChange]
-  );
-
-  // Narrow path used by the in-field X: clears the input, dismisses the
-  // keyboard, and resets `hasText` so the X hides — without touching filters.
-  const handleClearSearchOnly = useCallback(() => {
-    searchInputRef.current?.clear();
-    searchInputRef.current?.blur();
-    setHasText(false);
-    onClearSearchOnly();
-  }, [onClearSearchOnly]);
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
@@ -153,26 +107,6 @@ export function AgentSessionListContent({
     [activeIsError, hasActiveQuery, hasHistoryContent, hasPinnedActive, isError, isSearching]
   );
 
-  const listHeader = useMemo(
-    () => (
-      <SessionListSearchHeader
-        inputRef={searchInputRef}
-        hasText={hasText}
-        isSearchPending={isSearchPending}
-        showInlineError={bodyModel.showInlineError}
-        onChangeText={handleSearchInputChange}
-        onClearSearch={handleClearSearchOnly}
-      />
-    ),
-    [
-      bodyModel.showInlineError,
-      handleClearSearchOnly,
-      handleSearchInputChange,
-      hasText,
-      isSearchPending,
-    ]
-  );
-
   const emptyStateAction = useMemo(
     () => (
       <Button variant="outline" onPress={onCreateSession}>
@@ -185,11 +119,11 @@ export function AgentSessionListContent({
 
   const clearQueryAction = useMemo(
     () => (
-      <Button variant="outline" onPress={handleClearQuery}>
+      <Button variant="outline" onPress={onClearQuery}>
         <Text>{isSearching ? 'Clear search' : 'Clear filters'}</Text>
       </Button>
     ),
-    [handleClearQuery, isSearching]
+    [isSearching, onClearQuery]
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -278,10 +212,10 @@ export function AgentSessionListContent({
     );
   }
 
-  // The `contentOffset` trick that hides the search bar by default requires
-  // scrollable content, so when the user has no sessions at all we skip
-  // the SectionList entirely — mounting it with only a ListEmptyComponent
-  // would leave the search bar fully visible.
+  // The screen gates the search header on `hasAnySessions` to keep the
+  // first-use "No sessions yet" empty state chrome-free, so when the user
+  // has no sessions at all we skip the SectionList entirely here and just
+  // render the empty state.
   if (!hasAnySessions) {
     return (
       <Animated.View
@@ -324,7 +258,6 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionListKey}
-        ListHeaderComponent={listHeader}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (
@@ -334,7 +267,6 @@ export function AgentSessionListContent({
           ) : null
         }
         contentContainerStyle={tabBarClearanceStyle}
-        contentOffset={{ x: 0, y: SEARCH_BAR_HEIGHT }}
         keyboardDismissMode="on-drag"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}

@@ -97,18 +97,6 @@ export function temporarilyUnavailableResponse() {
   );
 }
 
-export function upstreamDisconnectResponse() {
-  const error = 'The upstream provider disconnected before sending a response.';
-  return NextResponse.json(
-    {
-      error,
-      error_type: ProxyErrorType.upstream_disconnect,
-      message: error,
-    },
-    { status: 503 }
-  );
-}
-
 export function upgradeRequiredResponse() {
   return NextResponse.json(
     {

@@ -10,8 +10,8 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { upstreamDisconnectResponse } from '@/lib/ai-gateway/llm-proxy-helpers';
-import type { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -134,6 +134,18 @@ function classifyUpstreamFetchFailure({
     default:
       return 'unknown';
   }
+}
+
+function upstreamDisconnectResponse() {
+  const error = 'The upstream provider disconnected before sending a response.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.upstream_disconnect,
+      message: error,
+    },
+    { status: 503 }
+  );
 }
 
 export async function upstreamRequest({

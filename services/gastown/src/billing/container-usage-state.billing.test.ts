@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { toBillingStatus, type StoredUsageState } from './container-usage-state.billing';
+import {
+  createPendingStop,
+  toBillingStatus,
+  type OpenUsageInterval,
+  type StoredUsageState,
+} from './container-usage-state.billing';
 import type { UsageContext } from './container-usage.billing';
 
 const context: UsageContext = {
   service: 'gastown',
   instanceId: 'container-1',
-  sku: 'cloudflare-container-standard-4',
+  sku: 'gastown-standard-2026-07',
   subject: { type: 'org', id: 'org-1' },
   actor: { type: 'user', id: 'user-1' },
   sessionId: 'town-1',
@@ -49,8 +54,6 @@ describe('toBillingStatus', () => {
     const state: StoredUsageState = {
       phase: 'running',
       context,
-      authorizationId: 'auth-1',
-      authorizationKey: 'authorize-1',
       startEpochMs: 1_000,
       startRecorded: true,
       seq: 2,
@@ -101,6 +104,27 @@ describe('toBillingStatus', () => {
       payer: context.subject,
       estimatedRunCharge: 0.3,
       runUsageSeconds: 900,
+    });
+  });
+});
+
+describe('createPendingStop', () => {
+  it('captures whole seconds remaining after the last acknowledged segment', () => {
+    const state: OpenUsageInterval = {
+      phase: 'stopping',
+      context,
+      startEpochMs: 1_000,
+      startRecorded: true,
+      seq: 2,
+      lastReportedAt: 2_000,
+      reportedUsageSeconds: 1,
+    };
+
+    expect(createPendingStop(state, 7_500, 'runtime_signal')).toEqual({
+      seq: 3,
+      usageSinceLast: 5,
+      measuredAtMs: 7_000,
+      reason: 'runtime_signal',
     });
   });
 });

@@ -43,8 +43,8 @@ usage-based charge, not a subscription or flat-rate entitlement.
    awake time.
 2. The attributable cost MUST be calculated by the metering service from a versioned SKU catalog.
    Gastown MUST send the catalog SKU and MUST NOT embed Cloudflare prices in application code.
-3. The initial production SKU MUST represent Gastown's configured `standard-4` container. A
-   container-size change MUST use a corresponding new or updated catalog entry before rollout.
+3. The initial production SKU is `gastown-standard-2026-07`, representing Gastown's configured
+   `standard-4` container. A container-size or price change MUST use a new catalog SKU.
 4. Charges MUST settle in Kilo credits. One dollar of calculated charge uses one dollar of Kilo
    credit balance under the existing credit conversion rules.
 5. The initial scope includes Cloudflare Container compute and memory costs represented by the
@@ -58,8 +58,7 @@ usage-based charge, not a subscription or flat-rate entitlement.
 3. Legacy user towns without `owner_id` MAY fall back to `owner_user_id`. A town with no reliable
    payer MUST NOT start billable work.
 4. Interactive work SHOULD identify the authenticated user as the actor. Autonomous scheduling
-   MUST use a stable Gastown bot identity and MAY include the initiating user as `onBehalfOf` when
-   known.
+   MUST use a stable Gastown bot identity with `onBehalfOf` equal to the billing subject.
 5. Payer, SKU, and interval start time MUST remain immutable for an open interval. An ownership or
    SKU change takes effect on the next container runtime.
 
@@ -68,11 +67,10 @@ usage-based charge, not a subscription or flat-rate entitlement.
 Gastown's `TownContainerDO` is the producer for `service: "gastown"`. It MUST durably retain enough
 interval state to retry every call after a Durable Object restart.
 
-1. **Start:** Before billable work is admitted, Gastown MUST complete the admission check described
-   below and await an acknowledged `recordStart`. The context MUST include the Town Container DO ID
-   as `instanceId`, the town ID as `sessionId`, the configured SKU, payer, actor, and
-   `metadata.townId`. Failure of both Postgres and the failover buffer MUST block admission and be
-   retried; `durable: "buffer"` is a successful ack.
+1. **Start:** Gastown MUST await a successful `recordStart` before starting the container. The
+   context MUST include the Town Container DO ID as `instanceId`, the town ID as `sessionId`, the
+   configured SKU, payer, actor, and `metadata.townId`. The current meter rejects missing,
+   incompatible, or closed SKUs; transport or persistence failure MUST fail the cold start closed.
 2. **Heartbeat:** Approximately every five minutes while `getState()` confirms the container is
    running, Gastown MUST await `recordHeartbeat` with monotonic `seq`, measured
    `usageSinceLast`, and the original context for self-healing. Gastown MUST NOT infer billable
@@ -99,7 +97,7 @@ Stop reasons map as follows:
 
 | Component | Responsibility |
 |---|---|
-| UBB / `@kilocode/container-usage` | SKU catalog, admission decision, reservations, usage ledger, credit debit, balance floor, idempotency, and reconciliation |
+| UBB / `@kilocode/container-usage` | Typed client/contracts, SKU validation, usage ledger, idempotency, and reconciliation; wallet admission and budget debits remain follow-up work |
 | `TownDO` | Resolve payer and actor, gate every dispatch path, expose billing state to the UI, stop scheduling after a budget stop, and request usage heartbeats from the container DO |
 | `TownContainerDO` | Own the durable interval state, guard cold starts, call `recordStart`/`recordHeartbeat`/`recordStop`, observe actual container runtime, and stop the container when instructed |
 | Gastown tRPC | Verify town access, pass the authenticated actor to `TownDO`, return stable billing errors/status, and never make an independent billing decision |
@@ -109,9 +107,16 @@ Gastown MUST receive the metering WorkerEntrypoint through a Cloudflare service 
 development, and test Wrangler configurations MUST bind the same typed interface; tests MAY use an
 in-memory fake ledger.
 
-### Required admission contract
+The initial integration binds `CONTAINER_USAGE` to the `container-usage-meter` Worker and its
+`ContainerUsageMeter` entrypoint. It records real intervals and SKU-rated seconds. The merged
+foundation currently returns `continue` for every heartbeat and does not expose wallet admission,
+reservations, credit debits, or remaining balance. Therefore `GASTOWN_BILLING_ENABLED` MUST remain
+off for customer charging until those ledger capabilities are implemented; the current integration
+is suitable for shadow metering and reconciliation.
 
-The proposed three recording calls are not sufficient by themselves to prevent a cold start:
+### Required admission contract before customer charging
+
+The current three recording calls are not sufficient by themselves to prevent a cold start:
 `recordStart` returns no budget verdict, while `recordHeartbeat` is defined only after
 `getState()` confirms that the container is running. UBB therefore MUST provide an upstream
 admission operation before paid rollout. This is a fourth operation, but it is not a usage-recording
@@ -223,16 +228,17 @@ The gate behaves as follows:
    repeated for every agent because the town has one shared container.
 2. If the town is in `billing_stopping` or `billing_blocked`, reject new dispatch and do not call a
    container proxy that would wake the runtime.
-3. For a cold start, resolve payer and actor, call `authorizeStart`, persist the authorization and
-   context in `TownContainerDO`, await `recordStart`, and only then call `startAndWaitForPorts` or a
-   proxy operation that can boot the container.
-4. If authorization is denied, return the stable domain code `INSUFFICIENT_CREDITS` with payer type,
-   remaining balance, and minimum required balance. Do not mutate a bead or agent to `working`.
+3. For a cold start, resolve payer and actor, persist the context in `TownContainerDO`, await the
+   real package client's `recordStart`, and only then call `startAndWaitForPorts` or a proxy operation
+   that can boot the container. Once wallet admission exists, `authorizeStart` precedes this step.
+4. Current SKU admission failures return `BILLING_UNAVAILABLE` and do not mutate a bead or agent to
+   `working`. Future wallet denial returns `INSUFFICIENT_CREDITS` with payer type, remaining balance,
+   and minimum required balance.
 5. If admission infrastructure is unavailable, return `BILLING_UNAVAILABLE` and fail closed for the
    cold start. An already-running interval continues and fails open as described under Failure
    Handling.
 6. If container startup fails after `recordStart`, close the zero- or near-zero-usage interval with
-   `runtime_signal` and release unused admission reservation.
+   `runtime_signal`; once reservations exist, release the unused reservation.
 7. `TownContainerDO` MUST defend the boundary as well as `TownDO`: a request that could cold-start
    the runtime without prepared metering context MUST be rejected. This prevents a new proxy route
    from accidentally bypassing billing.
@@ -409,11 +415,11 @@ primary CTA. Amounts and usage counters SHOULD use tabular numerals.
 
 ## Failure Handling
 
-1. A metering ack with `durable: "buffer"` MUST be treated as success and monitored as degraded
-   operation.
-2. If a heartbeat throws because both persistence paths are unavailable, Gastown SHOULD fail open
-   for the running interval, retry with the same idempotency key, and alert. It MUST NOT terminate
-   customer work solely because the billing service is temporarily unreachable.
+1. The current meter acknowledges durable Postgres writes only. Its typed client retries transient
+   RPC failures with the same generated idempotency key.
+2. If a heartbeat remains unavailable after client retries, Gastown SHOULD fail open for the running
+   interval, retain its pending segment, and alert. It MUST NOT terminate customer work solely
+   because the billing service is temporarily unreachable.
 3. If `recordStop` cannot be acknowledged during shutdown, the pending stop MUST survive and retry
    later. A missing stop ack MUST NOT cause the next runtime to reuse the previous interval.
 4. Metering errors and retries MUST NOT log credit balances, tokens, or other credentials.
@@ -422,9 +428,11 @@ primary CTA. Amounts and usage counters SHOULD use tabular numerals.
 
 Rollout SHOULD proceed through a single default-off backend flag:
 
-1. **Contract and catalog:** Ship the `standard-4` SKU, `3x` customer rate, and admission operation
-   behind `GASTOWN_BILLING_ENABLED=false`; provision the production UBB service binding before the
-   flag can be enabled.
+1. **Contract and catalog:** Ship `gastown-standard-2026-07`, its `3x` customer rate, the
+   `CONTAINER_USAGE` binding to `ContainerUsageMeter`, and the package client behind
+   `GASTOWN_BILLING_ENABLED=false`. The SKU row is an operational prerequisite and MUST exist in the
+   production catalog before the flag is enabled; schema migrations intentionally do not seed its
+   environment-specific rate.
 2. **Shadow reporting:** Emit complete intervals and calculated charges without reserving or
    debiting credits and without enforcing `warn`/`stop`.
 3. **Admission and UX:** Enable authoritative cold-start admission and all blocked/warning UI while
@@ -442,18 +450,18 @@ admission, debits, warnings, and stops together. A separate default-off
 disabled; it MUST NOT alter backend billing behavior.
 
 Dashboards MUST expose awake seconds, base Cloudflare cost, customer charge, gross multiplier,
-buffered writes, unclosed intervals, admission denials, RPC failures, graceful-stop duration, forced
-stops, and counts of `warn` and `stop` verdicts.
+unclosed intervals, SKU admission denials, RPC failures, graceful-stop duration, forced stops, and
+counts of `warn` and `stop` verdicts.
 
 ### Required verification
 
 1. Unit tests MUST cover every durable interval transition, identical retry payloads, dedup acks,
    stop/heartbeat races, ownership mapping, and billing-blocked scheduler behavior.
-2. Worker integration tests MUST use a fake UBB binding to cover PG-buffer acks, total failure,
-   allow/deny admission, all three heartbeat verdicts, lost responses, DO restart between calls,
-   idle stop, watchdog restart, and final partial-window settlement.
-3. Concurrency tests MUST prove two towns cannot consume the same minimum-start reservation for one
-   payer.
+2. Worker integration tests MUST use a fake UBB binding to cover successful and rejected SKU starts,
+   total failure, all three heartbeat verdicts, lost responses, DO restart between calls, idle stop,
+   watchdog restart, and final partial-window settlement.
+3. Before wallet admission ships, concurrency tests MUST prove two towns cannot consume the same
+   minimum-start reservation for one payer.
 4. End-to-end tests MUST cover a personal town and an organization town through start, warning,
    graceful pause, top-up, and resume. They MUST also prove that merely opening the town page creates
    no interval and no Cloudflare container start.

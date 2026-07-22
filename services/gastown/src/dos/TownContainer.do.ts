@@ -1,7 +1,9 @@
 import { Container } from '@cloudflare/containers';
+import { ContainerUsageAdmissionError } from '@kilocode/container-usage';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
 import {
-  getContainerUsageService,
+  clientUsageContext,
+  getContainerUsageClient,
   isGastownBillingEnabled,
   USAGE_HEARTBEAT_INTERVAL_MS,
   type ContainerRunPolicy,
@@ -9,6 +11,7 @@ import {
   type UsageContext,
 } from '../billing/container-usage.billing';
 import {
+  createPendingStop,
   toBillingStatus,
   type OpenUsageInterval,
   type StoredUsageState,
@@ -17,6 +20,7 @@ import {
 const TC_LOG = '[TownContainer.do]';
 const BILLING_CONTEXT_KEY = 'billing:context';
 const BILLING_STATE_KEY = 'billing:state';
+const BILLING_HOURLY_ESTIMATE_KEY = 'billing:estimatedHourlyCharge';
 const RUN_POLICY_KEY = 'container:runPolicy';
 
 /**
@@ -112,7 +116,6 @@ export class TownContainerDO extends Container<Env> {
         await this.ctx.storage.put(BILLING_STATE_KEY, {
           ...state,
           phase: 'running',
-          lastReportedAt: Date.now(),
         });
       }
     } catch (error) {
@@ -203,6 +206,14 @@ export class TownContainerDO extends Container<Env> {
     const state = await this.getUsageState();
     if (state.phase === 'idle') {
       await this.ctx.storage.put(BILLING_STATE_KEY, { ...state, context });
+    }
+  }
+
+  async setBillingHourlyEstimate(estimatedHourlyCharge: number): Promise<void> {
+    await this.ctx.storage.put(BILLING_HOURLY_ESTIMATE_KEY, estimatedHourlyCharge);
+    const state = await this.getUsageState();
+    if (state.phase !== 'idle') {
+      await this.ctx.storage.put(BILLING_STATE_KEY, { ...state, estimatedHourlyCharge });
     }
   }
 
@@ -323,6 +334,37 @@ export class TownContainerDO extends Container<Env> {
     return this.getBillingStatus();
   }
 
+  async destroyWithBilling(): Promise<void> {
+    if (isGastownBillingEnabled(this.env)) {
+      const state = await this.getUsageState();
+      if (state.phase !== 'idle') {
+        await this.stopForBilling();
+        if (!(await this.waitForRuntimeStop())) {
+          throw new Error('Cannot destroy Town container while graceful shutdown is still running');
+        }
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          await this.closeBillingInterval('runtime_signal');
+          if ((await this.getUsageState()).phase === 'idle') break;
+          if (attempt < 3) await new Promise(resolve => setTimeout(resolve, attempt * 250));
+        }
+        if ((await this.getUsageState()).phase !== 'idle') {
+          throw new Error('Cannot destroy Town container before usage settlement is acknowledged');
+        }
+      }
+    }
+    await this.destroy();
+  }
+
+  private async waitForRuntimeStop(timeoutMs = 30_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await this.getState();
+      if (state.status === 'stopped' || state.status === 'stopped_with_code') return true;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return false;
+  }
+
   private async ensureBillingInterval(): Promise<StoredUsageState> {
     await this.assertAutomaticStartsEnabled();
     if (!isGastownBillingEnabled(this.env)) return { phase: 'idle' };
@@ -345,6 +387,7 @@ export class TownContainerDO extends Container<Env> {
         'Container billing context has not been configured'
       );
     }
+    const estimatedHourlyCharge = await this.ctx.storage.get<number>(BILLING_HOURLY_ESTIMATE_KEY);
 
     const selected = await this.ctx.storage.transaction(async transaction => {
       const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
@@ -354,13 +397,12 @@ export class TownContainerDO extends Container<Env> {
       const starting: OpenUsageInterval = {
         phase: 'starting',
         context: latest?.context ?? context,
-        authorizationId: '',
-        authorizationKey: `${context.instanceId}:authorize:${observedAt}`,
         startEpochMs: observedAt,
         startRecorded: false,
         seq: 0,
         lastReportedAt: observedAt,
         reportedUsageSeconds: 0,
+        ...(estimatedHourlyCharge === undefined ? {} : { estimatedHourlyCharge }),
       };
       await transaction.put(BILLING_STATE_KEY, starting);
       return starting;
@@ -377,173 +419,26 @@ export class TownContainerDO extends Container<Env> {
   }
 
   private async completeBillingStart(starting: OpenUsageInterval): Promise<OpenUsageInterval> {
-    const usage = getContainerUsageService(this.env);
-    let current = starting;
-
-    if (
-      current.authorizationId &&
-      !current.startRecorded &&
-      current.authorizationExpiresAt !== undefined &&
-      current.authorizationExpiresAt <= Date.now()
-    ) {
-      const selected = await this.ctx.storage.transaction(async transaction => {
-        const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
-        if (!latest || latest.phase !== 'starting') return latest;
-        if (
-          !latest.authorizationId ||
-          latest.startRecorded ||
-          latest.authorizationExpiresAt === undefined ||
-          latest.authorizationExpiresAt > Date.now()
-        ) {
-          return latest;
-        }
-
-        const observedAt = Date.now();
-        const refreshed: OpenUsageInterval = {
-          ...latest,
-          context: {
-            ...latest.context,
-            metadata: Object.fromEntries(
-              Object.entries(latest.context.metadata).filter(([key]) => key !== 'authorizationId')
-            ),
-          },
-          authorizationId: '',
-          authorizationKey: `${latest.context.instanceId}:authorize:${observedAt}`,
-          authorizationExpiresAt: undefined,
-          startEpochMs: observedAt,
-          lastReportedAt: observedAt,
-        };
-        await transaction.put(BILLING_STATE_KEY, refreshed);
-        return refreshed;
-      });
-
-      if (!selected || selected.phase === 'idle' || selected.phase === 'stopping') {
-        throw new ContainerBillingError(
-          'BILLING_UNAVAILABLE',
-          'Container billing state changed while refreshing admission'
-        );
-      }
-      current = selected;
-    }
-
-    if (!current.authorizationId) {
-      let authorization;
-      try {
-        authorization = await usage.authorizeStart({
-          context: current.context,
-          idempotencyKey: current.authorizationKey,
-          observedAt: current.startEpochMs,
-        });
-      } catch (error) {
-        throw new ContainerBillingError(
-          'BILLING_UNAVAILABLE',
-          error instanceof Error ? error.message : 'Container billing is unavailable'
-        );
-      }
-
-      if (authorization.verdict === 'deny') {
-        const denied = await this.ctx.storage.transaction(async transaction => {
-          const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
-          if (
-            !latest ||
-            latest.phase !== 'starting' ||
-            latest.startEpochMs !== current.startEpochMs ||
-            latest.authorizationKey !== current.authorizationKey
-          ) {
-            return false;
-          }
-          await transaction.put(BILLING_STATE_KEY, {
-            phase: 'idle',
-            context: latest.context,
-            blocked: true,
-            latestBudget: { verdict: 'stop', remaining: authorization.remaining },
-          } satisfies StoredUsageState);
-          return true;
-        });
-        if (!denied) {
-          throw new ContainerBillingError(
-            'BILLING_UNAVAILABLE',
-            'Container billing state changed during admission'
-          );
-        }
-        throw new ContainerBillingError(
-          'INSUFFICIENT_CREDITS',
-          `Gas Town needs at least $${authorization.minimumRequired.toFixed(2)} in credits to start`,
-          {
-            remaining: authorization.remaining,
-            minimumRequired: authorization.minimumRequired,
-          }
-        );
-      }
-
-      const authorized = await this.ctx.storage.transaction(async transaction => {
-        const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
-        if (
-          !latest ||
-          latest.phase !== 'starting' ||
-          latest.startEpochMs !== current.startEpochMs ||
-          latest.authorizationKey !== current.authorizationKey
-        ) {
-          return null;
-        }
-        const updated: OpenUsageInterval = {
-          ...latest,
-          context: {
-            ...latest.context,
-            metadata: {
-              ...latest.context.metadata,
-              authorizationId: authorization.authorizationId,
-            },
-          },
-          authorizationId: authorization.authorizationId,
-          authorizationExpiresAt: authorization.expiresAt,
-          latestBudget: {
-            verdict: 'continue',
-            ...(authorization.remaining === undefined
-              ? {}
-              : { remaining: authorization.remaining }),
-          },
-          minimumRequired: authorization.minimumRequired,
-          ...(authorization.estimatedHourlyCharge === undefined
-            ? {}
-            : { estimatedHourlyCharge: authorization.estimatedHourlyCharge }),
-        };
-        await transaction.put(BILLING_STATE_KEY, updated);
-        return updated;
-      });
-      if (!authorized) {
-        throw new ContainerBillingError(
-          'BILLING_UNAVAILABLE',
-          'Container billing state changed during admission'
-        );
-      }
-      current = authorized;
-    }
-
-    if (current.startRecorded) return current;
+    if (starting.startRecorded) return starting;
 
     try {
-      await usage.recordStart({
-        ...current.context,
-        idempotencyKey: `${current.context.instanceId}:start:${current.startEpochMs}`,
-        startEpochMs: current.startEpochMs,
-        observedAt: current.startEpochMs,
+      await getContainerUsageClient(this.env).recordStart({
+        ...clientUsageContext(starting.context),
+        startEpochMs: starting.startEpochMs,
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to record container start';
       throw new ContainerBillingError(
         'BILLING_UNAVAILABLE',
-        error instanceof Error ? error.message : 'Unable to record container start'
+        error instanceof ContainerUsageAdmissionError
+          ? `Container usage was rejected: ${message}`
+          : message
       );
     }
 
     const recorded = await this.ctx.storage.transaction(async transaction => {
       const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
-      if (
-        !latest ||
-        latest.phase !== 'starting' ||
-        latest.startEpochMs !== current.startEpochMs ||
-        latest.authorizationId !== current.authorizationId
-      ) {
+      if (!latest || latest.phase !== 'starting' || latest.startEpochMs !== starting.startEpochMs) {
         return null;
       }
       const updated: OpenUsageInterval = { ...latest, startRecorded: true };
@@ -572,11 +467,11 @@ export class TownContainerDO extends Container<Env> {
         return { interval: latest, pending: latest.pendingHeartbeat };
       }
 
+      const usageSinceLast = Math.floor(Math.max(0, observedAt - latest.lastReportedAt) / 1000);
       const pending = {
         seq: latest.seq + 1,
-        observedAt,
-        usageSinceLast: Math.max(0, (observedAt - latest.lastReportedAt) / 1000),
-        idempotencyKey: `${latest.context.instanceId}:hb:${latest.seq + 1}`,
+        observedAt: latest.lastReportedAt + usageSinceLast * 1000,
+        usageSinceLast,
       } satisfies NonNullable<OpenUsageInterval['pendingHeartbeat']>;
       const interval = { ...latest, pendingHeartbeat: pending } satisfies OpenUsageInterval;
       await transaction.put(BILLING_STATE_KEY, interval);
@@ -588,15 +483,12 @@ export class TownContainerDO extends Container<Env> {
     }
     const { interval, pending } = selected;
 
-    const ack = await getContainerUsageService(this.env).recordHeartbeat({
-      service: 'gastown',
+    const ack = await getContainerUsageClient(this.env).recordHeartbeat({
       instanceId: interval.context.instanceId,
       startEpochMs: interval.startEpochMs,
-      idempotencyKey: pending.idempotencyKey,
       seq: pending.seq,
-      observedAt: pending.observedAt,
       usageSinceLast: pending.usageSinceLast,
-      context: interval.context,
+      context: clientUsageContext(interval.context),
     });
 
     const latest = await this.getUsageState();
@@ -649,35 +541,44 @@ export class TownContainerDO extends Container<Env> {
     let stopping = selected;
 
     try {
-      if (!stopping.finalUsageCaptured && stopObservedAt > stopping.lastReportedAt) {
+      if (stopping.pendingHeartbeat) {
         const captured = await this.captureHeartbeat(stopping, stopObservedAt);
         if (captured.phase === 'idle') return;
         stopping = captured;
-        stopping = {
-          ...stopping,
-          phase: 'stopping',
-          stopReason,
-          stopObservedAt,
-          finalUsageCaptured: true,
-        };
-        await this.ctx.storage.put(BILLING_STATE_KEY, stopping);
       }
 
-      await getContainerUsageService(this.env).recordStop({
-        service: 'gastown',
+      const stopSelection = await this.ctx.storage.transaction(async transaction => {
+        const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
+        if (!latest || latest.phase === 'idle' || latest.startEpochMs !== stopping.startEpochMs) {
+          return null;
+        }
+        if (latest.pendingStop) return { interval: latest, stop: latest.pendingStop };
+
+        const pendingStop = createPendingStop(latest, stopObservedAt, stopReason);
+        const interval = { ...latest, pendingStop } satisfies OpenUsageInterval;
+        await transaction.put(BILLING_STATE_KEY, interval);
+        return { interval, stop: pendingStop };
+      });
+      if (!stopSelection) return;
+      stopping = stopSelection.interval;
+
+      await getContainerUsageClient(this.env).recordStop({
         instanceId: stopping.context.instanceId,
         startEpochMs: stopping.startEpochMs,
-        idempotencyKey: `${stopping.context.instanceId}:stop:${stopping.startEpochMs}`,
-        observedAt: stopObservedAt,
-        reason: stopReason,
+        seq: stopSelection.stop.seq,
+        usageSinceLast: stopSelection.stop.usageSinceLast,
+        reason: stopSelection.stop.reason,
+        context: clientUsageContext(stopping.context),
       });
 
       const latest = await this.getUsageState();
       if (latest.phase !== 'idle' && latest.startEpochMs === stopping.startEpochMs) {
+        const totalUsageSeconds =
+          (stopping.reportedUsageSeconds ?? 0) + stopSelection.stop.usageSinceLast;
         const estimatedCharge =
           stopping.estimatedHourlyCharge === undefined
             ? undefined
-            : ((stopping.reportedUsageSeconds ?? 0) / 3600) * stopping.estimatedHourlyCharge;
+            : (totalUsageSeconds / 3600) * stopping.estimatedHourlyCharge;
         await this.ctx.storage.put(BILLING_STATE_KEY, {
           phase: 'idle',
           context: stopping.context,
@@ -686,7 +587,7 @@ export class TownContainerDO extends Container<Env> {
           lastRun: {
             startedAt: stopping.startEpochMs,
             stoppedAt: stopObservedAt,
-            usageSeconds: stopping.reportedUsageSeconds ?? 0,
+            usageSeconds: totalUsageSeconds,
             ...(estimatedCharge === undefined ? {} : { estimatedCharge }),
           },
         } satisfies StoredUsageState);

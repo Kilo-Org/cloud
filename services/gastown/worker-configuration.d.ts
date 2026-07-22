@@ -57,7 +57,7 @@ type WastelandService = {
 		evidence: string;
 	}): Promise<WastelandRpcResult<{ success: true; pr_url: string | null }>>;
 };
-type ContainerUsageService = import("./src/billing/container-usage.billing").ContainerUsageService;
+type ContainerUsageService = import("@kilocode/container-usage").ContainerUsageRpcMethods;
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/gastown.worker");

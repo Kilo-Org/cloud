@@ -992,19 +992,44 @@ export class TownDO extends DurableObject<Env> {
       townConfig.owner_type === 'org'
         ? ({ type: 'org', id: ownerId } as const)
         : ({ type: 'user', id: ownerId } as const);
+    const useBotActor = !actor || (subject.type === 'user' && actor.id !== subject.id);
+    const billingActor = useBotActor
+      ? ({ type: 'bot', id: `gastown:${this.townId}` } as const)
+      : actor;
     const context: UsageContext = {
       service: 'gastown',
       instanceId: getTownContainerDoId(this.env, this.townId),
       sku: GASTOWN_CONTAINER_SKU,
       subject,
-      actor: actor ?? { type: 'bot', id: `gastown:${this.townId}` },
+      actor: billingActor,
       sessionId: this.townId,
-      metadata: { townId: this.townId },
-      ...(townConfig.created_by_user_id
-        ? { onBehalfOf: { type: 'user' as const, id: townConfig.created_by_user_id } }
-        : {}),
+      metadata: {
+        townId: this.townId,
+        ...(actor && useBotActor ? { triggeredByUserId: actor.id } : {}),
+      },
+      ...(billingActor.type === 'bot' ? { onBehalfOf: subject } : {}),
     };
-    await getTownContainerStub(this.env, this.townId).setBillingContext(context);
+    const container = getTownContainerStub(this.env, this.townId);
+    await container.setBillingContext(context);
+    const estimatedHourlyCharge = await this.getBillingHourlyEstimate();
+    if (estimatedHourlyCharge !== undefined) {
+      await container.setBillingHourlyEstimate(estimatedHourlyCharge);
+    }
+  }
+
+  private async getBillingHourlyEstimate(): Promise<number | undefined> {
+    const storageKey = `billing:hourlyEstimate:${GASTOWN_CONTAINER_SKU}`;
+    const cached = await this.ctx.storage.get<number>(storageKey);
+    if (cached !== undefined) return cached;
+    if (!this.env.HYPERDRIVE) return undefined;
+
+    const { getSkuHourlyCharge } = await import('../billing/sku-rate.billing');
+    const estimate = await getSkuHourlyCharge(
+      this.env.HYPERDRIVE.connectionString,
+      GASTOWN_CONTAINER_SKU
+    );
+    if (estimate !== undefined) await this.ctx.storage.put(storageKey, estimate);
+    return estimate;
   }
 
   private async updateContainerBilling(): Promise<GastownBillingStatus> {
@@ -5938,13 +5963,9 @@ export class TownDO extends DurableObject<Env> {
       console.warn(`${TOWN_LOG} destroy: agent cleanup failed`, err);
     }
 
-    // Destroy TownContainerDO (sends SIGKILL to container process, clears state)
-    try {
-      const containerStub = getTownContainerStub(this.env, this.townId);
-      await containerStub.destroy();
-    } catch (err) {
-      console.warn(`${TOWN_LOG} destroy: container cleanup failed`, err);
-    }
+    // Usage settlement must be acknowledged before container state is destroyed.
+    const containerStub = getTownContainerStub(this.env, this.townId);
+    await containerStub.destroyWithBilling();
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();

@@ -105,6 +105,11 @@
       "service": "wasteland",
       "entrypoint": "WastelandRPCEntrypoint",
     },
+    {
+      "binding": "CONTAINER_USAGE",
+      "service": "container-usage-meter",
+      "entrypoint": "ContainerUsageMeter",
+    },
   ],
 
   // PRODUCTION Secrets Store (shared Kilo secrets store)
@@ -169,6 +174,11 @@
           // (above) uses the plain "wasteland" service name.
           "service": "wasteland-dev",
           "entrypoint": "WastelandRPCEntrypoint",
+        },
+        {
+          "binding": "CONTAINER_USAGE",
+          "service": "container-usage-meter",
+          "entrypoint": "ContainerUsageMeter",
         },
       ],
       "ai": { "binding": "AI" },

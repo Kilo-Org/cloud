@@ -9,27 +9,30 @@ export type PendingHeartbeat = {
   seq: number;
   observedAt: number;
   usageSinceLast: number;
-  idempotencyKey: string;
+};
+
+export type PendingStop = {
+  seq: number;
+  usageSinceLast: number;
+  measuredAtMs: number;
+  reason: 'exit' | 'runtime_signal' | 'activity_expired';
 };
 
 export type OpenUsageInterval = {
   phase: 'starting' | 'running' | 'stopping';
   context: UsageContext;
-  authorizationId: string;
-  authorizationKey: string;
-  authorizationExpiresAt?: number;
   startEpochMs: number;
   startRecorded: boolean;
   seq: number;
   lastReportedAt: number;
   pendingHeartbeat?: PendingHeartbeat;
+  pendingStop?: PendingStop;
   latestBudget?: BudgetVerdict;
   minimumRequired?: number;
   estimatedHourlyCharge?: number;
   reportedUsageSeconds?: number;
   stopReason?: 'exit' | 'runtime_signal' | 'activity_expired';
   stopObservedAt?: number;
-  finalUsageCaptured?: boolean;
 };
 
 export type StoredUsageState =
@@ -46,6 +49,20 @@ export type StoredUsageState =
       };
     }
   | OpenUsageInterval;
+
+export function createPendingStop(
+  state: OpenUsageInterval,
+  stopObservedAt: number,
+  reason: PendingStop['reason']
+): PendingStop {
+  const usageSinceLast = Math.floor(Math.max(0, stopObservedAt - state.lastReportedAt) / 1000);
+  return {
+    seq: state.seq + 1,
+    usageSinceLast,
+    measuredAtMs: state.lastReportedAt + usageSinceLast * 1000,
+    reason,
+  };
+}
 
 export function toBillingStatus(
   enabled: boolean,

@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { getContainerUsageService, isGastownBillingEnabled } from './container-usage.billing';
-import type { ContainerUsageService } from './container-usage.billing';
+import type { ContainerUsageRpcMethods, RecordStartInput } from '@kilocode/container-usage';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  GASTOWN_CONTAINER_SKU,
+  getContainerUsageClient,
+  isGastownBillingEnabled,
+} from './container-usage.billing';
 
 function envFixture(overrides: Partial<Env>): Env {
   return overrides as Env;
@@ -13,47 +17,42 @@ describe('Gastown billing configuration', () => {
     expect(isGastownBillingEnabled(envFixture({}))).toBe(false);
   });
 
-  it('uses the no-charge development stub when the binding is absent', async () => {
-    const service = getContainerUsageService(envFixture({ ENVIRONMENT: 'development' }));
-    const authorization = await service.authorizeStart({
-      context: {
-        service: 'gastown',
-        instanceId: 'container-1',
-        sku: 'cloudflare-container-standard-4',
-        subject: { type: 'user', id: 'user-1' },
-        actor: { type: 'user', id: 'user-1' },
-        sessionId: 'town-1',
-        metadata: { townId: 'town-1' },
-      },
-      idempotencyKey: 'authorize-1',
-      observedAt: 1_000,
+  it('uses the production Gastown SKU', () => {
+    expect(GASTOWN_CONTAINER_SKU).toBe('gastown-standard-2026-07');
+  });
+
+  it('creates a client backed by the WorkerEntrypoint binding', async () => {
+    const recordStart = vi.fn(async (_input: RecordStartInput) => ({
+      success: true as const,
+      ack: { intervalId: 'test', durable: 'pg' as const, dedup: false },
+    }));
+    const binding = {
+      recordStart,
+      recordHeartbeat: vi.fn(),
+      recordStop: vi.fn(),
+    } satisfies ContainerUsageRpcMethods;
+
+    await getContainerUsageClient(envFixture({ CONTAINER_USAGE: binding })).recordStart({
+      instanceId: 'container-1',
+      sku: GASTOWN_CONTAINER_SKU,
+      subject: { type: 'user', id: 'user-1' },
+      actor: { type: 'user', id: 'user-1' },
+      sessionId: 'town-1',
+      metadata: { townId: 'town-1' },
+      startEpochMs: 1_000,
     });
 
-    expect(authorization).toMatchObject({ verdict: 'allow', minimumRequired: 1 });
+    expect(recordStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: 'gastown',
+        sku: 'gastown-standard-2026-07',
+        idempotencyKey: 'v1:gastown:container-1:1000:start',
+      })
+    );
   });
 
-  it('prefers the configured WorkerEntrypoint binding', () => {
-    const binding = {
-      authorizeStart: async () => ({
-        verdict: 'deny' as const,
-        remaining: 0,
-        minimumRequired: 1,
-      }),
-      recordStart: async () => ({ intervalId: 'test', durable: 'pg' as const, dedup: false }),
-      recordHeartbeat: async () => ({
-        intervalId: 'test',
-        durable: 'pg' as const,
-        dedup: false,
-        budget: { verdict: 'continue' as const },
-      }),
-      recordStop: async () => ({ intervalId: 'test', durable: 'pg' as const, dedup: false }),
-    } satisfies ContainerUsageService;
-
-    expect(getContainerUsageService(envFixture({ CONTAINER_USAGE: binding }))).toBe(binding);
-  });
-
-  it('fails closed in production when the binding is absent', () => {
-    expect(() => getContainerUsageService(envFixture({ ENVIRONMENT: 'production' }))).toThrow(
+  it('fails closed when the binding is absent', () => {
+    expect(() => getContainerUsageClient(envFixture({ ENVIRONMENT: 'development' }))).toThrow(
       'CONTAINER_USAGE binding is required'
     );
   });

@@ -6,10 +6,12 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import { selectPrReviewGateView } from './pr-review-connect-gate-view';
 import { useTRPC } from '@/lib/trpc';
 
 type PrReviewConnectGateProps = {
@@ -108,9 +110,17 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
     }
   };
 
-  if (authorization.isError) {
+  const view = selectPrReviewGateView({
+    isError: authorization.isError,
+    isLoading: authorization.isLoading,
+    connected: authorization.data?.connected === true,
+    revoked: authorization.data?.revoked === true,
+  });
+
+  if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
+        <ScreenHeader title="PR Review" />
         <QueryError
           variant="server"
           title="Could not check GitHub connection"
@@ -124,18 +134,22 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
     );
   }
 
-  if (authorization.isLoading) {
+  if (view === 'loading') {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="PR Review" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        </View>
       </View>
     );
   }
 
-  if (!authorization.data?.connected) {
-    const revoked = authorization.data?.revoked === true;
+  if (view === 'connect' || view === 'reconnect') {
+    const revoked = view === 'reconnect';
     return (
       <View className="flex-1 bg-background">
+        <ScreenHeader title="PR Review" />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
           title={revoked ? 'Reconnect GitHub' : 'Connect GitHub'}

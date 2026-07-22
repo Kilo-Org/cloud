@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { db, readDb } from '@/lib/drizzle';
 import {
   cloudBillingSkuIdSchema,
   createCloudBillingSkuInputSchema,
@@ -70,6 +70,12 @@ const segmentSearchSchema = z
 
 const BILLING_HEALTH_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const STALE_OPEN_INTERVAL_MS = 15 * 60 * 1_000;
+const usageMetadataSchema = z
+  .record(z.string().min(1).max(64), z.string().max(512))
+  .refine(
+    metadata => Object.keys(metadata).length <= 16,
+    'Metadata may contain at most 16 entries'
+  );
 
 export type SerializedUsageInterval = Pick<
   ContainerUsageInterval,
@@ -94,7 +100,7 @@ export type SerializedUsageInterval = Pick<
   stopped_at: string | null;
 };
 
-function serializeUsageInterval(interval: ContainerUsageInterval): SerializedUsageInterval {
+export function serializeUsageInterval(interval: ContainerUsageInterval): SerializedUsageInterval {
   return {
     id: interval.id,
     service: interval.service,
@@ -117,16 +123,32 @@ function serializeUsageInterval(interval: ContainerUsageInterval): SerializedUsa
   };
 }
 
-export type SerializedUsageSegment = Omit<
+export type SerializedUsageSegment = Pick<
   ContainerUsageSegment,
-  'idempotency_key' | 'received_at'
+  'interval_id' | 'seq' | 'reported_seconds' | 'usage_seconds'
 > & {
   received_at: string;
 };
 
-function serializeUsageSegment(segment: ContainerUsageSegment): SerializedUsageSegment {
-  const { idempotency_key: _idempotencyKey, ...safe } = segment;
-  return { ...safe, received_at: new Date(segment.received_at).toISOString() };
+export function serializeUsageSegment(segment: ContainerUsageSegment): SerializedUsageSegment {
+  return {
+    interval_id: segment.interval_id,
+    seq: segment.seq,
+    reported_seconds: segment.reported_seconds,
+    usage_seconds: segment.usage_seconds,
+    received_at: new Date(segment.received_at).toISOString(),
+  };
+}
+
+function parseUsageMetadata(metadata: unknown): Record<string, string> {
+  const parsed = usageMetadataSchema.safeParse(metadata ?? {});
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Stored usage metadata is invalid',
+    });
+  }
+  return parsed.data;
 }
 
 function postgresErrorCode(error: unknown): string | undefined {
@@ -148,7 +170,8 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   searchUsageIntervals: adminProcedure.input(usageSearchSchema).query(async ({ input }) => {
     const predicates: SQL[] = [];
     if (input.search.kind === 'recent') {
-      const sharedPredicates: SQL[] = [];
+      const recentCutoff = new Date(Date.now() - BILLING_HEALTH_WINDOW_MS).toISOString();
+      const sharedPredicates: SQL[] = [gt(container_usage_interval.last_seen_at, recentCutoff)];
       if (input.closeReason) {
         sharedPredicates.push(eq(container_usage_interval.close_reason, input.closeReason));
       }
@@ -162,7 +185,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
           : (['open', 'closed'] as const);
       const pages = await Promise.all(
         statuses.map(status =>
-          db
+          readDb
             .select()
             .from(container_usage_interval)
             .where(and(eq(container_usage_interval.status, status), ...sharedPredicates))
@@ -208,7 +231,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       if (cursorPredicate) predicates.push(cursorPredicate);
     }
 
-    const rows = await db
+    const rows = await readDb
       .select()
       .from(container_usage_interval)
       .where(and(...predicates))
@@ -227,7 +250,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   }),
 
   listUsageSegments: adminProcedure.input(segmentSearchSchema).query(async ({ input }) => {
-    const [interval] = await db
+    const [interval] = await readDb
       .select({ id: container_usage_interval.id, metadata: container_usage_interval.metadata })
       .from(container_usage_interval)
       .where(eq(container_usage_interval.id, input.intervalId))
@@ -237,7 +260,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     }
     const predicates = [eq(container_usage_segment.interval_id, input.intervalId)];
     if (input.afterSeq) predicates.push(gt(container_usage_segment.seq, input.afterSeq));
-    const rows = await db
+    const rows = await readDb
       .select()
       .from(container_usage_segment)
       .where(and(...predicates))
@@ -246,7 +269,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     const hasMore = rows.length > input.limit;
     const page = rows.slice(0, input.limit);
     return {
-      metadata: interval.metadata ?? {},
+      metadata: parseUsageMetadata(interval.metadata),
       items: page.map(serializeUsageSegment),
       nextCursor: hasMore ? (page.at(-1)?.seq ?? null) : null,
     };
@@ -257,7 +280,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     const start = new Date(end.getTime() - BILLING_HEALTH_WINDOW_MS);
     const staleBefore = new Date(end.getTime() - STALE_OPEN_INTERVAL_MS);
     const [openRows, segmentRows, closeReasonRows] = await Promise.all([
-      db
+      readDb
         .select({
           open: sql<number>`count(*)`.mapWith(Number),
           stale:
@@ -267,7 +290,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
         })
         .from(container_usage_interval)
         .where(eq(container_usage_interval.status, 'open')),
-      db
+      readDb
         .select({
           segments: sql<number>`count(*)`.mapWith(Number),
           intervalsReported:
@@ -294,7 +317,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
             lt(container_usage_segment.received_at, end.toISOString())
           )
         ),
-      db
+      readDb
         .select({
           reason: container_usage_interval.close_reason,
           count: sql<number>`count(*)`.mapWith(Number),
@@ -320,14 +343,15 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       intervalsReported: segmentRows[0]?.intervalsReported ?? 0,
       openIntervals: openRows[0]?.open ?? 0,
       staleOpenIntervals: openRows[0]?.stale ?? 0,
-      closedIntervals: closeReasons.reduce((total, row) => total + row.count, 0),
-      unconfirmedIntervals: closeReasons.find(row => row.reason === 'unconfirmed')?.count ?? 0,
+      closedIntervalsWithRecentActivity: closeReasons.reduce((total, row) => total + row.count, 0),
+      unconfirmedIntervalsWithRecentActivity:
+        closeReasons.find(row => row.reason === 'unconfirmed')?.count ?? 0,
       segments: segmentRows[0]?.segments ?? 0,
       reportedSeconds: segmentRows[0]?.reportedSeconds ?? 0,
       acceptedSeconds: segmentRows[0]?.acceptedSeconds ?? 0,
       clippedSeconds: segmentRows[0]?.clippedSeconds ?? 0,
       clippedSegments: segmentRows[0]?.clippedSegments ?? 0,
-      closeReasons,
+      closeReasonsByLastActivity: closeReasons,
     };
   }),
 

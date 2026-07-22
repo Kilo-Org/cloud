@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import Link from 'next/link';
@@ -62,6 +62,17 @@ function adminSubjectHref(type: 'user' | 'org', id: string): string {
     : `/admin/organizations/${encodeURIComponent(id)}`;
 }
 
+function parseCloseReason(value: string | null): CloseReason | undefined {
+  return value === 'exit' ||
+    value === 'runtime_signal' ||
+    value === 'activity_expired' ||
+    value === 'reconciled' ||
+    value === 'unconfirmed' ||
+    value === 'superseded'
+    ? value
+    : undefined;
+}
+
 function SegmentDetails({ intervalId }: { intervalId: string }) {
   const trpc = useTRPC();
   const [afterSeq, setAfterSeq] = useState<number | undefined>();
@@ -72,7 +83,17 @@ function SegmentDetails({ intervalId }: { intervalId: string }) {
   if (query.isLoading)
     return <p className="text-muted-foreground type-label">Loading segments...</p>;
   if (query.isError) {
-    return <p className="text-destructive type-label">{query.error.message}</p>;
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Segments could not be loaded</AlertTitle>
+        <AlertDescription className="space-y-3">
+          <p>{query.error.message}</p>
+          <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
   }
   const segments = query.data?.items ?? [];
   const metadata = Object.entries(query.data?.metadata ?? {}).sort(([left], [right]) =>
@@ -169,17 +190,8 @@ export default function UsageRecordsContent() {
   const [kind, setKind] = useState<SearchKind>('user');
   const [value, setValue] = useState('');
   const [status, setStatus] = useState<'all' | 'open' | 'closed'>('all');
-  const initialCloseReason = searchParams.get('closeReason');
-  const [closeReason, setCloseReason] = useState<'all' | CloseReason>(
-    initialCloseReason === 'exit' ||
-      initialCloseReason === 'runtime_signal' ||
-      initialCloseReason === 'activity_expired' ||
-      initialCloseReason === 'reconciled' ||
-      initialCloseReason === 'unconfirmed' ||
-      initialCloseReason === 'superseded'
-      ? initialCloseReason
-      : 'all'
-  );
+  const urlCloseReason = parseCloseReason(searchParams.get('closeReason'));
+  const [closeReason, setCloseReason] = useState<'all' | CloseReason>(urlCloseReason ?? 'all');
   const [skuId, setSkuId] = useState('all');
   const [submitted, setSubmitted] = useState<SearchRequest>({
     kind: 'recent',
@@ -208,6 +220,32 @@ export default function UsageRecordsContent() {
   };
   const results = useQuery(trpc.admin.cloudBillingSkus.searchUsageIntervals.queryOptions(input));
   const rows = results.data?.items ?? [];
+
+  const resetResultNavigation = () => {
+    setCursor(undefined);
+    setPreviousCursors([]);
+    setExpandedId(null);
+  };
+
+  const replaceCloseReasonParam = (reason: CloseReason | undefined) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (reason) params.set('closeReason', reason);
+    else params.delete('closeReason');
+    const query = params.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  };
+
+  useEffect(() => {
+    const next = urlCloseReason ?? 'all';
+    setCloseReason(next);
+    if (urlCloseReason) setStatus('closed');
+    setSubmitted(current => {
+      const nextStatus = urlCloseReason && current.status === 'open' ? 'closed' : current.status;
+      if (current.closeReason === urlCloseReason && current.status === nextStatus) return current;
+      return { ...current, status: nextStatus, closeReason: urlCloseReason };
+    });
+    resetResultNavigation();
+  }, [urlCloseReason]);
 
   return (
     <div className="space-y-6">
@@ -240,9 +278,7 @@ export default function UsageRecordsContent() {
                 submitted.closeReason === next.closeReason &&
                 submitted.skuId === next.skuId;
               setSubmitted(next);
-              setCursor(undefined);
-              setPreviousCursors([]);
-              setExpandedId(null);
+              resetResultNavigation();
               if (unchanged) void results.refetch();
             }}
           >
@@ -272,7 +308,26 @@ export default function UsageRecordsContent() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="usage-search-status">Status</Label>
-              <Select value={status} onValueChange={next => setStatus(next as typeof status)}>
+              <Select
+                value={status}
+                onValueChange={next => {
+                  const selected = next as typeof status;
+                  const selectedStatus = selected === 'all' ? undefined : selected;
+                  const selectedCloseReason =
+                    selected === 'open' ? undefined : submitted.closeReason;
+                  setStatus(selected);
+                  if (selected === 'open' && closeReason !== 'all') {
+                    setCloseReason('all');
+                    replaceCloseReasonParam(undefined);
+                  }
+                  setSubmitted(current => ({
+                    ...current,
+                    status: selectedStatus,
+                    closeReason: selectedCloseReason,
+                  }));
+                  resetResultNavigation();
+                }}
+              >
                 <SelectTrigger id="usage-search-status" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -290,18 +345,15 @@ export default function UsageRecordsContent() {
                 onValueChange={next => {
                   const selected = next as typeof closeReason;
                   const selectedReason = selected === 'all' ? undefined : selected;
+                  if (selectedReason && status === 'open') setStatus('closed');
                   setCloseReason(selected);
-                  const params = new URLSearchParams(searchParams.toString());
-                  if (selectedReason) params.set('closeReason', selectedReason);
-                  else params.delete('closeReason');
-                  const query = params.toString();
-                  router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-                  if (submitted.kind === 'recent') {
-                    setSubmitted({ ...submitted, closeReason: selectedReason });
-                    setCursor(undefined);
-                    setPreviousCursors([]);
-                    setExpandedId(null);
-                  }
+                  replaceCloseReasonParam(selectedReason);
+                  setSubmitted(current => ({
+                    ...current,
+                    status: selectedReason && current.status === 'open' ? 'closed' : current.status,
+                    closeReason: selectedReason,
+                  }));
+                  resetResultNavigation();
                 }}
               >
                 <SelectTrigger id="usage-search-close-reason" className="w-full">
@@ -320,7 +372,17 @@ export default function UsageRecordsContent() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="usage-search-sku">SKU</Label>
-              <Select value={skuId} onValueChange={setSkuId}>
+              <Select
+                value={skuId}
+                onValueChange={selected => {
+                  setSkuId(selected);
+                  setSubmitted(current => ({
+                    ...current,
+                    skuId: selected === 'all' ? undefined : selected,
+                  }));
+                  resetResultNavigation();
+                }}
+              >
                 <SelectTrigger id="usage-search-sku" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -353,7 +415,12 @@ export default function UsageRecordsContent() {
       {results.isError && (
         <Alert variant="destructive">
           <AlertTitle>Usage records could not be loaded</AlertTitle>
-          <AlertDescription>{results.error.message}</AlertDescription>
+          <AlertDescription className="space-y-3">
+            <p>{results.error.message}</p>
+            <Button variant="outline" size="sm" onClick={() => void results.refetch()}>
+              Retry
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -422,7 +489,8 @@ export default function UsageRecordsContent() {
                               <Badge variant="secondary">{interval.subject_type}</Badge>
                               <Link
                                 href={adminSubjectHref(interval.subject_type, interval.subject_id)}
-                                className="block break-all font-medium underline-offset-4 type-code hover:underline"
+                                className="block break-all rounded-sm font-medium text-link underline decoration-current/40 underline-offset-4 type-code outline-none hover:text-link-hover focus-visible:ring-2 focus-visible:ring-ring"
+                                aria-label={`View ${interval.subject_type === 'user' ? 'user' : 'organization'} ${interval.subject_id}`}
                               >
                                 {interval.subject_id}
                               </Link>
@@ -431,7 +499,8 @@ export default function UsageRecordsContent() {
                                 {interval.actor_type === 'user' ? (
                                   <Link
                                     href={`/admin/users/${encodeURIComponent(interval.actor_id)}`}
-                                    className="underline-offset-4 hover:text-foreground hover:underline"
+                                    className="rounded-sm text-link underline decoration-current/40 underline-offset-4 outline-none hover:text-link-hover focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={`View user ${interval.actor_id}`}
                                   >
                                     {interval.actor_id}
                                   </Link>

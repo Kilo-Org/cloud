@@ -27,11 +27,13 @@ function Metric({
   value,
   detail,
   href,
+  linkLabel,
 }: {
   label: string;
   value: string;
   detail: string;
   href?: string;
+  linkLabel?: string;
 }) {
   return (
     <div className="bg-surface-inset rounded-lg border border-border p-4">
@@ -39,7 +41,8 @@ function Metric({
       {href ? (
         <Link
           href={href}
-          className="mt-1 block text-xl font-semibold tabular-nums underline-offset-4 hover:underline"
+          className="mt-1 block rounded-sm text-xl font-semibold tabular-nums text-link underline decoration-current/40 underline-offset-4 outline-none hover:text-link-hover focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={linkLabel}
         >
           {value}
         </Link>
@@ -66,7 +69,12 @@ export default function BillingHealthContent() {
     return (
       <Alert variant="destructive">
         <AlertTitle>Billing health could not be loaded</AlertTitle>
-        <AlertDescription>{health.error.message}</AlertDescription>
+        <AlertDescription className="space-y-3">
+          <p>{health.error.message}</p>
+          <Button variant="outline" size="sm" onClick={() => void health.refetch()}>
+            Retry
+          </Button>
+        </AlertDescription>
       </Alert>
     );
   }
@@ -75,7 +83,7 @@ export default function BillingHealthContent() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
-          <h2 className="type-section">Accounting health</h2>
+          <h2 className="type-heading">Accounting health</h2>
           <p className="text-muted-foreground mt-1 type-body">
             Metering-path indicators for the last 24 hours and current open intervals.
           </p>
@@ -86,21 +94,25 @@ export default function BillingHealthContent() {
           disabled={health.isFetching}
           onClick={() => void health.refetch()}
         >
-          <RefreshCw className={health.isFetching ? 'size-4 animate-spin' : 'size-4'} />
+          <RefreshCw
+            className={
+              health.isFetching ? 'size-4 animate-spin motion-reduce:animate-none' : 'size-4'
+            }
+          />
           {health.isFetching ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
 
-      {data && (data.staleOpenIntervals > 0 || data.unconfirmedIntervals > 0) && (
+      {data && (data.staleOpenIntervals > 0 || data.unconfirmedIntervalsWithRecentActivity > 0) && (
         <Alert variant="destructive">
           <AlertTriangle className="size-4" />
           <AlertTitle>Metering anomalies need attention</AlertTitle>
           <AlertDescription>
             {data.staleOpenIntervals} open interval
             {data.staleOpenIntervals === 1 ? '' : 's'} have not reported for more than 15 minutes;{' '}
-            {data.unconfirmedIntervals} interval
-            {data.unconfirmedIntervals === 1 ? '' : 's'} closed without a confirmed stop in the last
-            24 hours.
+            {data.unconfirmedIntervalsWithRecentActivity} unconfirmed interval
+            {data.unconfirmedIntervalsWithRecentActivity === 1 ? '' : 's'} had final activity in the
+            last 24 hours.
           </AlertDescription>
         </Alert>
       )}
@@ -129,15 +141,16 @@ export default function BillingHealthContent() {
           detail={data ? `${data.staleOpenIntervals} stale beyond 15 minutes` : 'Loading…'}
         />
         <Metric
-          label="Closed"
-          value={data ? data.closedIntervals.toLocaleString() : '—'}
-          detail="Closed during the last 24 hours"
+          label="Closed after recent activity"
+          value={data ? data.closedIntervalsWithRecentActivity.toLocaleString() : '—'}
+          detail="Final activity occurred in the last 24 hours"
         />
         <Metric
           label="Unconfirmed"
-          value={data ? data.unconfirmedIntervals.toLocaleString() : '—'}
-          detail="Closed by stale reconciliation"
+          value={data ? data.unconfirmedIntervalsWithRecentActivity.toLocaleString() : '—'}
+          detail="Final activity occurred in the last 24 hours"
           href="/admin/cloud-billing-skus?tab=usage-records&closeReason=unconfirmed"
+          linkLabel={`View ${data?.unconfirmedIntervalsWithRecentActivity ?? 0} unconfirmed usage intervals`}
         />
         <Metric
           label="Clipped segments"
@@ -155,12 +168,16 @@ export default function BillingHealthContent() {
         <CardHeader>
           <CardTitle>Closure outcomes</CardTitle>
           <CardDescription>
-            Closed intervals grouped by reason over the last 24 hours.
+            Closed intervals grouped by reason when final activity occurred in the last 24 hours.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {data && data.closeReasons.length === 0 ? (
-            <p className="text-muted-foreground type-body">No intervals closed in this period.</p>
+          {!data ? (
+            <p className="text-muted-foreground type-body">Loading closure outcomes…</p>
+          ) : data.closeReasonsByLastActivity.length === 0 ? (
+            <p className="text-muted-foreground type-body">
+              No closed intervals had final activity in this period.
+            </p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border">
               <Table>
@@ -171,7 +188,7 @@ export default function BillingHealthContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(data?.closeReasons ?? []).map(row => (
+                  {data.closeReasonsByLastActivity.map(row => (
                     <TableRow key={row.reason}>
                       <TableCell className="type-code">{row.reason}</TableCell>
                       <TableCell className="text-right tabular-nums type-code">

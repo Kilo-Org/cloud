@@ -59,11 +59,11 @@ export default function CloudBillingSkusPage() {
   const [disablingId, setDisablingId] = useState<string | null>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const listOptions = trpc.admin.cloudBillingSkus.list.queryOptions();
-  const catalog = useQuery(listOptions);
-  const { data: skus, isLoading } = catalog;
-  const loadedSkus = skus ?? [];
   const tabParam = searchParams.get('tab');
   const activeTab = tabParam === 'usage-records' || tabParam === 'health' ? tabParam : 'catalog';
+  const catalog = useQuery({ ...listOptions, enabled: activeTab === 'catalog' });
+  const { data: skus, isLoading } = catalog;
+  const loadedSkus = skus ?? [];
   const onTabChange = useCallback(
     (value: string) => {
       const params = new URLSearchParams(searchParams.toString());

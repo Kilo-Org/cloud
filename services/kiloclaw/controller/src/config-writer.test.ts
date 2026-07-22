@@ -2015,3 +2015,32 @@ describe('repairPersistedHookInvariants', () => {
     expect(unlinked[0]).toContain('.kilorepair.');
   });
 });
+
+describe('repairPersistedHookInvariants concurrency', () => {
+  it('abandons the repair when the config changed under it', () => {
+    const { deps, written, renamed, unlinked } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+    let reads = 0;
+    deps.readFileSync = vi.fn(() => {
+      reads += 1;
+      // First read returns the bricking config; the re-read before rename
+      // simulates an admin write landing mid-repair.
+      return reads === 1
+        ? JSON.stringify(bootBlockingConfig())
+        : JSON.stringify({ hooks: { enabled: true, mappings: [], adminEdit: true } });
+    });
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);
+
+    // Staged, then discarded — the admin's write is left intact.
+    expect(written).toHaveLength(1);
+    expect(renamed).toHaveLength(0);
+    expect(unlinked).toHaveLength(1);
+  });
+
+  it('completes the repair when the config is untouched', () => {
+    const { deps, renamed } = fakeDeps(JSON.stringify(bootBlockingConfig()));
+
+    expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(true);
+    expect(renamed).toHaveLength(1);
+  });
+});

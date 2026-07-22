@@ -1011,6 +1011,17 @@ export function repairPersistedHookInvariants(
     try {
       deps.writeFileSync(tmpPath, JSON.stringify(config, null, 2));
       deps.chmodSync(tmpPath, 0o600);
+
+      // Optimistic concurrency: this writer runs unattended on every gateway
+      // spawn, so unlike the human-initiated edit routes it must not be the one
+      // that silently reverts a concurrent admin write. If the file moved since
+      // the read above, drop the repair — the next spawn re-reads and retries.
+      if (deps.readFileSync(configPath, 'utf8') !== raw) {
+        deps.unlinkSync(tmpPath);
+        console.warn('[controller] Config changed during hook invariant repair, skipping write');
+        return false;
+      }
+
       deps.renameSync(tmpPath, configPath);
     } catch (error) {
       try {

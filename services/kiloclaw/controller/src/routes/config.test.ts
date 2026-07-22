@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerConfigRoutes } from './config';
 import type { Supervisor } from '../supervisor';
 
-// Keep the real hookSessionKeyPrefixViolation: it is pure, and the replace
+// Keep the real hookConfigBootViolation: it is pure, and the replace
 // route depends on it to reject configs the gateway could not boot.
 vi.mock('../config-writer', async importOriginal => {
   const actual = await importOriginal<typeof import('../config-writer')>();
@@ -232,7 +232,9 @@ describe('/_kilo/config/patch routes', () => {
     registerConfigRoutes(app, createMockSupervisor(), 'test-token');
 
     // Healthy config: hooks enabled, no templated sessionKey.
-    readMock.mockReturnValue(JSON.stringify({ hooks: { enabled: true, mappings: [] } }));
+    readMock.mockReturnValue(
+      JSON.stringify({ hooks: { enabled: true, token: 'local-token', mappings: [] } })
+    );
 
     const resp = await app.request('/_kilo/config/patch', {
       method: 'POST',
@@ -258,6 +260,7 @@ describe('/_kilo/config/patch routes', () => {
       JSON.stringify({
         hooks: {
           enabled: true,
+          token: 'local-token',
           mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
         },
       })

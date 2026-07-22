@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   backupConfigFile,
-  ensureHookSessionKeyPrefixes,
+  ensureBootableHookConfig,
   ensureInboundEmailHookFlags,
   generateBaseConfig,
-  hookSessionKeyPrefixViolation,
+  hookConfigBootViolation,
   repairPersistedHookInvariants,
   setNestedValue,
   writeBaseConfig,
@@ -1875,16 +1875,12 @@ describe('writeMcporterConfig', () => {
 
 /** Config shaped like the one that bricked a live instance: templated hook
  * sessionKey, `allowRequestSessionKey` set, but no prefix allow-list. */
-function bootBlockingConfig(): {
-  hooks: {
-    enabled: boolean;
-    token: string;
-    path: string;
-    allowRequestSessionKey: boolean;
-    allowedSessionKeyPrefixes?: unknown;
-    mappings: { id: string; action: string; sessionKey: string }[];
-  };
-} {
+// Mirrors the untyped shape of openclaw.json so cases can break one field at a
+// time without fighting inferred literal types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ConfigLike = { hooks: Record<string, any> };
+
+function bootBlockingConfig(): ConfigLike {
   return {
     hooks: {
       enabled: true,
@@ -1902,67 +1898,179 @@ function bootBlockingConfig(): {
   };
 }
 
-describe('ensureHookSessionKeyPrefixes', () => {
-  it('adds the required prefixes when a mapping sessionKey is templated', () => {
-    const config = bootBlockingConfig();
-    expect(ensureHookSessionKeyPrefixes(config)).toBe(true);
-    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
+/** Builds a hooks block that is startable, so each case can break one thing. */
+function healthyHookConfig(): ConfigLike {
+  return {
+    hooks: {
+      enabled: true,
+      token: 'local-token',
+      path: '/hooks',
+      mappings: [{ id: 'static', action: 'agent', sessionKey: 'hook:fixed' }],
+    },
+  };
+}
+
+/**
+ * Every way OpenClaw's resolveHooksConfig refuses to start, keyed to the throw
+ * it mirrors. Used to drive both the detector and the repair.
+ */
+const BOOT_BLOCKING_CASES: { name: string; expect: RegExp; build: () => ConfigLike }[] = [
+  {
+    name: 'hooks.enabled with no token',
+    expect: /hooks\.enabled requires hooks\.token/,
+    build: () => {
+      const config = healthyHookConfig();
+      delete config.hooks.token;
+      return config;
+    },
+  },
+  {
+    name: "hooks.path of '/'",
+    expect: /hooks\.path may not be/,
+    build: () => {
+      const config = healthyHookConfig();
+      config.hooks.path = '/';
+      return config;
+    },
+  },
+  {
+    name: 'defaultSessionKey matching no configured prefix',
+    expect: /hooks\.defaultSessionKey must match/,
+    build: () => {
+      const config = healthyHookConfig();
+      config.hooks.defaultSessionKey = 'custom:abc';
+      config.hooks.allowedSessionKeyPrefixes = ['hook:'];
+      return config;
+    },
+  },
+  {
+    name: "prefixes without 'hook:' and no defaultSessionKey",
+    expect: /must include 'hook:'/,
+    build: () => {
+      const config = healthyHookConfig();
+      config.hooks.allowedSessionKeyPrefixes = ['inbound-email:'];
+      return config;
+    },
+  },
+  {
+    name: 'templated sessionKey with no prefixes',
+    expect: /hooks\.allowedSessionKeyPrefixes is required/,
+    build: bootBlockingConfig,
+  },
+];
+
+describe('hookConfigBootViolation', () => {
+  it.each(BOOT_BLOCKING_CASES)('reports $name', ({ build, expect: pattern }) => {
+    expect(hookConfigBootViolation(build())).toMatch(pattern);
   });
 
-  it('is idempotent', () => {
+  it('accepts a startable hook config', () => {
+    expect(hookConfigBootViolation(healthyHookConfig())).toBeNull();
+  });
+
+  it('treats a blank-only allow-list as absent, matching OpenClaw', () => {
     const config = bootBlockingConfig();
-    ensureHookSessionKeyPrefixes(config);
-    expect(ensureHookSessionKeyPrefixes(config)).toBe(false);
+    config.hooks.allowedSessionKeyPrefixes = ['   '];
+    expect(hookConfigBootViolation(config)).not.toBeNull();
+  });
+
+  it.each(BOOT_BLOCKING_CASES)('ignores $name when hooks are disabled', ({ build }) => {
+    const config = build();
+    config.hooks.enabled = false;
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it('ignores configs with no hooks block', () => {
+    expect(hookConfigBootViolation({ gateway: { port: 3001 } })).toBeNull();
+  });
+});
+
+describe('ensureBootableHookConfig', () => {
+  // The property that matters: whatever the repair does, the result must be
+  // something OpenClaw will actually start from.
+  it.each(BOOT_BLOCKING_CASES)('repairs $name into a startable config', ({ build }) => {
+    const config = build();
+    const applied = ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' });
+
+    expect(applied.length).toBeGreaterThan(0);
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it.each(BOOT_BLOCKING_CASES)('is idempotent for $name', ({ build }) => {
+    const config = build();
+    ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' });
+    expect(ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' })).toEqual([]);
+  });
+
+  it('restores a missing token from the environment', () => {
+    const config = healthyHookConfig();
+    delete config.hooks.token;
+
+    const applied = ensureBootableHookConfig(config, { KILOCLAW_HOOKS_TOKEN: 'env-token' });
+
+    expect(config.hooks.token).toBe('env-token');
+    expect(config.hooks.enabled).toBe(true);
+    expect(applied.join()).toMatch(/restored hooks\.token/);
+  });
+
+  it('disables hooks when no token exists anywhere, rather than leaving it unbootable', () => {
+    const config = healthyHookConfig();
+    delete config.hooks.token;
+
+    const applied = ensureBootableHookConfig(config, {});
+
+    // A disabled hook surface still boots; bootstrap re-enables it next start.
+    expect(config.hooks.enabled).toBe(false);
+    expect(applied.join()).toMatch(/disabled hooks/);
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it("resets a '/' path to the default rather than guessing", () => {
+    const config = healthyHookConfig();
+    config.hooks.path = '/';
+
+    ensureBootableHookConfig(config, {});
+    expect(config.hooks.path).toBe('/hooks');
+  });
+
+  it('keeps the operator defaultSessionKey by allowing it as its own prefix', () => {
+    const config = healthyHookConfig();
+    config.hooks.defaultSessionKey = 'custom:abc';
+    config.hooks.allowedSessionKeyPrefixes = ['hook:'];
+
+    ensureBootableHookConfig(config, {});
+
+    expect(config.hooks.defaultSessionKey).toBe('custom:abc');
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'custom:abc']);
+  });
+
+  it('adds the required prefixes when a mapping sessionKey is templated', () => {
+    const config = bootBlockingConfig();
+    expect(ensureBootableHookConfig(config, {})).not.toEqual([]);
     expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
   });
 
   it('preserves operator-added prefixes while appending the required ones', () => {
     const config = bootBlockingConfig();
-    (config.hooks as Record<string, unknown>).allowedSessionKeyPrefixes = ['custom:'];
-    expect(ensureHookSessionKeyPrefixes(config)).toBe(true);
+    config.hooks.allowedSessionKeyPrefixes = ['custom:'];
+    expect(ensureBootableHookConfig(config, {})).not.toEqual([]);
     expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['custom:', 'hook:', 'inbound-email:']);
   });
 
-  it('leaves configs without a templated sessionKey untouched', () => {
-    const config = {
-      hooks: {
-        enabled: true,
-        mappings: [{ id: 'static', action: 'agent', sessionKey: 'hook:fixed' }],
-      },
-    };
-    expect(ensureHookSessionKeyPrefixes(config)).toBe(false);
+  it('leaves a startable config untouched', () => {
+    const config = healthyHookConfig();
+    expect(ensureBootableHookConfig(config, {})).toEqual([]);
     expect(config.hooks).not.toHaveProperty('allowedSessionKeyPrefixes');
   });
 
   it('ignores configs with no hooks block', () => {
-    const config: Record<string, unknown> = { gateway: { port: 3001 } };
-    expect(ensureHookSessionKeyPrefixes(config)).toBe(false);
-  });
-});
-
-describe('hookSessionKeyPrefixViolation', () => {
-  it('reports a config that would stop the gateway from starting', () => {
-    expect(hookSessionKeyPrefixViolation(bootBlockingConfig())).toMatch(
-      /hooks\.allowedSessionKeyPrefixes is required/
-    );
+    expect(ensureBootableHookConfig({ gateway: { port: 3001 } }, {})).toEqual([]);
   });
 
-  it('returns null once the prefixes are present', () => {
-    const config = bootBlockingConfig();
-    ensureHookSessionKeyPrefixes(config);
-    expect(hookSessionKeyPrefixViolation(config)).toBeNull();
-  });
-
-  it('treats a blank-only allow-list as missing', () => {
-    const config = bootBlockingConfig();
-    (config.hooks as Record<string, unknown>).allowedSessionKeyPrefixes = ['   '];
-    expect(hookSessionKeyPrefixViolation(config)).not.toBeNull();
-  });
-
-  it('returns null when hooks are disabled', () => {
+  it('leaves a disabled hook surface alone', () => {
     const config = bootBlockingConfig();
     config.hooks.enabled = false;
-    expect(hookSessionKeyPrefixViolation(config)).toBeNull();
+    expect(ensureBootableHookConfig(config, {})).toEqual([]);
   });
 });
 
@@ -1985,7 +2093,7 @@ describe('repairPersistedHookInvariants', () => {
 
   it('does not rewrite a config that is already valid', () => {
     const config = bootBlockingConfig();
-    ensureHookSessionKeyPrefixes(config);
+    ensureBootableHookConfig(config);
     const { deps, written } = fakeDeps(JSON.stringify(config));
 
     expect(repairPersistedHookInvariants('/root/.openclaw/openclaw.json', deps)).toBe(false);

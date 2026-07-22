@@ -7,8 +7,8 @@ import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 import {
   backupConfigFile,
-  ensureHookSessionKeyPrefixes,
-  hookSessionKeyPrefixViolation,
+  ensureBootableHookConfig,
+  hookConfigBootViolation,
   writeBaseConfig,
 } from '../config-writer';
 import { GOG_SECTION_CONFIG, seedExecApprovalsDefaults, updateToolsMdSection } from '../bootstrap';
@@ -170,7 +170,7 @@ export function registerConfigRoutes(
 
       // Same guard as the raw-file editor: never persist a config that stops
       // the gateway from starting, since the instance cannot recover on its own.
-      const bootBlocker = hookSessionKeyPrefixViolation(config);
+      const bootBlocker = hookConfigBootViolation(config);
       if (bootBlocker) {
         return c.json({ code: 'openclaw_config_would_not_boot', error: bootBlocker }, 422);
       }
@@ -213,9 +213,9 @@ export function registerConfigRoutes(
       // Compared before and after the merge on purpose. Rejecting on the
       // post-merge state alone would lock an already-broken instance out of
       // every unrelated patch — including the patch used to repair it.
-      const violationBefore = hookSessionKeyPrefixViolation(config);
+      const violationBefore = hookConfigBootViolation(config);
       deepMerge(config, patch as Record<string, unknown>);
-      const violationAfter = hookSessionKeyPrefixViolation(config);
+      const violationAfter = hookConfigBootViolation(config);
 
       if (violationAfter && !violationBefore) {
         return c.json({ code: 'openclaw_config_would_not_boot', error: violationAfter }, 422);
@@ -223,7 +223,7 @@ export function registerConfigRoutes(
       if (violationAfter) {
         // Already broken before this patch: heal it rather than persisting a
         // config we know the gateway cannot start from.
-        ensureHookSessionKeyPrefixes(config);
+        ensureBootableHookConfig(config);
       }
 
       // Sync exec-approvals.json BEFORE writing openclaw.json so the host

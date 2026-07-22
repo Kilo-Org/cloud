@@ -437,6 +437,7 @@ describe('file routes', () => {
     const BRICKING_CONFIG = JSON.stringify({
       hooks: {
         enabled: true,
+        token: 'local-token',
         mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
       },
     });
@@ -477,6 +478,7 @@ describe('file routes', () => {
       const repaired = JSON.stringify({
         hooks: {
           enabled: true,
+          token: 'local-token',
           allowedSessionKeyPrefixes: ['hook:', 'inbound-email:'],
           mappings: [{ id: 'cloudflare-email-inbound', sessionKey: '{{payload.sessionKey}}' }],
         },

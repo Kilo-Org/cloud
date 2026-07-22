@@ -23,7 +23,24 @@ import {
 } from '../openclaw-export';
 import { getBearerToken } from './gateway';
 import { timingSafeTokenEqual } from '../auth';
-import { hookSessionKeyPrefixViolation } from '../config-writer';
+import { hookConfigBootViolation } from '../config-writer';
+import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
+import { atomicWrite } from '../atomic-write';
+import { backupFile } from '../backup-file';
+import { serializeAgentConfigMutation } from '../openclaw-agent-config';
+import {
+  isOpenclawValidationArtifactPath,
+  validateOpenclawConfigCandidate,
+} from '../openclaw-config-validation';
+import {
+  ensureWeatherSkillInstalled,
+  formatBotIdentityMarkdown,
+  formatUserProfileMarkdown,
+  removeUserMdLocation,
+  removeUserMdTimezone,
+  setUserMdLocation,
+  setUserMdTimezone,
+} from '../bootstrap';
 
 /**
  * Returns a human-readable reason when persisting `content` would leave the
@@ -42,25 +59,8 @@ function describeBootBlockingConfig(content: string): string | null {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return null;
   }
-  return hookSessionKeyPrefixViolation(parsed as Record<string, unknown>);
+  return hookConfigBootViolation(parsed as Record<string, unknown>);
 }
-import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
-import { atomicWrite } from '../atomic-write';
-import { backupFile } from '../backup-file';
-import { serializeAgentConfigMutation } from '../openclaw-agent-config';
-import {
-  isOpenclawValidationArtifactPath,
-  validateOpenclawConfigCandidate,
-} from '../openclaw-config-validation';
-import {
-  ensureWeatherSkillInstalled,
-  formatBotIdentityMarkdown,
-  formatUserProfileMarkdown,
-  removeUserMdLocation,
-  removeUserMdTimezone,
-  setUserMdLocation,
-  setUserMdTimezone,
-} from '../bootstrap';
 
 const OpenclawWorkspaceImportFileSchema = z.object({
   path: z.string().min(1),

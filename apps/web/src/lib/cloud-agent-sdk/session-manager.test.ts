@@ -3332,7 +3332,7 @@ describe('createSessionManager', () => {
   // -------------------------------------------------------------------------
 
   describe('delivery failure status indicator', () => {
-    it('exhausted-retry failure sets an error indicator and leaves failedPrompt null', async () => {
+    it('interrupted message leaves terminal status to service state', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
@@ -3348,9 +3348,7 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.statusIndicator
       );
-      expect(indicator).toEqual(
-        expect.objectContaining({ type: 'error', message: 'Queued message interrupted' })
-      );
+      expect(indicator).toBeNull();
     });
 
     it('execution failure does not overwrite the indicator', async () => {

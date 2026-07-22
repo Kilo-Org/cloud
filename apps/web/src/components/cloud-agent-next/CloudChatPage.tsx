@@ -110,6 +110,7 @@ StaticMessages.displayName = 'StaticMessages';
 // ---------------------------------------------------------------------------
 type DynamicMessagesProps = {
   active: boolean;
+  isStreaming: boolean;
   messages: StoredMessage[];
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
@@ -120,6 +121,7 @@ type DynamicMessagesProps = {
 
 const DynamicMessages = memo(
   function DynamicMessages({
+    isStreaming,
     messages,
     pendingMessages,
     preparationByMessageId,
@@ -130,7 +132,7 @@ const DynamicMessages = memo(
     return (
       <>
         {messages.map(msg => {
-          const streaming = isMessageStreaming(msg);
+          const streaming = isStreaming && isMessageStreaming(msg);
           return (
             <MessageErrorBoundary key={msg.info.id}>
               <MessageBubble
@@ -158,6 +160,7 @@ const DynamicMessages = memo(
 
     return (
       previous.active === next.active &&
+      previous.isStreaming === next.isStreaming &&
       previous.messages === next.messages &&
       previous.pendingMessages === next.pendingMessages &&
       previous.preparationByMessageId === next.preparationByMessageId &&
@@ -877,6 +880,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                             />
                             <DynamicMessages
                               active={chatTabActive}
+                              isStreaming={isStreaming}
                               messages={dynamicMessages}
                               pendingMessages={pendingMessages}
                               preparationByMessageId={preparationByMessageId}

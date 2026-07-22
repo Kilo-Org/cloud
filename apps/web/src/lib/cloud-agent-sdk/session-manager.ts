@@ -1185,12 +1185,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onError: message => store.set(errorAtom, message),
       onMessageFailed: (_messageId, deliveryState) => {
-        if (deliveryState.reason === 'execution') return;
-        const message =
-          deliveryState.reason === 'interrupted'
-            ? 'Queued message interrupted'
-            : 'Message failed to deliver';
-        setIndicator({ type: 'error', message, timestamp: Date.now() });
+        if (deliveryState.reason !== 'exhausted') return;
+        setIndicator({
+          type: 'error',
+          message: 'Message failed to deliver',
+          timestamp: Date.now(),
+        });
       },
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;

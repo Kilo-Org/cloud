@@ -618,7 +618,7 @@ export function ChatInput({
               variant="destructive"
               size="icon"
               onClick={handleStop}
-              disabled={!onStop}
+              disabled={disabled || !onStop}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
               aria-label="Stop response"
             >

@@ -554,6 +554,13 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       attempts: event.attempts,
     };
     pendingMessages.delete(event.messageId);
+    if (event.reason === 'interrupted') {
+      activity = { type: 'idle' };
+      status = { type: 'interrupted' };
+      terminated = true;
+      disconnectedSource = null;
+      completed = false;
+    }
     config.onMessageFailed?.(event.messageId, deliveryState);
     notify();
   }

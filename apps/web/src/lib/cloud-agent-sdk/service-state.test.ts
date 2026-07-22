@@ -1666,10 +1666,11 @@ describe('createServiceState', () => {
       expect(state.getPendingMessages().has('m1')).toBe(false);
     });
 
-    it('cloud.message.failed with reason=interrupted clears pending entry', () => {
+    it('cloud.message.failed with reason=interrupted settles the session', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({
         type: 'cloud.message.failed',
         messageId: 'm1',
@@ -1678,6 +1679,8 @@ describe('createServiceState', () => {
       });
 
       expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
     });
 
     it('cloud.message.failed with reason=execution clears pending entry', () => {

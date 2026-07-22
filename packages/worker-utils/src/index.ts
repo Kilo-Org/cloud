@@ -53,9 +53,7 @@ export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-n
 
 export {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
-  GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
-  GITLAB_CREDENTIAL_REPAIR_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
 } from './internal-service-token-audiences.js';
 export {

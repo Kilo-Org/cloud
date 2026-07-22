@@ -16,14 +16,8 @@ export type GitLabLookupParams = {
 };
 
 export type GitLabIntegrationMetadata = {
-  access_token?: string;
-  refresh_token?: string;
-  token_expires_at?: string;
   gitlab_instance_url?: string;
-  client_id?: string;
-  client_secret?: string;
   auth_type?: 'oauth' | 'pat';
-  project_tokens?: Record<string, { token: string }>;
 };
 
 export type AuthorizedGitLabIntegration = {
@@ -56,16 +50,8 @@ export type GitLabRepositoryMatch = AuthorizedGitLabIntegration & {
 
 const GitLabMetadataSchema = z
   .object({
-    access_token: z.string().optional(),
-    refresh_token: z.string().optional(),
-    token_expires_at: z.string().optional(),
     gitlab_instance_url: z.string().optional(),
-    client_id: z.string().optional(),
-    client_secret: z.string().optional(),
     auth_type: z.enum(['oauth', 'pat']).optional(),
-    project_tokens: z
-      .record(z.string(), z.object({ token: z.string().min(1) }).passthrough())
-      .optional(),
   })
   .passthrough();
 

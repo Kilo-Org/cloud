@@ -47,10 +47,6 @@ vi.mock('./gitlab-lookup-service.js', () => ({
   GitLabLookupService: class GitLabLookupService {},
 }));
 
-vi.mock('./gitlab-token-service.js', () => ({
-  GitLabTokenService: class GitLabTokenService {},
-}));
-
 import handler, { GitTokenRPCEntrypoint } from './index.js';
 
 function createService(): GitTokenRPCEntrypoint {

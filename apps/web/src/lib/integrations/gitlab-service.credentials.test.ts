@@ -263,7 +263,7 @@ describe('GitLab encrypted credential persistence', () => {
     ]);
   });
 
-  it('reuses an exact legacy project credential when backfill has not inserted its row', async () => {
+  it('creates a new project credential when only stale legacy metadata remains', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -275,46 +275,53 @@ describe('GitLab encrypted credential persistence', () => {
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, connected.integration.id));
-    const legacyProjectToken = {
-      token_id: 991,
-      token: 'glpat-legacy-project-token',
-      expires_at: '2027-07-13',
-      created_at: '2026-07-13T00:00:00.000Z',
-      name: 'Kilo Code Review Bot',
-    };
+    // Stale plaintext left behind from before the credential-encryption
+    // migration's scrub ran. There is no encrypted row for this project, so
+    // it must never be trusted or reused.
     await db
       .update(platform_integrations)
       .set({
         metadata: {
           ...(integration.metadata as Record<string, unknown>),
-          project_tokens: { '42': legacyProjectToken },
+          project_tokens: {
+            '42': {
+              token_id: 991,
+              token: 'glpat-legacy-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
         },
       })
       .where(eq(platform_integrations.id, integration.id));
-    const [integrationWithLegacyProject] = await db
+    const [integrationWithStaleMetadata] = await db
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, integration.id));
-    mockFetchGitLabCredential.mockResolvedValueOnce({
-      status: 'available',
-      token: legacyProjectToken.token,
-      instanceUrl: 'https://gitlab.com',
-      glabIsOAuth2: false,
-    });
 
     await expect(
-      getOrCreateProjectAccessToken(integrationWithLegacyProject, 42, { userId: user.id })
-    ).resolves.toBe(legacyProjectToken.token);
-    expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
+      getOrCreateProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id })
+    ).resolves.toBe('glpat-created-project-token');
+    expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(mockFetchGitLabCredential).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ credential: 'project-exact' })
+    );
     await expect(
       db
         .select()
         .from(platform_access_token_credentials)
         .where(eq(platform_access_token_credentials.provider_resource_id, '42'))
-    ).resolves.toEqual([]);
+    ).resolves.toEqual([
+      expect.objectContaining({
+        provider_resource_id: '42',
+        token_encrypted: expect.any(String),
+      }),
+    ]);
   });
 
-  it('revokes and removes an exact legacy project credential', async () => {
+  it('no-ops removal when only stale legacy metadata remains and no encrypted row exists', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -339,37 +346,25 @@ describe('GitLab encrypted credential persistence', () => {
               created_at: '2026-07-13T00:00:00.000Z',
               name: 'Kilo Code Review Bot',
             },
-            '43': {
-              token_id: 992,
-              token: 'glpat-other-project-token',
-              expires_at: '2027-07-13',
-              created_at: '2026-07-13T00:00:00.000Z',
-              name: 'Kilo Code Review Bot',
-            },
           },
         },
       })
       .where(eq(platform_integrations.id, integration.id));
-    const [integrationWithLegacyProjects] = await db
+    const [integrationWithStaleMetadata] = await db
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, integration.id));
 
-    await removeStoredProjectAccessToken(integrationWithLegacyProjects, 42, { userId: user.id });
+    await removeStoredProjectAccessToken(integrationWithStaleMetadata, 42, { userId: user.id });
 
-    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
-      'glpat-primary-token',
-      42,
-      991,
-      'https://gitlab.com'
-    );
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
     const [updatedIntegration] = await db
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.id, integration.id));
     expect(updatedIntegration.metadata).toEqual(
       expect.objectContaining({
-        project_tokens: { '43': expect.objectContaining({ token_id: 992 }) },
+        project_tokens: { '42': expect.objectContaining({ token_id: 991 }) },
       })
     );
   });

@@ -19,8 +19,6 @@ const serviceMocks = vi.hoisted(() => ({
   hasGitLabProjectCredentialCandidates: vi.fn(),
   listBitbucketRepositories: vi.fn(),
   resolveBitbucketToken: vi.fn(),
-  runGitLabCredentialAudit: vi.fn(),
-  runGitLabCredentialRepair: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -67,12 +65,6 @@ vi.mock('./gitlab-lookup-service.js', async importOriginal => {
   };
 });
 
-vi.mock('./gitlab-token-service.js', () => ({
-  GitLabTokenService: class GitLabTokenService {
-    getToken = serviceMocks.getGitLabToken;
-  },
-}));
-
 vi.mock('./gitlab-credential-broker-handler.js', async importOriginal => {
   const actual = await importOriginal<typeof GitLabCredentialBrokerHandlerModule>();
   return {
@@ -101,14 +93,6 @@ vi.mock('./gitlab-credential-broker-handler.js', async importOriginal => {
 vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
   listBitbucketRepositories: serviceMocks.listBitbucketRepositories,
   resolveBitbucketToken: serviceMocks.resolveBitbucketToken,
-}));
-
-vi.mock('./gitlab-credential-audit-handler.js', () => ({
-  runGitLabCredentialAudit: serviceMocks.runGitLabCredentialAudit,
-}));
-
-vi.mock('./gitlab-credential-repair-handler.js', () => ({
-  runGitLabCredentialRepair: serviceMocks.runGitLabCredentialRepair,
 }));
 
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
@@ -337,233 +321,6 @@ describe('GitLab credential broker HTTP authorization', () => {
     expect(response.status).toBe(401);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
-  });
-});
-
-describe('GitLab credential audit HTTP authorization', () => {
-  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
-  const path = 'https://git-token-service.test/internal/gitlab/credential-audit';
-
-  beforeEach(() => {
-    serviceMocks.runGitLabCredentialAudit.mockReset().mockResolvedValue({
-      authorized: true,
-      result: {
-        activeKey: { keyId: 'active', publicKeySha256: 'a'.repeat(64) },
-        counts: {
-          credentials: 1,
-          secrets: 1,
-          passedCredentials: 1,
-          profileFailures: 0,
-          configurationFailures: 0,
-          parseFailures: 0,
-          unknownKeyFailures: 0,
-          decryptOrAadFailures: 0,
-        },
-        failingCredentials: {
-          profile: [],
-          configuration: [],
-          parse: [],
-          unknownKey: [],
-          decryptOrAad: [],
-        },
-        nextCursor: null,
-      },
-    });
-  });
-
-  async function authorization(audience?: string) {
-    return signKiloToken({
-      userId: 'admin-1',
-      pepper: null,
-      secret: jwtSecret,
-      expiresInSeconds: 5 * 60,
-      ...(audience ? { audience } : {}),
-    });
-  }
-
-  it('requires its dedicated audience and returns only the no-store audit result', async () => {
-    const { token } = await authorization('git-token-service:gitlab-credential-audit');
-    const response = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ limit: 10 }),
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const result = await response.json();
-    expect(result).toEqual(expect.objectContaining({ nextCursor: null }));
-    expect(result).toEqual(
-      expect.objectContaining({
-        activeKey: { keyId: 'active', publicKeySha256: 'a'.repeat(64) },
-      })
-    );
-    expect(JSON.stringify(result)).not.toMatch(/plaintext|ciphertext|token_encrypted/i);
-    expect(serviceMocks.runGitLabCredentialAudit).toHaveBeenCalledWith(
-      expect.anything(),
-      'admin-1',
-      { limit: 10 }
-    );
-  });
-
-  it('rejects a token without the audit audience before the admin lookup', async () => {
-    const { token } = await authorization();
-    const response = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: '{}',
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-
-    expect(response.status).toBe(401);
-    expect(serviceMocks.runGitLabCredentialAudit).not.toHaveBeenCalled();
-  });
-
-  it('rejects a non-admin after the database-backed authorization check', async () => {
-    serviceMocks.runGitLabCredentialAudit.mockResolvedValue({ authorized: false });
-    const { token } = await authorization('git-token-service:gitlab-credential-audit');
-    const response = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: '{}',
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-
-    expect(response.status).toBe(403);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    await expect(response.json()).resolves.toEqual({ error: 'forbidden' });
-  });
-
-  it('rejects unknown or oversized request fields before database access', async () => {
-    const { token } = await authorization('git-token-service:gitlab-credential-audit');
-    const response = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ limit: 101, unknown: true }),
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-
-    expect(response.status).toBe(400);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    expect(serviceMocks.runGitLabCredentialAudit).not.toHaveBeenCalled();
-  });
-});
-
-describe('GitLab credential repair HTTP authorization', () => {
-  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
-  const path = 'https://git-token-service.test/internal/gitlab/credential-repair';
-
-  beforeEach(() => {
-    serviceMocks.runGitLabCredentialRepair.mockReset().mockResolvedValue({
-      authorized: true,
-      result: {
-        counts: {
-          candidates: 1,
-          repaired: 1,
-          alreadyHealthy: 0,
-          profileFailures: 0,
-          configurationFailures: 0,
-          parseFailures: 0,
-          unknownKeyFailures: 0,
-          unrepairableFailures: 0,
-          writeConflicts: 0,
-        },
-        failures: {
-          profile: [],
-          configuration: [],
-          parse: [],
-          unknownKey: [],
-          unrepairable: [],
-          writeConflict: [],
-        },
-        nextCursor: null,
-      },
-    });
-  });
-
-  async function authorization(audience?: string) {
-    return signKiloToken({
-      userId: 'admin-1',
-      pepper: null,
-      secret: jwtSecret,
-      expiresInSeconds: 5 * 60,
-      ...(audience ? { audience } : {}),
-    });
-  }
-
-  it('requires its dedicated audience and returns only the no-store repair result', async () => {
-    const { token } = await authorization('git-token-service:gitlab-credential-repair');
-    const response = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ limit: 10 }),
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const result = await response.json();
-    expect(result).toEqual(expect.objectContaining({ nextCursor: null }));
-    expect(JSON.stringify(result)).not.toMatch(/plaintext|ciphertext|token_encrypted/i);
-    expect(serviceMocks.runGitLabCredentialRepair).toHaveBeenCalledWith(
-      expect.anything(),
-      'admin-1',
-      { limit: 10 }
-    );
-  });
-
-  it('rejects audit-audience tokens and invalid requests before repair runs', async () => {
-    const { token: wrongAudience } = await authorization(
-      'git-token-service:gitlab-credential-audit'
-    );
-    const unauthorized = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${wrongAudience}`, 'Content-Type': 'application/json' },
-        body: '{}',
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-    expect(unauthorized.status).toBe(401);
-
-    const { token } = await authorization('git-token-service:gitlab-credential-repair');
-    const invalid = await gitTokenServiceWorker.fetch(
-      new Request(path, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 101 }),
-      }),
-      { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv
-    );
-    expect(invalid.status).toBe(400);
-    expect(invalid.headers.get('Cache-Control')).toBe('no-store');
-    expect(serviceMocks.runGitLabCredentialRepair).not.toHaveBeenCalled();
   });
 });
 
@@ -1904,6 +1661,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
         project_tokens: { '42': { token: 'project-access-token' } },
       },
     });
+    serviceMocks.hasGitLabProjectCredentialCandidates.mockResolvedValueOnce(true);
 
     const result = await createService().issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',
@@ -1980,6 +1738,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
         integrations: [projectIntegration],
       });
       serviceMocks.findGitLabIntegration.mockResolvedValue(projectIntegration);
+      serviceMocks.hasGitLabProjectCredentialCandidates.mockResolvedValueOnce(true);
       const service = createService();
       const issued = await service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.com/acme/widgets.git',
@@ -2021,6 +1780,7 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       integrations: [projectIntegration],
     });
     serviceMocks.findGitLabIntegration.mockResolvedValue(projectIntegration);
+    serviceMocks.hasGitLabProjectCredentialCandidates.mockResolvedValueOnce(true);
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({
       gitUrl: 'https://gitlab.com/acme/widgets.git',

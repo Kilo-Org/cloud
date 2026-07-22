@@ -611,6 +611,103 @@ describe('terminalizeMessageOnce', () => {
     ).rejects.toThrow('Workspace failure subtype requires workspace_setup_failed failure code');
   });
 
+  it('derives managed provider ownership from the admitted model for assistant failures', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(
+        createIntent(VALID_MESSAGE_ID, 'hello', {
+          agent: { mode: 'code', model: 'kilo-auto/free' },
+        }),
+        undefined,
+        1000
+      ),
+      status: 'accepted',
+      acceptedAt: 2000,
+    });
+
+    const result = await terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+      kind: 'failed',
+      reason: 'assistant_error',
+      completionSource: 'wrapper_failure',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      assistantFailureReason: 'provider_unavailable',
+      providerOwnership: 'unknown',
+      safeFailureMessage: 'Assistant service is unavailable',
+    });
+
+    expect(result.state?.providerOwnership).toBe('managed');
+  });
+
+  it('keeps explicit byok ownership from the error marker', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+    });
+
+    const result = await terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+      kind: 'failed',
+      reason: 'assistant_error',
+      completionSource: 'wrapper_failure',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      assistantFailureReason: 'provider_authentication',
+      providerOwnership: 'byok',
+      safeFailureMessage: 'Assistant request was not authorized',
+    });
+
+    expect(result.state?.providerOwnership).toBe('byok');
+  });
+
+  it('keeps unknown ownership when no admitted model context exists', async () => {
+    const storage = createFakeStorage();
+    const state = createQueuedSessionMessageState(
+      createIntent(VALID_MESSAGE_ID, 'hello'),
+      undefined,
+      1000
+    );
+    await putSessionMessageState(storage, {
+      ...state,
+      status: 'accepted',
+      acceptedAt: 2000,
+      admissionSnapshot: undefined,
+    });
+
+    const result = await terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+      kind: 'failed',
+      reason: 'assistant_error',
+      completionSource: 'wrapper_failure',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      assistantFailureReason: 'provider_unavailable',
+      providerOwnership: 'unknown',
+      safeFailureMessage: 'Assistant service is unavailable',
+    });
+
+    expect(result.state?.providerOwnership).toBe('unknown');
+  });
+
+  it('leaves ownership unset for non-assistant failures', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(createIntent(VALID_MESSAGE_ID, 'hello'), undefined, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+    });
+
+    const result = await terminalizeMessageOnce(storage, VALID_MESSAGE_ID, {
+      kind: 'failed',
+      reason: 'wrapper_error',
+      completionSource: 'wrapper_failure',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'wrapper_error_before_activity',
+    });
+
+    expect(result.state?.providerOwnership).toBeUndefined();
+  });
+
   it('returns changed=false for unknown messageId', async () => {
     const storage = createFakeStorage();
     const result = await terminalizeMessageOnce(

@@ -646,6 +646,31 @@ describe('WrapperSupervisor', () => {
     });
   });
 
+  it('derives managed provider ownership from the admitted model on assistant failures', async () => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      admissionSnapshot: {
+        turn: { type: 'prompt', messageId: MESSAGE_ID, prompt: 'supervise this wrapper' },
+        agent: { mode: 'code', model: 'kilo-auto/free' },
+      },
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      error: '503 Service Unavailable',
+      errorSource: 'assistant',
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      assistantFailureReason: 'provider_unavailable',
+      providerOwnership: 'managed',
+    });
+  });
+
   it('does not persist model diagnostics for non-model-not-found assistant failures', async () => {
     const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
     await putSessionMessageState(harness.storage, acceptedMessage());

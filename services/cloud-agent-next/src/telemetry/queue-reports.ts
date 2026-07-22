@@ -6,7 +6,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../logger.js';
 import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
-import type { SessionMessageState } from '../session/session-message-state.js';
+import { admittedAgentModel, type SessionMessageState } from '../session/session-message-state.js';
 import {
   classifyCloudAgentFailure,
   isWorkspaceFailureSubtype,
@@ -55,10 +55,7 @@ function timestamp(value: number): string {
 }
 
 function usedManagedModelSelection(state: SessionMessageState): boolean {
-  const model =
-    state.admissionSnapshot?.agent.model ??
-    state.legacyAdmissionConstraints?.agent?.model ??
-    state.agent?.model;
+  const model = admittedAgentModel(state);
   return model === undefined ? false : /^(?:kilo\/)?kilo-auto\//.test(model);
 }
 

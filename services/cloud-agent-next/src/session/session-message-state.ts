@@ -731,6 +731,35 @@ export type TerminalizeEffectOptions = {
   allowIdleBatchWithoutObservedIdle?: boolean;
 };
 
+/**
+ * Model admitted for the run, preferring the immutable admission snapshot.
+ * Every admitted model dispatches through the managed kilo provider
+ * (see normalizeKilocodeModel and the kilo client's providerID default).
+ */
+export function admittedAgentModel(state: SessionMessageState): string | undefined {
+  return (
+    state.admissionSnapshot?.agent.model ??
+    state.legacyAdmissionConstraints?.agent?.model ??
+    state.agent?.model
+  );
+}
+
+/**
+ * Assistant-failure terminalizations carry error-text-derived ownership (the
+ * `[BYOK]` marker) from the safe-failure classifier. Since admitted runs always
+ * dispatch through the managed kilo provider, fill managed ownership from the
+ * admitted model unless the error text already identified BYOK routing.
+ */
+function resolveTerminalProviderOwnership(
+  params: Extract<TerminalizeParams, { kind: 'failed' }>,
+  state: SessionMessageState
+): CloudAgentProviderOwnership | undefined {
+  if (params.providerOwnership === 'byok' || params.assistantFailureReason === undefined) {
+    return params.providerOwnership;
+  }
+  return admittedAgentModel(state) === undefined ? params.providerOwnership : 'managed';
+}
+
 export type TerminalizeParams =
   | {
       kind: 'completed';
@@ -812,7 +841,7 @@ export async function terminalizeMessageOnce(
       failureCode: params.failureCode,
       failureSubtype: params.failureSubtype,
       assistantFailureReason: params.assistantFailureReason,
-      providerOwnership: params.providerOwnership,
+      providerOwnership: resolveTerminalProviderOwnership(params, state),
       safeFailureMessage: params.safeFailureMessage,
       modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
       attempts: params.attempts,

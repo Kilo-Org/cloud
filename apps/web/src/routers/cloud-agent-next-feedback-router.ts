@@ -13,10 +13,18 @@ const recentMessageSchema = z.object({
   ts: z.number(),
 });
 
+const feedbackSessionTypeSchema = z.enum(['cloud-agent', 'remote', 'read-only']);
+
+const feedbackSessionTypeLabels = {
+  'cloud-agent': 'Cloud Agent',
+  remote: 'Remote',
+  'read-only': 'Read-only',
+} as const satisfies Record<z.infer<typeof feedbackSessionTypeSchema>, string>;
+
 const CreateCloudAgentFeedbackInputSchema = z.object({
   cloud_agent_session_id: z.string().max(500).optional(),
   kilo_session_id: z.string().max(500).optional(),
-  session_type: z.enum(['cloud-agent', 'remote', 'read-only']).optional(),
+  session_type: feedbackSessionTypeSchema.optional(),
   organization_id: z.string().uuid().optional(),
   feedback_text: z.string().min(1).max(10_000),
   model: z.string().max(255).optional(),
@@ -58,7 +66,9 @@ export const cloudAgentNextFeedbackRouter = createTRPCRouter({
 
         const metadataLines = [
           `• session: ${sessionLink}`,
-          `• session type: ${input.session_type ?? '_unknown_'}`,
+          `• session type: ${
+            input.session_type ? feedbackSessionTypeLabels[input.session_type] : '_unknown_'
+          }`,
         ];
 
         const trimmedFeedback = input.feedback_text.trim();

@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- The profile screen composes Credits, Agents, Reviews, Organization, Linked accounts, Notifications, Restore Purchases, and Actions; each section is a small rendered surface that mirrors the shared ConfigureRow/Text-header pattern. Splitting would re-encode the same hooks. */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import {
+  Bell,
   Building2,
   GitMerge,
   GitPullRequest,
@@ -17,7 +19,6 @@ import { toast } from 'sonner-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
-import { NotificationsCard } from '@/components/notifications-card';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -264,8 +265,20 @@ export function ProfileScreen() {
         )}
 
         {/* Notifications */}
-        <View className="mt-6">
-          <NotificationsCard />
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Notifications
+          </Text>
+          <ConfigureRow
+            icon={Bell}
+            title="Notifications"
+            subtitle="Push preferences"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            }}
+          />
         </View>
 
         {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}

@@ -1347,10 +1347,6 @@ describe('agent_notification attention signals', () => {
     const body = JSON.stringify({ data: params.stagedItems ?? [] });
     const env = {
       HYPERDRIVE: { connectionString: 'postgres://unused' },
-      // Enable legacy (completed / needs_input) attention pushes for this user so the
-      // per-user rollout gate does not suppress them. agent_notification pushes bypass
-      // this gate regardless.
-      REMOTE_SESSION_ATTENTION_PUSH_USER_ID: 'usr_agent',
       SESSION_INGEST_R2: {
         get: vi.fn(async () => new Response(body)),
         put: vi.fn(async () => undefined),

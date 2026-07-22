@@ -30,7 +30,6 @@ export function buildRemoteSessionAttentionPushBody(signal: ExcerptAttentionSign
 }
 
 export type DispatchRemoteSessionAttentionDeps = {
-  remoteSessionAttentionPushUserId?: string;
   hasActiveCliSession: () => Promise<boolean>;
   sendPush: (
     params: SendCloudAgentSessionNotificationParams
@@ -79,12 +78,8 @@ export async function dispatchRemoteSessionAttentionSignal(
     return result.dispatched ? 'sent' : 'suppressed';
   }
 
-  // Legacy attention pushes (completed / needs_input) remain gated behind the staged
-  // per-user rollout and the live-CLI presence check.
-  if (deps.remoteSessionAttentionPushUserId?.trim() !== params.kiloUserId) {
-    return 'suppressed';
-  }
-
+  // Legacy attention pushes (completed / needs_input) remain gated behind the live-CLI
+  // presence check.
   if (!(await deps.hasActiveCliSession())) {
     return 'suppressed';
   }

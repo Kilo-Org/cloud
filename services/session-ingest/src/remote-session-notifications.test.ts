@@ -47,46 +47,13 @@ describe('buildRemoteSessionAttentionPushBody', () => {
 });
 
 describe('dispatchRemoteSessionAttentionSignal', () => {
-  it('suppresses pushes when no user is enabled', async () => {
-    const hasActiveCliSession = vi.fn(async () => true);
-    const sendPush = vi.fn(async () => ({ dispatched: true }));
-    const sendAgentSessionNotification = vi.fn(async () => ({ dispatched: true }));
-    const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
-      { hasActiveCliSession, sendPush, sendAgentSessionNotification }
-    );
-
-    expect(outcome).toBe('suppressed');
-    expect(hasActiveCliSession).not.toHaveBeenCalled();
-    expect(sendPush).not.toHaveBeenCalled();
-  });
-
-  it('suppresses pushes for users other than the rollout user', async () => {
-    const hasActiveCliSession = vi.fn(async () => true);
-    const sendPush = vi.fn(async () => ({ dispatched: true }));
-    const outcome = await dispatchRemoteSessionAttentionSignal(
-      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
-      {
-        remoteSessionAttentionPushUserId: 'usr_2',
-        hasActiveCliSession,
-        sendPush,
-        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
-      }
-    );
-
-    expect(outcome).toBe('suppressed');
-    expect(hasActiveCliSession).not.toHaveBeenCalled();
-    expect(sendPush).not.toHaveBeenCalled();
-  });
-
-  it('sends a push for the rollout user with an active remote CLI session', async () => {
+  it('sends a push when the remote CLI session is active', async () => {
     const hasActiveCliSession = vi.fn(async () => true);
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const signal = completedSignal('Done');
     const outcome = await dispatchRemoteSessionAttentionSignal(
       { kiloUserId: 'usr_1', sessionId: 'ses_1', signal },
       {
-        remoteSessionAttentionPushUserId: ' usr_1 ',
         hasActiveCliSession,
         sendPush,
         sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
@@ -103,6 +70,22 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
       body: 'Done',
       suppressIfViewingSession: true,
     });
+  });
+
+  it('suppresses pushes when no remote CLI session is active', async () => {
+    const hasActiveCliSession = vi.fn(async () => false);
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      { kiloUserId: 'usr_1', sessionId: 'ses_1', signal: completedSignal('Done') },
+      {
+        hasActiveCliSession,
+        sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
+    );
+
+    expect(outcome).toBe('suppressed');
+    expect(sendPush).not.toHaveBeenCalled();
   });
 
   // §4.3: agent_notification signals intentionally bypass the live-CLI gate so a

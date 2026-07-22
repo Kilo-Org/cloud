@@ -10,7 +10,6 @@ interface __BaseEnv_CloudflareBindings {
 	DIRECT_INGEST_PERCENT: "100";
 	DIRECT_INGEST_USER_IDS: "f1a848ca-bade-48d8-a5ad-1042d08651e6";
 	DIRECT_INGEST_MAX_BYTES: "4194304";
-	REMOTE_SESSION_ATTENTION_PUSH_USER_ID: "";
 	SESSION_INGEST_DO: DurableObjectNamespace<import("./src/index").SessionIngestDO>;
 	SESSION_ACCESS_CACHE_DO: DurableObjectNamespace<import("./src/index").SessionAccessCacheDO>;
 	USER_CONNECTION_DO: DurableObjectNamespace<import("./src/index").UserConnectionDO>;
@@ -29,7 +28,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "DIRECT_INGEST_PERCENT" | "DIRECT_INGEST_USER_IDS" | "DIRECT_INGEST_MAX_BYTES" | "REMOTE_SESSION_ATTENTION_PUSH_USER_ID">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "DIRECT_INGEST_PERCENT" | "DIRECT_INGEST_USER_IDS" | "DIRECT_INGEST_MAX_BYTES">> {}
 }
 declare module "*.sql" {
 	const value: string;

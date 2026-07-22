@@ -324,6 +324,7 @@ export function ChatSidebar({
   currentSessionId,
   organizationId,
   onDeleteSession,
+  deletingSessionId,
   onRenameSession,
   isInSheet = false,
   activeSessions = [],

@@ -24,6 +24,8 @@ The planner's first message must ask the user one question: is this run `hands o
 - `hands on`: ask the user one question at a time until requirements, trade-offs, acceptance criteria, and the plan are unambiguous. Obtain explicit user approval of the plan before launching the orchestrator. Ask the user when a repair loop or ambiguity cannot be resolved.
 - `hands off`: after mode selection, never ask the user a question and never wait for user approval. Treat all approvals as granted. Interrogate the plan yourself to expose missing requirements, trade-offs, risks, and acceptance criteria. Answer open questions from repository evidence and best judgment, and record material assumptions in the plan and handoff. Continue through planning, implementation, review, E2E, PR creation and repair, Kilobot review, conflict resolution, and green CI. Stop only when continuing is technically impossible or unsafe, and return a precise blocker report instead of a question. A blocked E2E criterion is a blocker, not something to self-accept.
 
+Planner lifecycle: regardless of the selected mode, the planner is hands-on through planning and must resolve every unknown before handoff — in hands-on mode with the user, in hands-off mode from repository evidence with recorded assumptions. After launching the orchestrator it switches to monitor mode (see Planner Monitor Mode) and does not resume hands-on work.
+
 Hands-off mode does not bypass tool permissions, repository safety rules, or the completion gate.
 
 ## Feature State Matrix
@@ -99,6 +101,17 @@ tmux new-window -t <planner-tmux-session> \
 
 Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Opus 4.8 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
 
+### Planner Monitor Mode
+
+After the handoff the planner stops all hands-on work — no planning, implementation, or product judgment — and switches to monitor mode. Everything the orchestrator does runs in the shared tmux session, so the planner inspects its windows and service logs directly.
+
+Monitor mode has exactly one job: unblock the orchestrator when it is stuck on an environment failure, never on a problem it is supposed to solve itself.
+
+- Unblock: a wedged or crashed kilo CLI, a dead orchestrator tmux window, a hung service or simulator the orchestrator cannot restart — infrastructure it cannot recover on its own.
+- Do not intervene: the orchestrator struggling with a product, logic, design, or review problem. That work is the orchestrator's, handled by its escalation ladder; solving it here defeats the fresh-session and delegation discipline.
+
+Run one check on a roughly 30-minute interval to preserve context, and stay idle between checks. Stop monitoring when the orchestrator reaches the completion gate or returns a blocker report.
+
 ## Roles
 
 | Agent | Responsibility | Repository edits |
@@ -129,14 +142,14 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 4. Dispatch one fresh `mobile-reviewer` over the coherent wave diff. Triage findings yourself: route valid findings through a bounded repair wave and then a fresh reviewer; record rejected findings with a short rationale. This is a loop: repeat repair wave → fresh reviewer, steering each round per the escalation ladder, until a fresh reviewer reports no valid actionable findings. Running this loop is the orchestrator's primary job, not a preamble to doing the work itself.
 5. After checks and review pass, create the commits at the ledger's intended per-slice boundaries. If a slice exhausts its implementer budget, split it or re-dispatch it with a sharper handoff; take it over yourself only per the escalation ladder.
 6. When device E2E is likely, prewarm infrastructure concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Do not judge acceptance behavior while implementation is still changing. Record a resource manifest for the final verifier.
-7. After the implementation passes review, dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier. This is also a loop: repeat triage → repair wave → fresh reviewer → fresh verifier, steering each round per the escalation ladder, until a fresh verifier passes every applicable feature state. The orchestrator may reproduce a failure once to triage it; the repair itself, with the orchestrator's diagnosis and acceptance criteria attached, goes through the implementer-reviewer loop. The orchestrator never sits in an edit-run-verify loop itself.
-8. Perform the final full-diff review and repository-appropriate verification yourself. Commit any final narrowly scoped repair, push, create or update the PR, and assign it to the requesting human.
+7. After the implementation passes review, perform the final full-diff review yourself, then push the reviewed head, create the PR, and assign it to the requesting human — before starting E2E. Opening the PR now lets CI and Kilobot review concurrently with the E2E run instead of after it. Do not read or triage any review comment yet (see step 9).
+8. Dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Route product failures through a bounded repair wave and fresh reviewer, then another fresh final verifier. This is a loop: repeat triage → repair wave → fresh reviewer → fresh verifier, steering each round per the escalation ladder, until a fresh verifier passes every applicable feature state. The orchestrator may reproduce a failure once to triage it; the repair itself, with the orchestrator's diagnosis and acceptance criteria attached, goes through the implementer-reviewer loop. The orchestrator never sits in an edit-run-verify loop itself. Perform a final full-diff review of any E2E-driven repair, commit it at the right boundary, and push — updating the PR and re-triggering CI and Kilobot.
 
 ### Reviewer and CI Loop
 
 Kilobot is the only reviewer whose review is waited for. Comments that other reviewers — bots or humans — have already posted get exactly the same triage, repair, reply, and resolve flow, but never wait for another reviewer to review or re-review.
 
-9. Wait until Kilobot has reviewed the latest head; do not wait for any other reviewer. Kilobot can crash: if its review or check does not arrive in a reasonable time, retrigger it by pushing an empty commit or by tagging it in a PR comment asking for a re-review, then resume waiting. Then fetch every unresolved review thread from every reviewer, including comments that arrived after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
+9. Only now, after E2E has completed, begin reading and triaging review comments; the PR opened at step 7 means Kilobot and CI results may already be waiting. Wait until Kilobot has reviewed the latest head; do not wait for any other reviewer. Kilobot can crash: if its review or check does not arrive in a reasonable time, retrigger it by pushing an empty commit or by tagging it in a PR comment asking for a re-review, then resume waiting. Then fetch every unresolved review thread from every reviewer, including comments that arrived after earlier repairs, and triage each finding using the repository-root `AGENTS.md` review-remark workflow.
 10. For each valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. For each invalid finding: reply in the thread with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done.
 11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable comment already posted by any reviewer is unresolved.
 12. Rerun local mobile E2E after any review-driven repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
@@ -190,4 +203,5 @@ The orchestrator may declare the work complete only when every item holds:
 - All expected CI checks on the latest head are in a successful terminal state; failed, cancelled, timed-out, action-required, or pending checks block completion
 - No generated E2E fixture remains tracked or untracked in any repository
 - Every verifier temporary edit is removed, and each repository's final Git state exactly matches its recorded pre-verification baseline
+- Every backend service, simulator, or emulator this run started — including prewarmed and bug-reproduction resources — is shut down or released; resources the run did not start (such as the shared Metro dev runner) are left running
 - The temporary handoff file is deleted

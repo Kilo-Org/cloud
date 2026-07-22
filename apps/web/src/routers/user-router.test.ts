@@ -545,42 +545,85 @@ describe('user router - notification preferences', () => {
     });
   });
 
+  afterEach(async () => {
+    // Reset notification preferences between tests so order does not matter
+    // and per-test assertions about the "no row" default and column-level
+    // writes are deterministic.
+    await db
+      .delete(user_notification_preferences)
+      .where(inArray(user_notification_preferences.user_id, [firstUser.id, secondUser.id]));
+  });
+
   afterAll(async () => {
     await db
       .delete(kilocode_users)
       .where(inArray(kilocode_users.id, [firstUser.id, secondUser.id]));
   });
 
-  it('returns the default-on preference for a user with no row', async () => {
+  it('returns the default-on preferences for a user with no row', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
     const result = await caller.user.getNotificationPreferences();
 
-    expect(result).toEqual({ agentPushEnabled: true });
+    expect(result).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      agentPushEnabled: true,
+    });
+    // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
+    expect(result.agentUpdates).toBe(result.agentPushEnabled);
   });
 
-  it('returns the stored preference when a row exists', async () => {
-    await db
-      .insert(user_notification_preferences)
-      .values({ user_id: firstUser.id, agent_push_enabled: false });
+  it('returns the stored preferences when a row exists', async () => {
+    await db.insert(user_notification_preferences).values({
+      user_id: firstUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: true,
+      agent_attention_enabled: false,
+      session_status_enabled: true,
+      kiloclaw_activity_enabled: false,
+    });
 
     const caller = await createCallerForUser(firstUser.id);
     const result = await caller.user.getNotificationPreferences();
 
-    expect(result).toEqual({ agentPushEnabled: false });
+    expect(result).toEqual({
+      chatMessages: true,
+      agentAttention: false,
+      agentUpdates: false,
+      sessionStatus: true,
+      kiloclawActivity: false,
+      agentPushEnabled: false,
+    });
+    expect(result.agentUpdates).toBe(result.agentPushEnabled);
   });
 
-  it('upserts the preference for the authenticated user only', async () => {
+  it('upserts the preference for the authenticated user only (legacy key)', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
     const result = await caller.user.setNotificationPreferences({ agentPushEnabled: false });
-    expect(result).toEqual({ agentPushEnabled: false });
+    expect(result).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: false,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      agentPushEnabled: false,
+    });
 
     const [row] = await db
       .select()
       .from(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, firstUser.id));
     expect(row?.agent_push_enabled).toBe(false);
+    // Other columns kept their default (true) since the legacy key only writes agent_push_enabled.
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
 
     // Calling again with true must update, not insert
     await caller.user.setNotificationPreferences({ agentPushEnabled: true });
@@ -600,10 +643,24 @@ describe('user router - notification preferences', () => {
     // Second user has no row; default-on must be returned and the first user's
     // row must not leak.
     const secondPrefs = await secondCaller.user.getNotificationPreferences();
-    expect(secondPrefs).toEqual({ agentPushEnabled: true });
+    expect(secondPrefs).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      agentPushEnabled: true,
+    });
 
     const firstPrefs = await firstCaller.user.getNotificationPreferences();
-    expect(firstPrefs).toEqual({ agentPushEnabled: false });
+    expect(firstPrefs).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: false,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      agentPushEnabled: false,
+    });
 
     // Setting second user's preference must not affect first user's row.
     await secondCaller.user.setNotificationPreferences({ agentPushEnabled: false });
@@ -618,5 +675,61 @@ describe('user router - notification preferences', () => {
       .where(eq(user_notification_preferences.user_id, secondUser.id));
     expect(firstRow?.agent_push_enabled).toBe(false);
     expect(secondRow?.agent_push_enabled).toBe(false);
+  });
+
+  it('writes only the provided column and leaves the others at their prior/default value', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    // Set two columns up front, then update only one of them with a new key.
+    await caller.user.setNotificationPreferences({
+      chatMessages: false,
+      sessionStatus: false,
+    });
+
+    const result = await caller.user.setNotificationPreferences({ agentAttention: false });
+    expect(result).toEqual({
+      chatMessages: false,
+      agentAttention: false,
+      agentUpdates: true,
+      sessionStatus: false,
+      kiloclawActivity: true,
+      agentPushEnabled: true,
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    // chatMessages and sessionStatus preserved from the prior write.
+    expect(row?.chat_messages_enabled).toBe(false);
+    expect(row?.session_status_enabled).toBe(false);
+    // agentAttention updated.
+    expect(row?.agent_attention_enabled).toBe(false);
+    // kiloclawActivity and agent_push_enabled still at DB default.
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+  });
+
+  it('accepts the legacy { agentPushEnabled: false } input and reflects agentUpdates === agentPushEnabled === false', async () => {
+    // Shipped-client compat path: the legacy key is the only thing the shipped
+    // mobile app knows how to send.
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({ agentPushEnabled: false });
+    expect(result.agentUpdates).toBe(false);
+    expect(result.agentPushEnabled).toBe(false);
+    expect(result.agentUpdates).toBe(result.agentPushEnabled);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.agent_push_enabled).toBe(false);
+    // Other categories remain at DB default (true) because only the legacy
+    // key was supplied.
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
   });
 });

@@ -250,8 +250,21 @@ function normalizeOptionalString(value: unknown): string | undefined {
 }
 
 /**
- * Mirrors OpenClaw's `hooks.path` normalization. Several inputs collapse to a
- * bare '/', which OpenClaw rejects: '/', '//', and '   ' among them.
+ * Mirrors OpenClaw's `hooks.path` normalization, including its quirks.
+ *
+ * Only a literal '/' is rejected by OpenClaw. It is tempting to assume every
+ * all-slash path is, but the trailing-slash strip is greedy, so '//' and '///'
+ * reduce to '' rather than '/' and pass the check; blank strings fall back to
+ * the default. Verified against openclaw 2026.6.11:
+ *
+ *   '/'   -> '/'       (rejected)
+ *   '//'  -> ''        (accepted)
+ *   '///' -> ''        (accepted)
+ *   '   ' -> '/hooks'  (accepted)
+ *
+ * Do not "fix" the empty-string result into '/': that would reject configs
+ * OpenClaw accepts, and make the repair rewrite a working path on every spawn.
+ * Parity with the gateway is the point — see the normalizeHookPath tests.
  */
 function normalizeHookPath(value: unknown): string {
   const raw = normalizeOptionalString(value) ?? DEFAULT_HOOKS_PATH;
@@ -285,13 +298,62 @@ function isAllowedByPrefix(sessionKey: string, prefixes: string[]): boolean {
   return normalized.length > 0 && prefixes.some(prefix => normalized.startsWith(prefix));
 }
 
-/** A hook mapping `sessionKey` that interpolates request data, e.g. `{{payload.sessionKey}}`. */
-function hasTemplatedSessionKey(mapping: unknown): boolean {
-  if (typeof mapping !== 'object' || mapping === null) {
+/** Mirrors OpenClaw's `hasHookTemplateExpressions`: a complete, non-empty `{{ … }}`. */
+const HOOK_TEMPLATE_EXPRESSION = /\{\{\s*[^}]+\s*\}\}/;
+
+/** Mirrors OpenClaw's `normalizeMatchPath`. */
+function normalizeMatchPath(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const trimmed = raw.trim();
+  return trimmed ? trimmed.replace(/^\/+/, '').replace(/\/+$/, '') : undefined;
+}
+
+/**
+ * Mirrors OpenClaw's `hasEffectiveTemplatedHookSessionKeyMapping`.
+ *
+ * Three details are load-bearing, and getting any of them wrong makes this
+ * broader than the gateway — which would reject configs OpenClaw starts from:
+ *  - only `action: 'agent'` mappings count, and `action` defaults to 'agent'
+ *  - the template must be a complete `{{ … }}`; a bare '{{' or '{{}}' is literal
+ *  - mappings shadowed by an earlier, broader mapping are skipped entirely
+ */
+function hasEffectiveTemplatedSessionKey(mappings: unknown): boolean {
+  if (!Array.isArray(mappings)) {
     return false;
   }
-  const sessionKey = (mapping as ConfigObject).sessionKey;
-  return typeof sessionKey === 'string' && sessionKey.includes('{{');
+  const effective: { matchPath?: string; matchSource?: string }[] = [];
+  for (const entry of mappings) {
+    if (typeof entry !== 'object' || entry === null) {
+      continue;
+    }
+    const mapping = entry as ConfigObject;
+    const matchPath = normalizeMatchPath(mapping.match?.path);
+    const matchSource =
+      typeof mapping.match?.source === 'string' ? mapping.match.source.trim() : undefined;
+
+    const shadowed = effective.some(earlier => {
+      if (earlier.matchPath && earlier.matchPath !== matchPath) {
+        return false;
+      }
+      return !earlier.matchSource || earlier.matchSource === matchSource;
+    });
+    if (shadowed) {
+      continue;
+    }
+    effective.push({ matchPath, matchSource });
+
+    const action = mapping.action ?? 'agent';
+    if (
+      action === 'agent' &&
+      typeof mapping.sessionKey === 'string' &&
+      HOOK_TEMPLATE_EXPRESSION.test(mapping.sessionKey)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -341,7 +403,7 @@ export function hookConfigBootViolation(config: ConfigObject): string | null {
       `is unset.${BOOT_BLOCKER_SUFFIX}`
     );
   }
-  if (Array.isArray(hooks.mappings) && hooks.mappings.some(hasTemplatedSessionKey) && !prefixes) {
+  if (hasEffectiveTemplatedSessionKey(hooks.mappings) && !prefixes) {
     return (
       'hooks.allowedSessionKeyPrefixes is required when a hook mapping sessionKey uses ' +
       'templates (for example "{{payload.sessionKey}}"), even with ' +
@@ -403,7 +465,7 @@ export function ensureBootableHookConfig(
     : [];
   const before = JSON.stringify(prefixes);
   const defaultSessionKey = normalizeOptionalString(hooks.defaultSessionKey);
-  const hasTemplated = Array.isArray(hooks.mappings) && hooks.mappings.some(hasTemplatedSessionKey);
+  const hasTemplated = hasEffectiveTemplatedSessionKey(hooks.mappings);
 
   // Preserve any operator-added prefixes; only append what is missing.
   //

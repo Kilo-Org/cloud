@@ -20,8 +20,26 @@ It runs a preflight (Docker, bump branch, clean tree, grype, credential) then:
 | Script | What it checks | Key? |
 |---|---|---|
 | `openclaw-upgrade-validate.sh` | **entry point** — orchestrates the two below | — |
-| `openclaw-upgrade-image-checks.sh` | the built image: version, bundle patches, plugin pins, config schema, grype CVE scan | no |
-| `openclaw-upgrade-smoke.sh` | the live upgrade: baseline → candidate on the same `/root`, plus a real gateway turn | yes |
+| `openclaw-upgrade-image-checks.sh` | the built image: version, bundle patches, plugin pins, config schema, hook boot-validation parity, grype CVE scan | no |
+| `openclaw-upgrade-smoke.sh` | the live upgrade: baseline → candidate on the same `/root`, plus a real gateway turn and hook config self-heal | yes |
+
+### Hook boot-validation parity
+
+`openclaw-upgrade-image-checks.sh` asserts that the set of conditions OpenClaw
+refuses to start the gateway on — the `throw`s in its `resolveHooksConfig` — is
+exactly the set the controller mirrors in `hookConfigBootViolation` /
+`ensureBootableHookConfig` (`controller/src/config-writer.ts`).
+
+This exists because nothing else catches drift here. Those failures are raised
+at **gateway startup**, so neither `openclaw config validate` (schema-only) nor
+`openclaw doctor` sees them, and a config that trips one crash-loops the
+instance with no self-recovery. If OpenClaw adds or rewords a condition, this
+check fails on the bump PR with a diff; update the mirror **and its tests**,
+then update the expected list in the script.
+
+The live smoke covers the other half: `assert_hook_config_self_heal` plants an
+unbootable config in the persisted root, restarts the gateway, and asserts the
+controller repaired it and came back up rather than crash-looping.
 
 Notes: run from a **clean committed bump branch** (the validator refuses a dirty
 tree; `ALLOW_DIRTY_TREE=true` runs but can't report a clean result). `grype` is

@@ -288,6 +288,49 @@ validate_fixture "validator still rejects a malformed config (self-check)" \
   '{"agents":{"defaults":{"model":{"primary":123}}}}' \
   "invalid"
 
+# ── Hook boot-validation parity (drift guard) ────────────────────────────────
+# The controller mirrors OpenClaw's resolveHooksConfig so it can (a) refuse
+# writes that would leave the gateway unable to start and (b) repair a persisted
+# config before each spawn — see hookConfigBootViolation / ensureBootableHookConfig
+# in controller/src/config-writer.ts.
+#
+# That mirror is duplicated logic against a fast-moving upstream, and nothing
+# else catches drift: these failures are thrown at gateway startup, NOT by
+# `config validate` (schema-only) or `doctor`. A config that trips one of them
+# crash-loops the instance with no self-recovery, which is how this class of bug
+# reached production in the first place.
+#
+# So assert the packaged conditions are exactly the set the controller mirrors.
+# A new or reworded condition fails here, on the bump PR, rather than silently
+# leaving the mirror incomplete. Verified identical on 2026.6.11 and 2026.7.2.
+#
+# If this fails: update the mirror in config-writer.ts (detector AND repair) and
+# its tests, then update the expected list below.
+HOOK_CONDITION_PATTERN="hooks\.[A-Za-z]+ (is required|requires|must match|must include|may not be)[^\"]*"
+EXPECTED_HOOK_CONDITIONS="hooks.allowedSessionKeyPrefixes is required when a hook mapping sessionKey uses templates, even if hooks.allowRequestSessionKey=true
+hooks.allowedSessionKeyPrefixes must include 'hook:' when hooks.defaultSessionKey is unset
+hooks.defaultSessionKey must match hooks.allowedSessionKeyPrefixes
+hooks.enabled requires hooks.token
+hooks.path may not be '/'"
+
+actual_hook_conditions=$(docker run --rm "$IMAGE" sh -c \
+  "grep -rhoE \"$HOOK_CONDITION_PATTERN\" /usr/local/lib/node_modules/openclaw/dist/ | sort -u" 2>/dev/null || echo "")
+
+expected_hook_count=$(printf '%s\n' "$EXPECTED_HOOK_CONDITIONS" | wc -l | tr -d ' ')
+actual_hook_count=$(printf '%s\n' "$actual_hook_conditions" | grep -c . || echo 0)
+check "hook boot-validation condition count" "$expected_hook_count" "$actual_hook_count"
+
+if [ "$actual_hook_conditions" = "$EXPECTED_HOOK_CONDITIONS" ]; then
+  echo "PASS: hook boot-validation conditions match the controller mirror"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL: hook boot-validation conditions drifted from the controller mirror"
+  echo "      controller/src/config-writer.ts must be updated to match. Diff:"
+  diff <(printf '%s\n' "$EXPECTED_HOOK_CONDITIONS") <(printf '%s\n' "$actual_hook_conditions") \
+    | sed 's/^/      /' || true
+  FAIL=$((FAIL + 1))
+fi
+
 # ── Keyless plugin-load resolution (doctor, no gateway) ──────────────────────
 # Regression guard for the class of bug where the controller writes a
 # plugins.load.paths entry that the bundled openclaw does not ship — e.g. the

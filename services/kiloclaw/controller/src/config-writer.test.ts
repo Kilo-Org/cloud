@@ -1983,6 +1983,72 @@ describe('hookConfigBootViolation', () => {
   it('ignores configs with no hooks block', () => {
     expect(hookConfigBootViolation({ gateway: { port: 3001 } })).toBeNull();
   });
+
+  // Parity with hasEffectiveTemplatedHookSessionKeyMapping. Each of these is a
+  // mapping OpenClaw does NOT treat as templated, so requiring prefixes for
+  // them would reject configs the gateway starts from.
+  it.each([
+    {
+      name: 'a non-agent action',
+      mapping: { id: 'x', action: 'wake', sessionKey: '{{payload.sessionKey}}' },
+    },
+    { name: 'an unclosed template', mapping: { id: 'x', sessionKey: 'literal{{' } },
+    { name: 'an empty template', mapping: { id: 'x', sessionKey: '{{}}' } },
+  ])('does not treat $name as templated', ({ mapping }) => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [mapping];
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it('treats a mapping with no explicit action as an agent mapping', () => {
+    const config = healthyHookConfig();
+    // action defaults to 'agent' in OpenClaw, so this one does require prefixes.
+    config.hooks.mappings = [{ id: 'x', sessionKey: '{{payload.sessionKey}}' }];
+    expect(hookConfigBootViolation(config)).toMatch(/allowedSessionKeyPrefixes is required/);
+  });
+
+  it('skips a templated mapping shadowed by an earlier catch-all', () => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [
+      // No matchPath/matchSource — shadows everything after it.
+      { id: 'catch-all', sessionKey: 'hook:fixed' },
+      { id: 'shadowed', sessionKey: '{{payload.sessionKey}}' },
+    ];
+    expect(hookConfigBootViolation(config)).toBeNull();
+  });
+
+  it('still flags a templated mapping that an earlier narrower mapping cannot shadow', () => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [
+      { id: 'narrow', match: { path: 'other' }, sessionKey: 'hook:fixed' },
+      { id: 'templated', match: { path: 'email' }, sessionKey: '{{payload.sessionKey}}' },
+    ];
+    expect(hookConfigBootViolation(config)).toMatch(/allowedSessionKeyPrefixes is required/);
+  });
+
+  // Parity with openclaw 2026.6.11's resolveHooksConfig, which rejects only a
+  // literal '/'. Its trailing-slash strip is greedy, so '//' reduces to '' and
+  // is accepted; blanks fall back to the default. Flagging these would reject
+  // configs the gateway starts from, so the accepted cases are pinned here to
+  // stop a well-meaning "all-slash paths are invalid" change.
+  it.each([
+    { path: '/', rejected: true },
+    { path: '//', rejected: false },
+    { path: '///', rejected: false },
+    { path: '   ', rejected: false },
+    { path: '/hooks', rejected: false },
+    { path: 'hooks', rejected: false },
+  ])('treats hooks.path $path as rejected=$rejected, matching OpenClaw', ({ path, rejected }) => {
+    const config = healthyHookConfig();
+    config.hooks.path = path;
+
+    const violation = hookConfigBootViolation(config);
+    if (rejected) {
+      expect(violation).toMatch(/hooks\.path may not be/);
+    } else {
+      expect(violation).toBeNull();
+    }
+  });
 });
 
 describe('ensureBootableHookConfig', () => {
@@ -2032,6 +2098,19 @@ describe('ensureBootableHookConfig', () => {
     ensureBootableHookConfig(config, {});
     expect(config.hooks.path).toBe('/hooks');
   });
+
+  // The repair must not touch paths OpenClaw accepts, or it would rewrite a
+  // working config on every gateway spawn.
+  it.each(['//', '///', '   ', '/hooks', 'hooks'])(
+    'leaves the OpenClaw-accepted path %j alone',
+    path => {
+      const config = healthyHookConfig();
+      config.hooks.path = path;
+
+      expect(ensureBootableHookConfig(config, {})).toEqual([]);
+      expect(config.hooks.path).toBe(path);
+    }
+  );
 
   it('keeps the operator defaultSessionKey by allowing it as its own prefix', () => {
     const config = healthyHookConfig();

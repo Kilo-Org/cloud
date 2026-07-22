@@ -425,3 +425,76 @@ PY
     echo "  details: $details"
   fi
 }
+
+# Prove the controller repairs a config the gateway cannot start from, in a real
+# container, before every spawn.
+#
+# This is the end-to-end counterpart to the unit tests for
+# ensureBootableHookConfig and the supervisor beforeSpawn hook: those cover the
+# pieces, only this covers the wiring. It is the regression guard for the
+# incident where a persisted config lost hooks.allowedSessionKeyPrefixes and the
+# instance crash-looped indefinitely, since gateway restarts do not re-run
+# bootstrap's config generation.
+#
+# Deliberately writes the broken config with `docker exec` rather than through a
+# config route: the routes now reject this shape, and the point is to simulate a
+# config that reached disk some other way (restored backup, hand-edit, or an
+# older controller) — which is exactly how the original incident happened.
+assert_hook_config_self_heal() {
+  local cid="$1"
+  local port="$2"
+  local token="$3"
+  local broken
+  local repaired
+  local code
+
+  echo
+  echo "--- hook config self-heal (gateway restart repairs an unbootable config) ---"
+
+  # Strip the prefixes while leaving the templated inbound-email mapping: the
+  # exact shape that bricked a production instance.
+  broken=$(docker exec -i "$cid" python3 - <<'PY' 2>&1
+import json, pathlib
+path = pathlib.Path('/root/.openclaw/openclaw.json')
+doc = json.loads(path.read_text())
+hooks = doc.setdefault('hooks', {})
+hooks['enabled'] = True
+hooks.setdefault('token', 'smoke-hooks-token')
+hooks.pop('allowedSessionKeyPrefixes', None)
+hooks['mappings'] = [{
+    'id': 'cloudflare-email-inbound',
+    'match': {'path': 'email'},
+    'action': 'agent',
+    'sessionKey': '{{payload.sessionKey}}',
+}]
+path.write_text(json.dumps(doc, indent=2))
+print('broken')
+PY
+  )
+  if [ "$broken" != "broken" ]; then
+    check "planted unbootable hook config" "broken" "$broken"
+    return
+  fi
+  check "planted unbootable hook config" "broken" "$broken"
+
+  # supervisor.restart() runs the beforeSpawn repair on the way back up.
+  code=$(curl -sS -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Authorization: Bearer $token" \
+    "http://127.0.0.1:${port}/_kilo/gateway/restart" 2>/dev/null || true)
+  check "gateway restart accepted -> 200" "200" "$code"
+
+  # The repair must have landed on disk...
+  repaired=$(docker exec -i "$cid" python3 - <<'PY' 2>&1
+import json, pathlib
+doc = json.loads(pathlib.Path('/root/.openclaw/openclaw.json').read_text())
+prefixes = (doc.get('hooks') or {}).get('allowedSessionKeyPrefixes')
+print('repaired' if isinstance(prefixes, list) and 'inbound-email:' in prefixes else f'not-repaired: {prefixes!r}')
+PY
+  )
+  check "controller restored allowedSessionKeyPrefixes" "repaired" "$repaired"
+
+  # ...and the gateway must actually be serving, not crash-looping.
+  wait_for_ready "self-heal restart"
+  assert_gateway_status
+}

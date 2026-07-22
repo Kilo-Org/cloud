@@ -320,7 +320,7 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
       className="active:opacity-70"
     >
       <SessionRow
-        agentLabel={remoteAgentLabel(session.platform ?? session.createdOnPlatform)}
+        agentLabel={remoteAgentLabel(session.createdOnPlatform)}
         title={title}
         subtitle={session.gitBranch ?? null}
         meta={remoteMeta(session)}

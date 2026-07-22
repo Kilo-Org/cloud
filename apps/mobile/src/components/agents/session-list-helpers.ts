@@ -2,7 +2,13 @@ import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
+
+// Re-exported so existing importers of `platformLabel` from this module keep
+// working while `@/lib/platform-label` stays the single source of truth for
+// the platform→label mapping (no duplicate definition to drift).
+export { platformLabel };
 
 /**
  * One stored-history section. Exclusivity against the "Active now" tray is
@@ -56,42 +62,21 @@ export function formatGitUrlProject(gitUrl: string): string {
   return gitUrl;
 }
 
-/**
- * Map backend `created_on_platform` strings to a pretty uppercase label
- * for the row eyebrow. The row's hue is hashed from this label.
- */
-export function platformLabel(platform: string): string {
-  switch (platform) {
-    case 'cloud-agent':
-    case 'cloud-agent-web': {
-      return 'CLOUD AGENT';
-    }
-    case 'vscode':
-    case 'agent-manager': {
-      return 'VSCODE';
-    }
-    case 'slack': {
-      return 'SLACK';
-    }
-    case 'cli': {
-      return 'CLI';
-    }
-    default: {
-      return platform.toUpperCase();
-    }
-  }
-}
-
 export function formatMeta(timestamp: string): string {
   return timeAgo(parseTimestamp(timestamp)).toUpperCase();
 }
 
 /**
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
- * platform is known, otherwise falls back to 'LIVE'.
+ * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
+ * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a
+ * definitive (and potentially wrong) label.
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
-  return createdOnPlatform ? platformLabel(createdOnPlatform) : 'LIVE';
+  if (!createdOnPlatform || createdOnPlatform === 'unknown') {
+    return 'LIVE';
+  }
+  return platformLabel(createdOnPlatform);
 }
 
 /**

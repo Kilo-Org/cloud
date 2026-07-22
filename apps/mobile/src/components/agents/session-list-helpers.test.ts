@@ -214,6 +214,14 @@ describe('remoteAgentLabel', () => {
   it("returns 'LIVE' for undefined", () => {
     expect(remoteAgentLabel(undefined)).toBe('LIVE');
   });
+
+  it("returns 'LIVE' for empty origin", () => {
+    expect(remoteAgentLabel('')).toBe('LIVE');
+  });
+
+  it("returns 'LIVE' for unknown origin", () => {
+    expect(remoteAgentLabel('unknown')).toBe('LIVE');
+  });
 });
 
 describe('remoteMeta', () => {

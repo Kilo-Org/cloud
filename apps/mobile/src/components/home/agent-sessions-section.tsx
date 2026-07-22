@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import {
   expandPlatformFilter,
   formatGitUrlProject,
+  remoteAgentLabel,
 } from '@/components/agents/session-list-helpers';
 import { SectionHeader } from '@/components/home/section-header';
 import { SessionRow } from '@/components/ui/session-row';
@@ -125,14 +126,15 @@ function storedSessionMeta(session: StoredSession): string {
   return timeAgo(parseTimestamp(tsSource)).toUpperCase();
 }
 
-function activeSessionLabel(session: ActiveSession): string {
+export function activeSessionLabel(session: ActiveSession): string {
   const repo = repoNameFromGitUrl(session.gitUrl);
-  // kilocode_change - K1/C3a: derive the fallback label from the live
-  // per-session `platform` heartbeat field instead of a hardcoded
-  // 'cloud-agent' guess, so a `kilo remote`-spawned session shows "CLI"
-  // (via platformLabel) instead of being mislabeled "CLOUD AGENT". Entries
-  // without `platform` (legacy senders) keep today's exact fallback.
-  return repo ? repo.toUpperCase() : platformLabel(session.platform ?? 'cloud-agent');
+  // kilocode_change - K1/C3a: derive the fallback label from the session's
+  // backend origin (`createdOnPlatform`) via the shared `remoteAgentLabel`,
+  // not from the host-OS `platform` heartbeat field. Live CLI sessions start
+  // with origin 'unknown' and get no repo, so they now show the neutral 'LIVE'
+  // label until the first `kilo_meta` sets origin to 'cli'; they never show
+  // 'CLOUD AGENT' (BUG1). Once origin is 'cli' the label becomes 'CLI'.
+  return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
 }
 
 function storedSessionLabel(session: StoredSession): string {

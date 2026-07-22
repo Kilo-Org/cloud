@@ -118,7 +118,7 @@ type Transport = {
    * effect.
    */
   createSession?: () => Promise<KiloSessionId>;
-  exitCli?: () => Promise<void>;
+  exitSession?: () => Promise<void>;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
   reject?: (payload: { requestId: string }) => Promise<unknown>;

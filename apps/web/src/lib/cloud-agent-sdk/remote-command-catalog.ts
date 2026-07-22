@@ -20,7 +20,7 @@ export {
 export type { RemoteCommandCatalogV1 } from './schemas';
 
 export type RemoteCommandParseResult =
-  | { ok: true; commands: SlashCommandInfo[] }
+  | { ok: true; commands: SlashCommandInfo[]; canExitSession?: boolean }
   | { ok: false; reason: 'invalid' };
 
 /**
@@ -33,6 +33,13 @@ export type RemoteCommandParseResult =
  * replacement/disconnect and malformed/oversized/upgrade-required failures
  * clear it to `[]`.
  *
+ * `canExitSession` mirrors the CLI-advertised flag from the latest valid
+ * catalog: `true` when the connected CLI supports the `exit_cli`
+ * session-detach wire command, `undefined` for old / unknown CLIs that
+ * never report it. The mobile /exit flow gates on
+ * `state.canExitSession === true`; anything else fails closed against the
+ * non-retryable upgrade message.
+ *
  * `refresh: 'error'` indicates a transient failure that retained the prior
  * catalog; `refresh: 'upgrade-required'` indicates a relay-reported
  * `CLI_UPGRADE_REQUIRED` that requires the user to upgrade the CLI; the
@@ -42,6 +49,7 @@ export type RemoteCommandState = {
   ownerConnectionId: string | null;
   refresh: 'idle' | 'loading' | 'error' | 'upgrade-required';
   commands: SlashCommandInfo[];
+  canExitSession?: boolean;
   message?: string;
 };
 
@@ -60,5 +68,5 @@ export type RemoteCommandState = {
 export function parseRemoteCommandCatalog(raw: unknown): RemoteCommandParseResult {
   const parsed = remoteCommandCatalogV1Schema.safeParse(raw);
   if (!parsed.success) return { ok: false, reason: 'invalid' };
-  return { ok: true, commands: parsed.data.commands };
+  return { ok: true, commands: parsed.data.commands, canExitSession: parsed.data.canExitSession };
 }

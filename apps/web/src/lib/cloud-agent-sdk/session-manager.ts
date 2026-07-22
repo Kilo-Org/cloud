@@ -19,7 +19,7 @@ import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
 import {
   createCloudAgentSession,
-  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
 } from './session';
 import type { CloudAgentSession } from './session';
@@ -289,7 +289,7 @@ type SessionManager = {
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
   createRemoteSession(): Promise<KiloSessionId>;
-  exitRemoteCli(): Promise<void>;
+  exitRemoteSession(): Promise<void>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -1455,11 +1455,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     return currentSession.createRemoteSession();
   }
 
-  async function exitRemoteCli(): Promise<void> {
+  async function exitRemoteSession(): Promise<void> {
     if (!currentSession || activeSessionType !== 'remote') {
-      throw new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+      throw new Error(REMOTE_SESSION_EXIT_NOT_SUPPORTED);
     }
-    return currentSession.exitRemoteCli();
+    return currentSession.exitRemoteSession();
   }
 
   function destroy(): void {
@@ -1488,7 +1488,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     retryRemoteModels,
     retryRemoteCommands,
     createRemoteSession,
-    exitRemoteCli,
+    exitRemoteSession,
     interrupt,
     answerQuestion,
     rejectQuestion,

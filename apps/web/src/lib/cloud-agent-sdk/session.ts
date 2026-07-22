@@ -45,7 +45,8 @@ import type {
 
 const REMOTE_SESSION_CREATION_NOT_SUPPORTED =
   'Remote session creation is not supported for the current session';
-const REMOTE_CLI_EXIT_NOT_SUPPORTED = 'Remote CLI exit is not supported for the current session';
+const REMOTE_SESSION_EXIT_NOT_SUPPORTED =
+  'Remote session exit is not supported for the current session';
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -179,7 +180,7 @@ type CloudAgentSession = {
   retryRemoteModels: () => void;
   retryRemoteCommands: () => void;
   createRemoteSession: () => Promise<KiloSessionId>;
-  exitRemoteCli: () => Promise<void>;
+  exitRemoteSession: () => Promise<void>;
 
   // Capability checks
   canSend: boolean;
@@ -473,11 +474,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       return transport.createSession();
     },
-    exitRemoteCli: async () => {
-      if (!transport?.exitCli) {
-        throw new Error(REMOTE_CLI_EXIT_NOT_SUPPORTED);
+    exitRemoteSession: async () => {
+      if (!transport?.exitSession) {
+        throw new Error(REMOTE_SESSION_EXIT_NOT_SUPPORTED);
       }
-      return transport.exitCli();
+      return transport.exitSession();
     },
     get canSend() {
       return transport?.send !== undefined && (transport.canSend?.() ?? true);
@@ -513,7 +514,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
 export {
   createCloudAgentSession,
-  REMOTE_CLI_EXIT_NOT_SUPPORTED,
+  REMOTE_SESSION_EXIT_NOT_SUPPORTED,
   REMOTE_SESSION_CREATION_NOT_SUPPORTED,
 };
 export type {

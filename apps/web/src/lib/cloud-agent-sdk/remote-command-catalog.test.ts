@@ -214,6 +214,50 @@ describe('remote command catalog schema', () => {
       }).success
     ).toBe(false);
   });
+
+  it('parses a catalog that advertises canExitSession: true (newer CLIs)', () => {
+    const parsed = remoteCommandCatalogV1Schema.parse({
+      protocolVersion: 1,
+      canExitSession: true,
+      commands: [{ name: 'review', description: 'Review changes', source: 'command', hints: [] }],
+    });
+    expect(parsed.canExitSession).toBe(true);
+    expect(parsed.commands).toHaveLength(1);
+  });
+
+  it('parses a catalog that omits canExitSession without invalidating other commands (old CLIs)', () => {
+    // The strict object shape accepts missing optional fields, so catalogs
+    // from old CLIs still parse — the gate downstream treats `undefined` as
+    // "not supported" and fails closed. No command is dropped.
+    const parsed = remoteCommandCatalogV1Schema.parse({
+      protocolVersion: 1,
+      commands: [
+        { name: 'review', description: 'Review changes', source: 'command', hints: ['$ARGUMENTS'] },
+        { name: 'compact', description: 'compact the current session context', hints: [] },
+      ],
+    });
+    expect(parsed.canExitSession).toBeUndefined();
+    expect(parsed.commands).toHaveLength(2);
+  });
+
+  it('parses a catalog that explicitly sets canExitSession: false', () => {
+    const parsed = remoteCommandCatalogV1Schema.parse({
+      protocolVersion: 1,
+      canExitSession: false,
+      commands: [],
+    });
+    expect(parsed.canExitSession).toBe(false);
+  });
+
+  it('rejects a non-boolean canExitSession value', () => {
+    expect(
+      remoteCommandCatalogV1Schema.safeParse({
+        protocolVersion: 1,
+        canExitSession: 'yes',
+        commands: [],
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('parseRemoteCommandCatalog', () => {
@@ -240,6 +284,27 @@ describe('parseRemoteCommandCatalog', () => {
       ],
     });
     expect(result).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('surfaces canExitSession: true from a newer-CLI catalog', () => {
+    const result = parseRemoteCommandCatalog({
+      protocolVersion: 1,
+      canExitSession: true,
+      commands: [],
+    });
+    expect(result).toEqual({ ok: true, commands: [], canExitSession: true });
+  });
+
+  it('surfaces canExitSession as undefined when an old CLI omits the field', () => {
+    const result = parseRemoteCommandCatalog({
+      protocolVersion: 1,
+      commands: [{ name: 'review', description: 'Review changes', source: 'command', hints: [] }],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.canExitSession).toBeUndefined();
+      expect(result.commands).toHaveLength(1);
+    }
   });
 });
 

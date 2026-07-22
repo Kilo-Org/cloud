@@ -363,6 +363,14 @@ export const remoteCommandCatalogV1Schema = z
   .object({
     protocolVersion: z.literal(1),
     commands: z.array(remoteSlashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
+    /**
+     * Optional CLI-advertised flag: the connected CLI supports the dedicated
+     * `exit_cli` session-detach command. Newer CLIs emit `true`; older CLIs
+     * omit the field entirely. The strict object shape accepts missing
+     * optional fields, so catalogs from old CLIs still parse — the gate
+     * downstream treats `undefined` as "not supported" and fails closed.
+     */
+    canExitSession: z.boolean().optional(),
   })
   .strict()
   .superRefine((catalog, context) => {
@@ -388,6 +396,7 @@ export const remoteCommandCatalogV1Schema = z
   })
   .transform(catalog => ({
     protocolVersion: 1 as const,
+    canExitSession: catalog.canExitSession,
     commands: catalog.commands
       .filter(command => command.source !== 'skill')
       // SlashCommandInfo requires a `hints` array; remote commands with no

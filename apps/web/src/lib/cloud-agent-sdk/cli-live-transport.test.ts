@@ -2504,10 +2504,11 @@ describe('CliLiveTransport createSession', () => {
   });
 });
 
-describe('CliLiveTransport exitCli', () => {
+describe('CliLiveTransport exitSession', () => {
   const EXIT_COMMAND_CATALOG = {
     protocolVersion: 1,
-    commands: [{ name: 'exit', description: 'Exit the CLI', hints: [] }],
+    canExitSession: true,
+    commands: [],
   };
 
   async function connectWithCommandCatalog(
@@ -2534,7 +2535,7 @@ describe('CliLiveTransport exitCli', () => {
     const { transport, userWebConnection } = await connectWithCommandCatalog();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).resolves.toBeUndefined();
+    await expect(transport.exitSession?.()).resolves.toBeUndefined();
 
     expect(userWebConnection.sendCommand).toHaveBeenCalledTimes(1);
     expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
@@ -2570,7 +2571,7 @@ describe('CliLiveTransport exitCli', () => {
     await Promise.resolve();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).resolves.toBeUndefined();
+    await expect(transport.exitSession?.()).resolves.toBeUndefined();
     expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
       KILO_SESSION_ID,
       'exit_cli',
@@ -2580,7 +2581,12 @@ describe('CliLiveTransport exitCli', () => {
     transport.destroy();
   });
 
-  it('permits exit_cli while a same-owner refresh retains the canonical catalog', async () => {
+  it('rejects unavailable while a same-owner refresh is still in flight', async () => {
+    // The new `canExitSession` gate is strict: only a successful catalog
+    // parse sets the flag, so a still-loading or transient-failing refresh
+    // drops the previous flag to `undefined` and fails closed. This is
+    // stronger than the prior synthetic-exit-command pattern: a CLI that
+    // has downgraded between refreshes can no longer be trusted.
     const connection = createConnection();
     let commandRequest = 0;
     jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
@@ -2602,17 +2608,17 @@ describe('CliLiveTransport exitCli', () => {
     await Promise.resolve();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).resolves.toBeUndefined();
-    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
-      KILO_SESSION_ID,
-      'exit_cli',
-      { protocolVersion: 1 },
-      'owner'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
   });
 
-  it('permits exit_cli after a transient same-owner refresh error retains the canonical catalog', async () => {
+  it('rejects unavailable after a transient same-owner refresh error', async () => {
+    // Same as above: a transient refresh error drops `canExitSession` to
+    // `undefined` (the prior cached commands are retained, but the flag is
+    // not). Retry-safe; a successful next parse restores the flag.
     const connection = createConnection();
     let commandRequest = 0;
     jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
@@ -2638,13 +2644,10 @@ describe('CliLiveTransport exitCli', () => {
     await Promise.resolve();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).resolves.toBeUndefined();
-    expect(userWebConnection.sendCommand).toHaveBeenCalledWith(
-      KILO_SESSION_ID,
-      'exit_cli',
-      { protocolVersion: 1 },
-      'owner'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
+    expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
   });
 
@@ -2657,7 +2660,7 @@ describe('CliLiveTransport exitCli', () => {
       );
       jest.mocked(userWebConnection.sendCommand).mockClear();
 
-      await expect(transport.exitCli?.()).rejects.toThrow('Invalid exit_cli response');
+      await expect(transport.exitSession?.()).rejects.toThrow('Invalid exit_cli response');
       expect(userWebConnection.sendCommand).toHaveBeenCalledTimes(1);
       transport.destroy();
     }
@@ -2670,7 +2673,7 @@ describe('CliLiveTransport exitCli', () => {
       .mockRejectedValueOnce(new Error('Connection lost before CLI acknowledgement'));
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(
+    await expect(transport.exitSession?.()).rejects.toThrow(
       'Connection lost before CLI acknowledgement'
     );
     expect(userWebConnection.sendCommand).toHaveBeenCalledTimes(1);
@@ -2688,7 +2691,7 @@ describe('CliLiveTransport exitCli', () => {
       });
     });
 
-    const exitPromise = transport.exitCli?.();
+    const exitPromise = transport.exitSession?.();
     connection.emitSystem({
       event: 'sessions.list',
       data: {
@@ -2710,20 +2713,20 @@ describe('CliLiveTransport exitCli', () => {
   });
 
   it.each([
-    { label: 'empty catalog', catalog: { protocolVersion: 1, commands: [] } },
     {
-      label: 'non-canonical exit command',
-      catalog: {
-        protocolVersion: 1,
-        commands: [{ name: 'exit', description: 'Close', hints: [] }],
-      },
+      label: 'catalog without canExitSession (old CLI)',
+      catalog: { protocolVersion: 1, commands: [] },
+    },
+    {
+      label: 'canExitSession: false',
+      catalog: { protocolVersion: 1, canExitSession: false, commands: [] },
     },
   ])('rejects unavailable for $label', async ({ catalog }) => {
     const { transport, userWebConnection } = await connectWithCommandCatalog(catalog);
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(
-      'Remote CLI exit is unavailable for the current session'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
@@ -2742,8 +2745,8 @@ describe('CliLiveTransport exitCli', () => {
     await Promise.resolve();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(
-      'Remote CLI exit is unavailable for the current session'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
@@ -2764,8 +2767,8 @@ describe('CliLiveTransport exitCli', () => {
     await Promise.resolve();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(
-      'Remote CLI exit is unavailable for the current session'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
@@ -2776,8 +2779,8 @@ describe('CliLiveTransport exitCli', () => {
     connection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(
-      'Remote CLI exit is unavailable for the current session'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
@@ -2795,8 +2798,8 @@ describe('CliLiveTransport exitCli', () => {
     });
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(
-      'Remote CLI exit is unavailable for the current session'
+    await expect(transport.exitSession?.()).rejects.toThrow(
+      'Remote session exit is unavailable for the current session'
     );
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
@@ -2823,7 +2826,7 @@ describe('CliLiveTransport exitCli', () => {
     await Promise.resolve();
     jest.mocked(userWebConnection.sendCommand).mockClear();
 
-    await expect(transport.exitCli?.()).rejects.toThrow(upgradeMessage);
+    await expect(transport.exitSession?.()).rejects.toThrow(upgradeMessage);
     expect(userWebConnection.sendCommand).not.toHaveBeenCalled();
     transport.destroy();
   });

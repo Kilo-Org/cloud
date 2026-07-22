@@ -4,10 +4,14 @@ export function isDeepseekModel(model: string) {
   return model.includes('deepseek');
 }
 
+export function isRecognizedDeepseekV4Model(model: string) {
+  return ['deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash'].includes(model);
+}
+
 export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-pro:discounted',
   internal_id: 'deepseek/deepseek-v4-pro',
-  display_name: 'DeepSeek: DeepSeek V4 Pro (>80% off)',
+  display_name: 'DeepSeek: DeepSeek V4 Pro (lowest price)',
   description:
     "DeepSeek V4 Pro is a large-scale Mixture-of-Experts model from DeepSeek with 1.6T total parameters and 49B activated parameters, supporting a 1M-token context window. For this discounted endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
   status: 'public',
@@ -32,7 +36,7 @@ export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
 const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   public_id: 'deepseek/deepseek-v4-flash:discounted',
   internal_id: 'deepseek/deepseek-v4-flash',
-  display_name: 'DeepSeek: DeepSeek V4 Flash (>40% off)',
+  display_name: 'DeepSeek: DeepSeek V4 Flash (lowest price)',
   description:
     "DeepSeek V4 Flash is an efficiency-optimized Mixture-of-Experts model from DeepSeek with 284B total parameters and 13B activated parameters, supporting a 1M-token context window. For this discounted endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
   status: 'public',

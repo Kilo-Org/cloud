@@ -4,6 +4,7 @@ import {
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
   type GatewayMessagesRequest,
+  isDataCollectionExplicitlyDisallowed,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
@@ -20,7 +21,6 @@ import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
-import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
@@ -38,6 +38,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isRecognizedDeepseekV4Model } from '@/lib/ai-gateway/providers/deepseek';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
@@ -59,9 +60,6 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
-  }
-  if (isDeepseekModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
   }
   if (isGlmModel(requestedModel)) {
     return [
@@ -111,6 +109,33 @@ export async function applyGatewayModelsFallback(
   }
 
   delete requestToMutate.body.models;
+}
+
+export function applyDeepSeekV4Routing(requestedModel: string, requestToMutate: GatewayRequest) {
+  if (!isRecognizedDeepseekV4Model(requestedModel)) {
+    return;
+  }
+  if (
+    requestToMutate.body.provider?.only &&
+    !requestToMutate.body.provider.only.includes(OpenRouterInferenceProviderIdSchema.enum.deepseek)
+  ) {
+    return;
+  }
+  if (
+    requestToMutate.body.provider?.ignore &&
+    requestToMutate.body.provider.ignore.includes(OpenRouterInferenceProviderIdSchema.enum.deepseek)
+  ) {
+    return;
+  }
+  if (isDataCollectionExplicitlyDisallowed(requestToMutate.body.provider)) {
+    return;
+  }
+  // independent providers are very expensive and have known issues
+  // e.g.: https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
+  requestToMutate.body.provider = {
+    ...requestToMutate.body.provider,
+    only: [OpenRouterInferenceProviderIdSchema.enum.deepseek],
+  };
 }
 
 export async function applyProviderSpecificLogic(
@@ -163,6 +188,7 @@ export async function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
+    applyDeepSeekV4Routing(requestedModel, requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

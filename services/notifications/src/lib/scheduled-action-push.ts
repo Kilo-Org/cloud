@@ -111,17 +111,50 @@ export function buildScheduledActionMessages(
 }
 
 export type ScheduledActionDispatchDeps = {
+  /**
+   * Read the user's `kiloclawActivityEnabled` preference for this category
+   * (KiloClaw scheduled-action notices). A throw fails closed and the
+   * caller returns `suppressedByPreference: true` without sending.
+   * `null` = successful read that returned no row → default-on.
+   */
+  readPreference: (userId: string) => Promise<boolean | null>;
   getTokens: (userId: string) => Promise<string[]>;
   deleteStaleTokens: (tokens: string[]) => Promise<void>;
   sendPush: (messages: ExpoPushMessage[]) => Promise<SendResult>;
   enqueueReceipts: (pairs: TicketTokenPair[]) => Promise<void>;
 };
 
+/** Zero-count result used when the user has opted out of KiloClaw activity. */
+function suppressedScheduledResult(): SendScheduledActionNoticeResult {
+  return {
+    tokenCount: 0,
+    sent: 0,
+    staleTokens: 0,
+    receiptCount: 0,
+    suppressedByPreference: true,
+  } satisfies SendScheduledActionNoticeResult;
+}
+
 export async function dispatchScheduledActionPush(
   params: SendScheduledActionNoticeParams,
   deps: ScheduledActionDispatchDeps
 ): Promise<SendScheduledActionNoticeResult> {
   const parsed = ParamsSchema.parse(params);
+
+  // Per-category preference gate (kiloclaw_activity_enabled). Fail-closed:
+  // a read throw suppresses the push and returns the zero-count shape with
+  // `suppressedByPreference: true` so callers can distinguish a deliberate
+  // opt-out from "no tokens". A null row is default-on.
+  let enabled: boolean;
+  try {
+    const row = await deps.readPreference(parsed.userId);
+    enabled = row ?? true;
+  } catch {
+    return suppressedScheduledResult();
+  }
+  if (!enabled) {
+    return suppressedScheduledResult();
+  }
 
   const tokens = await deps.getTokens(parsed.userId);
   if (tokens.length === 0) {

@@ -40,6 +40,7 @@ function fakeDeps(overrides: Partial<ScheduledActionDispatchDeps> = {}): {
   };
 
   const deps: ScheduledActionDispatchDeps = {
+    readPreference: async () => true,
     getTokens: async userId => {
       calls.getTokenQueries.push(userId);
       return ['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]'];
@@ -200,5 +201,53 @@ describe('dispatchScheduledActionPush', () => {
     await dispatchScheduledActionPush(baseParams(), deps);
 
     expect(calls.enqueuedReceipts).toHaveLength(0);
+  });
+});
+
+describe('dispatchScheduledActionPush per-category enforcement', () => {
+  it('sends when the preference is true and skips the gate when no row exists (default-on)', async () => {
+    const { deps, calls } = fakeDeps({ readPreference: async () => null });
+    const result = await dispatchScheduledActionPush(baseParams(), deps);
+    expect(result).toEqual({
+      tokenCount: 2,
+      sent: 2,
+      staleTokens: 0,
+      receiptCount: 2,
+    });
+    expect(calls.sentMessages).toHaveLength(1);
+  });
+
+  it('suppresses with suppressedByPreference:true and does not fetch tokens when the user opted out', async () => {
+    const { deps, calls } = fakeDeps({ readPreference: async () => false });
+    const result = await dispatchScheduledActionPush(baseParams(), deps);
+    expect(result).toEqual({
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      suppressedByPreference: true,
+    });
+    expect(calls.getTokenQueries).toEqual([]);
+    expect(calls.sentMessages).toHaveLength(0);
+    expect(calls.deletedTokens).toHaveLength(0);
+    expect(calls.enqueuedReceipts).toHaveLength(0);
+  });
+
+  it('fails closed (suppressedByPreference:true) when the preference read throws and does not fetch tokens', async () => {
+    const { deps, calls } = fakeDeps({
+      readPreference: async () => {
+        throw new Error('preference read failed');
+      },
+    });
+    const result = await dispatchScheduledActionPush(baseParams(), deps);
+    expect(result).toEqual({
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      suppressedByPreference: true,
+    });
+    expect(calls.getTokenQueries).toEqual([]);
+    expect(calls.sentMessages).toHaveLength(0);
   });
 });

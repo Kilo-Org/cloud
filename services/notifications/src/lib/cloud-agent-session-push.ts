@@ -1,7 +1,9 @@
 import { presenceContextForCliSession, presenceContextForPlatform } from '@kilocode/event-service';
 import {
+  cloudAgentSessionCategorySchema,
   sendCloudAgentSessionNotificationInputSchema,
   sendSessionReadyNotificationInputSchema,
+  type CloudAgentSessionCategory,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type SendCloudAgentSessionNotificationParams,
@@ -13,6 +15,15 @@ import {
 type CloudAgentNotificationSession = {
   title: string | null;
   organizationId: string | null;
+};
+
+/** Per-category preference columns, shared with the rest of the notification pipeline. */
+export type UserNotificationPreferences = {
+  agentPushEnabled: boolean;
+  chatMessagesEnabled: boolean;
+  agentAttentionEnabled: boolean;
+  sessionStatusEnabled: boolean;
+  kiloclawActivityEnabled: boolean;
 };
 
 const TITLE_MAX_LENGTH = 80;
@@ -32,6 +43,12 @@ export type DispatchCloudAgentSessionPushDeps = {
     cliSessionId: string
   ) => Promise<CloudAgentNotificationSession | null>;
   hasOrganizationAccess: (userId: string, organizationId: string) => Promise<boolean>;
+  /**
+   * Read the user's notification preferences. A throw fails closed
+   * (no push). `null` = successful read that returned no row, which is
+   * default-on for every category.
+   */
+  readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
 };
 
@@ -40,12 +57,14 @@ type SessionPushContent = {
   idempotencyKey: string;
   title: string;
   body: string;
+  category: CloudAgentSessionCategory;
 };
 
 async function dispatchSessionPush(
   userId: string,
   cliSessionId: string,
   buildContent: (session: CloudAgentNotificationSession) => SessionPushContent,
+  preferenceColumn: (prefs: UserNotificationPreferences) => boolean,
   deps: DispatchCloudAgentSessionPushDeps
 ): Promise<SendCloudAgentSessionNotificationResult> {
   const session = await deps.getSession(userId, cliSessionId);
@@ -61,6 +80,26 @@ async function dispatchSessionPush(
     return { dispatched: false, reason: 'missing_session' };
   }
 
+  // Per-category preference gate. Fail-closed: a read throw is treated
+  // as a transport-level failure and surfaced as `dispatch_failed` (the
+  // existing failure reason on this RPC).
+  let prefs: UserNotificationPreferences;
+  try {
+    const row = await deps.readPreferences(userId);
+    prefs = row ?? {
+      agentPushEnabled: true,
+      chatMessagesEnabled: true,
+      agentAttentionEnabled: true,
+      sessionStatusEnabled: true,
+      kiloclawActivityEnabled: true,
+    };
+  } catch {
+    return { dispatched: false, reason: 'dispatch_failed' };
+  }
+  if (!preferenceColumn(prefs)) {
+    return { dispatched: false, reason: 'suppressed_preference' };
+  }
+
   const content = buildContent(session);
   const outcome = await deps.dispatchPush({
     userId,
@@ -70,7 +109,11 @@ async function dispatchSessionPush(
     push: {
       title: content.title,
       body: content.body,
-      data: { type: 'cloud_agent_session', cliSessionId },
+      // ponytail: `category` is always set on the emitted pushData so the
+      // mobile deep-link handler can dispatch on attention vs. status
+      // without a second round-trip. The default covers the rolling-deploy
+      // window in which old producers omit the `category` field.
+      data: { type: 'cloud_agent_session', cliSessionId, category: content.category },
       sound: 'default',
       priority: 'high',
     },
@@ -88,6 +131,10 @@ export async function dispatchCloudAgentSessionPush(
   deps: DispatchCloudAgentSessionPushDeps
 ): Promise<SendCloudAgentSessionNotificationResult> {
   const parsed = sendCloudAgentSessionNotificationInputSchema.parse(params);
+  // ponytail: Absent `category` is treated as 'status' at the read site
+  // (the existing rolling-deploy default). Producers that omit it keep
+  // being routed through `sessionStatusEnabled`.
+  const category: CloudAgentSessionCategory = parsed.category ?? 'status';
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
@@ -98,15 +145,24 @@ export async function dispatchCloudAgentSessionPush(
       idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
       title: sanitizeTitle(session.title) ?? 'Agent session',
       body: parsed.body,
+      category,
     }),
+    prefs => (category === 'attention' ? prefs.agentAttentionEnabled : prefs.sessionStatusEnabled),
     deps
   );
 }
+
+// Re-export so call sites that already imported the schema name continue
+// to compile; no behavioural change.
+export { cloudAgentSessionCategorySchema };
 
 /**
  * Push sent when a CLI session first registers with session-ingest, telling
  * the user they can take over the session from their phone. Suppressed while
  * the user is actively in the mobile app (they already see the session list).
+ *
+ * Session-ready is always a status notification (the session is up; nothing
+ * demands user attention), so it gates on `sessionStatusEnabled`.
  */
 export async function dispatchSessionReadyPush(
   params: SendSessionReadyNotificationParams,
@@ -122,7 +178,9 @@ export async function dispatchSessionReadyPush(
       title:
         sanitizeTitle(parsed.title ?? null) ?? sanitizeTitle(session.title) ?? 'Kilo session ready',
       body: 'Your Kilo session is ready to control from your phone',
+      category: 'status',
     }),
+    prefs => prefs.sessionStatusEnabled,
     deps
   );
 }

@@ -8,6 +8,15 @@ import type {
 
 import type * as do_module from '../dos/NotificationChannelDO';
 import { sendPushForConversationCore } from '../index';
+import type { UserNotificationPreferences } from '../lib/cloud-agent-session-push';
+
+const ALL_ON: UserNotificationPreferences = {
+  agentPushEnabled: true,
+  chatMessagesEnabled: true,
+  agentAttentionEnabled: true,
+  sessionStatusEnabled: true,
+  kiloclawActivityEnabled: true,
+};
 
 const baseInput = (
   over: Partial<SendPushForConversationInput> = {}
@@ -84,6 +93,7 @@ describe('NotificationsService.sendPushForConversation', () => {
     const resultPromise = sendPushForConversationCore(
       baseInput({ recipientUserIds: ['r1', 'r2', 'r3'], senderUserId: null }),
       {
+        readPreferences: async () => ALL_ON,
         getRecipientDOStub: userId => ({
           dispatchPush: async () => {
             dispatchOrder.push(userId);
@@ -109,5 +119,53 @@ describe('NotificationsService.sendPushForConversation', () => {
       { userId: 'r2', outcome: 'delivered' },
       { userId: 'r3', outcome: 'delivered' },
     ]);
+  });
+
+  it('marks recipients as suppressed_preference when their chatMessagesEnabled is false', async () => {
+    const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
+      kind: 'delivered' as const,
+      tokenCount: 1,
+    }));
+    const prefs: Record<string, UserNotificationPreferences> = {
+      r1: ALL_ON,
+      r2: { ...ALL_ON, chatMessagesEnabled: false },
+      r3: ALL_ON,
+    };
+    const result = await sendPushForConversationCore(
+      baseInput({ recipientUserIds: ['r1', 'r2', 'r3'], senderUserId: null }),
+      {
+        readPreferences: async userId => prefs[userId] ?? null,
+        getRecipientDOStub: () => ({ dispatchPush: stubSpy }),
+      }
+    );
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'r1', outcome: 'delivered' },
+      { userId: 'r2', outcome: 'suppressed_preference' },
+      { userId: 'r3', outcome: 'delivered' },
+    ]);
+    expect(stubSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails every recipient (and never reaches the DO) when the preference read throws', async () => {
+    const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
+      kind: 'delivered' as const,
+      tokenCount: 1,
+    }));
+    const result = await sendPushForConversationCore(
+      baseInput({ recipientUserIds: ['r1', 'r2'], senderUserId: null }),
+      {
+        readPreferences: async () => {
+          throw new Error('preference read failed');
+        },
+        getRecipientDOStub: () => ({ dispatchPush: stubSpy }),
+      }
+    );
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'r1', outcome: 'failed' },
+      { userId: 'r2', outcome: 'failed' },
+    ]);
+    expect(stubSpy).not.toHaveBeenCalled();
   });
 });

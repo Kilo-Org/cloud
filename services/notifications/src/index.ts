@@ -44,6 +44,7 @@ import {
   dispatchCloudAgentSessionPush,
   dispatchSessionReadyPush,
   type DispatchCloudAgentSessionPushDeps,
+  type UserNotificationPreferences,
 } from './lib/cloud-agent-session-push';
 import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
@@ -123,6 +124,12 @@ export async function sendPushForConversationCore(
   input: SendPushForConversationInput,
   deps: {
     getRecipientDOStub: (userId: string) => RecipientDOStub;
+    /**
+     * Read the per-recipient notification preferences. Throw = fail-closed
+     * (suppress the recipient). `null` = successful read with no row →
+     * default-on for every category.
+     */
+    readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
   }
 ): Promise<SendPushForConversationOutput> {
   const recipients: string[] = [];
@@ -136,6 +143,19 @@ export async function sendPushForConversationCore(
 
   const results = await Promise.allSettled(
     recipients.map(async userId => {
+      // Per-recipient chat preference gate. Fail-closed: a read throw
+      // suppresses the recipient. `null` row is default-on.
+      let enabled: boolean;
+      try {
+        const prefs = await deps.readPreferences(userId);
+        enabled = (prefs ?? null)?.chatMessagesEnabled ?? true;
+      } catch {
+        return 'failed' as const;
+      }
+      if (!enabled) {
+        return 'suppressed_preference' as const;
+      }
+
       const stub = deps.getRecipientDOStub(userId);
       const dispatchInput = {
         userId,
@@ -194,11 +214,13 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendPushForConversation(
     input: SendPushForConversationInput
   ): Promise<SendPushForConversationOutput> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     return sendPushForConversationCore(input, {
       getRecipientDOStub: (userId: string) =>
         this.env.NOTIFICATION_CHANNEL_DO.get(
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
         ) as unknown as RecipientDOStub,
+      readPreferences: async userId => readPreferencesRow(db, userId),
     });
   }
 
@@ -218,6 +240,14 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     return dispatchInstanceLifecyclePush(params, {
+      readPreference: async userId => {
+        const [row] = await db
+          .select({ enabled: user_notification_preferences.kiloclaw_activity_enabled })
+          .from(user_notification_preferences)
+          .where(eq(user_notification_preferences.user_id, userId))
+          .limit(1);
+        return row?.enabled ?? null;
+      },
       getTokens: async userId => {
         const rows = await db
           .select({ token: user_push_tokens.token })
@@ -308,15 +338,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           .limit(1);
         return membership !== undefined;
       },
-      readPreference: async userId => {
-        const [row] = await getDbForCall()
-          .select({ enabled: user_notification_preferences.agent_push_enabled })
-          .from(user_notification_preferences)
-          .where(eq(user_notification_preferences.user_id, userId))
-          .limit(1);
-        // null = no row, which is the default-ON path per §4.5.
-        return row?.enabled ?? null;
-      },
+      readPreferences: async userId => readPreferencesRow(getDbForCall(), userId),
       dispatchPush: async input => {
         const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
@@ -366,6 +388,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           .limit(1);
         return membership !== undefined;
       },
+      readPreferences: async userId => readPreferencesRow(getDbForCall(), userId),
       dispatchPush: async input => {
         const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
@@ -381,6 +404,14 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     return dispatchScheduledActionPush(params, {
+      readPreference: async userId => {
+        const [row] = await db
+          .select({ enabled: user_notification_preferences.kiloclaw_activity_enabled })
+          .from(user_notification_preferences)
+          .where(eq(user_notification_preferences.user_id, userId))
+          .limit(1);
+        return row?.enabled ?? null;
+      },
       getTokens: async userId => {
         const rows = await db
           .select({ token: user_push_tokens.token })
@@ -404,3 +435,31 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
 }
 
 export default NotificationsService;
+
+/**
+ * Read the full per-category preference row. Returns `null` when the user
+ * has no row yet (default-on for every category). A thrown DB error
+ * propagates so each call site can choose fail-closed semantics
+ * (`agent_push_enabled` swallows it to `failed`; chat suppresses the
+ * recipient; lifecycle/scheduled return the zero-count shape with
+ * `suppressedByPreference: true`; cloud-agent-session surfaces it as
+ * `dispatch_failed`).
+ */
+async function readPreferencesRow(
+  db: ReturnType<typeof getWorkerDb>,
+  userId: string
+): Promise<UserNotificationPreferences | null> {
+  const [row] = await db
+    .select({
+      agentPushEnabled: user_notification_preferences.agent_push_enabled,
+      chatMessagesEnabled: user_notification_preferences.chat_messages_enabled,
+      agentAttentionEnabled: user_notification_preferences.agent_attention_enabled,
+      sessionStatusEnabled: user_notification_preferences.session_status_enabled,
+      kiloclawActivityEnabled: user_notification_preferences.kiloclaw_activity_enabled,
+    })
+    .from(user_notification_preferences)
+    .where(eq(user_notification_preferences.user_id, userId))
+    .limit(1);
+  if (!row) return null;
+  return row;
+}

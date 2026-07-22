@@ -19,7 +19,7 @@ import {
   type SendAgentSessionNotificationResult,
 } from '@kilocode/notifications';
 
-import { sanitizeTitle } from './cloud-agent-session-push';
+import { sanitizeTitle, type UserNotificationPreferences } from './cloud-agent-session-push';
 
 export type { SendAgentSessionNotificationParams } from '@kilocode/notifications';
 
@@ -47,17 +47,27 @@ export function buildAgentSessionNotificationContent(
   };
 }
 
+const DEFAULT_PREFERENCES: UserNotificationPreferences = {
+  agentPushEnabled: true,
+  chatMessagesEnabled: true,
+  agentAttentionEnabled: true,
+  sessionStatusEnabled: true,
+  kiloclawActivityEnabled: true,
+};
+
 export type DispatchAgentSessionNotificationPushDeps = {
   getSession: (userId: string, cliSessionId: string) => Promise<AgentNotificationSession | null>;
   hasOrganizationAccess: (userId: string, organizationId: string) => Promise<boolean>;
   /**
-   * Read the user's agent-push preference. `null` is a successful read that
-   * returned no row — default-on. A throw fails closed (§4.5) and propagates
-   * as a `{dispatched:false, reason:'failed'}` result; the RPC layer does
-   * not translate that into a thrown RPC error because preference read is a
-   * recoverable, fail-closed path, not a transport failure.
+   * Read the user's notification preferences. The agent-push RPC is
+   * category 3 ("Agent updates") and gates on `agentPushEnabled`. A throw
+   * fails closed (§4.5) and propagates as a
+   * `{dispatched:false, reason:'failed'}` result; the RPC layer does not
+   * translate that into a thrown RPC error because preference read is a
+   * recoverable, fail-closed path, not a transport failure. `null` is a
+   * successful read that returned no row — default-on for every category.
    */
-  readPreference: (userId: string) => Promise<boolean | null>;
+  readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
 };
 
@@ -126,14 +136,14 @@ export async function dispatchAgentSessionNotificationPush(
   }
 
   // Preference read fails closed per §4.5: a throw ⇒ no push.
-  let preferenceEnabled: boolean;
+  let prefs: UserNotificationPreferences;
   try {
-    const row = await deps.readPreference(parsed.userId);
-    preferenceEnabled = row ?? true;
+    const row = await deps.readPreferences(parsed.userId);
+    prefs = row ?? DEFAULT_PREFERENCES;
   } catch {
     return { dispatched: false, reason: 'failed' };
   }
-  if (!preferenceEnabled) {
+  if (!prefs.agentPushEnabled) {
     return { dispatched: false, reason: 'suppressed_preference' };
   }
 

@@ -12,6 +12,7 @@ import {
   dispatchAgentSessionNotificationPush,
   mapAgentDispatchOutcomeToResult,
 } from './agent-session-notification-push';
+import type { UserNotificationPreferences } from './cloud-agent-session-push';
 
 const baseParams: SendAgentSessionNotificationParams = {
   userId: 'user-1',
@@ -22,12 +23,21 @@ const baseParams: SendAgentSessionNotificationParams = {
 
 const session = { title: 'Refactor auth module', organizationId: null };
 
+const ALL_ON: UserNotificationPreferences = {
+  agentPushEnabled: true,
+  chatMessagesEnabled: true,
+  agentAttentionEnabled: true,
+  sessionStatusEnabled: true,
+  kiloclawActivityEnabled: true,
+};
+
 function fakeDeps(
   options: {
     session?: { title: string | null; organizationId: string | null } | null;
     hasOrganizationAccess?: boolean;
-    preference?: boolean | null;
-    preferenceThrows?: boolean;
+    /** Partial override applied on top of ALL_ON. `null` ⇒ no row. */
+    preferences?: Partial<UserNotificationPreferences> | null;
+    preferencesThrows?: boolean;
     dispatchPush?: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
   } = {}
 ): {
@@ -38,15 +48,21 @@ function fakeDeps(
 } {
   const calls = { dispatchPushInputs: [] as DispatchPushInput[] };
   const sessionRecord = options.session === undefined ? session : options.session;
+  const prefsValue: UserNotificationPreferences | null =
+    options.preferences === undefined
+      ? ALL_ON
+      : options.preferences === null
+        ? null
+        : { ...ALL_ON, ...options.preferences };
 
   const deps = {
     getSession: vi.fn(async () => sessionRecord),
     hasOrganizationAccess: vi.fn(async () => options.hasOrganizationAccess ?? true),
-    readPreference: options.preferenceThrows
+    readPreferences: options.preferencesThrows
       ? vi.fn(async () => {
           throw new Error('preference read failed');
         })
-      : vi.fn(async () => (options.preference === undefined ? true : options.preference)),
+      : vi.fn(async () => prefsValue),
     dispatchPush: vi.fn(
       options.dispatchPush ?? (async () => ({ kind: 'delivered' as const, tokenCount: 1 }))
     ),
@@ -136,7 +152,7 @@ describe('dispatchAgentSessionNotificationPush', () => {
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: false, reason: 'not_found' });
     expect(calls.dispatchPushInputs).toHaveLength(0);
-    expect(deps.readPreference).not.toHaveBeenCalled();
+    expect(deps.readPreferences).not.toHaveBeenCalled();
   });
 
   it('returns not_found when org membership is revoked (collapsed with session-missing)', async () => {
@@ -147,25 +163,40 @@ describe('dispatchAgentSessionNotificationPush', () => {
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: false, reason: 'not_found' });
     expect(calls.dispatchPushInputs).toHaveLength(0);
-    expect(deps.readPreference).not.toHaveBeenCalled();
+    expect(deps.readPreferences).not.toHaveBeenCalled();
   });
 
   it('returns suppressed_preference when the user has turned agent pushes off', async () => {
-    const { deps, calls } = fakeDeps({ preference: false });
+    const { deps, calls } = fakeDeps({ preferences: { agentPushEnabled: false } });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
-  it('treats a successful read with no row as default-on (preference returns null)', async () => {
-    const { deps, calls } = fakeDeps({ preference: null });
+  it('keeps other category preferences irrelevant — only agentPushEnabled gates this RPC', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        agentPushEnabled: true,
+        chatMessagesEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        kiloclawActivityEnabled: false,
+      },
+    });
+    const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
+    expect(result).toEqual({ dispatched: true });
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('treats a successful read with no row as default-on (preferences returns null)', async () => {
+    const { deps, calls } = fakeDeps({ preferences: null });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: true });
     expect(calls.dispatchPushInputs).toHaveLength(1);
   });
 
   it('fails closed with reason failed when the preference read throws', async () => {
-    const { deps, calls } = fakeDeps({ preferenceThrows: true });
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: false, reason: 'failed' });
     expect(calls.dispatchPushInputs).toHaveLength(0);

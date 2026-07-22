@@ -68,11 +68,30 @@ export function buildInstanceLifecycleMessages(
 }
 
 export type LifecycleDispatchDeps = {
+  /**
+   * Read the user's `kiloclawActivityEnabled` preference for this category
+   * (KiloClaw instance lifecycle events). A throw fails closed and the
+   * caller returns `suppressedByPreference: true` without sending.
+   * `null` = successful read that returned no row → default-on.
+   */
+  readPreference: (userId: string) => Promise<boolean | null>;
   getTokens: (userId: string) => Promise<string[]>;
   deleteStaleTokens: (tokens: string[]) => Promise<void>;
   sendPush: (messages: ExpoPushMessage[]) => Promise<SendResult>;
   enqueueReceipts: (pairs: TicketTokenPair[]) => Promise<void>;
 };
+
+/** Zero-count result used when the user has opted out of KiloClaw activity. */
+function suppressedLifecycleResult(): SendInstanceLifecycleNotificationResult {
+  return {
+    tokenCount: 0,
+    sent: 0,
+    staleTokens: 0,
+    receiptCount: 0,
+    suppressedByPreference: true,
+    ticketErrors: EMPTY_TICKET_ERRORS,
+  } satisfies SendInstanceLifecycleNotificationResult;
+}
 
 /**
  * Pure orchestrator for dispatching a lifecycle push notification. All IO is
@@ -82,6 +101,21 @@ export async function dispatchInstanceLifecyclePush(
   params: SendInstanceLifecycleNotificationParams,
   deps: LifecycleDispatchDeps
 ): Promise<SendInstanceLifecycleNotificationResult> {
+  // Per-category preference gate (kiloclaw_activity_enabled). Fail-closed:
+  // a read throw suppresses the push and returns the zero-count shape with
+  // `suppressedByPreference: true` so callers (and receipts) can distinguish
+  // a deliberate opt-out from "no tokens". A null row is default-on.
+  let enabled: boolean;
+  try {
+    const row = await deps.readPreference(params.userId);
+    enabled = row ?? true;
+  } catch {
+    return suppressedLifecycleResult();
+  }
+  if (!enabled) {
+    return suppressedLifecycleResult();
+  }
+
   const tokens = await deps.getTokens(params.userId);
   if (tokens.length === 0) {
     return {

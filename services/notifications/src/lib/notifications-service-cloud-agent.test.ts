@@ -11,11 +11,20 @@ import {
   dispatchCloudAgentSessionPush,
   dispatchSessionReadyPush,
   type DispatchCloudAgentSessionPushDeps,
+  type UserNotificationPreferences,
 } from './cloud-agent-session-push';
 
 type SessionRecord = {
   title: string | null;
   organizationId: string | null;
+};
+
+const ALL_ON: UserNotificationPreferences = {
+  agentPushEnabled: true,
+  chatMessagesEnabled: true,
+  agentAttentionEnabled: true,
+  sessionStatusEnabled: true,
+  kiloclawActivityEnabled: true,
 };
 
 const mockDispatchPush = vi.fn(
@@ -29,6 +38,8 @@ function createDeps(
   options: {
     session?: SessionRecord | null;
     hasOrganizationAccess?: boolean;
+    preferences?: UserNotificationPreferences | null;
+    preferencesThrow?: boolean;
   } = {}
 ): DispatchCloudAgentSessionPushDeps {
   const session =
@@ -39,6 +50,11 @@ function createDeps(
   return {
     getSession: vi.fn(async () => session),
     hasOrganizationAccess: vi.fn(async () => options.hasOrganizationAccess ?? true),
+    readPreferences: options.preferencesThrow
+      ? vi.fn(async () => {
+          throw new Error('preference read failed');
+        })
+      : vi.fn(async () => (options.preferences === undefined ? ALL_ON : options.preferences)),
     dispatchPush: mockDispatchPush,
   };
 }
@@ -73,7 +89,7 @@ describe('dispatchCloudAgentSessionPush', () => {
         push: expect.objectContaining({
           title: 'Resolved title',
           body: 'Finished',
-          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
         }),
       })
     );
@@ -421,7 +437,11 @@ describe('dispatchSessionReadyPush', () => {
         push: expect.objectContaining({
           title: 'Kilo session ready',
           body: 'Your Kilo session is ready to control from your phone',
-          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+          data: {
+            type: 'cloud_agent_session',
+            cliSessionId: 'ses_1',
+            category: 'status',
+          },
         }),
       })
     );
@@ -517,6 +537,225 @@ describe('dispatchSessionReadyPush', () => {
         }),
       })
     );
+  });
+});
+
+describe('dispatchCloudAgentSessionPush per-category enforcement', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDispatchPush.mockResolvedValue({ kind: 'delivered', tokenCount: 1 });
+  });
+
+  it('sends an attention dispatch when agentAttentionEnabled is true and tags pushData with category "attention"', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, agentAttentionEnabled: true, sessionStatusEnabled: false },
+    });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_attn',
+        status: 'completed',
+        body: 'Needs input',
+        category: 'attention',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'attention' },
+        }),
+      })
+    );
+  });
+
+  it('suppresses an attention dispatch with reason "suppressed_preference" when agentAttentionEnabled is false', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, agentAttentionEnabled: false, sessionStatusEnabled: true },
+    });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_attn_off',
+        status: 'completed',
+        body: 'Needs input',
+        category: 'attention',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('sends a status dispatch when sessionStatusEnabled is true and tags pushData with category "status"', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, sessionStatusEnabled: true, agentAttentionEnabled: false },
+    });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_status',
+        status: 'completed',
+        body: 'Done',
+        category: 'status',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        }),
+      })
+    );
+  });
+
+  it('suppresses a status dispatch with reason "suppressed_preference" when sessionStatusEnabled is false', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, sessionStatusEnabled: false, agentAttentionEnabled: true },
+    });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_status_off',
+        status: 'completed',
+        body: 'Done',
+        category: 'status',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('treats absent category as "status" and gates on sessionStatusEnabled (rolling-deploy default)', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, sessionStatusEnabled: false, agentAttentionEnabled: true },
+    });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_absent_cat',
+        status: 'completed',
+        body: 'Done',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('treats a null preference row as default-on and tags pushData with category "status"', async () => {
+    const deps = createDeps({ preferences: null });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_null_row',
+        status: 'completed',
+        body: 'Done',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        }),
+      })
+    );
+  });
+
+  it('fails closed with reason "dispatch_failed" when the preference read throws', async () => {
+    const deps = createDeps({ preferencesThrow: true });
+
+    const result = await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'exec_throw',
+        status: 'completed',
+        body: 'Done',
+        category: 'attention',
+      },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+});
+
+describe('dispatchSessionReadyPush per-category enforcement', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDispatchPush.mockResolvedValue({ kind: 'delivered', tokenCount: 1 });
+  });
+
+  it('sends when sessionStatusEnabled is true and tags pushData with category "status"', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, sessionStatusEnabled: true, agentAttentionEnabled: false },
+    });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_1' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        push: expect.objectContaining({
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        }),
+      })
+    );
+  });
+
+  it('suppresses with reason "suppressed_preference" when sessionStatusEnabled is false (independent of agentAttentionEnabled)', async () => {
+    const deps = createDeps({
+      preferences: { ...ALL_ON, sessionStatusEnabled: false, agentAttentionEnabled: true },
+    });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_1' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with reason "dispatch_failed" when the preference read throws', async () => {
+    const deps = createDeps({ preferencesThrow: true });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_1' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
   });
 });
 

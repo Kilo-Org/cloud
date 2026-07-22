@@ -39,7 +39,7 @@ All `curl` commands in this document use a helper function. Prefer the interacti
 ```bash
 debug_curl() {
   if [ -n "${CF_ACCESS_TOKEN:-}" ]; then
-    curl -s -H "cf-access-token: $CF_ACCESS_TOKEN" "$@"
+    curl -s -H "Cf-Access-Jwt-Assertion: $CF_ACCESS_TOKEN" "$@"
   else
     curl -s \
       -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \

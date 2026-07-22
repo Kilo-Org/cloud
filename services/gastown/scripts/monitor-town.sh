@@ -27,7 +27,7 @@ echo "=========================================="
 while true; do
   if [ -n "${CF_ACCESS_TOKEN:-}" ]; then
     RESP=$(curl -s --max-time 10 \
-      -H "cf-access-token: $CF_ACCESS_TOKEN" \
+      -H "Cf-Access-Jwt-Assertion: $CF_ACCESS_TOKEN" \
       "${URL}" 2>/dev/null)
   else
     RESP=$(curl -s --max-time 10 \

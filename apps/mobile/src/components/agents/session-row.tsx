@@ -1,6 +1,8 @@
+import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
@@ -77,6 +79,19 @@ function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => 
   );
 }
 
+async function copySessionId(sessionId: string) {
+  try {
+    const copied = await Clipboard.setStringAsync(sessionId);
+    if (!copied) {
+      throw new Error('Clipboard rejected session ID');
+    }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    toast.success('Session ID copied');
+  } catch {
+    toast.error('Could not copy session ID');
+  }
+}
+
 export function StoredSessionRow({
   session,
   sortBy,
@@ -116,20 +131,28 @@ export function StoredSessionRow({
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Rename', 'Delete session', 'Cancel'],
-          cancelButtonIndex: 2,
-          destructiveButtonIndex: 1,
+          options: ['Copy session ID', 'Rename', 'Delete session', 'Cancel'],
+          cancelButtonIndex: 3,
+          destructiveButtonIndex: 2,
         },
         buttonIndex => {
           if (buttonIndex === 0) {
-            showRenamePrompt(title, onRename);
+            void copySessionId(session.session_id);
           } else if (buttonIndex === 1) {
+            showRenamePrompt(title, onRename);
+          } else if (buttonIndex === 2) {
             showDeleteConfirm(onDelete);
           }
         }
       );
     } else {
       Alert.alert('Session actions', undefined, [
+        {
+          text: 'Copy session ID',
+          onPress: () => {
+            void copySessionId(session.session_id);
+          },
+        },
         {
           text: 'Rename',
           onPress: () => {
@@ -259,9 +282,35 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
       : session.status.toLowerCase().replaceAll('_', ' ');
   }
 
+  const handleLongPress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Copy session ID', 'Cancel'], cancelButtonIndex: 1 },
+        buttonIndex => {
+          if (buttonIndex === 0) {
+            void copySessionId(session.id);
+          }
+        }
+      );
+    } else {
+      Alert.alert('Session actions', undefined, [
+        {
+          text: 'Copy session ID',
+          onPress: () => {
+            void copySessionId(session.id);
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={handleLongPress}
       accessibilityLabel={sessionRowAccessibilityLabel({
         title,
         needsInput,

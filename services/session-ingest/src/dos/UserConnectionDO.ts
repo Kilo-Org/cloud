@@ -493,7 +493,15 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.broadcastToWeb({
       type: 'system',
       event: 'sessions.heartbeat',
-      data: { connectionId, protocolVersion, capabilities, sessions },
+      data: {
+        connectionId,
+        protocolVersion,
+        capabilities,
+        sessions: sessions.map(session => ({
+          ...session,
+          ...(capabilities ? { capabilities } : {}),
+        })),
+      },
     });
 
     this.sendToCli(ws, { type: 'heartbeat_ack' });

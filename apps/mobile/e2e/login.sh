@@ -8,6 +8,11 @@
 # Usage:
 #   e2e/login.sh <device-udid> [email]
 #
+# When no email is given, defaults to a per-worktree-unique address
+# (e2e-mobile+<worktree-basename>@example.com) so concurrent worktrees never
+# share a backend user. It is stable within a worktree, so repeat logins reuse
+# the same seeded account.
+#
 # Env overrides:
 #   OUTBOX   outbox dir (default: <repo-root>/dev/logs/emails)
 #
@@ -15,11 +20,13 @@
 set -euo pipefail
 
 DEVICE="${1:?usage: login.sh <device-udid> [email]}"
-EMAIL="${2:-e2e-mobile@example.com}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 OUTBOX="${OUTBOX:-$REPO_ROOT/dev/logs/emails}"
+
+WORKTREE_SLUG="$(basename "$REPO_ROOT" | tr -cs 'a-zA-Z0-9' '-' | sed 's/^-*//;s/-*$//')"
+EMAIL="${2:-e2e-mobile+${WORKTREE_SLUG}@example.com}"
 
 "$SCRIPT_DIR/preflight.sh" "$DEVICE"
 

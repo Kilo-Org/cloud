@@ -17,7 +17,7 @@ const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
 // Keep in sync with apps/web/src/lib/agent/profile-skills-service.ts limits.
 const MAX_SKILL_MARKDOWN_LENGTH = 100_000;
-const MAX_COMPANION_FILES = 20;
+const MAX_COMPANION_FILES = 40;
 const MAX_COMPANION_FILE_SIZE = 100_000;
 const MAX_COMPANION_FILES_TOTAL = 500_000;
 const MAX_PATH_LENGTH = 200;
@@ -149,6 +149,12 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
           Add skill manually (or drop a .zip)
         </Button>
       )}
+
+      <p className="text-muted-foreground text-center text-xs">
+        Drag and drop a skill folder{' '}
+        <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a new
+        skill. Up to {MAX_COMPANION_FILES} companion files per skill.
+      </p>
 
       {skills.length === 0 && !isAdding && !importing && (
         <p className="text-muted-foreground py-2 text-center text-sm">

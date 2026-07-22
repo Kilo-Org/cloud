@@ -98,9 +98,11 @@ The shared launch flows dismiss the clean-install tracking alert, accept the Exp
 Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Maestro runs. Never bypass their preflight or call the YAML login steps directly:
 
 ```bash
-apps/mobile/e2e/login.sh <udid> [email]  # default: e2e-mobile@example.com
+apps/mobile/e2e/login.sh <udid> [email]  # default: e2e-mobile+<worktree-basename>@example.com
 apps/mobile/e2e/logout.sh <udid>
 ```
+
+The default email is unique per worktree (`e2e-mobile+<worktree-basename>@example.com`), so concurrent worktrees sign into distinct backend users and never cross-pollute each other's sessions. Pass an explicit email only when a test needs a specific account.
 
 Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. It retries only the known dev-client launch/request boundary once. The wrappers open the exact dev-client URL via preflight, then `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app. `flows/open-app.yaml` is the standalone cold-launch flow.
 
@@ -156,7 +158,7 @@ Attach a screenshot of the changed flow to the PR when it helps review. For tran
 
 ## Remote CLI Session Flows
 
-Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the user's local auth token, installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer token already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands.
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the auth token for the same per-worktree user the app is signed in as (the `e2e-mobile+<worktree-basename>@example.com` account by default), installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer token already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands.
 
 Reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 

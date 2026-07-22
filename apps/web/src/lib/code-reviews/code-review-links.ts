@@ -3,5 +3,6 @@
 export type { CodeReviewPlatform as CodeReviewUiPlatform } from '@kilocode/app-shared/code-review';
 export {
   getCodeReviewJobsHref,
+  getCodeReviewDetailHref,
   getCodeReviewRepositoryUrl,
 } from '@kilocode/app-shared/code-review';

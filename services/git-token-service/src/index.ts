@@ -8,9 +8,7 @@ import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
-  GITLAB_CREDENTIAL_AUDIT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
-  GITLAB_CREDENTIAL_REPAIR_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -44,10 +42,6 @@ import {
   createGitLabCredentialBroker,
   handleGitLabCredentialBrokerRequest,
 } from './gitlab-credential-broker-handler.js';
-import { GitLabCredentialAuditRequestSchema } from './gitlab-credential-audit.js';
-import { runGitLabCredentialAudit } from './gitlab-credential-audit-handler.js';
-import { GitLabCredentialRepairRequestSchema } from './gitlab-credential-repair.js';
-import { runGitLabCredentialRepair } from './gitlab-credential-repair-handler.js';
 import type { GitLabCredentialBroker } from './gitlab-credential-broker.js';
 import { InstallationLookupService } from './installation-lookup-service.js';
 import {
@@ -261,8 +255,6 @@ const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review
 const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH = '/internal/bitbucket/code-review/webhooks/delete';
 const GITLAB_CREDENTIAL_BROKER_PATH = '/internal/gitlab/credentials';
-const GITLAB_CREDENTIAL_AUDIT_PATH = '/internal/gitlab/credential-audit';
-const GITLAB_CREDENTIAL_REPAIR_PATH = '/internal/gitlab/credential-repair';
 const INTERNAL_REQUEST_MAX_BYTES = 16_000;
 
 const BitbucketPullRequestHttpRequestSchema = BitbucketPullRequestRequestSchema.omit({
@@ -1191,17 +1183,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 export default {
   async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
-    const isGitLabCredentialAudit = url.pathname === GITLAB_CREDENTIAL_AUDIT_PATH;
-    const isGitLabCredentialRepair = url.pathname === GITLAB_CREDENTIAL_REPAIR_PATH;
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
     // Credential-bearing endpoints must never be cached, including on their
     // shared early-return error paths (405/401/503). The GitHub user-access
     // token endpoint joins the GitLab private endpoints here.
     const privateNoStoreHeaders =
-      isGitLabCredentialAudit ||
-      isGitLabCredentialRepair ||
-      isGitLabCredentialBroker ||
-      url.pathname === USER_ACCESS_TOKEN_PATH
+      isGitLabCredentialBroker || url.pathname === USER_ACCESS_TOKEN_PATH
         ? { 'Cache-Control': 'no-store' }
         : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
@@ -1210,8 +1197,6 @@ export default {
       url.pathname !== USER_ACCESS_TOKEN_PATH &&
       url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
       url.pathname !== GITLAB_CREDENTIAL_BROKER_PATH &&
-      !isGitLabCredentialAudit &&
-      !isGitLabCredentialRepair &&
       !codeReviewAudience
     ) {
       return new Response(null, { status: 404 });
@@ -1253,85 +1238,13 @@ export default {
             ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
             : url.pathname === USER_ACCESS_TOKEN_PATH
               ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
-              : isGitLabCredentialAudit
-                ? GITLAB_CREDENTIAL_AUDIT_AUDIENCE
-                : isGitLabCredentialRepair
-                  ? GITLAB_CREDENTIAL_REPAIR_AUDIENCE
-                  : codeReviewAudience;
+              : codeReviewAudience;
       authorization = await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
       return Response.json(
         { error: 'unauthorized' },
         { status: 401, headers: privateNoStoreHeaders }
       );
-    }
-
-    if (isGitLabCredentialAudit) {
-      let body: unknown;
-      try {
-        body = await readBoundedInternalJsonRequest(request);
-      } catch {
-        return Response.json(
-          { error: 'invalid_request' },
-          { status: 400, headers: { 'Cache-Control': 'no-store' } }
-        );
-      }
-      const parsed = GitLabCredentialAuditRequestSchema.safeParse(body);
-      if (!parsed.success) {
-        return Response.json(
-          { error: 'invalid_request' },
-          { status: 400, headers: { 'Cache-Control': 'no-store' } }
-        );
-      }
-      try {
-        const audit = await runGitLabCredentialAudit(env, authorization.kiloUserId, parsed.data);
-        if (!audit.authorized) {
-          return Response.json(
-            { error: 'forbidden' },
-            { status: 403, headers: { 'Cache-Control': 'no-store' } }
-          );
-        }
-        return Response.json(audit.result, { headers: { 'Cache-Control': 'no-store' } });
-      } catch {
-        return Response.json(
-          { error: 'temporarily_unavailable' },
-          { status: 503, headers: { 'Cache-Control': 'no-store' } }
-        );
-      }
-    }
-
-    if (isGitLabCredentialRepair) {
-      let body: unknown;
-      try {
-        body = await readBoundedInternalJsonRequest(request);
-      } catch {
-        return Response.json(
-          { error: 'invalid_request' },
-          { status: 400, headers: { 'Cache-Control': 'no-store' } }
-        );
-      }
-      const parsed = GitLabCredentialRepairRequestSchema.safeParse(body);
-      if (!parsed.success) {
-        return Response.json(
-          { error: 'invalid_request' },
-          { status: 400, headers: { 'Cache-Control': 'no-store' } }
-        );
-      }
-      try {
-        const repair = await runGitLabCredentialRepair(env, authorization.kiloUserId, parsed.data);
-        if (!repair.authorized) {
-          return Response.json(
-            { error: 'forbidden' },
-            { status: 403, headers: { 'Cache-Control': 'no-store' } }
-          );
-        }
-        return Response.json(repair.result, { headers: { 'Cache-Control': 'no-store' } });
-      } catch {
-        return Response.json(
-          { error: 'temporarily_unavailable' },
-          { status: 503, headers: { 'Cache-Control': 'no-store' } }
-        );
-      }
     }
 
     if (url.pathname === BITBUCKET_REPOSITORIES_PATH) {

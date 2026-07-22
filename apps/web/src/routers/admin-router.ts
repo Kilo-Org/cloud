@@ -46,6 +46,7 @@ import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
+import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
@@ -65,7 +66,6 @@ import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
-import { adminGitLabCredentialMigrationRouter } from '@/routers/admin-gitlab-credential-migration-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
@@ -479,7 +479,6 @@ export const adminRouter = createTRPCRouter({
       canManageCredits: userCanManageCredits(currentUser),
     };
   }),
-  gitlabCredentialMigration: adminGitLabCredentialMigrationRouter,
   kiloclawReferrals: adminKiloclawReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
@@ -2314,6 +2313,7 @@ export const adminRouter = createTRPCRouter({
   contributorChampions: contributorChampionsRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   creditCampaigns: creditCampaignsRouter,
+  cloudBillingSkus: cloudBillingSkusRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
   gastown: adminGastownRouter,

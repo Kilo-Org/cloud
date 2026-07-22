@@ -29,7 +29,7 @@ export async function buildRemoteAttachmentParts(
   const parts = await Promise.all(
     submission.files.map(async file => {
       const result = await trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate({
-        messageUuid: submission.messageUuid,
+        messageUuid: submission.wire.path,
         filename: file.remoteName,
       });
       const mime = mimeForExtension(normalizeAttachmentExtension(file.remoteName));

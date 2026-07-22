@@ -77,6 +77,7 @@ import {
 } from '@/lib/code-reviews/action-required-shared';
 import {
   getCodeReviewRepositoryUrl,
+  getCodeReviewDetailHref,
   type CodeReviewUiPlatform,
 } from '@/lib/code-reviews/code-review-links';
 import {
@@ -391,7 +392,7 @@ export function CodeReviewJobsCard({
     await invalidateJobsList();
     setManualJobDialogOpen(false);
     resetManualJobForm();
-    router.push(`/code-reviews/${data.reviewId}`);
+    router.push(getCodeReviewDetailHref(data.reviewId, organizationId));
   }
 
   function handleManualJobSubmit(event: FormEvent<HTMLFormElement>) {
@@ -831,7 +832,7 @@ export function CodeReviewJobsCard({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <Link
-                            href={`/code-reviews/${review.id}`}
+                            href={getCodeReviewDetailHref(review.id, organizationId)}
                             className="text-foreground hover:text-primary text-sm font-medium transition-colors hover:underline"
                           >
                             {review.pr_title}

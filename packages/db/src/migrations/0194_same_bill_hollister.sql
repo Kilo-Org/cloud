@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_feedback" ADD COLUMN "session_type" text;

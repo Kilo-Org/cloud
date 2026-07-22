@@ -161,10 +161,7 @@ async function evaluateGitLabProjectTokenCandidate(
   match: GitLabRepositoryMatch,
   resolver: GitLabCredentialResolver
 ): Promise<GitLabCandidateEvaluation> {
-  if (
-    (!match.metadata.project_tokens || Object.keys(match.metadata.project_tokens).length === 0) &&
-    resolver.hasProjectCredentialCandidates
-  ) {
+  if (resolver.hasProjectCredentialCandidates) {
     try {
       if (!(await resolver.hasProjectCredentialCandidates(params, match.integrationId))) {
         return { status: 'ruled_out' };

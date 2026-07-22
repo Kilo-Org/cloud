@@ -4,7 +4,6 @@ import {
   GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
   GitLabOAuthCredentialRowSchema,
   buildGitLabOAuthCredentialAad,
-  type GitLabCredentialOwner,
 } from '@kilocode/worker-utils/gitlab-credential';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -24,12 +23,6 @@ type GitLabOAuthCredentialRefresherEnv = GitLabCredentialCryptoEnv & {
 
 type RefreshInput = Parameters<GitLabOAuthCredentialRefresherContract['refresh']>[0];
 type RefreshResult = Awaited<ReturnType<GitLabOAuthCredentialRefresherContract['refresh']>>;
-
-export type GitLabLegacyOAuthPromotionResult =
-  | { status: 'available'; token: string; instanceUrl: string }
-  | { status: 'encrypted_credential_available' }
-  | { status: 'reconnect_required' }
-  | { status: 'temporarily_unavailable' };
 
 const OAuthRefreshResponseSchema = z
   .object({
@@ -52,13 +45,8 @@ const OAuthRefreshResponseSchema = z
 const OAuthRefreshErrorSchema = z.object({ error: z.string() });
 const GitLabRefreshMetadataSchema = z
   .object({
-    access_token: z.string().optional(),
-    refresh_token: z.string().optional(),
-    token_expires_at: z.string().optional(),
     gitlab_instance_url: z.string().optional(),
     client_id: z.string().min(1).optional(),
-    client_secret: z.string().optional(),
-    auth_type: z.enum(['oauth', 'pat']).optional(),
   })
   .passthrough();
 
@@ -135,178 +123,6 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
     } = {}
   ) {
     this.crypto = dependencies.crypto ?? new GitLabCredentialCrypto(env);
-  }
-
-  async promoteLegacy(input: {
-    actor: { userId: string; orgId?: string };
-    integrationId: string;
-  }): Promise<GitLabLegacyOAuthPromotionResult> {
-    if (!this.env.HYPERDRIVE) return { status: 'temporarily_unavailable' };
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
-    try {
-      return await db.transaction(async tx => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${`gitlab-integration:${input.integrationId}`}, 0))`
-        );
-        const [loaded] = await tx
-          .select({
-            credential: platform_oauth_credentials,
-            integrationId: platform_integrations.id,
-            platform: platform_integrations.platform,
-            integrationType: platform_integrations.integration_type,
-            integrationStatus: platform_integrations.integration_status,
-            ownedByUserId: platform_integrations.owned_by_user_id,
-            ownedByOrganizationId: platform_integrations.owned_by_organization_id,
-            accountId: platform_integrations.platform_account_id,
-            accountLogin: platform_integrations.platform_account_login,
-            metadata: platform_integrations.metadata,
-          })
-          .from(platform_integrations)
-          .leftJoin(
-            platform_oauth_credentials,
-            eq(platform_oauth_credentials.platform_integration_id, platform_integrations.id)
-          )
-          .where(eq(platform_integrations.id, input.integrationId))
-          .limit(1);
-        if (!loaded) return { status: 'reconnect_required' } as const;
-        if (loaded.credential !== null) {
-          return { status: 'encrypted_credential_available' } as const;
-        }
-
-        const metadata = GitLabRefreshMetadataSchema.safeParse(loaded.metadata ?? {});
-        const owner: GitLabCredentialOwner | null = input.actor.orgId
-          ? loaded.ownedByOrganizationId === input.actor.orgId && loaded.ownedByUserId === null
-            ? { type: 'org', id: input.actor.orgId }
-            : null
-          : loaded.ownedByUserId === input.actor.userId && loaded.ownedByOrganizationId === null
-            ? { type: 'user', id: input.actor.userId }
-            : null;
-        const instanceUrl = metadata.success
-          ? normalizeGitLabInstanceUrl(metadata.data.gitlab_instance_url ?? 'https://gitlab.com')
-          : null;
-        if (
-          !metadata.success ||
-          !owner ||
-          !instanceUrl ||
-          loaded.platform !== 'gitlab' ||
-          loaded.integrationType !== 'oauth' ||
-          loaded.integrationStatus !== 'active' ||
-          !loaded.accountId ||
-          !loaded.accountLogin ||
-          metadata.data.auth_type !== 'oauth' ||
-          !metadata.data.access_token
-        ) {
-          return { status: 'reconnect_required' } as const;
-        }
-
-        const now = (this.dependencies.now ?? (() => new Date()))();
-        if (
-          metadata.data.token_expires_at &&
-          new Date(metadata.data.token_expires_at).getTime() - now.getTime() > REFRESH_BUFFER_MS
-        ) {
-          return {
-            status: 'available',
-            token: metadata.data.access_token,
-            instanceUrl,
-          } as const;
-        }
-        if (!metadata.data.refresh_token) return { status: 'reconnect_required' } as const;
-
-        const clientId =
-          metadata.data.client_id ?? (await resolveSecret(this.env.GITLAB_CLIENT_ID));
-        const clientSecret = metadata.data.client_id
-          ? (metadata.data.client_secret ?? null)
-          : await resolveSecret(this.env.GITLAB_CLIENT_SECRET);
-        if (!clientId || !clientSecret) return { status: 'temporarily_unavailable' } as const;
-
-        const refreshed = await this.requestOAuthRefresh({
-          instanceUrl,
-          clientId,
-          clientSecret,
-          refreshToken: metadata.data.refresh_token,
-        });
-        if (refreshed.status === 'invalid_grant') {
-          return { status: 'reconnect_required' } as const;
-        }
-        if (refreshed.status !== 'available') {
-          return { status: 'temporarily_unavailable' } as const;
-        }
-
-        const credentialId = crypto.randomUUID();
-        const credentialVersion = 1;
-        const authorizedByUserId = owner.type === 'user' ? owner.id : null;
-        const encrypt = (plaintext: string, kind: 'access' | 'refresh' | 'oauth-client-secret') =>
-          this.crypto.encrypt({
-            plaintext,
-            scheme: GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
-            aad: buildGitLabOAuthCredentialAad({
-              credentialId,
-              integrationId: loaded.integrationId,
-              providerBaseUrl: instanceUrl,
-              owner,
-              authorizedByUserId,
-              credentialVersion,
-              kind,
-            }),
-          });
-        const [accessTokenEncrypted, refreshTokenEncrypted, clientSecretEncrypted] =
-          await Promise.all([
-            encrypt(refreshed.data.access_token, 'access'),
-            encrypt(refreshed.data.refresh_token, 'refresh'),
-            metadata.data.client_id
-              ? encrypt(clientSecret, 'oauth-client-secret')
-              : Promise.resolve(null),
-          ]);
-        if (
-          accessTokenEncrypted.status !== 'available' ||
-          refreshTokenEncrypted.status !== 'available' ||
-          (clientSecretEncrypted && clientSecretEncrypted.status !== 'available')
-        ) {
-          return { status: 'temporarily_unavailable' } as const;
-        }
-        const expiresAt = new Date(
-          (refreshed.data.created_at + refreshed.data.expires_in) * 1000
-        ).toISOString();
-        const inserted = await tx
-          .insert(platform_oauth_credentials)
-          .values({
-            id: credentialId,
-            platform_integration_id: loaded.integrationId,
-            authorized_by_user_id: authorizedByUserId,
-            provider_subject_id: loaded.accountId,
-            provider_subject_login: loaded.accountLogin,
-            provider_base_url: instanceUrl,
-            access_token_encrypted: accessTokenEncrypted.ciphertext,
-            access_token_expires_at: expiresAt,
-            refresh_token_encrypted: refreshTokenEncrypted.ciphertext,
-            refresh_token_expires_at: null,
-            oauth_client_secret_encrypted: clientSecretEncrypted?.ciphertext ?? null,
-            credential_version: credentialVersion,
-            last_used_at: now.toISOString(),
-          })
-          .onConflictDoNothing()
-          .returning({ id: platform_oauth_credentials.id });
-        if (inserted.length === 0) {
-          return { status: 'encrypted_credential_available' } as const;
-        }
-
-        await tx
-          .update(platform_integrations)
-          .set({
-            integration_type: 'oauth',
-            scopes: refreshed.data.scope.split(/\s+/).filter(Boolean),
-            updated_at: now.toISOString(),
-          })
-          .where(eq(platform_integrations.id, loaded.integrationId));
-        return {
-          status: 'available',
-          token: refreshed.data.access_token,
-          instanceUrl,
-        } as const;
-      });
-    } catch {
-      return { status: 'temporarily_unavailable' };
-    }
   }
 
   async refresh(input: RefreshInput): Promise<RefreshResult> {

@@ -193,9 +193,10 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set(['stepfun/step-3.7-flash:free']));
-    mockedUpstreamRequest.mockResolvedValue(
-      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
-    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
@@ -447,9 +448,14 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
-    mockedUpstreamRequest.mockResolvedValue(
-      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'anthropic/claude-haiku-4', choices: [] })
-    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({
+        id: 'chatcmpl-1',
+        model: 'anthropic/claude-haiku-4',
+        choices: [],
+      }),
+    });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
@@ -724,9 +730,10 @@ describe('auto-routing shadow classifier', () => {
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
     mockedGetOpenRouterModels.mockResolvedValue(new Set());
-    mockedUpstreamRequest.mockResolvedValue(
-      upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
-    );
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedApplyResolvedAutoModel.mockImplementation(async (_opts, request) => {

@@ -16,7 +16,7 @@ vi.mock('@/lib/trpc', () => {
 });
 
 describe('buildRemoteAttachmentParts', () => {
-  it('mints a presigned URL per file using remoteName and derives MIME from extension', async () => {
+  it('mints each download URL from the upload path and remoteName', async () => {
     const mutate = vi.mocked(trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate);
     mutate.mockResolvedValue({
       signedUrl: 'https://r2.example.com/signed',
@@ -27,7 +27,7 @@ describe('buildRemoteAttachmentParts', () => {
     const submission: AgentAttachmentSubmissionPayload = {
       messageUuid: 'msg-uuid',
       wire: {
-        path: 'msg-uuid',
+        path: 'upload-path',
         files: ['msg-uuid.zip', 'msg-uuid.txt', 'msg-uuid.png'],
       },
       files: [
@@ -40,9 +40,9 @@ describe('buildRemoteAttachmentParts', () => {
     const parts = await buildRemoteAttachmentParts(submission);
 
     expect(mutate).toHaveBeenCalledTimes(3);
-    expect(mutate).toHaveBeenCalledWith({ messageUuid: 'msg-uuid', filename: 'msg-uuid.zip' });
-    expect(mutate).toHaveBeenCalledWith({ messageUuid: 'msg-uuid', filename: 'msg-uuid.txt' });
-    expect(mutate).toHaveBeenCalledWith({ messageUuid: 'msg-uuid', filename: 'msg-uuid.png' });
+    expect(mutate).toHaveBeenCalledWith({ messageUuid: 'upload-path', filename: 'msg-uuid.zip' });
+    expect(mutate).toHaveBeenCalledWith({ messageUuid: 'upload-path', filename: 'msg-uuid.txt' });
+    expect(mutate).toHaveBeenCalledWith({ messageUuid: 'upload-path', filename: 'msg-uuid.png' });
 
     expect(parts).toEqual([
       {

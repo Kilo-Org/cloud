@@ -6,9 +6,7 @@ import {
   type GitLabCredentialActor,
 } from './gitlab-credential-service.js';
 import { DrizzleGitLabCredentialStore } from './gitlab-credential-store.js';
-import { GitLabLookupService } from './gitlab-lookup-service.js';
 import { GitLabOAuthCredentialRefresher } from './gitlab-oauth-credential-refresher.js';
-import { GitLabTokenService } from './gitlab-token-service.js';
 
 export const GitLabCredentialBrokerRequestSchema = z.discriminatedUnion('credential', [
   z
@@ -35,20 +33,11 @@ export function createGitLabCredentialService(env: CloudflareEnv): GitLabCredent
 }
 
 export function createGitLabCredentialBroker(env: CloudflareEnv): GitLabCredentialBroker {
-  const lookupService = new GitLabLookupService(env);
-  const tokenService = new GitLabTokenService(env, new GitLabOAuthCredentialRefresher(env));
   const credentialService = createGitLabCredentialService(env);
   return new GitLabCredentialBroker({
-    findIntegration: (actor, integrationId) =>
-      lookupService.findGitLabIntegration(actor, integrationId),
-    getLegacyIntegrationToken: (actor, integrationId, metadata) =>
-      tokenService.getToken(integrationId, metadata, actor),
     getEncryptedCredential: (actor, selector) => credentialService.getCredential(actor, selector),
     hasProjectCredentialCandidates: (actor, integrationId) =>
       credentialService.hasProjectCredentialCandidates(actor, integrationId),
-    reportFallback: event => {
-      console.warn(JSON.stringify({ message: 'GitLab legacy credential fallback', ...event }));
-    },
   });
 }
 

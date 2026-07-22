@@ -107,6 +107,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
+import { logExceptInTest } from '@/lib/utils.server';
 
 export const maxDuration = 1800;
 
@@ -865,7 +866,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
   }
 
-  const response = await upstreamRequest({
+  const upstreamResult = await upstreamRequest({
     path,
     search: url.search,
     method: request.method,
@@ -874,6 +875,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider: effectiveProviderContext.provider,
     signal: request.signal,
   });
+  if (upstreamResult.type === 'error') {
+    return upstreamResult.response;
+  }
+  const response = upstreamResult.response;
+  logExceptInTest(
+    'upstream response status: %s, x-vercel-id: %s',
+    response.status,
+    response.headers.get('x-vercel-id') || '<none>'
+  );
+
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
 

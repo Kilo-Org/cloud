@@ -10,6 +10,8 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
+import { NextResponse } from 'next/server';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'
@@ -134,6 +136,18 @@ function classifyUpstreamFetchFailure({
   }
 }
 
+function upstreamDisconnectResponse() {
+  const error = 'The upstream provider disconnected before sending a response.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.upstream_disconnect,
+      message: error,
+    },
+    { status: 503 }
+  );
+}
+
 export async function upstreamRequest({
   path,
   search,
@@ -150,7 +164,7 @@ export async function upstreamRequest({
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;
-}) {
+}): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
@@ -166,17 +180,23 @@ export async function upstreamRequest({
 
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
+  timeoutSignal.addEventListener('abort', () => {
+    errorExceptInTest('[upstreamRequest] timeout');
+  });
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   try {
-    return await fetch(targetUrl, {
-      method,
-      headers,
-      body: JSON.stringify(body),
-      // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
-      duplex: 'half',
-      signal: combinedSignal,
-    });
+    return {
+      type: 'success',
+      response: await fetch(targetUrl, {
+        method,
+        headers,
+        body: JSON.stringify(body),
+        // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
+        duplex: 'half',
+        signal: combinedSignal,
+      }),
+    };
   } catch (error) {
     try {
       const cause = error instanceof Error ? error.cause : undefined;
@@ -214,7 +234,7 @@ export async function upstreamRequest({
       // Fetch failure must remain caller-visible even when diagnostic enrichment fails.
     }
 
-    throw error;
+    return { type: 'error', response: upstreamDisconnectResponse() };
   }
 }
 

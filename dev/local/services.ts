@@ -105,6 +105,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
+  'container-usage-meter': {
+    group: 'cloud-agent',
+    dependsOn: ['postgres'],
+    dir: 'services/container-usage-meter',
+  },
   'cloudflare-webhook-agent-ingest': {
     group: 'cloud-agent',
     dependsOn: ['cloud-agent-next', 'nextjs', 'postgres'],

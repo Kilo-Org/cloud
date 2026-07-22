@@ -73,6 +73,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
       kilo_session_id: kiloSessionId ?? undefined,
       organization_id: organizationId ?? undefined,
       feedback_text: feedbackText.trim(),
+      session_type: activeSessionType ?? undefined,
       model: feedbackModelForSession(activeSessionType, sessionConfig?.model),
       repository: sessionConfig?.repository || undefined,
       is_streaming: isStreaming,

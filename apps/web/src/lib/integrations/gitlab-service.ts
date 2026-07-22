@@ -507,88 +507,36 @@ export type GitLabIntegrationMetadata = {
 const KILO_BOT_TOKEN_NAME = 'Kilo Code Review Bot';
 
 async function getStoredProjectCredential(integrationId: string, projectId: string) {
-  return db.transaction(async tx => {
-    const metadata = await readGitLabMetadataInTransaction(tx, integrationId);
-    const [row] = await tx
-      .select()
-      .from(platform_access_token_credentials)
-      .where(
-        and(
-          eq(platform_access_token_credentials.platform_integration_id, integrationId),
-          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token'),
-          eq(platform_access_token_credentials.provider_resource_id, projectId)
-        )
+  const [row] = await db
+    .select()
+    .from(platform_access_token_credentials)
+    .where(
+      and(
+        eq(platform_access_token_credentials.platform_integration_id, integrationId),
+        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token'),
+        eq(platform_access_token_credentials.provider_resource_id, projectId)
       )
-      .limit(1);
+    )
+    .limit(1);
 
-    if (row) {
-      const parsed = GitLabProjectAccessTokenCredentialRowSchema.safeParse(row);
-      const tokenId = parsed.success
-        ? Number(parsed.data.provider_metadata.providerCredentialId)
-        : Number.NaN;
-      if (!parsed.success || !Number.isSafeInteger(tokenId)) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'GitLab project credential must be recreated',
-        });
-      }
-      return {
-        source: 'encrypted' as const,
-        credentialId: parsed.data.id,
-        credentialVersion: parsed.data.credential_version,
-        tokenId,
-        expiresAt: parsed.data.provider_metadata.expiresOn,
-      };
-    }
+  if (!row) return null;
 
-    const projectTokens = metadata.project_tokens;
-    if (projectTokens === undefined) return null;
-    if (
-      typeof projectTokens !== 'object' ||
-      projectTokens === null ||
-      Array.isArray(projectTokens)
-    ) {
-      throw new TRPCError({
-        code: 'UNAUTHORIZED',
-        message: 'GitLab project credential must be recreated',
-      });
-    }
-    const candidate = (projectTokens as Record<string, unknown>)[projectId];
-    if (candidate === undefined) return null;
-    if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) {
-      throw new TRPCError({
-        code: 'UNAUTHORIZED',
-        message: 'GitLab project credential must be recreated',
-      });
-    }
-    const legacy = candidate as Record<string, unknown>;
-    const keys = Object.keys(legacy).sort();
-    const expectedKeys = ['created_at', 'expires_at', 'name', 'token', 'token_id'];
-    if (
-      keys.length !== expectedKeys.length ||
-      keys.some((key, index) => key !== expectedKeys[index]) ||
-      !Number.isSafeInteger(legacy.token_id) ||
-      Number(legacy.token_id) <= 0 ||
-      typeof legacy.token !== 'string' ||
-      legacy.token.length === 0 ||
-      typeof legacy.expires_at !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(legacy.expires_at) ||
-      typeof legacy.created_at !== 'string' ||
-      legacy.created_at.length === 0 ||
-      typeof legacy.name !== 'string' ||
-      legacy.name.length === 0
-    ) {
-      throw new TRPCError({
-        code: 'UNAUTHORIZED',
-        message: 'GitLab project credential must be recreated',
-      });
-    }
-    return {
-      source: 'legacy' as const,
-      tokenId: Number(legacy.token_id),
-      expiresAt: legacy.expires_at,
-    };
-  });
+  const parsed = GitLabProjectAccessTokenCredentialRowSchema.safeParse(row);
+  const tokenId = parsed.success
+    ? Number(parsed.data.provider_metadata.providerCredentialId)
+    : Number.NaN;
+  if (!parsed.success || !Number.isSafeInteger(tokenId)) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'GitLab project credential must be recreated',
+    });
+  }
+  return {
+    credentialId: parsed.data.id,
+    credentialVersion: parsed.data.credential_version,
+    tokenId,
+    expiresAt: parsed.data.provider_metadata.expiresOn,
+  };
 }
 
 /**
@@ -751,9 +699,7 @@ export async function getOrCreateProjectAccessToken(
 async function removeInvalidStoredToken(
   integrationId: string,
   projectId: string,
-  credential:
-    | { source: 'encrypted'; credentialId: string; credentialVersion: number }
-    | { source: 'legacy' }
+  credential: { credentialId: string; credentialVersion: number }
 ): Promise<void> {
   await db.transaction(async tx => {
     await mutateGitLabMetadataInTransaction(tx, integrationId, currentMetadata => {
@@ -761,19 +707,17 @@ async function removeInvalidStoredToken(
       delete projectTokens[projectId];
       return { set: { project_tokens: projectTokens } };
     });
-    if (credential.source === 'encrypted') {
-      const deleted = await tx
-        .delete(platform_access_token_credentials)
-        .where(
-          and(
-            eq(platform_access_token_credentials.id, credential.credentialId),
-            eq(platform_access_token_credentials.credential_version, credential.credentialVersion)
-          )
+    const deleted = await tx
+      .delete(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.id, credential.credentialId),
+          eq(platform_access_token_credentials.credential_version, credential.credentialVersion)
         )
-        .returning({ id: platform_access_token_credentials.id });
-      if (deleted.length !== 1) {
-        throw new Error('GitLab project access token was replaced concurrently');
-      }
+      )
+      .returning({ id: platform_access_token_credentials.id });
+    if (deleted.length !== 1) {
+      throw new Error('GitLab project access token was replaced concurrently');
     }
   });
 
@@ -929,32 +873,20 @@ export async function removeStoredProjectAccessToken(
       delete projectTokens[projectIdStr];
       return { set: { project_tokens: projectTokens } };
     });
-    if (storedCredential.source === 'encrypted') {
-      const deleted = await tx
-        .delete(platform_access_token_credentials)
-        .where(
-          and(
-            eq(platform_access_token_credentials.id, storedCredential.credentialId),
-            eq(
-              platform_access_token_credentials.credential_version,
-              storedCredential.credentialVersion
-            )
+    const deleted = await tx
+      .delete(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.id, storedCredential.credentialId),
+          eq(
+            platform_access_token_credentials.credential_version,
+            storedCredential.credentialVersion
           )
         )
-        .returning({ id: platform_access_token_credentials.id });
-      if (deleted.length !== 1) {
-        throw new Error('GitLab project access token was replaced concurrently');
-      }
-    } else {
-      await tx
-        .delete(platform_access_token_credentials)
-        .where(
-          and(
-            eq(platform_access_token_credentials.platform_integration_id, integration.id),
-            eq(platform_access_token_credentials.provider_credential_type, 'project_access_token'),
-            eq(platform_access_token_credentials.provider_resource_id, projectIdStr)
-          )
-        );
+      )
+      .returning({ id: platform_access_token_credentials.id });
+    if (deleted.length !== 1) {
+      throw new Error('GitLab project access token was replaced concurrently');
     }
   });
 

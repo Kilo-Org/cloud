@@ -298,7 +298,7 @@ type GastownBillingStatus = {
 
 | Area | Expected change |
 |---|---|
-| `services/gastown/wrangler.jsonc` and test config | Add the UBB WorkerEntrypoint service binding and rollout flags. |
+| `services/gastown/wrangler.jsonc` and test config | Add the default-off `GASTOWN_BILLING_ENABLED` flag; add the production UBB binding when that Worker is provisioned. |
 | `services/gastown/worker-configuration.d.ts` | Add the typed admission and recording RPC contract until generated binding types provide it. |
 | `services/gastown/package.json` | Add `@kilocode/container-usage` once the package exists. |
 | `services/gastown/src/dos/TownContainer.do.ts` | Persist interval state, guard cold starts, report lifecycle calls, expose a rate-limited usage heartbeat, and make stop handling idempotent. |
@@ -407,10 +407,11 @@ primary CTA. Amounts and usage counters SHOULD use tabular numerals.
 
 ## Rollout And Acceptance
 
-Rollout SHOULD proceed in independently reversible stages:
+Rollout SHOULD proceed through a single default-off backend flag:
 
-1. **Contract and catalog:** Ship the UBB service binding, `standard-4` SKU, `3x` customer rate, and
-   admission operation behind disabled flags.
+1. **Contract and catalog:** Ship the `standard-4` SKU, `3x` customer rate, and admission operation
+   behind `GASTOWN_BILLING_ENABLED=false`; provision the production UBB service binding before the
+   flag can be enabled.
 2. **Shadow reporting:** Emit complete intervals and calculated charges without reserving or
    debiting credits and without enforcing `warn`/`stop`.
 3. **Admission and UX:** Enable authoritative cold-start admission and all blocked/warning UI while
@@ -422,8 +423,10 @@ Rollout SHOULD proceed in independently reversible stages:
 
 Before charging customers, shadow data MUST demonstrate that starts and stops reconcile with
 Cloudflare runtime observations, duplicate RPCs do not duplicate charges, and aggregate base cost is
-reasonably consistent with the Cloudflare invoice. Admission, debits, warnings, and stops MUST have
-separate kill switches so metering can continue while a control behavior is disabled.
+reasonably consistent with the Cloudflare invoice. `GASTOWN_BILLING_ENABLED` controls metering,
+admission, debits, warnings, and stops together. A separate default-off
+`GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` web flag MAY show advance notice while actual billing remains
+disabled; it MUST NOT alter backend billing behavior.
 
 Dashboards MUST expose awake seconds, base Cloudflare cost, customer charge, gross multiplier,
 buffered writes, unclosed intervals, admission denials, RPC failures, graceful-stop duration, forced

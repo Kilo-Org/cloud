@@ -18,6 +18,7 @@ export function MayorChat({ townId }: MayorChatProps) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
+  const billingQuery = useQuery(trpc.gastown.getBillingStatus.queryOptions({ townId }));
 
   // Eagerly ensure mayor agent + container on mount
   const ensureMayor = useMutation(
@@ -48,10 +49,11 @@ export function MayorChat({ townId }: MayorChatProps) {
   // Reset on townId change so ensureMayor fires for each town
   const ensuredTownRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!billingQuery.isSuccess || billingQuery.data.enabled) return;
     if (ensuredTownRef.current === townId) return;
     ensuredTownRef.current = townId;
     ensureMayor.mutate({ townId });
-  }, [townId]);
+  }, [billingQuery.data, billingQuery.isSuccess, townId]);
 
   // Poll mayor status to get agentId
   const statusQuery = useQuery({
@@ -69,6 +71,12 @@ export function MayorChat({ townId }: MayorChatProps) {
   const { terminalRef, connected, status, fitAddonRef } = useXtermPty({
     townId,
     agentId: mayorAgentId,
+    enabled:
+      billingQuery.isSuccess &&
+      (!billingQuery.data.enabled ||
+        billingQuery.data.state === 'running' ||
+        billingQuery.data.state === 'warning' ||
+        billingQuery.data.state === 'starting'),
     retries: 10,
     retryDelay: 3_000,
   });

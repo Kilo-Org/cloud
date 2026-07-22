@@ -74,6 +74,7 @@
     "KILO_API_URL": "https://api.kilo.ai",
     "GASTOWN_API_URL": "https://gastown.kiloapps.io",
     "WASTELAND_API_URL": "https://wasteland.kiloapps.io",
+    "GASTOWN_BILLING_ENABLED": "false",
   },
 
   // Hyperdrive binding for Postgres (user lookups, token generation)
@@ -134,6 +135,7 @@
         "KILO_API_URL": "http://192.168.65.254:3000",
         "GASTOWN_API_URL": "http://192.168.65.254:8803",
         "WASTELAND_API_URL": "http://192.168.65.254:8788",
+        "GASTOWN_BILLING_ENABLED": "false",
       },
       "containers": [
         {

@@ -27,6 +27,7 @@ import {
   RpcBeadEventOutput,
   RpcMayorSendResultOutput,
   RpcMayorStatusOutput,
+  RpcBillingStatusOutput,
   RpcStreamTicketOutput,
   RpcPtySessionOutput,
   RpcSlingResultOutput,
@@ -37,6 +38,7 @@ import {
   RpcMergeQueueDataOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
+import { ContainerBillingError } from '../billing/ContainerBilling.error';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
@@ -81,6 +83,24 @@ async function refreshGitCredentials(
 /** Extract user identity fields from the tRPC context. */
 function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string | null } {
   return { id: ctx.userId, api_token_pepper: ctx.apiTokenPepper };
+}
+
+function mapContainerBillingError(error: unknown): TRPCError | null {
+  let code: unknown;
+  if (error instanceof ContainerBillingError) {
+    code = error.code;
+  } else if (typeof error === 'object' && error !== null && 'code' in error) {
+    code = error.code;
+  }
+
+  const message = error instanceof Error ? error.message : 'Container billing is unavailable';
+  if (code === 'INSUFFICIENT_CREDITS' || message.includes('in credits to start')) {
+    return new TRPCError({ code: 'PRECONDITION_FAILED', message, cause: error });
+  }
+  if (code === 'BILLING_UNAVAILABLE' || message.includes('billing')) {
+    return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message, cause: error });
+  }
+  return null;
 }
 
 /** Look up a user's membership for a specific org from the JWT claims. */
@@ -974,7 +994,16 @@ export const gastownRouter = router({
       await verifyTownOwnership(ctx.env, ctx, input.townId);
 
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.sendMayorMessage(input.message, input.model, input.uiContext);
+      try {
+        return await townStub.sendMayorMessage(
+          input.message,
+          input.model,
+          input.uiContext,
+          ctx.userId
+        );
+      } catch (error) {
+        throw mapContainerBillingError(error) ?? error;
+      }
     }),
 
   getMayorStatus: gastownProcedure
@@ -993,6 +1022,14 @@ export const gastownRouter = router({
       await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getAlarmStatus();
+    }),
+
+  getBillingStatus: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(RpcBillingStatusOutput)
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      return getTownDOStub(ctx.env, input.townId).getBillingStatus();
     }),
 
   ensureMayor: gastownProcedure
@@ -1023,7 +1060,11 @@ export const gastownRouter = router({
       }
 
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.ensureMayor();
+      try {
+        return await townStub.ensureMayor(ctx.userId);
+      } catch (error) {
+        throw mapContainerBillingError(error) ?? error;
+      }
     }),
 
   // ── Agent Streams ───────────────────────────────────────────────────

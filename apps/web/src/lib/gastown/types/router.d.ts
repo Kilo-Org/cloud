@@ -550,6 +550,38 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           type: string;
           message: string;
         }[];
+        billing: {
+          enabled: boolean;
+          state: 'blocked' | 'degraded' | 'idle' | 'running' | 'starting' | 'stopping' | 'warning';
+          payer?: {
+            type: 'org' | 'user';
+            id: string;
+          } | undefined;
+          remaining?: number | undefined;
+          minimumRequired?: number | undefined;
+          estimatedHourlyCharge?: number | undefined;
+          intervalStartedAt?: number | undefined;
+          lastReportedAt?: number | undefined;
+        };
+      };
+      meta: object;
+    }>;
+    getBillingStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        enabled: boolean;
+        state: 'blocked' | 'degraded' | 'idle' | 'running' | 'starting' | 'stopping' | 'warning';
+        payer?: {
+          type: 'org' | 'user';
+          id: string;
+        } | undefined;
+        remaining?: number | undefined;
+        minimumRequired?: number | undefined;
+        estimatedHourlyCharge?: number | undefined;
+        intervalStartedAt?: number | undefined;
+        lastReportedAt?: number | undefined;
       };
       meta: object;
     }>;
@@ -2184,6 +2216,52 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               type: string;
               message: string;
             }[];
+            billing: {
+              enabled: boolean;
+              state:
+                | 'blocked'
+                | 'degraded'
+                | 'idle'
+                | 'running'
+                | 'starting'
+                | 'stopping'
+                | 'warning';
+              payer?: {
+                type: 'org' | 'user';
+                id: string;
+              } | undefined;
+              remaining?: number | undefined;
+              minimumRequired?: number | undefined;
+              estimatedHourlyCharge?: number | undefined;
+              intervalStartedAt?: number | undefined;
+              lastReportedAt?: number | undefined;
+            };
+          };
+          meta: object;
+        }>;
+        getBillingStatus: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            enabled: boolean;
+            state:
+              | 'blocked'
+              | 'degraded'
+              | 'idle'
+              | 'running'
+              | 'starting'
+              | 'stopping'
+              | 'warning';
+            payer?: {
+              type: 'org' | 'user';
+              id: string;
+            } | undefined;
+            remaining?: number | undefined;
+            minimumRequired?: number | undefined;
+            estimatedHourlyCharge?: number | undefined;
+            intervalStartedAt?: number | undefined;
+            lastReportedAt?: number | undefined;
           };
           meta: object;
         }>;

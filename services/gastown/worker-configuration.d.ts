@@ -57,6 +57,7 @@ type WastelandService = {
 		evidence: string;
 	}): Promise<WastelandRpcResult<{ success: true; pr_url: string | null }>>;
 };
+type ContainerUsageService = import("./src/billing/container-usage.billing").ContainerUsageService;
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/gastown.worker");
@@ -80,6 +81,8 @@ declare namespace Cloudflare {
 		AGENT: DurableObjectNamespace<import("./src/gastown.worker").AgentDO>;
 		GIT_TOKEN_SERVICE: GitTokenService;
 		WASTELAND_SERVICE: WastelandService;
+		CONTAINER_USAGE?: ContainerUsageService;
+		GASTOWN_BILLING_ENABLED: "false" | "true";
 		AI: Ai;
 		AGENT_DB_SNAPSHOTS_KV: KVNamespace;
 	}
@@ -101,6 +104,8 @@ declare namespace Cloudflare {
 		AGENT: DurableObjectNamespace<import("./src/gastown.worker").AgentDO>;
 		GIT_TOKEN_SERVICE: GitTokenService;
 		WASTELAND_SERVICE: WastelandService;
+		CONTAINER_USAGE?: ContainerUsageService;
+		GASTOWN_BILLING_ENABLED: "false" | "true";
 		AI: Ai;
 		AGENT_DB_SNAPSHOTS_KV: KVNamespace;
 		HYPERDRIVE?: Hyperdrive;

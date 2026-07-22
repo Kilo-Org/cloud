@@ -879,7 +879,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return upstreamResult.response;
   }
   const response = upstreamResult.response;
-  logExceptInTest('upstream response status %s', response.status);
+  logExceptInTest(
+    'upstream response status: %s, x-vercel-id: %s',
+    response.status,
+    response.headers.get('x-vercel-id') || '<none>'
+  );
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;

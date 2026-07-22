@@ -245,6 +245,10 @@ export function ReviewConfigForm({
   );
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [customInstructions, setCustomInstructions] = useState('');
+  // Custom Instructions is deprecated in favour of REVIEW.md. The field is only
+  // surfaced to configs that already have something stored in it, and stays
+  // visible for the rest of the session even if the user clears it.
+  const [showCustomInstructions, setShowCustomInstructions] = useState(false);
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
@@ -372,6 +376,9 @@ export function ReviewConfigForm({
       setReviewStyle(configData.reviewStyle);
       setFocusAreas(configData.focusAreas);
       setCustomInstructions(configData.customInstructions || '');
+      if (configData.customInstructions?.trim()) {
+        setShowCustomInstructions(true);
+      }
       setSelectedModel(configData.modelSlug);
       setThinkingEffort(configData.thinkingEffort ?? null);
       setGateThreshold(configData.gateThreshold ?? 'off');
@@ -867,21 +874,30 @@ export function ReviewConfigForm({
               </div>
             </div>
 
-            {/* Custom Instructions (global) */}
-            <div className="space-y-3">
-              <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
-              <Textarea
-                id="custom-instructions"
-                placeholder="e.g., 'Always check for TypeScript strict mode compliance' or 'Focus on React best practices'"
-                value={customInstructions}
-                onChange={e => setCustomInstructions(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-              <p className="text-muted-foreground text-sm">
-                Add specific guidelines for your team's code review standards
-              </p>
-            </div>
+            {/* Custom Instructions (global) — deprecated, only shown to configs that already use it */}
+            {showCustomInstructions && (
+              <div className="space-y-3">
+                <Label htmlFor="custom-instructions">Custom Instructions (Optional)</Label>
+                <Textarea
+                  id="custom-instructions"
+                  placeholder="e.g., 'Always check for TypeScript strict mode compliance' or 'Focus on React best practices'"
+                  value={customInstructions}
+                  onChange={e => setCustomInstructions(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+                <p className="text-muted-foreground text-sm">
+                  Custom Instructions is planned for deprecation. Move these guidelines into a
+                  REVIEW.md file in your repository instead.{' '}
+                  <Link
+                    href={reviewMdGuideHref}
+                    className="text-blue-400 underline-offset-2 hover:text-blue-300 hover:underline"
+                  >
+                    Learn about REVIEW.md
+                  </Link>
+                </p>
+              </div>
+            )}
 
             {/* Advanced Settings — one card holding the switch and, when on, the per-repository
                 settings. GitLab has no "all" mode, so it is always Advanced (switch hidden). */}

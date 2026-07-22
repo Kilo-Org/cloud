@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { cloud_billing_sku, type User } from '@kilocode/db/schema';
+import {
+  cloud_billing_sku,
+  container_usage_interval,
+  container_usage_segment,
+  type User,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { serializeCloudBillingSku } from './cloud-billing-skus-router';
 
@@ -22,6 +27,30 @@ function validInput(id: string) {
     unit: 'second' as const,
     rate_cents_per_unit: '0.123456789012',
   };
+}
+
+async function insertUsageInterval(params: {
+  id: string;
+  subjectType?: 'user' | 'org';
+  subjectId?: string;
+  startedAt?: string;
+}) {
+  const subjectType = params.subjectType ?? 'user';
+  const subjectId = params.subjectId ?? admin.id;
+  await db.insert(container_usage_interval).values({
+    id: params.id,
+    service: 'cloud-agent-next',
+    instance_id: params.id,
+    start_epoch_ms: 123,
+    cloud_billing_sku_id: 'usage-search-sku',
+    context_fingerprint: 'a'.repeat(64),
+    subject_type: subjectType,
+    subject_id: subjectId,
+    actor_type: 'user',
+    actor_id: subjectType === 'user' ? subjectId : admin.id,
+    started_at: params.startedAt ?? '2026-07-22T10:00:00.000Z',
+    last_seen_at: params.startedAt ?? '2026-07-22T10:00:00.000Z',
+  });
 }
 
 describe('admin.cloudBillingSkus.list', () => {
@@ -58,6 +87,183 @@ describe('admin.cloudBillingSkus.list', () => {
     });
 
     expect(serialized.created_at).toBe('2026-04-29T01:16:12.945Z');
+  });
+});
+
+describe('admin.cloudBillingSkus usage records', () => {
+  beforeEach(async () => {
+    await db.insert(cloud_billing_sku).values({
+      ...validInput('usage-search-sku'),
+      created_by_user_id: admin.id,
+    });
+  });
+
+  it('merges the most recently active open and closed intervals', async () => {
+    await insertUsageInterval({ id: 'recent-open', startedAt: '2026-07-22T09:00:00.000Z' });
+    await insertUsageInterval({ id: 'recent-closed', startedAt: '2026-07-22T10:00:00.000Z' });
+    await db
+      .update(container_usage_interval)
+      .set({
+        status: 'closed',
+        close_reason: 'exit',
+        stopped_at: '2026-07-22T11:00:00.000Z',
+        last_seen_at: '2026-07-22T11:00:00.000Z',
+      })
+      .where(eq(container_usage_interval.id, 'recent-closed'));
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.cloudBillingSkus.searchUsageIntervals({
+      search: { kind: 'recent' },
+      limit: 10,
+    });
+    expect(result.items.map(item => item.id)).toEqual(['recent-closed', 'recent-open']);
+  });
+
+  it('requires admin access and searches exact interval IDs', async () => {
+    await insertUsageInterval({ id: 'interval-exact' });
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(
+      nonAdminCaller.admin.cloudBillingSkus.searchUsageIntervals({
+        search: { kind: 'interval', id: 'interval-exact' },
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.cloudBillingSkus.searchUsageIntervals({
+      search: { kind: 'interval', id: 'interval-exact' },
+    });
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: 'interval-exact',
+        started_at: '2026-07-22T10:00:00.000Z',
+      }),
+    ]);
+    expect(result.items[0]).not.toHaveProperty('context_fingerprint');
+    expect(result.items[0]).not.toHaveProperty('metadata');
+    expect(result.items[0]).not.toHaveProperty('session_id');
+  });
+
+  it('pages exact subject history deterministically', async () => {
+    await insertUsageInterval({ id: 'interval-b', subjectId: 'subject-1' });
+    await insertUsageInterval({ id: 'interval-a', subjectId: 'subject-1' });
+    await insertUsageInterval({ id: 'interval-other', subjectId: 'subject-2' });
+    const caller = await createCallerForUser(admin.id);
+    const first = await caller.admin.cloudBillingSkus.searchUsageIntervals({
+      search: { kind: 'subject', subjectType: 'user', subjectId: 'subject-1' },
+      limit: 1,
+    });
+    expect(first.items.map(item => item.id)).toEqual(['interval-b']);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await caller.admin.cloudBillingSkus.searchUsageIntervals({
+      search: { kind: 'subject', subjectType: 'user', subjectId: 'subject-1' },
+      limit: 1,
+      cursor: first.nextCursor!,
+    });
+    expect(second.items.map(item => item.id)).toEqual(['interval-a']);
+  });
+
+  it('returns ordered, safe segment details and rejects unknown intervals', async () => {
+    await insertUsageInterval({ id: 'interval-segments' });
+    await db
+      .update(container_usage_interval)
+      .set({ metadata: { repository: 'Kilo-Org/cloud', runtime: 'container' } })
+      .where(eq(container_usage_interval.id, 'interval-segments'));
+    await db.insert(container_usage_segment).values([
+      {
+        interval_id: 'interval-segments',
+        seq: 2,
+        idempotency_key: 'segment-2',
+        reported_seconds: 10,
+        usage_seconds: 8,
+        received_at: '2026-07-22T10:02:00.000Z',
+      },
+      {
+        interval_id: 'interval-segments',
+        seq: 1,
+        idempotency_key: 'segment-1',
+        reported_seconds: 5,
+        usage_seconds: 5,
+        received_at: '2026-07-22T10:01:00.000Z',
+      },
+    ]);
+    const caller = await createCallerForUser(admin.id);
+    const first = await caller.admin.cloudBillingSkus.listUsageSegments({
+      intervalId: 'interval-segments',
+      limit: 1,
+    });
+    expect(first.items.map(item => item.seq)).toEqual([1]);
+    expect(first.nextCursor).toBe(1);
+    expect(first.metadata).toEqual({ repository: 'Kilo-Org/cloud', runtime: 'container' });
+    if (!first.nextCursor) throw new Error('Expected a segment cursor');
+    const result = await caller.admin.cloudBillingSkus.listUsageSegments({
+      intervalId: 'interval-segments',
+      afterSeq: first.nextCursor,
+      limit: 1,
+    });
+    expect(result.items.map(item => item.seq)).toEqual([2]);
+    expect(result.nextCursor).toBeNull();
+    expect(result.items[0]).toMatchObject({
+      reported_seconds: 10,
+      usage_seconds: 8,
+      received_at: '2026-07-22T10:02:00.000Z',
+    });
+    expect(result.items[0]).not.toHaveProperty('idempotency_key');
+    expect(result).not.toHaveProperty('context_fingerprint');
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(
+      nonAdminCaller.admin.cloudBillingSkus.listUsageSegments({
+        intervalId: 'interval-segments',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      caller.admin.cloudBillingSkus.listUsageSegments({ intervalId: 'missing' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('reports bounded accounting health metrics and requires admin access', async () => {
+    const now = Date.now();
+    const recent = new Date(now - 60_000).toISOString();
+    const stale = new Date(now - 20 * 60_000).toISOString();
+    await insertUsageInterval({ id: 'health-open', startedAt: stale });
+    await insertUsageInterval({ id: 'health-closed', startedAt: recent });
+    await db
+      .update(container_usage_interval)
+      .set({ status: 'closed', close_reason: 'unconfirmed', stopped_at: recent })
+      .where(eq(container_usage_interval.id, 'health-closed'));
+    await db.insert(container_usage_segment).values({
+      interval_id: 'health-closed',
+      seq: 1,
+      idempotency_key: 'health-segment',
+      reported_seconds: 10,
+      usage_seconds: 8,
+      received_at: recent,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const health = await caller.admin.cloudBillingSkus.usageHealth();
+    expect(health).toMatchObject({
+      intervalsReported: 1,
+      openIntervals: 1,
+      staleOpenIntervals: 1,
+      closedIntervals: 1,
+      unconfirmedIntervals: 1,
+      segments: 1,
+      reportedSeconds: 10,
+      acceptedSeconds: 8,
+      clippedSeconds: 2,
+      clippedSegments: 1,
+      closeReasons: [{ reason: 'unconfirmed', count: 1 }],
+    });
+    expect(health.generatedAt).toMatch(/Z$/);
+    const unconfirmed = await caller.admin.cloudBillingSkus.searchUsageIntervals({
+      search: { kind: 'recent' },
+      closeReason: 'unconfirmed',
+      limit: 10,
+    });
+    expect(unconfirmed.items.map(item => item.id)).toEqual(['health-closed']);
+    const nonAdminCaller = await createCallerForUser(nonAdmin.id);
+    await expect(nonAdminCaller.admin.cloudBillingSkus.usageHealth()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 });
 

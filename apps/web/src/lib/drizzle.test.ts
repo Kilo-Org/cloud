@@ -18,10 +18,11 @@ describe('drizzle', () => {
   describe('replica selection', () => {
     const primaryUrl = 'postgres://primary';
 
-    it('uses the primary outside Vercel even when replicas are configured', () => {
+    it('uses the primary in local development even when replicas are configured', () => {
       expect(
         selectReplicaUrl({
           primaryUrl,
+          nodeEnv: 'development',
           vercelRegion: undefined,
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-replica'],
@@ -29,10 +30,24 @@ describe('drizzle', () => {
       ).toBe(primaryUrl);
     });
 
+    it('preserves EU replica selection for regionless non-development processes', () => {
+      expect(
+        selectReplicaUrl({
+          primaryUrl,
+          nodeEnv: 'production',
+          vercelRegion: undefined,
+          usReplicaUrl: 'postgres://us-replica',
+          euReplicaUrls: ['postgres://eu-replica'],
+          random: () => 0,
+        })
+      ).toBe('postgres://eu-replica');
+    });
+
     it('uses the US replica in a US Vercel region', () => {
       expect(
         selectReplicaUrl({
           primaryUrl,
+          nodeEnv: 'production',
           vercelRegion: 'iad1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-replica'],
@@ -44,6 +59,7 @@ describe('drizzle', () => {
       expect(
         selectReplicaUrl({
           primaryUrl,
+          nodeEnv: 'production',
           vercelRegion: 'fra1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: ['postgres://eu-1', 'postgres://eu-2'],
@@ -56,6 +72,7 @@ describe('drizzle', () => {
       expect(
         selectReplicaUrl({
           primaryUrl,
+          nodeEnv: 'production',
           vercelRegion: 'iad1',
           usReplicaUrl: undefined,
           euReplicaUrls: ['postgres://eu-replica'],
@@ -64,6 +81,7 @@ describe('drizzle', () => {
       expect(
         selectReplicaUrl({
           primaryUrl,
+          nodeEnv: 'production',
           vercelRegion: 'fra1',
           usReplicaUrl: 'postgres://us-replica',
           euReplicaUrls: [],

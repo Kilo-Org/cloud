@@ -5,8 +5,13 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import assert from 'node:assert';
 import { attachDatabasePool } from '@vercel/functions';
 export const { Client, Pool } = pg;
-const { POSTGRES_CONNECT_TIMEOUT, POSTGRES_MAX_QUERY_TIME, DEBUG_QUERY_LOGGING, VERCEL_REGION } =
-  process.env;
+const {
+  POSTGRES_CONNECT_TIMEOUT,
+  POSTGRES_MAX_QUERY_TIME,
+  DEBUG_QUERY_LOGGING,
+  VERCEL_REGION,
+  NODE_ENV,
+} = process.env;
 
 const POSTGRES_URL = getEnvVariable('POSTGRES_URL');
 
@@ -41,18 +46,20 @@ export function isUSRegion(region = VERCEL_REGION): boolean {
 
 export function selectReplicaUrl({
   primaryUrl,
+  nodeEnv,
   vercelRegion,
   usReplicaUrl,
   euReplicaUrls,
   random = Math.random,
 }: {
   primaryUrl: string;
+  nodeEnv: string | undefined;
   vercelRegion: string | undefined;
   usReplicaUrl: string | undefined;
   euReplicaUrls: string[];
   random?: () => number;
 }): string {
-  if (!vercelRegion) return primaryUrl;
+  if (nodeEnv === 'development') return primaryUrl;
   if (isUSRegion(vercelRegion)) return usReplicaUrl || primaryUrl;
   if (euReplicaUrls.length === 0) return primaryUrl;
   return euReplicaUrls.at(Math.floor(random() * euReplicaUrls.length)) ?? primaryUrl;
@@ -66,9 +73,10 @@ export function selectReplicaUrl({
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
-  if (!VERCEL_REGION) return postgresUrl;
+  if (NODE_ENV === 'development') return postgresUrl;
   return selectReplicaUrl({
     primaryUrl: postgresUrl,
+    nodeEnv: NODE_ENV,
     vercelRegion: VERCEL_REGION,
     usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
     euReplicaUrls: [

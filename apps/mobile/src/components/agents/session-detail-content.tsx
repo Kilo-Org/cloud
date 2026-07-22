@@ -55,6 +55,7 @@ import {
 } from '@/components/agents/session-transcript';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
+import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
@@ -638,6 +639,7 @@ export function SessionDetailContent({
           title={childSession.title}
           getChildMessages={getChildMessages}
           hydrationState={getChildSessionHydrationState(childSession.sessionId)}
+          isStreaming={getChildSessionStreaming(messages, childSession.sessionId)}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={handleOpenChildSession}
           onRetry={() => {

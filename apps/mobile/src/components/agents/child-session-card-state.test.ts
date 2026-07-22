@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getChildSessionActivityLabel,
   getChildSessionCardState,
+  getChildSessionStreaming,
   getTaskToolSessionId,
 } from './child-session-card-state';
 
@@ -385,5 +386,49 @@ describe('getTaskToolSessionId', () => {
       time: { start: 1, end: 2 },
     });
     expect(getTaskToolSessionId(readPart)).toBeUndefined();
+  });
+});
+
+describe('getChildSessionStreaming', () => {
+  it('returns true when an assistant message has a running task with a matching sessionId', () => {
+    const runningTask = makeTaskPart('running');
+    const messages = [makeAssistantMessage([runningTask])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(true);
+  });
+
+  it('returns false for a completed task with a matching sessionId', () => {
+    const completedTask = makeTaskPart('completed');
+    const messages = [makeAssistantMessage([completedTask])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(false);
+  });
+
+  it('returns false for an errored task with a matching sessionId', () => {
+    const erroredTask = makeTaskPart('error');
+    const messages = [makeAssistantMessage([erroredTask])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(false);
+  });
+
+  it('returns false when no task part matches the child sessionId', () => {
+    const otherTask = makeTaskPart('running', {});
+    const otherSessionId = 'ses-other' as KiloSessionId;
+    const messages = [makeAssistantMessage([otherTask])];
+    expect(getChildSessionStreaming(messages, otherSessionId)).toBe(false);
+  });
+
+  it('returns false when the only tool is a non-task tool', () => {
+    const readPart = makeToolPart('read', {
+      status: 'completed',
+      input: { filePath: 'x' },
+      output: 'y',
+      title: 'read',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    });
+    const messages = [makeAssistantMessage([readPart])];
+    expect(getChildSessionStreaming(messages, subagentSessionId)).toBe(false);
+  });
+
+  it('returns false for an empty messages list', () => {
+    expect(getChildSessionStreaming([], subagentSessionId)).toBe(false);
   });
 });

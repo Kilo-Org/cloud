@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { FlatList, Modal, View } from 'react-native';
+import { Modal, View } from 'react-native';
 import { type ChildSessionHydrationState, type StoredMessage } from 'cloud-agent-sdk';
 
 import { EmptyState } from '@/components/empty-state';
@@ -14,23 +14,30 @@ import {
 } from './child-session-section';
 import { MessageErrorBoundary } from './message-error-boundary';
 import { getChildSessionSheetState } from './child-session-sheet-state';
+import { SessionMessageList } from './session-message-list';
+import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
   sessionId: string;
   title: string;
   getChildMessages: (sessionId: string) => StoredMessage[];
   hydrationState: ChildSessionHydrationState;
+  isStreaming: boolean;
   renderPart: RenderPartFn;
   onOpenChildSession: OpenChildSession;
   onRetry: () => void;
   onClose: () => void;
 };
 
+// eslint-disable-next-line no-empty-function -- child sessions are hydrated one-shot, no pagination
+function noopLoadOlder(): void {}
+
 export function ChildSessionSheet({
   sessionId,
   title,
   getChildMessages,
   hydrationState,
+  isStreaming,
   renderPart,
   onOpenChildSession,
   onRetry,
@@ -42,9 +49,15 @@ export function ChildSessionSheet({
 
   if (state === 'content') {
     content = (
-      <FlatList
-        data={messages}
+      <SessionMessageList
+        sessionId={sessionId}
+        items={messages}
         keyExtractor={message => message.info.id}
+        hasOlderMessages={false}
+        isLoadingOlderMessages={false}
+        olderMessagesError={null}
+        olderMessagesOmittedItemCount={0}
+        onLoadOlderMessages={noopLoadOlder}
         renderItem={({ item }) => (
           <MessageErrorBoundary>
             <View className="px-4 py-1">
@@ -58,7 +71,7 @@ export function ChildSessionSheet({
             </View>
           </MessageErrorBoundary>
         )}
-        contentContainerClassName="py-2"
+        ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
       />
     );
   } else if (state === 'error') {

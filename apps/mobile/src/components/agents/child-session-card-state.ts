@@ -111,3 +111,24 @@ export function getTaskToolSessionId(part: ToolPart): KiloSessionId | undefined 
   }
   return undefined;
 }
+
+export function getChildSessionStreaming(
+  messages: StoredMessage[],
+  childSessionId: KiloSessionId
+): boolean {
+  for (const message of messages) {
+    if (message.info.role === 'assistant') {
+      for (const part of message.parts) {
+        if (
+          isToolPart(part) &&
+          part.tool === 'task' &&
+          part.state.status === 'running' &&
+          getTaskToolSessionId(part) === childSessionId
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}

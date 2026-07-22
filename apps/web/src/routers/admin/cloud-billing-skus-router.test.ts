@@ -119,12 +119,26 @@ describe('admin.cloudBillingSkus usage records', () => {
         last_seen_at: closedAt,
       })
       .where(eq(container_usage_interval.id, 'recent-closed'));
+    await db
+      .update(container_usage_interval)
+      .set({ status: 'closed', close_reason: 'unconfirmed', stopped_at: oldAt })
+      .where(eq(container_usage_interval.id, 'recent-old'));
     const caller = await createCallerForUser(admin.id);
     const result = await caller.admin.cloudBillingSkus.searchUsageIntervals({
       search: { kind: 'recent' },
       limit: 10,
     });
-    expect(result.items.map(item => item.id)).toEqual(['recent-closed', 'recent-open']);
+    expect(result.items.map(item => item.id)).toEqual([
+      'recent-closed',
+      'recent-open',
+      'recent-old',
+    ]);
+    const bounded = await caller.admin.cloudBillingSkus.searchUsageIntervals({
+      search: { kind: 'recent' },
+      closeReason: 'unconfirmed',
+      limit: 10,
+    });
+    expect(bounded.items).toEqual([]);
   });
 
   it('normalizes production-shaped interval and segment timestamps', () => {

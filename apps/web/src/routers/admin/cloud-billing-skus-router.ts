@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db, readDb } from '@/lib/drizzle';
+import { db } from '@/lib/drizzle';
 import {
   cloudBillingSkuIdSchema,
   createCloudBillingSkuInputSchema,
@@ -170,8 +170,11 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   searchUsageIntervals: adminProcedure.input(usageSearchSchema).query(async ({ input }) => {
     const predicates: SQL[] = [];
     if (input.search.kind === 'recent') {
-      const recentCutoff = new Date(Date.now() - BILLING_HEALTH_WINDOW_MS).toISOString();
-      const sharedPredicates: SQL[] = [gt(container_usage_interval.last_seen_at, recentCutoff)];
+      const sharedPredicates: SQL[] = [];
+      if (input.closeReason || input.skuId) {
+        const recentCutoff = new Date(Date.now() - BILLING_HEALTH_WINDOW_MS).toISOString();
+        sharedPredicates.push(gt(container_usage_interval.last_seen_at, recentCutoff));
+      }
       if (input.closeReason) {
         sharedPredicates.push(eq(container_usage_interval.close_reason, input.closeReason));
       }
@@ -185,7 +188,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
           : (['open', 'closed'] as const);
       const pages = await Promise.all(
         statuses.map(status =>
-          readDb
+          db
             .select()
             .from(container_usage_interval)
             .where(and(eq(container_usage_interval.status, status), ...sharedPredicates))
@@ -231,7 +234,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
       if (cursorPredicate) predicates.push(cursorPredicate);
     }
 
-    const rows = await readDb
+    const rows = await db
       .select()
       .from(container_usage_interval)
       .where(and(...predicates))
@@ -250,7 +253,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
   }),
 
   listUsageSegments: adminProcedure.input(segmentSearchSchema).query(async ({ input }) => {
-    const [interval] = await readDb
+    const [interval] = await db
       .select({ id: container_usage_interval.id, metadata: container_usage_interval.metadata })
       .from(container_usage_interval)
       .where(eq(container_usage_interval.id, input.intervalId))
@@ -260,7 +263,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     }
     const predicates = [eq(container_usage_segment.interval_id, input.intervalId)];
     if (input.afterSeq) predicates.push(gt(container_usage_segment.seq, input.afterSeq));
-    const rows = await readDb
+    const rows = await db
       .select()
       .from(container_usage_segment)
       .where(and(...predicates))
@@ -280,7 +283,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
     const start = new Date(end.getTime() - BILLING_HEALTH_WINDOW_MS);
     const staleBefore = new Date(end.getTime() - STALE_OPEN_INTERVAL_MS);
     const [openRows, segmentRows, closeReasonRows] = await Promise.all([
-      readDb
+      db
         .select({
           open: sql<number>`count(*)`.mapWith(Number),
           stale:
@@ -290,7 +293,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
         })
         .from(container_usage_interval)
         .where(eq(container_usage_interval.status, 'open')),
-      readDb
+      db
         .select({
           segments: sql<number>`count(*)`.mapWith(Number),
           intervalsReported:
@@ -317,7 +320,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
             lt(container_usage_segment.received_at, end.toISOString())
           )
         ),
-      readDb
+      db
         .select({
           reason: container_usage_interval.close_reason,
           count: sql<number>`count(*)`.mapWith(Number),

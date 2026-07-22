@@ -281,5 +281,4 @@ describe('GitLabOAuthCredentialRefresher', () => {
       }),
     ]);
   });
-
 });

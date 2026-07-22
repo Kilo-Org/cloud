@@ -158,6 +158,26 @@ describe('POST /admin/api/users/gdpr-removal', () => {
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
   });
 
+  test('reports a rollback failure without masking the worker destruction error', async () => {
+    const destroyError = new Error('worker unavailable');
+    const rollbackError = new Error('instance batch changed concurrently');
+    destroy.mockRejectedValueOnce(destroyError);
+    mockedRestoreGdprDestroyedInstanceBatch.mockRejectedValueOnce(rollbackError);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(mockedCaptureException).toHaveBeenNthCalledWith(1, rollbackError, {
+      tags: { source: 'gdpr-removal', operation: 'restore-instance-batch' },
+      extra: { userId: USER_ID, instanceIds: ['instance-one'] },
+    });
+    expect(mockedCaptureException).toHaveBeenNthCalledWith(2, destroyError, {
+      tags: { source: 'gdpr-removal' },
+      extra: { userId: USER_ID },
+    });
+    expect(mockedSoftDeleteUser).not.toHaveBeenCalled();
+  });
+
   test('returns subscription precondition failures before destructive calls', async () => {
     mockedAssertUserCanBeSoftDeleted.mockRejectedValue(
       new SoftDeletePreconditionError('active subscription')

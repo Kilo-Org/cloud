@@ -68,7 +68,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
           reason: 'admin_request',
         });
       } catch (error) {
-        await restoreGdprDestroyedInstanceBatch(batch);
+        try {
+          await restoreGdprDestroyedInstanceBatch(batch);
+        } catch (rollbackError) {
+          captureException(rollbackError, {
+            tags: { source: 'gdpr-removal', operation: 'restore-instance-batch' },
+            extra: { userId, instanceIds: batch.instanceIds },
+          });
+        }
         throw error;
       }
     }

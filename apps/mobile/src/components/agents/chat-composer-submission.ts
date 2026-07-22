@@ -1,5 +1,5 @@
 import { type ChatComposerParseResult } from '@/components/agents/chat-composer-slash-commands';
-import { confirmRemoteCliExit } from '@/components/agents/remote-cli-exit-confirmation';
+import { confirmRemoteSessionExit } from '@/components/agents/remote-session-exit-confirmation';
 
 /**
  * Submission types that have passed validation and are ready to execute.
@@ -8,14 +8,14 @@ import { confirmRemoteCliExit } from '@/components/agents/remote-cli-exit-confir
  */
 export type ExecutableChatComposerSubmission = Extract<
   ChatComposerParseResult,
-  { type: 'command' } | { type: 'create-session' } | { type: 'exit-cli' } | { type: 'prompt' }
+  { type: 'command' } | { type: 'create-session' } | { type: 'exit-session' } | { type: 'prompt' }
 >;
 
 type ChatComposerSubmissionHandlers = {
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
-  onExitCli: (onAccepted: () => void) => Promise<void>;
-  confirmExitCli: () => Promise<boolean>;
+  onExitSession: (onAccepted: () => void) => Promise<void>;
+  confirmExitSession: () => Promise<boolean>;
   onSendPrompt: (prompt: string) => Promise<void>;
 };
 
@@ -57,9 +57,9 @@ export async function executeChatComposerSubmission(
     return;
   }
 
-  if (submission.type === 'exit-cli') {
-    await confirmRemoteCliExit(handlers.confirmExitCli, async () => {
-      await handlers.onExitCli(() => {
+  if (submission.type === 'exit-session') {
+    await confirmRemoteSessionExit(handlers.confirmExitSession, async () => {
+      await handlers.onExitSession(() => {
         cleanup.clearDraft();
         cleanup.dismiss();
       });

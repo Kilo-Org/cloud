@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- Native Alert callbacks settle this Promise asynchronously. */
 import { Alert } from 'react-native';
 
-export function showRemoteCliExitConfirmation(): Promise<boolean> {
+export function showRemoteSessionExitConfirmation(): Promise<boolean> {
   return new Promise(resolve => {
     let settled = false;
     const settle = (confirmed: boolean) => {
@@ -13,18 +13,18 @@ export function showRemoteCliExitConfirmation(): Promise<boolean> {
     };
 
     Alert.alert(
-      'Exit CLI?',
-      'This will stop the CLI on your computer and take all sessions connected to it offline.',
+      'Exit session?',
+      'This stops the running session but keeps its history.',
       [
         {
-          text: 'Keep CLI running',
+          text: 'Keep session running',
           style: 'cancel',
           onPress: () => {
             settle(false);
           },
         },
         {
-          text: 'Exit CLI',
+          text: 'Exit session',
           style: 'destructive',
           onPress: () => {
             settle(true);

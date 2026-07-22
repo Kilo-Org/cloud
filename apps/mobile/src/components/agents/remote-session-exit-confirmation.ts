@@ -1,7 +1,7 @@
-type RemoteCliExitConfirmation = () => Promise<boolean>;
+type RemoteSessionExitConfirmation = () => Promise<boolean>;
 
-export async function confirmRemoteCliExit(
-  confirm: RemoteCliExitConfirmation,
+export async function confirmRemoteSessionExit(
+  confirm: RemoteSessionExitConfirmation,
   exit: () => Promise<void>
 ): Promise<'accepted' | 'cancelled'> {
   if (!(await confirm())) {

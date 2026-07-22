@@ -20,12 +20,13 @@ function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommand
     ownerConnectionId: 'conn-1',
     refresh: 'idle',
     commands: [COMPACT, EXIT],
+    canExitSession: true,
     ...overrides,
   };
 }
 
-describe('remote /exit command list', () => {
-  it('strips reserved CLI entries and appends canonical local /new and /exit without aliases', () => {
+describe('remote /exit command list — capability gate', () => {
+  it('strips reserved CLI entries and appends canonical local /new and /exit when canExitSession is true', () => {
     const commands = [COMPACT, LOCAL_NEW_SLASH_COMMAND, EXIT, QUIT, Q];
     const list = createMobileSlashCommandList('remote', commands, remoteState({ commands }));
 
@@ -35,13 +36,37 @@ describe('remote /exit command list', () => {
     expect(list.some(command => command.name === 'quit' || command.name === 'q')).toBe(false);
   });
 
-  it('omits local /exit when the current live catalog has no canonical exit capability', () => {
-    expect(
-      createMobileSlashCommandList('remote', [COMPACT, EXIT], remoteState({ commands: [COMPACT] }))
-    ).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
+  it('omits local /exit when canExitSession is undefined (old CLI)', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      [COMPACT, EXIT],
+      remoteState({ commands: [COMPACT, EXIT], canExitSession: undefined })
+    );
+    expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
+    expect(list.some(command => command.name === 'exit')).toBe(false);
   });
 
-  it('keeps local /exit available during upgrade-required when the live catalog advertises it', () => {
+  it('omits local /exit when canExitSession is false (CLI explicitly opts out)', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      [COMPACT, EXIT],
+      remoteState({ commands: [COMPACT, EXIT], canExitSession: false })
+    );
+    expect(list).toEqual([COMPACT, LOCAL_NEW_SLASH_COMMAND]);
+    expect(list.some(command => command.name === 'exit')).toBe(false);
+  });
+
+  it('omits /exit when the live catalog advertises canonical exit but omits canExitSession', () => {
+    const list = createMobileSlashCommandList(
+      'remote',
+      [COMPACT, EXIT],
+      remoteState({ commands: [COMPACT, EXIT], canExitSession: undefined })
+    );
+    expect(list.map(command => command.name)).toEqual(['compact', 'new']);
+    expect(list.some(command => command.name === 'exit')).toBe(false);
+  });
+
+  it('keeps /exit available under an upgrade-required refresh when canExitSession is true', () => {
     expect(
       createMobileSlashCommandList(
         'remote',
@@ -52,15 +77,49 @@ describe('remote /exit command list', () => {
   });
 });
 
-describe('remote /exit parser', () => {
-  it('routes exact remote /exit to exit-cli', () => {
+describe('remote /exit parser — capability gate', () => {
+  it('routes exact remote /exit to exit-session when canExitSession is true', () => {
     expect(
       parseChatComposerSubmission('/exit', [LOCAL_NEW_SLASH_COMMAND, LOCAL_EXIT_SLASH_COMMAND], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState(),
       })
-    ).toEqual({ type: 'exit-cli' });
+    ).toEqual({ type: 'exit-session' });
+  });
+
+  it('fails closed for exact /exit when canExitSession is undefined, even with the command in the list', () => {
+    expect(
+      parseChatComposerSubmission('/exit', [LOCAL_EXIT_SLASH_COMMAND], {
+        hasAttachments: false,
+        sessionType: 'remote',
+        remoteCommandState: remoteState({ canExitSession: undefined }),
+      })
+    ).toEqual({ type: 'upgrade-required', message: 'Update your CLI to exit the session.' });
+  });
+
+  it('fails closed for exact /exit when canExitSession is false', () => {
+    expect(
+      parseChatComposerSubmission('/exit', [LOCAL_EXIT_SLASH_COMMAND], {
+        hasAttachments: false,
+        sessionType: 'remote',
+        remoteCommandState: remoteState({ canExitSession: false }),
+      })
+    ).toEqual({ type: 'upgrade-required', message: 'Update your CLI to exit the session.' });
+  });
+
+  it('prefers the CLI-supplied upgrade message when canExitSession is missing', () => {
+    expect(
+      parseChatComposerSubmission('/exit', [], {
+        hasAttachments: false,
+        sessionType: 'remote',
+        remoteCommandState: remoteState({
+          commands: [],
+          canExitSession: undefined,
+          message: 'Custom CLI upgrade message',
+        }),
+      })
+    ).toEqual({ type: 'upgrade-required', message: 'Custom CLI upgrade message' });
   });
 
   it('rejects attachments with the command attachment error', () => {
@@ -93,7 +152,7 @@ describe('remote /exit parser', () => {
     ).toEqual({ type: 'prompt', prompt: input });
   });
 
-  it('returns upgrade-required for reserved /exit with an empty catalog', () => {
+  it('returns upgrade-required for reserved /exit with an empty catalog under upgrade-required', () => {
     expect(
       parseChatComposerSubmission('/exit', [], {
         hasAttachments: false,
@@ -101,6 +160,7 @@ describe('remote /exit parser', () => {
         remoteCommandState: remoteState({
           refresh: 'upgrade-required',
           commands: [],
+          canExitSession: undefined,
           message: 'Please upgrade your CLI',
         }),
       })
@@ -115,6 +175,7 @@ describe('remote /exit parser', () => {
         remoteCommandState: remoteState({
           refresh: 'upgrade-required',
           commands: [],
+          canExitSession: undefined,
           message: 'Please upgrade your CLI',
         }),
       })

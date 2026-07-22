@@ -15,7 +15,7 @@ export const LOCAL_NEW_SLASH_COMMAND: SlashCommandInfo = {
 
 export const LOCAL_EXIT_SLASH_COMMAND: SlashCommandInfo = {
   name: 'exit',
-  description: 'Exit the CLI',
+  description: 'Exit the session',
   hints: [],
 };
 
@@ -49,12 +49,18 @@ export type ChatComposerParseResult =
   | { type: 'prompt'; prompt: string }
   | { type: 'command'; command: string; arguments: string }
   | { type: 'create-session' }
-  | { type: 'exit-cli' }
+  | { type: 'exit-session' }
   | { type: 'attachment-error' }
   | { type: 'argument-error'; message: string }
   | { type: 'upgrade-required'; message: string };
 
 const UPGRADE_REQUIRED_FALLBACK_MESSAGE = 'Please upgrade your CLI to use this command.';
+/**
+ * Fallback copy when the catalog omits `canExitSession` and the CLI has not
+ * surfaced an explicit upgrade message. The product promise is fail-closed
+ * with no CTA: the user must upgrade the CLI before `/exit` is safe to send.
+ */
+const EXIT_CAPABILITY_UNAVAILABLE_MESSAGE = 'Update your CLI to exit the session.';
 
 /**
  * Select the slash command catalog the mobile composer should surface.
@@ -63,11 +69,14 @@ const UPGRADE_REQUIRED_FALLBACK_MESSAGE = 'Please upgrade your CLI to use this c
  *   stays empty and the Cloud Agent defaults live in the worker, not here.
  * - `remote` sessions strip CLI-reported `new`, `exit`, `quit`, and `q`, then
  *   append the locally reserved `/new` and capability-gated local `/exit` when
- *   the live catalog includes canonical `exit`.
+ *   the live catalog advertises `canExitSession: true`.
  * - `read-only` and `null` (unresolved) sessions expose no commands.
  *
- * We expose reserved `/new` even when the remote catalog is empty; `/exit` is
- * exposed only when the current live catalog advertises canonical `exit`.
+ * The `/exit` suggestion is gated on `canExitSession === true` rather than
+ * the synthetic `exit` command presence, so an old / unknown CLI that
+ * reports a catalog but lacks the safe-detach capability never advertises
+ * the action. `canExitSession === undefined` (old CLI) and
+ * `canExitSession === false` (CLI explicitly opts out) both fail closed.
  */
 export function createMobileSlashCommandList(
   sessionType: ActiveSessionType | null,
@@ -80,9 +89,7 @@ export function createMobileSlashCommandList(
   if (sessionType !== 'remote' || !remoteCommandState) {
     return [];
   }
-  const supportsExit = remoteCommandState.commands.some(
-    command => command.name === EXIT_COMMAND_NAME
-  );
+  const supportsExit = remoteCommandState.canExitSession === true;
   const remoteCommands = remoteCommandState.commands.filter(
     command => !LOCAL_COMMAND_NAMES.has(command.name)
   );
@@ -131,6 +138,14 @@ function findCommand(commands: SlashCommandInfo[], name: string): SlashCommandIn
  * silently falling through as ordinary prompts. Unknown slash inputs (`/foo`)
  * still fall through to `prompt` so the user can send arbitrary text the CLI
  * may know about.
+ *
+ * The `/exit` interception is also capability-gated: the parser rejects the
+ * exact-typed `/exit` with an upgrade-required upgrade message when the live
+ * remote catalog lacks `canExitSession === true`. That is the same fail-closed
+ * gate the suggestion list enforces, and it runs even when the suggestion
+ * list omits the command (e.g. an empty catalog) so the composer never sends
+ * `/exit` as a plain prompt to a CLI that does not advertise safe session
+ * detach.
  */
 export function parseChatComposerSubmission(
   input: string,
@@ -168,13 +183,24 @@ export function parseChatComposerSubmission(
   // Non-remote /new falls through to the command-or-prompt logic below.
 
   if (commandName === EXIT_COMMAND_NAME && context.sessionType === 'remote') {
+    if (context.remoteCommandState?.canExitSession !== true) {
+      // Fail-closed: never let an unsupported /exit leak through as a plain
+      // prompt, regardless of whether the suggestion list exposes the
+      // command. Use the CLI-supplied upgrade message when present so the
+      // user sees the same copy the rest of the upgrade-required surface
+      // shows; fall back to a copy that names the capability gap.
+      return {
+        type: 'upgrade-required',
+        message: context.remoteCommandState?.message ?? EXIT_CAPABILITY_UNAVAILABLE_MESSAGE,
+      };
+    }
     if (context.hasAttachments) {
       return { type: 'attachment-error' };
     }
     if (argumentsText.length > 0) {
       return { type: 'argument-error', message: '/exit does not take arguments.' };
     }
-    return { type: 'exit-cli' };
+    return { type: 'exit-session' };
   }
 
   if (commandName && findCommand(commands, commandName)) {

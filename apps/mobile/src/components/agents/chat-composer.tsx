@@ -29,7 +29,7 @@ import {
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
-import { showRemoteCliExitConfirmation } from '@/components/agents/remote-cli-exit-alert';
+import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
@@ -67,7 +67,11 @@ type ChatComposerProps = {
   ) => void | Promise<void>;
   onSendCommand: (command: string, argumentsText: string) => Promise<boolean>;
   onCreateSession: () => Promise<boolean>;
-  onExitCli: (onAccepted: () => void) => Promise<void>;
+  onExitSession: (
+    onAccepted: () => void,
+    lock: { current: boolean },
+    settleVoiceInput: () => Promise<boolean>
+  ) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -93,7 +97,7 @@ export function ChatComposer({
   onSend,
   onSendCommand,
   onCreateSession,
-  onExitCli,
+  onExitSession,
   onStop,
   disabled = false,
   isStreaming = false,
@@ -251,8 +255,10 @@ export function ChatComposer({
         {
           onSendCommand,
           onCreateSession,
-          onExitCli,
-          confirmExitCli: showRemoteCliExitConfirmation,
+          onExitSession: async onAccepted => {
+            await onExitSession(onAccepted, submissionLockRef, voiceInput.settleBeforeSubmit);
+          },
+          confirmExitSession: showRemoteSessionExitConfirmation,
           onSendPrompt: async prompt => {
             await onSend(prompt, upload.toWirePayload(), upload.toSubmissionPayload());
           },

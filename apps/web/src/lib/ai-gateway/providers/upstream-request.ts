@@ -180,9 +180,10 @@ export async function upstreamRequest({
 
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
-  timeoutSignal.addEventListener('abort', () => {
+  const onTimeoutAbort = () => {
     errorExceptInTest('[upstreamRequest] timeout');
-  });
+  };
+  timeoutSignal.addEventListener('abort', onTimeoutAbort);
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   try {
@@ -235,6 +236,11 @@ export async function upstreamRequest({
     }
 
     return { type: 'error', response: upstreamDisconnectResponse() };
+  } finally {
+    // The timeout signal fires unconditionally after TEN_MINUTES_MS. Detach the
+    // listener once the fetch has settled so a late timeout cannot log a spurious
+    // error after the response has already completed.
+    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
   }
 }
 

@@ -298,8 +298,22 @@ function isAllowedByPrefix(sessionKey: string, prefixes: string[]): boolean {
   return normalized.length > 0 && prefixes.some(prefix => normalized.startsWith(prefix));
 }
 
-/** Mirrors OpenClaw's `hasHookTemplateExpressions`: a complete, non-empty `{{ … }}`. */
-const HOOK_TEMPLATE_EXPRESSION = /\{\{\s*[^}]+\s*\}\}/;
+/**
+ * Mirrors OpenClaw's `hasHookTemplateExpressions`: a complete, non-empty `{{ … }}`.
+ *
+ * Upstream writes this as `/\{\{\s*[^}]+\s*\}\}/`, which accepts exactly the same
+ * strings — `\s` is a subset of `[^}]`, so the `\s*` groups are redundant — but
+ * that redundancy makes them ambiguous with `[^}]+`, and the engine explores
+ * exponentially many splits before failing on a `{{` that never closes.
+ * `{{` + 3000 spaces takes ~6s upstream and ~0.1ms here.
+ *
+ * That matters more for us than for the gateway: this runs on the controller's
+ * event loop on every gateway spawn, against whatever is already on disk, so one
+ * crafted sessionKey would stall every restart. Simplified rather than bounded
+ * so parity is exact — verified identical over templated, empty, whitespace-only,
+ * and unterminated inputs.
+ */
+const HOOK_TEMPLATE_EXPRESSION = /\{\{[^}]+\}\}/;
 
 /** Mirrors OpenClaw's `normalizeMatchPath`. */
 function normalizeMatchPath(raw: unknown): string | undefined {

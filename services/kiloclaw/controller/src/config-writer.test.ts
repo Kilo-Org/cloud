@@ -2000,6 +2000,27 @@ describe('hookConfigBootViolation', () => {
     expect(hookConfigBootViolation(config)).toBeNull();
   });
 
+  // The mapping sessionKey is attacker-influenced and re-checked on every gateway
+  // spawn, so template detection must stay linear. OpenClaw's own regex spends
+  // ~6s on this input; ours must not, or one crafted mapping stalls every restart.
+  it('detects templates in linear time on an unterminated expression', () => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [{ id: 'x', sessionKey: `{{${' '.repeat(5000)}a` }];
+
+    const startedAt = Date.now();
+    expect(hookConfigBootViolation(config)).toBeNull();
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+  });
+
+  // Parity guard: OpenClaw's regex accepts a whitespace-only interior, so a
+  // "tighten the pattern" change that rejects these would stop us repairing a
+  // config the gateway does treat as templated.
+  it.each(['{{ }}', '{{  }}'])('treats %j as templated, as OpenClaw does', sessionKey => {
+    const config = healthyHookConfig();
+    config.hooks.mappings = [{ id: 'x', sessionKey }];
+    expect(hookConfigBootViolation(config)).toMatch(/allowedSessionKeyPrefixes is required/);
+  });
+
   it('treats a mapping with no explicit action as an agent mapping', () => {
     const config = healthyHookConfig();
     // action defaults to 'agent' in OpenClaw, so this one does require prefixes.

@@ -304,23 +304,49 @@ validate_fixture "validator still rejects a malformed config (self-check)" \
 # A new or reworded condition fails here, on the bump PR, rather than silently
 # leaving the mirror incomplete. Verified identical on 2026.6.11 and 2026.7.2.
 #
+# Matches on the throw SITES (`throw new Error("hooks.…"`) rather than on the
+# wording of each message. Matching wording would silently pass when upstream
+# adds a condition phrased in a way the pattern does not recognise — the pattern
+# extracts nothing for it, so nothing differs from the expected list, so the
+# guard reports PASS while the mirror is already behind. Anchoring on the throw
+# site means any new hooks.* condition changes the extracted set no matter how it
+# is worded. Extraction returning nothing fails loudly for the same reason.
+#
+# Single-quoted, and passed into the container by environment rather than
+# interpolated into a nested `sh -c` string: the pattern contains a double quote,
+# which would otherwise unbalance the inner command and make it a syntax error
+# that `|| echo ""` silently turns into "no conditions found".
+#
 # If this fails: update the mirror in config-writer.ts (detector AND repair) and
 # its tests, then update the expected list below.
-HOOK_CONDITION_PATTERN="hooks\.[A-Za-z]+ (is required|requires|must match|must include|may not be)[^\"]*"
+HOOK_THROW_PATTERN='throw new Error\("hooks\.[^"]*"'
 EXPECTED_HOOK_CONDITIONS="hooks.allowedSessionKeyPrefixes is required when a hook mapping sessionKey uses templates, even if hooks.allowRequestSessionKey=true
 hooks.allowedSessionKeyPrefixes must include 'hook:' when hooks.defaultSessionKey is unset
 hooks.defaultSessionKey must match hooks.allowedSessionKeyPrefixes
 hooks.enabled requires hooks.token
 hooks.path may not be '/'"
 
-actual_hook_conditions=$(docker run --rm "$IMAGE" sh -c \
-  "grep -rhoE \"$HOOK_CONDITION_PATTERN\" /usr/local/lib/node_modules/openclaw/dist/ | sort -u" 2>/dev/null || echo "")
+actual_hook_conditions=$(docker run --rm \
+  -e HOOK_THROW_PATTERN="$HOOK_THROW_PATTERN" \
+  "$IMAGE" sh -c \
+  'grep -rhoE "$HOOK_THROW_PATTERN" /usr/local/lib/node_modules/openclaw/dist/ | sed "s/^throw new Error(\"//; s/\"$//" | sort -u' \
+  2>/dev/null || echo "")
 
 expected_hook_count=$(printf '%s\n' "$EXPECTED_HOOK_CONDITIONS" | wc -l | tr -d ' ')
-actual_hook_count=$(printf '%s\n' "$actual_hook_conditions" | grep -c . || echo 0)
+# `|| true`, not `|| echo 0`: grep -c already prints 0 when nothing matches, and
+# exits 1 while doing so, so the echo would append a second line and make the
+# count "0\n0" — which compares unequal to "0" and defeats the guard below.
+actual_hook_count=$(printf '%s\n' "$actual_hook_conditions" | grep -c . || true)
 check "hook boot-validation condition count" "$expected_hook_count" "$actual_hook_count"
 
-if [ "$actual_hook_conditions" = "$EXPECTED_HOOK_CONDITIONS" ]; then
+# Distinguish "extraction broke" from "upstream changed a condition": a zero
+# count means the grep found no throw sites at all, which is a bug in this check
+# (or a minifier change), not evidence that OpenClaw dropped hook validation.
+if [ "$actual_hook_count" = "0" ]; then
+  echo "FAIL: extracted no hook conditions from the image — this check is broken, not upstream"
+  echo "      verify: docker run --rm $IMAGE sh -c 'ls /usr/local/lib/node_modules/openclaw/dist/ | head'"
+  FAIL=$((FAIL + 1))
+elif [ "$actual_hook_conditions" = "$EXPECTED_HOOK_CONDITIONS" ]; then
   echo "PASS: hook boot-validation conditions match the controller mirror"
   PASS=$((PASS + 1))
 else

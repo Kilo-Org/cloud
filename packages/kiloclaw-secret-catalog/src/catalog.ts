@@ -308,6 +308,25 @@ export const INTERNAL_SENSITIVE_ENV_VARS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Env var names that used to be catalog fields and must still be classified
+ * sensitive even though they no longer appear in the UI.
+ *
+ * Plaintext env vars are encrypted only when their name is a known sensitive
+ * key; a name that leaves the catalog would otherwise be written to the
+ * provider's plaintext env. These names carried credentials before they were
+ * retired, so a value entered under one of them stays encrypted in transport.
+ *
+ * Unlike INTERNAL_SENSITIVE_ENV_VARS, these are deliberately NOT excluded from
+ * isCustomSecretEnvVar: a leftover value should remain visible and deletable in
+ * the Custom Secrets UI, just carried securely.
+ */
+export const RETAINED_SENSITIVE_ENV_VARS: ReadonlySet<string> = new Set([
+  // Retired 2026-07-22 when Composio moved from CLI sign-in to a consumer key.
+  'COMPOSIO_USER_API_KEY',
+  'COMPOSIO_ORG',
+]);
+
+/**
  * Get all entries for a given category, sorted by order (undefined sorts last).
  */
 export function getEntriesByCategory(category: SecretCategory): SecretCatalogEntry[] {

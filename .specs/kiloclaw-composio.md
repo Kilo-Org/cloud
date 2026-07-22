@@ -57,7 +57,7 @@ Kilo MUST NOT provision managed Composio identities, create managed Connect Link
 13. When no consumer key is present, the controller MUST remove the server definition it manages, because instance configuration persists across redeploys and a stale definition would otherwise outlive the credential's removal from Settings.
 14. Removal MUST be limited to a definition KiloClaw explicitly marked as managed when it wrote it. Ownership MUST NOT be inferred from a definition's endpoint, transport, headers, or any other value published by Composio, because a user configuring the same product by hand produces an identical definition. An unmarked Composio server MUST be left intact.
 15. Configuring Composio MUST NOT prevent controller startup. An unreachable or unauthorized endpoint surfaces at tool-call time and MUST NOT be treated as a boot failure.
-16. The instance MAY continue to contain the Composio CLI, and legacy CLI credentials MUST continue to reach the instance so that a sign-in a user performed themselves is not broken by an upgrade.
+16. The instance MAY continue to contain the Composio CLI, and legacy CLI credentials MUST continue to reach the instance so that a sign-in a user performed themselves is not broken by an upgrade. Retiring a credential's Settings field MUST NOT downgrade how that credential is carried: a retired credential env var name MUST remain classified sensitive so its value is still encrypted in transport rather than written to the provider's plaintext environment.
 17. Agent-facing documentation MUST describe the MCP surface and MUST NOT instruct the agent to sign the CLI in, because doing so cannot change which tools the configured credential reaches.
 
 ### Data Protection and Logging
@@ -79,6 +79,7 @@ Kilo MUST NOT provision managed Composio identities, create managed Connect Link
 - Defined Composio Connect as a remote MCP server written into instance configuration, replacing controller-run CLI sign-in as the supported path.
 - Scoped managed removal to definitions KiloClaw marks as its own, so hand-configured Composio servers are not deleted.
 - Kept legacy CLI credentials flowing to instances, and the CLI installed, so existing manual sign-ins survive.
+- Retained the two legacy CLI env var names as always-sensitive so a value under either stays encrypted in transport even though the fields left the catalog.
 
 ### 2026-05-27 -- Retained manual configuration only
 

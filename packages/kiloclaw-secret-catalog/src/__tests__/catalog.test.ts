@@ -8,6 +8,7 @@ import {
   FIELD_KEY_TO_ENTRY,
   ALL_SECRET_ENV_VARS,
   INTERNAL_SENSITIVE_ENV_VARS,
+  RETAINED_SENSITIVE_ENV_VARS,
   getEntriesByCategory,
   getFieldKeysByCategory,
   isValidCustomSecretKey,
@@ -500,6 +501,27 @@ describe('Secret Catalog', () => {
     it('does not overlap with catalog-derived ALL_SECRET_ENV_VARS', () => {
       for (const envVar of INTERNAL_SENSITIVE_ENV_VARS) {
         expect(ALL_SECRET_ENV_VARS.has(envVar)).toBe(false);
+      }
+    });
+  });
+
+  describe('RETAINED_SENSITIVE_ENV_VARS', () => {
+    it('keeps retired Composio CLI names classified sensitive', () => {
+      expect(RETAINED_SENSITIVE_ENV_VARS.has('COMPOSIO_USER_API_KEY')).toBe(true);
+      expect(RETAINED_SENSITIVE_ENV_VARS.has('COMPOSIO_ORG')).toBe(true);
+    });
+
+    it('does not re-add retired names to the catalog', () => {
+      for (const envVar of RETAINED_SENSITIVE_ENV_VARS) {
+        expect(ALL_SECRET_ENV_VARS.has(envVar)).toBe(false);
+      }
+    });
+
+    // Retained names stay visible/deletable in the Custom Secrets UI — the
+    // reason they live here rather than in INTERNAL_SENSITIVE_ENV_VARS.
+    it('leaves retired names visible as custom secrets', () => {
+      for (const envVar of RETAINED_SENSITIVE_ENV_VARS) {
+        expect(isCustomSecretEnvVar(envVar)).toBe(true);
       }
     });
   });

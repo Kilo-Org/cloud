@@ -20,7 +20,6 @@ import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
-import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
@@ -38,6 +37,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel, isQwenModel } from '@/lib/ai-gateway/providers/qwen';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isRecognizedDeepseekV4Model } from '@/lib/ai-gateway/providers/deepseek';
 
 export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
@@ -59,9 +59,6 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
-  }
-  if (isDeepseekModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.alibaba];
   }
   if (isGlmModel(requestedModel)) {
     return [
@@ -111,6 +108,19 @@ export async function applyGatewayModelsFallback(
   }
 
   delete requestToMutate.body.models;
+}
+
+export function applyDeepSeekV4Routing(requestedModel: string, requestToMutate: GatewayRequest) {
+  if (!isRecognizedDeepseekV4Model(requestedModel)) {
+    return;
+  }
+  requestToMutate.body.provider = {
+    ...requestToMutate.body.provider,
+    ignore: [
+      ...(requestToMutate.body.provider?.ignore ?? []),
+      OpenRouterInferenceProviderIdSchema.enum.novita, // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
+    ],
+  };
 }
 
 export async function applyProviderSpecificLogic(
@@ -163,6 +173,7 @@ export async function applyProviderSpecificLogic(
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     applyPreferredProvider(requestedModel, requestToMutate.body);
+    applyDeepSeekV4Routing(requestedModel, requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {

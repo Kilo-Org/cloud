@@ -25,8 +25,6 @@ import {
   getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -77,18 +75,9 @@ export function passesVercelRoutingPercentage(randomSeed: string, routingPercent
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  kiloExclusiveModel: KiloExclusiveModel | null,
   request: GatewayRequest,
   randomSeed: string
 ) {
-  if (!kiloExclusiveModel?.flags.includes('vercel-routing') && isDeepseekModel(requestedModel)) {
-    // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
-    console.debug(
-      '[shouldRouteToVercel] not routing to Vercel because some of its DeepSeek providers have tool call issues'
-    );
-    return false;
-  }
-
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const routingPercentage = await getVercelRoutingPercentage();
 

@@ -231,7 +231,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(requestedModel, kiloExclusiveModel, request, taskId || user.id))
+    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
     return {
       kind: 'provider',

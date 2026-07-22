@@ -1,4 +1,4 @@
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import { upstreamRequest } from '../lib/ai-gateway/providers/upstream-request';
 import PROVIDERS from '../lib/ai-gateway/providers/provider-definitions';
 
@@ -8,11 +8,13 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 const mockCaptureException = jest.mocked(captureException);
+const mockCaptureMessage = jest.mocked(captureMessage);
 const originalFetch = global.fetch;
 
 describe('upstreamRequest timeout', () => {
   beforeEach(() => {
     mockCaptureException.mockReset();
+    mockCaptureMessage.mockReset();
     global.fetch = originalFetch;
   });
 
@@ -42,7 +44,7 @@ describe('upstreamRequest timeout', () => {
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
-  it('classifies request timeout aborts separately', async () => {
+  it('returns a gateway timeout response for request timeout aborts', async () => {
     const timeoutError = new DOMException(
       'The operation was aborted due to timeout',
       'TimeoutError'
@@ -50,19 +52,22 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(timeoutError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-      })
-    ).rejects.toBe(timeoutError);
+    const response = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+    });
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ error: 'Gateway Timeout', error_type: 'upstream_error' })
+    );
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -76,7 +81,7 @@ describe('upstreamRequest timeout', () => {
     );
   });
 
-  it('preserves fetch failures when diagnostic enrichment throws', async () => {
+  it('returns a bad gateway response when diagnostic enrichment throws', async () => {
     const fetchError = new TypeError('fetch failed');
     Object.defineProperty(fetchError, 'cause', {
       get() {
@@ -86,19 +91,22 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-      })
-    ).rejects.toBe(fetchError);
+    const response = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+    });
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ error: 'Bad Gateway', error_type: 'upstream_error' })
+    );
 
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
@@ -118,22 +126,22 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '?trace=search-secret',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'body-secret-content' }],
-        },
-        extraHeaders: {},
-        provider: {
-          ...PROVIDERS.OPENROUTER,
-          apiUrl: 'https://gateway.example.test/v1?token=url-secret',
-        },
-      })
-    ).rejects.toBe(fetchError);
+    const response = await upstreamRequest({
+      path: '/chat/completions',
+      search: '?trace=search-secret',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'body-secret-content' }],
+      },
+      extraHeaders: {},
+      provider: {
+        ...PROVIDERS.OPENROUTER,
+        apiUrl: 'https://gateway.example.test/v1?token=url-secret',
+      },
+    });
+
+    expect(response.status).toBe(502);
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -158,7 +166,7 @@ describe('upstreamRequest timeout', () => {
     expect(capturedOptions).not.toContain('body-secret-content');
   });
 
-  it('classifies ETIMEDOUT transport failures as read timeouts', async () => {
+  it('returns a gateway timeout response for ETIMEDOUT transport failures', async () => {
     const timeoutCause = Object.assign(new Error('socket read timed out'), {
       code: 'ETIMEDOUT',
       name: 'SocketTimeoutError',
@@ -167,19 +175,19 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'test' }],
-        },
-        extraHeaders: {},
-        provider: PROVIDERS.OPENROUTER,
-      })
-    ).rejects.toBe(fetchError);
+    const response = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+    });
+
+    expect(response.status).toBe(504);
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'TypeError', message: 'fetch failed' }),
@@ -195,7 +203,7 @@ describe('upstreamRequest timeout', () => {
     );
   });
 
-  it('rethrows provider fetch failures and captures safe timeout metadata', async () => {
+  it('returns a gateway timeout response and captures safe timeout metadata', async () => {
     const timeoutCause = Object.assign(new Error('Headers Timeout Error'), {
       code: 'UND_ERR_HEADERS_TIMEOUT',
       name: 'HeadersTimeoutError',
@@ -204,23 +212,23 @@ describe('upstreamRequest timeout', () => {
     const mockFetch = jest.fn().mockRejectedValue(fetchError);
     global.fetch = mockFetch;
 
-    await expect(
-      upstreamRequest({
-        path: '/chat/completions',
-        search: '?trace=search-secret',
-        method: 'POST',
-        body: {
-          model: 'test-model',
-          messages: [{ role: 'user', content: 'body-secret-content' }],
-        },
-        extraHeaders: { 'x-safe-extra-header': 'extra-header-secret' },
-        provider: {
-          ...PROVIDERS.OPENROUTER,
-          apiUrl: 'https://gateway.example.test/v1?token=url-secret',
-          apiKey: 'provider-api-key-secret',
-        },
-      })
-    ).rejects.toBe(fetchError);
+    const response = await upstreamRequest({
+      path: '/chat/completions',
+      search: '?trace=search-secret',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'body-secret-content' }],
+      },
+      extraHeaders: { 'x-safe-extra-header': 'extra-header-secret' },
+      provider: {
+        ...PROVIDERS.OPENROUTER,
+        apiUrl: 'https://gateway.example.test/v1?token=url-secret',
+        apiKey: 'provider-api-key-secret',
+      },
+    });
+
+    expect(response.status).toBe(504);
 
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'TypeError', message: 'fetch failed' }),
@@ -251,5 +259,56 @@ describe('upstreamRequest timeout', () => {
     expect(capturedOptions).not.toContain('search-secret');
     expect(capturedOptions).not.toContain('body-secret-content');
     expect(capturedOptions).not.toContain('extra-header-secret');
+  });
+
+  it('logs when the timeout signal fires and returns a gateway timeout response', async () => {
+    const mockFetch = jest.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        const fetchSignal = init?.signal;
+        if (!fetchSignal) return;
+        const onAbort = () => reject(fetchSignal.reason);
+        if (fetchSignal.aborted) {
+          onAbort();
+          return;
+        }
+        fetchSignal.addEventListener('abort', onAbort, { once: true });
+      });
+    });
+    global.fetch = mockFetch;
+
+    const response = await upstreamRequest({
+      path: '/chat/completions',
+      search: '',
+      method: 'POST',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'test' }],
+      },
+      extraHeaders: {},
+      provider: PROVIDERS.OPENROUTER,
+      timeoutMs: 25,
+    });
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ error: 'Gateway Timeout', error_type: 'upstream_error' })
+    );
+
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'AI gateway upstream request timed out',
+      expect.objectContaining({
+        level: 'error',
+        tags: expect.objectContaining({
+          source: 'ai-gateway-upstream-fetch',
+          provider: 'openrouter',
+          failure_family: 'request_timeout',
+        }),
+        extra: expect.objectContaining({
+          providerId: 'openrouter',
+          path: '/chat/completions',
+          timeoutMs: 25,
+        }),
+      })
+    );
   });
 });

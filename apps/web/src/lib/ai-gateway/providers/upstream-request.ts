@@ -1,7 +1,9 @@
+import { NextResponse } from 'next/server';
 import { debugSaveProxyResponseStream } from '../../debugUtils';
 import { fetchWithBackoff } from '../../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { errorExceptInTest } from '@/lib/utils.server';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
@@ -134,6 +136,27 @@ function classifyUpstreamFetchFailure({
   }
 }
 
+const UPSTREAM_TIMEOUT_MS = 10 * 60 * 1000;
+
+const TIMEOUT_FAILURE_FAMILIES: ReadonlySet<UpstreamFetchFailureFamily> = new Set([
+  'request_timeout',
+  'headers_timeout',
+  'connect_timeout',
+  'read_timeout',
+]);
+
+function upstreamFailureResponse(failureFamily: UpstreamFetchFailureFamily): Response {
+  const isTimeout = TIMEOUT_FAILURE_FAMILIES.has(failureFamily);
+  const error = isTimeout ? 'Gateway Timeout' : 'Bad Gateway';
+  const message = isTimeout
+    ? 'The upstream provider did not respond in time. Please try again.'
+    : 'The request to the upstream provider failed. Please try again.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.upstream_error, message },
+    { status: isTimeout ? 504 : 502 }
+  );
+}
+
 export async function upstreamRequest({
   path,
   search,
@@ -142,6 +165,7 @@ export async function upstreamRequest({
   extraHeaders,
   provider,
   signal,
+  timeoutMs = UPSTREAM_TIMEOUT_MS,
 }: {
   path: string;
   search: string;
@@ -150,7 +174,8 @@ export async function upstreamRequest({
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;
-}) {
+  timeoutMs?: number;
+}): Promise<Response> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
@@ -164,9 +189,28 @@ export async function upstreamRequest({
 
   const targetUrl = `${provider.apiUrl}${path}${search}`;
 
-  const TEN_MINUTES_MS = 10 * 60 * 1000;
-  const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+
+  const onTimeoutAbort = () => {
+    const timeoutMetadata = {
+      providerId: provider.id,
+      targetHost: getProviderTargetHost(provider.apiUrl),
+      path,
+      timeoutMs,
+    };
+    errorExceptInTest('AI gateway upstream request timed out', timeoutMetadata);
+    captureMessage('AI gateway upstream request timed out', {
+      level: 'error',
+      tags: {
+        source: 'ai-gateway-upstream-fetch',
+        provider: provider.id,
+        failure_family: 'request_timeout',
+      },
+      extra: timeoutMetadata,
+    });
+  };
+  timeoutSignal.addEventListener('abort', onTimeoutAbort, { once: true });
 
   try {
     return await fetch(targetUrl, {
@@ -178,6 +222,8 @@ export async function upstreamRequest({
       signal: combinedSignal,
     });
   } catch (error) {
+    let failureFamily: UpstreamFetchFailureFamily = 'unknown';
+    let clientAborted = false;
     try {
       const cause = error instanceof Error ? error.cause : undefined;
       const errorName = getErrorName(error);
@@ -185,7 +231,8 @@ export async function upstreamRequest({
       const causeCode = getCauseCode(cause);
       const causeName = getCauseName(cause);
       const causeMessage = getCauseMessage(cause);
-      const failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      clientAborted = failureFamily === 'abort' && !!signal?.aborted;
       const failureMetadata = {
         providerId: provider.id,
         targetHost: getProviderTargetHost(provider.apiUrl),
@@ -198,7 +245,7 @@ export async function upstreamRequest({
         ...(causeMessage && { causeMessage }),
       };
 
-      if (!(failureFamily === 'abort' && signal?.aborted)) {
+      if (!clientAborted) {
         errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
         captureException(createLoggedFetchFailure(errorName, errorMessage), {
           level: 'error',
@@ -211,10 +258,16 @@ export async function upstreamRequest({
         });
       }
     } catch {
-      // Fetch failure must remain caller-visible even when diagnostic enrichment fails.
+      // The caller must still receive an HTTP error response even when diagnostic enrichment fails.
     }
 
-    throw error;
+    if (clientAborted) {
+      // The client disconnected; there is no one left to receive an HTTP error response.
+      throw error;
+    }
+    return upstreamFailureResponse(failureFamily);
+  } finally {
+    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
   }
 }
 

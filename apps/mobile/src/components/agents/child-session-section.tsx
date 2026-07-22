@@ -90,7 +90,7 @@ export function ChildSessionSection({
             {taskName}
           </Text>
           <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
-            {latestActivity === 'Waiting for activity' ? (
+            {typeof latestActivity === 'string' ? (
               latestActivity
             ) : (
               <>

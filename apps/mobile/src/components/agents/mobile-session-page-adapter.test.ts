@@ -72,7 +72,7 @@ async function importAdapter(): Promise<{
   fetchMobileSessionSnapshotPage: (
     kiloSessionId: KiloSessionId,
     options: { cursor?: string }
-  ) => Promise<SessionSnapshotPageOutcome | null>;
+  ) => Promise<SessionSnapshotPageOutcome>;
 }> {
   const adapter = await import('@/components/agents/mobile-session-page-adapter');
   return adapter;
@@ -140,14 +140,38 @@ describe('fetchMobileSessionSnapshotPage', () => {
     expect(mocks.getSessionMessagesPageQuery).toHaveBeenCalledWith({ session_id: 'ses_123' });
   });
 
-  it('preserves a null history result so the manager can mark it terminal', async () => {
+  it('maps a freshly-created cloud-agent session with no messages (BUG 3, history:null) to an empty success page', async () => {
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
-      kiloSessionId: 'ses_123',
+      kiloSessionId: 'ses_new',
       history: null,
     });
 
     const { fetchMobileSessionSnapshotPage } = await importAdapter();
-    await expect(fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {})).resolves.toBeNull();
+    await expect(fetchMobileSessionSnapshotPage(kiloSessionId('ses_new'), {})).resolves.toEqual({
+      kind: 'success',
+      info: { id: 'ses_new' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+  });
+
+  it('maps an existing empty read-only session (BUG 4, history:null) to an empty success page', async () => {
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_readonly_empty',
+      history: null,
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    await expect(
+      fetchMobileSessionSnapshotPage(kiloSessionId('ses_readonly_empty'), {})
+    ).resolves.toEqual({
+      kind: 'success',
+      info: { id: 'ses_readonly_empty' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
   });
 
   it('passes typed retryable_failure through verbatim so the UI can offer Retry', async () => {

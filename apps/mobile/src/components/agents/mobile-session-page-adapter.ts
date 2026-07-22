@@ -22,7 +22,8 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
  * `SessionSnapshotPageOutcome`:
  * - Page variant → success outcome with messages, cursor, and omitted count
  * - Failure variants → passed through verbatim (retryable, too_large, invalid_data)
- * - Null history → null (access not found)
+ * - Null history → empty success page (existing session with zero messages). A genuine
+ *   NOT_FOUND is returned as a thrown/rejected TRPCError, never as `history === null`.
  *
  * The adapter does not re-validate the tRPC response; it trusts the shared
  * contract and uses structural narrowing to distinguish page from failure.
@@ -30,7 +31,7 @@ function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessag
 export async function fetchMobileSessionSnapshotPage(
   kiloSessionId: KiloSessionId,
   options: { cursor?: string }
-): Promise<SessionSnapshotPageOutcome | null> {
+): Promise<SessionSnapshotPageOutcome> {
   const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
     session_id: kiloSessionId,
     ...(options.cursor ? { cursor: options.cursor } : {}),
@@ -38,7 +39,13 @@ export async function fetchMobileSessionSnapshotPage(
 
   const history = result.history as KiloSdkMessageHistory | null;
   if (history === null) {
-    return null;
+    return {
+      kind: 'success',
+      info: { id: result.kiloSessionId },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    };
   }
 
   if (isHistoryPage(history)) {

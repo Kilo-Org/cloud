@@ -1373,6 +1373,13 @@
       "when": 1784733911033,
       "tag": "0195_high_lord_tyger",
       "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1784750042186,
+      "tag": "0196_add_per_category_notification_preference_columns",
+      "breakpoints": true
     }
   ]
 }

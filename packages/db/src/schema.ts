@@ -8939,7 +8939,13 @@ export const user_notification_preferences = pgTable('user_notification_preferen
     .primaryKey()
     .notNull()
     .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+  // Category 3 "Agent updates" — retained in place; new per-category columns below.
   agent_push_enabled: boolean().default(true).notNull(),
+  // Per-category opt-in flags; defaults preserve current behaviour for existing rows.
+  chat_messages_enabled: boolean().default(true).notNull(),
+  agent_attention_enabled: boolean().default(true).notNull(),
+  session_status_enabled: boolean().default(true).notNull(),
+  kiloclaw_activity_enabled: boolean().default(true).notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp({ withTimezone: true, mode: 'string' })
     .defaultNow()

@@ -202,9 +202,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
       };
     }
 
-    // Extract webhook secret from metadata for display
+    // NOTE: The webhook secret is intentionally NOT returned here. The
+    // previous shape leaked it on every status read (self-only, but still
+    // a status-read leak). The secret is now surfaced only via the
+    // self-gated `gitlab.regenerateWebhookSecret` mutation (returned
+    // once, on demand). See P1-D-32.
     const metadata = integration.metadata as Record<string, unknown> | null;
-    const webhookSecret = metadata?.webhook_secret as string | undefined;
 
     return {
       connected: true,
@@ -213,7 +216,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
         isValid: true, // GitLab OAuth doesn't have suspension concept
-        webhookSecret, // Include webhook secret for user to configure in GitLab
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },
     };

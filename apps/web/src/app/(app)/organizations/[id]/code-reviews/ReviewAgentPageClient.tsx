@@ -405,20 +405,6 @@ export function ReviewAgentPageClient({
                 organizationId={organizationId}
                 platform="gitlab"
                 councilUiEnabled={councilUiEnabled}
-                gitlabStatusData={
-                  gitlabStatusData
-                    ? {
-                        connected: gitlabStatusData.connected,
-                        integration: gitlabStatusData.integration
-                          ? {
-                              isValid: gitlabStatusData.integration.isValid,
-                              webhookSecret: gitlabStatusData.integration.webhookSecret,
-                              instanceUrl: gitlabStatusData.integration.instanceUrl,
-                            }
-                          : undefined,
-                      }
-                    : undefined
-                }
               />
             </TabsContent>
 

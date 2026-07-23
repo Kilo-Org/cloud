@@ -2566,3 +2566,257 @@ describe('personalReviewAgent.patchReviewConfig', () => {
     );
   });
 });
+
+// ============================================================================
+// P1-D-32: GitLab webhook secret handling on the personal surface.
+//
+// Regression guards for two security fixes:
+//   1. `personalReviewAgent.getGitLabStatus` MUST NOT return the webhook
+//      secret. (Lower risk than the org path because the caller is the
+//      secret owner, but still a status-read leak that this slice removes.)
+//   2. `gitlab.regenerateWebhookSecret` MUST re-sync the Kilo-managed
+//      webhooks so the integration keeps working with the new secret. The
+//      previous shape persisted a new secret and never re-synced, so live
+//      webhooks kept carrying the old secret and stopped validating.
+// ============================================================================
+
+async function seedPersonalGitLabIntegration(userId: string, metadata: Record<string, unknown>) {
+  await db.insert(platform_integrations).values({
+    owned_by_user_id: userId,
+    platform: 'gitlab',
+    integration_type: 'oauth',
+    integration_status: 'active',
+    platform_installation_id: `inst-${crypto.randomUUID()}`,
+    metadata: { ...metadata, webhook_secret: 'old-secret-do-not-leak' },
+  });
+}
+
+async function readPersonalWebhookSecret(userId: string): Promise<string | undefined> {
+  const row = await db.query.platform_integrations.findFirst({
+    where: and(
+      eq(platform_integrations.owned_by_user_id, userId),
+      eq(platform_integrations.platform, 'gitlab')
+    ),
+  });
+  return (row?.metadata as Record<string, unknown> | null)?.webhook_secret as string | undefined;
+}
+
+async function readPersonalConfiguredWebhooks(
+  userId: string
+): Promise<Record<string, { hook_id: number; created_at: string; updated_at?: string }>> {
+  const row = await db.query.platform_integrations.findFirst({
+    where: and(
+      eq(platform_integrations.owned_by_user_id, userId),
+      eq(platform_integrations.platform, 'gitlab')
+    ),
+  });
+  return (
+    ((row?.metadata as Record<string, unknown> | null)?.configured_webhooks as
+      | Record<string, { hook_id: number; created_at: string; updated_at?: string }>
+      | undefined) ?? {}
+  );
+}
+
+describe('personalReviewAgent.getGitLabStatus P1-D-32 (omits webhook secret)', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('returns the integration shape WITHOUT webhookSecret for the self caller', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: { '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' } },
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const status = await caller.personalReviewAgent.getGitLabStatus();
+
+    expect(status.connected).toBe(true);
+    expect(status.integration).toBeDefined();
+    // Regression guard: the secret must NEVER appear in the status
+    // payload, even for the secret's owner. If this assertion fails,
+    // the leak has been re-introduced.
+    expect(status.integration).not.toHaveProperty('webhookSecret');
+    expect((status.integration as Record<string, unknown>).webhookSecret).toBeUndefined();
+    // The rest of the shape is preserved (non-secret fields still ship;
+    // account/repositorySelection/installedAt pass through verbatim from the
+    // stored integration row regardless of their concrete values).
+    expect(status.integration).toEqual(
+      expect.objectContaining({
+        isValid: true,
+        instanceUrl: 'https://gitlab.example.com',
+      })
+    );
+    expect(status.integration).toHaveProperty('accountLogin');
+    expect(status.integration).toHaveProperty('repositorySelection');
+    expect(status.integration).toHaveProperty('installedAt');
+  });
+});
+
+describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
+  let testUser: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    otherUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
+    // Default sync outcome: every currently-configured repo was "updated"
+    // (mirrors the `previous=[]` "treat all as added" path used by rotate).
+    mockSyncWebhooksForRepositories.mockImplementation(
+      async (_token, _secret, selectedIds, _previous, configuredWebhooks) => {
+        const updatedWebhooks: Record<
+          string,
+          { hook_id: number; created_at: string; updated_at?: string }
+        > = {};
+        for (const id of selectedIds) {
+          const existing = configuredWebhooks[String(id)];
+          updatedWebhooks[String(id)] = {
+            hook_id: existing?.hook_id ?? 1000 + Number(id),
+            created_at: existing?.created_at ?? new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return {
+          result: {
+            created: [],
+            updated: selectedIds.map((id: number) => ({ projectId: id, hookId: 1000 + id })),
+            deleted: [],
+            errors: [],
+          },
+          updatedWebhooks,
+        };
+      }
+    );
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-access-token');
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, otherUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [testUser.id, otherUser.id]));
+  });
+
+  it('persists a NEW secret, re-syncs webhooks with the new secret and previous=[]', async () => {
+    const configured = {
+      '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+      '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(typeof result.webhookSecret).toBe('string');
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSecret).not.toBe('old-secret-do-not-leak');
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      result.webhookSecret,
+      [101, 202],
+      [],
+      configured,
+      'https://gitlab.example.com'
+    );
+    expect(result.webhookSync.updated).toBe(2);
+    expect(result.webhookSync.created).toBe(0);
+    expect(result.webhookSync.deleted).toBe(0);
+    expect(result.webhookSync.errors).toEqual([]);
+    expect(result.configuredWebhookCount).toBe(2);
+
+    // Persistence: metadata.webhook_secret is the NEW secret and
+    // metadata.configured_webhooks was updated with the sync output.
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+    const stored = await readPersonalConfiguredWebhooks(testUser.id);
+    expect(Object.keys(stored).sort()).toEqual(['101', '202']);
+    expect(stored['101']?.updated_at).toBeDefined();
+    expect(stored['202']?.updated_at).toBeDefined();
+  });
+
+  it('with empty configured_webhooks returns the new secret and does NOT call sync', async () => {
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: {},
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSync).toEqual({
+      created: 0,
+      updated: 0,
+      deleted: 0,
+      errors: [],
+    });
+    expect(result.configuredWebhookCount).toBe(0);
+    expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+    // No token lookup needed when there are no webhooks to re-sync.
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+
+  it('is self-only: the callers own integration is rotated, never another users', async () => {
+    const configuredSelf = { '1': { hook_id: 1, created_at: '2026-01-01T00:00:00Z' } };
+    const configuredOther = { '2': { hook_id: 2, created_at: '2026-01-01T00:00:00Z' } };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.com',
+      configured_webhooks: configuredSelf,
+    });
+    await seedPersonalGitLabIntegration(otherUser.id, {
+      gitlab_instance_url: 'https://gitlab.com',
+      configured_webhooks: configuredOther,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    // Self was rotated; other user is untouched.
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+    expect(await readPersonalWebhookSecret(otherUser.id)).toBe('old-secret-do-not-leak');
+
+    // Sync was called only once, for the caller's configured repo id.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      result.webhookSecret,
+      [1],
+      [],
+      configuredSelf,
+      'https://gitlab.com'
+    );
+  });
+});

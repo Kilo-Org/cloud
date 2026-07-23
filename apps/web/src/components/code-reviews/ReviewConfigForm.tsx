@@ -74,19 +74,9 @@ import {
 
 type Platform = 'github' | 'gitlab';
 
-export type GitLabStatusData = {
-  connected: boolean;
-  integration?: {
-    isValid: boolean;
-    webhookSecret?: string;
-    instanceUrl?: string;
-  };
-};
-
 export type ReviewConfigFormProps = {
   organizationId?: string;
   platform?: Platform;
-  gitlabStatusData?: GitLabStatusData;
   /** Same gate as the manual council UI: local dev, or an entitled org behind the rollout flag. */
   councilUiEnabled?: boolean;
 };
@@ -134,7 +124,6 @@ export const REVIEW_STYLES = REVIEW_STYLE_VALUES.map(value => ({
 export function ReviewConfigForm({
   organizationId,
   platform = 'github',
-  gitlabStatusData,
   councilUiEnabled = false,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
@@ -319,13 +308,45 @@ export function ReviewConfigForm({
     }
   }, [availableVariants, thinkingEffort]);
 
-  // Mutation for regenerating webhook secret
-  const regenerateSecretMutation = useMutation(
+  // Mutation for regenerating webhook secret. The org path is billing-gated
+  // (owner/billing_manager only); the personal path is self-gated. The
+  // secret is returned ONCE on success and never re-fetched from status —
+  // status no longer carries it.
+  const orgRegenerateSecretMutation = useMutation(
+    trpc.organizations.reviewAgent.rotateGitLabWebhookSecret.mutationOptions({
+      onSuccess: data => {
+        setRegeneratedSecret(data.webhookSecret);
+        const updated = data.webhookSync.updated;
+        const errors = data.webhookSync.errors.length;
+        toast.success(
+          errors > 0
+            ? `Webhook secret rotated. ${updated} webhooks updated, ${errors} error(s) — check audit log.`
+            : `Webhook secret rotated. ${updated} webhook(s) re-synced.`
+        );
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.reviewAgent.getGitLabStatus.queryKey({
+            organizationId: organizationId ?? '',
+          }),
+        });
+      },
+      onError: error => {
+        toast.error('Failed to rotate webhook secret', {
+          description: error.message,
+        });
+      },
+    })
+  );
+  const personalRegenerateSecretMutation = useMutation(
     trpc.gitlab.regenerateWebhookSecret.mutationOptions({
       onSuccess: data => {
         setRegeneratedSecret(data.webhookSecret);
-        toast.success('Webhook secret regenerated successfully');
-        // Invalidate the GitLab status query to refresh the data
+        const updated = data.webhookSync.updated;
+        const errors = data.webhookSync.errors.length;
+        toast.success(
+          errors > 0
+            ? `Webhook secret regenerated. ${updated} webhooks updated, ${errors} error(s) — check audit log.`
+            : `Webhook secret regenerated. ${updated} webhook(s) re-synced.`
+        );
         void queryClient.invalidateQueries({
           queryKey: trpc.personalReviewAgent.getGitLabStatus.queryKey(),
         });
@@ -340,8 +361,16 @@ export function ReviewConfigForm({
 
   const handleRegenerateSecret = () => {
     setRegeneratedSecret(null); // Clear any previously shown secret
-    regenerateSecretMutation.mutate({});
+    if (organizationId) {
+      orgRegenerateSecretMutation.mutate({ organizationId });
+    } else {
+      personalRegenerateSecretMutation.mutate();
+    }
   };
+
+  const regenerateSecretMutation = organizationId
+    ? orgRegenerateSecretMutation
+    : personalRegenerateSecretMutation;
 
   const handleCopyWebhookUrl = async () => {
     await navigator.clipboard.writeText(webhookUrl);
@@ -350,16 +379,10 @@ export function ReviewConfigForm({
     setTimeout(() => setCopiedWebhookUrl(false), 2000);
   };
 
-  const handleCopyWebhookSecret = async () => {
-    const secret = gitlabStatusData?.integration?.webhookSecret;
-    if (secret) {
-      await navigator.clipboard.writeText(secret);
-      setCopiedWebhookSecret(true);
-      toast.success('Webhook secret copied to clipboard');
-      setTimeout(() => setCopiedWebhookSecret(false), 2000);
-    }
-  };
-
+  // The status endpoint no longer returns the webhook secret, so the old
+  // `handleCopyWebhookSecret` (which copied the status-provided secret) and
+  // its markup are removed. The only path to view/copy the secret is the
+  // rotate mutation, which returns it once into `regeneratedSecret` below.
   const handleCopyRegeneratedSecret = async () => {
     if (regeneratedSecret) {
       await navigator.clipboard.writeText(regeneratedSecret);
@@ -1252,30 +1275,6 @@ export function ReviewConfigForm({
                                   secret.
                                 </p>
                               </div>
-                            </>
-                          ) : gitlabStatusData?.integration?.webhookSecret ? (
-                            <>
-                              <div className="flex items-center gap-2">
-                                <code className="bg-muted flex-1 rounded px-3 py-2 font-mono text-sm">
-                                  ••••••••••••••••
-                                </code>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleCopyWebhookSecret}
-                                  className="shrink-0"
-                                >
-                                  {copiedWebhookSecret ? (
-                                    <Check className="h-4 w-4 text-green-500" />
-                                  ) : (
-                                    <Copy className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                              <p className="text-muted-foreground text-xs">
-                                Use this secret token in your GitLab webhook configuration for
-                                security.
-                              </p>
                             </>
                           ) : (
                             <p className="text-muted-foreground text-sm">

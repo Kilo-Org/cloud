@@ -1,8 +1,7 @@
-import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
+/* eslint-disable max-lines -- two cohesive session-row variants (stored + remote) share row structure and long-press wiring */
 import { useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
@@ -15,11 +14,25 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { formatMeta, platformLabel, remoteAgentLabel, remoteMeta } from './session-list-helpers';
+import {
+  formatMeta,
+  remoteMeta,
+  remoteSessionEyebrowLabel,
+  storedSessionEyebrowLabel,
+} from './session-list-helpers';
+import { copySessionId, showDeleteConfirm, showRenamePrompt } from './session-row-actions';
 import {
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
+
+/** Container shape only. `'list'` (default) keeps the Agents list look
+ * (`stripMode="inline"`, inner padding so the strip sits inside the
+ * padding). `'card'` mirrors the Home card look (`stripMode="edge"`,
+ * `last` so no divider, no inner padding so the strip meets the
+ * rounded tile border). Content flags (`live`, `needsInput`,
+ * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
+type RowVariant = 'list' | 'card';
 
 type StoredSessionRowProps = {
   session: {
@@ -41,56 +54,26 @@ type StoredSessionRowProps = {
    */
   sortBy: AgentSessionSortBy;
   onPress: () => void;
-  onDelete: () => void;
-  onRename: (newTitle: string) => void;
+  onDelete?: () => void;
+  onRename?: (newTitle: string) => void;
+  /** Container shape: see `RowVariant`. Defaults to `'list'`. */
+  variant?: RowVariant;
+  /**
+   * Whether the row is fully interactive. `false` removes the long-press
+   * manage menu (and gates any rename/delete/copy-id actions it owns).
+   * Tap is preserved either way. Defaults to `true`.
+   */
+  interactive?: boolean;
 };
 
 type RemoteSessionRowProps = {
   session: ActiveSession;
   onPress: () => void;
+  /** Container shape: see `RowVariant`. Defaults to `'list'`. */
+  variant?: RowVariant;
+  /** See `StoredSessionRowProps.interactive`. Defaults to `true`. */
+  interactive?: boolean;
 };
-
-function showDeleteConfirm(onDelete: () => void) {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  Alert.alert('Delete session?', 'This cannot be undone.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: onDelete },
-  ]);
-}
-
-/** iOS-only — uses Alert.prompt which is unavailable on Android. */
-function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => void) {
-  Alert.prompt(
-    'Rename session',
-    'Enter a new name for this session',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Rename',
-        onPress: (newName: string | undefined) => {
-          if (newName?.trim()) {
-            onRename(newName.trim());
-          }
-        },
-      },
-    ],
-    'plain-text',
-    currentTitle
-  );
-}
-
-async function copySessionId(sessionId: string) {
-  try {
-    const copied = await Clipboard.setStringAsync(sessionId);
-    if (!copied) {
-      throw new Error('Clipboard rejected session ID');
-    }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    toast.success('Session ID copied');
-  } catch {
-    toast.error('Could not copy session ID');
-  }
-}
 
 export function StoredSessionRow({
   session,
@@ -98,13 +81,16 @@ export function StoredSessionRow({
   onPress,
   onDelete,
   onRename,
+  variant = 'list',
+  interactive = true,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);
   const renameTextRef = useRef(title);
-  const agentLabel = platformLabel(session.created_on_platform);
+  const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
+  const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status_updated_at ?? session.status ?? null;
@@ -121,7 +107,7 @@ export function StoredSessionRow({
     const newName = renameTextRef.current.trim();
     setRenameVisible(false);
     if (newName && newName !== title) {
-      onRename(newName);
+      onRename?.(newName);
     }
   };
 
@@ -138,9 +124,11 @@ export function StoredSessionRow({
         buttonIndex => {
           if (buttonIndex === 0) {
             void copySessionId(session.session_id);
-          } else if (buttonIndex === 1) {
-            showRenamePrompt(title, onRename);
-          } else if (buttonIndex === 2) {
+          } else if (buttonIndex === 1 && onRename) {
+            showRenamePrompt(title, newTitle => {
+              onRename(newTitle);
+            });
+          } else if (buttonIndex === 2 && onDelete) {
             showDeleteConfirm(onDelete);
           }
         }
@@ -164,7 +152,9 @@ export function StoredSessionRow({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            showDeleteConfirm(onDelete);
+            if (onDelete) {
+              showDeleteConfirm(onDelete);
+            }
           },
         },
         { text: 'Cancel', style: 'cancel' },
@@ -182,7 +172,7 @@ export function StoredSessionRow({
     <>
       <Pressable
         onPress={onPress}
-        onLongPress={handleLongPress}
+        onLongPress={canManage ? handleLongPress : undefined}
         accessibilityLabel={sessionRowAccessibilityLabel({
           title,
           needsInput,
@@ -197,8 +187,9 @@ export function StoredSessionRow({
           subtitle={session.git_branch}
           meta={formatMeta(timestamp)}
           needsInput={needsInput}
-          stripMode="inline"
-          className="pl-[22px] pr-[22px]"
+          stripMode={variant === 'card' ? 'edge' : 'inline'}
+          last={variant === 'card' ? true : undefined}
+          className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
         />
       </Pressable>
 
@@ -254,8 +245,15 @@ export function StoredSessionRow({
   );
 }
 
-export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRowProps>) {
+export function RemoteSessionRow({
+  session,
+  onPress,
+  variant = 'list',
+  interactive = true,
+}: Readonly<RemoteSessionRowProps>) {
   const title = session.title.length > 0 ? session.title : 'Untitled session';
+  const canManage = interactive;
+  const agentLabel = remoteSessionEyebrowLabel(session);
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status;
@@ -310,25 +308,26 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={handleLongPress}
+      onLongPress={canManage ? handleLongPress : undefined}
       accessibilityLabel={sessionRowAccessibilityLabel({
         title,
         needsInput,
-        badge: remoteAgentLabel(session.createdOnPlatform),
+        badge: agentLabel,
         meta: spokenMeta,
       })}
       className="active:opacity-70"
     >
       <SessionRow
-        agentLabel={remoteAgentLabel(session.createdOnPlatform)}
+        agentLabel={agentLabel}
         title={title}
         subtitle={session.gitBranch ?? null}
         meta={remoteMeta(session)}
         live
         needsInput={needsInput}
         metaWhileLive
-        stripMode="inline"
-        className="pl-[22px] pr-[22px]"
+        stripMode={variant === 'card' ? 'edge' : 'inline'}
+        last={variant === 'card' ? true : undefined}
+        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
     </Pressable>
   );

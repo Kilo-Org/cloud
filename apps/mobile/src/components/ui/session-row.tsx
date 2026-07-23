@@ -138,7 +138,7 @@ export function SessionRow({
         {subtitle ? (
           <Text
             variant="mono"
-            className="mt-1 text-xs tracking-[0.3px] text-muted-soft"
+            className="mt-1 text-xs tracking-[0.3px] text-muted-foreground"
             numberOfLines={2}
           >
             {subtitle}

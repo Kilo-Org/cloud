@@ -13,7 +13,7 @@ type SessionListSectionHeaderProps = {
  * date sections AND the pinned "Active now" tray. Matches the existing
  * `flex-row items-center justify-between bg-background px-[22px] pb-2
  * pt-[18px]` header with `<Eyebrow>` + a mono count
- * `text-[10px] uppercase tracking-[1.5px] text-muted-soft`.
+ * `text-[10px] uppercase tracking-[1.5px] text-muted-foreground`.
  */
 export function SessionListSectionHeader({
   title,
@@ -22,7 +22,7 @@ export function SessionListSectionHeader({
   return (
     <View className="flex-row items-center justify-between bg-background px-[22px] pb-2 pt-[18px]">
       <Eyebrow>{title}</Eyebrow>
-      <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-soft">
+      <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-foreground">
         {count}
       </Text>
     </View>

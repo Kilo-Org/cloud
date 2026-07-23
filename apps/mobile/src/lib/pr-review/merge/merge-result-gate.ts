@@ -35,7 +35,7 @@ export type MergePullRequestResult =
   | { merged: true; sha: string; branchDeleted: true }
   | { merged: true; sha: string; branchDeleted: false; branchDeleteError: string };
 
-export type MergeResultGate =
+type MergeResultGate =
   | { kind: 'clean' }
   | { kind: 'partial'; reason: string }
   | { kind: 'incomplete' };

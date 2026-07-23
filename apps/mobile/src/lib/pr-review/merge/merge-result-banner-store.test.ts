@@ -4,8 +4,8 @@ import {
   __resetMergePartialSuccessStoreForTests,
   clearMergePartialSuccess,
   consumeMergePartialSuccess,
-  setMergePartialSuccess,
   type PrRef,
+  setMergePartialSuccess,
 } from './merge-result-banner-store';
 
 const ref: PrRef = { owner: 'octocat', repo: 'hello', number: 1 };

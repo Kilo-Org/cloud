@@ -32,7 +32,6 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: (...args: unknown[]) => {
       invalidateQueriesMock(...args);
-      return Promise.resolve();
     },
   }),
 }));

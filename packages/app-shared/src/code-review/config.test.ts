@@ -211,9 +211,8 @@ describe('applyCodeReviewConfigPatch', () => {
       modelSlug: 'anthropic/claude-opus-4.8',
       thinkingEffort: null,
     });
-    expect(
-      (merged.repositoryModelOverrides?.[0] as Record<string, unknown>).repository_id
-    ).toBeUndefined();
+    const firstOverride = (merged.repositoryModelOverrides ?? [])[0] as Record<string, unknown>;
+    expect(firstOverride.repository_id).toBeUndefined();
 
     // And the omits case keeps the stored array intact.
     const untouched = applyCodeReviewConfigPatch(stored, { reviewStyle: 'lenient' });

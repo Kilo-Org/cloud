@@ -64,6 +64,7 @@ import {
 } from '@/lib/integrations/platforms/bitbucket/manual-code-review-trigger';
 import {
   applyCodeReviewConfigPatch,
+  type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
 } from '@kilocode/app-shared/code-review';
 
@@ -876,7 +877,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
         // Field-merge: every key absent from `input` is preserved from
         // `stored`. `null` is an explicit "clear" (e.g. `council: null`).
-        const { organizationId: _orgId, platform: _platform, ...patch } = input;
+        const { organizationId: _orgId, platform: _platform, ...rest } = input;
+        const patch: CodeReviewFieldMergePatch = rest;
         const merged = applyCodeReviewConfigPatch(stored, patch);
 
         // Council entitlement gate: ONLY when the patch actually carries a
@@ -888,7 +890,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         if (
           Object.prototype.hasOwnProperty.call(patch, 'council') &&
           patch.council &&
-          isCouncilActive(patch.council)
+          isCouncilActive(patch.council as CodeReviewCouncilConfig | null)
         ) {
           const entitled = await isCouncilEntitledForOrganization(input.organizationId);
           if (!entitled) {
@@ -926,7 +928,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         const council = isBitbucket
           ? undefined
           : Object.prototype.hasOwnProperty.call(patch, 'council')
-            ? (patch.council ?? undefined)
+            ? ((patch.council as CodeReviewCouncilConfig | null) ?? undefined)
             : ((merged.council as CodeReviewCouncilConfig | null | undefined) ?? undefined);
         const councilEnabledRepositoryIds: Array<number | string> = isBitbucket
           ? []

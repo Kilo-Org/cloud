@@ -32,6 +32,7 @@ import {
 } from '@/lib/code-reviews/manual-code-review-jobs';
 import {
   applyCodeReviewConfigPatch,
+  type CodeReviewFieldMergePatch,
   type CodeReviewStoredConfig,
 } from '@kilocode/app-shared/code-review';
 
@@ -505,7 +506,8 @@ export const personalReviewAgentRouter = createTRPCRouter({
         // `stored`. `null` is an explicit "clear" (e.g. customInstructions).
         // Council-related keys aren't accepted by the personal input schema
         // so they can never reach this handler.
-        const { platform: _ignored, ...patch } = input;
+        const { platform: _ignored, ...rest } = input;
+        const patch: CodeReviewFieldMergePatch = rest;
         const merged = applyCodeReviewConfigPatch(stored, patch);
 
         // Re-apply platform forcing post-merge. GitLab only supports

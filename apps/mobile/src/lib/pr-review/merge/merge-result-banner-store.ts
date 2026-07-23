@@ -14,7 +14,7 @@ export type PrRef = {
   number: number;
 };
 
-export type PartialMergeSuccess = {
+type PartialMergeSuccess = {
   /** Human-readable branch-delete failure reason from the server. */
   reason: string;
 };

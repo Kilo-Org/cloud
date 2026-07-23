@@ -7,7 +7,10 @@ export type RepositoryModelOverrideInput = {
   repositoryId: number | string;
   repoFullName: string;
   modelSlug: string;
-  thinkingEffort: string | null;
+  // Optional to mirror the tRPC input contract (RepositoryModelOverrideInputSchema
+  // marks thinkingEffort `.nullable().optional()`); an omitted value means "no
+  // override effort". Read sites already coalesce with `?? null` when persisting.
+  thinkingEffort?: string | null;
 };
 
 // Wire shape of a manually-added repository (GitLab pagination workaround).
@@ -58,12 +61,11 @@ export type CodeReviewConfigInput = {
   disableReviewMd: boolean;
 };
 
-// Extended patch type. All keys are optional; omission preserves the stored
-// value. Used by both the personal and organization patch procedures. The
-// personal input schema is narrower (no `council` / `councilEnabledRepositoryIds`
-// / `manuallyAddedRepositories` keys), so those fields never reach the
-// personal handler — but the type stays the union here so a single helper
-// covers both surfaces without duplicating the merge logic.
+// Mobile/personal-org save patch. All keys are optional; omission preserves the
+// stored value. buildSaveConfigInput spreads this into the save payload, so
+// it MUST NOT carry org-only field-merge fields (manuallyAddedRepositories,
+// council, councilEnabledRepositoryIds) that the strict saveReviewConfig schemas
+// do not accept.
 export type CodeReviewConfigPatch = Partial<{
   reviewStyle: ReviewStyle;
   focusAreas: string[];
@@ -75,11 +77,17 @@ export type CodeReviewConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
-  // Org-only fields. Personal save never sends these.
-  manuallyAddedRepositories: ManuallyAddedRepositoryInput[];
-  council: CodeReviewCouncilConfigInput | null;
-  councilEnabledRepositoryIds: (number | string)[];
 }>;
+
+// Field-merge PATCH surface. Extends the save patch with the org-only fields
+// that the PATCH procedures preserve but the strict saveReviewConfig schemas do
+// not accept. Used by applyCodeReviewConfigPatch and the two PATCH route handlers.
+export type CodeReviewFieldMergePatch = CodeReviewConfigPatch &
+  Partial<{
+    manuallyAddedRepositories: ManuallyAddedRepositoryInput[];
+    council: CodeReviewCouncilConfigInput | null;
+    councilEnabledRepositoryIds: (number | string)[];
+  }>;
 
 // Snapshot of a stored Code Reviewer config in camelCase, suitable as the
 // `stored` argument to `applyCodeReviewConfigPatch`. Every field is optional
@@ -158,10 +166,10 @@ export function buildSaveConfigInput(
 // implementation" rule.
 export function applyCodeReviewConfigPatch(
   stored: CodeReviewStoredConfig,
-  patch: CodeReviewConfigPatch
+  patch: CodeReviewFieldMergePatch
 ): CodeReviewStoredConfig {
   const merged: CodeReviewStoredConfig = { ...stored };
-  for (const key of Object.keys(patch) as Array<keyof CodeReviewConfigPatch>) {
+  for (const key of Object.keys(patch) as Array<keyof CodeReviewFieldMergePatch>) {
     if (Object.prototype.hasOwnProperty.call(patch, key)) {
       const value = patch[key];
       if (value !== undefined) {

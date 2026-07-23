@@ -95,11 +95,16 @@ prepare_env() {
   fi
 
   # Env file carries the token; keep it private and out of the process table.
+  # KILO_AUTH_CONTENT is JSON.parse'd by the CLI into its process-local
+  # credential map (provider id -> credential); a bare token fails to parse and
+  # the CLI silently drops it ("invalid KILO_AUTH_CONTENT; using no
+  # process-local credentials"), then falls back to the production account. The
+  # gateway provider id is "kilo" and an API-key credential is {type:"api",key}.
   umask 077
   cat >"$ENV_FILE" <<EOF
 export KILO_API_URL="http://localhost:${nextjs_port}"
 export KILO_API_KEY="${token}"
-export KILO_AUTH_CONTENT="${token}"
+export KILO_AUTH_CONTENT='{"kilo":{"type":"api","key":"${token}"}}'
 export KILO_SESSION_INGEST_URL="http://localhost:${ingest_port}"
 $([ -n "$event_port" ] && echo "export KILO_EVENT_SERVICE_URL=\"ws://localhost:${event_port}\"")
 export KILO_CONFIG_DIR="${CLI_HOME}/.config"

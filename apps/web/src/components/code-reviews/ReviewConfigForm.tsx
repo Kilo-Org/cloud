@@ -44,6 +44,8 @@ import {
 } from '@/lib/code-reviews/core/council-selection';
 import {
   COUNCIL_AGGREGATION_STRATEGIES,
+  COUNCIL_MAX_REQUIRED_LABELS,
+  COUNCIL_REQUIRED_LABEL_MAX_LENGTH,
   DEFAULT_COUNCIL_AGGREGATION_STRATEGY,
   type CouncilAggregationStrategy,
 } from '@kilocode/db/schema-types';
@@ -629,6 +631,23 @@ export function ReviewConfigForm({
       }
       return labels;
     })();
+    // Enforce the same caps the server schema applies, so exceeding them shows a targeted message
+    // instead of failing the whole save with a raw Zod error. Only relevant when council persists.
+    if (councilActiveForSave && requiredLabels.length > COUNCIL_MAX_REQUIRED_LABELS) {
+      toast.error('Too many council labels', {
+        description: `Use at most ${COUNCIL_MAX_REQUIRED_LABELS} labels.`,
+      });
+      return;
+    }
+    if (
+      councilActiveForSave &&
+      requiredLabels.some(label => label.length > COUNCIL_REQUIRED_LABEL_MAX_LENGTH)
+    ) {
+      toast.error('Council label too long', {
+        description: `Each label must be ${COUNCIL_REQUIRED_LABEL_MAX_LENGTH} characters or fewer.`,
+      });
+      return;
+    }
     const councilPayload = councilActiveForSave
       ? {
           enabled: true,

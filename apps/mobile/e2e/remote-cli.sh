@@ -94,6 +94,17 @@ prepare_env() {
       || { echo "CLI install failed; see $CLI_HOME/install.log" >&2; tail -n 20 "$CLI_HOME/install.log" >&2; exit 1; }
   fi
 
+  # Isolate the CLI's XDG data/config dirs from the machine's global kilo
+  # install. The CLI stores its OAuth login in $XDG_DATA_HOME/kilo/auth.json
+  # (default ~/.local/share/kilo); if a developer is logged in there, the CLI
+  # uses that production credential for AI-gateway calls and ignores the minted
+  # KILO_API_KEY below, so the local gateway rejects it ("You need to sign in to
+  # use this model" / "not a member of the organization"). Pointing both XDG
+  # dirs into the disposable per-worktree home forces the CLI to fall back to
+  # the minted local token against this worktree's stack.
+  local xdg_data="${CLI_HOME}/xdg/data" xdg_config="${CLI_HOME}/xdg/config"
+  mkdir -p "$xdg_data" "$xdg_config"
+
   # Env file carries the token; keep it private and out of the process table.
   umask 077
   cat >"$ENV_FILE" <<EOF
@@ -103,6 +114,8 @@ export KILO_AUTH_CONTENT="${token}"
 export KILO_SESSION_INGEST_URL="http://localhost:${ingest_port}"
 $([ -n "$event_port" ] && echo "export KILO_EVENT_SERVICE_URL=\"ws://localhost:${event_port}\"")
 export KILO_CONFIG_DIR="${CLI_HOME}/.config"
+export XDG_DATA_HOME="${xdg_data}"
+export XDG_CONFIG_HOME="${xdg_config}"
 export KILO_DISABLE_AUTOUPDATE="true"
 export PATH="${CLI_HOME}/node_modules/.bin:\$PATH"
 EOF

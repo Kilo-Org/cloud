@@ -94,6 +94,7 @@ export function PrReviewEntryScreen() {
         icon={SearchX}
         title="No recent PRs"
         description="Paste a PR link above to start a review — it'll show up here next time."
+        placement="top"
         action={
           <Button variant="outline" onPress={focusInput}>
             <Text>Paste a PR link</Text>

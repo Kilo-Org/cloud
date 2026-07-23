@@ -1,10 +1,12 @@
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
-import {
-  JetBrainsMono_500Medium,
-  JetBrainsMono_600SemiBold,
-} from '@expo-google-fonts/jetbrains-mono';
+// Deep imports of only the two weights this app renders. The package barrel
+// (`@expo-google-fonts/jetbrains-mono`) require()s all 16 weights at module
+// scope and Metro does not tree-shake, so importing it ships ~1.63MB of unused
+// font bytes. The per-weight subpaths pull only the two used `.ttf` files.
+import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
+import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import { ThemeProvider } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
 import { isRunningInExpoGo } from 'expo';

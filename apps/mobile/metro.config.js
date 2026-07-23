@@ -17,6 +17,31 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
+// Drop the unused Material Symbols font chain from the bundle.
+//
+// `expo-router`'s <Tabs> statically pulls `expo-symbols` (via withLayoutContext ->
+// native-tabs -> materialIconConverter.android). `expo-symbols` require()s all 7
+// Android Material Symbols weights (~6.7MB) at module scope, through both the
+// `@expo-google-fonts/material-symbols` barrel (SymbolView) and the per-weight
+// subpaths (android/weights/*). This app renders lucide icons and never renders
+// <NativeTabs>/<SymbolView>, so those fonts are loaded-but-unused: the `.ttf`
+// values are only consumed lazily inside SymbolView (via useFonts), which is
+// never mounted. Resolving these specifiers to an empty module removes the font
+// bytes while leaving the never-rendered code paths harmlessly referencing
+// `undefined`. iOS uses native SF Symbols and never reaches this chain.
+const MATERIAL_SYMBOLS_PKG = '@expo-google-fonts/material-symbols';
+const upstreamResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (
+    moduleName === MATERIAL_SYMBOLS_PKG ||
+    moduleName.startsWith(`${MATERIAL_SYMBOLS_PKG}/`)
+  ) {
+    return { type: 'empty' };
+  }
+  const resolve = upstreamResolveRequest || context.resolveRequest;
+  return resolve(context, moduleName, platform);
+};
+
 module.exports = withNativewind(config, {
   inlineVariables: false,
 });

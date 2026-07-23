@@ -37,7 +37,7 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
-  wrangler: 4.98.0
+  wrangler: 4.112.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842

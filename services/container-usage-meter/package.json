@@ -9,6 +9,7 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/container-usage-meter/src",
     "test": "vitest run",
+    "wrangler": "wrangler",
     "test:postgres": "vitest run --config vitest.postgres.config.ts"
   },
   "dependencies": {

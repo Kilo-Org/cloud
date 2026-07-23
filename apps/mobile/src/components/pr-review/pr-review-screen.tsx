@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect } from 'expo-router';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { Check } from 'lucide-react-native';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
@@ -12,9 +13,15 @@ import {
   PrReviewTabSelector,
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
+
+const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
 type PrReviewScreenProps = {
   readonly owner: string;
@@ -40,8 +47,21 @@ type PrReviewScreenProps = {
 export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const colors = useThemeColors();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
+
+  // P1-F-46b: push the review-submit route with the same params the
+  // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued
+  // comments) can still be approved from the Overview tab.
+  const openReviewSubmit = useCallback(() => {
+    const href: Href = {
+      pathname: REVIEW_SUBMIT_PATH,
+      params: { owner, repo, number },
+    };
+    router.push(href);
+  }, [router, owner, repo, number]);
 
   // P0-B-08: post-merge "branch delete failed" partial-success banner.
   // The merge sheet writes the reason into the in-memory store right
@@ -154,7 +174,27 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={`#${number}`} eyebrow={`${owner}/${repo}`} />
+      <ScreenHeader
+        title={`#${number}`}
+        eyebrow={`${owner}/${repo}`}
+        headerRight={
+          // P1-F-46b: the Submit-review affordance is reachable from the
+          // Overview tab (header right) and the Files tab (floating
+          // action bar). The Discussion tab is intentionally left without
+          // a submit affordance — comment threads there are read-only.
+          tab === 'overview' ? (
+            <Button
+              size="sm"
+              onPress={openReviewSubmit}
+              accessibilityLabel="Submit review"
+              className={cn('px-3')}
+            >
+              <Check size={14} color={colors.primaryForeground} />
+              <Text>Submit review</Text>
+            </Button>
+          ) : null
+        }
+      />
       <View className="px-4 pb-2 pt-3">
         <PrReviewTabSelector activeTab={tab} onChange={setTab} />
       </View>

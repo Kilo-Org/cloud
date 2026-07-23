@@ -91,7 +91,7 @@ function startInputToSessionCreateRequest(
   };
 }
 
-async function assertOrganizationMembership(
+export async function assertOrganizationMembership(
   db: WorkerDb,
   userId: string,
   organizationId: string
@@ -156,12 +156,16 @@ const startSessionHandler = protectedProcedure
         procedure: 'start',
       });
 
-      const registration = await startNewSession(requestWithProfile, {
-        env: ctx.env,
-        userId: ctx.userId,
-        authToken: ctx.authToken,
-        botId: ctx.botId,
-      });
+      const registration = await startNewSession(
+        requestWithProfile,
+        {
+          env: ctx.env,
+          userId: ctx.userId,
+          authToken: ctx.authToken,
+          botId: ctx.botId,
+        },
+        { billingOrigin: 'cloud-agent' }
+      );
       const ack = registration.admission;
 
       logger

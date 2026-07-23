@@ -73,12 +73,9 @@ import {
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
 import {
   buildSandboxBillingInput,
+  configureSandboxBillingInput,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
-
-type BillingSandboxInstance = SandboxInstance & {
-  configureBilling(input: SandboxBillingInput): Promise<void>;
-};
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -207,10 +204,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       dependencies.stopObservationDelaysMs ?? DEFAULT_STOP_OBSERVATION_DELAYS_MS;
     this.configureBilling =
       dependencies.configureBilling ??
-      (dependencies.resolveSandbox
-        ? async () => undefined
-        : async (sandbox, input) =>
-            await (sandbox as BillingSandboxInstance).configureBilling(input));
+      (dependencies.resolveSandbox ? async () => undefined : configureSandboxBillingInput);
   }
 
   private resolveSandboxId(): Promise<SandboxId> {

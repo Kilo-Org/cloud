@@ -129,6 +129,94 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
   });
 
+  it('defers stopped-state closure when the producer owns an authoritative stop hook', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const schedule = vi.fn();
+    const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+      intervalId: `${input.instanceId}:${input.startEpochMs}`,
+      durable: 'pg',
+      dedup: false,
+    }));
+    const client = new ContainerUsageClient(
+      {
+        recordStart: async () => ({
+          success: true,
+          ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+        }),
+        recordHeartbeat: async () => ({
+          intervalId: 'instance-1:123',
+          durable: 'pg',
+          dedup: false,
+          budget: { verdict: 'continue' },
+        }),
+        recordStop,
+      },
+      { service: 'cloud-agent-next' }
+    );
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({
+          status: 'stopped_with_code' as const,
+          lastChange: Date.now(),
+          exitCode: 17,
+        })),
+        schedule: schedule as Container['schedule'],
+      },
+      { client, storage, stopOnStoppedState: false, enforceBudgetStop: vi.fn() }
+    );
+
+    await controller.billingHeartbeatTick();
+
+    expect(recordStop).not.toHaveBeenCalled();
+    expect(await getBillingContext(storage)).toBeDefined();
+    expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+  });
+
+  it('runs stop-delivery prerequisites before retrying a persisted stop', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const beforeStopDelivery = vi.fn(async () => undefined);
+    const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+      intervalId: `${input.instanceId}:${input.startEpochMs}`,
+      durable: 'pg',
+      dedup: false,
+    }));
+    const client = new ContainerUsageClient(
+      {
+        recordStart: async () => ({
+          success: true,
+          ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+        }),
+        recordHeartbeat: async () => ({
+          intervalId: 'instance-1:123',
+          durable: 'pg',
+          dedup: false,
+          budget: { verdict: 'continue' },
+        }),
+        recordStop,
+      },
+      { service: 'cloud-agent-next' }
+    );
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client, storage, beforeStopDelivery, enforceBudgetStop: vi.fn() }
+    );
+    await controller.persistStop({ reason: 'exit', exitCode: 9 });
+
+    await controller.billingHeartbeatTick();
+
+    expect(beforeStopDelivery).toHaveBeenCalledOnce();
+    expect(beforeStopDelivery.mock.invocationCallOrder[0]).toBeLessThan(
+      recordStop.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+  });
+
   it('immediately retries an unacknowledged heartbeat with the same segment payload', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

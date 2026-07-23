@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionMetadata } from './persistence/session-metadata.js';
-import { buildSandboxBillingInput, SANDBOX_USAGE_SKUS } from './container-usage-context.js';
+import {
+  assertSandboxBillingAllocation,
+  buildSandboxBillingInput,
+  SANDBOX_USAGE_SKUS,
+} from './container-usage-context.js';
 
 function metadata(identity: SessionMetadata['identity']): SessionMetadata {
   return {
@@ -75,7 +79,7 @@ describe('container usage context', () => {
         sessionId: 'agent_security',
         userId: 'user_security',
         orgId: 'org_security',
-        createdOnPlatform: 'security-remediation',
+        billingOrigin: 'security-remediation',
       }),
       'crv-isolated'
     );
@@ -97,7 +101,7 @@ describe('container usage context', () => {
         sessionId: 'agent_first',
         userId: 'user_shared',
         orgId: 'org_shared',
-        createdOnPlatform: 'security-agent',
+        billingOrigin: 'security-agent',
       }),
       'org-shared'
     );
@@ -106,7 +110,7 @@ describe('container usage context', () => {
         sessionId: 'agent_second',
         userId: 'user_shared',
         orgId: 'org_shared',
-        createdOnPlatform: 'cloud-agent-web',
+        billingOrigin: 'cloud-agent-web',
       }),
       'org-shared'
     );
@@ -124,10 +128,56 @@ describe('container usage context', () => {
       metadata({
         sessionId: 'agent_unknown',
         userId: 'user_unknown',
-        createdOnPlatform: 'attacker-controlled-value',
+        billingOrigin: 'attacker-controlled-value',
       }),
       'dind-isolated'
     );
     expect(input.metadata?.origin).toBe('other');
+  });
+
+  it('does not positively attribute legacy metadata without a trusted billing origin', () => {
+    const input = buildSandboxBillingInput(
+      metadata({
+        sessionId: 'agent_legacy',
+        userId: 'user_legacy',
+        createdOnPlatform: 'code-review',
+      }),
+      'crv-legacy'
+    );
+    expect(input.metadata?.origin).toBe('other');
+  });
+
+  it('does not trust the public createdOnPlatform label as billing origin', () => {
+    const input = buildSandboxBillingInput(
+      metadata({
+        sessionId: 'agent_public',
+        userId: 'user_public',
+        createdOnPlatform: 'security-remediation',
+        billingOrigin: 'cloud-agent',
+      }),
+      'ses-isolated'
+    );
+    expect(input.metadata?.origin).toBe('cloud-agent');
+  });
+
+  it('rejects session attribution and extra metadata for shared sandboxes', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('Sandbox', {
+        subject: { type: 'user', id: 'user_shared' },
+        actor: { type: 'user', id: 'user_shared' },
+        sessionId: 'agent_leak',
+        metadata: { allocation: 'shared', origin: 'cloud-agent' },
+      })
+    ).toThrow('Shared sandbox billing cannot contain session attribution');
+  });
+
+  it('requires bounded isolated attribution for non-shared sandbox classes', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxSmall', {
+        subject: { type: 'user', id: 'user_isolated' },
+        actor: { type: 'user', id: 'user_isolated' },
+        metadata: { allocation: 'isolated' },
+      })
+    ).toThrow('Isolated sandbox billing requires session attribution');
   });
 });

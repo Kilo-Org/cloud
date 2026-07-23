@@ -43,6 +43,7 @@ import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
 import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import { assertOrganizationMembership } from './session-start.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -313,6 +314,13 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
       const request = prepareInputToSessionCreateRequest(input);
+      if (input.kilocodeOrganizationId) {
+        await assertOrganizationMembership(
+          getPgDb(ctx.env),
+          ctx.userId,
+          input.kilocodeOrganizationId
+        );
+      }
       await assertBitbucketRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,
@@ -356,18 +364,26 @@ const prepareSessionHandler = internalApiProtectedProcedure
 
       const result =
         input.autoInitiate === true
-          ? await startNewSession(requestWithProfile, {
-              env: ctx.env,
-              userId: ctx.userId,
-              authToken: ctx.authToken,
-              botId: ctx.botId,
-            })
-          : await registerNewSession(requestWithProfile, {
-              env: ctx.env,
-              userId: ctx.userId,
-              authToken: ctx.authToken,
-              botId: ctx.botId,
-            });
+          ? await startNewSession(
+              requestWithProfile,
+              {
+                env: ctx.env,
+                userId: ctx.userId,
+                authToken: ctx.authToken,
+                botId: ctx.botId,
+              },
+              { billingOrigin: input.createdOnPlatform }
+            )
+          : await registerNewSession(
+              requestWithProfile,
+              {
+                env: ctx.env,
+                userId: ctx.userId,
+                authToken: ctx.authToken,
+                botId: ctx.botId,
+              },
+              { billingOrigin: input.createdOnPlatform }
+            );
 
       return {
         cloudAgentSessionId: result.cloudAgentSessionId,

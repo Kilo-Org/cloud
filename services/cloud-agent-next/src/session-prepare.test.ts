@@ -285,6 +285,7 @@ describe('prepareSession endpoint', () => {
     recordInitialAdmissionMock.mockResolvedValue(undefined);
     recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
+    organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership-123' }]);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
@@ -499,6 +500,7 @@ describe('prepareSession endpoint', () => {
           orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
           botId: undefined,
           createdOnPlatform: 'code-review',
+          billingOrigin: 'code-review',
         },
         auth: {
           kiloSessionId: 'cli-session-abc123',
@@ -549,6 +551,23 @@ describe('prepareSession endpoint', () => {
         },
       })
     );
+  });
+
+  it('rejects organization attribution when the internal caller user is not a member', async () => {
+    organizationMembershipLimitMock.mockResolvedValueOnce([]);
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Attempt unrelated organization attribution',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('retains split legacy preparation as registration-only', async () => {
@@ -774,6 +793,7 @@ describe('prepareSession endpoint', () => {
     expect(overrideStore.get).toHaveBeenCalledWith(`shared-sandbox-route:${routeKey}`);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
+        identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
         workspace: {
           sandboxId: failoverSandboxId,
           sandboxProvider: 'cloudflare',
@@ -790,6 +810,33 @@ describe('prepareSession endpoint', () => {
     expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
       expect.objectContaining({ sandboxId: failoverSandboxId }),
       expect.any(Object)
+    );
+  });
+
+  it('does not let public createdOnPlatform select the Code Review sandbox class', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Attempt to select a reserved class' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      profile: { id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
+      options: { createdOnPlatform: 'code-review' },
+    });
+
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'test-user-123',
+      expect.any(String),
+      undefined,
+      expect.objectContaining({ createdOnPlatform: undefined })
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ billingOrigin: 'cloud-agent' }),
+      })
     );
   });
 

@@ -20,6 +20,9 @@ export type BillingHeartbeatDependencies = {
   client: ContainerUsageClient;
   storage: BillingContextStorage;
   heartbeatSeconds?: number;
+  /** Defer stopped-state closure to the container's authoritative onStop hook. */
+  stopOnStoppedState?: boolean;
+  beforeStopDelivery?: (context: BillingContext) => Promise<void>;
   enforceBudgetStop: (
     budget: BudgetVerdict,
     expected: { generation: string; startEpochMs: number }
@@ -35,6 +38,10 @@ export type BillingHeartbeatController = {
     exitCode?: number;
   }) => Promise<RecordAck | undefined>;
   cancelHeartbeat: () => void;
+  persistStop: (params: {
+    reason: 'exit' | 'runtime_signal' | 'activity_expired';
+    exitCode?: number;
+  }) => Promise<BillingContext | undefined>;
 };
 
 function contextForHeartbeat(context: BillingContext) {
@@ -120,6 +127,7 @@ export function installBillingHeartbeat(
     }
     const stopIntent = context.pendingStop;
     if (!stopIntent) throw new Error('Billing stop intent was not persisted');
+    await dependencies.beforeStopDelivery?.(context);
     const ack = await dependencies.client.recordStop({
       instanceId: context.instanceId,
       startEpochMs: context.startEpochMs,
@@ -138,6 +146,23 @@ export function installBillingHeartbeat(
 
   const recordStop: BillingHeartbeatController['recordStop'] = params =>
     runLifecycleExclusive(() => recordStopForGeneration(params));
+
+  const persistStop: BillingHeartbeatController['persistStop'] = params =>
+    runLifecycleExclusive(async () => {
+      const context = await getBillingContext(dependencies.storage);
+      if (!context) return undefined;
+      if (context.pendingStop) return context;
+      const pendingHeartbeat = context.pendingHeartbeat;
+      const elapsedMs = Math.max(0, Date.now() - context.usageMeasuredAtMs);
+      const stopSegment = pendingHeartbeat ?? {
+        seq: context.nextSeq,
+        usageSinceLast: Math.floor(elapsedMs / 1_000),
+        measuredAtMs: context.usageMeasuredAtMs + Math.floor(elapsedMs / 1_000) * 1_000,
+      };
+      const updated = { ...context, pendingStop: { ...params, ...stopSegment } };
+      await updateBillingContext(dependencies.storage, updated);
+      return updated;
+    });
 
   const billingHeartbeatTickForGeneration = async (generation?: string) => {
     let context = await getBillingContext(dependencies.storage);
@@ -167,6 +192,10 @@ export function installBillingHeartbeat(
     if (!currentAfterState || !isSameBillingGeneration(currentAfterState, context)) return;
     context = currentAfterState;
     if (state.status === 'stopped' || state.status === 'stopped_with_code') {
+      if (dependencies.stopOnStoppedState === false) {
+        await rescheduleIfCurrent(context);
+        return;
+      }
       try {
         await recordStopForGeneration(
           {
@@ -254,5 +283,5 @@ export function installBillingHeartbeat(
     value: billingHeartbeatTick,
   });
 
-  return { scheduleHeartbeat, billingHeartbeatTick, recordStop, cancelHeartbeat };
+  return { scheduleHeartbeat, billingHeartbeatTick, recordStop, persistStop, cancelHeartbeat };
 }

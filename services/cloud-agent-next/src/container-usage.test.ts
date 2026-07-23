@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
+import { getBillingContext, type ContainerUsageRpcMethods } from '@kilocode/container-usage';
 
 // oxlint-disable-next-line no-empty-object-type -- Matches the mocked Sandbox constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
@@ -54,7 +54,6 @@ const sdk = vi.hoisted(() => {
 
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: sdk.StockSandbox }));
 
-import { getBillingContext } from '@kilocode/container-usage';
 import { MeteredSandbox } from './container-usage.js';
 
 class MemoryStorage {
@@ -98,6 +97,7 @@ type TestRuntime = MeteredSandbox & {
   superStopped: boolean;
   superActivityExpired: boolean;
   superStopCalled: boolean;
+  billingHeartbeatTick(generation?: string): Promise<void>;
 };
 
 function createSandbox(rpc = createRpc()) {
@@ -131,58 +131,163 @@ describe('MeteredSandbox', () => {
     vi.restoreAllMocks();
   });
 
-  it('admits duplicate acquisition with one generation-stable start', async () => {
+  it('admits one start per physical generation and short-circuits active acquisition', async () => {
     const { rpc, storage, sandbox } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(1_000);
 
     await sandbox.configureBilling(billingInput);
     await sandbox.configureBilling(billingInput);
+    expect(rpc.recordStart).not.toHaveBeenCalled();
 
-    expect(rpc.recordStart).toHaveBeenCalledTimes(2);
-    const starts = vi.mocked(rpc.recordStart).mock.calls.map(([input]) => input);
-    expect(starts[0]?.startEpochMs).toBe(1_000);
-    expect(starts[1]?.startEpochMs).toBe(1_000);
-    expect(starts[0]?.idempotencyKey).toBe(starts[1]?.idempotencyKey);
-    expect(starts[0]).toMatchObject({
-      instanceId: 'SandboxSmallContainment:do-id',
-      sku: 'cloud-agent-small-2026-07',
-      metadata: { allocation: 'isolated', container_class: 'SandboxSmallContainment' },
-    });
-    expect((await getBillingContext(storage))?.measurementStarted).toBe(false);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    vi.mocked(rpc.recordStart).mockRejectedValue(new Error('meter unavailable'));
+    await sandbox.configureBilling(billingInput);
+    await sandbox.configureBilling(billingInput);
+
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+    expect(sandbox.schedules).toHaveLength(1);
+    expect(rpc.recordStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startEpochMs: 1_000,
+        instanceId: 'SandboxSmallContainment:do-id',
+        sku: 'cloud-agent-small-2026-07',
+        metadata: { allocation: 'isolated', container_class: 'SandboxSmallContainment' },
+      })
+    );
+    expect((await getBillingContext(storage))?.measurementStarted).toBe(true);
   });
 
-  it('starts five-minute heartbeat measurement after preserving the SDK start hook', async () => {
-    const { sandbox, storage } = createSandbox();
+  it('adopts a physical container that predates shadow metering', async () => {
+    const { rpc, storage, sandbox } = createSandbox();
+    vi.spyOn(Date, 'now').mockReturnValue(1_500);
+    sandbox.mockState = { status: 'healthy' };
+
+    await sandbox.configureBilling(billingInput);
+
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+    expect(await getBillingContext(storage)).toMatchObject({
+      startEpochMs: 1_500,
+      measurementStarted: true,
+    });
+  });
+
+  it('retries an unacknowledged start before allowing active-generation work', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStart)
+      .mockRejectedValueOnce(new Error('ack lost'))
+      .mockRejectedValueOnce(new Error('ack lost'))
+      .mockRejectedValueOnce(new Error('ack lost'))
+      .mockResolvedValue({ success: true, ack: ack() });
+    const { sandbox, storage } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+
+    await expect(sandbox.onStart()).rejects.toThrow('ack lost');
+    const context = await getBillingContext(storage);
+    expect(context?.measurementStarted).toBe(false);
+
+    await sandbox.configureBilling(billingInput);
+    expect(rpc.recordStart).toHaveBeenCalledTimes(4);
+    expect((await getBillingContext(storage))?.measurementStarted).toBe(true);
+  });
+
+  it('keeps a delayed stop attached to the prior generation', async () => {
+    const { rpc, storage, sandbox } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(2_000);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    const first = await getBillingContext(storage);
+
+    sandbox.mockState = { status: 'stopped_with_code', exitCode: 17 };
+    await sandbox.configureBilling({ ...billingInput, sessionId: 'agent_2' });
+    expect((await getBillingContext(storage))?.generation).toBe(first?.generation);
+
+    await sandbox.onStop({ reason: 'exit', exitCode: 17 });
+    expect(await getBillingContext(storage)).toBeUndefined();
+
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    const second = await getBillingContext(storage);
+
+    expect(second?.generation).not.toBe(first?.generation);
+    expect(second?.startEpochMs).toBe(2_001);
+    expect(second?.sessionId).toBe('agent_2');
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'exit', exitCode: 17, startEpochMs: 2_000 })
+    );
+  });
+
+  it('treats duplicate start callbacks as one physical generation', async () => {
+    const { rpc, storage, sandbox } = createSandbox();
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
 
     await sandbox.onStart();
+    const first = await getBillingContext(storage);
+    await sandbox.onStart();
+    const second = await getBillingContext(storage);
 
-    expect(sandbox.superStarted).toBe(true);
-    expect(sandbox.schedules).toEqual([
-      expect.objectContaining({ when: 300, callback: 'billingHeartbeatTick' }),
-    ]);
-    expect((await getBillingContext(storage))?.measurementStarted).toBe(true);
+    expect(second?.generation).toBe(first?.generation);
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+    expect(rpc.recordStop).not.toHaveBeenCalled();
   });
 
-  it('closes a stopped generation before allocating a monotonic replacement', async () => {
-    const { rpc, sandbox } = createSandbox();
+  it('does not admit a new physical generation until the prior stop is durable', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    const first = await getBillingContext(storage);
+    await sandbox.billingHeartbeatTick(first?.generation);
+    vi.mocked(rpc.recordStop).mockRejectedValue(new Error('meter unavailable'));
+    await sandbox.onStop({ reason: 'exit', exitCode: 1 });
+    expect((await getBillingContext(storage))?.pendingStop).toBeDefined();
+
+    await expect(sandbox.onStart()).rejects.toThrow('meter unavailable');
+
+    expect((await getBillingContext(storage))?.generation).toBe(first?.generation);
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('defers activity-expiry closure until physical stop confirmation', async () => {
+    const { rpc, storage, sandbox } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(3_000);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
-    sandbox.mockState = { status: 'stopped_with_code', exitCode: 17 };
+    const active = await getBillingContext(storage);
 
-    await sandbox.configureBilling(billingInput);
+    await sandbox.onActivityExpired();
 
+    expect(sandbox.superActivityExpired).toBe(true);
+    expect(rpc.recordStop).not.toHaveBeenCalled();
+    expect((await getBillingContext(storage))?.generation).toBe(active?.generation);
+
+    await sandbox.onStop({ reason: 'exit', exitCode: 143 });
     expect(rpc.recordStop).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: 'runtime_signal', exitCode: 17, startEpochMs: 3_000 })
+      expect.objectContaining({ reason: 'activity_expired', exitCode: 143 })
     );
-    expect(vi.mocked(rpc.recordStart).mock.calls.at(-1)?.[0].startEpochMs).toBe(3_001);
+    expect(await getBillingContext(storage)).toBeUndefined();
   });
 
-  it('persists and retries the same durable stop intent while preserving SDK cleanup', async () => {
+  it('preserves normal exit reason and exit code', async () => {
+    const { rpc, sandbox } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+
+    await sandbox.onStop({ reason: 'exit', exitCode: 42 });
+
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'exit', exitCode: 42 })
+    );
+    expect(sandbox.superStopped).toBe(true);
+  });
+
+  it('persists a failed stop and retries it without blocking SDK cleanup', async () => {
     const rpc = createRpc();
     vi.mocked(rpc.recordStop)
       .mockRejectedValueOnce(new Error('postgres unavailable'))
@@ -190,27 +295,56 @@ describe('MeteredSandbox', () => {
       .mockRejectedValueOnce(new Error('postgres unavailable'))
       .mockResolvedValue(ack());
     const { sandbox, storage } = createSandbox(rpc);
-    vi.spyOn(Date, 'now').mockReturnValue(4_000);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
 
-    await expect(sandbox.onActivityExpired()).rejects.toThrow('postgres unavailable');
-    expect(sandbox.superActivityExpired).toBe(true);
-    expect((await getBillingContext(storage))?.pendingStop?.reason).toBe('activity_expired');
-
-    await sandbox.onStop();
+    await expect(sandbox.onStop({ reason: 'exit', exitCode: 1 })).resolves.toBeUndefined();
     expect(sandbox.superStopped).toBe(true);
+    const pending = await getBillingContext(storage);
+    expect(pending?.pendingStop).toMatchObject({ reason: 'exit', exitCode: 1 });
+
+    await sandbox.billingHeartbeatTick(pending?.generation);
     expect(await getBillingContext(storage)).toBeUndefined();
-    const stops = vi.mocked(rpc.recordStop).mock.calls.map(([input]) => input);
-    expect(stops.at(-1)?.reason).toBe('activity_expired');
-    expect(new Set(stops.map(stop => stop.idempotencyKey))).toHaveLength(1);
+    expect(
+      new Set(vi.mocked(rpc.recordStop).mock.calls.map(([input]) => input.idempotencyKey))
+    ).toHaveLength(1);
   });
 
-  it('stops an unadmitted runtime instead of silently running it', async () => {
+  it('persists authoritative stop details before recovering a missing start ack', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await storage.delete('container-usage:start-ack-generation:v1');
+    vi.mocked(rpc.recordStart).mockRejectedValue(new Error('meter unavailable'));
+
+    await sandbox.onStop({ reason: 'exit', exitCode: 9 });
+
+    expect(await getBillingContext(storage)).toMatchObject({
+      pendingStop: { reason: 'exit', exitCode: 9 },
+    });
+    expect(sandbox.superStopped).toBe(true);
+  });
+
+  it('rejects meter-owned identity fields at the custom RPC boundary', async () => {
+    const { sandbox } = createSandbox();
+    await expect(
+      sandbox.configureBilling({ ...billingInput, instanceId: 'forged-instance' })
+    ).rejects.toThrow();
+    await expect(
+      sandbox.configureBilling({ ...billingInput, sku: 'forged-sku' })
+    ).rejects.toThrow();
+    await expect(
+      sandbox.configureBilling({ ...billingInput, service: 'forged-service' })
+    ).rejects.toThrow();
+  });
+
+  it('stops a runtime that somehow starts without trusted attribution', async () => {
     const { sandbox } = createSandbox();
     await expect(sandbox.onStart()).rejects.toThrow(
-      'Container started without an admitted billing context'
+      'Container started without pending billing attribution'
     );
     expect(sandbox.superStarted).toBe(true);
     expect(sandbox.superStopCalled).toBe(true);

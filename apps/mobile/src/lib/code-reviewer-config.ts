@@ -6,7 +6,6 @@ import {
 import { parseParam } from '@/lib/route-params';
 
 export {
-  buildSaveConfigInput,
   GATE_THRESHOLDS,
   REVIEW_FOCUS_AREAS,
   REVIEW_STYLES,

@@ -355,4 +355,76 @@ describe('organization review agent router: patchReviewConfig', () => {
     expect(logs[0]?.message).toMatch(/^Patched Review Agent configuration for github/);
     expect(logs[0]?.message).toContain('roast');
   });
+
+  // P0-B-13b: real mobile→server contract guard. The mobile
+  // useSaveReviewConfig hook now sends a partial org patch whose shape
+  // is exactly { organizationId, platform, ...editedFields } — no
+  // manuallyAddedRepositories, no council, no councilEnabledRepositoryIds,
+  // no autoConfigureWebhooks. The server PATCH must field-merge those
+  // absent keys from the stored config so mobile edits do not clobber
+  // org-only state the mobile UI does not surface.
+  it('preserves a config seeded with council + manuallyAddedRepositories + councilEnabledRepositoryIds when a mobile-shaped patch is applied', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await seedOrgGithubConfig(organization, owner);
+    const caller = await createCallerForUser(owner.id);
+
+    // Mobile-shaped patch: ONLY the keys the mobile UI lets the user
+    // edit. council, councilEnabledRepositoryIds, manuallyAddedRepositories,
+    // and repositoryModelOverrides are ALL absent — the server must
+    // preserve them.
+    await caller.organizations.reviewAgent.patchReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['security'],
+    });
+
+    const stored = await getAgentConfig(organization.id, 'code_review', 'github');
+
+    // Patched fields applied.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        focus_areas: ['security'],
+      })
+    );
+    // Stored fields NOT in the mobile-shaped patch must round-trip
+    // unchanged. The org schema accepts council /
+    // councilEnabledRepositoryIds / manuallyAddedRepositories, but mobile
+    // never sends them — the field-merge must keep them as-is.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        council: expect.objectContaining({
+          enabled: true,
+          aggregation_strategy: 'unanimous',
+          specialists: expect.arrayContaining([
+            expect.objectContaining({ id: 'security' }),
+            expect.objectContaining({ id: 'performance' }),
+          ]),
+        }),
+        council_enabled_repository_ids: [101, 202],
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+      })
+    );
+    // Other stored fields that the mobile client never read or sent must
+    // also be preserved.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        selected_repository_ids: [101, 202],
+        repository_selection_mode: 'all',
+        gate_threshold: 'off',
+        disable_review_md: true,
+      })
+    );
+  });
 });

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import { toast } from 'sonner-native';
 
 import {
-  buildSaveConfigInput,
   type ConfigPatch,
   PERSONAL_SCOPE,
   type ReviewConfigData,
@@ -220,37 +219,80 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: ConfigPatch) =>
       // Rapid taps (e.g. toggling several focus areas in a row) each send a
-      // full-config snapshot; without serializing them, two in-flight saves
-      // for the same scope+platform can resolve out of order and the
-      // earlier response can stomp the later one's result. Chaining onto
-      // the prior in-flight save for this key keeps them in order — simple
-      // FIFO, no dedupe/coalescing.
+      // PATCH; without serializing them, two in-flight saves for the same
+      // scope+platform can resolve out of order and the earlier response can
+      // stomp the later one's optimistic state. Chaining onto the prior
+      // in-flight save for this key keeps them in order — simple FIFO, no
+      // dedupe/coalescing.
       chainSave(saveChainKey, async () => {
-        const config = queryClient.getQueryData<ReviewConfigData>(queryKey);
-        if (!config) {
-          throw new Error('Config not loaded yet');
-        }
-        const input = buildSaveConfigInput(platform, config, patch);
-        // The personal schema only accepts numeric repository IDs (bitbucket,
-        // the only string-ID platform, is org-only). Filtering keeps this a
-        // type-safe narrowing rather than a cast; the personal branch is only
-        // ever reached with platform !== 'bitbucket' in practice.
-        const result = isPersonal(scope)
-          ? await trpcClient.personalReviewAgent.saveReviewConfig.mutate({
-              ...input,
-              platform: toPersonalPlatform(platform),
-              selectedRepositoryIds: input.selectedRepositoryIds.filter(
-                (id): id is number => typeof id === 'number'
-              ),
-              // Same numeric-only narrowing as selectedRepositoryIds above.
-              repositoryModelOverrides: input.repositoryModelOverrides.filter(
+        // The PATCH only carries edited fields. Server-side field-merge
+        // preserves every key absent from the patch, so the mobile client
+        // does not need to read back the full config (or any of the
+        // org-only/council/manuallyAddedRepositories fields it never loaded)
+        // just to send a partial update.
+        //
+        // Pull each optional field off the patch individually (rather than
+        // spreading `patch` first) so the personal tRPC option type can see
+        // the already-narrowed numeric arrays — `ConfigPatch` permits
+        // string-id repository overrides (bitbucket is org-only by UI
+        // construction, but the shared type still allows them), and the
+        // personal PATCH schema only accepts numbers.
+        const {
+          selectedRepositoryIds: rawSelectedRepositoryIds,
+          repositoryModelOverrides: rawRepositoryModelOverrides,
+          ...restPatch
+        } = patch;
+        // The personal schema only accepts numeric repository IDs
+        // (bitbucket, the only string-ID platform, is org-only). Filtering
+        // keeps this a type-safe narrowing rather than a cast; the
+        // personal branch is only ever reached with platform !==
+        // 'bitbucket' in practice. Only include these keys when the
+        // incoming patch actually carries them — an empty array would
+        // still be a real edit and could clobber stored values.
+        const narrowedSelectedRepositoryIds =
+          rawSelectedRepositoryIds !== undefined
+            ? rawSelectedRepositoryIds.filter((id): id is number => typeof id === 'number')
+            : undefined;
+        const narrowedRepositoryModelOverrides =
+          rawRepositoryModelOverrides !== undefined
+            ? rawRepositoryModelOverrides.filter(
                 (override): override is typeof override & { repositoryId: number } =>
                   typeof override.repositoryId === 'number'
-              ),
+              )
+            : undefined;
+        // GitLab webhook re-sync is gated server-side on
+        // `selectedRepositoryIds` being present in the patch; we send
+        // `autoConfigureWebhooks: true` (mobile has no toggle) to match
+        // the prior always-true save behavior when a repo selection edit
+        // is part of the patch.
+        const gitlabAutoConfigure =
+          platform === 'gitlab' && rawSelectedRepositoryIds !== undefined
+            ? ({ autoConfigureWebhooks: true } as const)
+            : ({} as const);
+
+        const result = isPersonal(scope)
+          ? await trpcClient.personalReviewAgent.patchReviewConfig.mutate({
+              platform: toPersonalPlatform(platform),
+              ...restPatch,
+              ...(narrowedSelectedRepositoryIds !== undefined
+                ? { selectedRepositoryIds: narrowedSelectedRepositoryIds }
+                : {}),
+              ...(narrowedRepositoryModelOverrides !== undefined
+                ? { repositoryModelOverrides: narrowedRepositoryModelOverrides }
+                : {}),
+              ...gitlabAutoConfigure,
             })
-          : await trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
-              ...input,
+          : await trpcClient.organizations.reviewAgent.patchReviewConfig.mutate({
               organizationId: scope,
+              platform,
+              ...restPatch,
+              ...(rawSelectedRepositoryIds !== undefined
+                ? { selectedRepositoryIds: rawSelectedRepositoryIds }
+                : {}),
+              ...(rawRepositoryModelOverrides !== undefined
+                ? { repositoryModelOverrides: rawRepositoryModelOverrides }
+                : {}),
+              ...gitlabAutoConfigure,
             });
         // Same reasoning as useToggleReviewer: `success` is typed as `boolean`,
         // not a `true` literal, so a domain failure must throw rather than

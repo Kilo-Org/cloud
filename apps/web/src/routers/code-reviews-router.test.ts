@@ -2500,4 +2500,69 @@ describe('personalReviewAgent.patchReviewConfig', () => {
       'https://gitlab.example.com'
     );
   });
+
+  // P0-B-13b: real mobile→server contract guard. The mobile
+  // useSaveReviewConfig hook now sends a partial patch whose shape is
+  // exactly { platform, ...editedFields } — no manuallyAddedRepositories,
+  // no repositoryModelOverrides, no autoConfigureWebhooks. The server
+  // PATCH must field-merge those absent keys from the stored config.
+  it('preserves a config seeded with manuallyAddedRepositories + overrides when a mobile-shaped patch is applied', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    // Mobile-shaped patch: ONLY the keys the mobile UI lets the user edit.
+    // The personal PATCH schema does not even accept
+    // manuallyAddedRepositories / repositoryModelOverrides /
+    // autoConfigureWebhooks here — the contract guard is that the server
+    // never asks for them.
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['security'],
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    // Patched fields applied.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        focus_areas: ['security'],
+      })
+    );
+    // Stored fields NOT in the mobile-shaped patch must round-trip
+    // unchanged. The personal schema has no council/councilEnabled, so
+    // the mobile contract is specifically about manuallyAddedRepositories
+    // and repositoryModelOverrides.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+      })
+    );
+    // Other stored fields that the mobile client never read or sent must
+    // also be preserved.
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        selected_repository_ids: [101, 202],
+        repository_selection_mode: 'all',
+        gate_threshold: 'off',
+        disable_review_md: true,
+      })
+    );
+  });
 });

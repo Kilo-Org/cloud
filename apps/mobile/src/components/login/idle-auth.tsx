@@ -165,6 +165,15 @@ export function IdleAuth({
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
+        // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
+        // the same way the "Send code" button does, instead of only
+        // dismissing the keyboard as `actionDone` previously did.
+        returnKeyType="go"
+        onSubmitEditing={() => {
+          if (!authBusy) {
+            void handleSendCode();
+          }
+        }}
         onChangeText={value => {
           emailRef.current = value;
         }}

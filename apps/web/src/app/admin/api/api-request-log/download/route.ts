@@ -87,7 +87,13 @@ function buildFilter(
     conditions.push(eq(api_request_log.session_id, sessionId));
   }
   if (errorsOnly) {
-    conditions.push(or(gte(api_request_log.status_code, 400), isNotNull(api_request_log.error)));
+    const errorsCondition = or(
+      gte(api_request_log.status_code, 400),
+      isNotNull(api_request_log.error)
+    );
+    if (errorsCondition) {
+      conditions.push(errorsCondition);
+    }
   }
   return and(...conditions);
 }

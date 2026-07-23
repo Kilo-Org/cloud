@@ -76,7 +76,7 @@ describe('applyPreferredProvider', () => {
 
     applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
 
-    expect(request.body.provider).toEqual({ order: ['novita', 'deepseek'] });
+    expect(request.body.provider).toEqual({ order: ['novita'] });
   });
 
   it('overwrites a malformed provider value', () => {

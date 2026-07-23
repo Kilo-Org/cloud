@@ -61,10 +61,7 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isDeepseekModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.novita,
-      OpenRouterInferenceProviderIdSchema.enum.deepseek,
-    ];
+    return [OpenRouterInferenceProviderIdSchema.enum.novita];
   }
   if (isGlmModel(requestedModel)) {
     return [

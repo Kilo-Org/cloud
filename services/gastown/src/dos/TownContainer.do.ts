@@ -1,10 +1,11 @@
 import { Container } from '@cloudflare/containers';
-import { ContainerUsageAdmissionError } from '@kilocode/container-usage';
+import { ContainerUsageAdmissionError, type HeartbeatAck } from '@kilocode/container-usage';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
 import {
   clientUsageContext,
   getContainerUsageClient,
   isGastownBillingEnabled,
+  isUsageIntervalNotFoundError,
   USAGE_HEARTBEAT_INTERVAL_MS,
   type ContainerRunPolicy,
   type GastownBillingStatus,
@@ -12,6 +13,8 @@ import {
 } from '../billing/container-usage.billing';
 import {
   createPendingStop,
+  BILLING_STATE_VERSION,
+  migrateStoredUsageState,
   toBillingStatus,
   type OpenUsageInterval,
   type StoredUsageState,
@@ -395,6 +398,7 @@ export class TownContainerDO extends Container<Env> {
 
       const observedAt = Date.now();
       const starting: OpenUsageInterval = {
+        version: BILLING_STATE_VERSION,
         phase: 'starting',
         context: latest?.context ?? context,
         startEpochMs: observedAt,
@@ -483,13 +487,22 @@ export class TownContainerDO extends Container<Env> {
     }
     const { interval, pending } = selected;
 
-    const ack = await getContainerUsageClient(this.env).recordHeartbeat({
+    const heartbeatInput = {
       instanceId: interval.context.instanceId,
       startEpochMs: interval.startEpochMs,
       seq: pending.seq,
       usageSinceLast: pending.usageSinceLast,
       context: clientUsageContext(interval.context),
-    });
+    };
+    const usageClient = getContainerUsageClient(this.env);
+    let ack: HeartbeatAck;
+    try {
+      ack = await usageClient.recordHeartbeat(heartbeatInput);
+    } catch (error) {
+      if (!isUsageIntervalNotFoundError(error)) throw error;
+      await this.restoreRemoteInterval(interval);
+      ack = await usageClient.recordHeartbeat(heartbeatInput);
+    }
 
     const latest = await this.getUsageState();
     if (latest.phase === 'idle' || latest.startEpochMs !== interval.startEpochMs) return latest;
@@ -562,14 +575,22 @@ export class TownContainerDO extends Container<Env> {
       if (!stopSelection) return;
       stopping = stopSelection.interval;
 
-      await getContainerUsageClient(this.env).recordStop({
+      const stopInput = {
         instanceId: stopping.context.instanceId,
         startEpochMs: stopping.startEpochMs,
         seq: stopSelection.stop.seq,
         usageSinceLast: stopSelection.stop.usageSinceLast,
         reason: stopSelection.stop.reason,
         context: clientUsageContext(stopping.context),
-      });
+      };
+      const usageClient = getContainerUsageClient(this.env);
+      try {
+        await usageClient.recordStop(stopInput);
+      } catch (error) {
+        if (!isUsageIntervalNotFoundError(error)) throw error;
+        await this.restoreRemoteInterval(stopping);
+        await usageClient.recordStop(stopInput);
+      }
 
       const latest = await this.getUsageState();
       if (latest.phase !== 'idle' && latest.startEpochMs === stopping.startEpochMs) {
@@ -580,6 +601,7 @@ export class TownContainerDO extends Container<Env> {
             ? undefined
             : (totalUsageSeconds / 3600) * stopping.estimatedHourlyCharge;
         await this.ctx.storage.put(BILLING_STATE_KEY, {
+          version: BILLING_STATE_VERSION,
           phase: 'idle',
           context: stopping.context,
           blocked: stopping.latestBudget?.verdict === 'stop',
@@ -598,7 +620,23 @@ export class TownContainerDO extends Container<Env> {
   }
 
   private async getUsageState(): Promise<StoredUsageState> {
-    return (await this.ctx.storage.get<StoredUsageState>(BILLING_STATE_KEY)) ?? { phase: 'idle' };
+    const stored = await this.ctx.storage.get<StoredUsageState>(BILLING_STATE_KEY);
+    const fallbackContext = await this.ctx.storage.get<UsageContext>(BILLING_CONTEXT_KEY);
+    const migrated = migrateStoredUsageState(stored, fallbackContext);
+    if (!stored || stored.version !== BILLING_STATE_VERSION) {
+      await this.ctx.storage.put(BILLING_STATE_KEY, migrated);
+      if (stored) {
+        console.warn(`${TC_LOG} reset pre-integration billing state for ${this.ctx.id.toString()}`);
+      }
+    }
+    return migrated;
+  }
+
+  private async restoreRemoteInterval(state: OpenUsageInterval): Promise<void> {
+    await getContainerUsageClient(this.env).recordStart({
+      ...clientUsageContext(state.context),
+      startEpochMs: state.startEpochMs,
+    });
   }
 
   private async getRunPolicy(): Promise<ContainerRunPolicy> {

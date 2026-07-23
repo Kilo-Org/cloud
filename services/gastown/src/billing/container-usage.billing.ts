@@ -55,6 +55,14 @@ export function getContainerUsageClient(env: Env): ContainerUsageClient {
   return createContainerUsageClient(env.CONTAINER_USAGE, { service: 'gastown' });
 }
 
+export function isUsageIntervalNotFoundError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'UsageIntervalNotFoundError' ||
+      error.message.includes('Container usage interval not found:'))
+  );
+}
+
 export type ContainerUsageBinding = ContainerUsageRpcMethods;
 
 export function clientUsageContext(context: UsageContext): Omit<UsageContext, 'service'> {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPendingStop,
+  BILLING_STATE_VERSION,
+  migrateStoredUsageState,
   toBillingStatus,
   type OpenUsageInterval,
   type StoredUsageState,
@@ -126,5 +128,54 @@ describe('createPendingStop', () => {
       measuredAtMs: 7_000,
       reason: 'runtime_signal',
     });
+  });
+});
+
+describe('migrateStoredUsageState', () => {
+  it('resets hypothetical authorization state that predates the real meter', () => {
+    const legacy = {
+      phase: 'stopping',
+      context,
+      authorizationId: 'dev:old',
+      authorizationKey: 'old-key',
+      startEpochMs: 1_000,
+      startRecorded: true,
+      seq: 1,
+      lastReportedAt: 2_000,
+      latestBudget: { verdict: 'stop', remaining: 0 },
+    } as StoredUsageState;
+
+    expect(migrateStoredUsageState(legacy)).toEqual({
+      version: BILLING_STATE_VERSION,
+      phase: 'idle',
+      context,
+    });
+  });
+
+  it('preserves an unversioned real-meter interval', () => {
+    const current: StoredUsageState = {
+      phase: 'running',
+      context,
+      startEpochMs: 1_000,
+      startRecorded: true,
+      seq: 1,
+      lastReportedAt: 2_000,
+    };
+
+    expect(migrateStoredUsageState(current)).toEqual({
+      ...current,
+      version: BILLING_STATE_VERSION,
+    });
+  });
+
+  it('clears an unversioned stale credit block', () => {
+    expect(
+      migrateStoredUsageState({
+        phase: 'idle',
+        context,
+        blocked: true,
+        latestBudget: { verdict: 'stop', remaining: 0 },
+      })
+    ).toEqual({ version: BILLING_STATE_VERSION, phase: 'idle', context });
   });
 });

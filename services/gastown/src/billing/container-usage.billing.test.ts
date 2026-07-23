@@ -4,6 +4,7 @@ import {
   GASTOWN_CONTAINER_SKU,
   getContainerUsageClient,
   isGastownBillingEnabled,
+  isUsageIntervalNotFoundError,
 } from './container-usage.billing';
 
 function envFixture(overrides: Partial<Env>): Env {
@@ -55,5 +56,17 @@ describe('Gastown billing configuration', () => {
     expect(() => getContainerUsageClient(envFixture({ ENVIRONMENT: 'development' }))).toThrow(
       'CONTAINER_USAGE binding is required'
     );
+  });
+
+  it('recognizes a missing remote interval across the RPC error boundary', () => {
+    const namedError = new Error('missing');
+    namedError.name = 'UsageIntervalNotFoundError';
+    expect(isUsageIntervalNotFoundError(namedError)).toBe(true);
+    expect(
+      isUsageIntervalNotFoundError(
+        new Error('Container usage interval not found: gastown:instance:start')
+      )
+    ).toBe(true);
+    expect(isUsageIntervalNotFoundError(new Error('Postgres unavailable'))).toBe(false);
   });
 });

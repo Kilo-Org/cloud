@@ -140,7 +140,7 @@
         "KILO_API_URL": "http://192.168.65.254:3000",
         "GASTOWN_API_URL": "http://192.168.65.254:8803",
         "WASTELAND_API_URL": "http://192.168.65.254:8788",
-        "GASTOWN_BILLING_ENABLED": "false",
+        "GASTOWN_BILLING_ENABLED": "true",
       },
       "containers": [
         {
@@ -161,6 +161,13 @@
           { "name": "AGENT", "class_name": "AgentDO" },
         ],
       },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
       "services": [
         {
           "binding": "GIT_TOKEN_SERVICE",

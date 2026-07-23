@@ -19,6 +19,7 @@ export type PendingStop = {
 };
 
 export type OpenUsageInterval = {
+  version?: typeof BILLING_STATE_VERSION;
   phase: 'starting' | 'running' | 'stopping';
   context: UsageContext;
   startEpochMs: number;
@@ -38,6 +39,7 @@ export type OpenUsageInterval = {
 export type StoredUsageState =
   | {
       phase: 'idle';
+      version?: typeof BILLING_STATE_VERSION;
       context?: UsageContext;
       blocked?: boolean;
       latestBudget?: BudgetVerdict;
@@ -49,6 +51,29 @@ export type StoredUsageState =
       };
     }
   | OpenUsageInterval;
+
+export const BILLING_STATE_VERSION = 2 as const;
+
+export function migrateStoredUsageState(
+  state: StoredUsageState | undefined,
+  fallbackContext?: UsageContext
+): StoredUsageState {
+  if (state?.version === BILLING_STATE_VERSION) return state;
+  const context = state?.context ?? fallbackContext;
+  const hasLegacyAuthorization =
+    state !== undefined &&
+    ('authorizationId' in state ||
+      'authorizationKey' in state ||
+      'authorizationExpiresAt' in state);
+  if (state && !hasLegacyAuthorization && !(state.phase === 'idle' && state.blocked)) {
+    return { ...state, version: BILLING_STATE_VERSION };
+  }
+  return {
+    version: BILLING_STATE_VERSION,
+    phase: 'idle',
+    ...(context ? { context } : {}),
+  };
+}
 
 export function createPendingStop(
   state: OpenUsageInterval,

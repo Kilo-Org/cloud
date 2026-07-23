@@ -254,6 +254,7 @@ export const GASTOWN_SERVICE_URL =
   getEnvVariable('GASTOWN_SERVICE_URL') ||
   (process.env.NODE_ENV === 'production' ? 'https://gastown.kiloapps.io' : null);
 export const GASTOWN_BILLING_ANNOUNCEMENT_ENABLED =
+  process.env.NODE_ENV === 'development' ||
   getEnvVariable('GASTOWN_BILLING_ANNOUNCEMENT_ENABLED') === 'true';
 export const GASTOWN_CF_ACCESS_CLIENT_ID = getEnvVariable('GASTOWN_SERVICE_CF_ACCESS_CLIENT_ID');
 export const GASTOWN_CF_ACCESS_CLIENT_SECRET = getEnvVariable(

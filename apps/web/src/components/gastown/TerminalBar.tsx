@@ -9,6 +9,7 @@ import { useGastownTRPC, gastownWsUrl, type GastownOutputs } from '@/lib/gastown
 import { useSidebar } from '@/components/ui/sidebar';
 import { Switch } from '@/components/ui/switch';
 import { useConfirm } from '@/components/ui/confirm';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
@@ -313,12 +314,17 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     left: 'border-r',
   }[position];
 
-  // Resize handle — rendered as a flex child so it naturally sits at the correct edge
-  // and doesn't compete with content stacking contexts for pointer events.
+  // The handle overlays the pane edge so its hit area doesn't affect tab/content alignment.
   const isVerticalHandle = !horizontal;
   const resizeHandleClass = [
-    'group/resize shrink-0 flex items-center justify-center',
+    'group/resize absolute z-10 flex shrink-0 items-center justify-center',
     isVerticalHandle ? 'h-full w-2 cursor-ew-resize' : 'w-full h-2 cursor-ns-resize',
+    {
+      bottom: 'inset-x-0 top-0',
+      top: 'inset-x-0 bottom-0',
+      right: 'inset-y-0 left-0',
+      left: 'inset-y-0 right-0',
+    }[position],
   ].join(' ');
   const resizeHandleIndicator = isVerticalHandle
     ? 'h-8 w-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors'
@@ -596,6 +602,9 @@ function TabBar({
           : billing?.runPolicy === 'paused_by_user'
             ? 'Automatic container starts are paused.'
             : '';
+  const showRunCostTooltip =
+    billing?.estimatedRunCharge !== undefined &&
+    (billing.state === 'running' || billing.state === 'warning' || billing.state === 'stopping');
 
   return (
     <div
@@ -615,7 +624,7 @@ function TabBar({
 
       {/* Tabs */}
       <div
-        className={`flex ${horizontal ? 'flex-1 items-center gap-0.5 overflow-x-auto px-1' : 'flex-1 flex-col gap-0.5 overflow-y-auto py-1'}`}
+        className={`flex ${horizontal ? `flex-1 items-center gap-0.5 overflow-x-auto px-1 ${position === 'bottom' ? '-mb-3' : ''}` : 'flex-1 flex-col gap-0.5 overflow-y-auto py-1'}`}
       >
         <AnimatePresence initial={false}>
           {allTabs.map(tab => {
@@ -694,7 +703,28 @@ function TabBar({
           }`}
         >
           <CircleDollarSign className="size-3" />
-          {billingSummary}
+          {showRunCostTooltip ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="focus-visible:ring-ring cursor-help rounded-sm underline decoration-dotted underline-offset-2 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {billingSummary}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6} className="max-w-72 text-left">
+                <p className="font-medium">Estimated container cost</p>
+                <p className="text-muted-foreground mt-1">
+                  This estimate accrues only while the Gas Town container is running. Model and
+                  token usage is billed separately. The final amount may adjust after the latest
+                  meter interval settles.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            billingSummary
+          )}
           {billing.state === 'warning' && (
             <Link
               href={

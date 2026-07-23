@@ -423,6 +423,9 @@ primary CTA. Amounts and usage counters SHOULD use tabular numerals.
 3. If `recordStop` cannot be acknowledged during shutdown, the pending stop MUST survive and retry
    later. A missing stop ack MUST NOT cause the next runtime to reuse the previous interval.
 4. Metering errors and retries MUST NOT log credit balances, tokens, or other credentials.
+5. If the meter reports that a locally open interval is missing, Gastown MUST replay the same
+   idempotent `recordStart` and retry the heartbeat or stop. Pre-WorkerEntrypoint development state
+   MUST be version-migrated so obsolete authorization and credit-block fields cannot strand a town.
 
 ## Rollout And Acceptance
 
@@ -447,7 +450,8 @@ Cloudflare runtime observations, duplicate RPCs do not duplicate charges, and ag
 reasonably consistent with the Cloudflare invoice. `GASTOWN_BILLING_ENABLED` controls metering,
 admission, debits, warnings, and stops together. A separate default-off
 `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` web flag MAY show advance notice while actual billing remains
-disabled; it MUST NOT alter backend billing behavior.
+disabled; it MUST NOT alter backend billing behavior. Both flags are always enabled in local
+development while retaining default-off production behavior.
 
 Dashboards MUST expose awake seconds, base Cloudflare cost, customer charge, gross multiplier,
 unclosed intervals, SKU admission denials, RPC failures, graceful-stop duration, forced stops, and

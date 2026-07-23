@@ -81,8 +81,20 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
         active = undefined;
       }
       if (active?.measurementStarted) {
+        if (this.ctx.container?.running === true) {
+          await this.ensureStartAcknowledged(active);
+          return;
+        }
+        const state = await this.getState();
         await this.ensureStartAcknowledged(active);
-        return;
+        await this.billingHeartbeat.recordStop({
+          reason: 'runtime_signal',
+          ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
+            ? { exitCode: state.exitCode }
+            : {}),
+        });
+        await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        active = undefined;
       }
 
       // A start may have succeeded before the DO was evicted or a prior admission response failed.
@@ -104,8 +116,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       }
 
       // Adopt containers that were already running when shadow metering rolled out.
-      const state = await this.getState();
-      if (state.status !== 'stopped' && state.status !== 'stopped_with_code') {
+      if (this.ctx.container?.running === true) {
         await this.startBillingGeneration(parsed);
       }
     });

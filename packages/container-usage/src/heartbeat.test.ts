@@ -107,6 +107,24 @@ describe('installBillingHeartbeat', () => {
     expect(Object.hasOwn(container, BILLING_HEARTBEAT_CALLBACK)).toBe(true);
   });
 
+  it('does not mark measurement started when initial scheduling fails', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(),
+        schedule: vi.fn(async () => {
+          throw new Error('schedule unavailable');
+        }) as Container['schedule'],
+      },
+      { client: usageClient('continue'), storage, enforceBudgetStop: vi.fn() }
+    );
+
+    await expect(controller.scheduleHeartbeat()).rejects.toThrow('schedule unavailable');
+    expect((await getBillingContext(storage))?.measurementStarted).toBe(false);
+  });
+
   it('keeps a stopped-state probe scheduled until stop is durably acknowledged', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

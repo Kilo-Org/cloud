@@ -34,10 +34,16 @@ const sdk = vi.hoisted(() => {
     }
 
     async onStart(): Promise<void> {
+      if (this.ctx.container) {
+        Object.defineProperty(this.ctx.container, 'running', { value: true, configurable: true });
+      }
       this.superStarted = true;
     }
 
     async onStop(): Promise<void> {
+      if (this.ctx.container) {
+        Object.defineProperty(this.ctx.container, 'running', { value: false, configurable: true });
+      }
       this.superStopped = true;
     }
 
@@ -97,17 +103,28 @@ type TestRuntime = MeteredSandbox & {
   superStopped: boolean;
   superActivityExpired: boolean;
   superStopCalled: boolean;
+  setPhysicalRunning(running: boolean): void;
   billingHeartbeatTick(generation?: string): Promise<void>;
 };
 
-function createSandbox(rpc = createRpc()) {
+function createSandbox(rpc = createRpc(), containerRunning = false) {
   const storage = new MemoryStorage();
   const ctx = {
     id: { toString: () => 'do-id' },
     storage,
+    container: { running: containerRunning },
   } as unknown as SandboxDurableObjectState;
   class TestSandbox extends MeteredSandbox {
     protected readonly sandboxClassName = 'SandboxSmallContainment' as const;
+
+    setPhysicalRunning(running: boolean): void {
+      if (this.ctx.container) {
+        Object.defineProperty(this.ctx.container, 'running', {
+          value: running,
+          configurable: true,
+        });
+      }
+    }
   }
   return {
     rpc,
@@ -159,7 +176,7 @@ describe('MeteredSandbox', () => {
   });
 
   it('adopts a physical container that predates shadow metering', async () => {
-    const { rpc, storage, sandbox } = createSandbox();
+    const { rpc, storage, sandbox } = createSandbox(createRpc(), true);
     vi.spyOn(Date, 'now').mockReturnValue(1_500);
     sandbox.mockState = { status: 'healthy' };
 
@@ -170,6 +187,39 @@ describe('MeteredSandbox', () => {
       startEpochMs: 1_500,
       measurementStarted: true,
     });
+  });
+
+  it('does not adopt stale healthy state when no physical container is running', async () => {
+    const { rpc, storage, sandbox } = createSandbox();
+    sandbox.mockState = { status: 'healthy' };
+
+    await sandbox.configureBilling(billingInput);
+
+    expect(rpc.recordStart).not.toHaveBeenCalled();
+    expect(await getBillingContext(storage)).toBeUndefined();
+  });
+
+  it('closes a missed-stop generation before the next physical start', async () => {
+    const { rpc, storage, sandbox } = createSandbox();
+    vi.spyOn(Date, 'now').mockReturnValue(1_750);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    const first = await getBillingContext(storage);
+
+    sandbox.setPhysicalRunning(false);
+    sandbox.mockState = { status: 'stopped' };
+    await sandbox.configureBilling({ ...billingInput, sessionId: 'agent_2' });
+
+    expect(await getBillingContext(storage)).toBeUndefined();
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ startEpochMs: first?.startEpochMs, reason: 'runtime_signal' })
+    );
+
+    await sandbox.onStart();
+    const second = await getBillingContext(storage);
+    expect(second?.generation).not.toBe(first?.generation);
+    expect(second?.startEpochMs).toBe(1_751);
   });
 
   it('retries an unacknowledged start before allowing active-generation work', async () => {

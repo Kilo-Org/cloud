@@ -81,15 +81,15 @@ export function installBillingHeartbeat(
     const startedContext = context.measurementStarted
       ? context
       : { ...context, measurementStarted: true, usageMeasuredAtMs: Date.now() };
-    if (!context.measurementStarted) {
-      await updateBillingContext(dependencies.storage, startedContext);
-    }
     cancelHeartbeat();
     await container.schedule(
       heartbeatSeconds,
       BILLING_HEARTBEAT_CALLBACK,
       startedContext.generation
     );
+    if (!context.measurementStarted) {
+      await updateBillingContext(dependencies.storage, startedContext);
+    }
   };
 
   const rescheduleIfCurrent = async (expected: BillingContext): Promise<boolean> => {

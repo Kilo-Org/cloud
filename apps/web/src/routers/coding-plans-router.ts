@@ -13,11 +13,12 @@ import {
   terminateCodingPlanImmediately,
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
+import { CodingPlanQuotaWindowsSchema } from '@/lib/coding-plans/usage-contract';
 import {
-  getMiniMaxUsage,
-  MiniMaxUsageError,
-  MiniMaxUsageNativeSchema,
-} from '@/lib/coding-plans/minimax-usage';
+  CodingPlanUsageError,
+  getCodingPlanUsage,
+  hasCodingPlanUsageAdapter,
+} from '@/lib/coding-plans/usage';
 import {
   listManualCredentialRevocations,
   markCredentialManuallyRevoked,
@@ -50,11 +51,16 @@ const BillingHistoryInputSchema = z.object({
   cursor: z.string().optional(),
 });
 const CodingPlanUsageOutputSchema = z.object({
-  subscriptionId: SubscriptionIdSchema,
-  providerId: z.literal('minimax'),
-  region: z.literal('global'),
+  schemaVersion: z.literal(1),
   fetchedAt: z.iso.datetime(),
-  native: MiniMaxUsageNativeSchema,
+  subscription: z.object({
+    id: SubscriptionIdSchema,
+    planId: CodingPlanIdSchema,
+    planName: z.string().min(1),
+    providerId: CodingPlanProviderIdSchema,
+    providerName: z.string().min(1),
+    windows: CodingPlanQuotaWindowsSchema,
+  }),
 });
 
 const codingPlanSubscriptionColumns = {
@@ -89,6 +95,19 @@ function toIsoTimestamp(value: string): string {
 
 function toNullableIsoTimestamp(value: string | null): string | null {
   return value ? toIsoTimestamp(value) : null;
+}
+
+function hasCurrentUsageAccess(subscription: CodingPlanSubscriptionRow): boolean {
+  if (subscription.cancelAtPeriodEnd) {
+    return Date.parse(subscription.currentPeriodEnd) > Date.now();
+  }
+  if (subscription.status === 'past_due') {
+    return (
+      subscription.paymentGraceExpiresAt !== null &&
+      Date.parse(subscription.paymentGraceExpiresAt) > Date.now()
+    );
+  }
+  return true;
 }
 
 function toAvailabilityStatus(isAvailable: boolean): 'available' | 'sold_out' {
@@ -218,9 +237,10 @@ export const codingPlansRouter = createTRPCRouter({
       const plan = getCodingPlanPrice(subscription.planId);
       if (
         !['active', 'past_due'].includes(subscription.status) ||
+        !hasCurrentUsageAccess(subscription) ||
         !plan ||
-        plan.providerId !== 'minimax' ||
-        subscription.providerId !== plan.providerId
+        subscription.providerId !== plan.providerId ||
+        !hasCodingPlanUsageAdapter(plan.providerId)
       ) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
@@ -247,8 +267,8 @@ export const codingPlansRouter = createTRPCRouter({
         });
       }
 
-      const native = await getMiniMaxUsage(apiKey).catch(error => {
-        if (error instanceof MiniMaxUsageError) {
+      const usage = await getCodingPlanUsage(plan.providerId, apiKey).catch(error => {
+        if (error instanceof CodingPlanUsageError) {
           throw new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
         }
         throw new TRPCError({
@@ -258,11 +278,16 @@ export const codingPlansRouter = createTRPCRouter({
       });
 
       return {
-        subscriptionId: subscription.id,
-        providerId: 'minimax' as const,
-        region: 'global' as const,
-        fetchedAt: new Date().toISOString(),
-        native,
+        schemaVersion: 1 as const,
+        fetchedAt: usage.fetchedAt,
+        subscription: {
+          id: subscription.id,
+          planId: plan.planId,
+          planName: plan.name,
+          providerId: plan.providerId,
+          providerName: plan.providerName,
+          windows: usage.windows,
+        },
       };
     }),
 

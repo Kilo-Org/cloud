@@ -310,7 +310,11 @@ historical Commit names, prices, invoices, and credit deductions.
     Current quota state and Installed BYOK Configuration routing state MUST be
     presented separately. For an active or `past_due` plan, quota lookup MUST be
     authorized through the retained assigned Managed Plan Credential rather
-    than through the Installed BYOK Configuration.
+    than through the Installed BYOK Configuration. Cloud MUST normalize current
+    provider quota into an ordered set of windows owned by that subscription.
+    Each window MUST include a stable semantic ID, remaining percentage, reset
+    timestamp, and positive period. Kilo clients MUST NOT depend on
+    provider-native quota fields or labels.
 
     `/byok` MUST identify the Kilo-managed installed key as read-only and MUST
     NOT offer update, enable/disable, delete, saved raw-key view, or copy
@@ -498,6 +502,7 @@ not yet enforced in the current codebase:
 
 - Allowed authenticated Kilo clients to reuse current personal subscription data without moving billing history out of Subscription Center.
 - Kept provider quota authorization on the retained Managed Plan Credential and independent from current BYOK routing state.
+- Normalized provider quota into subscription-owned windows so current-plan clients do not depend on provider-native response formats.
 
 ### 2026-06-05 -- KiloClaw final Commit continuation
 

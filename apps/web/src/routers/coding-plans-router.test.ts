@@ -42,7 +42,12 @@ function usageResponse() {
           model_name: 'general',
           current_interval_remaining_percent: 80,
           current_interval_status: 1,
+          start_time: 1_781_262_000_000,
           end_time: 1_781_280_000_000,
+          current_weekly_remaining_percent: 70,
+          current_weekly_status: 1,
+          weekly_start_time: 1_781_280_000_000,
+          weekly_end_time: 1_781_884_800_000,
         },
       ],
     }),
@@ -330,18 +335,28 @@ describe('coding plans router', () => {
       subscriptionId: activation.subscriptionId,
     });
     expect(active).toEqual({
-      subscriptionId: activation.subscriptionId,
-      providerId: 'minimax',
-      region: 'global',
+      schemaVersion: 1,
       fetchedAt: expect.stringContaining('T'),
-      native: {
-        base_resp: { status_code: 0 },
-        model_remains: [
+      subscription: {
+        id: activation.subscriptionId,
+        planId: PLAN_ID,
+        planName: 'Token Plan Plus',
+        providerId: 'minimax',
+        providerName: 'MiniMax',
+        windows: [
           {
-            model_name: 'general',
-            current_interval_remaining_percent: 80,
-            current_interval_status: 1,
-            end_time: 1_781_280_000_000,
+            id: 'short_term',
+            remainingPercent: 80,
+            startsAt: new Date(1_781_262_000_000).toISOString(),
+            resetsAt: new Date(1_781_280_000_000).toISOString(),
+            period: { unit: 'hour', value: 5 },
+          },
+          {
+            id: 'weekly',
+            remainingPercent: 70,
+            startsAt: new Date(1_781_280_000_000).toISOString(),
+            resetsAt: new Date(1_781_884_800_000).toISOString(),
+            period: { unit: 'week', value: 1 },
           },
         ],
       },
@@ -363,7 +378,7 @@ describe('coding plans router', () => {
     }
   });
 
-  it('keeps past-due and pending-cancellation subscriptions eligible but rejects canceled plans', async () => {
+  it('limits usage to the paid period or payment grace window', async () => {
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
       microdollars_used: 0,
@@ -382,14 +397,52 @@ describe('coding plans router', () => {
       idempotencyKey: 'usage-states',
     });
     jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const past = new Date(Date.now() - 60_000).toISOString();
 
     await db
       .update(coding_plan_subscriptions)
-      .set({ status: 'past_due', cancel_at_period_end: true })
+      .set({ status: 'active', cancel_at_period_end: true, current_period_end: future })
       .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
-    ).resolves.toMatchObject({ subscriptionId: activation.subscriptionId });
+    ).resolves.toMatchObject({ subscription: { id: activation.subscriptionId } });
+
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ current_period_end: past })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    await db
+      .update(coding_plan_subscriptions)
+      .set({
+        status: 'past_due',
+        cancel_at_period_end: false,
+        payment_grace_expires_at: future,
+      })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).resolves.toMatchObject({ subscription: { id: activation.subscriptionId } });
+
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ payment_grace_expires_at: null })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    await db
+      .update(coding_plan_subscriptions)
+      .set({ payment_grace_expires_at: past })
+      .where(eq(coding_plan_subscriptions.id, activation.subscriptionId));
+    await expect(
+      caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
 
     await db
       .update(coding_plan_subscriptions)
@@ -471,7 +524,7 @@ describe('coding plans router', () => {
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
     ).rejects.toMatchObject({
       code: 'BAD_GATEWAY',
-      message: 'MiniMax usage is temporarily unavailable.',
+      message: 'Coding Plan usage is temporarily unavailable.',
     });
     await expect(caller.codingPlans.listSubscriptions()).resolves.toHaveLength(1);
     await expect(

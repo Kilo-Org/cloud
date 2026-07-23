@@ -1,7 +1,7 @@
 import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from 'cloud-agent-sdk';
 import { ChevronDown } from 'lucide-react-native';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -30,6 +30,15 @@ type SessionMessageListProps<T> = {
   onLoadOlderMessages: () => void;
   renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
+  /**
+   * Extra bottom padding (in dp) applied to the list's content container.
+   * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
+   * exactly, so the main session view is unaffected. Hosts that render
+   * inside a React Native `Modal` (e.g. the subagent sheet) pass a
+   * safe-area-aware value so the last row clears curved-bottom home
+   * indicators.
+   */
+  contentBottomInset?: number;
 };
 
 export function SessionMessageList<T>({
@@ -43,6 +52,7 @@ export function SessionMessageList<T>({
   onLoadOlderMessages,
   renderItem,
   ListFooterComponent,
+  contentBottomInset,
 }: Readonly<SessionMessageListProps<T>>) {
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
@@ -103,12 +113,25 @@ export function SessionMessageList<T>({
   // downstream types may infer it as nullable.
   const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<T>>;
 
+  // When the optional `contentBottomInset` is omitted we return the
+  // original module-level `listContentContainerStyle` reference so the
+  // default-prop path is behavior-identical (no allocation, no value
+  // change). When provided we extend the bottom padding to clear safe
+  // areas such as the home indicator on curved-bottom iPhones.
+  const resolvedContentContainerStyle = useMemo<ViewStyle>(
+    () =>
+      contentBottomInset
+        ? { paddingTop: 8, paddingBottom: 8 + contentBottomInset }
+        : listContentContainerStyle,
+    [contentBottomInset]
+  );
+
   return (
     <View className="flex-1">
       <FlashList<T>
         ref={listRefSafe}
         style={listStyle}
-        contentContainerStyle={listContentContainerStyle}
+        contentContainerStyle={resolvedContentContainerStyle}
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}

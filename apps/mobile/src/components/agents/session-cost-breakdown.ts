@@ -51,6 +51,9 @@ type Step = {
   };
 };
 
+// One micro-dollar — below the sheet's 4-decimal display precision.
+const COST_RECONCILIATION_EPSILON_USD = 1e-6;
+
 /**
  * Aggregate a session's cost + token usage by model, with a subagent
  * residual so the per-model rows reconcile to the session total.
@@ -154,7 +157,13 @@ export function getSessionCostBreakdown(
   };
 
   const attributedCostUsd = models.reduce((sum, m) => sum + m.costUsd, 0);
-  const subagentCostUsd = Math.max(0, totalCostUsd - attributedCostUsd);
+  // `totalCostUsd` is authoritative and >= `attributedCostUsd` by the cost-propagation
+  // model. A residual within +/-epsilon is floating-point noise, so no "Subagents" row
+  // is emitted. A genuinely negative residual (should not occur) is treated as zero
+  // rather than surfaced as a negative cost. This makes the clamp a deliberate,
+  // documented reconciliation step, not a silent guard.
+  const costResidualUsd = totalCostUsd - attributedCostUsd;
+  const subagentCostUsd = costResidualUsd > COST_RECONCILIATION_EPSILON_USD ? costResidualUsd : 0;
 
   return { totals, models, attributedCostUsd, subagentCostUsd };
 }

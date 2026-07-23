@@ -8,6 +8,7 @@ import {
   buildCouncilReviewSection,
   computeCouncilDecision,
   councilDecisionBlocksMerge,
+  councilHardExcludeReason,
   decideCouncilFromManifest,
   deriveSpecialistVote,
   determineAutomatedReviewType,
@@ -581,6 +582,41 @@ describe('determineAutomatedReviewType', () => {
         { councilEntitled: false, councilConfigActive: false, councilEnabledForRepo: false }
       )
     ).toBe('standard');
+  });
+
+  it('hard-excludes downgrade an otherwise-available council to standard', () => {
+    expect(determineAutomatedReviewType({ isDraft: true }, ALL_ON)).toBe('standard');
+    expect(determineAutomatedReviewType({ isBot: true }, ALL_ON)).toBe('standard');
+    expect(determineAutomatedReviewType({ isFork: true }, ALL_ON)).toBe('standard');
+    // A clean PR with council available still gets council.
+    expect(
+      determineAutomatedReviewType({ isDraft: false, isBot: false, isFork: false }, ALL_ON)
+    ).toBe('council');
+  });
+
+  it('a hard-excluded PR without council available is unaffected (stays standard)', () => {
+    expect(
+      determineAutomatedReviewType(
+        { isFork: true, isBot: true },
+        { ...ALL_ON, councilEnabledForRepo: false }
+      )
+    ).toBe('standard');
+  });
+});
+
+describe('councilHardExcludeReason', () => {
+  it('returns null when nothing excludes council', () => {
+    expect(councilHardExcludeReason({})).toBeNull();
+    expect(councilHardExcludeReason({ isDraft: false, isBot: false, isFork: false })).toBeNull();
+  });
+
+  it('reports the reason, ordered draft → bot-author → fork-pr', () => {
+    expect(councilHardExcludeReason({ isDraft: true })).toBe('draft');
+    expect(councilHardExcludeReason({ isBot: true })).toBe('bot-author');
+    expect(councilHardExcludeReason({ isFork: true })).toBe('fork-pr');
+    // When several apply, the earliest-listed reason wins (deterministic).
+    expect(councilHardExcludeReason({ isDraft: true, isBot: true, isFork: true })).toBe('draft');
+    expect(councilHardExcludeReason({ isBot: true, isFork: true })).toBe('bot-author');
   });
 });
 

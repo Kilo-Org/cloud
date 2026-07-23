@@ -146,6 +146,10 @@ export const PullRequestPayloadSchema = z.object({
       id: z.number(),
       login: z.string(),
       avatar_url: z.string(),
+      // GitHub account type: 'User' | 'Bot' | 'Organization'. Used to hard-exclude bot-authored
+      // PRs (dependabot/renovate/etc.) from the council review path. Optional for forward/back
+      // compatibility with payloads/fixtures that omit it.
+      type: z.string().optional(),
     }),
     head: z.object({
       sha: z.string(),

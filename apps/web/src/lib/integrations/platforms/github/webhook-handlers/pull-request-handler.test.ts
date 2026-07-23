@@ -363,6 +363,35 @@ describe('handlePullRequest', () => {
       );
       expect(mockIsCouncilEntitledForOwner).toHaveBeenCalled();
     });
+
+    it('hard-excludes a bot-authored PR from council (downgrades to standard)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
+
+    it('hard-excludes a fork PR from council (downgrades to standard)', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      // Head repo differs from the base repo → resolvePullRequestCheckoutRef marks it a fork PR.
+      const payload = pullRequestPayload();
+      payload.pull_request.head.repo = { full_name: 'contributor/widgets' };
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
   });
 
   it('cancels superseded DB rows, interrupts queued/running only, and creates the new review', async () => {

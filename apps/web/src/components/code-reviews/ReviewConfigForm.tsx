@@ -17,6 +17,7 @@ import {
   Copy,
   Check,
   ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -53,6 +54,7 @@ import {
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
+import { ReviewMdConversionDialog } from './ReviewMdConversionDialog';
 import {
   RepositoryModelOverrides,
   type RepositoryModelOverrideValue,
@@ -249,6 +251,7 @@ export function ReviewConfigForm({
   // surfaced to configs that already have something stored in it, and stays
   // visible for the rest of the session even if the user clears it.
   const [showCustomInstructions, setShowCustomInstructions] = useState(false);
+  const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
@@ -896,6 +899,16 @@ export function ReviewConfigForm({
                     Learn about REVIEW.md
                   </Link>
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setConversionDialogOpen(true)}
+                  disabled={!customInstructions.trim()}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Help me automate the conversion
+                </Button>
               </div>
             )}
 
@@ -1332,6 +1345,14 @@ export function ReviewConfigForm({
                   : 'Save Configuration'}
               </Button>
             </div>
+
+            <ReviewMdConversionDialog
+              open={conversionDialogOpen}
+              onOpenChange={setConversionDialogOpen}
+              organizationId={organizationId}
+              platform={platform}
+              repositories={selectableRepositories}
+            />
           </div>
         </div>
       </CardContent>

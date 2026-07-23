@@ -20,7 +20,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+# Compute the diff base SHA by GitHub event type.
+# - `push` event: use the BEFORE sha from $GITHUB_EVENT_PATH so the diff covers
+#   the pushed range. `git merge-base origin/main HEAD` on a push to main
+#   resolves to HEAD, which would produce an empty matrix and skip the
+#   workspace-tests job.
+# - `pull_request` event (and locally with no GitHub env): use the merge-base
+#   against origin/main to preserve prior PR behavior.
+# - All-zeros before-sha (force-push / first push / branch creation) or any
+#   invalid/unreachable before-sha falls back to HEAD~1.
+base=""
+if [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+  before=$(jq -r '.before // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+  if [ -n "$before" ] \
+      && [ "$before" != "0000000000000000000000000000000000000000" ] \
+      && git cat-file -e "$before" 2>/dev/null; then
+    base="$before"
+  else
+    base=$(git rev-parse --verify HEAD~1 2>/dev/null || true)
+  fi
+else
+  base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+fi
 
 # Decide selection mode:
 #   force_all=true — include every workspace (lockfile/workspace-yaml changes

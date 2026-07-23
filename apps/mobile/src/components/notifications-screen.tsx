@@ -29,6 +29,7 @@ import {
   applyAgentPushOptimistic,
   deriveAgentPushEditable,
   deriveShowEnableCta,
+  NOTIFICATION_CATEGORY_KEYS,
   type NotificationCategoryKey,
   type NotificationPreferences,
   readAgentPushPreference,
@@ -46,6 +47,18 @@ import { useTRPC } from '@/lib/trpc';
 
 const permissionQueryKey = ['notificationPermission'] as const;
 const deviceTokenQueryKey = ['devicePushToken'] as const;
+
+/**
+ * Resolve which category a `setNotificationPreferences` mutation invocation was
+ * for from its `{ [category]: next }` payload. Each row sends exactly one
+ * category key, so each mutation callback can scope its pending/optimistic
+ * bookkeeping to its own category instead of a shared, race-prone ref.
+ */
+function categoryFromVariables(
+  variables: Partial<Record<string, unknown>>
+): NotificationCategoryKey | undefined {
+  return NOTIFICATION_CATEGORY_KEYS.find(key => key in variables);
+}
 
 type InlineRetryProps = Readonly<{ label: string; color: string; onPress: () => void }>;
 
@@ -169,14 +182,16 @@ export function NotificationsScreen() {
 
   const [isTogglingPermission, setIsTogglingPermission] = useState(false);
   const [isRegisteringToken, setIsRegisteringToken] = useState(false);
-  // Which single category is currently mid-mutation (tRPC mutation's
-  // `isPending` is shared across the whole procedure, so we track the
-  // in-flight category explicitly to scope the row's busy state).
-  const [pendingCategory, setPendingCategory] = useState<NotificationCategoryKey | null>(null);
-  // The mutation's onMutate callback reads which category we're flipping
-  // from this ref (set just before mutate() is called). Using a ref keeps
-  // the mutation object stable across renders.
-  const pendingCategoryRef = useRef<NotificationCategoryKey | null>(null);
+  // The `setNotificationPreferences` mutation object is shared across all five
+  // rows, and its `isPending` is a single flag for the whole procedure. Two
+  // category flips can therefore be in flight at once, so we track the set of
+  // in-flight categories explicitly and scope each row's busy state to its own
+  // key. Each mutation callback resolves its own category from `variables`
+  // (the single `{ [category]: next }` payload) rather than a shared ref, so a
+  // later flip can never clear an earlier flip's pending/optimistic state.
+  const [pendingCategories, setPendingCategories] = useState<ReadonlySet<NotificationCategoryKey>>(
+    () => new Set()
+  );
 
   const {
     data: permissionGranted = false,
@@ -277,7 +292,7 @@ export function NotificationsScreen() {
       // write commits before the mutation body runs.
       // eslint-disable-next-line require-await, typescript-eslint/return-await
       onMutate: async variables => {
-        const category = pendingCategoryRef.current;
+        const category = categoryFromVariables(variables);
         if (category == null) {
           return undefined;
         }
@@ -300,8 +315,18 @@ export function NotificationsScreen() {
         });
         toast.error(error.message);
       },
-      onSettled: () => {
-        setPendingCategory(null);
+      onSettled: (_data, _error, variables) => {
+        const category = categoryFromVariables(variables);
+        if (category != null) {
+          setPendingCategories(prev => {
+            if (!prev.has(category)) {
+              return prev;
+            }
+            const next = new Set(prev);
+            next.delete(category);
+            return next;
+          });
+        }
         void queryClient.invalidateQueries({ queryKey: preferencesQueryKey });
       },
     })
@@ -309,8 +334,7 @@ export function NotificationsScreen() {
 
   const handleCategoryChange = useCallback(
     (category: NotificationCategoryKey, next: boolean) => {
-      pendingCategoryRef.current = category;
-      setPendingCategory(category);
+      setPendingCategories(prev => new Set([...prev, category]));
       setPreference.mutate({ [category]: next });
     },
     [setPreference]
@@ -334,7 +358,10 @@ export function NotificationsScreen() {
       const result = await Notifications.requestPermissionsAsync();
       void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
       if (result.status === Notifications.PermissionStatus.GRANTED || result.granted) {
-        setIsTogglingPermission(false);
+        // Keep `isTogglingPermission` set through token registration so the
+        // master switch stays busy for the whole enable flow. Clearing it here
+        // (before `isRegisteringToken` is set) would briefly re-enable the
+        // switch mid-flow and allow a re-entrant enable/disable.
         const token = await registerForPushNotifications();
         if (!token) {
           toast.error('Registration failed. Check your notification permissions.');
@@ -343,12 +370,18 @@ export function NotificationsScreen() {
         setIsRegisteringToken(true);
         try {
           await registerToken.mutateAsync({ token, platform: getPlatform() });
+        } catch {
+          // registerToken's onError already surfaced the toast; swallow here so
+          // the outer catch does not double-report the same failure.
         } finally {
           setIsRegisteringToken(false);
         }
       }
     } catch {
-      // registerToken's onError already shows the toast.
+      // A failure here comes from requestPermissionsAsync or
+      // registerForPushNotifications (the registration mutation reports its own
+      // error above), so surface the feedback the previous card also showed.
+      toast.error('Could not enable notifications. Please try again.');
     } finally {
       setIsTogglingPermission(false);
     }
@@ -490,7 +523,7 @@ export function NotificationsScreen() {
                   queryClient={queryClient}
                   preferences={preferences}
                   disabled={!notificationsEnabled}
-                  isPending={pendingCategory === meta.key}
+                  isPending={pendingCategories.has(meta.key)}
                   onChange={next => {
                     handleCategoryChange(meta.key, next);
                   }}

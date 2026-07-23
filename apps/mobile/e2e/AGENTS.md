@@ -171,6 +171,14 @@ apps/mobile/e2e/remote-cli.sh start [email]
 
 The helper resolves this worktree's stack ports from `pnpm dev:status --json`, mints a token for the given user (defaulting to the per-worktree login account, `e2e-mobile+<worktree-slug>@example.com`), installs the CLI into a disposable per-worktree directory, and launches it in a `kilo-e2e-cli-<worktree-slug>` tmux session already pointed at the local API, session-ingest, and event-service. Pass the account the app is signed in as when it differs from the default. Manage it with `remote-cli.sh status` and `remote-cli.sh stop`.
 
+Run any one-off CLI command against the same prepared stack (reusing the token and URLs) with `exec`, instead of the interactive TUI:
+
+```bash
+apps/mobile/e2e/remote-cli.sh exec remote              # enable the real-time relay
+apps/mobile/e2e/remote-cli.sh exec session list --pure # inspect sessions
+apps/mobile/e2e/remote-cli.sh exec run "say hello"     # non-interactive run
+```
+
 Role agents reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 
 ```bash

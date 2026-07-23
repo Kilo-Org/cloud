@@ -215,6 +215,7 @@ const commonSessionFieldsWithPr = {
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
+  total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
 } as const;
 
 /**

@@ -664,6 +664,9 @@ importers:
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
         version: link:../../packages/cloud-agent-profile
+      '@kilocode/cloud-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-sdk
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -1120,6 +1123,10 @@ importers:
         version: 5.9.3
 
   packages/app-shared:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1183,6 +1190,40 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+
+  packages/cloud-agent-sdk:
+    dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
+      jotai:
+        specifier: 2.18.1
+        version: 2.18.1(@babel/core@7.29.0)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.6)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@jest/globals':
+        specifier: 30.3.0
+        version: 30.3.0
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../session-ingest-contracts
+      '@swc/jest':
+        specifier: 0.2.39
+        version: 0.2.39(@swc/core@1.15.18)
+      '@types/jest':
+        specifier: 30.0.0
+        version: 30.0.0
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260514.1
+      jest:
+        specifier: 30.3.0
+        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
 
   packages/container-usage:
     dependencies:
@@ -4477,11 +4518,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild/aix-ppc64@0.27.4':
     resolution: {integrity: sha512-cQPwL2mp2nSmHHJlCyoXgHGhbEPMrEEU5xhkcy3Hs/O7nGZqEpZ2sUtLaL9MORLtDfRvVl2/3PAuEkYZH0Ty8Q==}

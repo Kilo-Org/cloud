@@ -10,7 +10,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUserWebConnection } from '../CloudAgentProvider';
-import type { UserWebSessionEventData } from '@/lib/cloud-agent-sdk';
+import type { UserWebSessionEventData } from '@kilocode/cloud-agent-sdk';
 import {
   apiSessionToDbSession,
   dbSessionsAtom,

@@ -9,12 +9,18 @@
     "./security-agent": "./src/security-agent/index.ts",
     "./code-review": "./src/code-review/index.ts",
     "./organizations": "./src/organizations/index.ts",
-    "./platforms": "./src/platforms.ts"
+    "./platforms": "./src/platforms.ts",
+    "./opencode": "./src/opencode.gen.ts",
+    "./images-schema": "./src/images-schema.ts",
+    "./cloud-agent": "./src/cloud-agent.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",

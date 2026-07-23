@@ -172,7 +172,9 @@ describe('resolvePullRequestCheckoutRef', () => {
     });
   });
 
-  it('uses refs/pull/<number>/head when head.repo is missing', () => {
+  it('treats a missing head.repo as a fork PR (deleted fork fails closed)', () => {
+    // A same-repo PR always carries head.repo, so a null one can only be a fork whose repo was
+    // deleted after opening. It must resolve to isForkPr: true so the council fork-exclusion holds.
     const result = resolvePullRequestCheckoutRef({
       pull_request: {
         number: 789,
@@ -187,7 +189,7 @@ describe('resolvePullRequestCheckoutRef', () => {
 
     expect(result).toEqual({
       checkoutRef: 'refs/pull/789/head',
-      isForkPr: false,
+      isForkPr: true,
       headRepoFullName: null,
     });
   });
@@ -386,6 +388,21 @@ describe('handlePullRequest', () => {
       // Head repo differs from the base repo → resolvePullRequestCheckoutRef marks it a fork PR.
       const payload = pullRequestPayload();
       payload.pull_request.head.repo = { full_name: 'contributor/widgets' };
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
+
+    it('hard-excludes a fork PR whose fork was deleted (null head.repo) from council', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(councilConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      // GitHub nulls head.repo when the contributor deletes their fork; this must still be a fork.
+      const payload = pullRequestPayload();
+      payload.pull_request.head.repo = null;
       await handlePullRequest(payload, platformIntegration());
 
       expect(mockCreateCodeReview).toHaveBeenCalledWith(

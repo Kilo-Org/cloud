@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import PostHog from 'posthog-react-native';
 import { useCallback, useSyncExternalStore } from 'react';
 
@@ -40,6 +41,22 @@ let client: PostHog | null = null;
 // flags later load. init wires the client's single update into this registry.
 const flagListeners = new Set<() => void>();
 
+// App version + build for PostHog. Both are strings; `app_build` is a monotonic
+// integer-as-string, so it's the reliable field for "release >= N" flag rules
+// (`app_version` compares lexicographically). Native SDK auto-captures
+// $app_version/$app_build on events; flag targeting needs them as person
+// properties, which this supplies.
+function appVersionProperties(): Record<string, string> {
+  const props: Record<string, string> = {};
+  if (Application.nativeApplicationVersion) {
+    props.app_version = Application.nativeApplicationVersion;
+  }
+  if (Application.nativeBuildVersion) {
+    props.app_build = Application.nativeBuildVersion;
+  }
+  return props;
+}
+
 export function initPostHog(): void {
   if (client) {
     return;
@@ -52,6 +69,9 @@ export function initPostHog(): void {
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.
   void client.register({ platform: 'mobile' });
+  // Feed app version/build into flag evaluation so flags can target by release
+  // even before (or without) an identified user. Triggers a flag reload.
+  client.setPersonPropertiesForFlags(appVersionProperties());
   client.onFeatureFlags(() => {
     for (const listener of flagListeners) {
       listener();
@@ -71,7 +91,9 @@ export function captureScreen(name: string): void {
 }
 
 export function identifyUser(email: string): void {
-  client?.identify(email, { email });
+  // Persist version/build on the person profile too, so cohorts and insights
+  // can segment by release (not just flag targeting).
+  client?.identify(email, { email, ...appVersionProperties() });
   // Pull the freshly-identified user's flags so gated UI resolves promptly.
   void client?.reloadFeatureFlags();
 }

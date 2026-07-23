@@ -401,6 +401,22 @@ function normalizeComment(node: GraphQlCommentNode) {
 // Exported for unit testing the follow-up pagination loop.
 export const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST = REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY;
 
+// All raw PR-Review GraphQL documents defined in this router, collected as a
+// single exported record so the schema-validity test enumerates docs from
+// module exports (newly added docs are auto-covered). Keys are the
+// operation name / mutation tag; values are the unchanged document strings.
+export const PR_REVIEW_GRAPHQL_DOCUMENTS = {
+  PULL_REQUEST_FRAGMENT_QUERY,
+  REVIEW_THREADS_QUERY,
+  REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY,
+  ENABLE_AUTO_MERGE_MUTATION,
+  DISABLE_AUTO_MERGE_MUTATION,
+  RESOLVE_THREAD_MUTATION,
+  UNRESOLVE_THREAD_MUTATION,
+  ADD_REACTION_MUTATION,
+  REMOVE_REACTION_MUTATION,
+} as const;
+
 // Exported for unit testing the reaction DTO invariant pinned against
 // GitHub's actual `reactionGroups` shape. The downstream DTO contract —
 // `Array<{ content: string; count: number; viewerHasReacted: boolean }>` —

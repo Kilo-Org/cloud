@@ -12,13 +12,34 @@
 //     selection reducer and updates the bridge / floating action.
 //   - `isSelected` paints a focus ring around the line when it
 //     falls inside the current selection range.
+//
+// P1-C-26a layers three non-color accessibility refinements on top
+// of the bounded font metrics from P1-C-22:
+//   - a small GUTTER GLYPH (`+` / `-` / `·`) that mirrors the unified
+//     diff prefix, so add/del/context are distinguishable in
+//     monochrome (color reinforces but never replaces the signal);
+//   - a PRESSABLE `accessibilityLabel` that includes the status word
+//     AND the line text (the prior label only named the gutter line
+//     number), and the same status word + text on the inner code
+//     view for screen-reader browsing;
+//   - a `hitSlop` that adds only horizontal padding to the touchable
+//     row. Rows are rendered contiguously with zero gaps, so vertical
+//     expansion would overlap adjacent rows and mis-route taps. The
+//     bounded visible row height itself is the effective vertical
+//     target; per-row selection accuracy takes precedence over a
+//     nominal 44pt vertical target on contiguous rows.
 
 import { memo, useMemo } from 'react';
 import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
-import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
+import { hitSlopForRow } from '@/lib/pr-review/diff/diff-target';
+import {
+  buildDiffLineAccessibilityLabel,
+  diffLineMarker,
+  type ParsedDiffLine,
+} from '@/lib/pr-review/diff/parse-patch';
 import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 import {
@@ -60,6 +81,19 @@ function rowBackgroundFor(type: ParsedDiffLine['type']): string {
   return 'bg-transparent';
 }
 
+function markerColorFor(
+  type: ParsedDiffLine['type'],
+  colors: ReturnType<typeof useThemeColors>
+): string {
+  if (type === 'add') {
+    return colors.good;
+  }
+  if (type === 'del') {
+    return colors.destructive;
+  }
+  return colors.mutedForeground;
+}
+
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
   const isDark = colors.background === '#0E0E10';
@@ -75,6 +109,10 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const gutterColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineLabel = ` ${NO_NEWLINE_INDICATOR}`;
+  const marker = diffLineMarker(line.type);
+  const markerColor = markerColorFor(line.type, colors);
+  const accessibilityLabel = buildDiffLineAccessibilityLabel(line);
+  const hitSlop = hitSlopForRow();
 
   // Row + gutter use the bounded rowMinHeight so the line is never
   // clipped when the user has a larger a11y font scale.
@@ -110,13 +148,23 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
       <View className="items-end justify-center pr-2" style={gutterStyle}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for gutter */}
         <RNText
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}
+          numberOfLines={1}
           style={{ ...gutterTextBase, color: gutterColor }}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
         >
-          {gutterText}
+          {/* Non-color gutter glyph: '+' / '-' / '·' — the CHARACTER is the
+              signal (readable in monochrome); markerColor only reinforces it.
+              numberOfLines + adjustsFontSizeToFit keeps marker + number on one
+              line at every honoured font scale, preserving bounded row height. */}
+          {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color for non-color add/del glyph */}
+          <RNText style={{ color: markerColor }}>{marker}</RNText>
+          {gutterText ? ` ${gutterText}` : ''}
         </RNText>
       </View>
-      <View className="flex-1" style={codeContainerStyle} accessibilityLabel={line.text}>
+      <View className="flex-1" style={codeContainerStyle} accessibilityLabel={accessibilityLabel}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for code */}
         <RNText
           maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}
@@ -150,10 +198,11 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
       accessibilityRole="button"
       accessibilityLabel={
         isSelected
-          ? `Selected diff line ${gutterText || 'context'}, tap to change selection`
-          : `Comment on diff line ${gutterText || 'context'}`
+          ? `Selected ${accessibilityLabel}, tap to change selection`
+          : `${accessibilityLabel}, tap to comment`
       }
       accessibilityState={{ selected: Boolean(isSelected) }}
+      hitSlop={hitSlop}
     >
       {content}
     </Pressable>

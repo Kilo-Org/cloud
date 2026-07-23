@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { detectLanIp, isUsableIpv4 } from './lan-ip';
 import { services } from './services';
 
 const MOBILE_ENV_REL_PATH = 'apps/mobile/.env.local';
@@ -39,44 +39,6 @@ function parseArgs(args: string[]): { host: string | undefined } {
     }
   }
   return { host };
-}
-
-function isUsableIpv4(value: string | undefined): value is string {
-  if (typeof value !== 'string' || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) {
-    return false;
-  }
-
-  return value.split('.').every(part => Number(part) <= 255);
-}
-
-function detectLanIp(): string | undefined {
-  try {
-    const routeOutput = execFileSync('route', ['-n', 'get', 'default'], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    const iface = routeOutput.match(/interface:\s*(\S+)/)?.[1];
-    if (iface) {
-      const ip = execFileSync('ipconfig', ['getifaddr', iface], {
-        encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-      if (isUsableIpv4(ip)) {
-        return ip;
-      }
-    }
-  } catch {
-    // Fall through to Node's cross-platform interface scan.
-  }
-
-  for (const addresses of Object.values(os.networkInterfaces())) {
-    for (const address of addresses ?? []) {
-      if (address.family === 'IPv4' && !address.internal && isUsableIpv4(address.address)) {
-        return address.address;
-      }
-    }
-  }
-  return undefined;
 }
 
 function serviceUrl(host: string, serviceName: string, protocol: 'http' | 'ws'): string {
@@ -262,6 +224,7 @@ export {
   ensureRootEnv,
   isUsableIpv4,
   prepareMobileEnvironment,
+  serviceUrl,
   upsertRootEnv,
 };
 export type { PreparedMobileEnvironment };

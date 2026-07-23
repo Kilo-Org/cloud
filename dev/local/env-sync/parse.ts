@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import { serviceUrl } from '../mobile-env';
 import { services } from '../services';
 import type { Annotation, ExampleEntry, ResolvedValueSource } from './types';
 
@@ -236,9 +237,10 @@ function resolveAnnotatedValue(
       const defaultUsesWorkerLocalhost =
         WORKER_LOCALHOST_URL_KEYS.has(key) &&
         (entry.defaultValue.includes('localhost') || entry.defaultValue.includes('127.0.0.1'));
-      // LAN IP for container services, but never for ORIGINS keys.
-      // Preserve host.docker.internal when the example default uses it
-      // (sandbox containers need it to reach the host from inside Docker).
+      // LAN IP for container services, except for ORIGINS keys where the host is
+      // always localhost for the base entry and a LAN entry is additionally emitted
+      // when serviceUsesLanIp is set. Preserve host.docker.internal when the example
+      // default uses it (sandbox containers need it to reach the host from inside Docker).
       // Preserve localhost for worker-side URLs that are translated separately
       // before being sent into sandbox containers.
       const host = defaultUsesDockerHost
@@ -261,6 +263,9 @@ function resolveAnnotatedValue(
           resolvedParts.push(`${host}:${port}`);
         } else if (isOrigins) {
           resolvedParts.push(`http://localhost:${port}`);
+          if (serviceUsesLanIp && lanIp) {
+            resolvedParts.push(serviceUrl(lanIp, svcRef.name, 'http'));
+          }
         } else {
           const base = `${protocol}://${host}:${port}`;
           resolvedParts.push(svcRef.path ? base + svcRef.path : base);

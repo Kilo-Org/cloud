@@ -707,10 +707,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Failures are logged and swallowed — must never break metrics emission.
     try {
       if (Number.isFinite(metrics.totalCost)) {
-        const totalCostMicrodollars = Math.max(
-          0,
-          Math.round(metrics.totalCost * 1_000_000)
-        );
+        const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
         await getWorkerDb(this.env.HYPERDRIVE.connectionString)
           .update(cli_sessions_v2)
           .set({ total_cost_microdollars: totalCostMicrodollars })

@@ -24,7 +24,9 @@ describe('getStepFinishRoutedModel', () => {
     const part = stepFinishPart({
       // The field is present on the wire / in the Zod contract but absent from
       // the generated type, so the test mirrors the runtime shape.
-      ...({ model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } } as Partial<StepFinishPart>),
+      ...({
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+      } as Partial<StepFinishPart>),
     });
 
     expect(getStepFinishRoutedModel(part)).toEqual({
@@ -59,7 +61,9 @@ describe('getStepFinishRoutedModel', () => {
       ...({ model: { providerID: '', modelID: 'claude-sonnet-4' } } as Partial<StepFinishPart>),
     });
     const wrongType = stepFinishPart({
-      ...({ model: { providerID: 42, modelID: 'claude-sonnet-4' } } as unknown as Partial<StepFinishPart>),
+      ...({
+        model: { providerID: 42, modelID: 'claude-sonnet-4' },
+      } as unknown as Partial<StepFinishPart>),
     });
 
     expect(getStepFinishRoutedModel(missing)).toBeUndefined();
@@ -75,7 +79,9 @@ describe('getStepFinishRoutedModel', () => {
       ...({ model: { providerID: 'anthropic', modelID: '' } } as Partial<StepFinishPart>),
     });
     const wrongType = stepFinishPart({
-      ...({ model: { providerID: 'anthropic', modelID: null } } as unknown as Partial<StepFinishPart>),
+      ...({
+        model: { providerID: 'anthropic', modelID: null },
+      } as unknown as Partial<StepFinishPart>),
     });
 
     expect(getStepFinishRoutedModel(missing)).toBeUndefined();

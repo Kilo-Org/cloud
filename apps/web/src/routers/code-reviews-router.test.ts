@@ -2251,3 +2251,253 @@ describe('review agent config repository model overrides', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 });
+
+describe('personalReviewAgent.patchReviewConfig', () => {
+  let testUser: User;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(agent_configs)
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.owned_by_user_id, testUser.id)
+        )
+      );
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+    mockSyncWebhooksForRepositories.mockReset();
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+  });
+
+  // Seeds a GitHub personal config with values that the patch should NOT
+  // touch: manuallyAddedRepositories, repositoryModelOverrides, and the
+  // review_memory_enabled / review_analytics_enabled feature flags. Each
+  // round-trip test asserts all of these survive a mobile-shaped patch.
+  async function seedPersonalGithubConfig() {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_style: 'balanced',
+        focus_areas: ['bugs'],
+        custom_instructions: 'be terse',
+        model_slug: 'anthropic/claude-sonnet-5',
+        thinking_effort: null,
+        gate_threshold: 'off',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101, 202],
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+        disable_review_md: true,
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+  }
+
+  it('returns NOT_FOUND when no stored personal config exists', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(
+      caller.personalReviewAgent.patchReviewConfig({
+        platform: 'github',
+        reviewStyle: 'strict',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    // PATCH must not have created a row.
+    expect(stored).toBeUndefined();
+  });
+
+  it('preserves manuallyAddedRepositories and repositoryModelOverrides when the patch omits them', async () => {
+    await seedPersonalGithubConfig();
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['security'],
+      modelSlug: 'openai/gpt-5',
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        focus_areas: ['security'],
+        model_slug: 'openai/gpt-5',
+        // Preserved by the field-merge:
+        manually_added_repositories: [
+          { id: 9, name: 'manual', full_name: 'manual/repo', private: true },
+        ],
+        repository_model_overrides: [
+          {
+            repository_id: 101,
+            repo_full_name: 'acme/api',
+            model_slug: 'openai/gpt-5',
+            thinking_effort: 'high',
+          },
+        ],
+        selected_repository_ids: [101, 202],
+        repository_selection_mode: 'all',
+        gate_threshold: 'off',
+        disable_review_md: true,
+        // Feature flags preserved by `preserveCodeReviewFeatureSettings`:
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      })
+    );
+  });
+
+  it('forces GitLab repository_selection_mode to selected when the patch omits it', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'all',
+        selected_repository_ids: [101],
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      // `repositorySelectionMode` deliberately omitted — GitLab forcing
+      // must still clamp to 'selected' post-merge.
+      modelSlug: 'openai/gpt-5',
+    });
+
+    const stored = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+    expect(stored?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        model_slug: 'openai/gpt-5',
+      })
+    );
+  });
+
+  it('does not run GitLab webhook sync when selectedRepositoryIds is absent from the patch', async () => {
+    await seedPersonalGithubConfig();
+    // Switch the stored row to gitlab so the proc's gitlab branch is
+    // reachable. The patch only sends focusAreas — selection is untouched,
+    // so webhook sync must NOT run.
+    await db
+      .update(agent_configs)
+      .set({ platform: 'gitlab' })
+      .where(
+        and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.owned_by_user_id, testUser.id)
+        )
+      );
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      focusAreas: ['performance'],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.webhookSync).toBeNull();
+    expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+  });
+
+  it('runs GitLab webhook sync only when selectedRepositoryIds is present in the patch', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.patchReviewConfig({
+      platform: 'gitlab',
+      selectedRepositoryIds: [202, 303],
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+});

@@ -30,7 +30,7 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 type AgentSessionListContentProps = {
   sections: SessionSection[];
@@ -87,7 +87,13 @@ export function AgentSessionListContent({
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it.
   const tabBarClearanceStyle = useMemo(
-    () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS, fontScale) }),
+    () => ({
+      paddingBottom: getEffectiveTabBarHeight({
+        bottomInset: bottom,
+        platform: Platform.OS,
+        fontScale,
+      }),
+    }),
     [bottom, fontScale]
   );
 

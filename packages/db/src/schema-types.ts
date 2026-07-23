@@ -1389,6 +1389,12 @@ export const CodeReviewCouncilConfigSchema = z.object({
         seen.add(specialist.id);
       }
     }),
+  // Optional selection gate for AUTOMATED (webhook) reviews: when non-empty, an opted-in repo's PR
+  // runs council only if it carries at least one of these labels (any-match, case-insensitive).
+  // Absent/empty = no label requirement (every eligible PR on an opted-in repo gets council, as
+  // before). Narrows only: it never widens who gets council and never overrides a hard exclusion
+  // (draft/bot/fork). Manual runs ignore it.
+  required_labels: z.array(z.string().min(1).max(100)).max(20).optional(),
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 

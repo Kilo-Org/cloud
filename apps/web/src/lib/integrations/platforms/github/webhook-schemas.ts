@@ -151,6 +151,9 @@ export const PullRequestPayloadSchema = z.object({
       // compatibility with payloads/fixtures that omit it.
       type: z.string().optional(),
     }),
+    // PR labels, used by the optional council `required_labels` selection gate. Only `name` is
+    // read; other label fields are ignored. Optional for payloads/fixtures that omit labels.
+    labels: z.array(z.object({ name: z.string() })).optional(),
     head: z.object({
       sha: z.string(),
       ref: z.string(),

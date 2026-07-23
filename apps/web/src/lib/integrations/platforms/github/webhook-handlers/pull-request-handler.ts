@@ -15,6 +15,7 @@ import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
   councilHardExcludeReason,
+  councilSelectionSkipReason,
   determineAutomatedReviewType,
   isCouncilActive,
   type AutomatedReviewPrFacts,
@@ -322,11 +323,14 @@ export async function handlePullRequestCodeReview(
       isBot: pull_request.user.type === 'Bot',
       isFork: checkoutRef.isForkPr,
       author: pull_request.user.login,
+      labels: (pull_request.labels ?? []).map(label => label.name),
     };
+    const councilSelection = { requiredLabels: config.council?.required_labels };
     const reviewType = determineAutomatedReviewType(prFacts, {
       councilEntitled,
       councilConfigActive,
       councilEnabledForRepo,
+      selection: councilSelection,
     });
     if (
       councilEntitled &&
@@ -334,11 +338,12 @@ export async function handlePullRequestCodeReview(
       councilEnabledForRepo &&
       reviewType !== 'council'
     ) {
-      // Council was available but hard-excluded; record why for observability.
-      const hardExcludeReason = councilHardExcludeReason(prFacts);
+      // Council was available but downgraded; record why (a hard exclude or a selection gate).
+      const downgradeReason =
+        councilHardExcludeReason(prFacts) ?? councilSelectionSkipReason(prFacts, councilSelection);
       logExceptInTest(
-        `Council hard-excluded for ${repository.full_name}#${pull_request.number}: ${hardExcludeReason}`,
-        { pr_number: pull_request.number, repo: repository.full_name, reason: hardExcludeReason }
+        `Council downgraded for ${repository.full_name}#${pull_request.number}: ${downgradeReason}`,
+        { pr_number: pull_request.number, repo: repository.full_name, reason: downgradeReason }
       );
     }
 

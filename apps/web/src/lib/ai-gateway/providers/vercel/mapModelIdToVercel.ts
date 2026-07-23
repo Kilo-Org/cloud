@@ -28,6 +28,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   '~google/gemini-pro-latest': GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
   '~google/gemini-flash-latest': GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
   '~x-ai/grok-latest': GROK_CURRENT_VERCEL_MODEL_ID,
+  'inclusionai/ling-3.0-flash:free': 'inclusionai/ling-3.0-flash-free',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
   'mistralai/mistral-embed-2312': 'mistral/mistral-embed',

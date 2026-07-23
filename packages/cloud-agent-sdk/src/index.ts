@@ -184,4 +184,5 @@ export type {
   Session,
   SessionStatus,
   QuestionInfo,
+  SendMessagePayload,
 } from './types';

@@ -30,6 +30,24 @@ export type {
   KiloSdkStoredMessage,
 } from '@kilocode/session-ingest-contracts';
 
+/**
+ * Payload sent to a cloud agent session transport — either a chat prompt or a
+ * slash command. Pairs with the SDK transport send types.
+ */
+export type SendMessagePayload =
+  | {
+      type: 'prompt';
+      prompt: string;
+      mode: string;
+      model: string;
+      variant?: string;
+    }
+  | {
+      type: 'command';
+      command: string;
+      arguments: string;
+    };
+
 // ---------------------------------------------------------------------------
 // Branded session ID types — prevent accidental mixing of kilo vs cloud agent IDs
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -72,6 +72,7 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
+import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -153,6 +154,8 @@ export function SessionDetailContent({
   const {
     isAnswering,
     isRespondingToPermission,
+    questionSubmissionError,
+    permissionSubmissionError,
     handleAnswerQuestion,
     handleRejectQuestion,
     handleRespondToPermission,
@@ -455,6 +458,31 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+
+  // When a blocking question/permission card dismisses, hand screen-reader
+  // focus back to the transcript so the user does not get stranded on a
+  // node that no longer exists. We track the previous blocking kind and
+  // only fire on the non-none → none transition (i.e. the user satisfied
+  // the card), not on the very first mount.
+  const transcriptRef = useRef<RNText | null>(null);
+  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
+  useEffect(() => {
+    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
+    const isBlocking = blockingInteraction !== 'none';
+    previousBlockingInteractionRef.current = blockingInteraction;
+    if (!wasBlocking || isBlocking) {
+      return undefined;
+    }
+    if (moveA11yFocus(transcriptRef)) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      moveA11yFocus(transcriptRef);
+    }, 50);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [blockingInteraction]);
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
@@ -666,10 +694,20 @@ export function SessionDetailContent({
   function renderKeyboardBody() {
     return (
       <>
-        <View className="flex-1">{renderContent()}</View>
+        <View className="flex-1">
+          <Text
+            ref={transcriptRef}
+            accessible
+            accessibilityLabel="Session transcript"
+            pointerEvents="none"
+            className="absolute inset-0 opacity-0"
+          />
+          {renderContent()}
+        </View>
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
+            key={activeQuestion.requestId}
             questions={activeQuestion.questions}
             onAnswer={answers => {
               void handleAnswerQuestion(answers);
@@ -678,11 +716,14 @@ export function SessionDetailContent({
               void handleRejectQuestion();
             }}
             isSubmitting={isAnswering}
+            requestId={activeQuestion.requestId}
+            submissionError={questionSubmissionError}
           />
         ) : null}
 
         {blockingInteraction === 'permission' && activePermission ? (
           <PermissionCard
+            key={activePermission.requestId}
             permission={activePermission.permission}
             patterns={activePermission.patterns}
             metadata={activePermission.metadata}
@@ -690,6 +731,8 @@ export function SessionDetailContent({
               void handleRespondToPermission(response);
             }}
             isSubmitting={isRespondingToPermission}
+            requestId={activePermission.requestId}
+            submissionError={permissionSubmissionError}
           />
         ) : null}
 

@@ -52,6 +52,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/lib/*.test.ts',
+      'src/lib/a11y/**/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.ts',

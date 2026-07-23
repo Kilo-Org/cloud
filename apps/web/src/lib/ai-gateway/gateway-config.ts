@@ -1,6 +1,7 @@
 import * as z from 'zod';
 
 export const DEFAULT_VERCEL_PERCENTAGE = 50;
+export const DEFAULT_VERCEL_PERCENTAGE_FREE = 50;
 
 export const VercelRoutingPercentageSchema = z.number().min(0).max(100).multipleOf(0.001);
 
@@ -10,6 +11,7 @@ const note = z.string().max(NOTE_MAX_LENGTH);
 
 export const GatewayConfigSchema = z.object({
   vercel_routing_percentage: VercelRoutingPercentageSchema.nullable(),
+  vercel_routing_percentage_free: VercelRoutingPercentageSchema.nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
@@ -20,6 +22,7 @@ export type GatewayConfig = z.infer<typeof GatewayConfigSchema>;
 
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   vercel_routing_percentage: null,
+  vercel_routing_percentage_free: null,
   updated_at: null,
   updated_by: null,
   updated_by_email: null,
@@ -31,14 +34,21 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
  *
  * `vercel_routing_percentage` is nullable because clearing the override in
  * the admin UI persists an explicit `null`. Callers should treat `null` as
- * "no override, use DEFAULT_VERCEL_PERCENTAGE".
+ * "no override, use DEFAULT_VERCEL_PERCENTAGE". It applies to paid models.
+ *
+ * `vercel_routing_percentage_free` is the separate override for free models
+ * and defaults to `null` so pre-existing Redis entries without the field
+ * parse cleanly. Callers should treat `null` as "no override, use
+ * DEFAULT_VERCEL_PERCENTAGE_FREE".
  */
 export const GatewayPercentageSchema = z.object({
   vercel_routing_percentage: VercelRoutingPercentageSchema.nullable(),
+  vercel_routing_percentage_free: VercelRoutingPercentageSchema.nullable().default(null),
 });
 
 /** Schema for the admin set-mutation input. */
 export const GatewayConfigInputSchema = z.object({
   vercel_routing_percentage: VercelRoutingPercentageSchema.nullable(),
+  vercel_routing_percentage_free: VercelRoutingPercentageSchema.nullable(),
   note: note.nullable(),
 });

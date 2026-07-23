@@ -2427,6 +2427,81 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(opencodeConfig).toEqual(kiloConfig);
   });
 
+  it('pins code-review KILO_CONFIG small_model to the session agent model', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const byokModel = 'neuralwatt/glm-5.2-short';
+
+    const codeReviewResult = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bSmallModelAAAA',
+          prompt: 'Review the PR',
+        },
+        agent: { mode: 'code', model: byokModel },
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          metadata: createMetadata({ createdOnPlatform: 'code-review' }),
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_small_model',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_small_model',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    const codeReviewConfig = JSON.parse(
+      codeReviewResult.readyRequest.materialized.env.KILO_CONFIG_CONTENT
+    ) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(codeReviewConfig.model).toBe(`kilo/${byokModel}`);
+    expect(codeReviewConfig.small_model).toBe(`kilo/${byokModel}`);
+    expect(codeReviewConfig.agent?.title?.model).toBe(`kilo/${byokModel}`);
+
+    const webResult = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bSmallModelBBBB',
+          prompt: 'Do the work',
+        },
+        agent: { mode: 'code', model: byokModel },
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          metadata: createMetadata({ createdOnPlatform: 'cloud-agent-web' }),
+        },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_small_model_web',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_small_model_web',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    const webConfig = JSON.parse(webResult.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+    expect(webConfig.model).toBe(`kilo/${byokModel}`);
+    expect(webConfig.small_model).toBeUndefined();
+    expect(webConfig.agent?.title).toBeUndefined();
+  });
+
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
     const service = new SessionService();
     const env = createEnv();

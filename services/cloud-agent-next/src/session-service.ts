@@ -1494,8 +1494,10 @@ export class SessionService {
         mcpServerCount: Object.keys(materialized).length,
       });
     }
-    if (kilocodeModel && kilocodeModel.trim()) {
-      configContent.model = normalizeKilocodeModel(kilocodeModel);
+    const normalizedModel =
+      kilocodeModel && kilocodeModel.trim() ? normalizeKilocodeModel(kilocodeModel) : undefined;
+    if (normalizedModel) {
+      configContent.model = normalizedModel;
     }
     const agentConfig: Record<string, unknown> = {};
     if (appendSystemPrompt && appendSystemPrompt.trim()) {
@@ -1509,6 +1511,16 @@ export class SessionService {
         agentSlugs: runtimeAgents.map(a => a.slug),
         agentCount: runtimeAgents.length,
       });
+    }
+    // Code Review sessions: pin small_model (and the title agent) to the configured
+    // review model. Otherwise kilo's title/aux calls fall through to the CLI default
+    // (kilo-auto/small → Gemma) and bill Kilo credits even when the primary review
+    // model is BYOK. See https://github.com/Kilo-Org/cloud/issues/4268
+    if (createdOnPlatform === 'code-review' && normalizedModel) {
+      configContent.small_model = normalizedModel;
+      if (agentConfig.title == null) {
+        agentConfig.title = { model: normalizedModel };
+      }
     }
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;

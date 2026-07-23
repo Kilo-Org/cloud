@@ -114,14 +114,6 @@ export function shouldRedactErrorResponse(provider: ProviderId, model: string): 
   return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
 }
 
-export function shouldRedactModelNameInResponse(provider: ProviderId, model: string): boolean {
-  // custom is only used internally so we don't have to risk the perf or reliablity impact of rewriting the response
-  return (
-    provider !== 'martian' && // this is a stealth provider, but the models aren't stealth, so we can keep the model name in place
-    (provider === 'experiment' || isKiloStealthModel(model))
-  );
-}
-
 export function isDeadFreeModel(model: string): boolean {
   return !!kiloExclusiveModels.find(
     m => m.public_id === model && m.status === 'disabled' && !m.pricing

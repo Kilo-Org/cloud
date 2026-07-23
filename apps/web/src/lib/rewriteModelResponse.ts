@@ -1,4 +1,4 @@
-import { isKiloExclusiveFreeModel, shouldRedactModelNameInResponse } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -351,7 +351,7 @@ export async function rewriteModelResponse(
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
 
-  if (!isFreeModelRequiringCostRemoval && !shouldRedactModelNameInResponse(providerId, model)) {
+  if (!isFreeModelRequiringCostRemoval) {
     console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
     return null;
   }

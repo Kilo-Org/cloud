@@ -402,5 +402,70 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
         'https://gitlab.com'
       );
     });
+
+    it('persists the NEW secret even when the webhook re-sync throws (no lost-secret state)', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      const configured = {
+        '404': { hook_id: 9040, created_at: '2026-03-01T00:00:00Z' },
+      };
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: configured,
+      });
+      // The GitLab re-sync call fails outright (e.g. a 5xx from GitLab).
+      const syncError = new Error('gitlab responded 500');
+      mockSyncWebhooksForRepositories.mockRejectedValueOnce(syncError);
+
+      const caller = await createCallerForUser(owner.id);
+      // The mutation MUST NOT throw — losing the just-rotated secret while
+      // GitLab may already carry it would strand the integration.
+      const result = await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: organization.id,
+      });
+
+      expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.webhookSecret).not.toBe('old-secret-do-not-leak');
+      // The failure is surfaced as a sync error, not swallowed silently.
+      expect(result.webhookSync.errors).toHaveLength(1);
+      expect(result.webhookSync.updated).toBe(0);
+
+      // The new secret is persisted regardless, so the operator can recover
+      // via manual reconfiguration and a retry does not desync further.
+      expect(await readWebhookSecret(organization.id)).toBe(result.webhookSecret);
+
+      // Neither the surfaced error payload nor the audit log leaks the secret.
+      expect(JSON.stringify(result.webhookSync.errors)).not.toContain(result.webhookSecret);
+      const auditMessages = await settingsChangeAuditMessages(organization.id);
+      const rotateMessages = auditMessages.filter(m =>
+        m.startsWith('Rotated GitLab webhook secret')
+      );
+      expect(rotateMessages).toHaveLength(1);
+      expect(rotateMessages[0]).not.toContain(result.webhookSecret);
+    });
+
+    it('persists the NEW secret even when the access-token lookup throws', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      const configured = {
+        '505': { hook_id: 9050, created_at: '2026-03-02T00:00:00Z' },
+      };
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: configured,
+      });
+      // Token resolution fails before the sync can run.
+      mockGetValidGitLabToken.mockRejectedValueOnce(new Error('token expired'));
+
+      const caller = await createCallerForUser(owner.id);
+      const result = await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: organization.id,
+      });
+
+      expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.webhookSync.errors).toHaveLength(1);
+      // Sync is never reached when the token lookup fails.
+      expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+      // Secret still persisted for recovery.
+      expect(await readWebhookSecret(organization.id)).toBe(result.webhookSecret);
+    });
   });
 });

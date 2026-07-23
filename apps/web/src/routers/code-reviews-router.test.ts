@@ -2819,4 +2819,47 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
       'https://gitlab.com'
     );
   });
+
+  it('persists the NEW secret even when the webhook re-sync throws (no lost-secret state)', async () => {
+    const configured = {
+      '404': { hook_id: 9040, created_at: '2026-03-01T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    mockSyncWebhooksForRepositories.mockRejectedValueOnce(new Error('gitlab responded 500'));
+
+    const caller = await createCallerForUser(testUser.id);
+    // Must not throw: losing the just-rotated secret while GitLab may
+    // already carry it would strand the caller's integration.
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSecret).not.toBe('old-secret-do-not-leak');
+    expect(result.webhookSync.errors).toHaveLength(1);
+    expect(result.webhookSync.updated).toBe(0);
+    // New secret persisted for manual recovery; surfaced error omits it.
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+    expect(JSON.stringify(result.webhookSync.errors)).not.toContain(result.webhookSecret);
+  });
+
+  it('persists the NEW secret even when the access-token lookup throws', async () => {
+    const configured = {
+      '505': { hook_id: 9050, created_at: '2026-03-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    mockGetValidGitLabToken.mockRejectedValueOnce(new Error('token expired'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.gitlab.regenerateWebhookSecret();
+
+    expect(result.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.webhookSync.errors).toHaveLength(1);
+    expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
+    expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
 });

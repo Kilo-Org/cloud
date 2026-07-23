@@ -19,6 +19,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
+import {
+  DiffFontMetricsContext,
+  useBoundedDiffFontMetrics,
+} from '@/components/pr-review/diff/diff-font-metrics';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import {
   PrDiffFileListHeader,
@@ -67,6 +71,11 @@ export function PrReviewFileList({
   onRequestOverview,
 }: PrReviewFileListProps) {
   const listRef = useRef<FlashListRef<ListItem>>(null);
+  // Bounded font-scale metrics for diff rows. We pass the scale into
+  // `extraData` so FlashList re-measures every row when the user changes
+  // a11y text size. The metrics are also provided via context so memoized
+  // diff rows receive the live scale and resize to fit.
+  const diffFontMetrics = useBoundedDiffFontMetrics();
 
   const { query, firstPageErrorState } = usePrReviewFileListQuery({
     owner,
@@ -246,40 +255,44 @@ export function PrReviewFileList({
   const effectiveViewMode = isTablet ? viewMode : 'unified';
 
   return (
-    <View className="flex-1" accessibilityLabel="Files list">
-      <PrDiffFileListHeader
-        owner={owner}
-        repo={repo}
-        number={number}
-        viewedCount={viewedCount}
-        totalListed={files.length}
-        isTruncated={isTruncated}
-        viewMode={effectiveViewMode}
-        onViewModeChange={setViewMode}
-      />
-      <FlashList
-        ref={listRef}
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={item => item.key}
-        getItemType={item => itemTypeFor(item)}
-        onEndReached={() => {
-          if (query.hasNextPage && !query.isFetchingNextPage) {
-            void query.fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={LIST_CONTENT_STYLE}
-        ItemSeparatorComponent={null}
-      />
-      <PrDiffFloatingActions
-        owner={owner}
-        repo={repo}
-        number={number}
-        viewMode={effectiveViewMode}
-        selection={selection}
-        onClearSelection={clearSelection}
-      />
-    </View>
+    <DiffFontMetricsContext.Provider value={diffFontMetrics}>
+      <View className="flex-1" accessibilityLabel="Files list">
+        <PrDiffFileListHeader
+          owner={owner}
+          repo={repo}
+          number={number}
+          viewedCount={viewedCount}
+          totalListed={files.length}
+          isTruncated={isTruncated}
+          viewMode={effectiveViewMode}
+          onViewModeChange={setViewMode}
+        />
+        <FlashList
+          ref={listRef}
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={item => item.key}
+          getItemType={item => itemTypeFor(item)}
+          // Re-measure rows when the bounded font scale changes.
+          extraData={diffFontMetrics.scale}
+          onEndReached={() => {
+            if (query.hasNextPage && !query.isFetchingNextPage) {
+              void query.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          contentContainerStyle={LIST_CONTENT_STYLE}
+          ItemSeparatorComponent={null}
+        />
+        <PrDiffFloatingActions
+          owner={owner}
+          repo={repo}
+          number={number}
+          viewMode={effectiveViewMode}
+          selection={selection}
+          onClearSelection={clearSelection}
+        />
+      </View>
+    </DiffFontMetricsContext.Provider>
   );
 }

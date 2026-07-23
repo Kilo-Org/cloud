@@ -2,10 +2,10 @@
 // highlighting, a gutter for old/new line numbers, and a tinted
 // background that signals add / del / context.
 //
-// We render fixed-height rows (height = lineHeight + vertical padding)
-// so FlashList can virtualize without measuring each row. The diff
-// surface renders thousands of lines and remeasuring on every scroll
-// frame would destroy scroll perf on mid-tier Android devices.
+// Row height scales with the system font scale (bounded — see
+// `diff-font-metrics.ts`). The cap preserves diff density and the
+// 56-point gutter; honouring the raw a11y scale (1.8x at AX5) would
+// overflow the gutter and break the side-by-side grid.
 //
 // S7a adds two opt-in behaviours, both passed from the diff list:
 //   - `onTap` makes the line tappable; the diff list runs the
@@ -21,34 +21,14 @@ import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlig
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
+import {
+  DIFF_MAX_FONT_SCALE,
+  useDiffFontMetrics,
+} from '@/components/pr-review/diff/diff-font-metrics';
 
-const LINE_HEIGHT = 18;
-const VERTICAL_PADDING = 2;
 const GUTTER_WIDTH = 56;
+const VERTICAL_PADDING = 2;
 const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
-
-const ROW_MIN_HEIGHT = LINE_HEIGHT + VERTICAL_PADDING * 2;
-const ROW_STYLE: ViewStyle = { minHeight: ROW_MIN_HEIGHT };
-const GUTTER_STYLE: ViewStyle = {
-  width: GUTTER_WIDTH,
-  height: ROW_MIN_HEIGHT,
-};
-const CODE_CONTAINER_STYLE: ViewStyle = { paddingVertical: VERTICAL_PADDING };
-const CODE_BASE_STYLE: TextStyle = {
-  fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 12,
-  lineHeight: LINE_HEIGHT,
-};
-const GUTTER_TEXT_BASE: TextStyle = {
-  fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 11,
-  lineHeight: LINE_HEIGHT,
-};
-const NO_NEWLINE_BASE: TextStyle = {
-  fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 11,
-  lineHeight: LINE_HEIGHT,
-};
 
 type DiffLineProps = {
   line: ParsedDiffLine;
@@ -83,6 +63,7 @@ function rowBackgroundFor(type: ParsedDiffLine['type']): string {
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
   const isDark = colors.background === '#0E0E10';
+  const metrics = useDiffFontMetrics();
 
   const tokens = useMemo<HighlightToken[]>(
     () => highlightLine(line.text, language),
@@ -95,25 +76,52 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineLabel = ` ${NO_NEWLINE_INDICATOR}`;
 
+  // Row + gutter use the bounded rowMinHeight so the line is never
+  // clipped when the user has a larger a11y font scale.
+  const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };
+  const gutterStyle: ViewStyle = {
+    width: GUTTER_WIDTH,
+    minHeight: metrics.rowMinHeight,
+  };
+  const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
+  const codeBaseStyle: TextStyle = {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: metrics.codeFontSize,
+    lineHeight: metrics.lineHeight,
+  };
+  const gutterTextBase: TextStyle = {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: metrics.labelFontSize,
+    lineHeight: metrics.lineHeight,
+  };
+  const noNewlineBase: TextStyle = {
+    fontFamily: 'JetBrainsMono_500Medium',
+    fontSize: metrics.labelFontSize,
+    lineHeight: metrics.lineHeight,
+  };
+
   // Selection ring: painted as a thick left border in the primary color
   // (works on both add/del/context backgrounds). Concrete Tailwind color
   // is required — CSS-var opacity modifiers don't work on theme tokens.
   const selectionClass = isSelected ? 'border-l-2 border-primary' : 'border-l-2 border-transparent';
 
   const content = (
-    <View className={cn('flex-row items-stretch', rowBackground, selectionClass)} style={ROW_STYLE}>
-      <View className="items-end justify-center pr-2" style={GUTTER_STYLE}>
+    <View className={cn('flex-row items-stretch', rowBackground, selectionClass)} style={rowStyle}>
+      <View className="items-end justify-center pr-2" style={gutterStyle}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for gutter */}
-        <RNText allowFontScaling={false} style={{ ...GUTTER_TEXT_BASE, color: gutterColor }}>
+        <RNText
+          maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}
+          style={{ ...gutterTextBase, color: gutterColor }}
+        >
           {gutterText}
         </RNText>
       </View>
-      <View className="flex-1" style={CODE_CONTAINER_STYLE} accessibilityLabel={line.text}>
+      <View className="flex-1" style={codeContainerStyle} accessibilityLabel={line.text}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for code */}
         <RNText
-          allowFontScaling={false}
+          maxFontSizeMultiplier={DIFF_MAX_FONT_SCALE}
           selectable
-          style={{ ...CODE_BASE_STYLE, color: colors.foreground }}
+          style={{ ...codeBaseStyle, color: colors.foreground }}
         >
           {tokens.map((token, index) => {
             const tokenColor = tokenColorFor(token.className, isDark);
@@ -126,7 +134,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
           })}
           {line.noNewlineAtEndOfFile ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
-            <RNText style={{ ...NO_NEWLINE_BASE, color: noNewlineColor }}>{noNewlineLabel}</RNText>
+            <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>
           ) : null}
         </RNText>
       </View>

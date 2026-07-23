@@ -209,6 +209,8 @@ export function PermissionCard({
                 handleRespond(activeResponse ?? 'once');
               }}
               disabled={isSubmitting || isInert}
+              accessibilityRole="button"
+              accessibilityLabel="Retry"
             >
               {isSubmitting ? (
                 <ActivityIndicator size="small" color={colors.primaryForeground} />

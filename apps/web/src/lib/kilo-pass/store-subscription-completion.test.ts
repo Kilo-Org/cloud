@@ -14,6 +14,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { getMonthlyPriceUsd } from './bonus';
 import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from './enums';
 import { KiloPassIssuanceSource, KiloPassPaymentProvider } from './enums';
+import { getEffectiveKiloPassThreshold } from './threshold';
 import {
   completeStoreKiloPassPurchase,
   type ValidatedStoreKiloPassPurchase,
@@ -103,6 +104,19 @@ describe('completeStoreKiloPassPurchase', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.id, items[0]?.creditTransactionId ?? ''));
     expect(creditRows[0]?.amountMicrodollars).toBe(49_000_000);
+
+    const [updatedUser] = await db
+      .select({
+        totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
+        threshold: kilocode_users.kilo_pass_threshold,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    const effectiveThreshold = getEffectiveKiloPassThreshold(updatedUser?.threshold ?? null);
+    expect(effectiveThreshold).toBe(48_000_000);
+    expect(
+      (updatedUser?.totalMicrodollarsAcquired ?? 0) - (effectiveThreshold ?? 0)
+    ).toBeGreaterThanOrEqual(1_000_000);
   });
 
   it('returns idempotently when the same provider transaction is replayed by the same user', async () => {
@@ -425,10 +439,15 @@ describe('completeStoreKiloPassPurchase', () => {
     ]);
 
     const [updatedUser] = await db
-      .select({ totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired })
+      .select({
+        totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
+        threshold: kilocode_users.kilo_pass_threshold,
+      })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id));
     expect(updatedUser?.totalMicrodollarsAcquired).toBe(58_500_000);
+    expect(updatedUser?.threshold).toBe(49_000_000);
+    expect(getEffectiveKiloPassThreshold(updatedUser?.threshold ?? null)).toBe(48_000_000);
     expect(creditRows.reduce((sum, row) => sum + row.amountMicrodollars, 0)).toBe(58_500_000);
   });
 
@@ -602,6 +621,10 @@ describe('completeStoreKiloPassPurchase', () => {
         bonus_percent_applied: 0.25,
       },
     ]);
+    await db
+      .update(kilocode_users)
+      .set({ microdollars_used: 20_000_000 })
+      .where(eq(kilocode_users.id, user.id));
 
     await completeStoreKiloPassPurchase({
       user,
@@ -646,10 +669,15 @@ describe('completeStoreKiloPassPurchase', () => {
     );
 
     const [updatedUser] = await db
-      .select({ totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired })
+      .select({
+        totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
+        threshold: kilocode_users.kilo_pass_threshold,
+      })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id));
     expect(updatedUser?.totalMicrodollarsAcquired).toBe(58_500_000);
+    expect(updatedUser?.threshold).toBe(58_500_000);
+    expect(getEffectiveKiloPassThreshold(updatedUser?.threshold ?? null)).toBe(57_500_000);
   });
 
   it('keeps one current base item across multiple App Store upgrades in the same month', async () => {

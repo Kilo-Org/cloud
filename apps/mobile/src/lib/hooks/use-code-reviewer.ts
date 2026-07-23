@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   buildSaveConfigInput,
   type ConfigPatch,
@@ -176,7 +176,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
       queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
         old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
       );
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
@@ -283,7 +283,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
           old ? { ...old, ...restoredFields } : old
         );
       }
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSettled: () => queryClient.invalidateQueries({ queryKey }),
@@ -324,7 +324,7 @@ export function useConnectBitbucket(scope: string) {
         accessToken: vars.accessToken,
       }),
     onError: error => {
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),

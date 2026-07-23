@@ -1,7 +1,7 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import { type SecurityAgentConfig, type SecurityAgentConfigPatch } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -47,17 +47,17 @@ export function useSaveSecurityAgentConfig(scope: string) {
           old ? { ...old, ...restoredFields } : old
         );
       }
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
     onSuccess: result => {
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
       }
       if (result.backlogAdmissionWarning) {
-        toast.error(result.backlogAdmissionWarning);
+        announcingToast.error(result.backlogAdmissionWarning);
       }
       if (result.remediationBacklogAdmissionWarning) {
-        toast.error(result.remediationBacklogAdmissionWarning);
+        announcingToast.error(result.remediationBacklogAdmissionWarning);
       }
     },
     onSettled: async () => {
@@ -113,11 +113,11 @@ export function useSetSecurityAgentEnabled(scope: string) {
       queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
         old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
       );
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
-        toast.error(
+        announcingToast.error(
           'Security Agent was enabled, but the initial sync could not be queued. Sync again.'
         );
       } else if ('initialSync' in result && result.initialSync) {
@@ -167,7 +167,7 @@ export function useTriggerSecuritySync(scope: string) {
             ...vars,
           }),
     onError: error => {
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
     onSuccess: result => {
       trackSecurityAgentCommand(queryClient, scope, result.commandId);

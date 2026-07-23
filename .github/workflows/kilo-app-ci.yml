@@ -17,6 +17,7 @@ on:
       - 'apps/web/src/routers/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/kilo-app-ci.yml'
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -128,3 +129,29 @@ jobs:
 
       - name: Check unused exports
         run: pnpm --filter kilo-app run check:unused
+
+  test:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+
+      - name: Test
+        run: pnpm --filter kilo-app run test

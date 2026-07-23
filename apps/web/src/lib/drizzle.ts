@@ -5,8 +5,13 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import assert from 'node:assert';
 import { attachDatabasePool } from '@vercel/functions';
 export const { Client, Pool } = pg;
-const { POSTGRES_CONNECT_TIMEOUT, POSTGRES_MAX_QUERY_TIME, DEBUG_QUERY_LOGGING, VERCEL_REGION } =
-  process.env;
+const {
+  POSTGRES_CONNECT_TIMEOUT,
+  POSTGRES_MAX_QUERY_TIME,
+  DEBUG_QUERY_LOGGING,
+  VERCEL_REGION,
+  NODE_ENV,
+} = process.env;
 
 const POSTGRES_URL = getEnvVariable('POSTGRES_URL');
 
@@ -29,14 +34,35 @@ if (IS_SCRIPT) {
 
 const appName = IS_SCRIPT ? 'kilocode-script' : 'kilocode-web';
 
-export function isUSRegion(): boolean {
-  if (!VERCEL_REGION) return false;
+export function isUSRegion(region = VERCEL_REGION): boolean {
+  if (!region) return false;
   return (
-    VERCEL_REGION.startsWith('sfo') ||
-    VERCEL_REGION.startsWith('iad') ||
-    VERCEL_REGION.startsWith('pdx') ||
-    VERCEL_REGION.startsWith('cle')
+    region.startsWith('sfo') ||
+    region.startsWith('iad') ||
+    region.startsWith('pdx') ||
+    region.startsWith('cle')
   );
+}
+
+export function selectReplicaUrl({
+  primaryUrl,
+  nodeEnv,
+  vercelRegion,
+  usReplicaUrl,
+  euReplicaUrls,
+  random = Math.random,
+}: {
+  primaryUrl: string;
+  nodeEnv: string | undefined;
+  vercelRegion: string | undefined;
+  usReplicaUrl: string | undefined;
+  euReplicaUrls: string[];
+  random?: () => number;
+}): string {
+  if (nodeEnv === 'development') return primaryUrl;
+  if (isUSRegion(vercelRegion)) return usReplicaUrl || primaryUrl;
+  if (euReplicaUrls.length === 0) return primaryUrl;
+  return euReplicaUrls.at(Math.floor(random() * euReplicaUrls.length)) ?? primaryUrl;
 }
 
 /**
@@ -47,20 +73,17 @@ export function isUSRegion(): boolean {
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
-  if (isUSRegion()) {
-    const usReplica = getEnvVariable('POSTGRES_REPLICA_US_URL');
-    if (usReplica) return usReplica;
-  } else {
-    const euReplicas = [
+  if (NODE_ENV === 'development') return postgresUrl;
+  return selectReplicaUrl({
+    primaryUrl: postgresUrl,
+    nodeEnv: NODE_ENV,
+    vercelRegion: VERCEL_REGION,
+    usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
+    euReplicaUrls: [
       getEnvVariable('POSTGRES_REPLICA_EU_URL'),
       getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean) as string[];
-    if (euReplicas.length > 0) {
-      return euReplicas[Math.floor(Math.random() * euReplicas.length)];
-    }
-  }
-
-  return postgresUrl;
+    ].filter(Boolean) as string[],
+  });
 }
 
 // 48h of production pool metrics show most instances use 2-5 connections with zero

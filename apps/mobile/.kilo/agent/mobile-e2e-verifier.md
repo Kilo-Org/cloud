@@ -1,6 +1,6 @@
 ---
 description: Verifies an approved mobile change end to end; in repro mode, reproduces a reported defect on the unmodified baseline
-mode: subagent
+mode: all
 model: kilo/kilo-auto/efficient
 steps: 100
 permission:

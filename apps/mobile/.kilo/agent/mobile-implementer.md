@@ -1,6 +1,6 @@
 ---
 description: Implements an approved mobile-app plan, including required changes in cloud services, shared packages, or sibling repositories
-mode: subagent
+mode: all
 model: kilo/kilo-auto/efficient
 steps: 80
 permission:

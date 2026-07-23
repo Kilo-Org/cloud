@@ -9,6 +9,18 @@ These rules apply to every session and role. Later sections do not repeat them.
 - Work only in dedicated worktrees, in every repository the plan touches. Never edit the primary or main checkout of any repository.
 - The first session is the planner. After plan approval, a fresh session becomes the orchestrator.
 - Model policy: every kilo CLI — all role agents and any other kilo invocation — always runs on `kilo/kilo-auto/efficient`. The only exceptions are the planner (model chosen by the user) and the orchestrator (model chosen by the user; default `kilo/anthropic/claude-opus-4.8` at high reasoning). `kilo/kilo-auto/free` is rate-limited and must never be used, including as a fallback: if an `efficient` call stalls or errors, retry or relaunch on `efficient` — never switch to `free`.
+- Role agents always run inside the Kilo CLI. The four role agents under `apps/mobile/.kilo/agent/` (`mobile-plan-reviewer`, `mobile-implementer`, `mobile-reviewer`, `mobile-e2e-verifier`) are configured with `mode: all`, making them available as both primary and subagents. They can be invoked directly via `kilo run --agent <agent-name>` even when the orchestrating agent is not itself running in a Kilo CLI harness.
+
+  Example command a non-kilo harness would run to dispatch a role agent:
+  ```bash
+  cd /path/to/mobile/worktree
+  kilo run \
+    --model kilo/kilo-auto/efficient \
+    --agent mobile-plan-reviewer \
+    --title "Plan review via role agent" \
+    "Please review the attached plan."
+  ```
+  The `kilo run` invocation must originate from the mobile worktree directory (where `.kilo/agent/` is visible) so Kilo can discover the agent definition.
 - The orchestrator owns product judgment, architecture decisions, loop control, final verification, Git, and the PR. Role agents never dispatch other agents, commit, push, or create or update a PR.
 - Every reviewer and verifier invocation must be a fresh session so earlier conclusions cannot anchor later passes.
 - Choose the simplest maintainable implementation that fully satisfies the accepted requirements. Reuse existing code and contracts. Do not add abstraction or scope without evidence that it is required.

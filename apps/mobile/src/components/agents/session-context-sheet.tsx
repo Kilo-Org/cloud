@@ -238,7 +238,7 @@ function ModelRow({
           setExpanded(value => !value);
         }}
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${provider}, ${model.steps} steps, ${formatCost(model.costUsd)}`}
+        accessibilityLabel={`${name}, ${provider}, ${model.steps} step${model.steps === 1 ? '' : 's'}, ${formatCost(model.costUsd)}`}
         accessibilityState={{ expanded }}
         className="flex-row items-center gap-2 px-3 py-3 active:opacity-70"
       >

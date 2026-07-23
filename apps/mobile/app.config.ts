@@ -39,9 +39,11 @@ const config: ExpoConfig = {
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
-      AdAttributionKit: {
-        PostbackCopyURL: 'https://appsflyer-skadnetwork.com/',
-      },
+      // Apple's raw key for AdAttributionKit postback copies is the top-level
+      // string `AttributionCopyEndpoint` (Xcode displays it as "AdAttributionKit -
+      // Postback Copy URL"). A nested AdAttributionKit dictionary is silently
+      // ignored by iOS, so copies never reached AppsFlyer.
+      AttributionCopyEndpoint: 'https://appsflyer-skadnetwork.com/',
       // Make the app's Documents directory user-visible in the iOS Files
       // app so downloaded any-file attachments (uploaded via the cloud-agent
       // composer) can be opened in place.
@@ -146,7 +148,7 @@ const config: ExpoConfig = {
           'This identifier is used to measure the effectiveness of advertising campaigns.',
       },
     ],
-    ['react-native-appsflyer', {}],
+    ['react-native-appsflyer', { shouldUsePurchaseConnector: true }],
     './plugins/withAndroidManifestFix',
     // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
     // Google OAuth clients exist.

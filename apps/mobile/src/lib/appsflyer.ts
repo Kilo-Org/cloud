@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
-import appsFlyer from 'react-native-appsflyer';
+import { Platform } from 'react-native';
+import appsFlyer, { AppsFlyerPurchaseConnector, StoreKitVersion } from 'react-native-appsflyer';
 
 import { captureEvent } from '@/lib/analytics/posthog';
 import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
@@ -33,6 +34,20 @@ export function initAppsFlyer(): void {
     return;
   }
 
+  // Purchase Connector auto-observes StoreKit transactions and validates
+  // purchase revenue server-side, so revenue is attributed without touching the
+  // purchase flow. iOS-only: Kilo Pass IAP ships on iOS only (subscriptions,
+  // StoreKit 2 via expo-iap). Create it before initSdk and start observing once
+  // the SDK has started (in the success callback below).
+  if (Platform.OS === 'ios') {
+    AppsFlyerPurchaseConnector.create({
+      logSubscriptions: true,
+      logInApps: false,
+      sandbox: __DEV__,
+      storeKitVersion: StoreKitVersion.SK2,
+    });
+  }
+
   appsFlyer.initSdk(
     {
       devKey: APPSFLYER_DEV_KEY,
@@ -43,6 +58,9 @@ export function initAppsFlyer(): void {
     },
     () => {
       initialized = true;
+      if (Platform.OS === 'ios') {
+        AppsFlyerPurchaseConnector.startObservingTransactions();
+      }
       drainPendingEvents();
     },
     handleError('AppsFlyer init failed')

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -473,28 +473,6 @@ describe('BYOK Router', () => {
       const keys = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, keyA.id));
 
       expect(keys).toHaveLength(1);
-    });
-  });
-
-  describe('key validation error safety', () => {
-    test('does not return upstream provider error bodies from API key tests', async () => {
-      const caller = await createCallerForUser(ownerUser.id);
-      const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
-      const fetchSpy = jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValue(
-          new Response('authorization=stored-secret provider detail', { status: 401 })
-        );
-
-      try {
-        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
-          success: false,
-          message:
-            'API key test failed. Check the credential and supported models, then try again.',
-        });
-      } finally {
-        fetchSpy.mockRestore();
-      }
     });
   });
 

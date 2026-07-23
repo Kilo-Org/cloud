@@ -50,6 +50,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels,
+  'inclusionai/ling-3.0-flash',
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,

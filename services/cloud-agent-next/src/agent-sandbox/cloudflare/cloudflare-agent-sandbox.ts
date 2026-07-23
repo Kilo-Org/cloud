@@ -71,6 +71,14 @@ import {
   WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
+import {
+  buildSandboxBillingInput,
+  type SandboxBillingInput,
+} from '../../container-usage-context.js';
+
+type BillingSandboxInstance = SandboxInstance & {
+  configureBilling(input: SandboxBillingInput): Promise<void>;
+};
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -155,6 +163,7 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
 
 export type CloudflareAgentSandboxDependencies = {
   resolveSandbox?: (sandboxId: SandboxId, options?: { sleepAfter?: number }) => SandboxInstance;
+  configureBilling?: (sandbox: SandboxInstance, input: SandboxBillingInput) => Promise<void>;
   sessionService?: SessionService;
   stopObservedWrappers?: typeof stopObservedWrappers;
   sleep?: (ms: number) => Promise<void>;
@@ -170,6 +179,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   private readonly stopObserved: typeof stopObservedWrappers;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly stopObservationDelaysMs: number[];
+  private readonly configureBilling: (
+    sandbox: SandboxInstance,
+    input: SandboxBillingInput
+  ) => Promise<void>;
   private sandboxIdPromise?: Promise<SandboxId>;
 
   constructor(
@@ -192,6 +205,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.stopObservationDelaysMs =
       dependencies.stopObservationDelaysMs ?? DEFAULT_STOP_OBSERVATION_DELAYS_MS;
+    this.configureBilling =
+      dependencies.configureBilling ??
+      (dependencies.resolveSandbox
+        ? async () => undefined
+        : async (sandbox, input) =>
+            await (sandbox as BillingSandboxInstance).configureBilling(input));
   }
 
   private resolveSandboxId(): Promise<SandboxId> {
@@ -213,7 +232,10 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   }
 
   private async getSandbox(options?: { sleepAfter?: number }): Promise<SandboxInstance> {
-    return this.resolveSandbox(await this.resolveSandboxId(), options);
+    const sandboxId = await this.resolveSandboxId();
+    const sandbox = this.resolveSandbox(sandboxId, options);
+    await this.configureBilling(sandbox, buildSandboxBillingInput(this.metadata, sandboxId));
+    return sandbox;
   }
 
   private async workspaceHasGit(sandbox: SandboxInstance, workspacePath: string): Promise<boolean> {

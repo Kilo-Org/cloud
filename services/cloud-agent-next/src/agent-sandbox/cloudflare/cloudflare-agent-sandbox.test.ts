@@ -345,6 +345,7 @@ describe('CloudflareAgentSandbox', () => {
     const setOutboundHandler = vi.fn().mockResolvedValue(undefined);
     const exec = vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' });
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const configureBilling = vi.fn().mockResolvedValue(undefined);
     const ensureBootstrapWrapper = vi
       .spyOn(WrapperClient, 'ensureBootstrapWrapper')
       .mockResolvedValueOnce({ client: {} as WrapperClient });
@@ -357,6 +358,7 @@ describe('CloudflareAgentSandbox', () => {
     const sandbox = new CloudflareAgentSandbox(env, sessionMetadata, {
       resolveSandbox: () =>
         ({ setOutboundHandler, exec, createSession }) as unknown as SandboxInstance,
+      configureBilling,
     });
 
     await sandbox.ensureWrapper(
@@ -364,6 +366,17 @@ describe('CloudflareAgentSandbox', () => {
     );
 
     expect(setOutboundHandler).toHaveBeenCalledWith('managedScm');
+    expect(configureBilling).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        subject: { type: 'org', id: 'org_cloudflare' },
+        actor: { type: 'user', id: 'user_cloudflare' },
+        metadata: { allocation: 'shared' },
+      })
+    );
+    expect(configureBilling.mock.invocationCallOrder[0]).toBeLessThan(
+      setOutboundHandler.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
     expect(setOutboundHandler.mock.invocationCallOrder[0]).toBeLessThan(
       exec.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );

@@ -4,6 +4,11 @@ import { requiresContainmentSandbox } from '../persistence/session-metadata.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 import { fetchSessionMetadata } from '../session-service.js';
 import type { Env, SandboxInstance, SandboxId, SessionId } from '../types.js';
+import { buildSandboxBillingInput, type SandboxBillingInput } from '../container-usage-context.js';
+
+type BillingSandboxInstance = SandboxInstance & {
+  configureBilling(input: SandboxBillingInput): Promise<void>;
+};
 
 export type SessionKiloFacadeDecision =
   | { kind: 'proxy-live-wrapper' }
@@ -84,6 +89,9 @@ export async function resolveLiveWrapperTarget(params: {
       managedScmContainment: requiresContainmentSandbox(metadata),
     }),
     sandboxId
+  );
+  await (sandbox as BillingSandboxInstance).configureBilling(
+    buildSandboxBillingInput(metadata, sandboxId)
   );
   const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
   if (!wrapperInfo) {

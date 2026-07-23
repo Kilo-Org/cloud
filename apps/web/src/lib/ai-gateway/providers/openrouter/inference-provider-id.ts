@@ -156,7 +156,7 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['morph-byok']]: 'morph-qwen35-397b',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
-  [DirectUserByokInferenceProviderIdSchema.enum['orcarouter']]: 'google/gemini-3.5-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['orcarouter']]: 'google/gemini-3.6-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['crofai']]: 'deepseek-v4-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',

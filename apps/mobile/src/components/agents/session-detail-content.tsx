@@ -14,6 +14,7 @@ import { createAndNavigateAgentSession } from '@/components/agents/create-and-na
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { computeMessageModelLabels } from '@/components/agents/message-model-label';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
@@ -331,6 +332,16 @@ export function SessionDetailContent({
     return null;
   }, [messages]);
 
+  // Per-message model label gating: the first assistant message is always
+  // labelled, and every subsequent assistant message is labelled only when
+  // its resolved model differs from the previous assistant's. Walked over
+  // the ordered transcript here so each `<MessageBubble>` only needs to
+  // consult a Map lookup, not re-derive the answer from the whole list.
+  const messageModelLabels = useMemo(
+    () => computeMessageModelLabels(messages, modelOptions),
+    [messages, modelOptions]
+  );
+
   const handleOpenChildSession = useCallback(
     (childSessionId: KiloSessionId, childTitle: string) => {
       setChildSession({ sessionId: childSessionId, title: childTitle });
@@ -364,6 +375,11 @@ export function SessionDetailContent({
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
+          modelLabel={
+            item.message.info.role === 'assistant'
+              ? messageModelLabels.get(item.message.info.id)
+              : undefined
+          }
         />
       );
     },
@@ -374,6 +390,7 @@ export function SessionDetailContent({
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
+      messageModelLabels,
     ]
   );
 

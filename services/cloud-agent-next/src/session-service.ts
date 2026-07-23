@@ -1518,9 +1518,14 @@ export class SessionService {
     // model is BYOK. See https://github.com/Kilo-Org/cloud/issues/4268
     if (createdOnPlatform === 'code-review' && normalizedModel) {
       configContent.small_model = normalizedModel;
-      if (agentConfig.title == null) {
-        agentConfig.title = { model: normalizedModel };
-      }
+      const existingTitle =
+        agentConfig.title != null &&
+        typeof agentConfig.title === 'object' &&
+        !Array.isArray(agentConfig.title)
+          ? (agentConfig.title as Record<string, unknown>)
+          : {};
+      // Always override model even if a runtime agent named `title` was merged above.
+      agentConfig.title = { ...existingTitle, model: normalizedModel };
     }
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;

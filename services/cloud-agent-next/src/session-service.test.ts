@@ -2502,6 +2502,52 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(webConfig.agent?.title).toBeUndefined();
   });
 
+  it('overrides a runtime title agent model for code-review sessions', async () => {
+    const service = new SessionService();
+    const env = createEnv();
+    env.WORKER_URL = 'https://cloud-agent.example.com';
+    const byokModel = 'neuralwatt/glm-5.2-short';
+    const metadata = createMetadata({
+      createdOnPlatform: 'code-review',
+      runtimeAgents: [
+        {
+          slug: 'title',
+          name: 'Title',
+          config: { mode: 'primary', model: 'anthropic/claude-haiku-4.5', description: 'titles' },
+        },
+      ],
+    });
+
+    const result = await service.buildWrapperSessionReadyAndPromptRequests({
+      env,
+      plan: {
+        scope: { sessionId: 'agent_test', userId: 'user_test' },
+        turn: {
+          type: 'prompt',
+          messageId: 'msg_018f1e2d3c4bSmallModelCCCC',
+          prompt: 'Review the PR',
+        },
+        agent: { mode: 'code', model: byokModel },
+        workspace: { sandboxId: 'ses-abcdef', metadata },
+        wrapper: {
+          fence: {
+            wrapperRunId: 'wr_title_override',
+            wrapperGeneration: 1,
+            wrapperConnectionId: 'conn_title_override',
+          },
+        },
+      } satisfies FencedWrapperDispatchRequest,
+    });
+
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      small_model?: string;
+      agent?: { title?: { model?: string; description?: string } };
+    };
+    expect(config.small_model).toBe(`kilo/${byokModel}`);
+    expect(config.agent?.title?.model).toBe(`kilo/${byokModel}`);
+    expect(config.agent?.title?.description).toBe('titles');
+  });
+
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
     const service = new SessionService();
     const env = createEnv();

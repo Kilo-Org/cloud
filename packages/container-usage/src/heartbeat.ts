@@ -13,6 +13,7 @@ import {
 
 export const BILLING_HEARTBEAT_CALLBACK = 'billingHeartbeatTick';
 export const DEFAULT_BILLING_HEARTBEAT_SECONDS = 5 * 60;
+export const DEFAULT_STOPPED_STATE_GRACE_SECONDS = 15 * 60;
 
 type BillingContainer = Pick<Container, 'deleteSchedules' | 'getState' | 'schedule'>;
 
@@ -22,6 +23,8 @@ export type BillingHeartbeatDependencies = {
   heartbeatSeconds?: number;
   /** Defer stopped-state closure to the container's authoritative onStop hook. */
   stopOnStoppedState?: boolean;
+  stoppedStateGraceSeconds?: number;
+  beforeHeartbeatDelivery?: (context: BillingContext) => Promise<void>;
   beforeStopDelivery?: (context: BillingContext) => Promise<void>;
   enforceBudgetStop: (
     budget: BudgetVerdict,
@@ -54,8 +57,13 @@ export function installBillingHeartbeat(
   dependencies: BillingHeartbeatDependencies
 ): BillingHeartbeatController {
   const heartbeatSeconds = dependencies.heartbeatSeconds ?? DEFAULT_BILLING_HEARTBEAT_SECONDS;
+  const stoppedStateGraceSeconds =
+    dependencies.stoppedStateGraceSeconds ?? DEFAULT_STOPPED_STATE_GRACE_SECONDS;
   if (heartbeatSeconds <= 0) {
     throw new Error('Billing heartbeat interval must be positive');
+  }
+  if (stoppedStateGraceSeconds <= 0) {
+    throw new Error('Stopped-state grace interval must be positive');
   }
 
   let lifecycleTail: Promise<void> = Promise.resolve();
@@ -102,7 +110,8 @@ export function installBillingHeartbeat(
 
   const recordStopForGeneration = async (
     params: Parameters<BillingHeartbeatController['recordStop']>[0],
-    expectedGeneration?: string
+    expectedGeneration?: string,
+    usageEndedAtMs = Date.now()
   ): Promise<RecordAck | undefined> => {
     let context = await getBillingContext(dependencies.storage);
     if (!context) return undefined;
@@ -111,7 +120,7 @@ export function installBillingHeartbeat(
     }
     if (!context.pendingStop) {
       const pendingHeartbeat = context.pendingHeartbeat;
-      const elapsedMs = Math.max(0, Date.now() - context.usageMeasuredAtMs);
+      const elapsedMs = Math.max(0, usageEndedAtMs - context.usageMeasuredAtMs);
       const stopSegment = pendingHeartbeat ?? {
         seq: context.nextSeq,
         usageSinceLast: Math.floor(elapsedMs / 1_000),
@@ -193,8 +202,15 @@ export function installBillingHeartbeat(
     context = currentAfterState;
     if (state.status === 'stopped' || state.status === 'stopped_with_code') {
       if (dependencies.stopOnStoppedState === false) {
-        await rescheduleIfCurrent(context);
-        return;
+        const stoppedObservedAtMs = context.stoppedObservedAtMs ?? Date.now();
+        if (context.stoppedObservedAtMs === undefined) {
+          context = { ...context, stoppedObservedAtMs };
+          await updateBillingContext(dependencies.storage, context);
+        }
+        if (Date.now() - stoppedObservedAtMs < stoppedStateGraceSeconds * 1_000) {
+          await rescheduleIfCurrent(context);
+          return;
+        }
       }
       try {
         await recordStopForGeneration(
@@ -202,7 +218,8 @@ export function installBillingHeartbeat(
             reason: 'runtime_signal',
             exitCode: state.status === 'stopped_with_code' ? state.exitCode : undefined,
           },
-          context.generation
+          context.generation,
+          context.stoppedObservedAtMs
         );
       } catch (error) {
         await rescheduleIfCurrent(context);
@@ -214,6 +231,11 @@ export function installBillingHeartbeat(
     if (state.status === 'stopping') {
       await rescheduleIfCurrent(context);
       return;
+    }
+
+    if (context.stoppedObservedAtMs !== undefined) {
+      context = { ...context, stoppedObservedAtMs: undefined };
+      await updateBillingContext(dependencies.storage, context);
     }
 
     const pendingHeartbeat =
@@ -233,6 +255,7 @@ export function installBillingHeartbeat(
       await updateBillingContext(dependencies.storage, { ...context, pendingHeartbeat });
     }
     try {
+      await dependencies.beforeHeartbeatDelivery?.(context);
       const ack = await dependencies.client.recordHeartbeat({
         instanceId: context.instanceId,
         startEpochMs: context.startEpochMs,

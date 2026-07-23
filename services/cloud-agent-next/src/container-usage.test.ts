@@ -222,7 +222,7 @@ describe('MeteredSandbox', () => {
     expect(second?.startEpochMs).toBe(1_751);
   });
 
-  it('retries an unacknowledged start before allowing active-generation work', async () => {
+  it('keeps physical start non-fatal while retrying an unacknowledged shadow start', async () => {
     const rpc = createRpc();
     vi.mocked(rpc.recordStart)
       .mockRejectedValueOnce(new Error('ack lost'))
@@ -233,13 +233,14 @@ describe('MeteredSandbox', () => {
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
 
-    await expect(sandbox.onStart()).rejects.toThrow('ack lost');
+    await expect(sandbox.onStart()).resolves.toBeUndefined();
     const context = await getBillingContext(storage);
-    expect(context?.measurementStarted).toBe(false);
+    expect(context?.measurementStarted).toBe(true);
+    expect(sandbox.superStarted).toBe(true);
 
-    await sandbox.configureBilling(billingInput);
+    await sandbox.billingHeartbeatTick(context?.generation);
     expect(rpc.recordStart).toHaveBeenCalledTimes(4);
-    expect((await getBillingContext(storage))?.measurementStarted).toBe(true);
+    expect(rpc.recordHeartbeat).toHaveBeenCalledOnce();
   });
 
   it('keeps a delayed stop attached to the prior generation', async () => {
@@ -296,7 +297,7 @@ describe('MeteredSandbox', () => {
     await sandbox.onStop({ reason: 'exit', exitCode: 1 });
     expect((await getBillingContext(storage))?.pendingStop).toBeDefined();
 
-    await expect(sandbox.onStart()).rejects.toThrow('meter unavailable');
+    await expect(sandbox.onStart()).resolves.toBeUndefined();
 
     expect((await getBillingContext(storage))?.generation).toBe(first?.generation);
     expect(rpc.recordStart).toHaveBeenCalledOnce();

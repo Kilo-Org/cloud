@@ -60,6 +60,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       client: this.usageClient,
       storage: this.ctx.storage,
       stopOnStoppedState: false,
+      beforeHeartbeatDelivery: context => this.ensureStartAcknowledged(context),
       beforeStopDelivery: context => this.ensureStartAcknowledged(context),
       // The meter currently returns only `continue`; shadow mode must not enforce future verdicts.
       enforceBudgetStop: async () => {
@@ -75,25 +76,37 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       await this.ctx.storage.put(PENDING_ATTRIBUTION_STORAGE_KEY, parsed);
       let active = await getBillingContext(this.ctx.storage);
       if (active?.pendingStop) {
-        await this.ensureStartAcknowledged(active);
-        await this.billingHeartbeat.recordStop(active.pendingStop);
-        await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        try {
+          await this.billingHeartbeat.recordStop(active.pendingStop);
+          await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        } catch (error) {
+          await this.deferBillingDelivery(error, 'pending stop recovery');
+          return;
+        }
         active = undefined;
       }
       if (active?.measurementStarted) {
         if (this.ctx.container?.running === true) {
-          await this.ensureStartAcknowledged(active);
+          try {
+            await this.ensureStartAcknowledged(active);
+          } catch (error) {
+            await this.deferBillingDelivery(error, 'active start acknowledgement');
+          }
           return;
         }
         const state = await this.getState();
-        await this.ensureStartAcknowledged(active);
-        await this.billingHeartbeat.recordStop({
-          reason: 'runtime_signal',
-          ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
-            ? { exitCode: state.exitCode }
-            : {}),
-        });
-        await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        try {
+          await this.billingHeartbeat.recordStop({
+            reason: 'runtime_signal',
+            ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
+              ? { exitCode: state.exitCode }
+              : {}),
+          });
+          await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        } catch (error) {
+          await this.deferBillingDelivery(error, 'missed stop recovery');
+          return;
+        }
         active = undefined;
       }
 
@@ -102,17 +115,20 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       if (active) {
         const state = await this.getState();
         if (state.status !== 'stopped' && state.status !== 'stopped_with_code') {
-          await this.admitAndSchedule(active);
+          await this.admitAndScheduleBestEffort(active);
           return;
         }
-        await this.ensureStartAcknowledged(active);
-        await this.billingHeartbeat.recordStop({
-          reason: 'runtime_signal',
-          ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
-            ? { exitCode: state.exitCode }
-            : {}),
-        });
-        await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        try {
+          await this.billingHeartbeat.recordStop({
+            reason: 'runtime_signal',
+            ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
+              ? { exitCode: state.exitCode }
+              : {}),
+          });
+          await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+        } catch (error) {
+          await this.deferBillingDelivery(error, 'unmeasured stop recovery');
+        }
       }
 
       // Adopt containers that were already running when shadow metering rolled out.
@@ -128,15 +144,24 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       const previous = await getBillingContext(this.ctx.storage);
       if (previous) {
         if (previous.pendingStop) {
-          await this.billingHeartbeat.recordStop(previous.pendingStop);
-          await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+          try {
+            await this.billingHeartbeat.recordStop(previous.pendingStop);
+            await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+          } catch (error) {
+            await this.deferBillingDelivery(error, 'start blocked by pending stop');
+            return;
+          }
         } else if (!previous.measurementStarted) {
-          await this.admitAndSchedule(previous);
+          await this.admitAndScheduleBestEffort(previous);
           return;
         } else {
           // The SDK can dispatch onStart more than once for concurrent callers waiting on one
           // physical start. Existing measured state is therefore already the current generation.
-          await this.ensureStartAcknowledged(previous);
+          try {
+            await this.ensureStartAcknowledged(previous);
+          } catch (error) {
+            await this.deferBillingDelivery(error, 'duplicate start acknowledgement');
+          }
           return;
         }
       }
@@ -227,9 +252,39 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     return parsed.generation === generation ? parsed.reason : undefined;
   }
 
-  private async admitAndSchedule(context: BillingContext): Promise<void> {
-    await this.ensureStartAcknowledged(context);
-    await this.billingHeartbeat.scheduleHeartbeat();
+  private async admitAndScheduleBestEffort(context: BillingContext): Promise<void> {
+    try {
+      await this.ensureStartAcknowledged(context);
+    } catch (error) {
+      await this.deferBillingDelivery(error, 'start acknowledgement');
+      return;
+    }
+    try {
+      await this.billingHeartbeat.scheduleHeartbeat();
+    } catch (error) {
+      await this.deferBillingDelivery(error, 'heartbeat scheduling', false);
+    }
+  }
+
+  private async deferBillingDelivery(
+    error: unknown,
+    operation: string,
+    scheduleRetry = true
+  ): Promise<void> {
+    if (scheduleRetry) {
+      try {
+        await this.billingHeartbeat.scheduleHeartbeat();
+      } catch {
+        // A later sandbox acquisition retries persisted shadow state.
+      }
+    }
+    logger
+      .withFields({
+        error: error instanceof Error ? error.message : String(error),
+        operation,
+        sandboxClass: this.sandboxClassName,
+      })
+      .warn('Container usage shadow delivery deferred');
   }
 
   private async ensureStartAcknowledged(context: BillingContext): Promise<void> {
@@ -256,6 +311,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       startEpochMs,
     } satisfies UsageContext & { startEpochMs: number });
     await this.ctx.storage.delete(PENDING_STOP_REASON_STORAGE_KEY);
-    await this.admitAndSchedule(context);
+    await this.admitAndScheduleBestEffort(context);
   }
 }

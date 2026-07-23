@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { SandboxInstance } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertSandboxBillingAllocation,
   buildSandboxBillingInput,
+  configureSandboxBillingInput,
   SANDBOX_USAGE_SKUS,
 } from './container-usage-context.js';
 
@@ -179,5 +181,29 @@ describe('container usage context', () => {
         metadata: { allocation: 'isolated' },
       })
     ).toThrow('Isolated sandbox billing requires session attribution');
+  });
+
+  it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {
+    await expect(
+      configureSandboxBillingInput({} as SandboxInstance, {
+        subject: { type: 'user', id: 'user_1' },
+        actor: { type: 'user', id: 'user_1' },
+        sessionId: 'agent_1',
+        metadata: { allocation: 'isolated' },
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not propagate shadow configuration delivery failures', async () => {
+    const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
+    await expect(
+      configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
+        subject: { type: 'user', id: 'user_1' },
+        actor: { type: 'user', id: 'user_1' },
+        sessionId: 'agent_1',
+        metadata: { allocation: 'isolated' },
+      })
+    ).resolves.toBeUndefined();
+    expect(configureBilling).toHaveBeenCalledOnce();
   });
 });

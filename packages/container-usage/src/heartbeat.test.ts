@@ -192,6 +192,64 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
   });
 
+  it('closes a repeatedly stopped generation after the deferred stale grace', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+            budget: { verdict: 'continue' },
+          }),
+          recordStop,
+        },
+        { service: 'cloud-agent-next' }
+      );
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client,
+          storage,
+          stopOnStoppedState: false,
+          stoppedStateGraceSeconds: 900,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      now.mockReturnValue(10_000);
+      await controller.billingHeartbeatTick();
+      expect(recordStop).not.toHaveBeenCalled();
+      expect((await getBillingContext(storage))?.stoppedObservedAtMs).toBe(10_000);
+
+      now.mockReturnValue(910_000);
+      await controller.billingHeartbeatTick();
+
+      expect(recordStop).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'runtime_signal', usageSinceLast: 9 })
+      );
+      expect(await getBillingContext(storage)).toBeUndefined();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('runs stop-delivery prerequisites before retrying a persisted stop', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

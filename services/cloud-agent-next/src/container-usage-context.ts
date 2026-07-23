@@ -5,6 +5,7 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
+import { logger } from './logger.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
 
@@ -140,5 +141,16 @@ export async function configureSandboxBillingInput(
   sandbox: SandboxInstance,
   input: SandboxBillingInput
 ): Promise<void> {
-  await (sandbox as MeteredSandboxInstance).configureBilling(input);
+  const configureBilling = (sandbox as Partial<MeteredSandboxInstance>).configureBilling;
+  if (typeof configureBilling !== 'function') {
+    logger.warn('Container usage shadow metering is unavailable for sandbox');
+    return;
+  }
+  try {
+    await configureBilling.call(sandbox, input);
+  } catch (error) {
+    logger
+      .withFields({ error: error instanceof Error ? error.message : String(error) })
+      .warn('Container usage shadow configuration deferred');
+  }
 }

@@ -1,4 +1,4 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 
@@ -17,7 +17,7 @@ import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-s
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 export type StoredSession = RouterOutputs['cliSessionsV2']['list']['cliSessions'][number];
 

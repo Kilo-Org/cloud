@@ -9,7 +9,7 @@ export const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   internal_id: 'deepseek/deepseek-v4-pro',
   display_name: 'DeepSeek: DeepSeek V4 Pro (lowest price)',
   description:
-    "DeepSeek V4 Pro is a large-scale Mixture-of-Experts model from DeepSeek with 1.6T total parameters and 49B activated parameters, supporting a 1M-token context window. For this discounted endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
+    'This DeepSeek V4 Pro endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
@@ -34,7 +34,7 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   internal_id: 'deepseek/deepseek-v4-flash',
   display_name: 'DeepSeek: DeepSeek V4 Flash (lowest price)',
   description:
-    "DeepSeek V4 Flash is an efficiency-optimized Mixture-of-Experts model from DeepSeek with 284B total parameters and 13B activated parameters, supporting a 1M-token context window. For this discounted endpoint, your prompts and completions may be retained and used to train or improve the provider's services.",
+    'This DeepSeek V4 Flash endpoint provides the lowest cost for multi-turn conversations for this model. This is accomplished with an exceptionally low cache read price. By using this endpoint you agree prompts and completions may be retained by DeepSeek and used to train future models.',
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,

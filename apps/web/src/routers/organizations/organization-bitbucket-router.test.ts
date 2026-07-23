@@ -630,7 +630,7 @@ describe('organization Bitbucket router', () => {
     expect(new Date(unchanged?.syncedAt ?? '').toISOString()).toBe(VALIDATED_AT);
   });
 
-  it('lets a billing manager connect with a token-only Workspace Access Token payload', async () => {
+  it('normalizes a billing manager Workspace Access Token before connecting', async () => {
     mockConnect.mockResolvedValue({
       integrationId: '33333333-3333-4333-8333-333333333333',
       workspace: {
@@ -647,7 +647,7 @@ describe('organization Bitbucket router', () => {
 
     await caller.organizations.bitbucket.connect({
       organizationId: organization.id,
-      accessToken: 'ATCT-manager-secret',
+      accessToken: '  ATCT-manager-secret\n',
     });
 
     expect(mockConnect).toHaveBeenCalledWith({

@@ -5,6 +5,7 @@ import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -668,6 +669,22 @@ export function SessionDetailContent({
       <>
         <View className="flex-1">{renderContent()}</View>
 
+        {/* Fixed indicator row — lives outside the FlashList so per-token
+            content-size changes during streaming cannot reposition it.
+            Gated on has-messages so the empty/connecting path (which
+            renders the centered status indicator inside `renderContent`)
+            does not double-render. */}
+        {messages.length > 0 && (shouldShowFooterWorking || statusIndicator) ? (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(150)}
+          >
+            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+          </Animated.View>
+        ) : null}
+
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
             questions={activeQuestion.questions}
@@ -789,12 +806,6 @@ export function SessionDetailContent({
           void manager.loadOlderMessages();
         }}
         renderItem={renderItem}
-        ListFooterComponent={
-          <>
-            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
-          </>
-        }
       />
     );
   }

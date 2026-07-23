@@ -56,7 +56,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteFreeModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -981,7 +981,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const rewrittenResponse = await rewriteFreeModelResponse(
+  const rewrittenResponse = await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,

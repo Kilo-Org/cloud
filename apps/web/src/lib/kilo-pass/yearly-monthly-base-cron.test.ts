@@ -37,7 +37,10 @@ describe('runKiloPassYearlyMonthlyBaseCron', () => {
     const now = new Date('2026-01-06T00:00:00.000Z');
     const dueAtIso = '2025-12-01T00:00:00.000Z';
 
-    const user = await insertTestUser();
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 100_000_000,
+    });
 
     const inserted = await db
       .insert(kilo_pass_subscriptions)
@@ -135,7 +138,7 @@ describe('runKiloPassYearlyMonthlyBaseCron', () => {
       .where(eq(kilocode_users.id, user.id))
       .limit(1);
     expect(userRow[0]?.threshold).toBe(
-      toMicrodollars(KILO_PASS_TIER_CONFIG[KiloPassTier.Tier49].monthlyPriceUsd)
+      toMicrodollars(KILO_PASS_TIER_CONFIG[KiloPassTier.Tier49].monthlyPriceUsd) * 2
     );
   });
 

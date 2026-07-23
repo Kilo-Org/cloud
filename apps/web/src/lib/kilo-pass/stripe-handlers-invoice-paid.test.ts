@@ -1508,7 +1508,7 @@ describe('handleKiloPassInvoicePaid', () => {
       await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({
-      total_microdollars_acquired: 0,
+      total_microdollars_acquired: 7_000_000,
       microdollars_used: 7_000_000,
     });
     const stripeSubId = `sub_${Math.random()}`;
@@ -2010,7 +2010,7 @@ describe('handleKiloPassInvoicePaid', () => {
       await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
     const user = await insertTestUser({
-      total_microdollars_acquired: 0,
+      total_microdollars_acquired: 3_000_000,
       microdollars_used: 3_000_000,
     });
     const stripeSubId = `sub_${Math.random()}`;

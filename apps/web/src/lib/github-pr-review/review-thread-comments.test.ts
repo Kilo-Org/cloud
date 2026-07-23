@@ -13,7 +13,7 @@ function commentNode(id: number) {
     body: `comment ${id}`,
     createdAt: '2024-01-01T00:00:00Z',
     author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
-    reactions: { nodes: [] },
+    reactionGroups: [],
   };
 }
 

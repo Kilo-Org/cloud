@@ -235,13 +235,11 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
                   login
                   avatarUrl
                 }
-                reactions(first: 20) {
-                  nodes {
-                    content
-                    count: reactors(first: 0) {
-                      totalCount
-                    }
-                    viewerHasReacted
+                reactionGroups {
+                  content
+                  viewerHasReacted
+                  reactors(first: 0) {
+                    totalCount
                   }
                 }
               }
@@ -271,13 +269,11 @@ const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY = /* GraphQL */ `
               login
               avatarUrl
             }
-            reactions(first: 20) {
-              nodes {
-                content
-                count: reactors(first: 0) {
-                  totalCount
-                }
-                viewerHasReacted
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 0) {
+                totalCount
               }
             }
           }
@@ -351,8 +347,8 @@ const REMOVE_REACTION_MUTATION = /* GraphQL */ `
 
 type GraphQlReactionNode = {
   content: string;
-  count?: { totalCount: number } | null;
   viewerHasReacted: boolean;
+  reactors?: { totalCount: number } | null;
 };
 
 type GraphQlCommentNode = {
@@ -361,7 +357,7 @@ type GraphQlCommentNode = {
   body: string;
   createdAt: string;
   author: { login: string; avatarUrl: string } | null;
-  reactions: { nodes: GraphQlReactionNode[] };
+  reactionGroups: GraphQlReactionNode[];
 };
 
 type GraphQlCommentConnection = {
@@ -383,10 +379,10 @@ type GraphQlReviewThreadNode = {
   comments: GraphQlCommentConnection;
 };
 
-function normalizeReactions(nodes: GraphQlReactionNode[]) {
-  return nodes.map(n => ({
+function normalizeReactions(groups: GraphQlReactionNode[]) {
+  return groups.map(n => ({
     content: n.content,
-    count: n.count?.totalCount ?? 0,
+    count: n.reactors?.totalCount ?? 0,
     viewerHasReacted: Boolean(n.viewerHasReacted),
   }));
 }
@@ -398,12 +394,20 @@ function normalizeComment(node: GraphQlCommentNode) {
     body: node.body,
     createdAt: node.createdAt,
     author: node.author,
-    reactions: normalizeReactions(node.reactions?.nodes ?? []),
+    reactions: normalizeReactions(node.reactionGroups ?? []),
   };
 }
 
 // Exported for unit testing the follow-up pagination loop.
 export const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST = REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY;
+
+// Exported for unit testing the reaction DTO invariant pinned against
+// GitHub's actual `reactionGroups` shape. The downstream DTO contract —
+// `Array<{ content: string; count: number; viewerHasReacted: boolean }>` —
+// is consumed by `mappers.ts` and the mobile reactions row and must NOT
+// change shape; see `normalize-reactions.test.ts`.
+export const normalizeReactions_FOR_TEST = normalizeReactions;
+export const normalizeComment_FOR_TEST = normalizeComment;
 
 export async function fetchAllThreadComments(args: {
   octokit: ReturnType<typeof createGitHubPrReviewOctokit>;

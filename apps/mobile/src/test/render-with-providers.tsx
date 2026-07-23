@@ -95,9 +95,14 @@ export async function waitFor(predicate: () => boolean, attempts = 50): Promise<
     if (predicate()) {
       return;
     }
+    // Yield to the macrotask queue (not just microtasks): TanStack Query flushes
+    // observer notifications through its scheduler, so a bare `Promise.resolve()`
+    // can loop without ever observing the settled query.
     // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
     await act(async () => {
-      await Promise.resolve();
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
     });
   }
   if (!predicate()) {

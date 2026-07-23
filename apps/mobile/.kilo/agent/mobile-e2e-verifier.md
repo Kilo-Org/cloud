@@ -1,7 +1,8 @@
 ---
 description: Verifies an approved mobile change end to end; in repro mode, reproduces a reported defect on the unmodified baseline
 mode: all
-model: kilo/kilo-auto/efficient
+model: kilo/x-ai/grok-4.5
+variant: high
 steps: 100
 permission:
   edit: allow

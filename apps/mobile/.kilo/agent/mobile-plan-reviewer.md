@@ -1,7 +1,8 @@
 ---
 description: Reviews a drafted mobile implementation plan for ambiguity, unsupported claims, and missing execution detail
 mode: all
-model: kilo/kilo-auto/efficient
+model: kilo/x-ai/grok-4.5
+variant: high
 steps: 40
 permission:
   edit: deny

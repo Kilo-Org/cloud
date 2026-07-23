@@ -1,7 +1,8 @@
 ---
 description: Implements an approved mobile-app plan, including required changes in cloud services, shared packages, or sibling repositories
 mode: all
-model: kilo/kilo-auto/efficient
+model: kilo/x-ai/grok-4.5
+variant: high
 steps: 80
 permission:
   edit: allow

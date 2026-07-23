@@ -8,14 +8,15 @@ These rules apply to every session and role. Later sections do not repeat them.
 
 - Work only in dedicated worktrees, in every repository the plan touches. Never edit the primary or main checkout of any repository.
 - The first session is the planner. After plan approval, a fresh session becomes the orchestrator.
-- Model policy: every kilo CLI — all role agents and any other kilo invocation — always runs on `kilo/kilo-auto/efficient`. The only exceptions are the planner (model chosen by the user) and the orchestrator (model chosen by the user; default `kilo/anthropic/claude-opus-4.8` at high reasoning). `kilo/kilo-auto/free` is rate-limited and must never be used, including as a fallback: if an `efficient` call stalls or errors, retry or relaunch on `efficient` — never switch to `free`.
+- Model policy: the four role agents always run on `kilo/x-ai/grok-4.5` at high reasoning, pinned in their agent definitions. The orchestrator runs on `kilo/moonshotai/kimi-k3` at high reasoning. The planner runs on `kilo/moonshotai/kimi-k3` at high reasoning unless the user chooses a different model. Product-side LLM calls in E2E flows are governed by the Real LLM responses rule below, not by this policy. `kilo/kilo-auto/free` is rate-limited and must never be used, including as a fallback: if a call stalls or errors, retry or relaunch on the assigned model — never switch to `free`.
 - Role agents always run inside the Kilo CLI. The four role agents under `apps/mobile/.kilo/agent/` (`mobile-plan-reviewer`, `mobile-implementer`, `mobile-reviewer`, `mobile-e2e-verifier`) are configured with `mode: all`, making them available as both primary and subagents. They can be invoked directly via `kilo run --agent <agent-name>` even when the orchestrating agent is not itself running in a Kilo CLI harness.
 
   Example command a non-kilo harness would run to dispatch a role agent:
   ```bash
   cd /path/to/mobile/worktree
   kilo run \
-    --model kilo/kilo-auto/efficient \
+    --model kilo/x-ai/grok-4.5 \
+    --variant high \
     --agent mobile-plan-reviewer \
     --title "Plan review via role agent" \
     "Please review the attached plan."
@@ -109,10 +110,10 @@ Launch the orchestrator in the current tmux session with a unique, descriptive w
 tmux new-window -t <planner-tmux-session> \
   -n <feature>-orchestrator \
   -c <dedicated-worktree>/apps/mobile \
-  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/anthropic/claude-opus-4.8 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
+  'kilo run "Execute the approved mobile plan in the attached handoff. Own implementation through the completion gate." --interactive --model kilo/moonshotai/kimi-k3 --variant high --title "<feature> orchestrator" --file <sanitized-handoff-file>'
 ```
 
-Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Claude Opus 4.8 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
+Use `kilo run --interactive` exactly as shown, with the message positional before the flags: `--file` accepts multiple values and consumes a trailing message as a file path, which fails with `File not found`. Do not add `--continue` or `--session`, because the orchestrator must be a fresh session on Kimi K3 at high reasoning effort. Verify the tmux window started, then report the window name, worktree paths, model, and handoff path to the user. The orchestrator deletes the handoff file after ingesting it.
 
 ### Planner Monitor Mode
 

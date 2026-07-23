@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { detectLanIp } from '../lan-ip';
 import { services } from '../services';
 import type {
   Annotation,
@@ -66,23 +66,6 @@ function maybeAddEnvLocalAutoCreate(
   if (!creates.some(existing => existing.key === create.key)) {
     creates.push(create);
   }
-}
-
-// ---------------------------------------------------------------------------
-// LAN IP detection
-// ---------------------------------------------------------------------------
-
-function detectLanIp(): string | undefined {
-  const interfaces = os.networkInterfaces();
-  for (const addrs of Object.values(interfaces)) {
-    if (!addrs) continue;
-    for (const addr of addrs) {
-      if (addr.family === 'IPv4' && !addr.internal) {
-        return addr.address;
-      }
-    }
-  }
-  return undefined;
 }
 
 // ---------------------------------------------------------------------------

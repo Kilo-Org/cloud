@@ -104,7 +104,6 @@ function ReplaceTokenDialog({
         });
       },
       onSettled: () => {
-        setToken('');
         queueMicrotask(() => mutationResetRef.current());
       },
     })
@@ -129,11 +128,11 @@ function ReplaceTokenDialog({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) return;
+    const normalizedToken = token.trim();
+    if (!normalizedToken) return;
 
     setError(null);
-    mutation.mutate({ organizationId, integrationId, accessToken: token });
-    setToken('');
+    mutation.mutate({ organizationId, integrationId, accessToken: normalizedToken });
   };
 
   return (
@@ -217,7 +216,7 @@ function ReplaceTokenDialog({
             <Button
               type="submit"
               className="min-h-control-touch sm:h-9 sm:min-h-0"
-              disabled={mutation.isPending || token.length === 0}
+              disabled={mutation.isPending || token.trim().length === 0}
             >
               {mutation.isPending ? 'Replacing token...' : 'Replace token'}
             </Button>

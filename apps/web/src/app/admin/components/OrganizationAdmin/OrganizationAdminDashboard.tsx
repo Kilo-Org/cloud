@@ -12,6 +12,7 @@ import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
 import { OrganizationAdminHierarchyManagement } from './OrganizationAdminHierarchyManagement';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
+import { OrganizationAdminIntegrations } from './OrganizationAdminIntegrations';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -56,6 +57,7 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <div className="space-y-4">
                 <OrganizationInfoCard organizationId={organizationId} showAdminControls />
+                <OrganizationAdminIntegrations organizationId={organizationId} />
                 <OrganizationAdminHierarchyManagement organizationId={organizationId} />
               </div>
               <div className="space-y-7">

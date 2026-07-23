@@ -111,6 +111,25 @@ describe('buildEnvVars', () => {
     expect(result.env.NODE_ENV).toBe('production');
   });
 
+  it('encrypts a retired Composio env var name set via the plaintext env editor', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      envVars: {
+        COMPOSIO_USER_API_KEY: 'uak_legacy_credential_123',
+        COMPOSIO_ORG: 'org-1',
+        HARMLESS_VAR: 'plain',
+      },
+    });
+
+    // Retired catalog names must stay sensitive so a legacy CLI credential is
+    // not written to the provider's plaintext env.
+    expect(result.sensitive.COMPOSIO_USER_API_KEY).toBe('uak_legacy_credential_123');
+    expect(result.sensitive.COMPOSIO_ORG).toBe('org-1');
+    expect(result.env.COMPOSIO_USER_API_KEY).toBeUndefined();
+    expect(result.env.COMPOSIO_ORG).toBeUndefined();
+    expect(result.env.HARMLESS_VAR).toBe('plain');
+  });
+
   it('puts KILOCODE_API_KEY in sensitive, default model in env', async () => {
     const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {

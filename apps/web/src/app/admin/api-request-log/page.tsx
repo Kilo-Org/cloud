@@ -7,6 +7,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ export default function ApiRequestLogPage() {
   const [endDate, setEndDate] = useState('');
   const [model, setModel] = useState('');
   const [sessionId, setSessionId] = useState('');
+  const [errorsOnly, setErrorsOnly] = useState(false);
 
   const trpc = useTRPC();
   const oldestEntryQuery = useQuery(trpc.admin.apiRequestLog.getOldestEntry.queryOptions());
@@ -38,6 +40,9 @@ export default function ApiRequestLogPage() {
     }
     if (sessionId.trim()) {
       params.set('sessionId', sessionId.trim());
+    }
+    if (errorsOnly) {
+      params.set('errorsOnly', 'true');
     }
 
     // Navigate directly to preserve server-side streaming
@@ -114,6 +119,17 @@ export default function ApiRequestLogPage() {
                   onChange={e => setEndDate(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="errorsOnly"
+                checked={errorsOnly}
+                onCheckedChange={checked => setErrorsOnly(checked === true)}
+              />
+              <Label htmlFor="errorsOnly" className="cursor-pointer">
+                Errors only (status &ge; 400 or error present)
+              </Label>
             </div>
 
             <Button onClick={handleDownload} className="w-full">

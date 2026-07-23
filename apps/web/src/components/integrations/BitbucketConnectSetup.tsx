@@ -116,6 +116,7 @@ export function BitbucketConnectSetup({
     trpc.organizations.bitbucket.connect.mutationOptions({
       gcTime: 0,
       onSuccess: result => {
+        setAccessToken('');
         setConnectError(null);
         queryClient.setQueryData(
           statusQueryKey,
@@ -133,7 +134,6 @@ export function BitbucketConnectSetup({
         toast.error("Couldn't connect the Bitbucket workspace", { description: error.message });
       },
       onSettled: () => {
-        setAccessToken('');
         queueMicrotask(() => mutationResetRef.current());
       },
     })
@@ -142,14 +142,14 @@ export function BitbucketConnectSetup({
 
   const handleConnect = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accessToken) return;
+    const normalizedAccessToken = accessToken.trim();
+    if (!normalizedAccessToken) return;
 
     setConnectError(null);
     connectMutation.mutate({
       organizationId,
-      accessToken,
+      accessToken: normalizedAccessToken,
     });
-    setAccessToken('');
   };
 
   const clearError = () => setConnectError(null);
@@ -287,7 +287,7 @@ export function BitbucketConnectSetup({
                   <Button
                     type="submit"
                     className="min-h-control-touch w-full sm:h-9 sm:min-h-0"
-                    disabled={connectMutation.isPending || accessToken.length === 0}
+                    disabled={connectMutation.isPending || accessToken.trim().length === 0}
                   >
                     {connectMutation.isPending ? 'Connecting workspace...' : 'Connect workspace'}
                   </Button>

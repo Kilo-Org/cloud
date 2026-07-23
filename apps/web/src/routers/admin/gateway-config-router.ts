@@ -27,6 +27,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   set: adminProcedure.input(GatewayConfigInputSchema).mutation(async ({ input, ctx }) => {
     const config: GatewayConfig = {
       vercel_routing_percentage: input.vercel_routing_percentage,
+      vercel_routing_percentage_free: input.vercel_routing_percentage_free,
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,

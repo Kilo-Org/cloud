@@ -1303,13 +1303,11 @@ export const COMPOSIO_SECTION_CONFIG: ToolsMdSectionConfig = {
 <!-- BEGIN:composio -->
 ## Composio
 
-The \`composio\` CLI is configured for this sandbox. Use it to discover and run Composio tools, or to create connection links for external services.
+Composio is connected to this sandbox as an MCP server, so its toolkits (Gmail, Calendar, Slack, and ~1000 others) appear as regular tools you can call directly. There is nothing to install or log into.
 
-- Check account: \`composio whoami\`
-- Search tools: \`composio search "send email"\`
-- List connections: \`composio connections list\`
-- Connect a toolkit: \`composio link <toolkit>\`
-- Run \`composio --help\` and \`composio <command> --help\` for all available commands.
+- Composio exposes a small set of meta-tools rather than one tool per toolkit. Use them to search for a capability, then execute it.
+- If a tool returns an authentication error, that toolkit is not connected yet. Tell the user to connect it at https://dashboard.composio.dev — it cannot be done from inside this sandbox.
+- Do NOT run \`composio login\`. The user's credential is supplied through KiloClaw Settings and signing in again with a different account will not change which tools you can reach.
 <!-- END:composio -->`,
 };
 
@@ -1469,11 +1467,7 @@ export async function bootstrapNonCritical(
         updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
-        updateToolsMdSection(
-          !!env.COMPOSIO_USER_API_KEY && !!env.COMPOSIO_ORG,
-          COMPOSIO_SECTION_CONFIG,
-          deps
-        );
+        updateToolsMdSection(!!env.COMPOSIO_CONSUMER_KEY, COMPOSIO_SECTION_CONFIG, deps);
         // Always-on: agent context about KiloClaw-mitigated audit findings
         // and how to keep plugins.allow in sync on plugin installs.
         updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);

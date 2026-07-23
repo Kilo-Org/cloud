@@ -137,11 +137,12 @@ export async function createManualReviewMutationFn(scope: string, vars: CreateMa
         organizationId: scope,
       });
   // The create router resolves with the job result directly (no
-  // `{success, error}` envelope) or throws — this check is defensive
-  // against the `{success: false}` shape other code-reviews mutations
-  // use, so a domain failure here still routes to onError.
-  if (!(result as { success?: boolean }).success) {
-    throw new Error((result as { error?: string }).error);
+  // `{success, error}` envelope) or throws. Keep a narrow defensive guard
+  // in case the mutation ever returns the `{success: false, error}` shape
+  // used by other code-reviews mutations, so a domain failure still routes
+  // to onError without treating a real success payload as a failure.
+  if ((result as { success?: boolean }).success === false) {
+    throw new Error((result as { error?: string }).error ?? 'Unknown error');
   }
   return result;
 }

@@ -54,5 +54,11 @@ describe('parseFixCommand', () => {
       expect(parseFixCommand('Looks good to me!')).toBe(false);
       expect(parseFixCommand('LGTM, merging.')).toBe(false);
     });
+
+    it('rejects unrelated @kilo-prefixed mentions that are not Kilo handles', () => {
+      expect(parseFixCommand('@kilocorp fix it')).toBe(false);
+      expect(parseFixCommand('@kilogram patch this')).toBe(false);
+      expect(parseFixCommand('@kilobyte fix')).toBe(false);
+    });
   });
 });

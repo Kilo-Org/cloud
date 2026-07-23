@@ -253,7 +253,7 @@ describe('createManualReviewMutationFn', () => {
   });
 
   it('resolves with the full success payload (including reviewId) so caller navigation works', async () => {
-    const successPayload = { success: true, reviewId: 'rev_abc123' };
+    const successPayload = { reviewId: 'rev_abc123', outputMode: 'provider' };
     personalCreateMutateMock.mockResolvedValue(successPayload);
 
     await expect(createManualReviewMutationFn('personal', CREATE_VARS)).resolves.toEqual(
@@ -285,7 +285,7 @@ describe('useCreateManualReview wiring', () => {
 
   it('invalidates the list (no detail) on real success', () => {
     const opts = getOptions('create', 'personal');
-    opts.onSuccess?.({ success: true, reviewId: 'rev_abc123' }, undefined);
+    opts.onSuccess?.({ reviewId: 'rev_abc123', outputMode: 'provider' }, undefined);
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();

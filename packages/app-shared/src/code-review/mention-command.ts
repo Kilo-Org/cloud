@@ -23,7 +23,13 @@
  * rejected so unrelated comment text does not trigger Auto Fix.
  */
 
-const MENTION_PATTERN = /@kilo[\w-]*/i;
+/**
+ * The mention pattern admits the known Kilo handles — @kilo, @kilocode,
+ * and @kilocode-bot — without matching unrelated tokens that start with the
+ * "kilo" prefix (e.g. @kilocorp, @kilogram). The first alternative matches a
+ * standalone @kilo; the second matches @kilocode with an optional suffix.
+ */
+const MENTION_PATTERN = /@kilo(?:\b|code[\w-]*\b)/i;
 const FIX_KEYWORD_PATTERN = /\b(?:fix|patch)\b/i;
 
 export function parseFixCommand(text: string): boolean {

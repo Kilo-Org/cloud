@@ -16,9 +16,9 @@ export async function updateKiloPassThresholdAfterBaseCredits(
   await tx
     .update(kilocode_users)
     .set({
-      kilo_pass_threshold: sql`${kilocode_users.microdollars_used} + ${toMicrodollars(
+      kilo_pass_threshold: sql`LEAST(${kilocode_users.microdollars_used} + ${toMicrodollars(
         params.baseAmountUsd
-      )}`,
+      )}, ${kilocode_users.total_microdollars_acquired})`,
     })
     .where(eq(kilocode_users.id, params.kiloUserId));
 }

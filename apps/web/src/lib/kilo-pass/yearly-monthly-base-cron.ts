@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { kilo_pass_issuances, kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
+import { kilo_pass_issuances, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import {
   KiloPassAuditLogResult,
   KiloPassCadence,
@@ -18,9 +18,9 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@/lib/kilo-pass/issuance';
-import { toMicrodollars } from '@/lib/utils';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { updateKiloPassThresholdAfterBaseCredits } from './subscription-accounting';
 
 type Db = typeof defaultDb;
 
@@ -134,12 +134,10 @@ async function issueYearlyCadenceMonthlyBaseOnce(
   });
 
   if (baseResult.wasIssued) {
-    await tx
-      .update(kilocode_users)
-      .set({
-        kilo_pass_threshold: sql`${kilocode_users.microdollars_used} + ${toMicrodollars(baseAmountUsd)}`,
-      })
-      .where(eq(kilocode_users.id, kiloUserId));
+    await updateKiloPassThresholdAfterBaseCredits(tx, {
+      kiloUserId,
+      baseAmountUsd,
+    });
   }
 
   // Use GREATEST() to ensure monotonic advancement - prevents regression under overlapping runs.

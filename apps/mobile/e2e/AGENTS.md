@@ -128,11 +128,14 @@ When editing the flows, preserve these device-tested constraints:
 - Target the email field by its placeholder `you@example.com`, and tap `Verify code` without trying to dismiss the number pad.
 - The native sign-out confirmation is the first case-insensitive `Sign Out` match (`index: 0`).
 
-Seed only when needed:
+Seed only when needed. Run `pnpm dev:seed` with no arguments to list every available topic and its usage:
 
 ```bash
-pnpm dev:seed app:user-id <email>
-pnpm dev:seed app:add-credits <user-id> <usd>
+pnpm dev:seed                                    # list all seed topics
+pnpm dev:seed app:user-id <email>                # resolve a user id
+pnpm dev:seed app:create-user "<name>" <email>   # create a local user
+pnpm dev:seed app:add-credits <user-id> <usd>    # grant credits
+pnpm dev:seed app:api-token <email>              # mint a bearer token (used by remote-cli.sh)
 ```
 
 ## Maestro
@@ -158,18 +161,25 @@ Attach a screenshot of the changed flow to the PR when it helps review. For tran
 
 ## Remote CLI Session Flows
 
-Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator mints the auth token for the same per-worktree user the app is signed in as (the `e2e-mobile+<worktree-basename>@example.com` account by default), installs the CLI in a disposable directory, and starts it in a `kilo-e2e-cli-$(basename "$PWD")` tmux session with the required API URLs and bearer token already set. Role agents must not read environment files, accept a bearer token, install the CLI, or run `wrangler` commands.
+Use this only when testing session discovery, mirroring, or mobile-to-CLI messaging. The orchestrator prepares the CLI with a single helper; role agents must not read environment files, mint or accept a bearer token, install the CLI, or run `wrangler` commands.
 
-Reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
+The orchestrator starts a local CLI as a remote session for this worktree:
+
+```bash
+apps/mobile/e2e/remote-cli.sh start [email]
+```
+
+The helper resolves this worktree's stack ports from `pnpm dev:status --json`, mints a token for the given user (defaulting to the per-worktree login account, `e2e-mobile+<worktree-slug>@example.com`), installs the CLI into a disposable per-worktree directory, and launches it in a `kilo-e2e-cli-<worktree-slug>` tmux session already pointed at the local API, session-ingest, and event-service. Pass the account the app is signed in as when it differs from the default. Manage it with `remote-cli.sh status` and `remote-cli.sh stop`.
+
+Role agents reuse the orchestrator-prepared session and verify discovery and mirroring by inspecting its pane and the mobile list:
 
 ```bash
 CLI_SESSION="kilo-e2e-cli-$(basename "$PWD")"
 tmux ls
-tmux list-windows -t "$CLI_SESSION"
-tmux capture-pane -p -t "$CLI_SESSION":cli -S -100
+tmux capture-pane -p -t "$CLI_SESSION" -S -100
 ```
 
-Drive the session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. The mobile list updates after the CLI WebSocket connects and its first heartbeat (about 12 seconds). If no session is prepared for this worktree, stop and ask the orchestrator to install the CLI, mint a token, and start the session.
+Drive the session with `tmux send-keys`; slash commands need one Enter for autocomplete and another to submit. Type a prompt to create a session; the mobile list updates after the CLI WebSocket connects and its first heartbeat (about 12 seconds). If no session is prepared for this worktree, stop and ask the orchestrator to run `remote-cli.sh start`.
 
 ## Android Emulator
 

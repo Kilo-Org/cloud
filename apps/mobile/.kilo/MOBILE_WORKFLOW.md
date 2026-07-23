@@ -122,6 +122,15 @@ Run one check on a roughly 30-minute interval to preserve context, and stay idle
 | `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
 | `mobile-e2e-verifier` | Exercises accepted behavior; in repro mode, reproduces a reported defect on the unmodified baseline before planning; may create temporary state-generation fixtures | Temporary only |
 
+## Local Tooling
+
+Agents start and inspect the local stack, simulator, login, and E2E flows through [e2e/AGENTS.md](../e2e/AGENTS.md); do not ask the user to start Metro or backend services. Two helpers cover most runs:
+
+- Seed data: `pnpm dev:seed` with no arguments lists every topic and its usage. Use it to resolve or create users, grant credits, and mint tokens (`app:user-id`, `app:create-user`, `app:add-credits`, `app:api-token`) instead of hand-writing SQL or JWTs.
+- Remote CLI sessions: the orchestrator runs `apps/mobile/e2e/remote-cli.sh start [email]` to launch a local kilo CLI as a remote session for this worktree, targeting the local stack, when testing session discovery, mirroring, or mobile-to-CLI messaging. It resolves ports, mints the token, installs the CLI, and starts a `kilo-e2e-cli-<worktree-slug>` tmux session. Role agents reuse that prepared session and never mint tokens or install the CLI themselves.
+
+Env sync between the app bundle, Metro, and this worktree is already validated by `apps/mobile/e2e/preflight.sh` (invoked by `login.sh`); trust its failure output instead of re-checking URLs by hand.
+
 ## Execution Ledger
 
 Split the accepted plan into the smallest behaviorally meaningful, independently testable slices. Before dispatching anything, record each slice in a ledger:

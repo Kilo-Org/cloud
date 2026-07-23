@@ -125,6 +125,21 @@ describe('githubPrReviewRouter.mergePullRequest', () => {
     expect(firstOctokit.git.deleteRef).not.toHaveBeenCalled();
   });
 
+  it('reports merged:false and skips branch delete when GitHub declines the merge', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    const firstOctokit = buildOctokit('t1');
+    firstOctokit.pulls.merge.mockResolvedValueOnce({
+      data: { merged: false, sha: 'mergedsha', message: 'PR is not mergeable' },
+    });
+
+    const result = await caller.mergePullRequest({ ...baseMergeInput, deleteBranch: true });
+
+    expect(result).toEqual({ merged: false, sha: 'mergedsha', branchDeleted: false });
+    expect(firstOctokit.git.deleteRef).not.toHaveBeenCalled();
+  });
+
   it('reports branchDeleted=true on a successful same-repo delete', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });

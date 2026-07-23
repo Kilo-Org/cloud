@@ -29,6 +29,8 @@ import {
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { setMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
+import { gateMergeResult } from '@/lib/pr-review/merge/merge-result-gate';
 import {
   defaultMergeMethodOptionFor,
   mergeMethodOptionsFor,
@@ -214,7 +216,20 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     try {
       // eslint-disable-next-line typescript-eslint/prefer-ternary -- awaits inside branches can't be a ternary expression
       if (mode === 'merge') {
-        await mergeMutation.mutateAsync(buildMergeInput());
+        // P0-B-08: only resolved here when `merged: true` (the hook's
+        // `assertMergeResult` throws on `merged: false` so a "not
+        // mergeable" reply is treated as a retryable mutation error,
+        // NOT a success). We use the non-throwing `gateMergeResult` to
+        // decide whether the post-merge step (branch delete) is a
+        // partial success that needs a persistent banner on the PR
+        // review screen, then dismiss the sheet in BOTH clean and
+        // partial cases. The `incomplete` gate never reaches here
+        // because `mutateAsync` would have rejected.
+        const result = await mergeMutation.mutateAsync(buildMergeInput());
+        const gate = gateMergeResult(result);
+        if (gate.kind === 'partial') {
+          setMergePartialSuccess(ref, { reason: gate.reason });
+        }
       } else {
         await enableAutoMergeMutation.mutateAsync(buildAutoMergeInput());
       }

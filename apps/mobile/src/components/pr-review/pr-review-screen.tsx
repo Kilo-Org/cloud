@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
+import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
@@ -10,6 +12,7 @@ import {
   PrReviewTabSelector,
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
+import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { useTRPC } from '@/lib/trpc';
 
@@ -39,6 +42,21 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
+
+  // P0-B-08: post-merge "branch delete failed" partial-success banner.
+  // The merge sheet writes the reason into the in-memory store right
+  // before dismissing; we consume it on every focus so the banner
+  // appears once after the user navigates back, then disappears (and
+  // does not re-flash on re-focus) thanks to consume-on-read semantics.
+  const [partialMergeReason, setPartialMergeReason] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const value = consumeMergePartialSuccess({ owner, repo, number });
+      if (value) {
+        setPartialMergeReason(value.reason);
+      }
+    }, [owner, repo, number])
+  );
 
   // The screen owns the PR query so it can drive the recents backfill
   // and pass `headSha` / `changedFiles` to the Files tab. The Overview
@@ -104,6 +122,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        {partialMergeReason ? <PrMergePartialSuccessBanner reason={partialMergeReason} /> : null}
         <PrReviewOverview owner={owner} repo={repo} number={number} isActive />
       </ScrollView>
     );

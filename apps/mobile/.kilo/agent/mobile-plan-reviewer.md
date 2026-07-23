@@ -1,6 +1,6 @@
 ---
 description: Reviews a drafted mobile implementation plan for ambiguity, unsupported claims, and missing execution detail
-mode: subagent
+mode: all
 model: kilo/kilo-auto/efficient
 steps: 40
 permission:

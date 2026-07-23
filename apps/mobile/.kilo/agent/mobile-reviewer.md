@@ -1,6 +1,6 @@
 ---
 description: Reviews an implementation produced for an approved mobile-app plan, including cross-repository changes
-mode: subagent
+mode: all
 model: kilo/kilo-auto/efficient
 steps: 50
 permission:

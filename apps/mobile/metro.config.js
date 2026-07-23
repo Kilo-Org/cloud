@@ -32,10 +32,7 @@ config.resolver.nodeModulesPaths = [
 const MATERIAL_SYMBOLS_PKG = '@expo-google-fonts/material-symbols';
 const upstreamResolveRequest = config.resolver.resolveRequest;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (
-    moduleName === MATERIAL_SYMBOLS_PKG ||
-    moduleName.startsWith(`${MATERIAL_SYMBOLS_PKG}/`)
-  ) {
+  if (moduleName === MATERIAL_SYMBOLS_PKG || moduleName.startsWith(`${MATERIAL_SYMBOLS_PKG}/`)) {
     return { type: 'empty' };
   }
   const resolve = upstreamResolveRequest || context.resolveRequest;

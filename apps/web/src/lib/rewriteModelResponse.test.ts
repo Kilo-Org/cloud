@@ -71,7 +71,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
       const json = await result.json();
 
       expect(json.model).toBe(REWRITTEN_MODEL);
@@ -81,6 +81,30 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.usage.prompt_tokens).toBe(10);
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(3);
       expect(result.headers.get('content-encoding')).toBe('identity');
+    });
+
+    test('preserves cost fields but still rewrites model when stripCost is false', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: true,
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: {},
+        },
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, false);
+      const json = await result.json();
+
+      expect(json.model).toBe(REWRITTEN_MODEL);
+      expect(json.usage.cost).toBe(0.5);
+      expect(json.usage.cost_details).toEqual({ upstream_inference_cost: 0.4 });
+      expect(json.usage.is_byok).toBe(true);
+      expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
     });
 
     test('defaults cached_tokens to 0 when absent', async () => {
@@ -94,7 +118,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
       const json = await result.json();
 
       expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
@@ -107,7 +131,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'application/json' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
 
       expect(result.status).toBe(502);
       expect(await result.text()).toBe('not-json{');
@@ -121,7 +145,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           'data: [DONE]\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -139,7 +163,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         'data: {"model":"upstream-model","usage":{"cost":1,"is_byok":true,"prompt_tokens":4,"completion_tokens":2,"total_tokens":6,"prompt_tokens_details":{}}}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
       const sse = await readOutputStream(result);
       const [chunk] = dataObjects(sse) as Array<{
         model: string;
@@ -163,7 +187,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         ': openrouter heartbeat\n\n' + 'data: {"model":"upstream-model","choices":[]}\n\n'
       );
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
       const sse = await readOutputStream(result);
 
       expect(sse).toContain(': KILO PROCESSING');
@@ -175,7 +199,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         headers: { 'content-type': 'text/event-stream' },
       });
 
-      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL);
+      const result = await rewriteModelResponse_ChatCompletions(upstream, REWRITTEN_MODEL, true);
 
       expect(await readOutputStream(result)).toBe('');
     });
@@ -196,7 +220,7 @@ describe('rewriteModelResponse_Messages', () => {
       },
     });
 
-    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL);
+    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL, true);
     const json = await result.json();
 
     expect(json.model).toBe(REWRITTEN_MODEL);
@@ -206,13 +230,36 @@ describe('rewriteModelResponse_Messages', () => {
     expect(json.usage.is_byok).toBeUndefined();
   });
 
+  test('preserves cost fields but still rewrites model when stripCost is false', async () => {
+    const upstream = jsonResponse({
+      type: 'message',
+      model: 'upstream-model',
+      usage: {
+        input_tokens: 20,
+        output_tokens: 7,
+        cost: 0.3,
+        cost_details: { upstream_inference_cost: 0.2 },
+        is_byok: false,
+      },
+    });
+
+    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL, false);
+    const json = await result.json();
+
+    expect(json.model).toBe(REWRITTEN_MODEL);
+    expect(json.usage.input_tokens).toBe(20);
+    expect(json.usage.cost).toBe(0.3);
+    expect(json.usage.cost_details).toEqual({ upstream_inference_cost: 0.2 });
+    expect(json.usage.is_byok).toBe(false);
+  });
+
   test('passes through invalid JSON bodies unchanged', async () => {
     const upstream = new Response('}{', {
       status: 500,
       headers: { 'content-type': 'application/json' },
     });
 
-    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL);
+    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL, true);
 
     expect(result.status).toBe(500);
     expect(await result.text()).toBe('}{');
@@ -225,7 +272,7 @@ describe('rewriteModelResponse_Messages', () => {
         'data: [DONE]\n\n'
     );
 
-    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL);
+    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL, true);
     const sse = await readOutputStream(result);
     const events = dataObjects(sse) as Array<{
       type: string;
@@ -254,7 +301,7 @@ describe('rewriteModelResponse_Messages', () => {
       'data: {"type":"message_delta","usage":{"output_tokens":9},"delta":{}}\n\n'
     );
 
-    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL);
+    const result = await rewriteModelResponse_Messages(upstream, REWRITTEN_MODEL, true);
     const sse = await readOutputStream(result);
 
     expect(dataPayloads(sse)).not.toContain('[DONE]');
@@ -276,12 +323,35 @@ describe('rewriteModelResponse_Responses', () => {
       },
     });
 
-    const result = await rewriteModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const result = await rewriteModelResponse_Responses(upstream, REWRITTEN_MODEL, true);
     const json = await result.json();
 
     expect(json.model).toBe(REWRITTEN_MODEL);
     expect(json.usage.cost).toBeUndefined();
     expect(json.usage.is_byok).toBeUndefined();
+    expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
+  });
+
+  test('preserves cost fields but still rewrites model when stripCost is false', async () => {
+    const upstream = jsonResponse({
+      id: 'resp_1',
+      model: 'upstream-model',
+      usage: {
+        cost: 0.9,
+        is_byok: true,
+        prompt_tokens: 30,
+        completion_tokens: 12,
+        total_tokens: 42,
+        prompt_tokens_details: {},
+      },
+    });
+
+    const result = await rewriteModelResponse_Responses(upstream, REWRITTEN_MODEL, false);
+    const json = await result.json();
+
+    expect(json.model).toBe(REWRITTEN_MODEL);
+    expect(json.usage.cost).toBe(0.9);
+    expect(json.usage.is_byok).toBe(true);
     expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
   });
 
@@ -292,7 +362,7 @@ describe('rewriteModelResponse_Responses', () => {
         'data: [DONE]\n\n'
     );
 
-    const result = await rewriteModelResponse_Responses(upstream, REWRITTEN_MODEL);
+    const result = await rewriteModelResponse_Responses(upstream, REWRITTEN_MODEL, true);
     const sse = await readOutputStream(result);
     const [event] = dataObjects(sse) as Array<{
       type: string;

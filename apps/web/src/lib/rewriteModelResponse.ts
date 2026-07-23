@@ -9,11 +9,13 @@ import { NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 
-function rewriteUsage(usage: OpenRouterUsage) {
-  // We only rewrite the response for free models, strip upstream cost
-  delete usage.cost;
-  delete usage.cost_details;
-  delete usage.is_byok;
+function rewriteUsage(usage: OpenRouterUsage, stripCost: boolean) {
+  if (stripCost) {
+    // We only strip upstream cost for free models
+    delete usage.cost;
+    delete usage.cost_details;
+    delete usage.is_byok;
+  }
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
@@ -21,7 +23,11 @@ function rewriteUsage(usage: OpenRouterUsage) {
   }
 }
 
-export async function rewriteModelResponse_ChatCompletions(response: Response, model: string) {
+export async function rewriteModelResponse_ChatCompletions(
+  response: Response,
+  model: string,
+  stripCost: boolean
+) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -45,7 +51,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, m
 
     const usage = json.usage as OpenRouterUsage;
     if (usage) {
-      rewriteUsage(usage);
+      rewriteUsage(usage, stripCost);
     }
 
     return NextResponse.json(json, {
@@ -89,7 +95,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, m
           }
 
           if (json.usage) {
-            rewriteUsage(json.usage);
+            rewriteUsage(json.usage, stripCost);
           }
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
@@ -142,13 +148,19 @@ type MessagesApiMessageDelta = {
   delta: Anthropic.Messages.MessageDeltaEvent['delta'];
 };
 
-function rewriteMessagesUsage(usage: MessagesApiUsage) {
-  delete usage.cost;
-  delete usage.cost_details;
-  delete usage.is_byok;
+function rewriteMessagesUsage(usage: MessagesApiUsage, stripCost: boolean) {
+  if (stripCost) {
+    delete usage.cost;
+    delete usage.cost_details;
+    delete usage.is_byok;
+  }
 }
 
-export async function rewriteModelResponse_Messages(response: Response, model: string) {
+export async function rewriteModelResponse_Messages(
+  response: Response,
+  model: string,
+  stripCost: boolean
+) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -170,7 +182,7 @@ export async function rewriteModelResponse_Messages(response: Response, model: s
       json.model = model;
     }
     if (json.usage) {
-      rewriteMessagesUsage(json.usage);
+      rewriteMessagesUsage(json.usage, stripCost);
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -205,14 +217,14 @@ export async function rewriteModelResponse_Messages(response: Response, model: s
               e.message.model = model;
             }
             if (e.message.usage) {
-              rewriteMessagesUsage(e.message.usage);
+              rewriteMessagesUsage(e.message.usage, stripCost);
             }
           }
 
           if (json.type === 'message_delta') {
             const e = json as MessagesApiMessageDelta;
             if (e.usage) {
-              rewriteMessagesUsage(e.usage);
+              rewriteMessagesUsage(e.usage, stripCost);
             }
           }
 
@@ -254,7 +266,11 @@ type ResponsesApiEvent = {
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
-export async function rewriteModelResponse_Responses(response: Response, model: string) {
+export async function rewriteModelResponse_Responses(
+  response: Response,
+  model: string,
+  stripCost: boolean
+) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -276,7 +292,7 @@ export async function rewriteModelResponse_Responses(response: Response, model: 
       json.model = model;
     }
     if (json.usage) {
-      rewriteUsage(json.usage);
+      rewriteUsage(json.usage, stripCost);
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -306,7 +322,7 @@ export async function rewriteModelResponse_Responses(response: Response, model: 
               json.response.model = model;
             }
             if (json.response.usage) {
-              rewriteUsage(json.response.usage);
+              rewriteUsage(json.response.usage, stripCost);
             }
           }
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
@@ -358,13 +374,13 @@ export async function rewriteModelResponse(
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(response, model);
+    return rewriteModelResponse_ChatCompletions(response, model, isFreeModelRequiringCostRemoval);
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, model);
+    return rewriteModelResponse_Responses(response, model, isFreeModelRequiringCostRemoval);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, model);
+    return rewriteModelResponse_Messages(response, model, isFreeModelRequiringCostRemoval);
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);

@@ -880,9 +880,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   const response = upstreamResult.response;
   logExceptInTest(
-    'upstream response status: %s, x-vercel-id: %s',
+    'upstream response status: %s, x-vercel-id: %s, session_id: %s',
     response.status,
-    response.headers.get('x-vercel-id') || '<none>'
+    response.headers.get('x-vercel-id') || '<none>',
+    usageContext.session_id || '<none>'
   );
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));

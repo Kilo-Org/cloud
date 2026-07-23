@@ -156,6 +156,7 @@ export async function upstreamRequest({
   extraHeaders,
   provider,
   signal,
+  request,
 }: {
   path: string;
   search: string;
@@ -164,6 +165,7 @@ export async function upstreamRequest({
   extraHeaders: Record<string, string>;
   provider: Provider;
   signal?: AbortSignal;
+  request?: Request;
 }): Promise<{ type: 'success'; response: Response } | { type: 'error'; response: NextResponse }> {
   const headers = new Headers();
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
@@ -180,9 +182,16 @@ export async function upstreamRequest({
 
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
-  timeoutSignal.addEventListener('abort', () => {
-    errorExceptInTest('[upstreamRequest] timeout');
-  });
+  const vercelId = request?.headers.get('x-vercel-id');
+  if (request && vercelId) {
+    const req = request;
+    timeoutSignal.addEventListener('abort', () => {
+      const currentVercelId = req.headers.get('x-vercel-id');
+      if (currentVercelId === vercelId) {
+        errorExceptInTest(`[upstreamRequest] timeout (vercelId: ${currentVercelId})`);
+      }
+    });
+  }
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   try {

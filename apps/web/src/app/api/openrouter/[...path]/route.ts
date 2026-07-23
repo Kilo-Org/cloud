@@ -874,6 +874,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     extraHeaders,
     provider: effectiveProviderContext.provider,
     signal: request.signal,
+    request,
   });
   if (upstreamResult.type === 'error') {
     return upstreamResult.response;

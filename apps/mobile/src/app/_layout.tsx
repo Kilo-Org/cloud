@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
@@ -34,6 +35,7 @@ import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
+import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import {
   checkInitialNotification,
@@ -93,6 +95,7 @@ function RootLayoutNav() {
   const pathname = usePathname();
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
+  const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
   const {
     userId,
     email,
@@ -114,7 +117,13 @@ function RootLayoutNav() {
   useSentryConsentSync(consentChecked && !needsConsent, initSentry);
 
   const fontsReady = fontsLoaded || fontsError !== null;
-  const isLoading = authLoading || updateChecking || !fontsReady;
+  const isLoading = authLoading || updateChecking || !fontsReady || !themeHasLoaded;
+
+  useEffect(() => {
+    if (themeHasLoaded) {
+      applyThemePreference(themePreference);
+    }
+  }, [themeHasLoaded, themePreference]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';

@@ -627,6 +627,8 @@ export function SessionDetailContent({
           modelDisplay={contextModelAndProvider.model}
           providerDisplay={contextModelAndProvider.provider}
           totalCost={totalCost}
+          messages={messages}
+          modelOptions={modelOptions}
           onClose={() => {
             setOpenContextSheetIdentity(null);
           }}

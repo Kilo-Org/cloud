@@ -141,6 +141,14 @@ const ReactionInput = z
   })
   .strict();
 
+// `headRef` and `isCrossRepo` were required in an earlier wire version. Older
+// shipped mobile clients still send them; newer clients omit them entirely.
+// The schema stays `.strict()` (so genuinely unknown fields are still
+// rejected) and tolerates these two legacy fields — they are accepted and
+// IGNORED. The server derives the authoritative head ref / same-repo
+// identity from `octokit.pulls.get` so a caller cannot spoof which ref gets
+// deleted. Aligns with the tolerate-not-reject pattern near `direction`
+// above.
 const MergePullRequestInput = ownerRepoSchema
   .extend({
     number: prNumberSchema,
@@ -149,8 +157,9 @@ const MergePullRequestInput = ownerRepoSchema
     commitMessage: z.string().min(1).max(65_535).optional(),
     deleteBranch: z.boolean(),
     expectedHeadSha: z.string().min(40).max(64),
-    headRef: z.string().min(1).max(255),
-    isCrossRepo: z.boolean(),
+    // Legacy fields — accepted for backward compat, ignored by the server.
+    headRef: z.string().min(1).max(255).optional(),
+    isCrossRepo: z.boolean().optional(),
   })
   .strict();
 
@@ -841,10 +850,41 @@ export const githubPrReviewRouter = createTRPCRouter({
   // returns 409 and the caller should re-fetch. The branch delete after a
   // successful merge is BEST-EFFORT: failures are reported in the result
   // (never thrown) so the mobile client can surface a banner.
+  //
+  // P0-D-09: the head ref + same-repo identity are derived from
+  // `octokit.pulls.get` rather than the client input. A caller must not be
+  // able to merge PR #N with a valid `expectedHeadSha` and then delete an
+  // arbitrary same-repo ref (e.g. `main`) by spoofing `headRef`. The delete
+  // is fenced on the server-derived head sha matching `expectedHeadSha`,
+  // same-repo identity, and the merge actually completing.
   mergePullRequest: baseProcedure.input(MergePullRequestInput).mutation(async ({ ctx, input }) => {
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
+        // Fetch the PR first so we know the authoritative head ref, head sha,
+        // and whether the head repo is the same as the base repo. A merge
+        // does not move the head branch, so the ref/sha derived here are
+        // valid for the post-merge delete decision.
+        const prResp = await octokit.pulls.get({
+          owner: input.owner,
+          repo: input.repo,
+          pull_number: input.number,
+        });
+        const pr = prResp.data;
+        const headRepo = pr.head?.repo ?? null;
+        const baseRepo = pr.base?.repo ?? null;
+        // Treat a null/absent head repo (e.g. deleted fork) as not-deletable;
+        // also bail if base.repo is missing for the same reason. Compare the
+        // numeric repo id — robust against name/owner changes.
+        const sameRepo =
+          headRepo !== null &&
+          baseRepo !== null &&
+          typeof headRepo.id === 'number' &&
+          typeof baseRepo.id === 'number' &&
+          headRepo.id === baseRepo.id;
+        const fetchedHeadSha = typeof pr.head?.sha === 'string' ? pr.head.sha : null;
+        const headRefName = typeof pr.head?.ref === 'string' ? pr.head.ref : null;
+
         const params = buildMergePullRequestParams({
           owner: input.owner,
           repo: input.repo,
@@ -856,22 +896,30 @@ export const githubPrReviewRouter = createTRPCRouter({
         });
         const response = await octokit.pulls.merge(params);
         const merged = Boolean(response.data.merged);
-        if (!merged || !input.deleteBranch || input.isCrossRepo) {
+        if (
+          !merged ||
+          !input.deleteBranch ||
+          !sameRepo ||
+          headRefName === null ||
+          fetchedHeadSha === null ||
+          fetchedHeadSha !== input.expectedHeadSha
+        ) {
           return {
             merged,
             sha: response.data.sha,
             branchDeleted: false as const,
           };
         }
-        // Best-effort: only call deleteRef when the head is same-repo.
-        // Catch every error and surface it in the result instead of
-        // failing the whole mutation.
+        // Best-effort: only call deleteRef when the server-derived head is
+        // same-repo AND the head sha we fetched matches what the caller
+        // claimed to merge. Catch every error and surface it in the result
+        // instead of failing the whole mutation.
         try {
           await octokit.git.deleteRef(
             buildDeleteRefParams({
               owner: input.owner,
               repo: input.repo,
-              headRef: input.headRef,
+              headRef: headRefName,
             })
           );
           return {

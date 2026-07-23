@@ -32,8 +32,6 @@ type MergePullRequestInput = {
   commitMessage?: string;
   deleteBranch: boolean;
   expectedHeadSha: string;
-  headRef: string;
-  isCrossRepo: boolean;
 };
 
 function usePrRefKeys(ref: PrRef) {

@@ -64,8 +64,6 @@ const INPUT = {
   method: 'squash' as const,
   deleteBranch: true,
   expectedHeadSha: 'a'.repeat(40),
-  headRef: 'feature/x',
-  isCrossRepo: false,
 };
 
 describe('useMergePullRequestMutation (P0-B-08 wiring)', () => {

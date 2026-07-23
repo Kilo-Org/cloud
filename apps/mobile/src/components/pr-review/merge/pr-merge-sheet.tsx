@@ -77,8 +77,6 @@ type MergePullRequestInput = {
   commitMessage?: string;
   deleteBranch: boolean;
   expectedHeadSha: string;
-  headRef: string;
-  isCrossRepo: boolean;
 };
 
 type AutoMergeInput = {
@@ -97,7 +95,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     repoName,
     number,
     headSha,
-    headRef,
     isCrossRepo,
     prNodeId,
     title,
@@ -183,8 +180,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       commitMessage: messageRef.current.trim().length > 0 ? messageRef.current.trim() : undefined,
       deleteBranch: showDeleteBranchToggle ? deleteBranch : false,
       expectedHeadSha: headSha,
-      headRef,
-      isCrossRepo,
     };
   }
 

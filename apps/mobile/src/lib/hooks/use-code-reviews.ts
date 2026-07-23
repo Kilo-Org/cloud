@@ -68,14 +68,20 @@ export function useCancelReview(scope: string) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: { reviewId: string }) =>
-      trpcClient.codeReviews.cancel.mutate({ reviewId: vars.reviewId }),
-    onSuccess: (data, vars) => {
-      if (!data.success) {
-        toast.error(data.error);
-        return;
+    mutationFn: async (vars: { reviewId: string }) => {
+      // `success` is typed as `boolean` (not a `true` literal), so a domain
+      // failure here must not be treated as a resolved mutation — throwing
+      // routes it to onError (toast) instead of letting callers' onSuccess
+      // fire haptics/navigation as if it worked. The error carries the
+      // server's `data.error` verbatim so toast.error(error.message) shows
+      // the domain reason instead of a generic literal.
+      const result = await trpcClient.codeReviews.cancel.mutate({ reviewId: vars.reviewId });
+      if (!result.success) {
+        throw new Error(result.error);
       }
+      return result;
+    },
+    onSuccess: (_data, vars) => {
       invalidateReviews(vars.reviewId);
     },
     onError: error => {
@@ -88,14 +94,16 @@ export function useRetriggerReview(scope: string) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: { reviewId: string }) =>
-      trpcClient.codeReviews.retrigger.mutate({ reviewId: vars.reviewId }),
-    onSuccess: (data, vars) => {
-      if (!data.success) {
-        toast.error(data.error);
-        return;
+    mutationFn: async (vars: { reviewId: string }) => {
+      // Same typed-error pattern as useCancelReview: a domain failure throws
+      // so React Query runs onError (toast) rather than onSuccess (haptic).
+      const result = await trpcClient.codeReviews.retrigger.mutate({ reviewId: vars.reviewId });
+      if (!result.success) {
+        throw new Error(result.error);
       }
+      return result;
+    },
+    onSuccess: (_data, vars) => {
       invalidateReviews(vars.reviewId);
     },
     onError: error => {
@@ -108,20 +116,33 @@ export function useCreateManualReview(scope: string) {
   const invalidateReviews = useInvalidateReviews(scope);
 
   return useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (vars: {
+    mutationFn: async (vars: {
       platform: 'github' | 'gitlab';
       url: string;
       modelSlug: string;
       thinkingEffort?: string | null;
       instructions?: string;
-    }) =>
-      isPersonal(scope)
-        ? trpcClient.personalReviewAgent.createManualReviewJob.mutate(vars)
-        : trpcClient.organizations.reviewAgent.createManualReviewJob.mutate({
+    }) => {
+      // Same typed-error pattern: a domain failure throws so the screen's
+      // per-call onSuccess (haptic + router.replace to the new review)
+      // does not run with `reviewId` undefined. The full success payload
+      // (including `reviewId`) still resolves on real success so caller
+      // navigation keeps working.
+      const result = isPersonal(scope)
+        ? await trpcClient.personalReviewAgent.createManualReviewJob.mutate(vars)
+        : await trpcClient.organizations.reviewAgent.createManualReviewJob.mutate({
             ...vars,
             organizationId: scope,
-          }),
+          });
+      // The create router resolves with the job result directly (no
+      // `{success, error}` envelope) or throws — this check is defensive
+      // against the `{success: false}` shape other code-reviews mutations
+      // use, so a domain failure here still routes to onError.
+      if (!(result as { success?: boolean }).success) {
+        throw new Error((result as { error?: string }).error);
+      }
+      return result;
+    },
     onSuccess: () => {
       invalidateReviews();
     },

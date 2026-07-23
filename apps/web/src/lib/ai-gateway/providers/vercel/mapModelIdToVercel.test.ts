@@ -54,6 +54,7 @@ describe('mapModelIdToVercel', () => {
       ['mistralai/mistral-medium-3-5', 'mistral/mistral-medium-3.5'],
       ['mistralai/mistral-small-2603', 'mistral/mistral-small'],
       ['mistralai/pixtral-large-2411', 'mistral/pixtral-large'],
+      ['poolside/laguna-s-2.1:free', 'poolside/laguna-s-2.1-free'],
       ['qwen/qwen3-14b', 'alibaba/qwen-3-14b'],
       ['qwen/qwen3-235b-a22b', 'alibaba/qwen-3-235b'],
       ['qwen/qwen3-30b-a3b', 'alibaba/qwen-3-30b'],

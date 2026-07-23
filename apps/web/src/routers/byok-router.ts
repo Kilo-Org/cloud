@@ -402,6 +402,16 @@ export const byokRouter = createTRPCRouter({
 
       const decryptedKey = decryptByokRow(existingKey);
 
+      // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
+      // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).
+      // Decline to test it rather than returning a misleading failure for a still-valid key.
+      if (decryptedKey.providerId === 'codestral') {
+        return {
+          success: false,
+          message: 'Codestral is deprecated and its API key can no longer be tested.',
+        };
+      }
+
       function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
         const model = UserByokTestModels[provider];

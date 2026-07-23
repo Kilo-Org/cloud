@@ -476,6 +476,18 @@ describe('BYOK Router', () => {
     });
   });
 
+  describe('deprecated codestral provider', () => {
+    test('declines to test a legacy codestral key with a deprecation message', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({ provider_id: 'codestral', api_key: 'stored-secret' });
+
+      await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+        success: false,
+        message: 'Codestral is deprecated and its API key can no longer be tested.',
+      });
+    });
+  });
+
   describe('MiniMax Coding Plan-installed credentials', () => {
     test('rejects removed dedicated provider identity in manual creation requests', async () => {
       const caller = await createCallerForUser(ownerUser.id);

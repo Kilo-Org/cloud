@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
-import { type ChildSessionHydrationState, type StoredMessage } from 'cloud-agent-sdk';
+import { type ChildSessionHydrationState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';

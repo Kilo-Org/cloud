@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';

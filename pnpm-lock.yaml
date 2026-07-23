@@ -272,6 +272,9 @@ importers:
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
+      '@kilocode/cloud-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-sdk
       '@kilocode/event-service':
         specifier: workspace:*
         version: link:../../packages/event-service

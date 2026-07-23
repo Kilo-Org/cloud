@@ -1,4 +1,4 @@
-import { type OlderMessagesError } from 'cloud-agent-sdk';
+import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 import { selectSessionPaginationHeaderRenderModel } from '@/components/agents/session-pagination-header-render-model';
 import { type SessionMessageListHeaderStateInputs } from '@/components/agents/session-message-list-state';

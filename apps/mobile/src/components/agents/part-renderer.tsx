@@ -1,4 +1,4 @@
-import { type Part, type StoredMessage } from 'cloud-agent-sdk';
+import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';

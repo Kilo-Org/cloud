@@ -17,7 +17,7 @@ import {
   heartbeatDataSchema,
   type SessionsListData,
   sessionsListDataSchema,
-} from 'cloud-agent-sdk/schemas';
+} from '@kilocode/cloud-agent-sdk/schemas';
 
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 

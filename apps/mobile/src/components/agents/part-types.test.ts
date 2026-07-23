@@ -1,4 +1,4 @@
-import { type Part, type ReasoningPart } from 'cloud-agent-sdk';
+import { type Part, type ReasoningPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import { isPartStreaming, shouldRenderReasoningPart } from './part-types';

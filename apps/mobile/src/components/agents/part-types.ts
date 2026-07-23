@@ -5,7 +5,7 @@ import {
   type ReasoningPart,
   type TextPart,
   type ToolPart,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 export function isTextPart(part: Part): part is TextPart {
   return part.type === 'text';

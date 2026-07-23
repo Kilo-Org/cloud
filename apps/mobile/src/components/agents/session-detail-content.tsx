@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId } from 'cloud-agent-sdk';
+import { type CloudStatus, type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';

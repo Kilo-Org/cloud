@@ -1,6 +1,6 @@
 import { ScrollView } from 'react-native';
 import { Search } from 'lucide-react-native';
-import { type ToolPart } from 'cloud-agent-sdk';
+import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 

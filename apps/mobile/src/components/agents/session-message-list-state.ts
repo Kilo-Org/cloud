@@ -1,4 +1,4 @@
-import { type OlderMessagesError } from 'cloud-agent-sdk';
+import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 
 /**
  * Pagination header state for `SessionMessageList`. The component renders

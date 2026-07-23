@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from 'lucide-react-native';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';

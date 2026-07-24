@@ -3,18 +3,24 @@ import { classifyGitHubHttpError, classifyGitHubGraphQlErrors } from './errors';
 function httpError(
   status: number,
   message: string,
-  headers?: Record<string, string>
+  options?: {
+    headers?: Record<string, string>;
+    data?: unknown;
+  }
 ): Error & {
   status: number;
-  response?: { headers?: Record<string, string> };
+  response?: { headers?: Record<string, string>; data?: unknown };
 } {
   const err = new Error(message) as Error & {
     status: number;
-    response?: { headers?: Record<string, string> };
+    response?: { headers?: Record<string, string>; data?: unknown };
   };
   err.status = status;
-  if (headers) {
-    err.response = { headers };
+  if (options?.headers || options?.data !== undefined) {
+    err.response = {
+      ...(options.headers ? { headers: options.headers } : {}),
+      ...(options.data !== undefined ? { data: options.data } : {}),
+    };
   }
   return err;
 }
@@ -40,8 +46,10 @@ describe('classifyGitHubHttpError', () => {
     const resetSeconds = Math.floor(NOW / 1000) + 600;
     const result = classifyGitHubHttpError(
       httpError(403, 'API rate limit exceeded', {
-        'x-ratelimit-remaining': '0',
-        'x-ratelimit-reset': String(resetSeconds),
+        headers: {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(resetSeconds),
+        },
       }),
       NOW
     );
@@ -53,7 +61,7 @@ describe('classifyGitHubHttpError', () => {
 
   it('maps 403 retry-after (delta seconds) to an absolute epoch relative to now', () => {
     const result = classifyGitHubHttpError(
-      httpError(403, 'Secondary rate limit', { 'retry-after': '120' }),
+      httpError(403, 'Secondary rate limit', { headers: { 'retry-after': '120' } }),
       NOW
     );
     expect(result.code).toBe('TOO_MANY_REQUESTS');
@@ -87,13 +95,33 @@ describe('classifyGitHubHttpError', () => {
     const resetSeconds = Math.floor(NOW / 1000) + 60;
     const result = classifyGitHubHttpError(
       httpError(403, 'Resource not accessible by integration', {
-        'x-ratelimit-remaining': '0',
-        'x-ratelimit-reset': String(resetSeconds),
+        headers: {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(resetSeconds),
+        },
       }),
       NOW
     );
     expect(result.code).toBe('TOO_MANY_REQUESTS');
     expect(result.retryAfterEpochMs).toBe(resetSeconds * 1000);
+  });
+
+  it('maps 422 lock-prevents-review to FORBIDDEN with archived read-only message', () => {
+    const result = classifyGitHubHttpError(
+      httpError(422, 'Unprocessable Entity', {
+        data: { message: 'Unprocessable Entity', errors: ['lock prevents review'] },
+      })
+    );
+    expect(result.code).toBe('FORBIDDEN');
+    expect(result.message).toBe('Repository was archived so is read-only.');
+  });
+
+  it('maps 422 with archived message in body to FORBIDDEN with canonical archived message', () => {
+    const result = classifyGitHubHttpError(
+      httpError(422, 'Repository was archived so is read-only.')
+    );
+    expect(result.code).toBe('FORBIDDEN');
+    expect(result.message).toBe('Repository was archived so is read-only.');
   });
 
   it('maps 422 stale line comment shape to BAD_REQUEST', () => {

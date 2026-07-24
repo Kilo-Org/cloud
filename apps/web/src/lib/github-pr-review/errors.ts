@@ -94,6 +94,10 @@ const FALLBACK_FORBIDDEN = 'You do not have permission to perform this action on
 const FALLBACK_BAD_REQUEST = 'GitHub rejected this request';
 const FALLBACK_CONFLICT = 'GitHub reported a conflict for this PR';
 const FALLBACK_BAD_GATEWAY = 'GitHub returned an unexpected error';
+// Canonical sentence GitHub returns on comments/writes to archived repos (403).
+// Reviews on the same repos often 422 with `lock prevents review` instead — map both
+// to this message so submit and composer share identical FORBIDDEN UX.
+const ARCHIVED_READ_ONLY_MESSAGE = 'Repository was archived so is read-only.';
 // GitHub App user-to-server tokens read public repos fine but 403 on writes when
 // the app installation is missing, excludes the repo, or lacks PR write.
 const INTEGRATION_ACCESS_FORBIDDEN_MESSAGE =
@@ -104,6 +108,30 @@ function forbiddenMessageFromGitHub(message: string): string {
     return INTEGRATION_ACCESS_FORBIDDEN_MESSAGE;
   }
   return message || FALLBACK_FORBIDDEN;
+}
+
+/** String entries from Octokit `response.data.errors` (GitHub 422 bodies). */
+function responseDataErrorStrings(data: unknown): string[] {
+  if (typeof data !== 'object' || data === null) return [];
+  const errors = (data as { errors?: unknown }).errors;
+  if (!Array.isArray(errors)) return [];
+  return errors.filter((entry): entry is string => typeof entry === 'string');
+}
+
+/**
+ * Archived/read-only write failures: comments 403 with the canonical sentence;
+ * review create/submit often 422 with `errors: ["lock prevents review"]`.
+ * Match only that phrase (and the archived message) so genuine validation 422s
+ * (stale line, own-PR approve, missing fields, thread lock failed, etc.) stay BAD_REQUEST.
+ */
+function isArchivedReadOnlySignal(message: string, data: unknown): boolean {
+  const lowerMessage = message.toLowerCase();
+  if (lowerMessage.includes('repository was archived so is read-only')) {
+    return true;
+  }
+  return responseDataErrorStrings(data).some(entry =>
+    entry.toLowerCase().includes('lock prevents review')
+  );
 }
 
 export function classifyGitHubHttpError(
@@ -124,6 +152,9 @@ export function classifyGitHubHttpError(
     return { code: 'PRECONDITION_FAILED', message: PRECONDITION_FAILED_MESSAGE };
   }
   if (status === 422) {
+    if (isArchivedReadOnlySignal(message, error.response?.data)) {
+      return { code: 'FORBIDDEN', message: ARCHIVED_READ_ONLY_MESSAGE };
+    }
     return { code: 'BAD_REQUEST', message: message || FALLBACK_BAD_REQUEST };
   }
   if (status === 405 || status === 409) {

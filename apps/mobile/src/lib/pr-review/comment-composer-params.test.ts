@@ -69,4 +69,23 @@ describe('parseComposerParams', () => {
     expect(parseComposerParams(valid({ startLine: '0' }))).toBeNull();
     expect(parseComposerParams(valid({ startLine: '-1' }))).toBeNull();
   });
+
+  it('omits pendingId when absent', () => {
+    expect(parseComposerParams(valid())).not.toHaveProperty('pendingId');
+    const withoutId = parseComposerParams(valid({ pendingId: undefined }));
+    expect(withoutId).not.toBeNull();
+    expect(withoutId).not.toHaveProperty('pendingId');
+  });
+
+  it('passes a present pendingId string through', () => {
+    expect(parseComposerParams(valid({ pendingId: 'pending-abc' }))).toEqual(
+      expect.objectContaining({ pendingId: 'pending-abc' })
+    );
+  });
+
+  it('treats an empty pendingId as absent without rejecting the route', () => {
+    const parsed = parseComposerParams(valid({ pendingId: '' }));
+    expect(parsed).not.toBeNull();
+    expect(parsed).not.toHaveProperty('pendingId');
+  });
 });

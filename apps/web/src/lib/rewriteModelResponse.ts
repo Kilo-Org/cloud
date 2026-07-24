@@ -94,7 +94,8 @@ async function rewriteSseStream(
   parser: ReturnType<typeof createParser>,
   controller: ReadableStreamDefaultController<string>,
   doneReceived: () => boolean,
-  serializeError: (error: ResponseReadError) => string
+  serializeError: (error: ResponseReadError) => string,
+  onFinally: () => void
 ) {
   const decoder = new TextDecoder();
   try {
@@ -122,6 +123,7 @@ async function rewriteSseStream(
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
+    onFinally();
     reader.releaseLock();
   }
 }
@@ -225,27 +227,24 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
         },
       });
 
-      try {
-        await rewriteSseStream(
-          reader,
-          parser,
-          controller,
-          () => doneReceived,
-          responseReadError =>
-            'data: ' +
-            JSON.stringify({
-              ...(generationId ? { id: generationId } : {}),
-              error: {
-                code: 503,
-                message: responseReadError.message,
-                type: responseReadError.errorType,
-              },
-            }) +
-            '\n\n'
-        );
-      } finally {
-        progress.stop();
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'data: ' +
+          JSON.stringify({
+            ...(generationId ? { id: generationId } : {}),
+            error: {
+              code: 503,
+              message: responseReadError.message,
+              type: responseReadError.errorType,
+            },
+          }) +
+          '\n\n',
+        progress.stop
+      );
     },
   });
 
@@ -365,29 +364,26 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
         },
       });
 
-      try {
-        await rewriteSseStream(
-          reader,
-          parser,
-          controller,
-          () => doneReceived,
-          responseReadError =>
-            'event: error\n' +
-            'data: ' +
-            JSON.stringify({
-              ...(generationId ? { id: generationId } : {}),
-              type: 'error',
-              error: {
-                type: 'api_error',
-                message: responseReadError.message,
-                error_type: responseReadError.errorType,
-              },
-            }) +
-            '\n\n'
-        );
-      } finally {
-        progress.stop();
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'event: error\n' +
+          'data: ' +
+          JSON.stringify({
+            ...(generationId ? { id: generationId } : {}),
+            type: 'error',
+            error: {
+              type: 'api_error',
+              message: responseReadError.message,
+              error_type: responseReadError.errorType,
+            },
+          }) +
+          '\n\n',
+        progress.stop
+      );
     },
   });
 
@@ -479,30 +475,27 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
         },
       });
 
-      try {
-        await rewriteSseStream(
-          reader,
-          parser,
-          controller,
-          () => doneReceived,
-          responseReadError =>
-            'event: error\n' +
-            'data: ' +
-            JSON.stringify({
-              ...(generationId ? { id: generationId } : {}),
-              type: 'error',
-              sequence_number: nextSequenceNumber,
-              error: {
-                type: responseReadError.errorType,
-                code: responseReadError.errorType === 'timeout' ? '504' : '503',
-                message: responseReadError.message,
-              },
-            }) +
-            '\n\n'
-        );
-      } finally {
-        progress.stop();
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'event: error\n' +
+          'data: ' +
+          JSON.stringify({
+            ...(generationId ? { id: generationId } : {}),
+            type: 'error',
+            sequence_number: nextSequenceNumber,
+            error: {
+              type: responseReadError.errorType,
+              code: responseReadError.errorType === 'timeout' ? '504' : '503',
+              message: responseReadError.message,
+            },
+          }) +
+          '\n\n',
+        progress.stop
+      );
     },
   });
 

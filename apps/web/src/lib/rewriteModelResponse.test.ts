@@ -3,7 +3,9 @@ import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
+  rewriteModelResponse,
 } from './rewriteModelResponse';
+import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -17,6 +19,25 @@ function sseResponse(body: string, status = 200): Response {
     status,
     headers: { 'content-type': 'text/event-stream' },
   });
+}
+
+function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
+  const encoder = new TextEncoder();
+  let pullCount = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pullCount++ === 0 && initialBody !== undefined) {
+        controller.enqueue(encoder.encode(initialBody));
+        return;
+      }
+
+      const error = new Error(errorName);
+      error.name = errorName;
+      controller.error(error);
+    },
+  });
+
+  return new Response(body, { headers: { 'content-type': contentType } });
 }
 
 async function readOutputStream(response: Response): Promise<string> {
@@ -52,6 +73,28 @@ function dataObjects(sse: string): unknown[] {
     .filter(payload => payload !== '[DONE]')
     .map(payload => JSON.parse(payload));
 }
+
+const rewriters = [
+  ['Chat Completions', rewriteModelResponse_ChatCompletions],
+  ['Messages', rewriteModelResponse_Messages],
+  ['Responses', rewriteModelResponse_Responses],
+] as const;
+
+describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect', 'disconnected'],
+    ['TimeoutError', 'timeout', 'timed out'],
+  ])('returns structured JSON for %s', async (errorName, errorType, messageFragment) => {
+    const result = await rewrite(failingResponse('application/json', errorName));
+
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({
+      error: expect.stringContaining(messageFragment),
+      error_type: errorType,
+      message: expect.stringContaining(messageFragment),
+    });
+  });
+});
 
 describe('rewriteModelResponse_ChatCompletions', () => {
   describe('JSON responses', () => {
@@ -113,6 +156,26 @@ describe('rewriteModelResponse_ChatCompletions', () => {
   });
 
   describe('streaming responses', () => {
+    test.each([
+      ['ResponseAborted', 'upstream_disconnect'],
+      ['TimeoutError', 'timeout'],
+    ])('emits a structured SSE error for %s', async (errorName, errorType) => {
+      const upstream = failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream);
+      const sse = await readOutputStream(result);
+      const events = dataObjects(sse) as Array<{ error?: { code: number; type: string } }>;
+
+      expect(events[0]).toMatchObject({ model: 'upstream-model' });
+      expect(events[1]).toMatchObject({ id: 'gen-chat' });
+      expect(events[1]?.error).toMatchObject({ code: 503, type: errorType });
+      expect(dataPayloads(sse)).not.toContain('[DONE]');
+    });
+
     test('drops null delta role and emits [DONE]', async () => {
       const upstream = sseResponse(
         'data: {"model":"upstream-model","choices":[{"delta":{"role":null,"content":"hi"}}]}\n\n' +
@@ -181,6 +244,40 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 });
 
 describe('rewriteModelResponse_Messages', () => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect'],
+    ['TimeoutError', 'timeout'],
+  ])('emits an Anthropic SSE error for %s', async (errorName, errorType) => {
+    const result = await rewriteModelResponse_Messages(
+      failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"type":"message_start","message":{"id":"gen-message","usage":{"input_tokens":1,"output_tokens":0}}}\n\n'
+      )
+    );
+    const sse = await readOutputStream(result);
+
+    expect(sse).toContain('event: error\n');
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'message_start',
+        message: {
+          id: 'gen-message',
+          usage: { input_tokens: 1, output_tokens: 0 },
+        },
+      },
+      {
+        id: 'gen-message',
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: expect.any(String),
+          error_type: errorType,
+        },
+      },
+    ]);
+  });
+
   test('strips cost fields for JSON responses', async () => {
     const upstream = jsonResponse({
       type: 'message',
@@ -260,6 +357,39 @@ describe('rewriteModelResponse_Messages', () => {
 });
 
 describe('rewriteModelResponse_Responses', () => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect'],
+    ['TimeoutError', 'timeout'],
+  ])('emits an OpenAI Responses SSE error for %s', async (errorName, errorType) => {
+    const result = await rewriteModelResponse_Responses(
+      failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"type":"response.created","sequence_number":4,"response":{"id":"gen-response"}}\n\n'
+      )
+    );
+    const sse = await readOutputStream(result);
+
+    expect(sse).toContain('event: error\n');
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'response.created',
+        sequence_number: 4,
+        response: { id: 'gen-response' },
+      },
+      {
+        id: 'gen-response',
+        type: 'error',
+        sequence_number: 5,
+        error: {
+          type: errorType,
+          code: errorType === 'timeout' ? '504' : '503',
+          message: expect.any(String),
+        },
+      },
+    ]);
+  });
+
   test('strips cost fields for JSON responses', async () => {
     const upstream = jsonResponse({
       id: 'resp_1',
@@ -310,5 +440,63 @@ describe('rewriteModelResponse_Responses', () => {
     expect(event.response.usage.prompt_tokens_details.cached_tokens).toBe(1);
     expect(sse).toContain('event: response.completed');
     expect(dataPayloads(sse)).toContain('[DONE]');
+  });
+});
+
+describe('rewriteModelResponse', () => {
+  test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {
+    const result = await rewriteModelResponse(
+      jsonResponse({
+        model: 'openai/gpt-5',
+        usage: {
+          cost: 0.5,
+          cost_details: { upstream_inference_cost: 0.4 },
+          is_byok: false,
+        },
+      }),
+      'openai/gpt-5',
+      'openrouter',
+      'chat_completions',
+      KILO_ORGANIZATION_ID
+    );
+
+    expect(result).not.toBeNull();
+    expect(await result?.json()).toMatchObject({
+      usage: {
+        cost: 0.5,
+        cost_details: { upstream_inference_cost: 0.4 },
+        is_byok: false,
+      },
+    });
+  });
+
+  test('does not rewrite paid-model traffic for other organizations', async () => {
+    const result = await rewriteModelResponse(
+      jsonResponse({ model: 'openai/gpt-5' }),
+      'openai/gpt-5',
+      'openrouter',
+      'chat_completions',
+      '00000000-0000-0000-0000-000000000000'
+    );
+
+    expect(result).toBeNull();
+  });
+
+  test('continues stripping cost for free models outside the Kilo organization', async () => {
+    const result = await rewriteModelResponse(
+      jsonResponse({
+        model: 'google/gemma-4-26b-a4b-it:free',
+        usage: { cost: 0, is_byok: false },
+      }),
+      'google/gemma-4-26b-a4b-it:free',
+      'openrouter',
+      'chat_completions'
+    );
+
+    expect(result).not.toBeNull();
+    expect(await result?.json()).toEqual({
+      model: 'google/gemma-4-26b-a4b-it:free',
+      usage: {},
+    });
   });
 });

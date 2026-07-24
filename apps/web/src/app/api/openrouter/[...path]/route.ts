@@ -985,7 +985,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
-    requestBodyParsed.kind
+    requestBodyParsed.kind,
+    organizationId
   );
   if (rewrittenResponse) {
     return rewrittenResponse;

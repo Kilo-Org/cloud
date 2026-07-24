@@ -3,17 +3,109 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
+import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { errorExceptInTest } from '@/lib/utils.server';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 
-function rewriteUsage(usage: OpenRouterUsage) {
-  // We only rewrite the response for free models, strip upstream cost
-  delete usage.cost;
-  delete usage.cost_details;
-  delete usage.is_byok;
+type ResponseReadError = {
+  errorType: 'timeout' | 'upstream_disconnect';
+  message: string;
+};
+
+function getResponseReadError(error: unknown): ResponseReadError | null {
+  if (typeof error !== 'object' || error === null || !('name' in error)) {
+    return null;
+  }
+
+  if (error.name === 'ResponseAborted') {
+    return {
+      errorType: 'upstream_disconnect',
+      message: 'The upstream provider disconnected while sending the response.',
+    };
+  }
+
+  if (error.name === 'TimeoutError') {
+    return {
+      errorType: 'timeout',
+      message: 'The upstream provider timed out while sending the response.',
+    };
+  }
+
+  return null;
+}
+
+async function readResponseText(
+  response: Response,
+  headers: Headers
+): Promise<{ text: string } | { errorResponse: NextResponse }> {
+  try {
+    return { text: await response.text() };
+  } catch (error) {
+    const responseReadError = getResponseReadError(error);
+    if (!responseReadError) {
+      throw error;
+    }
+
+    return {
+      errorResponse: NextResponse.json(
+        {
+          error: responseReadError.message,
+          error_type: responseReadError.errorType,
+          message: responseReadError.message,
+        },
+        { status: 503, headers }
+      ),
+    };
+  }
+}
+
+async function rewriteSseStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  parser: ReturnType<typeof createParser>,
+  controller: ReadableStreamDefaultController<string>,
+  doneReceived: () => boolean,
+  serializeError: (error: ResponseReadError) => string
+) {
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        // Flush any event left buffered when the stream ends without a
+        // trailing blank line, so its data isn't silently dropped.
+        parser.reset({ consume: true });
+        if (doneReceived()) {
+          controller.enqueue('data: [DONE]\n\n');
+        }
+        controller.close();
+        return;
+      }
+      parser.feed(decoder.decode(value, { stream: true }));
+    }
+  } catch (error) {
+    const responseReadError = getResponseReadError(error);
+    if (!responseReadError) {
+      throw error;
+    }
+
+    errorExceptInTest('[rewriteModelResponse] emitting stream error event', responseReadError);
+    controller.enqueue(serializeError(responseReadError));
+    controller.close();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
+  if (removeCost) {
+    delete usage.cost;
+    delete usage.cost_details;
+    delete usage.is_byok;
+  }
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent
@@ -21,13 +113,17 @@ function rewriteUsage(usage: OpenRouterUsage) {
   }
 }
 
-export async function rewriteModelResponse_ChatCompletions(response: Response) {
+export async function rewriteModelResponse_ChatCompletions(response: Response, removeCost = true) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
     // Read the body text once to avoid "Response body object should not be
     // disturbed or locked" errors that occur when `.clone().json()` fails.
-    const text = await response.text();
+    const textResult = await readResponseText(response, headers);
+    if ('errorResponse' in textResult) {
+      return textResult.errorResponse;
+    }
+    const { text } = textResult;
     let json: OpenAI.ChatCompletion;
     try {
       json = JSON.parse(text) as OpenAI.ChatCompletion;
@@ -41,7 +137,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
     }
     const usage = json.usage as OpenRouterUsage;
     if (usage) {
-      rewriteUsage(usage);
+      rewriteUsage(usage, removeCost);
     }
 
     return NextResponse.json(json, {
@@ -60,6 +156,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
       }
 
       let doneReceived = false;
+      let generationId: string | undefined;
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (event.data === '[DONE]') {
@@ -67,6 +164,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
             return;
           }
           const json = JSON.parse(event.data) as ChatCompletionChunk;
+          generationId = json.id ?? generationId;
 
           const delta = json.choices?.[0]?.delta;
           if (delta) {
@@ -82,7 +180,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
           }
 
           if (json.usage) {
-            rewriteUsage(json.usage);
+            rewriteUsage(json.usage, removeCost);
           }
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
@@ -93,21 +191,23 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
         },
       });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'data: ' +
+          JSON.stringify({
+            ...(generationId ? { id: generationId } : {}),
+            error: {
+              code: 503,
+              message: responseReadError.message,
+              type: responseReadError.errorType,
+            },
+          }) +
+          '\n\n'
+      );
     },
   });
 
@@ -135,17 +235,23 @@ type MessagesApiMessageDelta = {
   delta: Anthropic.Messages.MessageDeltaEvent['delta'];
 };
 
-function rewriteMessagesUsage(usage: MessagesApiUsage) {
-  delete usage.cost;
-  delete usage.cost_details;
-  delete usage.is_byok;
+function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
+  if (removeCost) {
+    delete usage.cost;
+    delete usage.cost_details;
+    delete usage.is_byok;
+  }
 }
 
-export async function rewriteModelResponse_Messages(response: Response) {
+export async function rewriteModelResponse_Messages(response: Response, removeCost = true) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const text = await response.text();
+    const textResult = await readResponseText(response, headers);
+    if ('errorResponse' in textResult) {
+      return textResult.errorResponse;
+    }
+    const { text } = textResult;
     let json: Anthropic.Messages.Message & { usage?: MessagesApiUsage };
     try {
       json = JSON.parse(text) as Anthropic.Messages.Message & {
@@ -160,7 +266,7 @@ export async function rewriteModelResponse_Messages(response: Response) {
       });
     }
     if (json.usage) {
-      rewriteMessagesUsage(json.usage);
+      rewriteMessagesUsage(json.usage, removeCost);
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -178,6 +284,7 @@ export async function rewriteModelResponse_Messages(response: Response) {
       }
 
       let doneReceived = false;
+      let generationId: string | undefined;
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (event.data === '[DONE]') {
@@ -191,15 +298,16 @@ export async function rewriteModelResponse_Messages(response: Response) {
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
+            generationId = e.message.id ?? generationId;
             if (e.message.usage) {
-              rewriteMessagesUsage(e.message.usage);
+              rewriteMessagesUsage(e.message.usage, removeCost);
             }
           }
 
           if (json.type === 'message_delta') {
             const e = json as MessagesApiMessageDelta;
             if (e.usage) {
-              rewriteMessagesUsage(e.usage);
+              rewriteMessagesUsage(e.usage, removeCost);
             }
           }
 
@@ -211,21 +319,25 @@ export async function rewriteModelResponse_Messages(response: Response) {
         },
       });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'event: error\n' +
+          'data: ' +
+          JSON.stringify({
+            ...(generationId ? { id: generationId } : {}),
+            type: 'error',
+            error: {
+              type: 'api_error',
+              message: responseReadError.message,
+              error_type: responseReadError.errorType,
+            },
+          }) +
+          '\n\n'
+      );
     },
   });
 
@@ -238,14 +350,19 @@ export async function rewriteModelResponse_Messages(response: Response) {
 
 type ResponsesApiEvent = {
   type: string;
+  sequence_number?: number;
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
-export async function rewriteModelResponse_Responses(response: Response) {
+export async function rewriteModelResponse_Responses(response: Response, removeCost = true) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const text = await response.text();
+    const textResult = await readResponseText(response, headers);
+    if ('errorResponse' in textResult) {
+      return textResult.errorResponse;
+    }
+    const { text } = textResult;
     let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
     try {
       json = JSON.parse(text) as OpenAI.Responses.Response & {
@@ -260,7 +377,7 @@ export async function rewriteModelResponse_Responses(response: Response) {
       });
     }
     if (json.usage) {
-      rewriteUsage(json.usage);
+      rewriteUsage(json.usage, removeCost);
     }
     return NextResponse.json(json, {
       status: response.status,
@@ -278,6 +395,8 @@ export async function rewriteModelResponse_Responses(response: Response) {
       }
 
       let doneReceived = false;
+      let generationId: string | undefined;
+      let nextSequenceNumber = 0;
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (event.data === '[DONE]') {
@@ -285,9 +404,13 @@ export async function rewriteModelResponse_Responses(response: Response) {
             return;
           }
           const json = JSON.parse(event.data) as ResponsesApiEvent;
+          if (json.sequence_number !== undefined) {
+            nextSequenceNumber = Math.max(nextSequenceNumber, json.sequence_number + 1);
+          }
           if (json.response) {
+            generationId = json.response.id ?? generationId;
             if (json.response.usage) {
-              rewriteUsage(json.response.usage);
+              rewriteUsage(json.response.usage, removeCost);
             }
           }
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
@@ -298,21 +421,26 @@ export async function rewriteModelResponse_Responses(response: Response) {
         },
       });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'event: error\n' +
+          'data: ' +
+          JSON.stringify({
+            ...(generationId ? { id: generationId } : {}),
+            type: 'error',
+            sequence_number: nextSequenceNumber,
+            error: {
+              type: responseReadError.errorType,
+              code: responseReadError.errorType === 'timeout' ? '504' : '503',
+              message: responseReadError.message,
+            },
+          }) +
+          '\n\n'
+      );
     },
   });
 
@@ -327,25 +455,26 @@ export async function rewriteModelResponse(
   response: Response,
   model: string,
   providerId: ProviderId,
-  kind: GatewayRequest['kind']
+  kind: GatewayRequest['kind'],
+  organizationId?: string
 ): Promise<NextResponse | null> {
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
 
-  if (!isFreeModelRequiringCostRemoval) {
+  if (!isFreeModelRequiringCostRemoval && organizationId !== KILO_ORGANIZATION_ID) {
     console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
     return null;
   }
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(response);
+    return rewriteModelResponse_ChatCompletions(response, isFreeModelRequiringCostRemoval);
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response);
+    return rewriteModelResponse_Responses(response, isFreeModelRequiringCostRemoval);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response);
+    return rewriteModelResponse_Messages(response, isFreeModelRequiringCostRemoval);
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);

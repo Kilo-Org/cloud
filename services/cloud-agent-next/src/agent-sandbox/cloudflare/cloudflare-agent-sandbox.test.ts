@@ -394,14 +394,11 @@ describe('CloudflareAgentSandbox', () => {
     );
 
     expect(setOutboundHandler).toHaveBeenCalledWith('managedScm');
-    expect(configureBilling).toHaveBeenCalledWith(
-      expect.anything(),
-      {
-        sandboxId: 'usr-shared',
-        subject: { type: 'org', id: 'org_cloudflare' },
-        actor: { type: 'user', id: 'user_cloudflare' },
-      }
-    );
+    expect(configureBilling).toHaveBeenCalledWith(expect.anything(), {
+      sandboxId: 'usr-shared',
+      subject: { type: 'org', id: 'org_cloudflare' },
+      actor: { type: 'user', id: 'user_cloudflare' },
+    });
     expect(configureBilling.mock.invocationCallOrder[0]).toBeLessThan(
       setOutboundHandler.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );

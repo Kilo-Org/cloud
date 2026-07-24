@@ -113,6 +113,7 @@ overrides:
   fast-uri: 3.1.2
 patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
+  react-native-appsflyer@6.17.9: patches/react-native-appsflyer@6.17.9.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

@@ -6,14 +6,31 @@ import {
   REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY_FOR_TEST,
 } from '@/routers/github-pr-review-router';
 
-function commentNode(id: number) {
+function commentNode(
+  id: number,
+  reactionGroups?: Array<{
+    content: string;
+    viewerHasReacted: boolean;
+    reactors: { totalCount: number };
+  }>
+) {
   return {
     databaseId: id,
     id: `node_${id}`,
     body: `comment ${id}`,
     createdAt: '2024-01-01T00:00:00Z',
     author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
-    reactions: { nodes: [] },
+    // Live GitHub shape: unpaginated reactionGroups list (all group types).
+    reactionGroups: reactionGroups ?? [
+      { content: 'THUMBS_UP', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'THUMBS_DOWN', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'LAUGH', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'HOORAY', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'CONFUSED', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'HEART', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'ROCKET', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      { content: 'EYES', viewerHasReacted: false, reactors: { totalCount: 0 } },
+    ],
   };
 }
 
@@ -61,6 +78,8 @@ describe('fetchAllThreadComments', () => {
 
     // All three pages aggregated to completion — no silent truncation.
     expect(comments.map(c => c.databaseId)).toEqual([1, 2, 3]);
+    // Zero-count reactionGroups are dropped; DTO reactions stay empty.
+    expect(comments.map(c => c.reactions)).toEqual([[], [], []]);
     expect(request).toHaveBeenCalledTimes(2);
 
     // GraphQL variables must be nested under `variables` (GitHub — and a
@@ -79,5 +98,32 @@ describe('fetchAllThreadComments', () => {
       { variables: Record<string, unknown> },
     ];
     expect(secondArgs.variables.after).toBe('c2');
+  });
+
+  it('keeps only reactionGroups with totalCount > 0 in the DTO shape', async () => {
+    const comments = await fetchAllThreadComments({
+      octokit: { request: jest.fn() } as never,
+      threadId: 'thread_1',
+      initialConnection: {
+        pageInfo: { hasNextPage: false, endCursor: null },
+        nodes: [
+          commentNode(1, [
+            { content: 'THUMBS_UP', viewerHasReacted: true, reactors: { totalCount: 3 } },
+            { content: 'THUMBS_DOWN', viewerHasReacted: false, reactors: { totalCount: 0 } },
+            { content: 'LAUGH', viewerHasReacted: false, reactors: { totalCount: 0 } },
+            { content: 'HOORAY', viewerHasReacted: false, reactors: { totalCount: 0 } },
+            { content: 'CONFUSED', viewerHasReacted: false, reactors: { totalCount: 0 } },
+            { content: 'HEART', viewerHasReacted: false, reactors: { totalCount: 1 } },
+            { content: 'ROCKET', viewerHasReacted: false, reactors: { totalCount: 0 } },
+            { content: 'EYES', viewerHasReacted: false, reactors: { totalCount: 0 } },
+          ]),
+        ],
+      },
+    });
+
+    expect(comments[0]?.reactions).toEqual([
+      { content: 'THUMBS_UP', count: 3, viewerHasReacted: true },
+      { content: 'HEART', count: 1, viewerHasReacted: false },
+    ]);
   });
 });

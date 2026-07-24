@@ -1,4 +1,5 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
@@ -131,10 +132,20 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'disabled-settings': {
-      return <SettingsOverviewScreen scope={scope} />;
+      return <SettingsOverviewScreen scope={scope} presentation="inline" />;
     }
     case 'dashboard': {
-      return <DashboardScreen scope={scope} />;
+      // Fade the Dashboard in when the agent is enabled: the
+      // `disabled-settings` branch's <SettingsOverviewScreen> unmounts in
+      // place once `config.isEnabled` flips true, which is otherwise an
+      // abrupt snap. Only the incoming subtree is wrapped — the loading,
+      // error, and setup branches above must stay snap-instant so they
+      // feel like real state changes, not animations.
+      return (
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+          <DashboardScreen scope={scope} />
+        </Animated.View>
+      );
     }
     default: {
       throw new Error('Unexpected scope entry view');

@@ -1,4 +1,4 @@
-import { count, max, eq, and, gt, gte, lte, lt, inArray, asc, like } from 'drizzle-orm';
+import { count, max, eq, and, gt, gte, lte, lt, inArray, asc } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import * as z from 'zod';
 import type { StoredEvent } from '../../websocket/types.js';
@@ -206,6 +206,31 @@ function buildLatestAssistantMessage(
   } satisfies LatestAssistantMessage;
 }
 
+/**
+ * Exclusive upper bound for a prefix scan under SQLite's default BINARY
+ * collation: the prefix with its final UTF-16 code unit incremented. Returns
+ * null when no finite bound exists (an empty prefix, or one that is entirely
+ * U+FFFF), in which case callers fall back to a lower-bound-only scan.
+ *
+ * The bound is exact only when the prefix's final character is not a UTF-16
+ * surrogate: the JS-side increment must agree with SQLite's UTF-8 byte-order
+ * comparison, which holds for BMP-non-surrogate characters. Every caller here
+ * passes an `entity_id` prefix that ends in ASCII ('/'), and preparation ids are
+ * held to ASCII at ingest, so this holds. A future caller with a prefix ending
+ * in a non-BMP character must not reuse this without revisiting the bound. (The
+ * lower bound is an exact string comparison, so non-ASCII within a prefix is
+ * fine; only the trailing character matters here.)
+ */
+export function prefixUpperBound(prefix: string): string | null {
+  for (let i = prefix.length - 1; i >= 0; i--) {
+    const code = prefix.charCodeAt(i);
+    if (code < 0xffff) {
+      return prefix.slice(0, i) + String.fromCharCode(code + 1);
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Factory Function
 // ---------------------------------------------------------------------------
@@ -307,6 +332,18 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
     },
 
     findByEntityPrefix(prefix: string): StoredEvent[] {
+      // Prefix-match via a half-open range scan rather than LIKE. SQLite raises
+      // "LIKE or GLOB pattern too complex" once a LIKE pattern exceeds
+      // SQLITE_MAX_LIKE_PATTERN_LENGTH (50 KB) — which throws, and keeps
+      // re-throwing on every reconnect, for any session whose stored
+      // preparation attemptId is pathologically large. A range over the
+      // entity_id B-tree has no such limit and also avoids treating '%'/'_' in
+      // the prefix as LIKE wildcards.
+      const upperBound = prefixUpperBound(prefix);
+      const prefixCondition =
+        upperBound === null
+          ? gte(events.entity_id, prefix)
+          : and(gte(events.entity_id, prefix), lt(events.entity_id, upperBound));
       return db
         .select({
           id: events.id,
@@ -317,7 +354,7 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
           timestamp: events.timestamp,
         })
         .from(events)
-        .where(like(events.entity_id, `${prefix}%`))
+        .where(prefixCondition)
         .orderBy(asc(events.timestamp), asc(events.id))
         .all() satisfies StoredEvent[];
     },

@@ -25,6 +25,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -32,6 +33,11 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  setThemePreference,
+  type ThemePreference,
+  useThemePreference,
+} from '@/lib/hooks/use-theme-preference';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
@@ -50,6 +56,7 @@ export function ProfileScreen() {
   const router = useRouter();
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const { preference: themePreference } = useThemePreference();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
@@ -263,6 +270,23 @@ export function ProfileScreen() {
             })}
           </Animated.View>
         )}
+
+        {/* Appearance */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Appearance
+          </Text>
+          <SegmentedControl<ThemePreference>
+            accessibilityLabel="Appearance"
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            value={themePreference}
+            onChange={setThemePreference}
+          />
+        </View>
 
         {/* Notifications */}
         <View className="mt-6 gap-3">

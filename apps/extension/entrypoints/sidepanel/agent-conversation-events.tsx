@@ -1,4 +1,6 @@
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
+import { isValidElement } from 'react';
+import type { Components } from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type {
@@ -6,9 +8,76 @@ import type {
   GroupedConversationItem,
 } from '@/src/shared/agent-conversation';
 import { getViewportScreenshotDataUrl } from '@/src/shared/agent-tool-output';
+// Explicit .tsx: collapsible-code-block.ts (pure helpers) shadows the default resolution.
+import { CollapsibleCodeBlock } from './collapsible-code-block.tsx';
 
 // Hoisted so the array reference is stable (react-perf) across renders.
 const remarkPlugins = [remarkGfm];
+
+const extractCodeText = (codeChildren: unknown): string | undefined => {
+  if (typeof codeChildren === 'string') {
+    return codeChildren;
+  }
+
+  if (Array.isArray(codeChildren) && codeChildren.every(part => typeof part === 'string')) {
+    return codeChildren.join('');
+  }
+
+  return undefined;
+};
+
+const asNodeList = (children: ReactNode): readonly unknown[] => {
+  if (Array.isArray(children)) {
+    return children;
+  }
+
+  return [children];
+};
+
+const extractCodeChild = (
+  children: ReactNode
+): { readonly className: string | undefined; readonly code: string } | undefined => {
+  for (const child of asNodeList(children)) {
+    if (child === null || typeof child !== 'object') {
+      // Skip non-element children (text nodes, null).
+    } else if (
+      isValidElement<{ children?: unknown; className?: string }>(child) &&
+      child.type === 'code'
+    ) {
+      const code = extractCodeText(child.props.children);
+
+      if (code === undefined) {
+        return undefined;
+      }
+
+      return { className: child.props.className, code };
+    }
+  }
+
+  return undefined;
+};
+
+const createAssistantMarkdownComponents = (forceExpanded: boolean): Components => ({
+  pre: ({ children }) => {
+    const extracted = extractCodeChild(children);
+
+    if (extracted === undefined) {
+      return <pre>{children}</pre>;
+    }
+
+    return (
+      <CollapsibleCodeBlock
+        code={extracted.code}
+        forceExpanded={forceExpanded}
+        languageClassName={extracted.className}
+      />
+    );
+  },
+});
+
+// Hoisted so the object reference is stable (react-perf) across renders.
+const assistantMarkdownComponentsStreaming = createAssistantMarkdownComponents(true);
+const assistantMarkdownComponentsFinalized = createAssistantMarkdownComponents(false);
 
 const formatToolValue = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -37,10 +106,20 @@ const formatToolValue = (value: unknown): string => {
 
 const MessageEvent = ({
   event,
+  streamingMessageId,
 }: {
   event: Extract<AgentConversationEvent, { readonly type: 'message' }>;
+  streamingMessageId?: string | undefined;
 }): JSX.Element => {
   const isUser = event.role === 'user';
+  // Only assistant messages get collapsible code blocks; user branch keeps default rendering.
+  let assistantComponents: Components | undefined = undefined;
+  if (!isUser) {
+    assistantComponents =
+      event.id === streamingMessageId
+        ? assistantMarkdownComponentsStreaming
+        : assistantMarkdownComponentsFinalized;
+  }
 
   return (
     <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
@@ -52,7 +131,9 @@ const MessageEvent = ({
         }
       >
         <div className="agent-message-markdown">
-          <ReactMarkdown remarkPlugins={remarkPlugins}>{event.text}</ReactMarkdown>
+          <ReactMarkdown components={assistantComponents} remarkPlugins={remarkPlugins}>
+            {event.text}
+          </ReactMarkdown>
         </div>
       </div>
     </div>
@@ -169,8 +250,10 @@ const StandaloneToolEvent = ({
 
 export const AgentConversationItemView = ({
   item,
+  streamingMessageId,
 }: {
   item: GroupedConversationItem;
+  streamingMessageId?: string | undefined;
 }): JSX.Element => {
   if (item.type === 'tool-exchange') {
     return <ToolExchangeEvent item={item} />;
@@ -179,7 +262,7 @@ export const AgentConversationItemView = ({
   const { event } = item;
 
   if (event.type === 'message') {
-    return <MessageEvent event={event} />;
+    return <MessageEvent event={event} streamingMessageId={streamingMessageId} />;
   }
 
   if (event.type === 'thinking') {

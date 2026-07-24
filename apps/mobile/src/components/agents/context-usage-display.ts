@@ -114,7 +114,7 @@ type ContextSheetContent = {
   percentage: string | null;
   remainingTokens: string | null;
   remainingPercentage: string | null;
-  cost: string | null;
+  cost: string;
   tone: ContextTone;
 };
 
@@ -124,7 +124,7 @@ export function getContextSheetContent(
 ): ContextSheetContent {
   const tone = getContextTone(info.percentage);
   const usedTokens = formatExactTokens(info.contextTokens);
-  const cost = totalCost > 0 ? formatCost(totalCost) : null;
+  const cost = formatCost(totalCost);
   if (info.contextWindow === undefined) {
     return {
       usedTokens,

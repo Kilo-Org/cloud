@@ -76,6 +76,7 @@ import {
   computeOpenRouterCostFields,
   drainSseStream,
   extractVercelIsByok,
+  isResponseInterruptedError,
 } from '@/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
@@ -928,6 +929,17 @@ export function countAndStoreUsage(
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
+  const parseResponseText = async (
+    parse: (content: string) => MicrodollarUsageStats
+  ): Promise<MicrodollarUsageStats | null> => {
+    try {
+      return parse(await clonedReponse.text());
+    } catch (error) {
+      if (isResponseInterruptedError(error)) return null;
+      throw error;
+    }
+  };
+
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
@@ -938,11 +950,9 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status
           )
-        : clonedReponse
-            .text()
-            .then(content =>
-              parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
-            );
+        : parseResponseText(content =>
+            parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
+          );
     }
     if (usageContext.api_kind === 'chat_completions') {
       usageStatsPromise = usageContext.isStreaming
@@ -953,15 +963,9 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status
           )
-        : clonedReponse
-            .text()
-            .then(content =>
-              parseMicrodollarUsageFromString(
-                content,
-                usageContext.kiloUserId,
-                clonedReponse.status
-              )
-            );
+        : parseResponseText(content =>
+            parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
+          );
     }
     if (usageContext.api_kind === 'messages') {
       usageStatsPromise = usageContext.isStreaming
@@ -972,11 +976,9 @@ export function countAndStoreUsage(
             usageContext.provider,
             clonedReponse.status
           )
-        : clonedReponse
-            .text()
-            .then(content =>
-              parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
-            );
+        : parseResponseText(content =>
+            parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
+          );
     }
   }
 

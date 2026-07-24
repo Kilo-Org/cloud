@@ -46,7 +46,7 @@ function makePayload(overrides: {
       merged: overrides.merged,
       draft: overrides.draft,
       html_url: overrides.prUrl ?? `https://github.com/${repo}/pull/${overrides.prNumber}`,
-      user: { id: 1, login: 'octocat', avatar_url: 'https://example.com/a.png' },
+      user: { id: 1, login: 'octocat', avatar_url: 'https://example.com/a.png', type: 'User' },
       head: {
         sha: overrides.headSha,
         ref: overrides.headRef,

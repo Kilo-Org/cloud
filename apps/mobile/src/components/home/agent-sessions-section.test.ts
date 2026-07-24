@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { activeSessionLabel } from '@/components/home/agent-sessions-section';
-import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { hasDisplayableAgentSessions } from '@/components/home/agent-sessions-section';
+import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 
 vi.mock('expo-router', () => ({
   useRouter: vi.fn(),
@@ -15,8 +15,12 @@ vi.mock('@/components/home/section-header', () => ({
   SectionHeader: () => null,
 }));
 
-vi.mock('@/components/ui/session-row', () => ({
-  SessionRow: () => null,
+vi.mock('@/components/agents/remote-session-row', () => ({
+  RemoteSessionRow: () => null,
+}));
+
+vi.mock('@/components/agents/session-row', () => ({
+  StoredSessionRow: () => null,
 }));
 
 vi.mock('@/components/ui/text', () => ({
@@ -32,62 +36,58 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   }),
 }));
 
-function makeActiveSession(over: Partial<ActiveSession> = {}): ActiveSession {
+function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
   return {
-    id: 'test-id',
+    id: 'a1',
     status: 'running',
-    title: 'Test Session',
-    connectionId: 'conn-1',
+    title: 'test',
+    connectionId: 'c1',
     ...over,
   };
 }
 
-describe('activeSessionLabel', () => {
-  it('returns repo name uppercased when gitUrl is present', () => {
-    const session = makeActiveSession({
-      gitUrl: 'git@github.com:org/my-repo.git',
-      createdOnPlatform: 'cli',
-    });
-    expect(activeSessionLabel(session)).toBe('MY-REPO');
+function makeStored(over: Partial<StoredSession> = {}): StoredSession {
+  return {
+    session_id: 's1',
+    title: 'Untitled',
+    cloud_agent_session_id: null,
+    parent_session_id: null,
+    organization_id: null,
+    created_on_platform: 'cli',
+    git_url: null,
+    git_branch: null,
+    status: null,
+    status_updated_at: null,
+    total_cost_microdollars: null,
+    created_at: '2026-07-01 00:00:00+00',
+    updated_at: '2026-07-01 00:00:00+00',
+    version: 0,
+    associatedPr: null,
+    ...over,
+  };
+}
+
+describe('hasDisplayableAgentSessions', () => {
+  it('returns true when there is at least one active session', () => {
+    expect(hasDisplayableAgentSessions([], [makeActive()])).toBe(true);
   });
 
-  it('returns "LIVE" when createdOnPlatform is undefined and no repo', () => {
-    const session = makeActiveSession({
-      createdOnPlatform: undefined,
-      gitUrl: undefined,
-    });
-    expect(activeSessionLabel(session)).toBe('LIVE');
+  it('returns true when a cloud-agent stored session exists', () => {
+    expect(
+      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent' })], [])
+    ).toBe(true);
+    expect(
+      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent-web' })], [])
+    ).toBe(true);
   });
 
-  it('returns "LIVE" when createdOnPlatform is empty string and no repo', () => {
-    const session = makeActiveSession({
-      createdOnPlatform: '',
-      gitUrl: undefined,
-    });
-    expect(activeSessionLabel(session)).toBe('LIVE');
+  it('returns false when only non-cloud-agent stored sessions exist', () => {
+    expect(hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cli' })], [])).toBe(
+      false
+    );
   });
 
-  it('returns "LIVE" when createdOnPlatform is "unknown" and no repo', () => {
-    const session = makeActiveSession({
-      createdOnPlatform: 'unknown',
-      gitUrl: undefined,
-    });
-    expect(activeSessionLabel(session)).toBe('LIVE');
-  });
-
-  it('returns "CLI" when createdOnPlatform is "cli" and no repo', () => {
-    const session = makeActiveSession({
-      createdOnPlatform: 'cli',
-      gitUrl: undefined,
-    });
-    expect(activeSessionLabel(session)).toBe('CLI');
-  });
-
-  it('returns "CLOUD AGENT" when createdOnPlatform is "cloud-agent-web" and no repo', () => {
-    const session = makeActiveSession({
-      createdOnPlatform: 'cloud-agent-web',
-      gitUrl: undefined,
-    });
-    expect(activeSessionLabel(session)).toBe('CLOUD AGENT');
+  it('returns false when both arrays are empty', () => {
+    expect(hasDisplayableAgentSessions([], [])).toBe(false);
   });
 });

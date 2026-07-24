@@ -3,6 +3,7 @@ import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUs
 import {
   extractPromptInfo,
   extractUsageContextInfo,
+  countAndStoreUsage,
   parseMicrodollarUsageFromStream,
   parseMicrodollarUsageFromString,
   mapToUsageStats,
@@ -174,41 +175,70 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     await verifyApproval(resultString, approvalFilePath);
   });
 
-  test('handles ResponseAborted error gracefully and returns partial data', async () => {
-    // Create a stream that emits some SSE data then throws ResponseAborted
-    const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
+  test.each(['ResponseAborted', 'TimeoutError'])(
+    'handles %s gracefully and returns partial data',
+    async errorName => {
+      // Create a stream that emits some SSE data then fails.
+      const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
 
-    // Create a custom error that mimics ResponseAborted
-    const responseAbortedError = new Error('Response aborted');
-    responseAbortedError.name = 'ResponseAborted';
+      const streamError = new Error('Response interrupted');
+      streamError.name = errorName;
 
-    let pullCount = 0;
-    // Create a readable stream that emits partial data then throws on second pull
-    const stream = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        pullCount++;
-        if (pullCount === 1) {
-          controller.enqueue(new TextEncoder().encode(partialSSEData));
-        } else {
-          // Simulate abort on subsequent read
-          controller.error(responseAbortedError);
-        }
-      },
-    });
+      let pullCount = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pullCount++;
+          if (pullCount === 1) {
+            controller.enqueue(new TextEncoder().encode(partialSSEData));
+          } else {
+            controller.error(streamError);
+          }
+        },
+      });
 
-    const result = await parseMicrodollarUsageFromStream(
-      stream,
-      'fake-user-id',
-      undefined,
-      'openrouter',
-      200
+      const result = await parseMicrodollarUsageFromStream(
+        stream,
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200
+      );
+
+      expect(result.messageId).toBe('gen-123');
+      expect(result.model).toBe('anthropic/claude-3-5-sonnet');
+      expect(result.responseContent).toBe('Hello world');
+      expect(result.hasError).toBe(true);
+    }
+  );
+
+  test.each([
+    ['chat_completions', 'ResponseAborted'],
+    ['chat_completions', 'TimeoutError'],
+    ['responses', 'ResponseAborted'],
+    ['responses', 'TimeoutError'],
+    ['messages', 'ResponseAborted'],
+    ['messages', 'TimeoutError'],
+  ] as const)('handles %s response.text() %s errors', async (apiKind, errorName) => {
+    const streamError = new Error('Response interrupted');
+    streamError.name = errorName;
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(streamError);
+        },
+      })
     );
 
-    // Should have captured partial data before abort
-    expect(result.messageId).toBe('gen-123');
-    expect(result.model).toBe('anthropic/claude-3-5-sonnet');
-    expect(result.responseContent).toBe('Hello world');
-    expect(result.hasError).toBe(true); // Should be marked as error due to abort
+    await expect(
+      countAndStoreUsage(
+        response,
+        {
+          api_kind: apiKind,
+          isStreaming: false,
+        } as MicrodollarUsageContext,
+        undefined
+      )
+    ).resolves.toBeNull();
   });
 
   test('captures numeric error.code from in-stream error event as status_code_override', async () => {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive unit-test suite for session-list-helpers pure functions */
 import { describe, expect, it } from 'vitest';
 
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
@@ -10,7 +11,10 @@ import {
   platformLabel,
   remoteAgentLabel,
   remoteMeta,
+  remoteSessionEyebrowLabel,
+  repoNameFromGitUrl,
   selectPinnedActiveSessions,
+  storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 
@@ -328,5 +332,120 @@ describe('expandPlatformFilter (regression guard for filter expansion)', () => {
 
   it('passes through unknown concrete values unchanged', () => {
     expect(expandPlatformFilter(['cli', 'other'])).toEqual(['cli', 'other']);
+  });
+});
+
+describe('repoNameFromGitUrl', () => {
+  it('returns null for null', () => {
+    expect(repoNameFromGitUrl(null)).toBeNull();
+  });
+
+  it('returns null for undefined', () => {
+    expect(repoNameFromGitUrl(undefined)).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(repoNameFromGitUrl('')).toBeNull();
+  });
+
+  it('returns the last path segment for an SSH URL with .git suffix', () => {
+    expect(repoNameFromGitUrl('git@github.com:org/my-repo.git')).toBe('my-repo');
+  });
+
+  it('returns the last path segment for an SSH URL without .git suffix', () => {
+    expect(repoNameFromGitUrl('git@github.com:org/my-repo')).toBe('my-repo');
+  });
+
+  it('returns the last path segment for an https URL with .git suffix', () => {
+    expect(repoNameFromGitUrl('https://github.com/org/my-repo.git')).toBe('my-repo');
+  });
+
+  it('returns the last path segment for an https URL without .git suffix', () => {
+    expect(repoNameFromGitUrl('https://github.com/org/my-repo')).toBe('my-repo');
+  });
+
+  it('handles a nested group/project path (GitLab style) by returning the last segment', () => {
+    // formatGitUrlProject strips the dash-prefixed project segment when there
+    // are >=2 leading parts, so the last segment is the repo name.
+    expect(repoNameFromGitUrl('https://gitlab.com/group/sub/my-repo.git')).toBe('my-repo');
+  });
+});
+
+describe('storedSessionEyebrowLabel (canonical eyebrow — repo-name-first)', () => {
+  it('returns the uppercased repo name when git_url is present (SSH)', () => {
+    expect(
+      storedSessionEyebrowLabel({
+        git_url: 'git@github.com:org/my-repo.git',
+        created_on_platform: 'cli',
+      })
+    ).toBe('MY-REPO');
+  });
+
+  it('returns the uppercased repo name when git_url is present (https)', () => {
+    expect(
+      storedSessionEyebrowLabel({
+        git_url: 'https://github.com/org/my-repo.git',
+        created_on_platform: 'cloud-agent',
+      })
+    ).toBe('MY-REPO');
+  });
+
+  it('falls back to the platform label when git_url is null', () => {
+    expect(storedSessionEyebrowLabel({ git_url: null, created_on_platform: 'cli' })).toBe('CLI');
+  });
+
+  it('falls back to the platform label when git_url is the empty string', () => {
+    expect(storedSessionEyebrowLabel({ git_url: '', created_on_platform: 'cloud-agent' })).toBe(
+      'CLOUD AGENT'
+    );
+  });
+});
+
+describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', () => {
+  it('returns the uppercased repo name when gitUrl is present (SSH)', () => {
+    expect(
+      remoteSessionEyebrowLabel({
+        gitUrl: 'git@github.com:org/my-repo.git',
+        createdOnPlatform: 'cli',
+      })
+    ).toBe('MY-REPO');
+  });
+
+  it('returns the uppercased repo name when gitUrl is present (https)', () => {
+    expect(
+      remoteSessionEyebrowLabel({
+        gitUrl: 'https://github.com/org/my-repo.git',
+        createdOnPlatform: 'cloud-agent',
+      })
+    ).toBe('MY-REPO');
+  });
+
+  it('returns "LIVE" when gitUrl is null and origin is undefined (origin-not-heartbeat)', () => {
+    expect(remoteSessionEyebrowLabel({ gitUrl: null, createdOnPlatform: undefined })).toBe('LIVE');
+  });
+
+  it('returns "LIVE" when gitUrl is undefined and origin is "unknown"', () => {
+    expect(remoteSessionEyebrowLabel({ gitUrl: undefined, createdOnPlatform: 'unknown' })).toBe(
+      'LIVE'
+    );
+  });
+
+  it('returns "CLI" when gitUrl is undefined and origin is "cli"', () => {
+    expect(remoteSessionEyebrowLabel({ gitUrl: undefined, createdOnPlatform: 'cli' })).toBe('CLI');
+  });
+
+  it('returns "CLOUD AGENT" when gitUrl is undefined and origin is "cloud-agent-web"', () => {
+    expect(
+      remoteSessionEyebrowLabel({ gitUrl: undefined, createdOnPlatform: 'cloud-agent-web' })
+    ).toBe('CLOUD AGENT');
+  });
+
+  it('repo name wins over a known platform origin', () => {
+    expect(
+      remoteSessionEyebrowLabel({
+        gitUrl: 'https://github.com/org/my-repo.git',
+        createdOnPlatform: 'cli',
+      })
+    ).toBe('MY-REPO');
   });
 });

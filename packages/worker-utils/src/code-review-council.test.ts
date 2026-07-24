@@ -8,6 +8,8 @@ import {
   buildCouncilReviewSection,
   computeCouncilDecision,
   councilDecisionBlocksMerge,
+  councilHardExcludeReason,
+  councilSelectionSkipReason,
   decideCouncilFromManifest,
   deriveSpecialistVote,
   determineAutomatedReviewType,
@@ -581,6 +583,87 @@ describe('determineAutomatedReviewType', () => {
         { councilEntitled: false, councilConfigActive: false, councilEnabledForRepo: false }
       )
     ).toBe('standard');
+  });
+
+  it('hard-excludes downgrade an otherwise-available council to standard', () => {
+    expect(determineAutomatedReviewType({ isDraft: true }, ALL_ON)).toBe('standard');
+    expect(determineAutomatedReviewType({ isBot: true }, ALL_ON)).toBe('standard');
+    expect(determineAutomatedReviewType({ isFork: true }, ALL_ON)).toBe('standard');
+    // A clean PR with council available still gets council.
+    expect(
+      determineAutomatedReviewType({ isDraft: false, isBot: false, isFork: false }, ALL_ON)
+    ).toBe('council');
+  });
+
+  it('a hard-excluded PR without council available is unaffected (stays standard)', () => {
+    expect(
+      determineAutomatedReviewType(
+        { isFork: true, isBot: true },
+        { ...ALL_ON, councilEnabledForRepo: false }
+      )
+    ).toBe('standard');
+  });
+
+  it('a required-label gate narrows council to labeled PRs (unset gate is a no-op)', () => {
+    const gated = { ...ALL_ON, selection: { requiredLabels: ['council'] } };
+    // Labeled → council; unlabeled → standard.
+    expect(determineAutomatedReviewType({ labels: ['council'] }, gated)).toBe('council');
+    expect(determineAutomatedReviewType({ labels: ['bug'] }, gated)).toBe('standard');
+    expect(determineAutomatedReviewType({}, gated)).toBe('standard');
+    // No gate configured → labels are irrelevant, council still runs.
+    expect(determineAutomatedReviewType({ labels: [] }, ALL_ON)).toBe('council');
+  });
+
+  it('a hard exclude wins over a satisfied required-label gate', () => {
+    // Even a correctly-labeled fork PR is downgraded — floors beat customer gates.
+    expect(
+      determineAutomatedReviewType(
+        { isFork: true, labels: ['council'] },
+        { ...ALL_ON, selection: { requiredLabels: ['council'] } }
+      )
+    ).toBe('standard');
+  });
+});
+
+describe('councilSelectionSkipReason', () => {
+  it('is a no-op when no gate is configured', () => {
+    expect(councilSelectionSkipReason({ labels: [] }, undefined)).toBeNull();
+    expect(councilSelectionSkipReason({ labels: [] }, {})).toBeNull();
+    expect(councilSelectionSkipReason({ labels: [] }, { requiredLabels: [] })).toBeNull();
+    // Blank/whitespace-only configured labels do not form a gate.
+    expect(councilSelectionSkipReason({ labels: [] }, { requiredLabels: ['  ', ''] })).toBeNull();
+  });
+
+  it('matches any required label case-insensitively / trimmed', () => {
+    const gate = { requiredLabels: ['Council', ' needs-review '] };
+    expect(councilSelectionSkipReason({ labels: ['council'] }, gate)).toBeNull();
+    expect(councilSelectionSkipReason({ labels: ['NEEDS-REVIEW'] }, gate)).toBeNull();
+    expect(councilSelectionSkipReason({ labels: ['other', 'council'] }, gate)).toBeNull();
+  });
+
+  it('skips when none of the required labels are present', () => {
+    expect(councilSelectionSkipReason({ labels: ['bug'] }, { requiredLabels: ['council'] })).toBe(
+      'missing-required-label'
+    );
+    expect(councilSelectionSkipReason({}, { requiredLabels: ['council'] })).toBe(
+      'missing-required-label'
+    );
+  });
+});
+
+describe('councilHardExcludeReason', () => {
+  it('returns null when nothing excludes council', () => {
+    expect(councilHardExcludeReason({})).toBeNull();
+    expect(councilHardExcludeReason({ isDraft: false, isBot: false, isFork: false })).toBeNull();
+  });
+
+  it('reports the reason, ordered draft → bot-author → fork-pr', () => {
+    expect(councilHardExcludeReason({ isDraft: true })).toBe('draft');
+    expect(councilHardExcludeReason({ isBot: true })).toBe('bot-author');
+    expect(councilHardExcludeReason({ isFork: true })).toBe('fork-pr');
+    // When several apply, the earliest-listed reason wins (deterministic).
+    expect(councilHardExcludeReason({ isDraft: true, isBot: true, isFork: true })).toBe('draft');
+    expect(councilHardExcludeReason({ isBot: true, isFork: true })).toBe('bot-author');
   });
 });
 

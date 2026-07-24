@@ -14,8 +14,11 @@ import {
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import {
+  councilHardExcludeReason,
+  councilSelectionSkipReason,
   determineAutomatedReviewType,
   isCouncilActive,
+  type AutomatedReviewPrFacts,
 } from '@kilocode/worker-utils/code-review-council';
 import { isCouncilEntitledForOwner } from '@/lib/code-reviews/core/council-entitlement';
 import type { PlatformIntegration } from '@kilocode/db/schema';
@@ -312,10 +315,37 @@ export async function handlePullRequestCodeReview(
       config.council_enabled_repository_ids.includes(repository.id);
     const councilEntitled =
       councilConfigActive && councilEnabledForRepo ? await isCouncilEntitledForOwner(owner) : false;
-    const reviewType = determineAutomatedReviewType(
-      { isDraft: pull_request.draft ?? false, author: pull_request.user.login },
-      { councilEntitled, councilConfigActive, councilEnabledForRepo }
-    );
+    // Hard, code-owned facts that can veto council even when it is otherwise available. Bot type and
+    // fork origin are GitHub-authoritative (not author-controlled), so they cannot be spoofed to
+    // reach the expensive council path.
+    const prFacts: AutomatedReviewPrFacts = {
+      isDraft: pull_request.draft ?? false,
+      isBot: pull_request.user.type === 'Bot',
+      isFork: checkoutRef.isForkPr,
+      author: pull_request.user.login,
+      labels: (pull_request.labels ?? []).map(label => label.name),
+    };
+    const councilSelection = { requiredLabels: config.council?.required_labels };
+    const reviewType = determineAutomatedReviewType(prFacts, {
+      councilEntitled,
+      councilConfigActive,
+      councilEnabledForRepo,
+      selection: councilSelection,
+    });
+    if (
+      councilEntitled &&
+      councilConfigActive &&
+      councilEnabledForRepo &&
+      reviewType !== 'council'
+    ) {
+      // Council was available but downgraded; record why (a hard exclude or a selection gate).
+      const downgradeReason =
+        councilHardExcludeReason(prFacts) ?? councilSelectionSkipReason(prFacts, councilSelection);
+      logExceptInTest(
+        `Council downgraded for ${repository.full_name}#${pull_request.number}: ${downgradeReason}`,
+        { pr_number: pull_request.number, repo: repository.full_name, reason: downgradeReason }
+      );
+    }
 
     // 7. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({

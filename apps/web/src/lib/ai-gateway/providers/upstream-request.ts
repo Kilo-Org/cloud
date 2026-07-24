@@ -10,7 +10,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 
 type UpstreamFetchFailureFamily =
@@ -180,8 +180,12 @@ export async function upstreamRequest({
 
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
-  timeoutSignal.addEventListener('abort', () => {
+  const onTimeoutAbort = () => {
     errorExceptInTest('[upstreamRequest] timeout');
+  };
+  timeoutSignal.addEventListener('abort', onTimeoutAbort);
+  after(() => {
+    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
   });
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 

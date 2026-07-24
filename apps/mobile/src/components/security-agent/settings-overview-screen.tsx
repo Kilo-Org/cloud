@@ -33,7 +33,12 @@ function SettingsOverviewSkeleton() {
   );
 }
 
-export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
+type SettingsOverviewPresentation = 'inline' | 'route';
+
+export function SettingsOverviewScreen({
+  scope,
+  presentation = 'inline',
+}: Readonly<{ scope: string; presentation?: SettingsOverviewPresentation }>) {
   const router = useRouter();
   const config = useSecurityAgentConfig(scope);
   const canManage = useSecurityAgentCapability(scope).canManage;
@@ -86,11 +91,31 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   const handleToggle = (value: boolean) => {
     void Haptics.selectionAsync();
-    setEnabled.mutate({
-      isEnabled: value,
-      repositorySelectionMode: data.repositorySelectionMode,
-      selectedRepositoryIds: data.selectedRepositoryIds,
-    });
+    // When this screen is the PUSHED settings route (reached from the
+    // Dashboard's Settings button), toggling OFF makes the base
+    // `[scope]/index` re-derive to `disabled-settings` too — leaving two
+    // stacked identical settings pages. Collapse the pushed route on
+    // success so Back exits the security-agent section rather than
+    // landing on a duplicate. The per-call onSuccess only fires on
+    // successful mutation, so the rolled-back error path never navigates.
+    const collapseOnSuccess =
+      presentation === 'route' && !value
+        ? () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.dismiss();
+            }
+          }
+        : undefined;
+    setEnabled.mutate(
+      {
+        isEnabled: value,
+        repositorySelectionMode: data.repositorySelectionMode,
+        selectedRepositoryIds: data.selectedRepositoryIds,
+      },
+      collapseOnSuccess ? { onSuccess: collapseOnSuccess } : undefined
+    );
   };
 
   // Audit-report access shouldn't depend on the agent being enabled — see

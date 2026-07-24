@@ -67,6 +67,56 @@ export function formatMeta(timestamp: string): string {
 }
 
 /**
+ * Visible cost segment for a stored session row.
+ *
+ * Returns `null` whenever the row should not display a cost — caller omits
+ * the segment entirely. Inputs that are `null`, `undefined`, zero, or not
+ * finite (defensive against unexpected shapes from the server) all collapse
+ * to `null` so the list row shows the timestamp alone.
+ *
+ * Otherwise the microdollar count is converted to USD and formatted as a
+ * two-decimal dollar amount (e.g. `$0.12`). Sub-half-cent values render as
+ * `"<$0.01"` so the smallest visible charge is unambiguous — a $0.001 row
+ * is not silently rendered as `$0.00`.
+ */
+export function formatSessionListCost(microdollars: number | null | undefined): string | null {
+  if (microdollars === null || microdollars === undefined) {
+    return null;
+  }
+  if (!Number.isFinite(microdollars)) {
+    return null;
+  }
+  if (microdollars <= 0) {
+    return null;
+  }
+  const usd = microdollars / 1_000_000;
+  if (usd < 0.005) {
+    return '<$0.01';
+  }
+  return `$${usd.toFixed(2)}`;
+}
+
+/**
+ * Compose the visible `meta` string for a stored session row by folding an
+ * optional cost segment in front of the relative timestamp. `cost === null`
+ * means the row should render the timestamp alone (the common case for
+ * in-progress, old, or zero-cost sessions).
+ */
+export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: string): string {
+  return cost ? `${cost} · ${timeMeta}` : timeMeta;
+}
+
+/**
+ * Compose the spoken `meta` string for a stored session row's accessibility
+ * label. When `cost === null`, the spoken meta is just the time phrase.
+ * Otherwise cost is spoken first ("cost 12 cents, 5 minutes ago"), matching
+ * the visible "$0.12 · 5M AGO" order.
+ */
+export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
+  return cost ? `cost ${cost}, ${timeSpoken}` : timeSpoken;
+}
+
+/**
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
  * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
  * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a
@@ -86,6 +136,48 @@ export function remoteAgentLabel(createdOnPlatform: string | undefined): string 
  */
 export function remoteMeta(session: { status: string; updatedAt?: string }): string {
   return session.updatedAt ? formatMeta(session.updatedAt) : session.status.toUpperCase();
+}
+
+/**
+ * Pure helper: extract the repo's last path segment from a git URL, using the
+ * same SSH/https handling as the list-grouping logic. Returns null when the
+ * URL is missing so callers can fall back to a platform label. Exposed for the
+ * unified row wrappers' eyebrow label and its unit tests.
+ */
+export function repoNameFromGitUrl(gitUrl: string | null | undefined): string | null {
+  if (!gitUrl) {
+    return null;
+  }
+  const project = formatGitUrlProject(gitUrl);
+  const parts = project.split('/');
+  return parts.at(-1) ?? project;
+}
+
+/**
+ * Canonical eyebrow label for a stored session: repo name (uppercased) when
+ * a git URL is present, else the platform fallback. Replaces the legacy
+ * platform-only label in the Agents list.
+ */
+export function storedSessionEyebrowLabel(session: {
+  git_url: string | null;
+  created_on_platform: string;
+}): string {
+  const repo = repoNameFromGitUrl(session.git_url);
+  return repo ? repo.toUpperCase() : platformLabel(session.created_on_platform);
+}
+
+/**
+ * Canonical eyebrow label for a remote (active) session: repo name
+ * (uppercased) when a git URL is present, else the LIVE/CLI origin fallback
+ * via `remoteAgentLabel` (preserves the origin-not-heartbeat behavior — live
+ * CLI sessions start with origin 'unknown' and get the neutral 'LIVE' label).
+ */
+export function remoteSessionEyebrowLabel(session: {
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+}): string {
+  const repo = repoNameFromGitUrl(session.gitUrl);
+  return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
 }
 
 const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;

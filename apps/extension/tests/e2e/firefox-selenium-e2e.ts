@@ -23,7 +23,7 @@ const waitMs = 15_000;
 
 const chromeWorkflowNames = [
   'conversation automatically continues through another eval request',
-  'new conversation inherits the selected target tab',
+  'new conversation does not inherit the selected target tab',
   'conversation tabs can run in parallel',
   'conversation tabs persist across side panel reloads',
   'closing a conversation removes only that tab',
@@ -945,18 +945,46 @@ const scenarios: FirefoxScenario[] = [
       ),
   },
   {
-    name: 'new conversation inherits the selected target tab',
+    // R3 non-inheritance without activation (A9 probe FAIL / harness-limited).
+    name: 'new conversation does not inherit the selected target tab',
     run: context =>
       withSession(context.api, {}, async session => {
         await session.openTargetPage('First target tab');
         await session.openTargetPage('Second target tab');
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
-        await setSelectByText(session.driver, 'Target tab', 'Second target tab');
-        await waitForTargetTab(session.driver, 'Second target tab');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const optionsText = await getSelectOptionsText(session.driver, 'Target tab');
+
+            return (
+              optionsText.includes('First target tab') && optionsText.includes('Second target tab')
+            );
+          },
+          'Timed out waiting for both target tab options'
+        );
+
+        const optionsText = await getSelectOptionsText(session.driver, 'Target tab');
+        const optionLabels = optionsText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && line !== 'No tab selected');
+        const [firstListed] = optionLabels;
+        const nonFirstListed = optionLabels.find(label => label !== firstListed);
+
+        assert.ok(firstListed !== undefined, 'expected a first-listed target tab option');
+        assert.ok(nonFirstListed !== undefined, 'expected a non-first-listed target tab option');
+
+        // Conv1 picks non-first-listed so inheritance would differ from first-listed.
+        await setSelectByText(session.driver, 'Target tab', nonFirstListed);
+        await waitForTargetTab(session.driver, nonFirstListed);
 
         await clickButtonByLabel(session.driver, 'New conversation');
-        await waitForTargetTab(session.driver, 'Second target tab');
+        // New conversation must not inherit conv1's pick; defaults to first-listed.
+        await waitForTargetTab(session.driver, firstListed);
+        assert.notEqual(firstListed, nonFirstListed);
       }),
   },
   {

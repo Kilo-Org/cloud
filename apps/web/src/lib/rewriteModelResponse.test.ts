@@ -1,4 +1,12 @@
 import { describe, test, expect, jest } from '@jest/globals';
+
+const mockLogExceptInTest = jest.fn();
+
+jest.mock('@/lib/utils.server', () => ({
+  errorExceptInTest: jest.fn(),
+  logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
+}));
+
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
@@ -6,7 +14,6 @@ import {
   rewriteModelResponse,
 } from './rewriteModelResponse';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import * as serverUtils from '@/lib/utils.server';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -159,7 +166,6 @@ describe('rewriteModelResponse_ChatCompletions', () => {
   describe('streaming responses', () => {
     test('logs processed event progress every minute', async () => {
       jest.useFakeTimers();
-      const logSpy = jest.spyOn(serverUtils, 'logExceptInTest');
       const encoder = new TextEncoder();
       const upstreamController: { current?: ReadableStreamDefaultController<Uint8Array> } = {};
       const upstream = new Response(
@@ -178,7 +184,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         const result = await rewriteModelResponse_ChatCompletions(upstream);
         await jest.advanceTimersByTimeAsync(60_000);
 
-        expect(logSpy).toHaveBeenCalledWith('[rewriteModelResponse] stream progress', {
+        expect(mockLogExceptInTest).toHaveBeenCalledWith('[rewriteModelResponse] stream progress', {
           kind: 'chat_completions',
           eventCount: 1,
           generationId: 'gen-chat',
@@ -188,7 +194,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         await readOutputStream(result);
         expect(jest.getTimerCount()).toBe(0);
       } finally {
-        logSpy.mockRestore();
+        mockLogExceptInTest.mockClear();
         jest.useRealTimers();
       }
     });

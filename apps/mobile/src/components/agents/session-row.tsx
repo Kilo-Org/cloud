@@ -1,13 +1,11 @@
-/* eslint-disable max-lines -- two cohesive session-row variants (stored + remote) share row structure and long-press wiring */
-import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -15,16 +13,18 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import {
+  composeStoredSessionSpokenMeta,
+  composeStoredSessionVisibleMeta,
   formatMeta,
-  remoteMeta,
-  remoteSessionEyebrowLabel,
+  formatSessionListCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
-import { copySessionId, showDeleteConfirm, showRenamePrompt } from './session-row-actions';
 import {
+  formatSpokenCost,
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
+import { copySessionId, showDeleteConfirm, showRenamePrompt } from './session-row-actions';
 
 /** Container shape only. `'list'` (default) keeps the Agents list look
  * (`stripMode="inline"`, inner padding so the strip sits inside the
@@ -32,7 +32,7 @@ import {
  * `last` so no divider, no inner padding so the strip meets the
  * rounded tile border). Content flags (`live`, `needsInput`,
  * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
-type RowVariant = 'list' | 'card';
+export type RowVariant = 'list' | 'card';
 
 type StoredSessionRowProps = {
   session: {
@@ -46,6 +46,7 @@ type StoredSessionRowProps = {
     git_branch: string | null;
     status: string | null;
     status_updated_at: string | null;
+    total_cost_microdollars: number | null;
   };
   /**
    * Which timestamp drives the row's relative meta label. The list
@@ -63,15 +64,6 @@ type StoredSessionRowProps = {
    * manage menu (and gates any rename/delete/copy-id actions it owns).
    * Tap is preserved either way. Defaults to `true`.
    */
-  interactive?: boolean;
-};
-
-type RemoteSessionRowProps = {
-  session: ActiveSession;
-  onPress: () => void;
-  /** Container shape: see `RowVariant`. Defaults to `'list'`. */
-  variant?: RowVariant;
-  /** See `StoredSessionRowProps.interactive`. Defaults to `true`. */
   interactive?: boolean;
 };
 
@@ -162,11 +154,20 @@ export function StoredSessionRow({
     }
   };
 
-  // Spoken meta mirrors the visible meta for the same inputs the row
-  // already uses to render `formatMeta(timestamp)`. When `needsInput`
-  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it.
-  const spokenMeta = needsInput ? null : formatSpokenTimeAgo(timestamp);
+  // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered.
+  // When a cost is present, both forms fold it in first (matches the row's
+  // "$0.12 · time" order). Needs-input sessions have no persisted cost.
+  const visibleMeta = composeStoredSessionVisibleMeta(
+    formatSessionListCost(session.total_cost_microdollars),
+    formatMeta(timestamp)
+  );
+  const spokenMeta = needsInput
+    ? null
+    : composeStoredSessionSpokenMeta(
+        formatSpokenCost(session.total_cost_microdollars),
+        formatSpokenTimeAgo(timestamp)
+      );
 
   return (
     <>
@@ -185,7 +186,7 @@ export function StoredSessionRow({
           agentLabel={agentLabel}
           title={title}
           subtitle={session.git_branch}
-          meta={formatMeta(timestamp)}
+          meta={visibleMeta}
           needsInput={needsInput}
           stripMode={variant === 'card' ? 'edge' : 'inline'}
           last={variant === 'card' ? true : undefined}
@@ -242,93 +243,5 @@ export function StoredSessionRow({
         </View>
       </Modal>
     </>
-  );
-}
-
-export function RemoteSessionRow({
-  session,
-  onPress,
-  variant = 'list',
-  interactive = true,
-}: Readonly<RemoteSessionRowProps>) {
-  const title = session.title.length > 0 ? session.title : 'Untitled session';
-  const canManage = interactive;
-  const agentLabel = remoteSessionEyebrowLabel(session);
-
-  const revision = useSessionAttentionRevision();
-  const raiseId = session.status;
-  const needsInput = shouldShowNeedsInput({
-    status: session.status,
-    raiseId,
-    isAcked: isAttentionAcked(session.id, raiseId),
-  });
-  useEffect(() => {
-    reconcileSessionAttention(session.id, session.status, null);
-  }, [session.id, session.status, revision]);
-
-  // Spoken meta mirrors the visible meta the row renders. When `needsInput`
-  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. The remote row's `live` eyebrow (`live-and-meta`)
-  // renders the timestamp when `updatedAt` is present, otherwise the
-  // uppercased status. For speech we expand the timestamp via
-  // `formatSpokenTimeAgo` and lowercase/underscore-strip the status so
-  // VoiceOver doesn't read it letter-by-letter.
-  let spokenMeta: string | null = null;
-  if (!needsInput) {
-    spokenMeta = session.updatedAt
-      ? formatSpokenTimeAgo(session.updatedAt)
-      : session.status.toLowerCase().replaceAll('_', ' ');
-  }
-
-  const handleLongPress = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Copy session ID', 'Cancel'], cancelButtonIndex: 1 },
-        buttonIndex => {
-          if (buttonIndex === 0) {
-            void copySessionId(session.id);
-          }
-        }
-      );
-    } else {
-      Alert.alert('Session actions', undefined, [
-        {
-          text: 'Copy session ID',
-          onPress: () => {
-            void copySessionId(session.id);
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
-  };
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={canManage ? handleLongPress : undefined}
-      accessibilityLabel={sessionRowAccessibilityLabel({
-        title,
-        needsInput,
-        badge: agentLabel,
-        meta: spokenMeta,
-      })}
-      className="active:opacity-70"
-    >
-      <SessionRow
-        agentLabel={agentLabel}
-        title={title}
-        subtitle={session.gitBranch ?? null}
-        meta={remoteMeta(session)}
-        live
-        needsInput={needsInput}
-        metaWhileLive
-        stripMode={variant === 'card' ? 'edge' : 'inline'}
-        last={variant === 'card' ? true : undefined}
-        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
-      />
-    </Pressable>
   );
 }

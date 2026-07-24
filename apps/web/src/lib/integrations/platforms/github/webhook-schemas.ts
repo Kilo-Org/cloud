@@ -146,6 +146,13 @@ export const PullRequestPayloadSchema = z.object({
       id: z.number(),
       login: z.string(),
       avatar_url: z.string(),
+      // GitHub account type: 'User' | 'Bot' | 'Organization'. Used to hard-exclude bot-authored
+      // PRs (dependabot/renovate/etc.) from the council review path. GitHub always sends this on
+      // real PR webhooks; a missing value only occurs in partial payloads/fixtures. Defaults to
+      // 'User' (a regular, non-bot account) so an absent type fails open: the PR stays eligible for
+      // council rather than being treated as a bot. Explicit default over `.optional()` documents
+      // the assumption and removes the `undefined` case for consumers.
+      type: z.string().default('User'),
     }),
     head: z.object({
       sha: z.string(),

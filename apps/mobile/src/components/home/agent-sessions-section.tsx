@@ -1,8 +1,9 @@
 import { type Href, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
+import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
-import { RemoteSessionRow, StoredSessionRow } from '@/components/agents/session-row';
+import { StoredSessionRow } from '@/components/agents/session-row';
 import { SectionHeader } from '@/components/home/section-header';
 import { Text } from '@/components/ui/text';
 import {

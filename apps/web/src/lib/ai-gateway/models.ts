@@ -50,6 +50,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels,
+  'inclusionai/ling-3.0-flash:free',
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -112,14 +113,6 @@ export function shouldRedactModelNameInMicrodollarUsage(
 
 export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
   return provider === 'custom' || provider === 'experiment' || isKiloStealthModel(model);
-}
-
-export function shouldRedactModelNameInResponse(provider: ProviderId, model: string): boolean {
-  // custom is only used internally so we don't have to risk the perf or reliablity impact of rewriting the response
-  return (
-    provider !== 'martian' && // this is a stealth provider, but the models aren't stealth, so we can keep the model name in place
-    (provider === 'experiment' || isKiloStealthModel(model))
-  );
 }
 
 export function isDeadFreeModel(model: string): boolean {

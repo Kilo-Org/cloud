@@ -4,5 +4,5 @@ import { SettingsOverviewScreen } from '@/components/security-agent/settings-ove
 
 export default function SecurityAgentSettingsRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
-  return <SettingsOverviewScreen scope={scope} />;
+  return <SettingsOverviewScreen scope={scope} presentation="route" />;
 }

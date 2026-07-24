@@ -1,4 +1,4 @@
-import { isKiloExclusiveFreeModel, shouldRedactModelNameInResponse } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -21,7 +21,7 @@ function rewriteUsage(usage: OpenRouterUsage) {
   }
 }
 
-export async function rewriteModelResponse_ChatCompletions(response: Response, model: string) {
+export async function rewriteModelResponse_ChatCompletions(response: Response) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -39,10 +39,6 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, m
         headers,
       });
     }
-    if (json.model) {
-      json.model = model;
-    }
-
     const usage = json.usage as OpenRouterUsage;
     if (usage) {
       rewriteUsage(usage);
@@ -71,9 +67,6 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, m
             return;
           }
           const json = JSON.parse(event.data) as ChatCompletionChunk;
-          if (json.model) {
-            json.model = model;
-          }
 
           const delta = json.choices?.[0]?.delta;
           if (delta) {
@@ -148,7 +141,7 @@ function rewriteMessagesUsage(usage: MessagesApiUsage) {
   delete usage.is_byok;
 }
 
-export async function rewriteModelResponse_Messages(response: Response, model: string) {
+export async function rewriteModelResponse_Messages(response: Response) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -165,9 +158,6 @@ export async function rewriteModelResponse_Messages(response: Response, model: s
         statusText: response.statusText,
         headers,
       });
-    }
-    if (json.model) {
-      json.model = model;
     }
     if (json.usage) {
       rewriteMessagesUsage(json.usage);
@@ -201,9 +191,6 @@ export async function rewriteModelResponse_Messages(response: Response, model: s
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
-            if (e.message.model) {
-              e.message.model = model;
-            }
             if (e.message.usage) {
               rewriteMessagesUsage(e.message.usage);
             }
@@ -254,7 +241,7 @@ type ResponsesApiEvent = {
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
-export async function rewriteModelResponse_Responses(response: Response, model: string) {
+export async function rewriteModelResponse_Responses(response: Response) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -271,9 +258,6 @@ export async function rewriteModelResponse_Responses(response: Response, model: 
         statusText: response.statusText,
         headers,
       });
-    }
-    if (json.model) {
-      json.model = model;
     }
     if (json.usage) {
       rewriteUsage(json.usage);
@@ -302,9 +286,6 @@ export async function rewriteModelResponse_Responses(response: Response, model: 
           }
           const json = JSON.parse(event.data) as ResponsesApiEvent;
           if (json.response) {
-            if (json.response.model) {
-              json.response.model = model;
-            }
             if (json.response.usage) {
               rewriteUsage(json.response.usage);
             }
@@ -351,20 +332,20 @@ export async function rewriteModelResponse(
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
 
-  if (!isFreeModelRequiringCostRemoval && !shouldRedactModelNameInResponse(providerId, model)) {
+  if (!isFreeModelRequiringCostRemoval) {
     console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
     return null;
   }
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(response, model);
+    return rewriteModelResponse_ChatCompletions(response);
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, model);
+    return rewriteModelResponse_Responses(response);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, model);
+    return rewriteModelResponse_Messages(response);
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);

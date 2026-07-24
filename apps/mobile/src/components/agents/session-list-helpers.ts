@@ -67,6 +67,56 @@ export function formatMeta(timestamp: string): string {
 }
 
 /**
+ * Visible cost segment for a stored session row.
+ *
+ * Returns `null` whenever the row should not display a cost — caller omits
+ * the segment entirely. Inputs that are `null`, `undefined`, zero, or not
+ * finite (defensive against unexpected shapes from the server) all collapse
+ * to `null` so the list row shows the timestamp alone.
+ *
+ * Otherwise the microdollar count is converted to USD and formatted as a
+ * two-decimal dollar amount (e.g. `$0.12`). Sub-half-cent values render as
+ * `"<$0.01"` so the smallest visible charge is unambiguous — a $0.001 row
+ * is not silently rendered as `$0.00`.
+ */
+export function formatSessionListCost(microdollars: number | null | undefined): string | null {
+  if (microdollars === null || microdollars === undefined) {
+    return null;
+  }
+  if (!Number.isFinite(microdollars)) {
+    return null;
+  }
+  if (microdollars <= 0) {
+    return null;
+  }
+  const usd = microdollars / 1_000_000;
+  if (usd < 0.005) {
+    return '<$0.01';
+  }
+  return `$${usd.toFixed(2)}`;
+}
+
+/**
+ * Compose the visible `meta` string for a stored session row by folding an
+ * optional cost segment in front of the relative timestamp. `cost === null`
+ * means the row should render the timestamp alone (the common case for
+ * in-progress, old, or zero-cost sessions).
+ */
+export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: string): string {
+  return cost ? `${cost} · ${timeMeta}` : timeMeta;
+}
+
+/**
+ * Compose the spoken `meta` string for a stored session row's accessibility
+ * label. When `cost === null`, the spoken meta is just the time phrase.
+ * Otherwise cost is spoken first ("cost 12 cents, 5 minutes ago"), matching
+ * the visible "$0.12 · 5M AGO" order.
+ */
+export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
+  return cost ? `cost ${cost}, ${timeSpoken}` : timeSpoken;
+}
+
+/**
  * Pinned-tray label for an active session. Reuses `platformLabel` when the
  * origin is known, otherwise falls back to 'LIVE'. An undefined, empty, or
  * 'unknown' origin is treated as unknown and returns 'LIVE' rather than a

@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { Modal, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type ChildSessionHydrationState, type StoredMessage } from 'cloud-agent-sdk';
 
 import { EmptyState } from '@/components/empty-state';
@@ -45,6 +46,12 @@ export function ChildSessionSheet({
 }: Readonly<ChildSessionSheetProps>) {
   const messages = getChildMessages(sessionId);
   const state = getChildSessionSheetState(hydrationState, messages.length);
+  // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
+  // always propagate the home-indicator inset), so we floor the value with
+  // a comfortable constant to keep the last row / working indicator clear
+  // of the home indicator on curved-bottom devices.
+  const insets = useSafeAreaInsets();
+  const sheetBottomInset = Math.max(insets.bottom, 16);
   let content: ReactNode = null;
 
   if (state === 'content') {
@@ -72,6 +79,7 @@ export function ChildSessionSheet({
           </MessageErrorBoundary>
         )}
         ListFooterComponent={<WorkingIndicator messages={messages} isStreaming={isStreaming} />}
+        contentBottomInset={sheetBottomInset}
       />
     );
   } else if (state === 'error') {

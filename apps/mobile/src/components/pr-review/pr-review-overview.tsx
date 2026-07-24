@@ -96,6 +96,7 @@ export function PrReviewOverview({
     if (state.kind === 'not-found') {
       return (
         <EmptyState
+          placement="top"
           icon={GitPullRequest}
           title="Pull request unavailable"
           description="This PR can't be opened. It may have been deleted, the repository is private, or the Kilo GitHub App isn't installed on it."
@@ -111,6 +112,7 @@ export function PrReviewOverview({
       // Terminal — no CTA. The user has no recourse from this screen.
       return (
         <EmptyState
+          placement="top"
           icon={GitPullRequest}
           title="Access denied"
           description="You don't have permission to view this pull request."
@@ -120,6 +122,7 @@ export function PrReviewOverview({
     if (state.kind === 'reconnect') {
       return (
         <EmptyState
+          placement="top"
           icon={GitPullRequest}
           title="GitHub connection expired"
           description="Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
@@ -134,6 +137,7 @@ export function PrReviewOverview({
     // retryable
     return (
       <QueryError
+        placement="top"
         variant="server"
         title="Could not load pull request"
         onRetry={() => {

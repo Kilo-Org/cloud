@@ -15,8 +15,11 @@ vi.mock('@/components/home/section-header', () => ({
   SectionHeader: () => null,
 }));
 
-vi.mock('@/components/agents/session-row', () => ({
+vi.mock('@/components/agents/remote-session-row', () => ({
   RemoteSessionRow: () => null,
+}));
+
+vi.mock('@/components/agents/session-row', () => ({
   StoredSessionRow: () => null,
 }));
 

@@ -964,11 +964,7 @@ export function countAndStoreUsage(
             clonedReponse.status
           )
         : parseResponseText(content =>
-            parseMicrodollarUsageFromString(
-              content,
-              usageContext.kiloUserId,
-              clonedReponse.status
-            )
+            parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
           );
     }
     if (usageContext.api_kind === 'messages') {

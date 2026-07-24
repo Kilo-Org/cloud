@@ -230,10 +230,14 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     );
 
     await expect(
-      countAndStoreUsage(response, {
-        api_kind: apiKind,
-        isStreaming: false,
-      } as MicrodollarUsageContext, undefined)
+      countAndStoreUsage(
+        response,
+        {
+          api_kind: apiKind,
+          isStreaming: false,
+        } as MicrodollarUsageContext,
+        undefined
+      )
     ).resolves.toBeNull();
   });
 

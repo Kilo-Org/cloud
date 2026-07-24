@@ -957,8 +957,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  await handleRequestLogging({
-    clonedResponse: response.clone(),
+  // Request logging and response rewriting are combined so the event stream
+  // is only processed once: the capture returned here is passed to
+  // rewriteModelResponse, which records the body while processing it.
+  const requestLogCapture = await handleRequestLogging({
+    status: response.status,
     user: maybeUser,
     organization_id: organizationId || null,
     provider: effectiveProviderContext.provider.id,
@@ -977,20 +980,39 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
+      // The response body is not processed any further on this path, so read
+      // it here to still capture it for request logging.
+      if (requestLogCapture) {
+        try {
+          requestLogCapture.setBody(await response.text());
+        } catch (readError) {
+          requestLogCapture.setReadError(readError);
+        }
+      }
       return errorResponse;
     }
   }
 
-  const rewrittenResponse = await rewriteModelResponse(
-    response,
-    effectiveModelIdLowerCased,
-    effectiveProviderContext.provider.id,
-    requestBodyParsed.kind,
-    organizationId
-  );
+  let rewrittenResponse: NextResponseType | null = null;
+  try {
+    rewrittenResponse = await rewriteModelResponse(
+      response,
+      effectiveModelIdLowerCased,
+      effectiveProviderContext.provider.id,
+      requestBodyParsed.kind,
+      organizationId,
+      requestLogCapture
+    );
+  } catch (rewriteError) {
+    requestLogCapture?.setReadError(rewriteError);
+    throw rewriteError;
+  }
   if (rewrittenResponse) {
     return rewrittenResponse;
   }
 
+  // Should not happen when request logging is enabled, but make sure the
+  // capture is settled so the request is still logged (without response).
+  requestLogCapture?.setReadError(new Error('response was not processed'));
   return wrapInSafeNextResponse(response);
 }

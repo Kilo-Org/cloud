@@ -1,4 +1,5 @@
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
+import type { RequestLogCapture } from '@/lib/ai-gateway/handleRequestLogging';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -61,7 +62,7 @@ function getResponseReadError(error: unknown): ResponseReadError | null {
 async function readResponseText(
   response: Response,
   headers: Headers
-): Promise<{ text: string } | { errorResponse: NextResponse }> {
+): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
   } catch (error) {
@@ -71,6 +72,7 @@ async function readResponseText(
     }
 
     return {
+      error,
       errorResponse: NextResponse.json(
         {
           error: responseReadError.message,
@@ -89,9 +91,13 @@ async function rewriteSseStream(
   controller: ReadableStreamDefaultController<string>,
   doneReceived: () => boolean,
   serializeError: (error: ResponseReadError) => string,
-  onFinally: () => void
+  onFinally: () => void,
+  capture?: RequestLogCapture | null
 ) {
   const decoder = new TextDecoder();
+  // Accumulate the raw upstream text for request logging while the stream is
+  // being processed anyway, so it doesn't have to be processed a second time.
+  const capturedChunks: string[] | null = capture ? [] : null;
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -103,17 +109,25 @@ async function rewriteSseStream(
           controller.enqueue('data: [DONE]\n\n');
         }
         controller.close();
+        if (capturedChunks) {
+          capturedChunks.push(decoder.decode());
+          capture?.setBody(capturedChunks.join(''));
+        }
         return;
       }
-      parser.feed(decoder.decode(value, { stream: true }));
+      const chunk = decoder.decode(value, { stream: true });
+      capturedChunks?.push(chunk);
+      parser.feed(chunk);
     }
   } catch (error) {
     const responseReadError = getResponseReadError(error);
     if (!responseReadError) {
+      capture?.setReadError(error);
       throw error;
     }
 
     errorExceptInTest('[rewriteModelResponse] emitting stream error event', responseReadError);
+    capture?.setReadError(error);
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
@@ -135,7 +149,11 @@ function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
   }
 }
 
-export async function rewriteModelResponse_ChatCompletions(response: Response, removeCost = true) {
+export async function rewriteModelResponse_ChatCompletions(
+  response: Response,
+  removeCost = true,
+  capture?: RequestLogCapture | null
+) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
@@ -143,8 +161,10 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
     // disturbed or locked" errors that occur when `.clone().json()` fails.
     const textResult = await readResponseText(response, headers);
     if ('errorResponse' in textResult) {
+      capture?.setReadError(textResult.error);
       return textResult.errorResponse;
     }
+    capture?.setBody(textResult.text);
     const { text } = textResult;
     let json: OpenAI.ChatCompletion;
     try {
@@ -174,6 +194,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
       const reader = response.body?.getReader();
       if (!reader) {
         controller.close();
+        capture?.setBody('');
         return;
       }
 
@@ -237,8 +258,13 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
             },
           }) +
           '\n\n',
-        progress.stop
+        progress.stop,
+        capture
       );
+    },
+    cancel() {
+      // The client disconnected before the stream completed.
+      capture?.setReadError(new Error('response stream was cancelled'));
     },
   });
 
@@ -274,14 +300,20 @@ function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
   }
 }
 
-export async function rewriteModelResponse_Messages(response: Response, removeCost = true) {
+export async function rewriteModelResponse_Messages(
+  response: Response,
+  removeCost = true,
+  capture?: RequestLogCapture | null
+) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
     const textResult = await readResponseText(response, headers);
     if ('errorResponse' in textResult) {
+      capture?.setReadError(textResult.error);
       return textResult.errorResponse;
     }
+    capture?.setBody(textResult.text);
     const { text } = textResult;
     let json: Anthropic.Messages.Message & { usage?: MessagesApiUsage };
     try {
@@ -311,6 +343,7 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
       const reader = response.body?.getReader();
       if (!reader) {
         controller.close();
+        capture?.setBody('');
         return;
       }
 
@@ -376,8 +409,13 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
             },
           }) +
           '\n\n',
-        progress.stop
+        progress.stop,
+        capture
       );
+    },
+    cancel() {
+      // The client disconnected before the stream completed.
+      capture?.setReadError(new Error('response stream was cancelled'));
     },
   });
 
@@ -394,14 +432,20 @@ type ResponsesApiEvent = {
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
-export async function rewriteModelResponse_Responses(response: Response, removeCost = true) {
+export async function rewriteModelResponse_Responses(
+  response: Response,
+  removeCost = true,
+  capture?: RequestLogCapture | null
+) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
     const textResult = await readResponseText(response, headers);
     if ('errorResponse' in textResult) {
+      capture?.setReadError(textResult.error);
       return textResult.errorResponse;
     }
+    capture?.setBody(textResult.text);
     const { text } = textResult;
     let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
     try {
@@ -431,6 +475,7 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
       const reader = response.body?.getReader();
       if (!reader) {
         controller.close();
+        capture?.setBody('');
         return;
       }
 
@@ -488,8 +533,13 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
             },
           }) +
           '\n\n',
-        progress.stop
+        progress.stop,
+        capture
       );
+    },
+    cancel() {
+      // The client disconnected before the stream completed.
+      capture?.setReadError(new Error('response stream was cancelled'));
     },
   });
 
@@ -505,25 +555,29 @@ export async function rewriteModelResponse(
   model: string,
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
-  organizationId?: string
+  organizationId?: string,
+  capture?: RequestLogCapture | null
 ): Promise<NextResponse | null> {
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
 
-  if (!isFreeModelRequiringCostRemoval && organizationId !== KILO_ORGANIZATION_ID) {
+  // When request logging is enabled the response has to be processed anyway
+  // so the body can be captured for the request log in a single pass, so the
+  // rewrite is not skipped in that case.
+  if (!isFreeModelRequiringCostRemoval && organizationId !== KILO_ORGANIZATION_ID && !capture) {
     console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
     return null;
   }
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(response, isFreeModelRequiringCostRemoval);
+    return rewriteModelResponse_ChatCompletions(response, isFreeModelRequiringCostRemoval, capture);
   }
   if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, isFreeModelRequiringCostRemoval);
+    return rewriteModelResponse_Responses(response, isFreeModelRequiringCostRemoval, capture);
   }
   if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, isFreeModelRequiringCostRemoval);
+    return rewriteModelResponse_Messages(response, isFreeModelRequiringCostRemoval, capture);
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);

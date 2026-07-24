@@ -11,11 +11,26 @@ import { logger } from '../logger.js';
 
 const OUTPUT_TAIL_MAX_BYTES = 65_536;
 
-// A preparation attemptId is a UUID (see CloudAgentSession `crypto.randomUUID()`).
-// It becomes part of an `entity_id` key and, via `findByEntityPrefix`, a query
-// bound, so an oversized value would bloat storage and previously crashed the
-// prefix scan. Reject anything far larger than a UUID before it is stored.
+// attemptId is the value embedded in the `entity_id` key and, via
+// findByEntityPrefix, in a query prefix; triggerMessageId is persisted in the
+// event payload. Both are short ASCII identifiers in normal operation
+// (attemptId is a UUID minted server-side, triggerMessageId a message id), but
+// materialize receives them from the ingest channel, so a corrupted value can
+// arrive. Bound the length (an oversized attemptId previously crashed the prefix
+// scan) and require ASCII, so entity_id keys stay ASCII — which the prefix-range
+// scan in findByEntityPrefix relies on for correct byte-order comparison.
 const MAX_PREPARATION_ID_LENGTH = 256;
+
+function isAscii(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    if (value.charCodeAt(i) > 0x7f) return false;
+  }
+  return true;
+}
+
+function isValidPreparationId(value: string): boolean {
+  return value.length <= MAX_PREPARATION_ID_LENGTH && isAscii(value);
+}
 
 type PreparationSnapshot =
   | { action: 'attempt_snapshot'; attempt: Omit<PreparationAttempt, 'steps'> }
@@ -147,23 +162,22 @@ export function materializePreparationEvent(
   data: unknown
 ): boolean {
   if (!isPreparationEvent(data) || data.action.endsWith('_snapshot')) return false;
-  if (
-    data.attemptId.length > MAX_PREPARATION_ID_LENGTH ||
-    data.triggerMessageId.length > MAX_PREPARATION_ID_LENGTH
-  ) {
-    // Drop the event before it is stored: an oversized id becomes part of an
-    // entity_id key and a findByEntityPrefix bound. Log it because this should
-    // never happen in normal operation (ids are UUIDs) — it flags an upstream
-    // emitter bug that this guard is containing.
+  if (!isValidPreparationId(data.attemptId) || !isValidPreparationId(data.triggerMessageId)) {
+    // Drop the event before it is stored: attemptId becomes part of an
+    // entity_id key and a findByEntityPrefix prefix. Log it because valid ids
+    // are short and ASCII, so a rejection flags an upstream emitter bug that
+    // this guard is containing rather than a routine outcome.
     logger
       .withFields({
         sessionId: event.session_id,
         action: data.action,
         attemptIdLength: data.attemptId.length,
         triggerMessageIdLength: data.triggerMessageId.length,
+        attemptIdNonAscii: !isAscii(data.attemptId),
+        triggerMessageIdNonAscii: !isAscii(data.triggerMessageId),
         limit: MAX_PREPARATION_ID_LENGTH,
       })
-      .warn('Rejected preparation event with oversized id');
+      .warn('Rejected preparation event with invalid id');
     return false;
   }
   const attemptId = data.attemptId;

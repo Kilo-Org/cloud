@@ -208,10 +208,18 @@ function buildLatestAssistantMessage(
 
 /**
  * Exclusive upper bound for a prefix scan under SQLite's default BINARY
- * collation: the prefix with its final code unit incremented. Returns null when
- * no finite bound exists (an empty prefix, or one that is entirely U+FFFF), in
- * which case callers fall back to a lower-bound-only scan. `entity_id` values
- * are ASCII paths, so incrementing the last unit yields an exact bound.
+ * collation: the prefix with its final UTF-16 code unit incremented. Returns
+ * null when no finite bound exists (an empty prefix, or one that is entirely
+ * U+FFFF), in which case callers fall back to a lower-bound-only scan.
+ *
+ * The bound is exact only when the prefix's final character is not a UTF-16
+ * surrogate: the JS-side increment must agree with SQLite's UTF-8 byte-order
+ * comparison, which holds for BMP-non-surrogate characters. Every caller here
+ * passes an `entity_id` prefix that ends in ASCII ('/'), and preparation ids are
+ * held to ASCII at ingest, so this holds. A future caller with a prefix ending
+ * in a non-BMP character must not reuse this without revisiting the bound. (The
+ * lower bound is an exact string comparison, so non-ASCII within a prefix is
+ * fine; only the trailing character matters here.)
  */
 export function prefixUpperBound(prefix: string): string | null {
   for (let i = prefix.length - 1; i >= 0; i--) {

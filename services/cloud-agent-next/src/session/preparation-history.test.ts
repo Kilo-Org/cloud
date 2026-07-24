@@ -41,6 +41,26 @@ describe('materializePreparationEvent', () => {
     expect(getPreparationSnapshots(eventQueries)).toEqual([]);
   });
 
+  it('rejects a preparing event whose attemptId contains non-ASCII characters', () => {
+    const eventQueries = createMemoryEventQueries();
+    // A non-ASCII id would put non-ASCII bytes in the entity_id key, breaking
+    // the assumption that findByEntityPrefix's range bound (a JS-side UTF-16
+    // increment) agrees with SQLite's UTF-8 byte-order comparison.
+    const applied = materializePreparationEvent(eventQueries, storedEvent(1000), {
+      version: 2,
+      attemptId: 'attempt-\u{1f600}',
+      triggerMessageId: 'msg-1',
+      revision: 1,
+      timestamp: 1000,
+      step: 'workspace_setup',
+      message: 'Preparing environment',
+      action: 'attempt_started',
+    });
+
+    expect(applied).toBe(false);
+    expect(getPreparationSnapshots(eventQueries)).toEqual([]);
+  });
+
   it('preserves startedAt when attempt_started re-announces a running attempt', () => {
     const eventQueries = createMemoryEventQueries();
     const { attemptId } = seedRunningAttempt(eventQueries, { startedAt: 1000 });

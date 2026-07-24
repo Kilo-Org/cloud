@@ -17,14 +17,22 @@ import {
   composeStoredSessionVisibleMeta,
   formatMeta,
   formatSessionListCost,
-  platformLabel,
+  storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import {
   formatSpokenCost,
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
-import { copySessionId } from './session-row-actions';
+import { copySessionId, showDeleteConfirm, showRenamePrompt } from './session-row-actions';
+
+/** Container shape only. `'list'` (default) keeps the Agents list look
+ * (`stripMode="inline"`, inner padding so the strip sits inside the
+ * padding). `'card'` mirrors the Home card look (`stripMode="edge"`,
+ * `last` so no divider, no inner padding so the strip meets the
+ * rounded tile border). Content flags (`live`, `needsInput`,
+ * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
+export type RowVariant = 'list' | 'card';
 
 type StoredSessionRowProps = {
   session: {
@@ -47,38 +55,17 @@ type StoredSessionRowProps = {
    */
   sortBy: AgentSessionSortBy;
   onPress: () => void;
-  onDelete: () => void;
-  onRename: (newTitle: string) => void;
+  onDelete?: () => void;
+  onRename?: (newTitle: string) => void;
+  /** Container shape: see `RowVariant`. Defaults to `'list'`. */
+  variant?: RowVariant;
+  /**
+   * Whether the row is fully interactive. `false` removes the long-press
+   * manage menu (and gates any rename/delete/copy-id actions it owns).
+   * Tap is preserved either way. Defaults to `true`.
+   */
+  interactive?: boolean;
 };
-
-function showDeleteConfirm(onDelete: () => void) {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  Alert.alert('Delete session?', 'This cannot be undone.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Delete', style: 'destructive', onPress: onDelete },
-  ]);
-}
-
-/** iOS-only — uses Alert.prompt which is unavailable on Android. */
-function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => void) {
-  Alert.prompt(
-    'Rename session',
-    'Enter a new name for this session',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Rename',
-        onPress: (newName: string | undefined) => {
-          if (newName?.trim()) {
-            onRename(newName.trim());
-          }
-        },
-      },
-    ],
-    'plain-text',
-    currentTitle
-  );
-}
 
 export function StoredSessionRow({
   session,
@@ -86,13 +73,16 @@ export function StoredSessionRow({
   onPress,
   onDelete,
   onRename,
+  variant = 'list',
+  interactive = true,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
   const [renameVisible, setRenameVisible] = useState(false);
   const renameTextRef = useRef(title);
-  const agentLabel = platformLabel(session.created_on_platform);
+  const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
+  const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status_updated_at ?? session.status ?? null;
@@ -109,7 +99,7 @@ export function StoredSessionRow({
     const newName = renameTextRef.current.trim();
     setRenameVisible(false);
     if (newName && newName !== title) {
-      onRename(newName);
+      onRename?.(newName);
     }
   };
 
@@ -126,9 +116,11 @@ export function StoredSessionRow({
         buttonIndex => {
           if (buttonIndex === 0) {
             void copySessionId(session.session_id);
-          } else if (buttonIndex === 1) {
-            showRenamePrompt(title, onRename);
-          } else if (buttonIndex === 2) {
+          } else if (buttonIndex === 1 && onRename) {
+            showRenamePrompt(title, newTitle => {
+              onRename(newTitle);
+            });
+          } else if (buttonIndex === 2 && onDelete) {
             showDeleteConfirm(onDelete);
           }
         }
@@ -152,7 +144,9 @@ export function StoredSessionRow({
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            showDeleteConfirm(onDelete);
+            if (onDelete) {
+              showDeleteConfirm(onDelete);
+            }
           },
         },
         { text: 'Cancel', style: 'cancel' },
@@ -179,7 +173,7 @@ export function StoredSessionRow({
     <>
       <Pressable
         onPress={onPress}
-        onLongPress={handleLongPress}
+        onLongPress={canManage ? handleLongPress : undefined}
         accessibilityLabel={sessionRowAccessibilityLabel({
           title,
           needsInput,
@@ -194,8 +188,9 @@ export function StoredSessionRow({
           subtitle={session.git_branch}
           meta={visibleMeta}
           needsInput={needsInput}
-          stripMode="inline"
-          className="pl-[22px] pr-[22px]"
+          stripMode={variant === 'card' ? 'edge' : 'inline'}
+          last={variant === 'card' ? true : undefined}
+          className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
         />
       </Pressable>
 

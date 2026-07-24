@@ -138,6 +138,48 @@ export function remoteMeta(session: { status: string; updatedAt?: string }): str
   return session.updatedAt ? formatMeta(session.updatedAt) : session.status.toUpperCase();
 }
 
+/**
+ * Pure helper: extract the repo's last path segment from a git URL, using the
+ * same SSH/https handling as the list-grouping logic. Returns null when the
+ * URL is missing so callers can fall back to a platform label. Exposed for the
+ * unified row wrappers' eyebrow label and its unit tests.
+ */
+export function repoNameFromGitUrl(gitUrl: string | null | undefined): string | null {
+  if (!gitUrl) {
+    return null;
+  }
+  const project = formatGitUrlProject(gitUrl);
+  const parts = project.split('/');
+  return parts.at(-1) ?? project;
+}
+
+/**
+ * Canonical eyebrow label for a stored session: repo name (uppercased) when
+ * a git URL is present, else the platform fallback. Replaces the legacy
+ * platform-only label in the Agents list.
+ */
+export function storedSessionEyebrowLabel(session: {
+  git_url: string | null;
+  created_on_platform: string;
+}): string {
+  const repo = repoNameFromGitUrl(session.git_url);
+  return repo ? repo.toUpperCase() : platformLabel(session.created_on_platform);
+}
+
+/**
+ * Canonical eyebrow label for a remote (active) session: repo name
+ * (uppercased) when a git URL is present, else the LIVE/CLI origin fallback
+ * via `remoteAgentLabel` (preserves the origin-not-heartbeat behavior — live
+ * CLI sessions start with origin 'unknown' and get the neutral 'LIVE' label).
+ */
+export function remoteSessionEyebrowLabel(session: {
+  gitUrl?: string | null;
+  createdOnPlatform?: string;
+}): string {
+  const repo = repoNameFromGitUrl(session.gitUrl);
+  return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
+}
+
 const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
 
 /**

@@ -10,7 +10,8 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { remoteAgentLabel, remoteMeta } from './session-list-helpers';
+import { remoteMeta, remoteSessionEyebrowLabel } from './session-list-helpers';
+import { type RowVariant } from './session-row';
 import { copySessionId } from './session-row-actions';
 import {
   formatSpokenTimeAgo,
@@ -20,10 +21,21 @@ import {
 type RemoteSessionRowProps = {
   session: ActiveSession;
   onPress: () => void;
+  /** Container shape: see `RowVariant`. Defaults to `'list'`. */
+  variant?: RowVariant;
+  /** See `StoredSessionRowProps.interactive`. Defaults to `true`. */
+  interactive?: boolean;
 };
 
-export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRowProps>) {
+export function RemoteSessionRow({
+  session,
+  onPress,
+  variant = 'list',
+  interactive = true,
+}: Readonly<RemoteSessionRowProps>) {
   const title = session.title.length > 0 ? session.title : 'Untitled session';
+  const canManage = interactive;
+  const agentLabel = remoteSessionEyebrowLabel(session);
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status;
@@ -78,25 +90,26 @@ export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRow
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={handleLongPress}
+      onLongPress={canManage ? handleLongPress : undefined}
       accessibilityLabel={sessionRowAccessibilityLabel({
         title,
         needsInput,
-        badge: remoteAgentLabel(session.createdOnPlatform),
+        badge: agentLabel,
         meta: spokenMeta,
       })}
       className="active:opacity-70"
     >
       <SessionRow
-        agentLabel={remoteAgentLabel(session.createdOnPlatform)}
+        agentLabel={agentLabel}
         title={title}
         subtitle={session.gitBranch ?? null}
         meta={remoteMeta(session)}
         live
         needsInput={needsInput}
         metaWhileLive
-        stripMode="inline"
-        className="pl-[22px] pr-[22px]"
+        stripMode={variant === 'card' ? 'edge' : 'inline'}
+        last={variant === 'card' ? true : undefined}
+        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
     </Pressable>
   );

@@ -3,6 +3,7 @@ import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUs
 import {
   extractPromptInfo,
   extractUsageContextInfo,
+  countAndStoreUsage,
   parseMicrodollarUsageFromStream,
   parseMicrodollarUsageFromString,
   mapToUsageStats,
@@ -209,6 +210,32 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       expect(result.hasError).toBe(true);
     }
   );
+
+  test.each([
+    ['chat_completions', 'ResponseAborted'],
+    ['chat_completions', 'TimeoutError'],
+    ['responses', 'ResponseAborted'],
+    ['responses', 'TimeoutError'],
+    ['messages', 'ResponseAborted'],
+    ['messages', 'TimeoutError'],
+  ] as const)('handles %s response.text() %s errors', async (apiKind, errorName) => {
+    const streamError = new Error('Response interrupted');
+    streamError.name = errorName;
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(streamError);
+        },
+      })
+    );
+
+    await expect(
+      countAndStoreUsage(response, {
+        api_kind: apiKind,
+        isStreaming: false,
+      } as MicrodollarUsageContext, undefined)
+    ).resolves.toBeNull();
+  });
 
   test('captures numeric error.code from in-stream error event as status_code_override', async () => {
     const errorChunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"","provider":"Amazon Bedrock","choices":[],"error":{"code":502,"message":"Internal server error","metadata":{"error_type":"provider_unavailable"}}}\n\n`;

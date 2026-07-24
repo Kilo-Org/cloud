@@ -115,7 +115,11 @@ type TestRuntime = MeteredSandbox & {
   billingHeartbeatTick(generation?: string): Promise<void>;
 };
 
-function createSandbox(rpc = createRpc(), containerRunning = false) {
+function createSandbox(
+  rpc = createRpc(),
+  containerRunning = false,
+  sandboxClassName: 'SandboxSmallContainment' | 'SandboxDIND' = 'SandboxSmallContainment'
+) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
   const ctx = {
@@ -125,7 +129,7 @@ function createSandbox(rpc = createRpc(), containerRunning = false) {
     waitUntil: (promise: Promise<unknown>) => shadowTasks.push(promise),
   } as unknown as SandboxDurableObjectState;
   class TestSandbox extends MeteredSandbox {
-    protected readonly sandboxClassName = 'SandboxSmallContainment' as const;
+    protected readonly sandboxClassName = sandboxClassName;
 
     setPhysicalRunning(running: boolean): void {
       if (this.ctx.container) {
@@ -147,10 +151,11 @@ function createSandbox(rpc = createRpc(), containerRunning = false) {
 }
 
 const billingInput = {
+  sandboxId: 'ses-abcdef' as const,
   subject: { type: 'org' as const, id: 'org_1' },
   actor: { type: 'user' as const, id: 'user_1' },
   sessionId: 'agent_1',
-  metadata: { allocation: 'isolated', origin: 'cloud-agent' },
+  metadata: { origin: 'cloud-agent' },
 };
 
 describe('MeteredSandbox', () => {
@@ -179,12 +184,12 @@ describe('MeteredSandbox', () => {
     expect(rpc.recordStart).toHaveBeenCalledWith(
       expect.objectContaining({
         startEpochMs: 1_000,
-        instanceId: 'SandboxSmallContainment:do-id',
+        instanceId: 'ses-abcdef',
         sku: 'cloud-agent-small-2026-07',
         metadata: {
-          allocation: 'isolated',
           origin: 'cloud-agent',
           container_class: 'SandboxSmallContainment',
+          durable_object_id: 'do-id',
         },
       })
     );
@@ -204,6 +209,36 @@ describe('MeteredSandbox', () => {
       startEpochMs: 1_500,
       measurementStarted: true,
     });
+  });
+
+  it('records a DIND instance using its Cloudflare instance ID', async () => {
+    const rpc = createRpc();
+    const { sandbox, flushShadowTasks } = createSandbox(rpc, false, 'SandboxDIND');
+    await sandbox.configureBilling({
+      ...billingInput,
+      sandboxId: 'dind-abcdef',
+      metadata: { origin: 'cloud-agent' },
+    });
+    sandbox.mockState = { status: 'healthy' };
+
+    await sandbox.onStart();
+    await flushShadowTasks();
+
+    expect(rpc.recordStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: 'cloud-agent-next',
+        instanceId: 'dind-abcdef',
+        sku: 'cloud-agent-dind-2026-07',
+        subject: { type: 'org', id: 'org_1' },
+        actor: { type: 'user', id: 'user_1' },
+        sessionId: 'agent_1',
+        metadata: {
+          container_class: 'SandboxDIND',
+          durable_object_id: 'do-id',
+          origin: 'cloud-agent',
+        },
+      })
+    );
   });
 
   it('does not adopt stale healthy state when no physical container is running', async () => {
@@ -238,6 +273,7 @@ describe('MeteredSandbox', () => {
     await flushShadowTasks();
     const second = await getBillingContext(storage);
     expect(second?.generation).not.toBe(first?.generation);
+    expect(second?.instanceId).toBe('ses-abcdef');
     expect(second?.startEpochMs).toBe(1_751);
   });
 

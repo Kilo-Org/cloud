@@ -72,7 +72,7 @@ describe('container usage context', () => {
       },
     },
   ])('derives trusted $name attribution', ({ identity, expected }) => {
-    expect(buildSandboxBillingInput(metadata(identity), 'ses-isolated')).toMatchObject(expected);
+    expect(buildSandboxBillingInput(metadata(identity), 'ses-abcdef')).toMatchObject(expected);
   });
 
   it('keeps isolated metadata bounded and normalizes automation origins', () => {
@@ -83,16 +83,13 @@ describe('container usage context', () => {
         orgId: 'org_security',
         billingOrigin: 'security-remediation',
       }),
-      'crv-isolated'
+      'crv-abcdef'
     );
 
     expect(input).toMatchObject({
+      sandboxId: 'crv-abcdef',
       sessionId: 'agent_security',
-      metadata: {
-        allocation: 'isolated',
-        origin: 'security-remediation',
-        repository_provider: 'github',
-      },
+      metadata: { origin: 'security-remediation' },
     });
     expect(JSON.stringify(input)).not.toContain('Kilo-Org/cloud');
   });
@@ -105,7 +102,7 @@ describe('container usage context', () => {
         orgId: 'org_shared',
         billingOrigin: 'security-agent',
       }),
-      'org-shared'
+      'org-abcdef'
     );
     const second = buildSandboxBillingInput(
       metadata({
@@ -114,14 +111,14 @@ describe('container usage context', () => {
         orgId: 'org_shared',
         billingOrigin: 'cloud-agent-web',
       }),
-      'org-shared'
+      'org-abcdef'
     );
 
     expect(first).toEqual(second);
     expect(first).toEqual({
+      sandboxId: 'org-abcdef',
       subject: { type: 'org', id: 'org_shared' },
       actor: { type: 'user', id: 'user_shared' },
-      metadata: { allocation: 'shared' },
     });
   });
 
@@ -132,7 +129,7 @@ describe('container usage context', () => {
         userId: 'user_unknown',
         billingOrigin: 'attacker-controlled-value',
       }),
-      'dind-isolated'
+      'dind-abcdef'
     );
     expect(input.metadata?.origin).toBe('other');
   });
@@ -157,7 +154,7 @@ describe('container usage context', () => {
         createdOnPlatform: 'security-remediation',
         billingOrigin: 'cloud-agent',
       }),
-      'ses-isolated'
+      'ses-abcdef'
     );
     expect(input.metadata?.origin).toBe('cloud-agent');
   });
@@ -165,10 +162,11 @@ describe('container usage context', () => {
   it('rejects session attribution and extra metadata for shared sandboxes', () => {
     expect(() =>
       assertSandboxBillingAllocation('Sandbox', {
+        sandboxId: 'org-abcdef',
         subject: { type: 'user', id: 'user_shared' },
         actor: { type: 'user', id: 'user_shared' },
         sessionId: 'agent_leak',
-        metadata: { allocation: 'shared', origin: 'cloud-agent' },
+        metadata: { origin: 'cloud-agent' },
       })
     ).toThrow('Shared sandbox billing cannot contain session attribution');
   });
@@ -176,9 +174,10 @@ describe('container usage context', () => {
   it('requires bounded isolated attribution for non-shared sandbox classes', () => {
     expect(() =>
       assertSandboxBillingAllocation('SandboxSmall', {
+        sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_isolated' },
         actor: { type: 'user', id: 'user_isolated' },
-        metadata: { allocation: 'isolated' },
+        metadata: { origin: 'cloud-agent' },
       })
     ).toThrow('Isolated sandbox billing requires session attribution');
   });
@@ -186,21 +185,35 @@ describe('container usage context', () => {
   it('rejects unsupported isolated origins at the sandbox RPC boundary', () => {
     expect(() =>
       assertSandboxBillingAllocation('SandboxSmall', {
+        sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_isolated' },
         actor: { type: 'user', id: 'user_isolated' },
         sessionId: 'agent_1',
-        metadata: { allocation: 'isolated', origin: 'forged-origin' },
+        metadata: { origin: 'forged-origin' },
       })
     ).toThrow('Isolated sandbox billing origin is unsupported');
+  });
+
+  it('rejects a sandbox ID that does not match the concrete container class', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxDIND', {
+        sandboxId: 'ses-abcdef',
+        subject: { type: 'user', id: 'user_1' },
+        actor: { type: 'user', id: 'user_1' },
+        sessionId: 'agent_1',
+        metadata: { origin: 'cloud-agent' },
+      })
+    ).toThrow('SandboxDIND billing requires a dind- sandbox ID');
   });
 
   it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {
     await expect(
       configureSandboxBillingInput({} as SandboxInstance, {
+        sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_1' },
         actor: { type: 'user', id: 'user_1' },
         sessionId: 'agent_1',
-        metadata: { allocation: 'isolated' },
+        metadata: { origin: 'cloud-agent' },
       })
     ).resolves.toBeUndefined();
   });
@@ -209,10 +222,11 @@ describe('container usage context', () => {
     const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
     await expect(
       configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
+        sandboxId: 'ses-abcdef',
         subject: { type: 'user', id: 'user_1' },
         actor: { type: 'user', id: 'user_1' },
         sessionId: 'agent_1',
-        metadata: { allocation: 'isolated' },
+        metadata: { origin: 'cloud-agent' },
       })
     ).resolves.toBeUndefined();
     expect(configureBilling).toHaveBeenCalledOnce();

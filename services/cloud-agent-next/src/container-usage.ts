@@ -306,11 +306,18 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
     const startEpochMs = Math.max(Date.now(), previousStartEpochMs + 1);
     await this.ctx.storage.put(LAST_START_EPOCH_STORAGE_KEY, startEpochMs);
     const context = await setBillingContext(this.ctx.storage, {
-      ...input,
+      subject: input.subject,
+      actor: input.actor,
+      ...(input.onBehalfOf ? { onBehalfOf: input.onBehalfOf } : {}),
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       service: SERVICE,
-      instanceId: `${this.sandboxClassName}:${this.ctx.id.toString()}`,
+      instanceId: input.sandboxId,
       sku: SANDBOX_USAGE_SKUS[this.sandboxClassName],
-      metadata: { ...input.metadata, container_class: this.sandboxClassName },
+      metadata: {
+        container_class: this.sandboxClassName,
+        durable_object_id: this.ctx.id.toString(),
+        ...(input.metadata?.origin ? { origin: input.metadata.origin } : {}),
+      },
       startEpochMs,
     } satisfies UsageContext & { startEpochMs: number });
     await this.ctx.storage.delete(PENDING_STOP_REASON_STORAGE_KEY);

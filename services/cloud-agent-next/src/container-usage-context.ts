@@ -20,13 +20,24 @@ export const SANDBOX_USAGE_SKUS = {
 } as const;
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
-export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'>;
+export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
+  sandboxId: SandboxId;
+};
 export type MeteredSandboxInstance = SandboxInstance & {
   configureBilling(input: unknown): Promise<void>;
 };
 
 const sandboxBillingInputEnvelopeSchema = z
   .object({
+    sandboxId: z
+      .string()
+      .min(1)
+      .max(63)
+      .refine(
+        value => /^(ses|crv|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(value) || value.includes('__'),
+        'Invalid sandboxId format'
+      )
+      .transform(value => value as SandboxId),
     subject: billingSubjectSchema,
     actor: billingActorSchema,
     onBehalfOf: billingSubjectSchema.optional(),
@@ -79,30 +90,28 @@ export function buildSandboxBillingInput(
   const isolated = isIsolatedSandbox(sandboxId);
 
   return {
+    sandboxId,
     subject,
     actor,
     ...(actor.type === 'bot' ? { onBehalfOf: subject } : {}),
     ...(isolated ? { sessionId: metadata.identity.sessionId } : {}),
-    metadata: isolated
-      ? {
-          allocation: 'isolated',
-          origin: normalizedOrigin(metadata.identity.billingOrigin),
-          ...(metadata.repository ? { repository_provider: metadata.repository.type } : {}),
-        }
-      : { allocation: 'shared' },
+    ...(isolated
+      ? { metadata: { origin: normalizedOrigin(metadata.identity.billingOrigin) } }
+      : {}),
   };
 }
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
+  const { sandboxId, ...usageInput } = parsed;
   const validated = usageContextSchema.parse({
     service: 'cloud-agent-next',
     instanceId: 'validation',
     sku: 'validation',
-    ...parsed,
+    ...usageInput,
   });
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
-  return billingInput;
+  return { sandboxId, ...billingInput };
 }
 
 export function assertSandboxBillingAllocation(
@@ -111,24 +120,40 @@ export function assertSandboxBillingAllocation(
 ): void {
   const shared = sandboxClassName === 'Sandbox' || sandboxClassName === 'SandboxContainment';
   if (shared) {
-    if (input.sessionId !== undefined || input.metadata?.allocation !== 'shared') {
+    if (input.sessionId !== undefined) {
       throw new Error('Shared sandbox billing cannot contain session attribution');
     }
-    if (Object.keys(input.metadata).some(key => key !== 'allocation')) {
-      throw new Error('Shared sandbox billing metadata must contain only allocation');
+    if (!/^(org|usr|bot|ubt)-/.test(input.sandboxId) && !input.sandboxId.includes('__')) {
+      throw new Error('Shared sandbox billing requires a shared sandbox ID');
+    }
+    if (input.metadata !== undefined && Object.keys(input.metadata).length > 0) {
+      throw new Error('Shared sandbox billing cannot contain metadata');
     }
     return;
   }
 
-  if (!input.sessionId || input.metadata?.allocation !== 'isolated') {
+  const expectedPrefix =
+    sandboxClassName === 'SandboxDIND'
+      ? 'dind-'
+      : sandboxClassName === 'SandboxSmall' || sandboxClassName === 'SandboxSmallContainment'
+        ? 'ses-'
+        : 'crv-';
+  if (!input.sandboxId.startsWith(expectedPrefix)) {
+    throw new Error(`${sandboxClassName} billing requires a ${expectedPrefix} sandbox ID`);
+  }
+  if (!input.sessionId) {
     throw new Error('Isolated sandbox billing requires session attribution');
   }
-  const origin = input.metadata.origin;
+  const metadata = input.metadata;
+  if (!metadata) {
+    throw new Error('Isolated sandbox billing origin is unsupported');
+  }
+  const origin = metadata.origin;
   if (origin === undefined || normalizedOrigin(origin) !== origin) {
     throw new Error('Isolated sandbox billing origin is unsupported');
   }
-  const allowedMetadata = new Set(['allocation', 'origin', 'repository_provider']);
-  if (Object.keys(input.metadata).some(key => !allowedMetadata.has(key))) {
+  const allowedMetadata = new Set(['origin']);
+  if (Object.keys(metadata).some(key => !allowedMetadata.has(key))) {
     throw new Error('Isolated sandbox billing metadata contains an unsupported field');
   }
 }

@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { JSX } from 'react';
 import { formatContextSummary, getContextRatio, getContextTone } from '@/src/shared/context-usage';
+import { formatSessionCost } from '@/src/shared/session-cost';
 
 const toneStroke: Record<'danger' | 'safe' | 'warn', string> = {
   danger: '#f87171',
@@ -16,11 +17,13 @@ export const ContextDonut = ({
   contextLength,
   onCompact,
   promptTokens,
+  sessionCostUsd,
 }: {
   canCompact: boolean;
   contextLength: number | undefined;
   onCompact: () => void;
   promptTokens: number;
+  sessionCostUsd: number;
 }): JSX.Element => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const ratio = getContextRatio(promptTokens, contextLength);
@@ -28,6 +31,7 @@ export const ContextDonut = ({
   const dash = ratio === undefined ? 0 : ratio * CIRCUMFERENCE;
   const summary = formatContextSummary(promptTokens, contextLength);
   const label = `Context usage: ${summary}`;
+  const sessionCostLabel = formatSessionCost(sessionCostUsd);
 
   return (
     <details className="relative shrink-0" ref={detailsRef}>
@@ -54,6 +58,7 @@ export const ContextDonut = ({
       <div className="absolute bottom-10 right-0 z-20 w-56 rounded-md border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300 shadow-lg shadow-zinc-950/60">
         <p className="font-medium text-zinc-100">Context</p>
         <p className="mt-1 text-zinc-400">{summary}</p>
+        <p className="mt-1 text-zinc-400">Session cost {sessionCostLabel}</p>
         <button
           className="mt-3 h-7 w-full rounded-md bg-[#EDFF00] px-2 text-xs font-semibold text-zinc-950 outline-none transition hover:bg-[#d9ea00] focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
           disabled={!canCompact}

@@ -29,6 +29,7 @@ const chromeWorkflowNames = [
   'closing a conversation removes only that tab',
   'conversation tab bar scrolls horizontally',
   'assistant messages render markdown',
+  'long assistant code blocks are collapsible',
   'only the message pane scrolls virtualized overflowing conversation content',
   'manual scroll up shows jump to latest without following new messages',
   'scrolling back to bottom reactivates automatic scroll to new messages',
@@ -36,6 +37,7 @@ const chromeWorkflowNames = [
   'native side panel is outside the page DOM',
   'dangerous mode conversation can eval against a normal tab',
   'safe mode conversation reads the selected tab with safe tools',
+  'safe mode conversation completes a tool call streamed with empty arguments',
   'dangerous mode conversation can use safe read tools',
   'running conversation can be stopped',
   'target tab list updates automatically',
@@ -1432,7 +1434,116 @@ const scenarios: FirefoxScenario[] = [
       ),
   },
   {
+    name: 'long assistant code blocks are collapsible',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            {
+              choices: [
+                {
+                  delta: {
+                    content: [
+                      '```ts',
+                      ...Array.from({ length: 20 }, (_value, index) => `line ${index + 1}`),
+                      '```',
+                      '',
+                      '```ts',
+                      ...Array.from({ length: 18 }, (_value, index) => `other ${index + 1}`),
+                      '```',
+                      '',
+                      '```ts',
+                      ...Array.from({ length: 3 }, (_value, index) => `short ${index + 1}`),
+                      '```',
+                    ].join('\n'),
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        async session => {
+          await submitDangerousPrompt(session, 'Show collapsible code');
+          await waitForText(session.driver, 'Show more (20 lines)');
+          await waitForText(session.driver, 'Show more (18 lines)');
+          await waitForText(session.driver, 'short 3');
+
+          const showMore20 = await session.driver.findElement(
+            By.xpath('//button[contains(normalize-space(.), "Show more (20 lines)")]')
+          );
+          const showMore18 = await session.driver.findElement(
+            By.xpath('//button[contains(normalize-space(.), "Show more (18 lines)")]')
+          );
+
+          assert.equal(await showMore20.getAttribute('aria-expanded'), 'false');
+          assert.equal(await showMore18.getAttribute('aria-expanded'), 'false');
+
+          const toggleCount = await session.driver.executeScript(
+            () =>
+              [...document.querySelectorAll('button')].filter(button => {
+                const label = button.textContent?.replaceAll(/\s+/gu, ' ').trim() ?? '';
+
+                return label.startsWith('Show more') || label === 'Show less';
+              }).length
+          );
+
+          assert.equal(toggleCount, 2);
+
+          const bodyTextCollapsed = await getBodyText(session.driver);
+
+          assert.match(bodyTextCollapsed, /line 1/u);
+          assert.match(bodyTextCollapsed, /line 8/u);
+          assert.doesNotMatch(bodyTextCollapsed, /line 9/u);
+          assert.match(bodyTextCollapsed, /other 1/u);
+          assert.match(bodyTextCollapsed, /other 8/u);
+          assert.doesNotMatch(bodyTextCollapsed, /other 9/u);
+          assert.match(bodyTextCollapsed, /short 1/u);
+          assert.match(bodyTextCollapsed, /short 2/u);
+          assert.match(bodyTextCollapsed, /short 3/u);
+          assert.doesNotMatch(bodyTextCollapsed, /Show more \(3 lines\)/u);
+
+          await showMore20.click();
+          await waitForText(session.driver, 'Show less');
+          await waitForText(session.driver, 'line 20');
+
+          const showLess = await session.driver.findElement(
+            By.xpath('//button[contains(normalize-space(.), "Show less")]')
+          );
+
+          assert.equal(await showLess.getAttribute('aria-expanded'), 'true');
+
+          const bodyTextExpanded = await getBodyText(session.driver);
+
+          assert.match(bodyTextExpanded, /line 20/u);
+          assert.doesNotMatch(bodyTextExpanded, /other 18/u);
+          assert.match(bodyTextExpanded, /Show more \(18 lines\)/u);
+
+          const secondExpanded = await session.driver
+            .findElement(By.xpath('//button[contains(normalize-space(.), "Show more (18 lines)")]'))
+            .getAttribute('aria-expanded');
+
+          assert.equal(secondExpanded, 'false');
+
+          await showLess.click();
+          await waitForText(session.driver, 'Show more (20 lines)');
+
+          const bodyTextRecollapsed = await getBodyText(session.driver);
+
+          assert.doesNotMatch(bodyTextRecollapsed, /line 20/u);
+          assert.doesNotMatch(bodyTextRecollapsed, /Show less/u);
+
+          const firstRecollapsed = await session.driver
+            .findElement(By.xpath('//button[contains(normalize-space(.), "Show more (20 lines)")]'))
+            .getAttribute('aria-expanded');
+
+          assert.equal(firstRecollapsed, 'false');
+        }
+      ),
+  },
+  {
     name: 'only the message pane scrolls virtualized overflowing conversation content',
+
     run: context =>
       withSession(context.api, {}, async session => {
         await openAuthenticatedPanel(session);
@@ -1849,6 +1960,59 @@ const scenarios: FirefoxScenario[] = [
           await sendMessage(session.driver, 'What is on this page?');
           await waitForText(session.driver, 'get_page_snapshot completed');
           await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+        }
+      ),
+  },
+  {
+    name: 'safe mode conversation completes a tool call streamed with empty arguments',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            { choices: [{ delta: { content: 'I will read the page.' } }] },
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: '',
+                          name: 'get_page_snapshot',
+                        },
+                        id: 'call_snapshot_1',
+                        index: 0,
+                        type: 'function',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
+          ],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+          await sendMessage(session.driver, 'What is on this page?');
+          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+          await getButtonByText(session.driver, 'Send message');
+          const bodyText = await getBodyText(session.driver);
+          assert.ok(!bodyText.includes('Gateway tool call arguments were not valid JSON.'));
         }
       ),
   },

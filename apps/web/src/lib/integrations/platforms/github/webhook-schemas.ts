@@ -154,6 +154,9 @@ export const PullRequestPayloadSchema = z.object({
       // the assumption and removes the `undefined` case for consumers.
       type: z.string().default('User'),
     }),
+    // PR labels, used by the optional council `required_labels` selection gate. Only `name` is
+    // read; other label fields are ignored. Optional for payloads/fixtures that omit labels.
+    labels: z.array(z.object({ name: z.string() })).optional(),
     head: z.object({
       sha: z.string(),
       ref: z.string(),

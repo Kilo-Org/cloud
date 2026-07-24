@@ -45,6 +45,7 @@ interface RunDangerousLlmTurnOptions {
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
+  readonly onAssistantStreaming?: ((eventId: string | undefined) => void) | undefined;
 }
 
 type DangerousToolCallEvent =

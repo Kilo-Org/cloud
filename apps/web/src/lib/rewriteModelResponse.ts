@@ -4,7 +4,7 @@ import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
@@ -15,6 +15,26 @@ type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
   message: string;
 };
+
+const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
+
+function createStreamProgressLogger() {
+  let eventCount = 0;
+  const interval = setInterval(() => {
+    logExceptInTest('[rewriteModelResponse] stream progress', {
+      eventCount,
+    });
+  }, STREAM_PROGRESS_LOG_INTERVAL_MS);
+
+  return {
+    eventProcessed() {
+      eventCount += 1;
+    },
+    stop() {
+      clearInterval(interval);
+    },
+  };
+}
 
 function getResponseReadError(error: unknown): ResponseReadError | null {
   if (typeof error !== 'object' || error === null || !('name' in error)) {
@@ -68,7 +88,8 @@ async function rewriteSseStream(
   parser: ReturnType<typeof createParser>,
   controller: ReadableStreamDefaultController<string>,
   doneReceived: () => boolean,
-  serializeError: (error: ResponseReadError) => string
+  serializeError: (error: ResponseReadError) => string,
+  onFinally: () => void
 ) {
   const decoder = new TextDecoder();
   try {
@@ -96,6 +117,7 @@ async function rewriteSseStream(
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
+    onFinally();
     reader.releaseLock();
   }
 }
@@ -157,14 +179,22 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
 
       let doneReceived = false;
       let generationId: string | undefined;
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
           }
           const json = JSON.parse(event.data) as ChatCompletionChunk;
-          generationId = json.id ?? generationId;
+          if (generationId === undefined && json.id) {
+            generationId = json.id;
+            logExceptInTest('[rewriteModelResponse] received generation ID', {
+              kind: 'chat_completions',
+              generationId,
+            });
+          }
 
           const delta = json.choices?.[0]?.delta;
           if (delta) {
@@ -206,7 +236,8 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
               type: responseReadError.errorType,
             },
           }) +
-          '\n\n'
+          '\n\n',
+        progress.stop
       );
     },
   });
@@ -285,8 +316,10 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
       let doneReceived = false;
       let generationId: string | undefined;
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -298,7 +331,13 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
-            generationId = e.message.id ?? generationId;
+            if (generationId === undefined && e.message.id) {
+              generationId = e.message.id;
+              logExceptInTest('[rewriteModelResponse] received generation ID', {
+                kind: 'messages',
+                generationId,
+              });
+            }
             if (e.message.usage) {
               rewriteMessagesUsage(e.message.usage, removeCost);
             }
@@ -336,7 +375,8 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
               error_type: responseReadError.errorType,
             },
           }) +
-          '\n\n'
+          '\n\n',
+        progress.stop
       );
     },
   });
@@ -397,8 +437,10 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
       let doneReceived = false;
       let generationId: string | undefined;
       let nextSequenceNumber = 0;
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -408,7 +450,13 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
             nextSequenceNumber = Math.max(nextSequenceNumber, json.sequence_number + 1);
           }
           if (json.response) {
-            generationId = json.response.id ?? generationId;
+            if (generationId === undefined && json.response.id) {
+              generationId = json.response.id;
+              logExceptInTest('[rewriteModelResponse] received generation ID', {
+                kind: 'responses',
+                generationId,
+              });
+            }
             if (json.response.usage) {
               rewriteUsage(json.response.usage, removeCost);
             }
@@ -439,7 +487,8 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
               message: responseReadError.message,
             },
           }) +
-          '\n\n'
+          '\n\n',
+        progress.stop
       );
     },
   });

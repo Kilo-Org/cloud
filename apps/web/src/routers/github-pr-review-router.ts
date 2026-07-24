@@ -226,13 +226,11 @@ const REVIEW_THREADS_QUERY = /* GraphQL */ `
                   login
                   avatarUrl
                 }
-                reactions(first: 20) {
-                  nodes {
-                    content
-                    count: reactors(first: 0) {
-                      totalCount
-                    }
-                    viewerHasReacted
+                reactionGroups {
+                  content
+                  viewerHasReacted
+                  reactors(first: 0) {
+                    totalCount
                   }
                 }
               }
@@ -262,13 +260,11 @@ const REVIEW_THREAD_COMMENTS_FOLLOWUP_QUERY = /* GraphQL */ `
               login
               avatarUrl
             }
-            reactions(first: 20) {
-              nodes {
-                content
-                count: reactors(first: 0) {
-                  totalCount
-                }
-                viewerHasReacted
+            reactionGroups {
+              content
+              viewerHasReacted
+              reactors(first: 0) {
+                totalCount
               }
             }
           }
@@ -340,10 +336,12 @@ const REMOVE_REACTION_MUTATION = /* GraphQL */ `
   }
 `;
 
-type GraphQlReactionNode = {
+// Mirrors GitHub's ReactionGroup (not Reaction): reactionGroups is an
+// unpaginated list of all group types; only groups with totalCount > 0 are kept.
+type GraphQlReactionGroup = {
   content: string;
-  count?: { totalCount: number } | null;
   viewerHasReacted: boolean;
+  reactors?: { totalCount: number } | null;
 };
 
 type GraphQlCommentNode = {
@@ -352,7 +350,7 @@ type GraphQlCommentNode = {
   body: string;
   createdAt: string;
   author: { login: string; avatarUrl: string } | null;
-  reactions: { nodes: GraphQlReactionNode[] };
+  reactionGroups: GraphQlReactionGroup[];
 };
 
 type GraphQlCommentConnection = {
@@ -374,12 +372,14 @@ type GraphQlReviewThreadNode = {
   comments: GraphQlCommentConnection;
 };
 
-function normalizeReactions(nodes: GraphQlReactionNode[]) {
-  return nodes.map(n => ({
-    content: n.content,
-    count: n.count?.totalCount ?? 0,
-    viewerHasReacted: Boolean(n.viewerHasReacted),
-  }));
+function normalizeReactions(groups: GraphQlReactionGroup[]) {
+  return groups
+    .map(g => ({
+      content: g.content,
+      count: g.reactors?.totalCount ?? 0,
+      viewerHasReacted: Boolean(g.viewerHasReacted),
+    }))
+    .filter(r => r.count > 0);
 }
 
 function normalizeComment(node: GraphQlCommentNode) {
@@ -389,7 +389,7 @@ function normalizeComment(node: GraphQlCommentNode) {
     body: node.body,
     createdAt: node.createdAt,
     author: node.author,
-    reactions: normalizeReactions(node.reactions?.nodes ?? []),
+    reactions: normalizeReactions(node.reactionGroups ?? []),
   };
 }
 

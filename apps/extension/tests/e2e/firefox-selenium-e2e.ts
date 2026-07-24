@@ -37,6 +37,7 @@ const chromeWorkflowNames = [
   'native side panel is outside the page DOM',
   'dangerous mode conversation can eval against a normal tab',
   'safe mode conversation reads the selected tab with safe tools',
+  'safe mode conversation completes a tool call streamed with empty arguments',
   'dangerous mode conversation can use safe read tools',
   'running conversation can be stopped',
   'target tab list updates automatically',
@@ -1646,6 +1647,53 @@ const scenarios: FirefoxScenario[] = [
           await sendMessage(session.driver, 'What is on this page?');
           await waitForText(session.driver, 'get_page_snapshot completed');
           await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+        }
+      ),
+  },
+  {
+    name: 'safe mode conversation completes a tool call streamed with empty arguments',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            { choices: [{ delta: { content: 'I will read the page.' } }] },
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: '',
+                          name: 'get_page_snapshot',
+                        },
+                        id: 'call_snapshot_1',
+                        index: 0,
+                        type: 'function',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
+          ],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+          await sendMessage(session.driver, 'What is on this page?');
+          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+          await getButtonByText(session.driver, 'Send message');
+          const bodyText = await getBodyText(session.driver);
+          assert.ok(!bodyText.includes('Gateway tool call arguments were not valid JSON.'));
         }
       ),
   },

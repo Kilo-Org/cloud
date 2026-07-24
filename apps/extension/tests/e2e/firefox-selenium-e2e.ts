@@ -135,7 +135,14 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
   `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
 
 const defaultEvalCode = 'return document.documentElement.outerHTML.length;';
-const dangerousToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page', 'eval'];
+const dangerousToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+  'eval',
+];
 
 const defaultFirstCompletionEvents = (): unknown[] => [
   { choices: [{ delta: { content: 'I will inspect Firefox.' } }] },
@@ -969,7 +976,13 @@ const scenarios: FirefoxScenario[] = [
           beforeFirstCompletion: () => pendingFirstCompletion,
           firstCompletionEvents: [{ choices: [{ delta: { content: 'First tab finished.' } }] }],
           secondCompletionEvents: [{ choices: [{ delta: { content: 'Second tab finished.' } }] }],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1008,7 +1021,13 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'Second persisted reply.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           await session.openTargetPage();
@@ -1038,7 +1057,13 @@ const scenarios: FirefoxScenario[] = [
         {
           firstCompletionEvents: [{ choices: [{ delta: { content: 'Keep this reply.' } }] }],
           secondCompletionEvents: [{ choices: [{ delta: { content: 'Close this reply.' } }] }],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           await session.openTargetPage();
@@ -1203,7 +1228,13 @@ const scenarios: FirefoxScenario[] = [
           firstCompletionEvents: [
             { choices: [{ delta: { content: 'Delayed Firefox reply arrived.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1347,7 +1378,13 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'Second Firefox reply after bottom.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {
@@ -1526,7 +1563,13 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
           ],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           await session.openTargetPage();
@@ -1866,7 +1909,13 @@ const scenarios: FirefoxScenario[] = [
         {
           beforeFirstCompletion: () => pendingCompletion,
           firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
-          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+          toolNames: [
+            'get_page_snapshot',
+            'get_element_details',
+            'find_in_page',
+            'search_memories',
+            'get_memory',
+          ],
         },
         async session => {
           try {

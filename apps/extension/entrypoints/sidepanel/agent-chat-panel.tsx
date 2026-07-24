@@ -56,6 +56,10 @@ import { buildRemoteMcpToolDefinitions } from '@/src/shared/remote-mcp-tools';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import { toRemoteMcpToolCallEvents } from './agent-tool-call-events';
 import { executeRemoteMcpToolCall } from './agent-remote-mcp-tool-runtime';
+import { useAgentMemories } from './use-agent-memories';
+import type { AgentMemory } from '@/src/shared/agent-memories';
+import { formatAgentMemoryIndex } from '@/src/shared/agent-memories';
+import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-context-sanitize';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
@@ -84,28 +88,36 @@ const getSelectedInspectableTabId = ({
   return inspectableTabs[0]?.id;
 };
 
-const sanitizeTabContextText = (text: string): string =>
-  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-const sanitizeTabContextUrl = (url: string): string => {
-  try {
-    const parsedUrl = new URL(url);
-
-    parsedUrl.search = '';
-    parsedUrl.hash = '';
-
-    return parsedUrl.toString();
-  } catch {
-    return '[invalid URL]';
+export const formatSystemEnvironment = ({
+  selectedTab,
+  memories,
+}: {
+  readonly selectedTab: { readonly title: string; readonly url: string } | undefined;
+  readonly memories: readonly AgentMemory[];
+}): string | undefined => {
+  if (selectedTab === undefined) {
+    return undefined;
   }
+
+  const lines = [
+    `Selected tab title: ${sanitizeTabContextText(selectedTab.title)}`,
+    `Selected tab URL: ${sanitizeTabContextUrl(selectedTab.url)}`,
+    `Current time: ${new Date().toISOString()}`,
+    `Timezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}`,
+  ];
+  const memoryIndex = formatAgentMemoryIndex(memories);
+  const body = memoryIndex === undefined ? lines.join('\n') : `${lines.join('\n')}\n${memoryIndex}`;
+
+  return `<system_environment>\n${body}\n</system_environment>`;
 };
+
 export const formatSelectedTabSystemEnvironment = ({
   title,
   url,
 }: {
   readonly title: string;
   readonly url: string;
-}): string =>
-  `<system_environment>\nSelected tab title: ${sanitizeTabContextText(title)}\nSelected tab URL: ${sanitizeTabContextUrl(url)}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
+}): string => formatSystemEnvironment({ memories: [], selectedTab: { title, url } }) ?? '';
 
 export const AgentChatPanel = ({
   auth,
@@ -119,11 +131,13 @@ export const AgentChatPanel = ({
   const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
+  const { memories } = useAgentMemories();
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
   const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
   const compactingConversationIds = useAtomValue(compactingConversationIdsAtom);
   const setCompactingConversationIds = useSetAtom(compactingConversationIdsAtom);
   const conversationStoreRef = useRef(conversationStore);
+  const memoriesRef = useRef(memories);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
   const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
@@ -266,6 +280,7 @@ export const AgentChatPanel = ({
     !isCompacting;
 
   conversationStoreRef.current = conversationStore;
+  memoriesRef.current = memories;
 
   useEffect(
     () => () => {
@@ -437,7 +452,13 @@ export const AgentChatPanel = ({
     const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
     const userEvent = createUserMessage(
       text,
-      selectedTab === undefined ? undefined : formatSelectedTabSystemEnvironment(selectedTab)
+      formatSystemEnvironment({
+        memories: memoriesRef.current,
+        selectedTab:
+          selectedTab === undefined
+            ? undefined
+            : { title: selectedTab.title, url: selectedTab.url },
+      })
     );
     const conversationWithUserMessage = [...conversationEvents, userEvent];
 

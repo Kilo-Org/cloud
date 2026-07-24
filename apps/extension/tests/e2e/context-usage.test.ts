@@ -11,7 +11,13 @@ import {
   waitForStoredConversationText,
 } from './extension-context-fixture';
 
-const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
+const safeToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+];
 
 /*
  * Read the persisted conversation store as a JSON string. Storage is the source of truth and is

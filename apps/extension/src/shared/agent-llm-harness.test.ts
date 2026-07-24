@@ -86,11 +86,15 @@ describe('agent LLM harness', () => {
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'search_memories',
+      'get_memory',
     ]);
     expect(toolNames(true)).toStrictEqual([
       'get_page_snapshot',
       'get_element_details',
       'find_in_page',
+      'search_memories',
+      'get_memory',
       'get_viewport_screenshot',
     ]);
   });

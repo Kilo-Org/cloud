@@ -24,6 +24,7 @@ import {
   compactConversationEvents,
   hasCompactableHistory,
 } from '@/src/shared/agent-context-compaction';
+import type { TurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -474,7 +475,7 @@ export const AgentChatPanel = ({
       }
     };
     let currentRunHasUsage = false;
-    const updateRunUsage = (usage: { costUsd?: number; promptTokens: number }): void => {
+    const updateRunUsage = (usage: TurnUsage): void => {
       if (isCurrentRun()) {
         currentRunHasUsage = true;
         store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });

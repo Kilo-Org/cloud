@@ -183,6 +183,17 @@ describe('container usage context', () => {
     ).toThrow('Isolated sandbox billing requires session attribution');
   });
 
+  it('rejects unsupported isolated origins at the sandbox RPC boundary', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxSmall', {
+        subject: { type: 'user', id: 'user_isolated' },
+        actor: { type: 'user', id: 'user_isolated' },
+        sessionId: 'agent_1',
+        metadata: { allocation: 'isolated', origin: 'forged-origin' },
+      })
+    ).toThrow('Isolated sandbox billing origin is unsupported');
+  });
+
   it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {
     await expect(
       configureSandboxBillingInput({} as SandboxInstance, {

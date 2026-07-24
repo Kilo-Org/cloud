@@ -11,10 +11,7 @@
  * session ownership state is created.
  */
 import { protectedProcedure } from '../auth.js';
-import { TRPCError } from '@trpc/server';
-import { organization_memberships } from '@kilocode/db/schema';
 import type { WorkerDb } from '@kilocode/db/client';
-import { and, eq } from 'drizzle-orm';
 import { logger, withLogTags } from '../../logger.js';
 import { getPgDb } from '../../db/pg.js';
 import type * as z from 'zod';
@@ -28,6 +25,7 @@ import {
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
 import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import { assertOrganizationMembership } from './organization-membership.js';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -89,30 +87,6 @@ function startInputToSessionCreateRequest(
         }
       : undefined,
   };
-}
-
-export async function assertOrganizationMembership(
-  db: WorkerDb,
-  userId: string,
-  organizationId: string
-): Promise<void> {
-  const [membership] = await db
-    .select({ id: organization_memberships.id })
-    .from(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.organization_id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId)
-      )
-    )
-    .limit(1);
-
-  if (!membership) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'You do not have access to this organization',
-    });
-  }
 }
 
 const startSessionHandler = protectedProcedure

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getBillingContext, type ContainerUsageRpcMethods } from '@kilocode/container-usage';
+import {
+  getBillingContext,
+  updateBillingContext,
+  type ContainerUsageRpcMethods,
+} from '@kilocode/container-usage';
 
 // oxlint-disable-next-line no-empty-object-type -- Matches the mocked Sandbox constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
@@ -64,12 +68,16 @@ import { MeteredSandbox } from './container-usage.js';
 
 class MemoryStorage {
   private readonly values = new Map<string, unknown>();
+  failWrites = false;
+  hangReads = false;
 
   async get<T>(key: string): Promise<T | undefined> {
+    if (this.hangReads) return await new Promise(() => undefined);
     return this.values.get(key) as T | undefined;
   }
 
   async put(key: string, value: unknown): Promise<void> {
+    if (this.failWrites) throw new Error('storage unavailable');
     this.values.set(key, value);
   }
 
@@ -109,10 +117,12 @@ type TestRuntime = MeteredSandbox & {
 
 function createSandbox(rpc = createRpc(), containerRunning = false) {
   const storage = new MemoryStorage();
+  const shadowTasks: Promise<unknown>[] = [];
   const ctx = {
     id: { toString: () => 'do-id' },
     storage,
     container: { running: containerRunning },
+    waitUntil: (promise: Promise<unknown>) => shadowTasks.push(promise),
   } as unknown as SandboxDurableObjectState;
   class TestSandbox extends MeteredSandbox {
     protected readonly sandboxClassName = 'SandboxSmallContainment' as const;
@@ -129,6 +139,7 @@ function createSandbox(rpc = createRpc(), containerRunning = false) {
   return {
     rpc,
     storage,
+    flushShadowTasks: () => Promise.all(shadowTasks),
     sandbox: new TestSandbox(ctx, {
       CONTAINER_USAGE_METER: rpc,
     } as never) as unknown as TestRuntime,
@@ -139,7 +150,7 @@ const billingInput = {
   subject: { type: 'org' as const, id: 'org_1' },
   actor: { type: 'user' as const, id: 'user_1' },
   sessionId: 'agent_1',
-  metadata: { allocation: 'isolated' },
+  metadata: { allocation: 'isolated', origin: 'cloud-agent' },
 };
 
 describe('MeteredSandbox', () => {
@@ -149,7 +160,7 @@ describe('MeteredSandbox', () => {
   });
 
   it('admits one start per physical generation and short-circuits active acquisition', async () => {
-    const { rpc, storage, sandbox } = createSandbox();
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(1_000);
 
     await sandbox.configureBilling(billingInput);
@@ -158,6 +169,7 @@ describe('MeteredSandbox', () => {
 
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     vi.mocked(rpc.recordStart).mockRejectedValue(new Error('meter unavailable'));
     await sandbox.configureBilling(billingInput);
     await sandbox.configureBilling(billingInput);
@@ -169,18 +181,23 @@ describe('MeteredSandbox', () => {
         startEpochMs: 1_000,
         instanceId: 'SandboxSmallContainment:do-id',
         sku: 'cloud-agent-small-2026-07',
-        metadata: { allocation: 'isolated', container_class: 'SandboxSmallContainment' },
+        metadata: {
+          allocation: 'isolated',
+          origin: 'cloud-agent',
+          container_class: 'SandboxSmallContainment',
+        },
       })
     );
     expect((await getBillingContext(storage))?.measurementStarted).toBe(true);
   });
 
   it('adopts a physical container that predates shadow metering', async () => {
-    const { rpc, storage, sandbox } = createSandbox(createRpc(), true);
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox(createRpc(), true);
     vi.spyOn(Date, 'now').mockReturnValue(1_500);
     sandbox.mockState = { status: 'healthy' };
 
     await sandbox.configureBilling(billingInput);
+    await flushShadowTasks();
 
     expect(rpc.recordStart).toHaveBeenCalledOnce();
     expect(await getBillingContext(storage)).toMatchObject({
@@ -200,11 +217,12 @@ describe('MeteredSandbox', () => {
   });
 
   it('closes a missed-stop generation before the next physical start', async () => {
-    const { rpc, storage, sandbox } = createSandbox();
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(1_750);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     const first = await getBillingContext(storage);
 
     sandbox.setPhysicalRunning(false);
@@ -217,9 +235,31 @@ describe('MeteredSandbox', () => {
     );
 
     await sandbox.onStart();
+    await flushShadowTasks();
     const second = await getBillingContext(storage);
     expect(second?.generation).not.toBe(first?.generation);
     expect(second?.startEpochMs).toBe(1_751);
+  });
+
+  it('uses the first stopped observation as the re-acquisition usage cutoff', async () => {
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const active = await getBillingContext(storage);
+    if (!active) throw new Error('Expected active billing context');
+    await updateBillingContext(storage, { ...active, stoppedObservedAtMs: 10_000 });
+
+    now.mockReturnValue(500_000);
+    sandbox.setPhysicalRunning(false);
+    sandbox.mockState = { status: 'stopped' };
+    await sandbox.configureBilling(billingInput);
+
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ usageSinceLast: 9, reason: 'runtime_signal' })
+    );
   });
 
   it('keeps physical start non-fatal while retrying an unacknowledged shadow start', async () => {
@@ -229,11 +269,12 @@ describe('MeteredSandbox', () => {
       .mockRejectedValueOnce(new Error('ack lost'))
       .mockRejectedValueOnce(new Error('ack lost'))
       .mockResolvedValue({ success: true, ack: ack() });
-    const { sandbox, storage } = createSandbox(rpc);
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
 
     await expect(sandbox.onStart()).resolves.toBeUndefined();
+    await flushShadowTasks();
     const context = await getBillingContext(storage);
     expect(context?.measurementStarted).toBe(true);
     expect(sandbox.superStarted).toBe(true);
@@ -243,12 +284,25 @@ describe('MeteredSandbox', () => {
     expect(rpc.recordHeartbeat).toHaveBeenCalledOnce();
   });
 
+  it('does not await an unresolved meter during physical start', async () => {
+    const rpc = createRpc();
+    vi.mocked(rpc.recordStart).mockImplementation(() => new Promise(() => undefined));
+    const { sandbox } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+
+    await expect(sandbox.onStart()).resolves.toBeUndefined();
+
+    expect(sandbox.superStarted).toBe(true);
+  });
+
   it('keeps a delayed stop attached to the prior generation', async () => {
-    const { rpc, storage, sandbox } = createSandbox();
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(2_000);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     const first = await getBillingContext(storage);
 
     sandbox.mockState = { status: 'stopped_with_code', exitCode: 17 };
@@ -256,10 +310,12 @@ describe('MeteredSandbox', () => {
     expect((await getBillingContext(storage))?.generation).toBe(first?.generation);
 
     await sandbox.onStop({ reason: 'exit', exitCode: 17 });
+    await flushShadowTasks();
     expect(await getBillingContext(storage)).toBeUndefined();
 
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     const second = await getBillingContext(storage);
 
     expect(second?.generation).not.toBe(first?.generation);
@@ -271,13 +327,15 @@ describe('MeteredSandbox', () => {
   });
 
   it('treats duplicate start callbacks as one physical generation', async () => {
-    const { rpc, storage, sandbox } = createSandbox();
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
 
     await sandbox.onStart();
+    await flushShadowTasks();
     const first = await getBillingContext(storage);
     await sandbox.onStart();
+    await flushShadowTasks();
     const second = await getBillingContext(storage);
 
     expect(second?.generation).toBe(first?.generation);
@@ -287,14 +345,16 @@ describe('MeteredSandbox', () => {
 
   it('does not admit a new physical generation until the prior stop is durable', async () => {
     const rpc = createRpc();
-    const { sandbox, storage } = createSandbox(rpc);
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     const first = await getBillingContext(storage);
     await sandbox.billingHeartbeatTick(first?.generation);
     vi.mocked(rpc.recordStop).mockRejectedValue(new Error('meter unavailable'));
     await sandbox.onStop({ reason: 'exit', exitCode: 1 });
+    await flushShadowTasks();
     expect((await getBillingContext(storage))?.pendingStop).toBeDefined();
 
     await expect(sandbox.onStart()).resolves.toBeUndefined();
@@ -304,20 +364,23 @@ describe('MeteredSandbox', () => {
   });
 
   it('defers activity-expiry closure until physical stop confirmation', async () => {
-    const { rpc, storage, sandbox } = createSandbox();
+    const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(3_000);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     const active = await getBillingContext(storage);
 
     await sandbox.onActivityExpired();
+    await flushShadowTasks();
 
     expect(sandbox.superActivityExpired).toBe(true);
     expect(rpc.recordStop).not.toHaveBeenCalled();
     expect((await getBillingContext(storage))?.generation).toBe(active?.generation);
 
     await sandbox.onStop({ reason: 'exit', exitCode: 143 });
+    await flushShadowTasks();
     expect(rpc.recordStop).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'activity_expired', exitCode: 143 })
     );
@@ -325,16 +388,32 @@ describe('MeteredSandbox', () => {
   });
 
   it('preserves normal exit reason and exit code', async () => {
-    const { rpc, sandbox } = createSandbox();
+    const { rpc, sandbox, flushShadowTasks } = createSandbox();
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
 
     await sandbox.onStop({ reason: 'exit', exitCode: 42 });
+    await flushShadowTasks();
 
     expect(rpc.recordStop).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'exit', exitCode: 42 })
     );
+    expect(sandbox.superStopped).toBe(true);
+  });
+
+  it('does not await an unresolved meter during physical stop', async () => {
+    const rpc = createRpc();
+    const { sandbox, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    vi.mocked(rpc.recordStop).mockImplementation(() => new Promise(() => undefined));
+
+    await expect(sandbox.onStop({ reason: 'exit', exitCode: 0 })).resolves.toBeUndefined();
+
     expect(sandbox.superStopped).toBe(true);
   });
 
@@ -345,12 +424,14 @@ describe('MeteredSandbox', () => {
       .mockRejectedValueOnce(new Error('postgres unavailable'))
       .mockRejectedValueOnce(new Error('postgres unavailable'))
       .mockResolvedValue(ack());
-    const { sandbox, storage } = createSandbox(rpc);
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
 
     await expect(sandbox.onStop({ reason: 'exit', exitCode: 1 })).resolves.toBeUndefined();
+    await flushShadowTasks();
     expect(sandbox.superStopped).toBe(true);
     const pending = await getBillingContext(storage);
     expect(pending?.pendingStop).toMatchObject({ reason: 'exit', exitCode: 1 });
@@ -364,14 +445,16 @@ describe('MeteredSandbox', () => {
 
   it('persists authoritative stop details before recovering a missing start ack', async () => {
     const rpc = createRpc();
-    const { sandbox, storage } = createSandbox(rpc);
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
     await sandbox.configureBilling(billingInput);
     sandbox.mockState = { status: 'healthy' };
     await sandbox.onStart();
+    await flushShadowTasks();
     await storage.delete('container-usage:start-ack-generation:v1');
     vi.mocked(rpc.recordStart).mockRejectedValue(new Error('meter unavailable'));
 
     await sandbox.onStop({ reason: 'exit', exitCode: 9 });
+    await flushShadowTasks();
 
     expect(await getBillingContext(storage)).toMatchObject({
       pendingStop: { reason: 'exit', exitCode: 9 },
@@ -392,12 +475,47 @@ describe('MeteredSandbox', () => {
     ).rejects.toThrow();
   });
 
-  it('stops a runtime that somehow starts without trusted attribution', async () => {
-    const { sandbox } = createSandbox();
-    await expect(sandbox.onStart()).rejects.toThrow(
-      'Container started without pending billing attribution'
-    );
+  it('does not stop a runtime that starts without shadow attribution', async () => {
+    const { sandbox, flushShadowTasks } = createSandbox();
+    await expect(sandbox.onStart()).resolves.toBeUndefined();
+    await flushShadowTasks();
     expect(sandbox.superStarted).toBe(true);
-    expect(sandbox.superStopCalled).toBe(true);
+    expect(sandbox.superStopCalled).toBe(false);
+  });
+
+  it('does not fail physical start when persisted shadow state is corrupt', async () => {
+    const { sandbox, storage, flushShadowTasks } = createSandbox();
+    await storage.put('container-usage:billing-context:v1', { invalid: true });
+
+    await expect(sandbox.onStart()).resolves.toBeUndefined();
+    await flushShadowTasks();
+    expect(sandbox.superStarted).toBe(true);
+    expect(sandbox.superStopCalled).toBe(false);
+  });
+
+  it('always performs real activity expiry when shadow storage fails', async () => {
+    const { sandbox, storage, flushShadowTasks } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    storage.failWrites = true;
+
+    await expect(sandbox.onActivityExpired()).resolves.toBeUndefined();
+    await flushShadowTasks();
+    expect(sandbox.superActivityExpired).toBe(true);
+  });
+
+  it('does not await shadow persistence during real activity expiry', async () => {
+    const { sandbox, storage, flushShadowTasks } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    storage.hangReads = true;
+
+    await expect(sandbox.onActivityExpired()).resolves.toBeUndefined();
+
+    expect(sandbox.superActivityExpired).toBe(true);
   });
 });

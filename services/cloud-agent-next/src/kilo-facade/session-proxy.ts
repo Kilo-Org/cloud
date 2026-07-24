@@ -76,7 +76,7 @@ export async function resolveLiveWrapperTarget(params: {
       metadata.identity.sessionId,
       metadata.identity.botId,
       {
-        createdOnPlatform: metadata.identity.createdOnPlatform,
+        createdOnPlatform: metadata.identity.billingOrigin,
       }
     ));
 
@@ -86,7 +86,7 @@ export async function resolveLiveWrapperTarget(params: {
     }),
     sandboxId
   );
-  await configureSandboxBilling(sandbox, metadata, sandboxId);
+  void configureSandboxBilling(sandbox, metadata, sandboxId);
   const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
   if (!wrapperInfo) {
     return null;

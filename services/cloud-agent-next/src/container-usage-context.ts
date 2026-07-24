@@ -123,6 +123,10 @@ export function assertSandboxBillingAllocation(
   if (!input.sessionId || input.metadata?.allocation !== 'isolated') {
     throw new Error('Isolated sandbox billing requires session attribution');
   }
+  const origin = input.metadata.origin;
+  if (origin === undefined || normalizedOrigin(origin) !== origin) {
+    throw new Error('Isolated sandbox billing origin is unsupported');
+  }
   const allowedMetadata = new Set(['allocation', 'origin', 'repository_provider']);
   if (Object.keys(input.metadata).some(key => !allowedMetadata.has(key))) {
     throw new Error('Isolated sandbox billing metadata contains an unsupported field');
@@ -147,7 +151,7 @@ export async function configureSandboxBillingInput(
     return;
   }
   try {
-    await configureBilling.call(sandbox, input);
+    await (sandbox as MeteredSandboxInstance).configureBilling(input);
   } catch (error) {
     logger
       .withFields({ error: error instanceof Error ? error.message : String(error) })

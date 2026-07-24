@@ -254,6 +254,34 @@ describe('deriveSetupEnvironment', () => {
 });
 
 describe('CloudflareAgentSandbox', () => {
+  it('keeps default billing configuration when the sandbox resolver is injected', async () => {
+    const configureBilling = vi.fn().mockResolvedValue(undefined);
+    const renewActivityTimeout = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({ configureBilling, renewActivityTimeout }) as unknown as SandboxInstance,
+    });
+
+    await sandbox.keepAlive();
+
+    expect(configureBilling).toHaveBeenCalledOnce();
+    expect(renewActivityTimeout).toHaveBeenCalledOnce();
+  });
+
+  it('does not await shadow configuration before using an injected sandbox', async () => {
+    const configureBilling = vi.fn(() => new Promise<void>(() => undefined));
+    const renewActivityTimeout = vi.fn();
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () => ({ renewActivityTimeout }) as unknown as SandboxInstance,
+      configureBilling,
+    });
+
+    await expect(sandbox.keepAlive()).resolves.toBeUndefined();
+
+    expect(configureBilling).toHaveBeenCalledOnce();
+    expect(renewActivityTimeout).toHaveBeenCalledOnce();
+  });
+
   it('starts an ordinary bootstrap wrapper through the adapter', async () => {
     const bootstrapSession = {};
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);

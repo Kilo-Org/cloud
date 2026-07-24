@@ -250,6 +250,60 @@ describe('installBillingHeartbeat', () => {
     }
   });
 
+  it('abandons local stopped-state retries after the hard ceiling', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async () => {
+        throw new Error('meter unavailable');
+      });
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+            budget: { verdict: 'continue' },
+          }),
+          recordStop,
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 1 } }
+      );
+      const deleteSchedules = vi.fn();
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules,
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client,
+          storage,
+          stopOnStoppedState: false,
+          stoppedStateGraceSeconds: 900,
+          stoppedStateAbandonSeconds: 3_600,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      now.mockReturnValue(10_000);
+      await controller.billingHeartbeatTick();
+      now.mockReturnValue(3_610_000);
+      await controller.billingHeartbeatTick();
+
+      expect(recordStop).toHaveBeenCalledOnce();
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(deleteSchedules).toHaveBeenCalledWith(BILLING_HEARTBEAT_CALLBACK);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('runs stop-delivery prerequisites before retrying a persisted stop', async () => {
     const storage = memoryStorage();
     await storedContext(storage);

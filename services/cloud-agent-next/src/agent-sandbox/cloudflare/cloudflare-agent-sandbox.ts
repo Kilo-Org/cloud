@@ -202,9 +202,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.stopObservationDelaysMs =
       dependencies.stopObservationDelaysMs ?? DEFAULT_STOP_OBSERVATION_DELAYS_MS;
-    this.configureBilling =
-      dependencies.configureBilling ??
-      (dependencies.resolveSandbox ? async () => undefined : configureSandboxBillingInput);
+    this.configureBilling = dependencies.configureBilling ?? configureSandboxBillingInput;
   }
 
   private resolveSandboxId(): Promise<SandboxId> {
@@ -218,7 +216,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
             this.metadata.identity.sessionId,
             this.metadata.identity.botId,
             {
-              createdOnPlatform: this.metadata.identity.createdOnPlatform,
+              createdOnPlatform: this.metadata.identity.billingOrigin,
             }
           );
     }
@@ -228,7 +226,13 @@ export class CloudflareAgentSandbox implements AgentSandbox {
   private async getSandbox(options?: { sleepAfter?: number }): Promise<SandboxInstance> {
     const sandboxId = await this.resolveSandboxId();
     const sandbox = this.resolveSandbox(sandboxId, options);
-    await this.configureBilling(sandbox, buildSandboxBillingInput(this.metadata, sandboxId));
+    void this.configureBilling(sandbox, buildSandboxBillingInput(this.metadata, sandboxId)).catch(
+      error => {
+        logger
+          .withFields({ error: error instanceof Error ? error.message : String(error) })
+          .warn('Container usage shadow configuration deferred');
+      }
+    );
     return sandbox;
   }
 

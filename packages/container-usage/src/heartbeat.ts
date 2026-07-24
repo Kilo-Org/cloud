@@ -14,6 +14,7 @@ import {
 export const BILLING_HEARTBEAT_CALLBACK = 'billingHeartbeatTick';
 export const DEFAULT_BILLING_HEARTBEAT_SECONDS = 5 * 60;
 export const DEFAULT_STOPPED_STATE_GRACE_SECONDS = 15 * 60;
+export const DEFAULT_STOPPED_STATE_ABANDON_SECONDS = 60 * 60;
 
 type BillingContainer = Pick<Container, 'deleteSchedules' | 'getState' | 'schedule'>;
 
@@ -24,6 +25,7 @@ export type BillingHeartbeatDependencies = {
   /** Defer stopped-state closure to the container's authoritative onStop hook. */
   stopOnStoppedState?: boolean;
   stoppedStateGraceSeconds?: number;
+  stoppedStateAbandonSeconds?: number;
   beforeHeartbeatDelivery?: (context: BillingContext) => Promise<void>;
   beforeStopDelivery?: (context: BillingContext) => Promise<void>;
   enforceBudgetStop: (
@@ -36,10 +38,13 @@ export type BillingHeartbeatDependencies = {
 export type BillingHeartbeatController = {
   scheduleHeartbeat: () => Promise<void>;
   billingHeartbeatTick: (generation?: string) => Promise<void>;
-  recordStop: (params: {
-    reason: 'exit' | 'runtime_signal' | 'activity_expired';
-    exitCode?: number;
-  }) => Promise<RecordAck | undefined>;
+  recordStop: (
+    params: {
+      reason: 'exit' | 'runtime_signal' | 'activity_expired';
+      exitCode?: number;
+    },
+    usageEndedAtMs?: number
+  ) => Promise<RecordAck | undefined>;
   cancelHeartbeat: () => void;
   persistStop: (params: {
     reason: 'exit' | 'runtime_signal' | 'activity_expired';
@@ -59,11 +64,16 @@ export function installBillingHeartbeat(
   const heartbeatSeconds = dependencies.heartbeatSeconds ?? DEFAULT_BILLING_HEARTBEAT_SECONDS;
   const stoppedStateGraceSeconds =
     dependencies.stoppedStateGraceSeconds ?? DEFAULT_STOPPED_STATE_GRACE_SECONDS;
+  const stoppedStateAbandonSeconds =
+    dependencies.stoppedStateAbandonSeconds ?? DEFAULT_STOPPED_STATE_ABANDON_SECONDS;
   if (heartbeatSeconds <= 0) {
     throw new Error('Billing heartbeat interval must be positive');
   }
   if (stoppedStateGraceSeconds <= 0) {
     throw new Error('Stopped-state grace interval must be positive');
+  }
+  if (stoppedStateAbandonSeconds < stoppedStateGraceSeconds) {
+    throw new Error('Stopped-state abandon interval must not be shorter than its grace interval');
   }
 
   let lifecycleTail: Promise<void> = Promise.resolve();
@@ -108,6 +118,17 @@ export function installBillingHeartbeat(
     return true;
   };
 
+  const computeStopSegment = (context: BillingContext, usageEndedAtMs: number) => {
+    if (context.pendingHeartbeat) return context.pendingHeartbeat;
+    const elapsedMs = Math.max(0, usageEndedAtMs - context.usageMeasuredAtMs);
+    const usageSinceLast = Math.floor(elapsedMs / 1_000);
+    return {
+      seq: context.nextSeq,
+      usageSinceLast,
+      measuredAtMs: context.usageMeasuredAtMs + usageSinceLast * 1_000,
+    };
+  };
+
   const recordStopForGeneration = async (
     params: Parameters<BillingHeartbeatController['recordStop']>[0],
     expectedGeneration?: string,
@@ -119,13 +140,7 @@ export function installBillingHeartbeat(
       return undefined;
     }
     if (!context.pendingStop) {
-      const pendingHeartbeat = context.pendingHeartbeat;
-      const elapsedMs = Math.max(0, usageEndedAtMs - context.usageMeasuredAtMs);
-      const stopSegment = pendingHeartbeat ?? {
-        seq: context.nextSeq,
-        usageSinceLast: Math.floor(elapsedMs / 1_000),
-        measuredAtMs: context.usageMeasuredAtMs + Math.floor(elapsedMs / 1_000) * 1_000,
-      };
+      const stopSegment = computeStopSegment(context, usageEndedAtMs);
       await updateBillingContext(dependencies.storage, {
         ...context,
         pendingStop: { ...params, ...stopSegment },
@@ -153,21 +168,15 @@ export function installBillingHeartbeat(
     return ack;
   };
 
-  const recordStop: BillingHeartbeatController['recordStop'] = params =>
-    runLifecycleExclusive(() => recordStopForGeneration(params));
+  const recordStop: BillingHeartbeatController['recordStop'] = (params, usageEndedAtMs) =>
+    runLifecycleExclusive(() => recordStopForGeneration(params, undefined, usageEndedAtMs));
 
   const persistStop: BillingHeartbeatController['persistStop'] = params =>
     runLifecycleExclusive(async () => {
       const context = await getBillingContext(dependencies.storage);
       if (!context) return undefined;
       if (context.pendingStop) return context;
-      const pendingHeartbeat = context.pendingHeartbeat;
-      const elapsedMs = Math.max(0, Date.now() - context.usageMeasuredAtMs);
-      const stopSegment = pendingHeartbeat ?? {
-        seq: context.nextSeq,
-        usageSinceLast: Math.floor(elapsedMs / 1_000),
-        measuredAtMs: context.usageMeasuredAtMs + Math.floor(elapsedMs / 1_000) * 1_000,
-      };
+      const stopSegment = computeStopSegment(context, Date.now());
       const updated = { ...context, pendingStop: { ...params, ...stopSegment } };
       await updateBillingContext(dependencies.storage, updated);
       return updated;
@@ -184,6 +193,14 @@ export function installBillingHeartbeat(
       try {
         await recordStopForGeneration(context.pendingStop, context.generation);
       } catch (error) {
+        if (
+          context.stoppedObservedAtMs !== undefined &&
+          Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
+        ) {
+          cancelHeartbeat();
+          await clearBillingContext(dependencies.storage);
+          return;
+        }
         await rescheduleIfCurrent(context);
         throw error;
       }
@@ -222,6 +239,14 @@ export function installBillingHeartbeat(
           context.stoppedObservedAtMs
         );
       } catch (error) {
+        if (
+          context.stoppedObservedAtMs !== undefined &&
+          Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
+        ) {
+          cancelHeartbeat();
+          await clearBillingContext(dependencies.storage);
+          return;
+        }
         await rescheduleIfCurrent(context);
         throw error;
       }

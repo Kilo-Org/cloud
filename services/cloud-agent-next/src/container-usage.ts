@@ -50,6 +50,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   private readonly usageClient: ContainerUsageClient;
   private readonly billingHeartbeat: BillingHeartbeatController;
   private billingLifecycleTail: Promise<void> = Promise.resolve();
+  private activityExpiryRequested = false;
 
   constructor(ctx: SandboxDurableObjectState, env: Env) {
     super(ctx, env);
@@ -96,12 +97,15 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
         }
         const state = await this.getState();
         try {
-          await this.billingHeartbeat.recordStop({
-            reason: 'runtime_signal',
-            ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
-              ? { exitCode: state.exitCode }
-              : {}),
-          });
+          await this.billingHeartbeat.recordStop(
+            {
+              reason: 'runtime_signal',
+              ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
+                ? { exitCode: state.exitCode }
+                : {}),
+            },
+            active.stoppedObservedAtMs
+          );
           await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {
           await this.deferBillingDelivery(error, 'missed stop recovery');
@@ -119,12 +123,15 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
           return;
         }
         try {
-          await this.billingHeartbeat.recordStop({
-            reason: 'runtime_signal',
-            ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
-              ? { exitCode: state.exitCode }
-              : {}),
-          });
+          await this.billingHeartbeat.recordStop(
+            {
+              reason: 'runtime_signal',
+              ...(state.status === 'stopped_with_code' && state.exitCode !== undefined
+                ? { exitCode: state.exitCode }
+                : {}),
+            },
+            active.stoppedObservedAtMs
+          );
           await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {
           await this.deferBillingDelivery(error, 'unmeasured stop recovery');
@@ -140,7 +147,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
   override async onStart(): Promise<void> {
     await super.onStart();
-    await this.runBillingExclusive(async () => {
+    this.runShadowTask('start lifecycle', async () => {
       const previous = await getBillingContext(this.ctx.storage);
       if (previous) {
         if (previous.pendingStop) {
@@ -168,8 +175,10 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
       const input = await this.getPendingAttribution();
       if (!input) {
-        await super.stop();
-        throw new Error('Container started without pending billing attribution');
+        logger
+          .withFields({ sandboxClass: this.sandboxClassName })
+          .warn('Container usage shadow start has no attribution');
+        return;
       }
 
       await this.startBillingGeneration(input);
@@ -177,49 +186,33 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   }
 
   override async onStop(params?: ContainerStopParams): Promise<void> {
-    try {
-      await this.runBillingExclusive(async () => {
-        const context = await getBillingContext(this.ctx.storage);
-        if (!context) return;
-        const requestedReason = await this.getPendingStopReason(context.generation);
-        try {
-          const pending = await this.billingHeartbeat.persistStop({
-            reason: requestedReason ?? params?.reason ?? 'runtime_signal',
-            exitCode: params?.exitCode,
-          });
-          if (!pending) return;
-          await this.ensureStartAcknowledged(pending);
-          await this.billingHeartbeat.recordStop(
-            pending.pendingStop ?? {
-              reason: requestedReason ?? params?.reason ?? 'runtime_signal',
-              exitCode: params?.exitCode,
-            }
-          );
-          await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
-          await this.ctx.storage.delete(PENDING_STOP_REASON_STORAGE_KEY);
-        } catch (error) {
-          // recordStop persists its intent before delivery. Keep the heartbeat schedule alive so
-          // the durable intent retries without blocking the SDK's physical stop transition.
-          try {
-            await this.billingHeartbeat.scheduleHeartbeat();
-          } catch {
-            // The persisted stop intent remains recoverable on the next sandbox acquisition.
-          }
-          logger
-            .withFields({
-              error: error instanceof Error ? error.message : String(error),
-              sandboxClass: this.sandboxClassName,
-            })
-            .warn('Container usage stop delivery deferred');
-        }
+    await super.onStop();
+    this.runShadowTask('stop lifecycle', async () => {
+      const context = await getBillingContext(this.ctx.storage);
+      if (!context) return;
+      const requestedReason = this.activityExpiryRequested
+        ? 'activity_expired'
+        : await this.getPendingStopReason(context.generation);
+      const pending = await this.billingHeartbeat.persistStop({
+        reason: requestedReason ?? params?.reason ?? 'runtime_signal',
+        exitCode: params?.exitCode,
       });
-    } finally {
-      await super.onStop();
-    }
+      if (!pending) return;
+      await this.ensureStartAcknowledged(pending);
+      await this.billingHeartbeat.recordStop({
+        reason: requestedReason ?? params?.reason ?? 'runtime_signal',
+        exitCode: params?.exitCode,
+      });
+      await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
+      await this.ctx.storage.delete(PENDING_STOP_REASON_STORAGE_KEY);
+      this.activityExpiryRequested = false;
+    });
   }
 
   override async onActivityExpired(): Promise<void> {
-    await this.runBillingExclusive(async () => {
+    this.activityExpiryRequested = true;
+    await super.onActivityExpired();
+    this.runShadowTask('activity expiry', async () => {
       const context = await getBillingContext(this.ctx.storage);
       if (context) {
         await this.ctx.storage.put(PENDING_STOP_REASON_STORAGE_KEY, {
@@ -228,7 +221,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
         });
       }
     });
-    await super.onActivityExpired();
   }
 
   private runBillingExclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -238,6 +230,13 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       () => undefined
     );
     return result;
+  }
+
+  private runShadowTask(operation: string, task: () => Promise<void>): void {
+    const promise = this.runBillingExclusive(task).catch(error => {
+      this.logShadowFailure(error, operation);
+    });
+    this.ctx.waitUntil(promise);
   }
 
   private async getPendingAttribution(): Promise<SandboxBillingInput | undefined> {
@@ -278,6 +277,10 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
         // A later sandbox acquisition retries persisted shadow state.
       }
     }
+    this.logShadowFailure(error, operation);
+  }
+
+  private logShadowFailure(error: unknown, operation: string): void {
     logger
       .withFields({
         error: error instanceof Error ? error.message : String(error),

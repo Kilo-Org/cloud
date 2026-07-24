@@ -43,7 +43,7 @@ import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
 import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
-import { assertOrganizationMembership } from './session-start.js';
+import { assertOrganizationMembership } from './organization-membership.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;

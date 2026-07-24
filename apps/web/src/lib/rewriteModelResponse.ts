@@ -18,17 +18,11 @@ type ResponseReadError = {
 
 const STREAM_PROGRESS_LOG_INTERVAL_MS = 60_000;
 
-function createStreamProgressLogger(
-  kind: GatewayRequest['kind'],
-  getGenerationId: () => string | undefined
-) {
+function createStreamProgressLogger() {
   let eventCount = 0;
   const interval = setInterval(() => {
-    const generationId = getGenerationId();
     logExceptInTest('[rewriteModelResponse] stream progress', {
-      kind,
       eventCount,
-      ...(generationId ? { generationId } : {}),
     });
   }, STREAM_PROGRESS_LOG_INTERVAL_MS);
 
@@ -185,7 +179,7 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
 
       let doneReceived = false;
       let generationId: string | undefined;
-      const progress = createStreamProgressLogger('chat_completions', () => generationId);
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           progress.eventProcessed();
@@ -322,7 +316,7 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
       let doneReceived = false;
       let generationId: string | undefined;
-      const progress = createStreamProgressLogger('messages', () => generationId);
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           progress.eventProcessed();
@@ -443,7 +437,7 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
       let doneReceived = false;
       let generationId: string | undefined;
       let nextSequenceNumber = 0;
-      const progress = createStreamProgressLogger('responses', () => generationId);
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           progress.eventProcessed();

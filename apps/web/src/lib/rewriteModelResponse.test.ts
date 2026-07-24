@@ -185,9 +185,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         await jest.advanceTimersByTimeAsync(60_000);
 
         expect(mockLogExceptInTest).toHaveBeenCalledWith('[rewriteModelResponse] stream progress', {
-          kind: 'chat_completions',
           eventCount: 1,
-          generationId: 'gen-chat',
         });
 
         upstreamController.current?.close();

@@ -199,6 +199,106 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
       caller.listReviewThreads({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
     ).resolves.toBeDefined();
   });
+
+  it('listReviewThreads maps reactionGroups to non-zero DTO reactions only', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').request.mockResolvedValue({
+      data: {
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [
+                  {
+                    id: 'PRRT_1',
+                    isResolved: false,
+                    isOutdated: false,
+                    subjectType: 'LINE',
+                    path: 'src/foo.ts',
+                    line: 4,
+                    startLine: null,
+                    originalLine: 4,
+                    originalStartLine: null,
+                    diffSide: 'RIGHT',
+                    comments: {
+                      pageInfo: { hasNextPage: false, endCursor: null },
+                      nodes: [
+                        {
+                          databaseId: 11,
+                          id: 'PRRC_11',
+                          body: 'nit',
+                          createdAt: '2024-01-01T00:00:00Z',
+                          author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
+                          // Live schema: all group types present; zero-count filtered out.
+                          reactionGroups: [
+                            {
+                              content: 'THUMBS_UP',
+                              viewerHasReacted: true,
+                              reactors: { totalCount: 2 },
+                            },
+                            {
+                              content: 'THUMBS_DOWN',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 0 },
+                            },
+                            {
+                              content: 'LAUGH',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 0 },
+                            },
+                            {
+                              content: 'HOORAY',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 0 },
+                            },
+                            {
+                              content: 'CONFUSED',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 0 },
+                            },
+                            {
+                              content: 'HEART',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 1 },
+                            },
+                            {
+                              content: 'ROCKET',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 0 },
+                            },
+                            {
+                              content: 'EYES',
+                              viewerHasReacted: false,
+                              reactors: { totalCount: 0 },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      direction: 'forward',
+    });
+
+    expect(result.threads).toHaveLength(1);
+    expect(result.threads[0]?.comments[0]?.reactions).toEqual([
+      { content: 'THUMBS_UP', count: 2, viewerHasReacted: true },
+      { content: 'HEART', count: 1, viewerHasReacted: false },
+    ]);
+  });
 });
 
 describe('githubPrReviewRouter mutations go through withGitHubUserTokenRetry', () => {

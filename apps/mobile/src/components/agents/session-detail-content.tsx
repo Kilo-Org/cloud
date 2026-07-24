@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import { type CloudStatus, type KiloSessionId } from 'cloud-agent-sdk';
+import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
 import { type Href, useRouter } from 'expo-router';
 import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
@@ -15,6 +15,7 @@ import { createAndNavigateAgentSession } from '@/components/agents/create-and-na
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
@@ -144,6 +145,7 @@ export function SessionDetailContent({
   const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
   const [openContextSheetIdentity, setOpenContextSheetIdentity] =
     useState<ContextSheetIdentity | null>(null);
+  const [detailsMessage, setDetailsMessage] = useState<StoredMessage | null>(null);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -366,6 +368,7 @@ export function SessionDetailContent({
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
+          onLongPressDetails={setDetailsMessage}
         />
       );
     },
@@ -651,6 +654,15 @@ export function SessionDetailContent({
           }}
         />
       ) : null}
+
+      <MessageDetailsSheet
+        visible={detailsMessage !== null}
+        message={detailsMessage}
+        modelOptions={modelOptions}
+        onClose={() => {
+          setDetailsMessage(null);
+        }}
+      />
 
       {childSession ? (
         <ChildSessionSheet

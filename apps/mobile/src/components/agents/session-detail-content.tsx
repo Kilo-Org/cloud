@@ -15,7 +15,6 @@ import { createAndNavigateAgentSession } from '@/components/agents/create-and-na
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import { computeMessageModelLabels } from '@/components/agents/message-model-label';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
@@ -40,6 +39,7 @@ import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
+  shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -333,16 +333,6 @@ export function SessionDetailContent({
     return null;
   }, [messages]);
 
-  // Per-message model label gating: the first assistant message is always
-  // labelled, and every subsequent assistant message is labelled only when
-  // its resolved model differs from the previous assistant's. Walked over
-  // the ordered transcript here so each `<MessageBubble>` only needs to
-  // consult a Map lookup, not re-derive the answer from the whole list.
-  const messageModelLabels = useMemo(
-    () => computeMessageModelLabels(messages, modelOptions),
-    [messages, modelOptions]
-  );
-
   const handleOpenChildSession = useCallback(
     (childSessionId: KiloSessionId, childTitle: string) => {
       setChildSession({ sessionId: childSessionId, title: childTitle });
@@ -376,11 +366,6 @@ export function SessionDetailContent({
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
-          modelLabel={
-            item.message.info.role === 'assistant'
-              ? messageModelLabels.get(item.message.info.id)
-              : undefined
-          }
         />
       );
     },
@@ -391,7 +376,6 @@ export function SessionDetailContent({
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
-      messageModelLabels,
     ]
   );
 
@@ -452,10 +436,25 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: pendingMessages.size,
   });
+  const hasFooterStatusIndicator =
+    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator:
-      statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready'),
+    hasStatusIndicator: hasFooterStatusIndicator,
+  });
+  // Only a live PreparationGroup duplicates footer progress. Completed groups
+  // stay in the transcript after cold starts and must not suppress a later
+  // recycle re-prepare footer (Setting up environment…).
+  const hasInProgressTranscriptPreparation = useMemo(
+    () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
+    [transcript]
+  );
+  const showSessionFooterRow = shouldShowSessionFooterRow({
+    cloudStatusType: cloudStatus?.type,
+    hasInProgressTranscriptPreparation,
+    shouldShowFooterWorking,
+    hasStatusIndicator: statusIndicator !== null,
+    messageCount: messages.length,
   });
 
   const emptyStateText = statusIndicator ? null : 'No messages yet';
@@ -692,8 +691,9 @@ export function SessionDetailContent({
             content-size changes during streaming cannot reposition it.
             Gated on has-messages so the empty/connecting path (which
             renders the centered status indicator inside `renderContent`)
-            does not double-render. */}
-        {messages.length > 0 && (shouldShowFooterWorking || statusIndicator) ? (
+            does not double-render. While preparing, suppressed when the
+            transcript already shows PreparationGroup (no duplicate). */}
+        {showSessionFooterRow ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}

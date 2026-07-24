@@ -24,6 +24,11 @@ import {
   hasCompactableHistory,
 } from '@/src/shared/agent-context-compaction';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
+import {
+  captureEvent,
+  CONVERSATION_CREATED_EVENT,
+  MESSAGE_SENT_EVENT,
+} from '@/src/shared/analytics';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import {
@@ -497,6 +502,7 @@ export const AgentChatPanel = ({
       try {
         const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
 
+        captureEvent(MESSAGE_SENT_EVENT, { mode: runMode });
         await runTurn({
           apiBaseUrl,
           appendEvents: appendRunEvents,
@@ -587,6 +593,8 @@ export const AgentChatPanel = ({
     if (!isConversationStoreLoaded) {
       return;
     }
+
+    captureEvent(CONVERSATION_CREATED_EVENT);
 
     const settings = {
       mode,

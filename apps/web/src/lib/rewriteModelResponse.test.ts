@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@jest/globals';
+import { describe, test, expect, jest } from '@jest/globals';
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
@@ -156,6 +156,41 @@ describe('rewriteModelResponse_ChatCompletions', () => {
   });
 
   describe('streaming responses', () => {
+    test('tracks event progress every 30 seconds and clears the interval', async () => {
+      const intervalHandle = setTimeout(() => {}, 0);
+      clearTimeout(intervalHandle);
+      const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockReturnValue(intervalHandle);
+      const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval');
+      const encoder = new TextEncoder();
+      const upstreamController: { current?: ReadableStreamDefaultController<Uint8Array> } = {};
+      const upstream = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            upstreamController.current = controller;
+            controller.enqueue(
+              encoder.encode('data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n')
+            );
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+
+      try {
+        const result = await rewriteModelResponse_ChatCompletions(upstream);
+        const reader = result.body?.getReader();
+        expect(reader).toBeDefined();
+        await reader?.read();
+        expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+
+        upstreamController.current?.close();
+        await reader?.read();
+        expect(clearIntervalSpy).toHaveBeenCalledWith(intervalHandle);
+      } finally {
+        setIntervalSpy.mockRestore();
+        clearIntervalSpy.mockRestore();
+      }
+    });
+
     test.each([
       ['ResponseAborted', 'upstream_disconnect'],
       ['TimeoutError', 'timeout'],

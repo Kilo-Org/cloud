@@ -37,6 +37,8 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) => ToolCall[];
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
+  /** Fires with the assistant event id on first content delta; fires undefined when that stream ends. */
+  readonly onAssistantStreaming?: ((eventId: string | undefined) => void) | undefined;
 }
 
 // Attach the turn's reasoning blocks to the first tool call so the harness can replay them on the assistant tool-call message (providers may require signed/encrypted reasoning for a continuation).
@@ -79,6 +81,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   toToolCallEvents,
   updateAssistantMessage,
   updateThinkingBlock,
+  onAssistantStreaming,
 }: RunLlmTurnOptions<ToolCall>): Promise<void> => {
   const getGatewayChatCompletion = (
     nextEvents: AgentConversationEvent[],
@@ -110,94 +113,107 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     let streamedAssistantEventId: string | undefined = undefined;
     let streamedThinkingText = '';
     let streamedThinkingEventId: string | undefined = undefined;
-    const completion = await getGatewayChatCompletion(
-      nextEvents,
-      delta => {
-        streamedText += delta;
+    let didStartAssistantStreaming = false;
 
-        if (streamedAssistantEventId === undefined) {
-          const assistantEvent = createAssistantMessage(streamedText);
+    try {
+      const completion = await getGatewayChatCompletion(
+        nextEvents,
+        delta => {
+          streamedText += delta;
 
-          streamedAssistantEventId = assistantEvent.id;
-          completionEvents.push(assistantEvent);
-          appendEvents([assistantEvent]);
-          return;
+          if (streamedAssistantEventId === undefined) {
+            const assistantEvent = createAssistantMessage(streamedText);
+
+            streamedAssistantEventId = assistantEvent.id;
+            didStartAssistantStreaming = true;
+            onAssistantStreaming?.(assistantEvent.id);
+            completionEvents.push(assistantEvent);
+            appendEvents([assistantEvent]);
+            return;
+          }
+
+          updateAssistantMessage(streamedAssistantEventId, streamedText);
+        },
+        delta => {
+          streamedThinkingText += delta;
+
+          if (streamedThinkingEventId === undefined) {
+            const thinkingEvent = createThinkingBlock(streamedThinkingText);
+
+            streamedThinkingEventId = thinkingEvent.id;
+            completionEvents.push(thinkingEvent);
+            appendEvents([thinkingEvent]);
+            return;
+          }
+
+          updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
         }
-
-        updateAssistantMessage(streamedAssistantEventId, streamedText);
-      },
-      delta => {
-        streamedThinkingText += delta;
-
-        if (streamedThinkingEventId === undefined) {
-          const thinkingEvent = createThinkingBlock(streamedThinkingText);
-
-          streamedThinkingEventId = thinkingEvent.id;
-          completionEvents.push(thinkingEvent);
-          appendEvents([thinkingEvent]);
-          return;
-        }
-
-        updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
-      }
-    );
-
-    if (completion.usage !== undefined) {
-      onUsage?.(completion.usage);
-    }
-
-    if (streamedThinkingEventId !== undefined) {
-      const finalStreamedThinkingText = completion.reasoning ?? streamedThinkingText;
-      const streamedThinkingEventIndex = completionEvents.findIndex(
-        event => event.id === streamedThinkingEventId
       );
 
-      if (streamedThinkingEventIndex !== -1) {
-        completionEvents.splice(streamedThinkingEventIndex, 1, {
-          id: streamedThinkingEventId,
-          text: finalStreamedThinkingText,
-          type: 'thinking',
-        });
+      if (completion.usage !== undefined) {
+        onUsage?.(completion.usage);
       }
-    }
 
-    if (streamedAssistantEventId !== undefined) {
-      const finalStreamedText = completion.content ?? streamedText;
-      const streamedAssistantEventIndex = completionEvents.findIndex(
-        event => event.id === streamedAssistantEventId
+      if (streamedThinkingEventId !== undefined) {
+        const finalStreamedThinkingText = completion.reasoning ?? streamedThinkingText;
+        const streamedThinkingEventIndex = completionEvents.findIndex(
+          event => event.id === streamedThinkingEventId
+        );
+
+        if (streamedThinkingEventIndex !== -1) {
+          completionEvents.splice(streamedThinkingEventIndex, 1, {
+            id: streamedThinkingEventId,
+            text: finalStreamedThinkingText,
+            type: 'thinking',
+          });
+        }
+      }
+
+      if (streamedAssistantEventId !== undefined) {
+        const finalStreamedText = completion.content ?? streamedText;
+        const streamedAssistantEventIndex = completionEvents.findIndex(
+          event => event.id === streamedAssistantEventId
+        );
+
+        if (streamedAssistantEventIndex !== -1) {
+          completionEvents.splice(streamedAssistantEventIndex, 1, {
+            id: streamedAssistantEventId,
+            role: 'assistant',
+            text: finalStreamedText,
+            type: 'message',
+          });
+        }
+      }
+
+      // Non-streamed completion.content path: no onAssistantStreaming start/end.
+      if (completion.content !== undefined && streamedAssistantEventId === undefined) {
+        completionEvents.push(createAssistantMessage(completion.content));
+      }
+
+      if (completion.reasoning !== undefined && streamedThinkingEventId === undefined) {
+        completionEvents.push(createThinkingBlock(completion.reasoning));
+      }
+
+      const toolCallEvents = withReasoningDetails(
+        toToolCallEvents(completion.toolCalls),
+        completion.reasoningDetails
+      );
+      completionEvents.push(...toolCallEvents);
+
+      appendEvents(
+        completionEvents.filter(
+          event => event.id !== streamedAssistantEventId && event.id !== streamedThinkingEventId
+        )
       );
 
-      if (streamedAssistantEventIndex !== -1) {
-        completionEvents.splice(streamedAssistantEventIndex, 1, {
-          id: streamedAssistantEventId,
-          role: 'assistant',
-          text: finalStreamedText,
-          type: 'message',
-        });
+      return { completionEvents, toolCallEvents };
+    } finally {
+      if (didStartAssistantStreaming) {
+        // Explicit clear: callers key collapse chrome off this id being undefined.
+        const cleared: string | undefined = undefined;
+        onAssistantStreaming?.(cleared);
       }
     }
-
-    if (completion.content !== undefined && streamedAssistantEventId === undefined) {
-      completionEvents.push(createAssistantMessage(completion.content));
-    }
-
-    if (completion.reasoning !== undefined && streamedThinkingEventId === undefined) {
-      completionEvents.push(createThinkingBlock(completion.reasoning));
-    }
-
-    const toolCallEvents = withReasoningDetails(
-      toToolCallEvents(completion.toolCalls),
-      completion.reasoningDetails
-    );
-    completionEvents.push(...toolCallEvents);
-
-    appendEvents(
-      completionEvents.filter(
-        event => event.id !== streamedAssistantEventId && event.id !== streamedThinkingEventId
-      )
-    );
-
-    return { completionEvents, toolCallEvents };
   };
 
   try {

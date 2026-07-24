@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createSafeToolCall, createUserMessage } from './agent-conversation';
@@ -201,5 +202,140 @@ describe('agent LLM turn runner core', () => {
       text: 'Too many tool rounds.',
       type: 'message',
     });
+  });
+
+  it('fires onAssistantStreaming with the event id at first content delta and undefined when the stream resolves', async () => {
+    const streamingCalls: (string | undefined)[] = [];
+    const appendedEvents: AgentConversationEvent[] = [];
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":" world"}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Hi')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onAssistantStreaming: eventId => {
+        streamingCalls.push(eventId);
+      },
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    const assistantMessages = appendedEvents.filter(
+      (event): event is Extract<AgentConversationEvent, { type: 'message' }> =>
+        event.type === 'message'
+    );
+    expect(assistantMessages).toHaveLength(1);
+    expect(streamingCalls).toHaveLength(2);
+    expect(streamingCalls[0]).toBe(assistantMessages[0]?.id);
+    expect(streamingCalls[1]).toBeUndefined();
+  });
+
+  it('fires onAssistantStreaming undefined via try/finally when the stream rejects after a start', async () => {
+    const streamingCalls: (string | undefined)[] = [];
+    const encoder = new TextEncoder();
+    // Pull 1 delivers a content delta (starts streaming); pull 2 errors the stream.
+    // Array dispatch avoids controller.error wiping an already-enqueued chunk before the first read.
+    const pullActions: ((controller: ReadableStreamDefaultController<Uint8Array>) => void)[] = [
+      controller => {
+        controller.enqueue(
+          encoder.encode('data: {"choices":[{"delta":{"content":"Partial"}}]}\n\n')
+        );
+      },
+      controller => {
+        controller.error(new Error('network dropped'));
+      },
+    ];
+    let pullIndex = 0;
+    const fetch: FetchLike = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pullActions[pullIndex]?.(controller);
+            pullIndex += 1;
+          },
+        }),
+        {
+          headers: { 'Content-Type': 'text/event-stream' },
+          status: 200,
+        }
+      );
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: () => {},
+      conversationEvents: [createUserMessage('Hi')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onAssistantStreaming: eventId => {
+        streamingCalls.push(eventId);
+      },
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(streamingCalls).toHaveLength(2);
+    const [startedId, endedId] = streamingCalls;
+    expect(startedId).toBeDefined();
+    expect(startedId).not.toBe('');
+    expect(endedId).toBeUndefined();
+  });
+
+  it('never fires onAssistantStreaming when the stream has no content deltas', async () => {
+    const streamingCalls: (string | undefined)[] = [];
+    // Empty stream: no onContentDelta calls, so the non-streamed start path never runs.
+    // Deltas absent means the defensive completion.content branch is not exercised here;
+    // The public stream client never produces content without deltas.
+    const fetch: FetchLike = () => streamResponse(['data: [DONE]\n\n']);
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: () => {},
+      conversationEvents: [createUserMessage('Hi')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onAssistantStreaming: eventId => {
+        streamingCalls.push(eventId);
+      },
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(streamingCalls).toStrictEqual([]);
   });
 });

@@ -174,7 +174,9 @@ const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCal
 
   const parsedArguments = (() => {
     try {
-      return parseJson(value.arguments);
+      // Bedrock-served Claude streams a zero-argument tool call as a single empty
+      // `arguments: ""` delta; an empty accumulated buffer is a zero-argument call.
+      return value.arguments === '' ? {} : parseJson(value.arguments);
     } catch {
       throw new TypeError('Gateway tool call arguments were not valid JSON.');
     }

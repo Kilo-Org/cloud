@@ -24,15 +24,22 @@ export const contextUsageAtomFamily = atomFamily((_conversationId: string) =>
 // Same lifecycle as drafts/usage: kept across close and compaction, evicted on delete and sign-out.
 export const sessionCostAtomFamily = atomFamily((_conversationId: string) => atom(0));
 
+// Event id of the assistant message currently streaming content for a conversation.
+// Cleared when that message's stream ends (even if later tool rounds continue).
+export const streamingMessageIdAtomFamily = atomFamily((_conversationId: string) =>
+  atom<string | undefined>()
+);
+
 // Ids of conversations with an in-flight run / compaction.
 export const runningConversationIdsAtom = atom<readonly string[]>([]);
 export const compactingConversationIdsAtom = atom<readonly string[]>([]);
 
-// Evict a single conversation's in-memory atoms (draft + context usage + session cost).
+// Evict a single conversation's in-memory atoms (draft + context usage + session cost + streaming id).
 export const evictConversationAtoms = (conversationId: string): void => {
   draftAtomFamily.remove(conversationId);
   contextUsageAtomFamily.remove(conversationId);
   sessionCostAtomFamily.remove(conversationId);
+  streamingMessageIdAtomFamily.remove(conversationId);
 };
 
 /*
@@ -46,6 +53,7 @@ export const clearPerConversationAtoms = (): void => {
     ...draftAtomFamily.getParams(),
     ...contextUsageAtomFamily.getParams(),
     ...sessionCostAtomFamily.getParams(),
+    ...streamingMessageIdAtomFamily.getParams(),
   ]);
   for (const id of ids) {
     evictConversationAtoms(id);

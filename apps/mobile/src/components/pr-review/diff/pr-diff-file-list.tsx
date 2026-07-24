@@ -32,8 +32,15 @@ import {
   LIST_CONTENT_STYLE,
   TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-rows';
+import { dedupeFilesByPath } from '@/lib/pr-review/diff/dedupe-file-pages';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import {
+  cancelPendingScroll,
+  decideOnItemsChange,
+  decideOnScrollRequest,
+  type PendingScrollState,
+} from '@/lib/pr-review/diff/pending-scroll-request';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
 import {
   useFetchToCompletion,
@@ -106,7 +113,9 @@ export function PrReviewFileList({
         all.push(f);
       }
     }
-    return all;
+    // Dedupe by path (first wins) so retry/refetch races cannot emit
+    // duplicate `file-header:<path>` keys into FlashList.
+    return dedupeFilesByPath(all);
   }, [query.data]);
 
   const viewedCount = useMemo(() => {
@@ -174,20 +183,60 @@ export function PrReviewFileList({
   const indexByKeyRef = useRef(indexByKey);
   indexByKeyRef.current = indexByKey;
 
+  // AC4 / D7: first transition to files.length > 0 per mount → offset 0.
+  // Covers cold load and warm-cache remounts; never re-scrolls on page appends.
+  const didScrollToTopRef = useRef(false);
+  useEffect(() => {
+    if (didScrollToTopRef.current || files.length === 0) {
+      return;
+    }
+    didScrollToTopRef.current = true;
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [files.length]);
+
+  // AC4b / D7: resilient navigator scroll — park when key is absent from
+  // indexByKey (items rebuild race), retry on next items change, supersede
+  // on a newer request, cancel on unmount.
+  const pendingScrollRef = useRef<PendingScrollState>(null);
+
+  const applyScrollDecision = (decision: ReturnType<typeof decideOnScrollRequest>) => {
+    pendingScrollRef.current = decision.pending;
+    if (decision.index === null) {
+      return;
+    }
+    void listRef.current?.scrollToIndex({
+      index: decision.index,
+      animated: true,
+      viewPosition: 0,
+    });
+  };
+
   useEffect(() => {
     const unsubscribe = subscribeFileNavigatorRequest(
       { owner, repo, number },
       (request: FileNavigatorRequest) => {
         const targetKey = fileHeaderKey(request.path);
-        const index = indexByKeyRef.current.get(targetKey);
-        if (typeof index === 'number' && index !== -1) {
-          setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
-          void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
-        }
+        const decision = decideOnScrollRequest(
+          pendingScrollRef.current,
+          targetKey,
+          indexByKeyRef.current
+        );
+        // Expand as soon as we accept the request so the file is open once
+        // the list can scroll to it (including the deferred/pending path).
+        setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
+        applyScrollDecision(decision);
       }
     );
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      pendingScrollRef.current = cancelPendingScroll();
+    };
   }, [owner, repo, number]);
+
+  useEffect(() => {
+    const decision = decideOnItemsChange(pendingScrollRef.current, indexByKey);
+    applyScrollDecision(decision);
+  }, [indexByKey]);
 
   const renderItem = useDiffRenderItem({
     viewed,

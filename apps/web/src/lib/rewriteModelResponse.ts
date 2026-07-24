@@ -16,7 +16,7 @@ type ResponseReadError = {
   message: string;
 };
 
-const STREAM_PROGRESS_LOG_INTERVAL_MS = 60_000;
+const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
 
 function createStreamProgressLogger() {
   let eventCount = 0;

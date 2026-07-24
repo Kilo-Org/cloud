@@ -135,6 +135,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
           await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {
           await this.deferBillingDelivery(error, 'unmeasured stop recovery');
+          return;
         }
       }
 
@@ -187,10 +188,12 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
   override async onStop(params?: ContainerStopParams): Promise<void> {
     await super.onStop();
+    const activityExpiryRequested = this.activityExpiryRequested;
+    this.activityExpiryRequested = false;
     this.runShadowTask('stop lifecycle', async () => {
       const context = await getBillingContext(this.ctx.storage);
       if (!context) return;
-      const requestedReason = this.activityExpiryRequested
+      const requestedReason = activityExpiryRequested
         ? 'activity_expired'
         : await this.getPendingStopReason(context.generation);
       const pending = await this.billingHeartbeat.persistStop({
@@ -205,7 +208,6 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       });
       await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
       await this.ctx.storage.delete(PENDING_STOP_REASON_STORAGE_KEY);
-      this.activityExpiryRequested = false;
     });
   }
 

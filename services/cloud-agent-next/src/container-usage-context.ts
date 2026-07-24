@@ -123,7 +123,9 @@ export function assertSandboxBillingAllocation(
     if (input.sessionId !== undefined) {
       throw new Error('Shared sandbox billing cannot contain session attribution');
     }
-    if (!/^(org|usr|bot|ubt)-/.test(input.sandboxId) && !input.sandboxId.includes('__')) {
+    const legacySharedId =
+      !/^(ses|crv|dind)-/.test(input.sandboxId) && input.sandboxId.includes('__');
+    if (!/^(org|usr|bot|ubt)-/.test(input.sandboxId) && !legacySharedId) {
       throw new Error('Shared sandbox billing requires a shared sandbox ID');
     }
     if (input.metadata !== undefined && Object.keys(input.metadata).length > 0) {

@@ -399,6 +399,26 @@ describe('MeteredSandbox', () => {
     expect(rpc.recordStart).toHaveBeenCalledOnce();
   });
 
+  it('does not replace an unmeasured generation when stop recovery fails', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const first = await getBillingContext(storage);
+    if (!first) throw new Error('Expected active billing context');
+    await updateBillingContext(storage, { ...first, measurementStarted: false });
+    sandbox.setPhysicalRunning(true);
+    sandbox.mockState = { status: 'stopped' };
+    vi.mocked(rpc.recordStop).mockRejectedValue(new Error('meter unavailable'));
+
+    await sandbox.configureBilling({ ...billingInput, sessionId: 'agent_2' });
+
+    expect((await getBillingContext(storage))?.generation).toBe(first.generation);
+    expect(rpc.recordStart).toHaveBeenCalledOnce();
+  });
+
   it('defers activity-expiry closure until physical stop confirmation', async () => {
     const { rpc, storage, sandbox, flushShadowTasks } = createSandbox();
     vi.spyOn(Date, 'now').mockReturnValue(3_000);
@@ -421,6 +441,25 @@ describe('MeteredSandbox', () => {
       expect.objectContaining({ reason: 'activity_expired', exitCode: 143 })
     );
     expect(await getBillingContext(storage)).toBeUndefined();
+  });
+
+  it('does not carry an activity-expiry reason across generations without context', async () => {
+    const { rpc, sandbox, flushShadowTasks } = createSandbox();
+    await sandbox.onActivityExpired();
+    await flushShadowTasks();
+    await sandbox.onStop({ reason: 'exit', exitCode: 0 });
+    await flushShadowTasks();
+
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    await sandbox.onStop({ reason: 'exit', exitCode: 42 });
+    await flushShadowTasks();
+
+    expect(rpc.recordStop).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'exit', exitCode: 42 })
+    );
   });
 
   it('preserves normal exit reason and exit code', async () => {

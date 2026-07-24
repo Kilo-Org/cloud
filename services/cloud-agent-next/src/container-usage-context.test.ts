@@ -171,6 +171,16 @@ describe('container usage context', () => {
     ).toThrow('Shared sandbox billing cannot contain session attribution');
   });
 
+  it('rejects isolated-prefixed legacy IDs for shared sandbox classes', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('Sandbox', {
+        sandboxId: 'ses-abcdef__legacy',
+        subject: { type: 'user', id: 'user_shared' },
+        actor: { type: 'user', id: 'user_shared' },
+      })
+    ).toThrow('Shared sandbox billing requires a shared sandbox ID');
+  });
+
   it('requires bounded isolated attribution for non-shared sandbox classes', () => {
     expect(() =>
       assertSandboxBillingAllocation('SandboxSmall', {

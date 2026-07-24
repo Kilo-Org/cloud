@@ -41,6 +41,7 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
+  'inclusionai/ling-3.0-flash:free',
 ].filter(m => m !== null);
 
 export const preferredModels = [
@@ -50,7 +51,6 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
 
   ...autoFreeModels,
-  'inclusionai/ling-3.0-flash:free',
 
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_ID,

@@ -220,6 +220,82 @@ describe('kilo gateway chat stream client', () => {
     expect(reasoningDeltas).toStrictEqual(['Thinking']);
   });
 
+  it('treats a single empty-arguments tool call delta as an empty object', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":""}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'kilo-auto/frontier',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_snapshot_1',
+          name: 'get_page_snapshot',
+        },
+      ],
+    });
+  });
+
+  it('treats tool call deltas that omit arguments as an empty object', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'kilo-auto/frontier',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_snapshot_1',
+          name: 'get_page_snapshot',
+        },
+      ],
+    });
+  });
+
+  it('rejects non-empty invalid tool call arguments from the gateway stream', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"not-json"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).rejects.toThrow('Gateway tool call arguments were not valid JSON.');
+  });
+
   it('rejects non-object tool call arguments from the gateway stream', async () => {
     const fetch: FetchLike = () =>
       streamResponse([

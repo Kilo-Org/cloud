@@ -464,6 +464,60 @@ describe('handlePullRequest', () => {
       expect(mockCreateCodeReview).not.toHaveBeenCalled();
     });
 
+    it('still cancels a superseded review and resolves its stale check run before skipping a bot PR', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      // A prior in-flight review (from before the skip was enabled) superseded by this bot push.
+      mockCancelSupersededReviewsForPR.mockResolvedValue([
+        {
+          id: 'queued-review',
+          prevStatus: 'queued',
+          sessionId: 'session-queued',
+          latestActiveAttemptId: 'queued-attempt',
+          checkRunId: 555,
+          headSha: 'old-sha',
+          platform: 'github',
+          platformProjectId: null,
+          platformIntegrationId: 'integration-1',
+        },
+      ]);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      // The bot PR is still skipped (no new review)...
+      expect(response.status).toBe(200);
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+      // ...but the stale review is cancelled and its check run resolved, so the PR isn't left stuck.
+      expect(mockCancelSupersededReviewsForPR).toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        '98765',
+        'acme',
+        'widgets',
+        555,
+        expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
+        'standard'
+      );
+    });
+
+    it('routes a bot PR with a merge-commit head through skip, not merge-commit migration', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      // A non-bot PR here would hit the merge-commit path (step 4) and return 'Skipped merge commit'.
+      mockIsMergeCommit.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      // The bot-skip decision defers step 4, so the PR is skipped as a bot PR (not re-pointed to a
+      // new SHA with a fresh check run by migrateInFlightReviewsToMergeCommitHead).
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    });
+
     it('reviews a bot-authored PR when skip_bot_pull_requests is false', async () => {
       mockGetBotUserId.mockResolvedValue('bot-user-1');
       mockGetAgentConfigForOwner.mockResolvedValue({

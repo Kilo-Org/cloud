@@ -13,6 +13,14 @@
 //     `diff-selection-bridge` (so the comment composer can read it on
 //     mount) and a floating action bar (`PrDiffFloatingActions`)
 //     hosts the "Comment" and "Finish review" affordances.
+//
+// Cold first paint: FlashList mounts only after the first page of files is
+// present. The first-load waiting state is a plain skeleton outside the list
+// (see `PrDiffFileListLoading`). Mounting the list on a single pagination-row
+// loading item and then swapping in ~50 file rows left FlashList v2 with a
+// full content height but zero mounted cells until the user scrolled; warm
+// remounts already had data at mount and painted. Deferring the list mount
+// makes cold match warm.
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +32,7 @@ import {
   PrDiffFileListHeader,
   useDiffViewMode,
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
+import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
@@ -304,6 +313,10 @@ export function PrReviewFileList({
 
   const isTruncated = query.hasNextPage || Boolean(fetchToCompletion.error);
   const effectiveViewMode = isTablet ? viewMode : 'unified';
+  // First page still in flight: keep FlashList unmounted. A list that first
+  // lays out a single loading pagination-row and later receives the real file
+  // rows can measure full content height without mounting cells until scroll.
+  const showFirstPageLoading = files.length === 0;
 
   return (
     <View className="flex-1" accessibilityLabel="Files list">
@@ -317,22 +330,26 @@ export function PrReviewFileList({
         viewMode={effectiveViewMode}
         onViewModeChange={setViewMode}
       />
-      <FlashList
-        ref={listRef}
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={item => item.key}
-        getItemType={item => itemTypeFor(item)}
-        onContentSizeChange={handleContentSizeChange}
-        onEndReached={() => {
-          if (query.hasNextPage && !query.isFetchingNextPage) {
-            void query.fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={LIST_CONTENT_STYLE}
-        ItemSeparatorComponent={null}
-      />
+      {showFirstPageLoading ? (
+        <PrDiffFileListLoading />
+      ) : (
+        <FlashList
+          ref={listRef}
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={item => item.key}
+          getItemType={item => itemTypeFor(item)}
+          onContentSizeChange={handleContentSizeChange}
+          onEndReached={() => {
+            if (query.hasNextPage && !query.isFetchingNextPage) {
+              void query.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          contentContainerStyle={LIST_CONTENT_STYLE}
+          ItemSeparatorComponent={null}
+        />
+      )}
       <PrDiffFloatingActions
         owner={owner}
         repo={repo}

@@ -140,6 +140,22 @@ export async function handlePullRequestCodeReview(
 
     // 3. Check if repository is in allowed list (when using selected repositories mode)
     const config = agentConfig.config as CodeReviewAgentConfig;
+
+    // Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
+    // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
+    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests` (defaults to
+    // skipping when unset). Bot type is GitHub-authoritative (`user.type`), so it cannot be spoofed.
+    // Applies to standard and council reviews; manual reviews never reach this handler.
+    const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
+    if (skipBotPullRequests && pull_request.user.type === 'Bot') {
+      logExceptInTest('Skipping bot-authored PR:', {
+        pr_number: pull_request.number,
+        repo: repository.full_name,
+        author: pull_request.user.login,
+      });
+      return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
+    }
+
     if (
       config?.repository_selection_mode === 'selected' &&
       Array.isArray(config?.selected_repository_ids)

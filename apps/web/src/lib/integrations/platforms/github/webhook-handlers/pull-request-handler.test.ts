@@ -321,6 +321,9 @@ describe('handlePullRequest', () => {
         },
         // Repo 123 (acme/widgets, from pullRequestPayload) opted into council.
         council_enabled_repository_ids: [123],
+        // Review bot PRs so the council bot-exclusion test reaches the council decision; the
+        // feature-level bot skip (default on) would otherwise drop bot PRs before this point.
+        skip_bot_pull_requests: false,
       },
     };
 
@@ -444,6 +447,44 @@ describe('handlePullRequest', () => {
       expect(mockCreateCodeReview).toHaveBeenCalledWith(
         expect.objectContaining({ reviewType: 'standard' })
       );
+    });
+  });
+
+  describe('bot pull request guardrail', () => {
+    it('skips a bot-authored PR by default (skip_bot_pull_requests unset) and creates no review', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      const response = await handlePullRequest(payload, platformIntegration());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });
+      expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    });
+
+    it('reviews a bot-authored PR when skip_bot_pull_requests is false', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({
+        is_enabled: true,
+        config: { skip_bot_pull_requests: false },
+      });
+
+      const payload = pullRequestPayload();
+      payload.pull_request.user.type = 'Bot';
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalled();
+    });
+
+    it('reviews a non-bot PR while the guardrail is on', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+
+      await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalled();
     });
   });
 

@@ -1512,6 +1512,13 @@ export const CodeReviewAgentConfigSchema = z.object({
   // council-entitled and `council` is configured + active; the automated trigger re-checks both.
   // Matched against the platform repository ID the same way as `selected_repository_ids`.
   council_enabled_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
+  // Feature-level guardrail: when true (the default when absent), skip automated (webhook) code
+  // reviews for bot-authored pull requests (dependabot/renovate/etc.). Applies to standard and
+  // council reviews alike; manual reviews are unaffected. Set false to review bot PRs.
+  // Enforced on GitHub, where the bot signal (`user.type`) is in the webhook payload. GitLab and
+  // Bitbucket do not expose an authoritative bot flag in their webhooks, so the setting has no
+  // effect there yet.
+  skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.

@@ -131,6 +131,7 @@ overrides:
 
 patchedDependencies:
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
+  react-native-appsflyer@6.17.9: 82df99378c830e774b0f01796d8be595da114d1d13393d85ddd47d565c5c2aab
 
 importers:
 
@@ -442,7 +443,7 @@ importers:
         version: 0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
       react-native-appsflyer:
         specifier: 6.17.9
-        version: 6.17.9
+        version: 6.17.9(patch_hash=82df99378c830e774b0f01796d8be595da114d1d13393d85ddd47d565c5c2aab)
       react-native-css:
         specifier: 3.0.7
         version: 3.0.7(@expo/metro-config@55.0.24(bufferutil@4.1.0)(expo@55.0.27)(typescript@5.9.3)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -33718,7 +33719,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-native-appsflyer@6.17.9: {}
+  react-native-appsflyer@6.17.9(patch_hash=82df99378c830e774b0f01796d8be595da114d1d13393d85ddd47d565c5c2aab): {}
 
   react-native-css@3.0.7(@expo/metro-config@55.0.24(bufferutil@4.1.0)(expo@55.0.27)(typescript@5.9.3)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
     dependencies:

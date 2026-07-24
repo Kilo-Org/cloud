@@ -10,6 +10,7 @@ import {
   evictConversationAtoms,
   remoteMcpStoreAtom,
   runningConversationIdsAtom,
+  streamingMessageIdAtomFamily,
 } from './agent-chat-atoms';
 import {
   createAssistantMessage,
@@ -161,6 +162,7 @@ export const AgentChatPanel = ({
   const isCompacting = compactingConversationIds.includes(activeConversationId);
   const activeUsage = useAtomValue(contextUsageAtomFamily(activeConversationId));
   const activePromptTokens = activeUsage?.promptTokens ?? 0;
+  const streamingMessageId = useAtomValue(streamingMessageIdAtomFamily(activeConversationId));
   const contextLength = selectedModel?.contextLength;
 
   const compactConversation = useCallback(
@@ -513,6 +515,11 @@ export const AgentChatPanel = ({
             }),
           fetch: fetchFromWindow,
           model: runModel,
+          onAssistantStreaming: eventId => {
+            if (isCurrentRun()) {
+              store.set(streamingMessageIdAtomFamily(conversationId), eventId);
+            }
+          },
           onUsage: updateRunUsage,
           organizationId,
           remoteMcpTools,
@@ -528,6 +535,7 @@ export const AgentChatPanel = ({
         });
       } finally {
         if (isCurrentRun()) {
+          store.set(streamingMessageIdAtomFamily(conversationId), undefined);
           runStatesRef.current.delete(conversationId);
           setRunningConversationIds(currentIds =>
             currentIds.filter(currentId => currentId !== conversationId)
@@ -619,11 +627,14 @@ export const AgentChatPanel = ({
     (conversationId: string): void => {
       runStatesRef.current.get(conversationId)?.abort.abort();
       runStatesRef.current.delete(conversationId);
+      // Required: deleting run-state makes the run's later finally see isCurrentRun() === false
+      // And skip cleanup; without this, close/delete mid-stream leaks a stale streaming id.
+      store.set(streamingMessageIdAtomFamily(conversationId), undefined);
       setRunningConversationIds(currentIds =>
         currentIds.filter(currentId => currentId !== conversationId)
       );
     },
-    [setRunningConversationIds]
+    [setRunningConversationIds, store]
   );
 
   const closeConversation = useCallback(
@@ -732,7 +743,7 @@ export const AgentChatPanel = ({
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}
       />
-      <ConversationList items={groupedEvents} />
+      <ConversationList items={groupedEvents} streamingMessageId={streamingMessageId} />
 
       {remoteMcpToolWarning === undefined ? null : (
         <p className="border-t border-amber-500/30 bg-amber-950/20 px-4 py-2 text-xs text-amber-300">

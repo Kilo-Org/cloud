@@ -58,6 +58,7 @@ function makeStored(over: Partial<StoredSession> = {}): StoredSession {
     git_branch: null,
     status: null,
     status_updated_at: null,
+    total_cost_microdollars: null,
     created_at: '2026-07-01 00:00:00+00',
     updated_at: '2026-07-01 00:00:00+00',
     version: 0,

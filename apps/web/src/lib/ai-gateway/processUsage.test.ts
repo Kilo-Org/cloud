@@ -174,42 +174,41 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     await verifyApproval(resultString, approvalFilePath);
   });
 
-  test('handles ResponseAborted error gracefully and returns partial data', async () => {
-    // Create a stream that emits some SSE data then throws ResponseAborted
-    const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
+  test.each(['ResponseAborted', 'TimeoutError'])(
+    'handles %s gracefully and returns partial data',
+    async errorName => {
+      // Create a stream that emits some SSE data then fails.
+      const partialSSEData = `data: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":"Hello"}}]}\n\ndata: {"id":"gen-123","model":"anthropic/claude-3-5-sonnet","choices":[{"delta":{"content":" world"}}]}\n\n`;
 
-    // Create a custom error that mimics ResponseAborted
-    const responseAbortedError = new Error('Response aborted');
-    responseAbortedError.name = 'ResponseAborted';
+      const streamError = new Error('Response interrupted');
+      streamError.name = errorName;
 
-    let pullCount = 0;
-    // Create a readable stream that emits partial data then throws on second pull
-    const stream = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        pullCount++;
-        if (pullCount === 1) {
-          controller.enqueue(new TextEncoder().encode(partialSSEData));
-        } else {
-          // Simulate abort on subsequent read
-          controller.error(responseAbortedError);
-        }
-      },
-    });
+      let pullCount = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pullCount++;
+          if (pullCount === 1) {
+            controller.enqueue(new TextEncoder().encode(partialSSEData));
+          } else {
+            controller.error(streamError);
+          }
+        },
+      });
 
-    const result = await parseMicrodollarUsageFromStream(
-      stream,
-      'fake-user-id',
-      undefined,
-      'openrouter',
-      200
-    );
+      const result = await parseMicrodollarUsageFromStream(
+        stream,
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200
+      );
 
-    // Should have captured partial data before abort
-    expect(result.messageId).toBe('gen-123');
-    expect(result.model).toBe('anthropic/claude-3-5-sonnet');
-    expect(result.responseContent).toBe('Hello world');
-    expect(result.hasError).toBe(true); // Should be marked as error due to abort
-  });
+      expect(result.messageId).toBe('gen-123');
+      expect(result.model).toBe('anthropic/claude-3-5-sonnet');
+      expect(result.responseContent).toBe('Hello world');
+      expect(result.hasError).toBe(true);
+    }
+  );
 
   test('captures numeric error.code from in-stream error event as status_code_override', async () => {
     const errorChunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"","provider":"Amazon Bedrock","choices":[],"error":{"code":502,"message":"Internal server error","metadata":{"error_type":"provider_unavailable"}}}\n\n`;

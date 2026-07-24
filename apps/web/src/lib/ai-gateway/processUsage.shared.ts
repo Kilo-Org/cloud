@@ -86,7 +86,7 @@ export function extractVercelIsByok(
 
 /**
  * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
- * decoded piece of text. Handles client-abort (`ResponseAborted`) gracefully
+ * decoded piece of text. Handles client aborts and upstream timeouts gracefully
  * and always releases the reader lock and ends `streamProcessingSpan`.
  *
  * Returns `true` if the stream was aborted before completion.
@@ -106,7 +106,10 @@ export async function drainSseStream(
       onTextChunk(decoder.decode(value, { stream: true }));
     }
   } catch (error) {
-    if (error instanceof Error && error.name === 'ResponseAborted') {
+    if (
+      error instanceof Error &&
+      (error.name === 'ResponseAborted' || error.name === 'TimeoutError')
+    ) {
       wasAborted = true;
     } else {
       throw error;

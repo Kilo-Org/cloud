@@ -16,6 +16,32 @@ type ResponseReadError = {
   message: string;
 };
 
+const STREAM_PROGRESS_LOG_INTERVAL_MS = 60_000;
+
+function createStreamProgressLogger(
+  kind: GatewayRequest['kind'],
+  getGenerationId: () => string | undefined
+) {
+  let eventCount = 0;
+  const interval = setInterval(() => {
+    const generationId = getGenerationId();
+    logExceptInTest('[rewriteModelResponse] stream progress', {
+      kind,
+      eventCount,
+      ...(generationId ? { generationId } : {}),
+    });
+  }, STREAM_PROGRESS_LOG_INTERVAL_MS);
+
+  return {
+    eventProcessed() {
+      eventCount += 1;
+    },
+    stop() {
+      clearInterval(interval);
+    },
+  };
+}
+
 function getResponseReadError(error: unknown): ResponseReadError | null {
   if (typeof error !== 'object' || error === null || !('name' in error)) {
     return null;
@@ -157,8 +183,10 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
 
       let doneReceived = false;
       let generationId: string | undefined;
+      const progress = createStreamProgressLogger('chat_completions', () => generationId);
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -197,23 +225,27 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
         },
       });
 
-      await rewriteSseStream(
-        reader,
-        parser,
-        controller,
-        () => doneReceived,
-        responseReadError =>
-          'data: ' +
-          JSON.stringify({
-            ...(generationId ? { id: generationId } : {}),
-            error: {
-              code: 503,
-              message: responseReadError.message,
-              type: responseReadError.errorType,
-            },
-          }) +
-          '\n\n'
-      );
+      try {
+        await rewriteSseStream(
+          reader,
+          parser,
+          controller,
+          () => doneReceived,
+          responseReadError =>
+            'data: ' +
+            JSON.stringify({
+              ...(generationId ? { id: generationId } : {}),
+              error: {
+                code: 503,
+                message: responseReadError.message,
+                type: responseReadError.errorType,
+              },
+            }) +
+            '\n\n'
+        );
+      } finally {
+        progress.stop();
+      }
     },
   });
 
@@ -291,8 +323,10 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
       let doneReceived = false;
       let generationId: string | undefined;
+      const progress = createStreamProgressLogger('messages', () => generationId);
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -331,25 +365,29 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
         },
       });
 
-      await rewriteSseStream(
-        reader,
-        parser,
-        controller,
-        () => doneReceived,
-        responseReadError =>
-          'event: error\n' +
-          'data: ' +
-          JSON.stringify({
-            ...(generationId ? { id: generationId } : {}),
-            type: 'error',
-            error: {
-              type: 'api_error',
-              message: responseReadError.message,
-              error_type: responseReadError.errorType,
-            },
-          }) +
-          '\n\n'
-      );
+      try {
+        await rewriteSseStream(
+          reader,
+          parser,
+          controller,
+          () => doneReceived,
+          responseReadError =>
+            'event: error\n' +
+            'data: ' +
+            JSON.stringify({
+              ...(generationId ? { id: generationId } : {}),
+              type: 'error',
+              error: {
+                type: 'api_error',
+                message: responseReadError.message,
+                error_type: responseReadError.errorType,
+              },
+            }) +
+            '\n\n'
+        );
+      } finally {
+        progress.stop();
+      }
     },
   });
 
@@ -409,8 +447,10 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
       let doneReceived = false;
       let generationId: string | undefined;
       let nextSequenceNumber = 0;
+      const progress = createStreamProgressLogger('responses', () => generationId);
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -439,26 +479,30 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
         },
       });
 
-      await rewriteSseStream(
-        reader,
-        parser,
-        controller,
-        () => doneReceived,
-        responseReadError =>
-          'event: error\n' +
-          'data: ' +
-          JSON.stringify({
-            ...(generationId ? { id: generationId } : {}),
-            type: 'error',
-            sequence_number: nextSequenceNumber,
-            error: {
-              type: responseReadError.errorType,
-              code: responseReadError.errorType === 'timeout' ? '504' : '503',
-              message: responseReadError.message,
-            },
-          }) +
-          '\n\n'
-      );
+      try {
+        await rewriteSseStream(
+          reader,
+          parser,
+          controller,
+          () => doneReceived,
+          responseReadError =>
+            'event: error\n' +
+            'data: ' +
+            JSON.stringify({
+              ...(generationId ? { id: generationId } : {}),
+              type: 'error',
+              sequence_number: nextSequenceNumber,
+              error: {
+                type: responseReadError.errorType,
+                code: responseReadError.errorType === 'timeout' ? '504' : '503',
+                message: responseReadError.message,
+              },
+            }) +
+            '\n\n'
+        );
+      } finally {
+        progress.stop();
+      }
     },
   });
 

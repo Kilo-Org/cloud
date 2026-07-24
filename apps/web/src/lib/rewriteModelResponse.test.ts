@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@jest/globals';
+import { describe, test, expect, jest } from '@jest/globals';
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
@@ -6,6 +6,7 @@ import {
   rewriteModelResponse,
 } from './rewriteModelResponse';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import * as serverUtils from '@/lib/utils.server';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -156,6 +157,42 @@ describe('rewriteModelResponse_ChatCompletions', () => {
   });
 
   describe('streaming responses', () => {
+    test('logs processed event progress every minute', async () => {
+      jest.useFakeTimers();
+      const logSpy = jest.spyOn(serverUtils, 'logExceptInTest');
+      const encoder = new TextEncoder();
+      const upstreamController: { current?: ReadableStreamDefaultController<Uint8Array> } = {};
+      const upstream = new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            upstreamController.current = controller;
+            controller.enqueue(
+              encoder.encode('data: {"id":"gen-chat","model":"upstream-model","choices":[]}\n\n')
+            );
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } }
+      );
+
+      try {
+        const result = await rewriteModelResponse_ChatCompletions(upstream);
+        await jest.advanceTimersByTimeAsync(60_000);
+
+        expect(logSpy).toHaveBeenCalledWith('[rewriteModelResponse] stream progress', {
+          kind: 'chat_completions',
+          eventCount: 1,
+          generationId: 'gen-chat',
+        });
+
+        upstreamController.current?.close();
+        await readOutputStream(result);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        logSpy.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
     test.each([
       ['ResponseAborted', 'upstream_disconnect'],
       ['TimeoutError', 'timeout'],

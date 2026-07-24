@@ -4,7 +4,7 @@ import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
@@ -164,7 +164,13 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
             return;
           }
           const json = JSON.parse(event.data) as ChatCompletionChunk;
-          generationId = json.id ?? generationId;
+          if (generationId === undefined && json.id) {
+            generationId = json.id;
+            logExceptInTest('[rewriteModelResponse] received generation ID', {
+              kind: 'chat_completions',
+              generationId,
+            });
+          }
 
           const delta = json.choices?.[0]?.delta;
           if (delta) {
@@ -298,7 +304,13 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
-            generationId = e.message.id ?? generationId;
+            if (generationId === undefined && e.message.id) {
+              generationId = e.message.id;
+              logExceptInTest('[rewriteModelResponse] received generation ID', {
+                kind: 'messages',
+                generationId,
+              });
+            }
             if (e.message.usage) {
               rewriteMessagesUsage(e.message.usage, removeCost);
             }
@@ -408,7 +420,13 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
             nextSequenceNumber = Math.max(nextSequenceNumber, json.sequence_number + 1);
           }
           if (json.response) {
-            generationId = json.response.id ?? generationId;
+            if (generationId === undefined && json.response.id) {
+              generationId = json.response.id;
+              logExceptInTest('[rewriteModelResponse] received generation ID', {
+                kind: 'responses',
+                generationId,
+              });
+            }
             if (json.response.usage) {
               rewriteUsage(json.response.usage, removeCost);
             }

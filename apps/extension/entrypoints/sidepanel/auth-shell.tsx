@@ -1,9 +1,27 @@
-import { useState } from 'react';
+import { storage } from '#imports';
+import { useEffect, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { Settings, X } from 'lucide-react';
+import {
+  getFirefoxUsageDataGranted,
+  loadAnalyticsOptOut,
+  setAnalyticsOptOut,
+} from '@/src/shared/analytics';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { KiloLogo } from '@/src/shared/kilo-logo';
+import type { AnalyticsSettingsState } from './analytics-settings-logic';
+import {
+  FIREFOX_USAGE_DATA_BLOCKED_HINT,
+  applyAnalyticsSettingsLoaded,
+  beginAnalyticsSettingsFlip,
+  completeAnalyticsSettingsFlip,
+  createInitialAnalyticsSettingsState,
+  failAnalyticsSettingsFlip,
+  isAnalyticsSettingsInteractive,
+  resolveAnalyticsOptOutIdentity,
+  shouldShowFirefoxUsageDataHint,
+} from './analytics-settings-logic';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
 
@@ -27,6 +45,99 @@ const IconButton = ({
     {children}
   </button>
 );
+
+const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }): JSX.Element => {
+  const [state, setState] = useState<AnalyticsSettingsState>(createInitialAnalyticsSettingsState);
+  const interactive = isAnalyticsSettingsInteractive(state);
+  const showFirefoxHint = shouldShowFirefoxUsageDataHint(state.firefoxUsageDataGranted);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const [optedOut, firefoxUsageDataGranted] = await Promise.all([
+        loadAnalyticsOptOut(storage),
+        getFirefoxUsageDataGranted(),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      setState(
+        applyAnalyticsSettingsLoaded({
+          firefoxUsageDataGranted,
+          optedOut,
+        })
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onToggle = (): void => {
+    const started = beginAnalyticsSettingsFlip(state);
+    if (started === null) {
+      return;
+    }
+
+    setState(started.state);
+
+    void (async () => {
+      try {
+        await setAnalyticsOptOut(
+          storage,
+          started.optedOut,
+          resolveAnalyticsOptOutIdentity(started.optedOut, userEmail)
+        );
+        setState(current => completeAnalyticsSettingsFlip(current));
+      } catch {
+        setState(current => failAnalyticsSettingsFlip(current, started.priorChecked));
+      }
+    })();
+  };
+
+  return (
+    <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-zinc-200">Share usage analytics</p>
+          <p className="mt-0.5 text-xs leading-4 text-zinc-500">
+            Helps improve Kilo. No page content is collected.
+          </p>
+          {showFirefoxHint ? (
+            <p className="mt-1 text-xs leading-4 text-zinc-500">
+              {FIREFOX_USAGE_DATA_BLOCKED_HINT}
+            </p>
+          ) : null}
+          {state.errorMessage === null ? null : (
+            <p className="mt-1 text-xs leading-4 text-red-400">{state.errorMessage}</p>
+          )}
+        </div>
+        <button
+          aria-checked={state.checked}
+          aria-label="Share usage analytics"
+          className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
+            state.checked ? 'border-[#EDFF00]/40 bg-[#EDFF00]/20' : 'border-zinc-700 bg-zinc-800'
+          }`}
+          disabled={!interactive}
+          onClick={onToggle}
+          role="switch"
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute top-0.5 size-3.5 rounded-full transition ${
+              state.checked ? 'left-4 bg-[#EDFF00]' : 'left-0.5 bg-zinc-400'
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const HeaderActions = ({
   auth,
@@ -88,6 +199,7 @@ const HeaderActions = ({
               selectedOrganizationId={selectedOrganizationId}
             />
             <RemoteMcpSettings />
+            <AnalyticsSettingsRow userEmail={auth.userEmail} />
             <button
               className="h-9 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
               onClick={() => {

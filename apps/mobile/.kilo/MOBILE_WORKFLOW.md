@@ -10,6 +10,7 @@ These apply to every session and role. Later sections do not repeat them.
 - The first session is the planner. After plan approval, a fresh session becomes the orchestrator.
 - The orchestrator owns product judgment, architecture, loop control, final verification, Git, and the PR. Role agents never dispatch agents, commit, push, or create or update a PR.
 - Every reviewer and verifier invocation is a fresh session, so earlier conclusions cannot anchor later passes.
+- Monitoring is event-driven down the chain planner → orchestrator → role agents: when a dispatched process exits, its dispatcher reacts immediately, never after a sleep or fixed wait. Periodic checks exist only to detect a wedge.
 - Choose the simplest maintainable implementation that fully satisfies the accepted requirements. Reuse existing code and contracts. Do not add abstraction or scope without evidence it is required.
 - Commit in small, logically scoped commits. Never squash everything into one catch-all commit unless the user asks.
 
@@ -36,6 +37,8 @@ kilo run \
   --title "Plan review via role agent" \
   "Please review the attached plan."
 ```
+
+While a role agent runs, the orchestrator checks on it about every 7 minutes and unsticks infrastructure failures: a wedged or crashed kilo CLI, a dead tmux window, or a hung service or simulator the agent cannot restart itself. Product, logic, or review problems are not stuck states — route those through the escalation ladder (Delegation and Escalation). When the agent's CLI process exits, react immediately: collect its result and continue the loop. The 7-minute cadence is only the ceiling for detecting a wedge, never a wait between dispatch and result.
 
 ### Delegation and Escalation
 
@@ -150,7 +153,7 @@ After the handoff the planner stops all hands-on work: no planning, implementati
 - Unblock: a wedged or crashed kilo CLI, a dead orchestrator tmux window, a hung service or simulator the orchestrator cannot restart itself.
 - Do not intervene: product, logic, design, or review problems. Those are the orchestrator's, handled by its escalation ladder.
 
-Everything the orchestrator does runs in the shared tmux session; inspect its windows and service logs directly. Run one check about every 30 minutes and stay idle between checks. Stop when the orchestrator reaches the completion gate or returns a blocker report.
+Everything the orchestrator does runs in the shared tmux session; inspect its windows and service logs directly. Run one check about every 30 minutes and stay idle between checks. When the orchestrator's CLI process exits, react immediately — completion, blocker report, or crash — instead of waiting for the next scheduled check. The 30-minute cadence is only the ceiling for detecting a wedge, never a wait. Stop when the orchestrator reaches the completion gate or returns a blocker report.
 
 ## Roles
 

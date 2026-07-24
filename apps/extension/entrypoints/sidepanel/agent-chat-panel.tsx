@@ -358,11 +358,29 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setConversationStore(currentStore =>
-      updateStoredConversationSettings(currentStore, activeConversationId, {
-        selectedTabId: nextSelectedTabId,
-      })
-    );
+    setConversationStore(currentStore => {
+      const currentConversation = currentStore.conversations.find(
+        item => item.id === activeConversationId
+      );
+
+      if (currentConversation === undefined) {
+        return currentStore;
+      }
+
+      const applyTimeSelectedTabId = getSelectedInspectableTabId({
+        activeTabId,
+        inspectableTabs,
+        selectedTabId: currentConversation.selectedTabId,
+      });
+
+      if (currentConversation.selectedTabId === applyTimeSelectedTabId) {
+        return currentStore;
+      }
+
+      return updateStoredConversationSettings(currentStore, activeConversationId, {
+        selectedTabId: applyTimeSelectedTabId,
+      });
+    });
   }, [
     activeConversation.selectedTabId,
     activeConversationId,

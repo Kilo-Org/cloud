@@ -13,10 +13,12 @@ function* createGatewayResponses(): Generator<Response, Response> {
   yield streamResponse([
     'data: {"choices":[{"delta":{"content":"Reading"}}]}\n\n',
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+    'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5,"total_tokens":105,"cost":0.0007}}\n\n',
     'data: [DONE]\n\n',
   ]);
   yield streamResponse([
     'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+    'data: {"choices":[],"usage":{"prompt_tokens":200,"completion_tokens":3,"total_tokens":203,"cost":0.001}}\n\n',
     'data: [DONE]\n\n',
   ]);
   return streamResponse(['data: [DONE]\n\n']);
@@ -62,7 +64,7 @@ describe('agent LLM turn runner core', () => {
     const fetch: FetchLike = () =>
       streamResponse([
         'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
-        'data: {"choices":[],"usage":{"completion_tokens":5,"prompt_tokens":999,"total_tokens":1004}}\n\n',
+        'data: {"choices":[],"usage":{"completion_tokens":5,"prompt_tokens":999,"total_tokens":1004,"cost":0.0123}}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -87,6 +89,7 @@ describe('agent LLM turn runner core', () => {
     });
 
     expect(usageCalls).toContainEqual({
+      costUsd: 0.0123,
       promptTokens: 999,
     });
   });
@@ -94,6 +97,7 @@ describe('agent LLM turn runner core', () => {
   it('streams, runs tools, and continues with tool results', async () => {
     const appendedEvents: AgentConversationEvent[] = [];
     const updatedMessages: string[] = [];
+    const usageCalls: unknown[] = [];
     const fetchCalls: unknown[] = [];
     const responses = createGatewayResponses();
     const fetch: FetchLike = (_input, init) => {
@@ -114,6 +118,7 @@ describe('agent LLM turn runner core', () => {
       maxToolRounds: 4,
       model: 'anthropic/claude-sonnet-4',
       noResponseMessage: 'The model did not return a response.',
+      onUsage: usage => usageCalls.push(usage),
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
@@ -151,6 +156,10 @@ describe('agent LLM turn runner core', () => {
       { role: 'assistant', text: 'Done.', type: 'message' },
     ]);
     expect(fetchCalls).toHaveLength(2);
+    expect(usageCalls).toStrictEqual([
+      { costUsd: 0.0007, promptTokens: 100 },
+      { costUsd: 0.001, promptTokens: 200 },
+    ]);
   });
 
   it('allows twenty tool rounds before asking the user to continue', async () => {

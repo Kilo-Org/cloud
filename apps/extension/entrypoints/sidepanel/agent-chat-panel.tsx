@@ -10,6 +10,7 @@ import {
   evictConversationAtoms,
   remoteMcpStoreAtom,
   runningConversationIdsAtom,
+  sessionCostAtomFamily,
 } from './agent-chat-atoms';
 import {
   createAssistantMessage,
@@ -45,6 +46,7 @@ import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
+import { addSessionCost } from '@/src/shared/session-cost';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 import { ConversationTabs } from './conversation-tabs';
@@ -161,6 +163,7 @@ export const AgentChatPanel = ({
   const isCompacting = compactingConversationIds.includes(activeConversationId);
   const activeUsage = useAtomValue(contextUsageAtomFamily(activeConversationId));
   const activePromptTokens = activeUsage?.promptTokens ?? 0;
+  const activeSessionCostUsd = useAtomValue(sessionCostAtomFamily(activeConversationId));
   const contextLength = selectedModel?.contextLength;
 
   const compactConversation = useCallback(
@@ -244,10 +247,12 @@ export const AgentChatPanel = ({
           void compactActiveConversation();
         }}
         promptTokens={activePromptTokens}
+        sessionCostUsd={activeSessionCostUsd}
       />
     ),
     [
       activePromptTokens,
+      activeSessionCostUsd,
       canCompactActive,
       compactActiveConversation,
       contextLength,
@@ -469,10 +474,15 @@ export const AgentChatPanel = ({
       }
     };
     let currentRunHasUsage = false;
-    const updateRunUsage = (usage: { promptTokens: number }): void => {
+    const updateRunUsage = (usage: { costUsd?: number; promptTokens: number }): void => {
       if (isCurrentRun()) {
         currentRunHasUsage = true;
         store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });
+        const previousCost = store.get(sessionCostAtomFamily(conversationId));
+        store.set(
+          sessionCostAtomFamily(conversationId),
+          addSessionCost(previousCost, usage.costUsd)
+        );
       }
     };
 

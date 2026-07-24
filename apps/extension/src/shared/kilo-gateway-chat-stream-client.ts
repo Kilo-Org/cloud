@@ -87,8 +87,9 @@ const streamingToolCallDeltaSchema = z.object({
   id: z.string().optional(),
   index: z.number(),
 });
-// Only prompt_tokens is consumed (the context-usage ratio); other usage fields are ignored.
+// Prompt_tokens drives the context-usage ratio; cost is optional session spend (USD).
 const usageSchema = z.object({
+  cost: z.number().nullish(),
   prompt_tokens: z.number(),
 });
 const streamDataSchema = z.object({
@@ -259,7 +260,11 @@ const applyStreamingData = (
   }
 
   if (parsed.data.usage !== undefined && parsed.data.usage !== null) {
-    accumulator.usage = { promptTokens: parsed.data.usage.prompt_tokens };
+    const { cost, prompt_tokens: promptTokens } = parsed.data.usage;
+    accumulator.usage = {
+      promptTokens,
+      ...(typeof cost === 'number' ? { costUsd: cost } : {}),
+    };
   }
 
   const choice = parsed.data.choices.at(0);

@@ -20,14 +20,19 @@ export const contextUsageAtomFamily = atomFamily((_conversationId: string) =>
   atom<ContextUsage | undefined>()
 );
 
+// Per-conversation running session spend (USD) from streamed usage.cost (in-memory only).
+// Same lifecycle as drafts/usage: kept across close and compaction, evicted on delete and sign-out.
+export const sessionCostAtomFamily = atomFamily((_conversationId: string) => atom(0));
+
 // Ids of conversations with an in-flight run / compaction.
 export const runningConversationIdsAtom = atom<readonly string[]>([]);
 export const compactingConversationIdsAtom = atom<readonly string[]>([]);
 
-// Evict a single conversation's in-memory atoms (draft + context usage).
+// Evict a single conversation's in-memory atoms (draft + context usage + session cost).
 export const evictConversationAtoms = (conversationId: string): void => {
   draftAtomFamily.remove(conversationId);
   contextUsageAtomFamily.remove(conversationId);
+  sessionCostAtomFamily.remove(conversationId);
 };
 
 /*
@@ -37,7 +42,11 @@ export const evictConversationAtoms = (conversationId: string): void => {
  * the atom families would otherwise hand back the old account's values.
  */
 export const clearPerConversationAtoms = (): void => {
-  const ids = new Set([...draftAtomFamily.getParams(), ...contextUsageAtomFamily.getParams()]);
+  const ids = new Set([
+    ...draftAtomFamily.getParams(),
+    ...contextUsageAtomFamily.getParams(),
+    ...sessionCostAtomFamily.getParams(),
+  ]);
   for (const id of ids) {
     evictConversationAtoms(id);
   }

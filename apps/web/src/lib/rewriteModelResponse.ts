@@ -16,6 +16,26 @@ type ResponseReadError = {
   message: string;
 };
 
+const STREAM_PROGRESS_LOG_INTERVAL_MS = 30_000;
+
+function createStreamProgressLogger() {
+  let eventCount = 0;
+  const interval = setInterval(() => {
+    logExceptInTest('[rewriteModelResponse] stream progress', {
+      eventCount,
+    });
+  }, STREAM_PROGRESS_LOG_INTERVAL_MS);
+
+  return {
+    eventProcessed() {
+      eventCount += 1;
+    },
+    stop() {
+      clearInterval(interval);
+    },
+  };
+}
+
 function getResponseReadError(error: unknown): ResponseReadError | null {
   if (typeof error !== 'object' || error === null || !('name' in error)) {
     return null;
@@ -68,7 +88,8 @@ async function rewriteSseStream(
   parser: ReturnType<typeof createParser>,
   controller: ReadableStreamDefaultController<string>,
   doneReceived: () => boolean,
-  serializeError: (error: ResponseReadError) => string
+  serializeError: (error: ResponseReadError) => string,
+  onFinally: () => void
 ) {
   const decoder = new TextDecoder();
   try {
@@ -96,6 +117,7 @@ async function rewriteSseStream(
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
+    onFinally();
     reader.releaseLock();
   }
 }
@@ -157,8 +179,10 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
 
       let doneReceived = false;
       let generationId: string | undefined;
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -212,7 +236,8 @@ export async function rewriteModelResponse_ChatCompletions(response: Response, r
               type: responseReadError.errorType,
             },
           }) +
-          '\n\n'
+          '\n\n',
+        progress.stop
       );
     },
   });
@@ -291,8 +316,10 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
       let doneReceived = false;
       let generationId: string | undefined;
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -348,7 +375,8 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
               error_type: responseReadError.errorType,
             },
           }) +
-          '\n\n'
+          '\n\n',
+        progress.stop
       );
     },
   });
@@ -409,8 +437,10 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
       let doneReceived = false;
       let generationId: string | undefined;
       let nextSequenceNumber = 0;
+      const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          progress.eventProcessed();
           if (event.data === '[DONE]') {
             doneReceived = true;
             return;
@@ -457,7 +487,8 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
               message: responseReadError.message,
             },
           }) +
-          '\n\n'
+          '\n\n',
+        progress.stop
       );
     },
   });

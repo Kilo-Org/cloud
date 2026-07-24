@@ -19,6 +19,25 @@ function sseResponse(body: string, status = 200): Response {
   });
 }
 
+function failingResponse(contentType: string, errorName: string, initialBody?: string): Response {
+  const encoder = new TextEncoder();
+  let pullCount = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (pullCount++ === 0 && initialBody !== undefined) {
+        controller.enqueue(encoder.encode(initialBody));
+        return;
+      }
+
+      const error = new Error(errorName);
+      error.name = errorName;
+      controller.error(error);
+    },
+  });
+
+  return new Response(body, { headers: { 'content-type': contentType } });
+}
+
 async function readOutputStream(response: Response): Promise<string> {
   const reader = response.body?.getReader();
   if (!reader) return '';
@@ -52,6 +71,28 @@ function dataObjects(sse: string): unknown[] {
     .filter(payload => payload !== '[DONE]')
     .map(payload => JSON.parse(payload));
 }
+
+const rewriters = [
+  ['Chat Completions', rewriteModelResponse_ChatCompletions],
+  ['Messages', rewriteModelResponse_Messages],
+  ['Responses', rewriteModelResponse_Responses],
+] as const;
+
+describe.each(rewriters)('%s response read errors', (_name, rewrite) => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect', 'disconnected'],
+    ['TimeoutError', 'timeout', 'timed out'],
+  ])('returns structured JSON for %s', async (errorName, errorType, messageFragment) => {
+    const result = await rewrite(failingResponse('application/json', errorName));
+
+    expect(result.status).toBe(503);
+    expect(await result.json()).toEqual({
+      error: expect.stringContaining(messageFragment),
+      error_type: errorType,
+      message: expect.stringContaining(messageFragment),
+    });
+  });
+});
 
 describe('rewriteModelResponse_ChatCompletions', () => {
   describe('JSON responses', () => {
@@ -113,6 +154,25 @@ describe('rewriteModelResponse_ChatCompletions', () => {
   });
 
   describe('streaming responses', () => {
+    test.each([
+      ['ResponseAborted', 'upstream_disconnect'],
+      ['TimeoutError', 'timeout'],
+    ])('emits a structured SSE error for %s', async (errorName, errorType) => {
+      const upstream = failingResponse(
+        'text/event-stream',
+        errorName,
+        'data: {"model":"upstream-model","choices":[]}\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions(upstream);
+      const sse = await readOutputStream(result);
+      const events = dataObjects(sse) as Array<{ error?: { code: number; type: string } }>;
+
+      expect(events[0]).toMatchObject({ model: 'upstream-model' });
+      expect(events[1]?.error).toMatchObject({ code: 503, type: errorType });
+      expect(dataPayloads(sse)).not.toContain('[DONE]');
+    });
+
     test('drops null delta role and emits [DONE]', async () => {
       const upstream = sseResponse(
         'data: {"model":"upstream-model","choices":[{"delta":{"role":null,"content":"hi"}}]}\n\n' +
@@ -181,6 +241,28 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 });
 
 describe('rewriteModelResponse_Messages', () => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect'],
+    ['TimeoutError', 'timeout'],
+  ])('emits an Anthropic SSE error for %s', async (errorName, errorType) => {
+    const result = await rewriteModelResponse_Messages(
+      failingResponse('text/event-stream', errorName)
+    );
+    const sse = await readOutputStream(result);
+
+    expect(sse).toContain('event: error\n');
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'error',
+        error: {
+          type: 'api_error',
+          message: expect.any(String),
+          error_type: errorType,
+        },
+      },
+    ]);
+  });
+
   test('strips cost fields for JSON responses', async () => {
     const upstream = jsonResponse({
       type: 'message',
@@ -260,6 +342,24 @@ describe('rewriteModelResponse_Messages', () => {
 });
 
 describe('rewriteModelResponse_Responses', () => {
+  test.each([
+    ['ResponseAborted', 'upstream_disconnect'],
+    ['TimeoutError', 'timeout'],
+  ])('emits an OpenAI Responses SSE error for %s', async (errorName, errorType) => {
+    const result = await rewriteModelResponse_Responses(
+      failingResponse('text/event-stream', errorName)
+    );
+    const sse = await readOutputStream(result);
+
+    expect(sse).toContain('event: error\n');
+    expect(dataObjects(sse)).toEqual([
+      {
+        type: 'error',
+        error: { code: errorType, message: expect.any(String) },
+      },
+    ]);
+  });
+
   test('strips cost fields for JSON responses', async () => {
     const upstream = jsonResponse({
       id: 'resp_1',

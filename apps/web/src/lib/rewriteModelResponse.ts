@@ -9,6 +9,94 @@ import { NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 
+type ResponseReadError = {
+  errorType: 'timeout' | 'upstream_disconnect';
+  message: string;
+};
+
+function getResponseReadError(error: unknown): ResponseReadError | null {
+  if (typeof error !== 'object' || error === null || !('name' in error)) {
+    return null;
+  }
+
+  if (error.name === 'ResponseAborted') {
+    return {
+      errorType: 'upstream_disconnect',
+      message: 'The upstream provider disconnected while sending the response.',
+    };
+  }
+
+  if (error.name === 'TimeoutError') {
+    return {
+      errorType: 'timeout',
+      message: 'The upstream provider timed out while sending the response.',
+    };
+  }
+
+  return null;
+}
+
+async function readResponseText(
+  response: Response,
+  headers: Headers
+): Promise<{ text: string } | { errorResponse: NextResponse }> {
+  try {
+    return { text: await response.text() };
+  } catch (error) {
+    const responseReadError = getResponseReadError(error);
+    if (!responseReadError) {
+      throw error;
+    }
+
+    return {
+      errorResponse: NextResponse.json(
+        {
+          error: responseReadError.message,
+          error_type: responseReadError.errorType,
+          message: responseReadError.message,
+        },
+        { status: 503, headers }
+      ),
+    };
+  }
+}
+
+async function rewriteSseStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  parser: ReturnType<typeof createParser>,
+  controller: ReadableStreamDefaultController<string>,
+  doneReceived: () => boolean,
+  serializeError: (error: ResponseReadError) => string
+) {
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        // Flush any event left buffered when the stream ends without a
+        // trailing blank line, so its data isn't silently dropped.
+        parser.reset({ consume: true });
+        if (doneReceived()) {
+          controller.enqueue('data: [DONE]\n\n');
+        }
+        controller.close();
+        return;
+      }
+      parser.feed(decoder.decode(value, { stream: true }));
+    }
+  } catch (error) {
+    const responseReadError = getResponseReadError(error);
+    if (!responseReadError) {
+      throw error;
+    }
+
+    controller.enqueue(serializeError(responseReadError));
+    controller.close();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function rewriteUsage(usage: OpenRouterUsage) {
   // We only rewrite the response for free models, strip upstream cost
   delete usage.cost;
@@ -27,7 +115,11 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
   if (headers.get('content-type')?.includes('application/json')) {
     // Read the body text once to avoid "Response body object should not be
     // disturbed or locked" errors that occur when `.clone().json()` fails.
-    const text = await response.text();
+    const textResult = await readResponseText(response, headers);
+    if ('errorResponse' in textResult) {
+      return textResult.errorResponse;
+    }
+    const { text } = textResult;
     let json: OpenAI.ChatCompletion;
     try {
       json = JSON.parse(text) as OpenAI.ChatCompletion;
@@ -93,21 +185,22 @@ export async function rewriteModelResponse_ChatCompletions(response: Response) {
         },
       });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'data: ' +
+          JSON.stringify({
+            error: {
+              code: 503,
+              message: responseReadError.message,
+              type: responseReadError.errorType,
+            },
+          }) +
+          '\n\n'
+      );
     },
   });
 
@@ -145,7 +238,11 @@ export async function rewriteModelResponse_Messages(response: Response) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const text = await response.text();
+    const textResult = await readResponseText(response, headers);
+    if ('errorResponse' in textResult) {
+      return textResult.errorResponse;
+    }
+    const { text } = textResult;
     let json: Anthropic.Messages.Message & { usage?: MessagesApiUsage };
     try {
       json = JSON.parse(text) as Anthropic.Messages.Message & {
@@ -211,21 +308,24 @@ export async function rewriteModelResponse_Messages(response: Response) {
         },
       });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'event: error\n' +
+          'data: ' +
+          JSON.stringify({
+            type: 'error',
+            error: {
+              type: 'api_error',
+              message: responseReadError.message,
+              error_type: responseReadError.errorType,
+            },
+          }) +
+          '\n\n'
+      );
     },
   });
 
@@ -245,7 +345,11 @@ export async function rewriteModelResponse_Responses(response: Response) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const text = await response.text();
+    const textResult = await readResponseText(response, headers);
+    if ('errorResponse' in textResult) {
+      return textResult.errorResponse;
+    }
+    const { text } = textResult;
     let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
     try {
       json = JSON.parse(text) as OpenAI.Responses.Response & {
@@ -298,21 +402,23 @@ export async function rewriteModelResponse_Responses(response: Response) {
         },
       });
 
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Flush any event left buffered when the stream ends without a
-          // trailing blank line, so its data isn't silently dropped.
-          parser.reset({ consume: true });
-          if (doneReceived) {
-            controller.enqueue('data: [DONE]\n\n');
-          }
-          controller.close();
-          break;
-        }
-        parser.feed(decoder.decode(value, { stream: true }));
-      }
+      await rewriteSseStream(
+        reader,
+        parser,
+        controller,
+        () => doneReceived,
+        responseReadError =>
+          'event: error\n' +
+          'data: ' +
+          JSON.stringify({
+            type: 'error',
+            error: {
+              code: responseReadError.errorType,
+              message: responseReadError.message,
+            },
+          }) +
+          '\n\n'
+      );
     },
   });
 

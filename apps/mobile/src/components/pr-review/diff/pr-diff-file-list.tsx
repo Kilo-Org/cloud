@@ -33,6 +33,12 @@ import {
   TabStateMessage,
 } from '@/components/pr-review/diff/pr-diff-rows';
 import { dedupeFilesByPath } from '@/lib/pr-review/diff/dedupe-file-pages';
+import {
+  armInitialTopScroll,
+  INITIAL_TOP_SCROLL_IDLE,
+  type InitialTopScrollState,
+  onInitialTopScrollContentSize,
+} from '@/lib/pr-review/diff/initial-top-scroll';
 import { buildItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { fileHeaderKey, itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import {
@@ -183,16 +189,21 @@ export function PrReviewFileList({
   const indexByKeyRef = useRef(indexByKey);
   indexByKeyRef.current = indexByKey;
 
-  // AC4 / D7: first transition to files.length > 0 per mount → offset 0.
-  // Covers cold load and warm-cache remounts; never re-scrolls on page appends.
-  const didScrollToTopRef = useRef(false);
-  useEffect(() => {
-    if (didScrollToTopRef.current || files.length === 0) {
-      return;
+  // AC4 / D7: one-shot scroll-to-top after first real content lays out.
+  // Arm synchronously on first files.length > 0 (cold + warm-cache remount);
+  // fire from onContentSizeChange only — never in useEffect, which races
+  // FlashList's first layout and blanks the window until the user scrolls.
+  // Page appends cannot re-arm once done.
+  const initialTopScrollRef = useRef<InitialTopScrollState>(INITIAL_TOP_SCROLL_IDLE);
+  initialTopScrollRef.current = armInitialTopScroll(initialTopScrollRef.current, files.length);
+
+  const handleContentSizeChange = (_width: number, height: number) => {
+    const result = onInitialTopScrollContentSize(initialTopScrollRef.current, height);
+    initialTopScrollRef.current = result.state;
+    if (result.shouldScroll) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
     }
-    didScrollToTopRef.current = true;
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [files.length]);
+  };
 
   // AC4b / D7: resilient navigator scroll — park when key is absent from
   // indexByKey (items rebuild race), retry on next items change, supersede
@@ -312,6 +323,7 @@ export function PrReviewFileList({
         renderItem={renderItem}
         keyExtractor={item => item.key}
         getItemType={item => itemTypeFor(item)}
+        onContentSizeChange={handleContentSizeChange}
         onEndReached={() => {
           if (query.hasNextPage && !query.isFetchingNextPage) {
             void query.fetchNextPage();

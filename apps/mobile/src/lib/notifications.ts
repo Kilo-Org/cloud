@@ -40,7 +40,6 @@ export function parseNotificationData(data: unknown): PushData | null {
 }
 
 const shown = {
-  shouldShowAlert: true,
   shouldPlaySound: true,
   shouldSetBadge: true,
   shouldShowBanner: true,
@@ -48,7 +47,6 @@ const shown = {
 } satisfies Notifications.NotificationBehavior;
 
 const suppressed = {
-  shouldShowAlert: false,
   shouldPlaySound: false,
   shouldSetBadge: false,
   shouldShowBanner: false,

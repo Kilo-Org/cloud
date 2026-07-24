@@ -3,6 +3,8 @@ import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull } from '
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 
+import { getWorkerDb } from '@kilocode/db/client';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { ingestItems, ingestMeta, agentNotificationDispatch } from '../db/sqlite-schema';
 import type { Env } from '../env';
 import type { IngestBatch } from '../types/session-sync';
@@ -699,6 +701,31 @@ export class SessionIngestDO extends DurableObject<Env> {
       model,
       ...metrics,
     });
+
+    // Best-effort persist the per-session total cost to Postgres so the session
+    // list can surface it. Runs once per close under the metricsEmitted dedup.
+    // Failures are logged and swallowed — must never break metrics emission.
+    try {
+      if (Number.isFinite(metrics.totalCost)) {
+        const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
+        await getWorkerDb(this.env.HYPERDRIVE.connectionString)
+          .update(cli_sessions_v2)
+          .set({ total_cost_microdollars: totalCostMicrodollars })
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    } catch (error) {
+      console.error('SessionIngestDO failed to persist session total cost', {
+        sessionId,
+        kiloUserId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
 
     // Mark metrics as emitted to prevent duplicates
     this.db

@@ -24,6 +24,13 @@ type MessageBubbleProps = {
   onOpenChildSession?: OpenChildSession;
   /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
   deliveryState?: MessageDeliveryState;
+  /**
+   * Subtle model label for an assistant message, precomputed by the parent
+   * via `computeMessageModelLabels`. Only the assistant branch renders it
+   * (and only when truthy); the user branch and the unlabelled
+   * same-model follow-ups render nothing.
+   */
+  modelLabel?: string;
 };
 
 export function MessageBubble({
@@ -34,6 +41,7 @@ export function MessageBubble({
   defaultReasoningExpanded,
   onOpenChildSession,
   deliveryState,
+  modelLabel,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
@@ -131,6 +139,15 @@ export function MessageBubble({
             onOpenChildSession={onOpenChildSession}
           />
         ))}
+        {modelLabel ? (
+          <Text
+            className="text-xs text-muted-foreground"
+            accessibilityRole="text"
+            accessibilityLabel={`Model: ${modelLabel}`}
+          >
+            {modelLabel}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );

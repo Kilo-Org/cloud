@@ -405,6 +405,7 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
       reasoning: z.number(),
       cache: z.object({ read: z.number(), write: z.number() }),
     }),
+    model: z.object({ providerID: z.string(), modelID: z.string() }).optional(),
   }),
   z.object({ ...sdkPartBaseShape, type: z.literal('snapshot'), snapshot: z.string() }),
   z.object({

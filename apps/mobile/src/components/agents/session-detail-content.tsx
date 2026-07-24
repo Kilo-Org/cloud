@@ -5,6 +5,7 @@ import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -14,6 +15,7 @@ import { createAndNavigateAgentSession } from '@/components/agents/create-and-na
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { computeMessageModelLabels } from '@/components/agents/message-model-label';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
@@ -331,6 +333,16 @@ export function SessionDetailContent({
     return null;
   }, [messages]);
 
+  // Per-message model label gating: the first assistant message is always
+  // labelled, and every subsequent assistant message is labelled only when
+  // its resolved model differs from the previous assistant's. Walked over
+  // the ordered transcript here so each `<MessageBubble>` only needs to
+  // consult a Map lookup, not re-derive the answer from the whole list.
+  const messageModelLabels = useMemo(
+    () => computeMessageModelLabels(messages, modelOptions),
+    [messages, modelOptions]
+  );
+
   const handleOpenChildSession = useCallback(
     (childSessionId: KiloSessionId, childTitle: string) => {
       setChildSession({ sessionId: childSessionId, title: childTitle });
@@ -364,6 +376,11 @@ export function SessionDetailContent({
           defaultReasoningExpanded={reasoningDefaultExpanded}
           onOpenChildSession={handleOpenChildSession}
           deliveryState={deliveryState}
+          modelLabel={
+            item.message.info.role === 'assistant'
+              ? messageModelLabels.get(item.message.info.id)
+              : undefined
+          }
         />
       );
     },
@@ -374,6 +391,7 @@ export function SessionDetailContent({
       reasoningDefaultExpanded,
       handleOpenChildSession,
       pendingMessages,
+      messageModelLabels,
     ]
   );
 
@@ -627,6 +645,8 @@ export function SessionDetailContent({
           modelDisplay={contextModelAndProvider.model}
           providerDisplay={contextModelAndProvider.provider}
           totalCost={totalCost}
+          messages={messages}
+          modelOptions={modelOptions}
           onClose={() => {
             setOpenContextSheetIdentity(null);
           }}
@@ -667,6 +687,22 @@ export function SessionDetailContent({
     return (
       <>
         <View className="flex-1">{renderContent()}</View>
+
+        {/* Fixed indicator row — lives outside the FlashList so per-token
+            content-size changes during streaming cannot reposition it.
+            Gated on has-messages so the empty/connecting path (which
+            renders the centered status indicator inside `renderContent`)
+            does not double-render. */}
+        {messages.length > 0 && (shouldShowFooterWorking || statusIndicator) ? (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(150)}
+          >
+            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+          </Animated.View>
+        ) : null}
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard
@@ -789,12 +825,6 @@ export function SessionDetailContent({
           void manager.loadOlderMessages();
         }}
         renderItem={renderItem}
-        ListFooterComponent={
-          <>
-            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
-          </>
-        }
       />
     );
   }

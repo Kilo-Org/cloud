@@ -7,7 +7,7 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 
-import { RemoteSessionRow } from '@/components/agents/session-row';
+import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { ACTIVE_NOW_TRAY_CAP, selectTrayWindow } from '@/components/agents/active-now-window';
 import { Text } from '@/components/ui/text';

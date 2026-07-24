@@ -40,6 +40,54 @@ export function formatSpokenTimeAgo(timestamp: string): string {
   return `${n} ${n === 1 ? word : `${word}s`} ago`;
 }
 
+/**
+ * Speech-friendly cost formatter.
+ *
+ * Mirrors the visible cost segment on the stored session list row, but in a
+ * form VoiceOver reads as words rather than the literal `"$0.12"`. Inputs
+ * that are `null`, `undefined`, zero, or not finite collapse to `null` so
+ * the caller can omit the cost phrase from the spoken meta entirely
+ * (matching the visible row, which shows the timestamp alone when there
+ * is no cost).
+ *
+ * Otherwise the microdollar count is converted to USD, rounded to whole
+ * cents, and spoken as:
+ *   - under $1 → `"<N> cent(s)"`
+ *   - $1+     → `"<N> dollar(s)"` plus `" <N> cent(s)"` only when the
+ *               cents component is non-zero
+ *
+ * A value that rounds to zero cents (e.g. a $0.004 sub-half-cent charge)
+ * returns `null` so the spoken form omits an amount that rounds to zero
+ * whole cents — whole-cent granularity for speech. This intentionally
+ * diverges from the visible formatter, which shows `"<$0.01"` for a
+ * sub-half-cent charge.
+ */
+export function formatSpokenCost(microdollars: number | null | undefined): string | null {
+  if (microdollars === null || microdollars === undefined) {
+    return null;
+  }
+  if (!Number.isFinite(microdollars)) {
+    return null;
+  }
+  if (microdollars <= 0) {
+    return null;
+  }
+  const cents = Math.round(microdollars / 10_000);
+  if (cents <= 0) {
+    return null;
+  }
+  if (cents < 100) {
+    return `${cents} ${cents === 1 ? 'cent' : 'cents'}`;
+  }
+  const dollars = Math.floor(cents / 100);
+  const remainder = cents % 100;
+  const dollarPart = `${dollars} ${dollars === 1 ? 'dollar' : 'dollars'}`;
+  if (remainder === 0) {
+    return dollarPart;
+  }
+  return `${dollarPart} ${remainder} ${remainder === 1 ? 'cent' : 'cents'}`;
+}
+
 type SessionRowAccessibilityLabelInputs = {
   /** Row title, always present (e.g. "Untitled session" fallback). */
   title: string;

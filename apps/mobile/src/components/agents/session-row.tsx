@@ -1,25 +1,30 @@
-import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, Modal, Platform, Pressable, TextInput, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { formatMeta, platformLabel, remoteAgentLabel, remoteMeta } from './session-list-helpers';
 import {
+  composeStoredSessionSpokenMeta,
+  composeStoredSessionVisibleMeta,
+  formatMeta,
+  formatSessionListCost,
+  platformLabel,
+} from './session-list-helpers';
+import {
+  formatSpokenCost,
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
+import { copySessionId } from './session-row-actions';
 
 type StoredSessionRowProps = {
   session: {
@@ -33,6 +38,7 @@ type StoredSessionRowProps = {
     git_branch: string | null;
     status: string | null;
     status_updated_at: string | null;
+    total_cost_microdollars: number | null;
   };
   /**
    * Which timestamp drives the row's relative meta label. The list
@@ -43,11 +49,6 @@ type StoredSessionRowProps = {
   onPress: () => void;
   onDelete: () => void;
   onRename: (newTitle: string) => void;
-};
-
-type RemoteSessionRowProps = {
-  session: ActiveSession;
-  onPress: () => void;
 };
 
 function showDeleteConfirm(onDelete: () => void) {
@@ -77,19 +78,6 @@ function showRenamePrompt(currentTitle: string, onRename: (newTitle: string) => 
     'plain-text',
     currentTitle
   );
-}
-
-async function copySessionId(sessionId: string) {
-  try {
-    const copied = await Clipboard.setStringAsync(sessionId);
-    if (!copied) {
-      throw new Error('Clipboard rejected session ID');
-    }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    toast.success('Session ID copied');
-  } catch {
-    toast.error('Could not copy session ID');
-  }
 }
 
 export function StoredSessionRow({
@@ -172,11 +160,20 @@ export function StoredSessionRow({
     }
   };
 
-  // Spoken meta mirrors the visible meta for the same inputs the row
-  // already uses to render `formatMeta(timestamp)`. When `needsInput`
-  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it.
-  const spokenMeta = needsInput ? null : formatSpokenTimeAgo(timestamp);
+  // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
+  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered.
+  // When a cost is present, both forms fold it in first (matches the row's
+  // "$0.12 · time" order). Needs-input sessions have no persisted cost.
+  const visibleMeta = composeStoredSessionVisibleMeta(
+    formatSessionListCost(session.total_cost_microdollars),
+    formatMeta(timestamp)
+  );
+  const spokenMeta = needsInput
+    ? null
+    : composeStoredSessionSpokenMeta(
+        formatSpokenCost(session.total_cost_microdollars),
+        formatSpokenTimeAgo(timestamp)
+      );
 
   return (
     <>
@@ -195,7 +192,7 @@ export function StoredSessionRow({
           agentLabel={agentLabel}
           title={title}
           subtitle={session.git_branch}
-          meta={formatMeta(timestamp)}
+          meta={visibleMeta}
           needsInput={needsInput}
           stripMode="inline"
           className="pl-[22px] pr-[22px]"
@@ -251,85 +248,5 @@ export function StoredSessionRow({
         </View>
       </Modal>
     </>
-  );
-}
-
-export function RemoteSessionRow({ session, onPress }: Readonly<RemoteSessionRowProps>) {
-  const title = session.title.length > 0 ? session.title : 'Untitled session';
-
-  const revision = useSessionAttentionRevision();
-  const raiseId = session.status;
-  const needsInput = shouldShowNeedsInput({
-    status: session.status,
-    raiseId,
-    isAcked: isAttentionAcked(session.id, raiseId),
-  });
-  useEffect(() => {
-    reconcileSessionAttention(session.id, session.status, null);
-  }, [session.id, session.status, revision]);
-
-  // Spoken meta mirrors the visible meta the row renders. When `needsInput`
-  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. The remote row's `live` eyebrow (`live-and-meta`)
-  // renders the timestamp when `updatedAt` is present, otherwise the
-  // uppercased status. For speech we expand the timestamp via
-  // `formatSpokenTimeAgo` and lowercase/underscore-strip the status so
-  // VoiceOver doesn't read it letter-by-letter.
-  let spokenMeta: string | null = null;
-  if (!needsInput) {
-    spokenMeta = session.updatedAt
-      ? formatSpokenTimeAgo(session.updatedAt)
-      : session.status.toLowerCase().replaceAll('_', ' ');
-  }
-
-  const handleLongPress = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Copy session ID', 'Cancel'], cancelButtonIndex: 1 },
-        buttonIndex => {
-          if (buttonIndex === 0) {
-            void copySessionId(session.id);
-          }
-        }
-      );
-    } else {
-      Alert.alert('Session actions', undefined, [
-        {
-          text: 'Copy session ID',
-          onPress: () => {
-            void copySessionId(session.id);
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
-  };
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={handleLongPress}
-      accessibilityLabel={sessionRowAccessibilityLabel({
-        title,
-        needsInput,
-        badge: remoteAgentLabel(session.createdOnPlatform),
-        meta: spokenMeta,
-      })}
-      className="active:opacity-70"
-    >
-      <SessionRow
-        agentLabel={remoteAgentLabel(session.createdOnPlatform)}
-        title={title}
-        subtitle={session.gitBranch ?? null}
-        meta={remoteMeta(session)}
-        live
-        needsInput={needsInput}
-        metaWhileLive
-        stripMode="inline"
-        className="pl-[22px] pr-[22px]"
-      />
-    </Pressable>
   );
 }

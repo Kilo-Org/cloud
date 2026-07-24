@@ -27,11 +27,10 @@ export default function AppLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
               <Stack.Screen
-                name="pr-review"
-                options={{
-                  headerShown: false,
-                }}
+                name="pr-review/[owner]/[repo]/[number]"
+                options={{ headerShown: false }}
               />
               <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
               <Stack.Screen name="agent-chat/[session-id]" />

@@ -167,6 +167,20 @@ export function NewSessionPrompt({
       />
       <View className="flex-row items-end px-2 pt-2">
         {promptMeasure.measureElement}
+        <Pressable
+          onPress={handlePaperclipPress}
+          disabled={paperclipDisabled}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          className={cn(
+            'mb-1 h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+            paperclipDisabled && 'opacity-50'
+          )}
+          accessibilityRole="button"
+          accessibilityLabel="Add attachment"
+          accessibilityState={{ disabled: paperclipDisabled }}
+        >
+          <Paperclip size={18} color={colors.mutedForeground} />
+        </Pressable>
         <RNTextInput
           ref={promptInputRef}
           placeholder="What would you like to work on?"
@@ -202,25 +216,11 @@ export function NewSessionPrompt({
           </View>
         ) : null}
       </View>
-      <View className="flex-row items-center px-2 pt-1">
-        <Pressable
-          onPress={handlePaperclipPress}
-          disabled={paperclipDisabled}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          className={cn(
-            'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-            paperclipDisabled && 'opacity-50'
-          )}
-          accessibilityRole="button"
-          accessibilityLabel="Add attachment"
-          accessibilityState={{ disabled: paperclipDisabled }}
-        >
-          <Paperclip size={18} color={colors.mutedForeground} />
-        </Pressable>
-      </View>
-      <View className="px-3 pb-1">
-        <VoiceInputStatus status={voiceInput.status} />
-      </View>
+      {voiceInput.available ? (
+        <View className="min-h-[20px] px-3 pb-1">
+          <VoiceInputStatus status={voiceInput.status} />
+        </View>
+      ) : null}
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError
           placement="top"

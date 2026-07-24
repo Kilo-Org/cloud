@@ -230,7 +230,7 @@ describe('getContextSheetContent', () => {
     expect(content.percentage).toBe('125%');
     expect(content.remainingTokens).toBe('0');
     expect(content.remainingPercentage).toBe('0%');
-    expect(content.cost).toBeNull();
+    expect(content.cost).toBe('$0.0000');
     expect(content.tone).toBe('destructive');
   });
 
@@ -244,14 +244,14 @@ describe('getContextSheetContent', () => {
     expect(content.windowUnavailable).toBe(true);
     expect(content.percentage).toBeNull();
     expect(content.remainingTokens).toBeNull();
-    expect(content.cost).toBeNull();
+    expect(content.cost).toBe('$0.0000');
     expect(content.windowUnavailableLabel).toBe('Context-window size unavailable');
     expect(content.tone).toBe('neutral');
   });
 
-  it('omits the cost line when total cost is zero', () => {
+  it('shows the cost line as $0.0000 when total cost is zero', () => {
     const content = getContextSheetContent(info({ percentage: 20 }), 0);
-    expect(content.cost).toBeNull();
+    expect(content.cost).toBe('$0.0000');
   });
 });
 

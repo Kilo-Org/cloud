@@ -11,6 +11,12 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-07-24',
+    description: 'Updated OpenClaw to 2026.7.1.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-07-07',
     description:
       'Fixed KiloClaw instances that appeared to be running but left the agent unavailable. Instances provisioned on an older OpenClaw version could write a configuration that referenced a model provider plugin that version does not include, which stopped the agent gateway from starting. Redeploy your instance to pick up the fix.',

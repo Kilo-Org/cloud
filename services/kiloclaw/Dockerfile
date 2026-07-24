@@ -69,7 +69,7 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # NOTE: the KiloCode provider was externalized from openclaw core into the standalone
 # @openclaw/kilocode-provider package (openclaw #93470, 2026.6.9); it is installed
 # alongside openclaw and its provider-models bundle is a single non-hashed file.
-RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
+RUN npm install -g pnpm openclaw@2026.7.1 @openclaw/kilocode-provider@2026.7.1 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
     && PM_FILE="$KP_DIST/provider-models.js" \
@@ -102,7 +102,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.6.11's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.7.1's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -263,8 +263,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-07-01-v73-openclaw-2026.6.11-kilocode-provider
-RUN echo "18"
+# Build cache bust: 2026-07-24-v74-openclaw-2026.7.1-kilocode-provider
+RUN echo "19"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

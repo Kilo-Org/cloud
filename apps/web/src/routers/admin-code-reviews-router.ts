@@ -91,6 +91,10 @@ const errorCategoryExpr = sql<string>`CASE
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%500%' OR ${cloud_agent_code_reviews.error_message} LIKE '%502%' OR ${cloud_agent_code_reviews.error_message} LIKE '%503%' OR ${cloud_agent_code_reviews.error_message} LIKE '%internal server%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_reviews.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_reviews.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_reviews.error_message} LIKE '%network%' THEN 'Network Error'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%parse%' OR ${cloud_agent_code_reviews.error_message} LIKE '%JSON%' OR ${cloud_agent_code_reviews.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
+  WHEN ${cloud_agent_code_reviews.terminal_reason} = 'workspace_capacity' OR ${cloud_agent_code_reviews.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_reviews.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_reviews.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
+  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
+  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%could not be delivered%' THEN 'Delivery Failure'
+  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%repository_not_installed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%app installation required%' THEN 'Action Required'
   WHEN ${cloud_agent_code_reviews.error_message} IS NULL THEN 'Unknown Error'
   ELSE 'Other'
 END`;
@@ -105,6 +109,10 @@ const attemptErrorCategoryExpr = sql<string>`CASE
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%500%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%502%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%503%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%internal server%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%network%' THEN 'Network Error'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%parse%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%JSON%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
+  WHEN ${cloud_agent_code_review_attempts.terminal_reason} = 'workspace_capacity' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%could not be delivered%' THEN 'Delivery Failure'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%repository_not_installed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%app installation required%' THEN 'Action Required'
   WHEN ${cloud_agent_code_review_attempts.error_message} IS NULL THEN 'Unknown Error'
   ELSE 'Other'
 END`;

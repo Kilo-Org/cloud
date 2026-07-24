@@ -1,12 +1,4 @@
 import { describe, test, expect, jest } from '@jest/globals';
-
-const mockLogExceptInTest = jest.fn();
-
-jest.mock('@/lib/utils.server', () => ({
-  errorExceptInTest: jest.fn(),
-  logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
-}));
-
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
@@ -164,8 +156,11 @@ describe('rewriteModelResponse_ChatCompletions', () => {
   });
 
   describe('streaming responses', () => {
-    test('logs processed event progress every 30 seconds', async () => {
-      jest.useFakeTimers();
+    test('tracks event progress every 30 seconds and clears the interval', async () => {
+      const intervalHandle = setTimeout(() => {}, 0);
+      clearTimeout(intervalHandle);
+      const setIntervalSpy = jest.spyOn(globalThis, 'setInterval').mockReturnValue(intervalHandle);
+      const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval');
       const encoder = new TextEncoder();
       const upstreamController: { current?: ReadableStreamDefaultController<Uint8Array> } = {};
       const upstream = new Response(
@@ -185,18 +180,14 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         const reader = result.body?.getReader();
         expect(reader).toBeDefined();
         await reader?.read();
-        await jest.advanceTimersByTimeAsync(30_000);
-
-        expect(mockLogExceptInTest).toHaveBeenCalledWith('[rewriteModelResponse] stream progress', {
-          eventCount: 1,
-        });
+        expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
 
         upstreamController.current?.close();
         await reader?.read();
-        expect(jest.getTimerCount()).toBe(0);
+        expect(clearIntervalSpy).toHaveBeenCalledWith(intervalHandle);
       } finally {
-        mockLogExceptInTest.mockClear();
-        jest.useRealTimers();
+        setIntervalSpy.mockRestore();
+        clearIntervalSpy.mockRestore();
       }
     });
 

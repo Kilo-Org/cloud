@@ -371,6 +371,38 @@ describe('recordPendingFlushFailure', () => {
     expect(delays).toEqual([2_000, undefined]);
   });
 
+  it('gives a full-disk workspace failure a longer backed-off retry budget', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const delays: (number | undefined)[] = [];
+    const now = 100_000;
+
+    // A workspace_setup_failed with the sandbox_storage_full subtype is transient
+    // disk backpressure and should retry several times with growing delays before
+    // exhausting, unlike a plain workspace failure (one warm-followup retry above).
+    for (let i = 0; i < 4; i++) {
+      const result = await recordPendingFlushFailure(
+        storage,
+        message,
+        'sandbox storage full',
+        now,
+        {
+          policy: 'warm-followup',
+          code: 'WORKSPACE_SETUP_FAILED',
+          subtype: 'sandbox_storage_full',
+        }
+      );
+      delays.push(
+        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
+      );
+      message = result.message;
+    }
+
+    expect(delays).toEqual([10_000, 30_000, 60_000, undefined]);
+  });
+
   it('retries a sandbox connection failure once after exactly five seconds', async () => {
     const storage = createMemoryStorage();
     let message = makeMessage({ createdAt: 100_000 });

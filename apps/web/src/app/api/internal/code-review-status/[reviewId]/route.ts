@@ -348,6 +348,12 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  // Infer workspace capacity (transient sandbox disk pressure) so it is
+  // classified distinctly instead of counted as an unknown delivery failure.
+  if (!terminalReason && isWorkspaceCapacityFailure(failure, raw.errorMessage)) {
+    terminalReason = 'workspace_capacity';
+  }
+
   if (
     (raw.status === 'failed' || raw.status === 'interrupted') &&
     isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
@@ -369,6 +375,23 @@ function normalizePayload(raw: StatusUpdatePayload): {
     gateResult: raw.gateResult,
     failure,
   };
+}
+
+/**
+ * Detects a workspace disk-capacity failure so it is recorded with a distinct
+ * `workspace_capacity` terminal reason. Prefers the structured failure subtype
+ * from cloud-agent-next and falls back to the safe error message for older
+ * payloads.
+ */
+function isWorkspaceCapacityFailure(
+  failure: CloudAgentSafeFailure | undefined,
+  errorMessage: string | undefined
+): boolean {
+  if (failure?.code === 'workspace_setup_failed' && failure.subtype === 'sandbox_storage_full') {
+    return true;
+  }
+  const message = (errorMessage ?? '').toLowerCase();
+  return message.includes('sandbox storage full') || message.includes('admission rejected');
 }
 
 function isBillingCodeReviewTerminalReason(
@@ -418,6 +441,10 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
+    // Capacity failures are already retried at the delivery layer in
+    // cloud-agent-next. A fresh web-level retry would re-dispatch onto the same
+    // full shared sandbox and restart the storm, so terminalize instead.
+    terminalReason === 'workspace_capacity' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }

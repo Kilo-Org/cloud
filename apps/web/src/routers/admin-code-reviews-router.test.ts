@@ -341,6 +341,37 @@ describe('adminCodeReviewsRouter', () => {
     expect(exportRows[0]).toHaveProperty('attempt_status');
   });
 
+  it('buckets sandbox capacity and delivery failures instead of Other', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(700),
+        terminalReason: 'workspace_capacity',
+        errorMessage: 'Workspace setup failed: sandbox storage full',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(710),
+        errorMessage: 'The message could not be delivered',
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+
+    expect(errors.categories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: 'Sandbox Capacity', count: 1 }),
+        expect.objectContaining({ category: 'Delivery Failure', count: 1 }),
+      ])
+    );
+    expect(errors.categories.map(category => category.category)).not.toContain('Other');
+  });
+
   it('classifies final model-not-found outcomes as cancellations instead of failures', async () => {
     const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
 

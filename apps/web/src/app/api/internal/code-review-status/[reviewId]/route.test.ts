@@ -705,6 +705,28 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it('infers workspace_capacity terminalReason for a sandbox storage full failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Workspace setup failed: sandbox storage full',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage: 'Workspace setup failed: sandbox storage full',
+          terminalReason: 'workspace_capacity',
+        })
+      );
+    });
+
     it.each([
       'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.',
       'Payment Required: [BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',

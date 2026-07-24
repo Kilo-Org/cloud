@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
@@ -23,11 +24,13 @@ const ConversationVirtualRow = ({
   item,
   measureElement,
   start,
+  streamingMessageId,
 }: {
   index: number;
   item: GroupedConversationItem;
   measureElement: (element: HTMLElement) => void;
   start: number;
+  streamingMessageId?: string | undefined;
 }): JSX.Element => {
   const rowRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,12 +62,18 @@ const ConversationVirtualRow = ({
       ref={rowRef}
       style={getVirtualRowStyle(start)}
     >
-      <AgentConversationItemView item={item} />
+      <AgentConversationItemView item={item} streamingMessageId={streamingMessageId} />
     </div>
   );
 };
 
-export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
+export const ConversationList = ({
+  items,
+  streamingMessageId,
+}: {
+  items: GroupedConversationItem[];
+  streamingMessageId?: string | undefined;
+}): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
   // Source of truth for auto-scroll, owned outside React so a streaming render cannot race it. The state mirror below only drives the jump button.
   const isStuckToBottomRef = useRef(true);
@@ -280,6 +289,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
                 key={getConversationItemKey(item)}
                 measureElement={virtualizer.measureElement}
                 start={virtualItem.start}
+                streamingMessageId={streamingMessageId}
               />
             );
           })}

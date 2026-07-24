@@ -220,6 +220,82 @@ describe('kilo gateway chat stream client', () => {
     expect(reasoningDeltas).toStrictEqual(['Thinking']);
   });
 
+  it('treats a single empty-arguments tool call delta as an empty object', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":""}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'kilo-auto/frontier',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_snapshot_1',
+          name: 'get_page_snapshot',
+        },
+      ],
+    });
+  });
+
+  it('treats tool call deltas that omit arguments as an empty object', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'kilo-auto/frontier',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_snapshot_1',
+          name: 'get_page_snapshot',
+        },
+      ],
+    });
+  });
+
+  it('rejects non-empty invalid tool call arguments from the gateway stream', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"not-json"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).rejects.toThrow('Gateway tool call arguments were not valid JSON.');
+  });
+
   it('rejects non-object tool call arguments from the gateway stream', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
@@ -506,5 +582,50 @@ describe('kilo gateway chat stream client', () => {
     expect(completion.usage).toStrictEqual({
       promptTokens: 1200,
     });
+  });
+
+  it('carries costUsd when the usage chunk includes cost', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":34,"total_tokens":1234,"cost":0.0123}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      costUsd: 0.0123,
+      promptTokens: 1200,
+    });
+  });
+
+  it('omits costUsd when the usage chunk has no cost field', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":800,"completion_tokens":10,"total_tokens":810}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      promptTokens: 800,
+    });
+    expect(completion.usage).not.toHaveProperty('costUsd');
+  });
+
+  it('parses prompt_tokens when cost is null and omits costUsd', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":500,"completion_tokens":2,"total_tokens":502,"cost":null}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      promptTokens: 500,
+    });
+    expect(completion.usage).not.toHaveProperty('costUsd');
   });
 });

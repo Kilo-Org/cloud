@@ -44,10 +44,23 @@ export async function handleRequestLogging(params: {
     return;
   }
   after(async () => {
+    // Read the response body in its own try/catch: if it cannot be read (e.g.
+    // the stream errored mid-flight), still log the request without it.
     let response: string | undefined;
+    let responseReadError: string | undefined;
     try {
       response = await clonedResponse.text();
-      const error = detectToolCallArgumentErrors(response, request);
+    } catch (e) {
+      responseReadError = String(e).substring(0, 4000);
+      logExceptInTest(
+        `[handleRequestLogging] failed to read response body (user=${user?.id}, status=${clonedResponse.status}, model=${model}): ${responseReadError}`
+      );
+    }
+    try {
+      const error =
+        response !== undefined
+          ? detectToolCallArgumentErrors(response, request)
+          : { response_body_read_error: responseReadError };
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({

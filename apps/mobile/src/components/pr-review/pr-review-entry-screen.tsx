@@ -23,6 +23,7 @@ import {
   type PrLinkHelperMessage,
   selectPrLinkHelperSlotState,
 } from '@/lib/pr-review/pr-link-helper-slot';
+import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import { decidePrLinkPaste } from '@/lib/pr-review/pr-link-paste';
 import { getRecentPrs, type RecentPr, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
@@ -38,9 +39,10 @@ export function PrReviewEntryScreen() {
   // and setNativeProps on programmatic paste.
   const inputRef = useRef<TextInput>(null);
   const inputValueRef = useRef<string>('');
-  // Text we just wrote via setNativeProps. onChangeText with this exact
-  // value is treated as programmatic (does not clear helper messages).
-  const pendingProgrammaticTextRef = useRef<string | null>(null);
+  // FIFO of values written via setNativeProps. Matching onChangeText values
+  // are treated as programmatic echoes (do not clear helpers / clobber ref).
+  // Order-agnostic membership so double-taps and delayed native echoes work.
+  const pendingProgrammaticTextsRef = useRef<string[]>([]);
   const [hasInput, setHasInput] = useState(false);
   const [helperMessage, setHelperMessage] = useState<PrLinkHelperMessage | null>(null);
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
@@ -61,7 +63,10 @@ export function PrReviewEntryScreen() {
   );
 
   const applyFieldText = (text: string) => {
-    pendingProgrammaticTextRef.current = text;
+    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
+      pendingProgrammaticTextsRef.current,
+      text
+    );
     inputValueRef.current = text;
     inputRef.current?.setNativeProps({ text });
     setHasInput(text.length > 0);
@@ -214,15 +219,16 @@ export function PrReviewEntryScreen() {
                 // Don't setState on every keystroke; track only whether the
                 // input has any text. The raw value lives in the ref so
                 // handleSubmit reads the latest text without re-rendering.
+                const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
+                pendingProgrammaticTextsRef.current = [...decision.pending];
+                if (decision.kind === 'echo') {
+                  // Echo of setNativeProps: inputValueRef already holds the
+                  // intentional value from applyFieldText — do not clobber it
+                  // with a delayed/stale echo, and do not clear helpers.
+                  return;
+                }
                 inputValueRef.current = value;
                 setHasInput(value.length > 0);
-                if (pendingProgrammaticTextRef.current !== null) {
-                  if (value === pendingProgrammaticTextRef.current) {
-                    pendingProgrammaticTextRef.current = null;
-                    return;
-                  }
-                  pendingProgrammaticTextRef.current = null;
-                }
                 // Any real edit clears transient helper messages (invalid /
                 // clipboard-empty). Last-set message is replaced by null.
                 if (helperMessage !== null) {

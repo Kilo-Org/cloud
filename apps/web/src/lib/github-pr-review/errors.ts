@@ -94,6 +94,17 @@ const FALLBACK_FORBIDDEN = 'You do not have permission to perform this action on
 const FALLBACK_BAD_REQUEST = 'GitHub rejected this request';
 const FALLBACK_CONFLICT = 'GitHub reported a conflict for this PR';
 const FALLBACK_BAD_GATEWAY = 'GitHub returned an unexpected error';
+// GitHub App user-to-server tokens read public repos fine but 403 on writes when
+// the app installation is missing, excludes the repo, or lacks PR write.
+const INTEGRATION_ACCESS_FORBIDDEN_MESSAGE =
+  "The Kilo GitHub App can't write to this repository. An owner of the repository's organization must install the Kilo app (or approve its updated permissions), then try again.";
+
+function forbiddenMessageFromGitHub(message: string): string {
+  if (message.includes('Resource not accessible by integration')) {
+    return INTEGRATION_ACCESS_FORBIDDEN_MESSAGE;
+  }
+  return message || FALLBACK_FORBIDDEN;
+}
 
 export function classifyGitHubHttpError(
   error: unknown,
@@ -126,7 +137,7 @@ export function classifyGitHubHttpError(
         retryAfterEpochMs: retryAfterEpochMs(headers, now),
       };
     }
-    return { code: 'FORBIDDEN', message: message || FALLBACK_FORBIDDEN };
+    return { code: 'FORBIDDEN', message: forbiddenMessageFromGitHub(message) };
   }
   if (status >= 500) {
     return { code: 'BAD_GATEWAY', message: message || FALLBACK_BAD_GATEWAY };
@@ -146,7 +157,7 @@ function classifyGraphQlEntry(entry: GraphQlErrorEntry, now: number): Classified
     return { code: 'NOT_FOUND', message: NOT_FOUND_MESSAGE };
   }
   if (type === 'FORBIDDEN') {
-    return { code: 'FORBIDDEN', message: message || FALLBACK_FORBIDDEN };
+    return { code: 'FORBIDDEN', message: forbiddenMessageFromGitHub(message ?? '') };
   }
   if (type === 'RATE_LIMITED' || type === 'SECONDARY_RATE_LIMIT' || type === 'ABUSE_DETECTION') {
     return { code: 'TOO_MANY_REQUESTS', message: rateLimitMessage(undefined, now) };

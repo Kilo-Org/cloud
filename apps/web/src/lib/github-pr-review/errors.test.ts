@@ -65,12 +65,35 @@ describe('classifyGitHubHttpError', () => {
     expect(result.code).toBe('TOO_MANY_REQUESTS');
   });
 
-  it('maps non-rate-limit 403 to FORBIDDEN preserving GitHub message', () => {
+  it('maps integration-access 403 to FORBIDDEN with actionable install message', () => {
     const result = classifyGitHubHttpError(
       httpError(403, 'Resource not accessible by integration')
     );
     expect(result.code).toBe('FORBIDDEN');
-    expect(result.message).toBe('Resource not accessible by integration');
+    expect(result.message).toBe(
+      "The Kilo GitHub App can't write to this repository. An owner of the repository's organization must install the Kilo app (or approve its updated permissions), then try again."
+    );
+  });
+
+  it('maps other non-rate-limit 403 to FORBIDDEN preserving GitHub message', () => {
+    const result = classifyGitHubHttpError(
+      httpError(403, 'Repository was archived so is read-only.')
+    );
+    expect(result.code).toBe('FORBIDDEN');
+    expect(result.message).toBe('Repository was archived so is read-only.');
+  });
+
+  it('prefers rate-limit classification over integration-access wording on 403', () => {
+    const resetSeconds = Math.floor(NOW / 1000) + 60;
+    const result = classifyGitHubHttpError(
+      httpError(403, 'Resource not accessible by integration', {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(resetSeconds),
+      }),
+      NOW
+    );
+    expect(result.code).toBe('TOO_MANY_REQUESTS');
+    expect(result.retryAfterEpochMs).toBe(resetSeconds * 1000);
   });
 
   it('maps 422 stale line comment shape to BAD_REQUEST', () => {
@@ -156,16 +179,31 @@ describe('classifyGitHubGraphQlErrors', () => {
     );
   });
 
-  it('maps GraphQL FORBIDDEN to FORBIDDEN preserving message', () => {
+  it('maps GraphQL integration-access FORBIDDEN to actionable install message', () => {
     const result = classifyGitHubGraphQlErrors([
       { type: 'FORBIDDEN', message: 'Resource not accessible by integration' },
     ]);
     expect(result?.code).toBe('FORBIDDEN');
-    expect(result?.message).toBe('Resource not accessible by integration');
+    expect(result?.message).toBe(
+      "The Kilo GitHub App can't write to this repository. An owner of the repository's organization must install the Kilo app (or approve its updated permissions), then try again."
+    );
+  });
+
+  it('maps other GraphQL FORBIDDEN to FORBIDDEN preserving message', () => {
+    const result = classifyGitHubGraphQlErrors([{ type: 'FORBIDDEN', message: 'no push access' }]);
+    expect(result?.code).toBe('FORBIDDEN');
+    expect(result?.message).toBe('no push access');
   });
 
   it('maps GraphQL RATE_LIMITED to TOO_MANY_REQUESTS', () => {
     const result = classifyGitHubGraphQlErrors([{ type: 'RATE_LIMITED', message: 'rate limit' }]);
+    expect(result?.code).toBe('TOO_MANY_REQUESTS');
+  });
+
+  it('maps GraphQL RATE_LIMITED even when message mentions integration access', () => {
+    const result = classifyGitHubGraphQlErrors([
+      { type: 'RATE_LIMITED', message: 'Resource not accessible by integration' },
+    ]);
     expect(result?.code).toBe('TOO_MANY_REQUESTS');
   });
 

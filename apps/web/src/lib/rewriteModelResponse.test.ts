@@ -581,19 +581,22 @@ describe('request log capture', () => {
     expect(capture.setReadError).not.toHaveBeenCalled();
   });
 
-  test.each(rewriters)('%s: captures an empty body when upstream has no body', async (_name, rewrite) => {
-    const capture = makeCapture();
+  test.each(rewriters)(
+    '%s: captures an empty body when upstream has no body',
+    async (_name, rewrite) => {
+      const capture = makeCapture();
 
-    const result = await rewrite(
-      new Response(null, { headers: { 'content-type': 'text/event-stream' } }),
-      true,
-      capture
-    );
-    await readOutputStream(result);
+      const result = await rewrite(
+        new Response(null, { headers: { 'content-type': 'text/event-stream' } }),
+        true,
+        capture
+      );
+      await readOutputStream(result);
 
-    expect(capture.setBody).toHaveBeenCalledWith('');
-    expect(capture.setReadError).not.toHaveBeenCalled();
-  });
+      expect(capture.setBody).toHaveBeenCalledWith('');
+      expect(capture.setReadError).not.toHaveBeenCalled();
+    }
+  );
 
   test.each(rewriters)('%s: records a read error when the stream fails', async (_name, rewrite) => {
     const capture = makeCapture();
@@ -618,7 +621,11 @@ describe('request log capture', () => {
     async (_name, rewrite) => {
       const capture = makeCapture();
 
-      const result = await rewrite(failingResponse('application/json', 'TimeoutError'), true, capture);
+      const result = await rewrite(
+        failingResponse('application/json', 'TimeoutError'),
+        true,
+        capture
+      );
 
       expect(result.status).toBe(503);
       expect(capture.setReadError).toHaveBeenCalledTimes(1);

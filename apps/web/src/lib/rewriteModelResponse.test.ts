@@ -365,7 +365,7 @@ describe('rewriteModelResponse_Responses', () => {
       failingResponse(
         'text/event-stream',
         errorName,
-        'data: {"type":"response.created","response":{"id":"gen-response"}}\n\n'
+        'data: {"type":"response.created","sequence_number":4,"response":{"id":"gen-response"}}\n\n'
       )
     );
     const sse = await readOutputStream(result);
@@ -374,12 +374,18 @@ describe('rewriteModelResponse_Responses', () => {
     expect(dataObjects(sse)).toEqual([
       {
         type: 'response.created',
+        sequence_number: 4,
         response: { id: 'gen-response' },
       },
       {
         id: 'gen-response',
         type: 'error',
-        error: { code: errorType, message: expect.any(String) },
+        sequence_number: 5,
+        error: {
+          type: errorType,
+          code: errorType === 'timeout' ? '504' : '503',
+          message: expect.any(String),
+        },
       },
     ]);
   });

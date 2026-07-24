@@ -4,6 +4,7 @@ import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { errorExceptInTest } from '@/lib/utils.server';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
@@ -91,6 +92,7 @@ async function rewriteSseStream(
       throw error;
     }
 
+    errorExceptInTest('[rewriteModelResponse] emitting stream error event', responseReadError);
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
@@ -348,6 +350,7 @@ export async function rewriteModelResponse_Messages(response: Response, removeCo
 
 type ResponsesApiEvent = {
   type: string;
+  sequence_number?: number;
   response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
 };
 
@@ -393,6 +396,7 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
 
       let doneReceived = false;
       let generationId: string | undefined;
+      let nextSequenceNumber = 0;
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (event.data === '[DONE]') {
@@ -400,6 +404,9 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
             return;
           }
           const json = JSON.parse(event.data) as ResponsesApiEvent;
+          if (json.sequence_number !== undefined) {
+            nextSequenceNumber = Math.max(nextSequenceNumber, json.sequence_number + 1);
+          }
           if (json.response) {
             generationId = json.response.id ?? generationId;
             if (json.response.usage) {
@@ -425,8 +432,10 @@ export async function rewriteModelResponse_Responses(response: Response, removeC
           JSON.stringify({
             ...(generationId ? { id: generationId } : {}),
             type: 'error',
+            sequence_number: nextSequenceNumber,
             error: {
-              code: responseReadError.errorType,
+              type: responseReadError.errorType,
+              code: responseReadError.errorType === 'timeout' ? '504' : '503',
               message: responseReadError.message,
             },
           }) +

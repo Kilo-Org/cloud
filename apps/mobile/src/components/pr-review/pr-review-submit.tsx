@@ -1,47 +1,41 @@
-// S7a review-submit content component. The orchestrator mounts this
-// inside the `review-submit.tsx` route (S4b left a thin stub there);
-// the route supplies the route-params; this component owns the form
-// body, the event radio, and the single batched submit.
+// Review-submit content: event radio, optional summary, pending-comments
+// list (view/edit/delete), and one batched submitReview call. Queue is
+// cleared on success and retained on failure.
 //
-// The sheet drains the `PendingReviewProvider` queue into ONE
-// `submitReview` call (per the S3 contract). The head SHA submitted
-// is the LATEST one — the per-item `commitSha` is only used by the
-// sheet's "may be outdated" hint. The queue is cleared on success
-// and retained on failure so the user can decide what to drop or retry.
-//
-// Submit failures are classified: 422/BAD_REQUEST validation errors
-// (approve-own-PR, stale) are non-retryable and remove the submit
-// affordance until the user changes the event or body; everything
-// else is retryable and keeps the submit button enabled.
-//
-// Toasts paint behind formSheets on iOS, so the mutation hook toasts
-// `onError` AND the sheet renders an inline error box.
+// Disable lifetime: bad-request clears on event/summary change; forbidden
+// stays for the rest of the sheet session. Toasts paint behind formSheets
+// on iOS, so the mutation hook toasts onError AND the sheet shows inline.
 
 import * as Haptics from 'expo-haptics';
-import { type RefObject, useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { type Href, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, ScrollView, type TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  PendingQueueHint,
+  PrReviewPendingCommentRow,
+  ReviewSummaryField,
+} from '@/components/pr-review/pr-review-pending-comment-row';
 import {
   buildSubmitReviewInput,
   type ReviewEvent,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
+import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
-import { cn } from '@/lib/utils';
+
+const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 
 type PrReviewSubmitProps = Readonly<{
   owner: string;
   repo: string;
   number: number;
-  /** Current PR head SHA — submitted as `commitSha` for the review. */
   headSha: string;
-  /** Invoked after a successful submit or a cancel. */
   onDismiss: () => void;
 }>;
 
@@ -53,46 +47,39 @@ const EVENT_OPTIONS: readonly { value: ReviewEvent; label: string }[] = [
 
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { owner, repo, number, headSha, onDismiss } = props;
+  const router = useRouter();
   const pending = usePendingReview();
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'non-retryable' | 'reconnect' | null
+    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
   >(null);
 
-  // iOS uncontrolled pattern: body lives in a ref, the input's visible
-  // value is set via defaultValue once. No `value` + state.
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
-
-  // Flag when any queued item was queued against a different head SHA
-  // than the current one. Submission still uses the latest head SHA.
   const hasStaleItems = pending.items.some(item => item.commitSha !== headSha);
 
   useEffect(() => {
     if (submitReview.error) {
       const classification = classifyPrReviewMutationError(submitReview.error);
-      if (classification.kind === 'bad-request' || classification.kind === 'forbidden') {
-        setInlineError(
-          classification.kind === 'forbidden'
-            ? "You don't have permission to submit this review."
-            : "This review can't be submitted as is. The PR may have changed, or you can't approve your own pull request."
-        );
-        setInlineErrorKind('non-retryable');
-      } else if (classification.kind === 'reconnect') {
-        setInlineError('GitHub connection expired.');
-        setInlineErrorKind('reconnect');
-      } else {
-        setInlineError('Could not submit review. Check your connection and try again.');
-        setInlineErrorKind('retryable');
-      }
+      const display = mutationErrorDisplay('submit', classification, submitReview.error);
+      setInlineError(display.message);
+      setInlineErrorKind(display.kind);
     }
   }, [submitReview.error]);
+
+  function clearRecoverableError() {
+    // bad-request / retryable clear on edit; forbidden stays for the session.
+    if (inlineErrorKind === 'bad-request' || inlineErrorKind === 'retryable') {
+      setInlineError(null);
+      setInlineErrorKind(null);
+    }
+  }
 
   async function handleSubmit() {
     setInlineError(null);
@@ -114,17 +101,45 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDismiss();
     } catch {
-      // The effect above classifies the mutation error into inlineError;
-      // swallow here to avoid an unhandled promise rejection.
+      // Classified into inlineError by the effect above.
     }
   }
 
-  function handleCancel() {
-    if (isSubmitting) {
-      return;
-    }
-    onDismiss();
+  function openEditComposer(item: PendingReviewItem) {
+    const href: Href = {
+      pathname: COMMENT_COMPOSER_PATH,
+      params: {
+        owner,
+        repo,
+        number: String(number),
+        path: item.path,
+        side: item.side,
+        line: String(item.line),
+        ...(item.startLine !== undefined ? { startLine: String(item.startLine) } : {}),
+        pendingId: item.id,
+      },
+    };
+    router.push(href);
   }
+
+  function confirmDelete(item: PendingReviewItem) {
+    Alert.alert('Delete pending comment?', 'This comment will be removed from the review queue.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          pending.removeComment(item.id);
+        },
+      },
+    ]);
+  }
+
+  const submitDisabled =
+    isSubmitting ||
+    inlineErrorKind === 'bad-request' ||
+    inlineErrorKind === 'forbidden' ||
+    inlineErrorKind === 'reconnect';
 
   return (
     <View className="flex-1 bg-background">
@@ -142,20 +157,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           disabled={isSubmitting}
           onChange={next => {
             setEvent(next);
-            setInlineError(null);
-            setInlineErrorKind(null);
+            clearRecoverableError();
           }}
         />
         <View className="gap-2">
           <Text className="text-sm font-medium text-foreground">Summary (optional)</Text>
-          <ReviewBodyField
+          <ReviewSummaryField
             bodyRef={bodyRef}
             inputRef={bodyInputRef}
             isDisabled={isSubmitting}
-            onChange={() => {
-              setInlineError(null);
-              setInlineErrorKind(null);
-            }}
+            onChange={clearRecoverableError}
           />
         </View>
 
@@ -164,6 +175,19 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
           </Text>
           <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />
+          {pending.items.map(item => (
+            <PrReviewPendingCommentRow
+              key={item.id}
+              item={item}
+              disabled={isSubmitting}
+              onPress={() => {
+                openEditComposer(item);
+              }}
+              onDelete={() => {
+                confirmDelete(item);
+              }}
+            />
+          ))}
         </View>
 
         {inlineError && inlineErrorKind !== 'reconnect' ? (
@@ -183,16 +207,18 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             void handleSubmit();
           }}
           loading={isSubmitting}
-          disabled={
-            isSubmitting || inlineErrorKind === 'non-retryable' || inlineErrorKind === 'reconnect'
-          }
+          disabled={submitDisabled}
           accessibilityLabel="Submit review"
         >
           <Text>Submit review</Text>
         </Button>
         <Button
           variant="ghost"
-          onPress={handleCancel}
+          onPress={() => {
+            if (!isSubmitting) {
+              onDismiss();
+            }
+          }}
           disabled={isSubmitting}
           className="mt-2"
           accessibilityLabel="Cancel"
@@ -201,62 +227,5 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         </Button>
       </View>
     </View>
-  );
-}
-
-function PendingQueueHint({
-  queuedCount,
-  hasStaleItems,
-}: {
-  queuedCount: number;
-  hasStaleItems: boolean;
-}) {
-  let message = '';
-  if (queuedCount === 0) {
-    message = 'No comments queued. The review will be submitted with just the event above.';
-  } else if (hasStaleItems) {
-    message =
-      'Some comments may be outdated because the PR head changed after they were queued. Submission will use the current head.';
-  } else {
-    message = 'All comments will be sent in a single batched request.';
-  }
-  return (
-    <Text variant="muted" className="text-xs">
-      {message}
-    </Text>
-  );
-}
-
-function ReviewBodyField({
-  bodyRef,
-  inputRef,
-  isDisabled,
-  onChange,
-}: {
-  bodyRef: RefObject<string>;
-  inputRef: RefObject<TextInput | null>;
-  isDisabled: boolean;
-  onChange: () => void;
-}) {
-  const colors = useThemeColors();
-  return (
-    <TextInput
-      ref={inputRef}
-      defaultValue=""
-      editable={!isDisabled}
-      placeholder="Optional summary for the review"
-      placeholderTextColor={colors.mutedForeground}
-      accessibilityLabel="Review summary"
-      onChangeText={value => {
-        bodyRef.current = value;
-        onChange();
-      }}
-      multiline
-      textAlignVertical="top"
-      className={cn(
-        'min-h-24 rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
-        'focus:border-ring'
-      )}
-    />
   );
 }

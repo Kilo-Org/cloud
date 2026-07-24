@@ -18,6 +18,29 @@ import {
 const MINUTE_MS = 60 * 1000;
 
 describe('materializePreparationEvent', () => {
+  it('rejects a preparing event whose attemptId exceeds the id length bound', () => {
+    const eventQueries = createMemoryEventQueries();
+    // An oversized attemptId would become part of an entity_id key and, via
+    // findByEntityPrefix, a query bound. Reject it before storage so it can
+    // never poison the session (previously it crashed the prefix scan on
+    // every reconnect).
+    const oversizedAttemptId = 'a'.repeat(1024);
+
+    const applied = materializePreparationEvent(eventQueries, storedEvent(1000), {
+      version: 2,
+      attemptId: oversizedAttemptId,
+      triggerMessageId: 'msg-1',
+      revision: 1,
+      timestamp: 1000,
+      step: 'workspace_setup',
+      message: 'Preparing environment',
+      action: 'attempt_started',
+    });
+
+    expect(applied).toBe(false);
+    expect(getPreparationSnapshots(eventQueries)).toEqual([]);
+  });
+
   it('preserves startedAt when attempt_started re-announces a running attempt', () => {
     const eventQueries = createMemoryEventQueries();
     const { attemptId } = seedRunningAttempt(eventQueries, { startedAt: 1000 });

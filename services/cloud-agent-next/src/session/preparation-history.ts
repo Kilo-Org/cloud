@@ -7,8 +7,15 @@ import type {
 import type { EventQueries } from './queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
 import type { EventId } from '../types/ids.js';
+import { logger } from '../logger.js';
 
 const OUTPUT_TAIL_MAX_BYTES = 65_536;
+
+// A preparation attemptId is a UUID (see CloudAgentSession `crypto.randomUUID()`).
+// It becomes part of an `entity_id` key and, via `findByEntityPrefix`, a query
+// bound, so an oversized value would bloat storage and previously crashed the
+// prefix scan. Reject anything far larger than a UUID before it is stored.
+const MAX_PREPARATION_ID_LENGTH = 256;
 
 type PreparationSnapshot =
   | { action: 'attempt_snapshot'; attempt: Omit<PreparationAttempt, 'steps'> }
@@ -140,6 +147,25 @@ export function materializePreparationEvent(
   data: unknown
 ): boolean {
   if (!isPreparationEvent(data) || data.action.endsWith('_snapshot')) return false;
+  if (
+    data.attemptId.length > MAX_PREPARATION_ID_LENGTH ||
+    data.triggerMessageId.length > MAX_PREPARATION_ID_LENGTH
+  ) {
+    // Drop the event before it is stored: an oversized id becomes part of an
+    // entity_id key and a findByEntityPrefix bound. Log it because this should
+    // never happen in normal operation (ids are UUIDs) — it flags an upstream
+    // emitter bug that this guard is containing.
+    logger
+      .withFields({
+        sessionId: event.session_id,
+        action: data.action,
+        attemptIdLength: data.attemptId.length,
+        triggerMessageIdLength: data.triggerMessageId.length,
+        limit: MAX_PREPARATION_ID_LENGTH,
+      })
+      .warn('Rejected preparation event with oversized id');
+    return false;
+  }
   const attemptId = data.attemptId;
   const attemptIdKey = attemptEntityId(attemptId);
   const existingAttempt = eventQueries.findByEntityId(attemptIdKey);

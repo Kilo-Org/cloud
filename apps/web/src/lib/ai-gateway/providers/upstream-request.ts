@@ -178,8 +178,8 @@ export async function upstreamRequest({
 
   const targetUrl = `${provider.apiUrl}${path}${search}`;
 
-  const TEN_MINUTES_MS = 10 * 60 * 1000;
-  const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
+  const TIMEOUT_MS = 15 * 60 * 1000; // longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout
+  const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
     errorExceptInTest('[upstreamRequest] timeout');
   };

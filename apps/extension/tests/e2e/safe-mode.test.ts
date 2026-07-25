@@ -55,7 +55,13 @@ test('safe mode conversation reads the selected tab with safe tools', async () =
           ],
         },
       ],
-      toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'search_memories',
+        'get_memory',
+      ],
     });
 
     const page = await context.newPage();
@@ -121,7 +127,13 @@ test('safe mode conversation completes a tool call streamed with empty arguments
           ],
         },
       ],
-      toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'search_memories',
+        'get_memory',
+      ],
     });
 
     const page = await context.newPage();
@@ -194,6 +206,8 @@ test('viewport screenshot tool output expands to a captured image preview', asyn
         'get_page_snapshot',
         'get_element_details',
         'find_in_page',
+        'search_memories',
+        'get_memory',
         'get_viewport_screenshot',
       ],
     });
@@ -276,6 +290,8 @@ test('safe mode can capture a viewport screenshot from a local image file tab', 
         'get_page_snapshot',
         'get_element_details',
         'find_in_page',
+        'search_memories',
+        'get_memory',
         'get_viewport_screenshot',
       ],
     });

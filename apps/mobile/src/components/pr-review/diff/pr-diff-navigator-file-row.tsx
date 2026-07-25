@@ -33,19 +33,19 @@ export function NavigatorFileRow({
   const colors = useThemeColors();
   const { dir, basename } = splitPath(file.path);
   return (
-    <View className="flex-row items-center border-b border-hair-soft bg-card px-4 py-2.5">
+    <View className="flex-row items-center gap-3 border-b border-hair-soft bg-card px-4 py-2.5">
       <Pressable
         onPress={onSelect}
         accessibilityRole="button"
         accessibilityLabel={`Open ${file.path}${viewed ? ' (viewed)' : ''}`}
-        className="min-h-11 flex-1 flex-row items-center active:opacity-70"
+        className="min-h-11 min-w-0 flex-1 flex-row items-center active:opacity-70"
       >
-        <View className="flex-1 pr-3">
-          <View className="flex-row items-baseline">
+        <View className="min-w-0 flex-1">
+          <View className="min-w-0 flex-row items-baseline">
             {dir.length > 0 ? (
               <Text
                 variant="muted"
-                className="text-sm"
+                className="min-w-0 shrink text-sm"
                 // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
                 style={{ color: colors.mutedForeground }}
                 numberOfLines={1}
@@ -53,7 +53,7 @@ export function NavigatorFileRow({
                 {dir}
               </Text>
             ) : null}
-            <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+            <Text className="shrink-0 text-sm font-medium text-foreground" numberOfLines={1}>
               {basename}
             </Text>
           </View>
@@ -72,7 +72,9 @@ export function NavigatorFileRow({
           </View>
         </View>
       </Pressable>
-      <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
+      <View className="shrink-0">
+        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
+      </View>
     </View>
   );
 }

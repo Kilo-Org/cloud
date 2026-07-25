@@ -208,8 +208,22 @@ const turnMockConfig = {
   secondCompletionEvents: [{ choices: [{ delta: { content: 'The weather in Skopje is 21C.' } }] }],
   // Both turns offer the safe tools plus the mapped MCP tool.
   toolNamesByCall: [
-    ['get_page_snapshot', 'get_element_details', 'find_in_page', MAPPED_TOOL_NAME],
-    ['get_page_snapshot', 'get_element_details', 'find_in_page', MAPPED_TOOL_NAME],
+    [
+      'get_page_snapshot',
+      'get_element_details',
+      'find_in_page',
+      'search_memories',
+      'get_memory',
+      MAPPED_TOOL_NAME,
+    ],
+    [
+      'get_page_snapshot',
+      'get_element_details',
+      'find_in_page',
+      'search_memories',
+      'get_memory',
+      MAPPED_TOOL_NAME,
+    ],
   ],
 };
 

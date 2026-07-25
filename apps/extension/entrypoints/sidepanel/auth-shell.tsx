@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useAtom } from 'jotai';
 import type { JSX, ReactNode } from 'react';
 import { Settings, X } from 'lucide-react';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { KiloLogo } from '@/src/shared/kilo-logo';
+import { MemorySettings } from './memory-settings';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 import { RemoteMcpSettings } from './remote-mcp-settings';
+import { settingsDialogOpenAtom } from './settings-dialog-state';
 
 const emptyOrganizationOptions: KiloOrganizationOption[] = [];
 
@@ -43,7 +45,7 @@ const HeaderActions = ({
   organizationOptions: KiloOrganizationOption[];
   selectedOrganizationId: string;
 }): JSX.Element => {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useAtom(settingsDialogOpenAtom);
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
@@ -82,6 +84,7 @@ const HeaderActions = ({
               <p className="text-xs font-medium text-zinc-500">Signed in</p>
               <p className="mt-1 truncate text-sm text-zinc-200">{auth.userEmail ?? 'Kilo user'}</p>
             </div>
+            <MemorySettings />
             <OrganizationCreditAccountSelect
               onChange={onOrganizationChange}
               organizationOptions={organizationOptions}

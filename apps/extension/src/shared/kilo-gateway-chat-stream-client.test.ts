@@ -583,4 +583,49 @@ describe('kilo gateway chat stream client', () => {
       promptTokens: 1200,
     });
   });
+
+  it('carries costUsd when the usage chunk includes cost', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":34,"total_tokens":1234,"cost":0.0123}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      costUsd: 0.0123,
+      promptTokens: 1200,
+    });
+  });
+
+  it('omits costUsd when the usage chunk has no cost field', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":800,"completion_tokens":10,"total_tokens":810}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      promptTokens: 800,
+    });
+    expect(completion.usage).not.toHaveProperty('costUsd');
+  });
+
+  it('parses prompt_tokens when cost is null and omits costUsd', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":500,"completion_tokens":2,"total_tokens":502,"cost":null}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      promptTokens: 500,
+    });
+    expect(completion.usage).not.toHaveProperty('costUsd');
+  });
 });

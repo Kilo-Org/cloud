@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 
+import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
 import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
@@ -38,6 +38,11 @@ export function PrReviewMergeScreen() {
   const method: PrMergeMethod = MERGE_METHODS.has(params.method as PrMergeMethod)
     ? (params.method as PrMergeMethod)
     : 'merge';
+  const sheetTitle = mode === 'enable-auto-merge' ? 'Enable auto-merge' : 'Merge pull request';
+  const eyebrow = `${owner}/${repo}#${rawNumber}`;
+  const dismiss = () => {
+    router.back();
+  };
 
   const trpc = useTRPC();
   const pr = useQuery(
@@ -47,28 +52,8 @@ export function PrReviewMergeScreen() {
     )
   );
 
-  let content: ReactNode = null;
-  if (pr.isLoading) {
-    content = (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-      </View>
-    );
-  } else if (pr.isError || !pr.data) {
-    content = (
-      <View className="flex-1">
-        <QueryError
-          variant="server"
-          title="Couldn't load merge options"
-          onRetry={() => {
-            void pr.refetch();
-          }}
-          isRetrying={pr.isFetching}
-        />
-      </View>
-    );
-  } else {
-    content = (
+  if (pr.data) {
+    return (
       <PrMergeSheet
         owner={owner}
         repoName={repo}
@@ -83,27 +68,37 @@ export function PrReviewMergeScreen() {
         repo={pr.data.repo}
         initialMethod={method}
         mode={mode}
+        sheetTitle={sheetTitle}
+        eyebrow={eyebrow}
         onRefetch={async () => {
           await pr.refetch();
         }}
-        onDismiss={() => {
-          router.back();
-        }}
+        onDismiss={dismiss}
       />
     );
   }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={mode === 'enable-auto-merge' ? 'Enable auto-merge' : 'Merge pull request'}
-        eyebrow={`${owner}/${repo}#${rawNumber}`}
-        modal
-        onBack={() => {
-          router.back();
-        }}
-      />
-      {content}
+  const body: ReactNode = pr.isLoading ? (
+    <View className="flex-1 items-center justify-center py-16">
+      <ActivityIndicator size="small" color={colors.mutedForeground} />
     </View>
+  ) : (
+    <QueryError
+      variant="server"
+      title="Couldn't load merge options"
+      onRetry={() => {
+        void pr.refetch();
+      }}
+      isRetrying={pr.isFetching}
+    />
+  );
+
+  return (
+    <>
+      <PrFormSheetHeader title={sheetTitle} eyebrow={eyebrow} onBack={dismiss} />
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="grow">
+        {body}
+      </ScrollView>
+    </>
   );
 }

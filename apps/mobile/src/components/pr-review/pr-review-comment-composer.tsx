@@ -7,8 +7,12 @@
 import * as Crypto from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, type TextInput, View } from 'react-native';
+import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
 
+import {
+  PrFormSheetHeader,
+  useFormSheetKeyboardVisible,
+} from '@/components/pr-review/pr-form-sheet-chrome';
 import {
   CommentBodyField,
   ComposerFooter,
@@ -40,6 +44,8 @@ type PrReviewCommentComposerProps = Readonly<{
   startLine?: number;
   /** Seeded body (edit) / empty (create). Also the dirty-check baseline. */
   initialBody?: string;
+  title: string;
+  eyebrow: string;
   onDismiss: () => void;
 }>;
 
@@ -54,6 +60,8 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     line,
     startLine,
     initialBody = '',
+    title,
+    eyebrow,
     onDismiss,
   } = props;
   const pending = usePendingReview();
@@ -67,6 +75,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   const bodyRef = useRef<string>(initialBody);
   const bodyBaselineRef = useRef<string>(initialBody);
   const bodyInputRef = useRef<TextInput | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
   const [hasBody, setHasBody] = useState(() => initialBody.trim().length > 0);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<
@@ -85,6 +94,20 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     setInlineError(display.message);
     setInlineErrorKind(display.kind);
   }, [createComment.error, isEdit]);
+
+  // automaticallyAdjustKeyboardInsets can scroll the focused field under the
+  // pinned header. Compact kb layout fits at offset 0 — snap back so body +
+  // footer CTAs stay in the inset viewport together.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   function clearBadRequestOnBodyEdit() {
     // bad-request clears on body change; forbidden stays for the session.
@@ -203,6 +226,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     bodyInputRef.current?.focus();
   }
 
+  const keyboardVisible = useFormSheetKeyboardVisible();
   const suggestionAvailable = !isEdit && side === 'RIGHT' && Boolean(selection?.selectedText);
   let suggestionDisabledReason: string | null = null;
   if (!isEdit) {
@@ -212,6 +236,9 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       suggestionDisabledReason = 'Tap a diff line to enable suggestions.';
     }
   }
+  // Half-detent needs every row for footer CTAs; surface Insert only once the
+  // keyboard has expanded the sheet and compacted the body field.
+  const showInsertSuggestion = suggestionAvailable && keyboardVisible;
 
   const primaryDisabled =
     isSubmitting ||
@@ -220,66 +247,73 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     (!isEdit && inlineErrorKind === 'bad-request') ||
     (isEdit && !hasBody);
 
+  // PickerSheet invariant: [header, ScrollView] as direct children (no
+  // wrapper View, no sticky-footer sibling). Footer is trailing scroll
+  // content so keyboard insets + AppAwareKeyboardPaddingView keep CTAs
+  // tappable without overpainting the pinned header.
   return (
-    <View className="flex-1 bg-background">
+    <>
+      <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={onDismiss} />
       <ScrollView
-        className="flex-1"
-        contentContainerClassName="gap-4 px-6 pb-8 pt-2"
+        ref={scrollRef}
+        className="flex-1 bg-background"
+        contentContainerClassName="pb-1"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <ContextPreview
-          selection={selection}
-          fallbackPath={path}
-          fallbackLineLabel={lineRangeLabel}
-          fallbackSide={side}
-          preferFallback={isEdit}
-        />
-        <View className="gap-2">
-          <Text className="text-sm font-medium text-foreground">Comment</Text>
-          <CommentBodyField
-            inputRef={bodyInputRef}
-            isDisabled={isSubmitting}
-            defaultValue={initialBody}
-            onChangeText={handleBodyChange}
+        <View className="gap-1.5 px-6 pt-1.5">
+          <ContextPreview
+            selection={selection}
+            fallbackPath={path}
+            fallbackLineLabel={lineRangeLabel}
+            fallbackSide={side}
+            preferFallback={isEdit}
           />
-          {!isEdit ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={handleInsertSuggestion}
-              disabled={!suggestionAvailable}
-              accessibilityLabel="Insert a code suggestion"
-              accessibilityHint={suggestionDisabledReason ?? undefined}
-              className="self-start"
-            >
-              <Text>Insert suggestion</Text>
-            </Button>
-          ) : null}
-        </View>
-        {inlineError && inlineErrorKind !== 'reconnect' ? (
-          <View
-            className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 p-3"
-            accessibilityLiveRegion="polite"
-          >
-            <Text className="text-sm text-destructive">{inlineError}</Text>
+          <View className="gap-1">
+            <Text className="text-xs font-medium text-foreground">Comment</Text>
+            <CommentBodyField
+              inputRef={bodyInputRef}
+              isDisabled={isSubmitting}
+              defaultValue={initialBody}
+              onChangeText={handleBodyChange}
+            />
+            {showInsertSuggestion ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={handleInsertSuggestion}
+                accessibilityLabel="Insert a code suggestion"
+                accessibilityHint={suggestionDisabledReason ?? undefined}
+                className="self-start"
+              >
+                <Text>Insert suggestion</Text>
+              </Button>
+            ) : null}
           </View>
-        ) : null}
-        {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
-      </ScrollView>
+          {inlineError && inlineErrorKind !== 'reconnect' ? (
+            <View
+              className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-1.5"
+              accessibilityLiveRegion="polite"
+            >
+              <Text className="text-xs text-destructive">{inlineError}</Text>
+            </View>
+          ) : null}
+          {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
+        </View>
 
-      <ComposerFooter
-        isEdit={isEdit}
-        isSubmitting={isSubmitting}
-        primaryDisabled={primaryDisabled}
-        onSave={handleSave}
-        onCommentNow={() => {
-          void handleCommentNow();
-        }}
-        onAddToReview={handleAddToReview}
-        onCancel={handleCancel}
-      />
-    </View>
+        <ComposerFooter
+          isEdit={isEdit}
+          isSubmitting={isSubmitting}
+          primaryDisabled={primaryDisabled}
+          onSave={handleSave}
+          onCommentNow={() => {
+            void handleCommentNow();
+          }}
+          onAddToReview={handleAddToReview}
+          onCancel={handleCancel}
+        />
+      </ScrollView>
+    </>
   );
 }

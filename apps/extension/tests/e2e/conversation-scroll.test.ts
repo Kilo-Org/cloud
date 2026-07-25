@@ -11,7 +11,13 @@ import {
   waitForStoredConversationText,
 } from './extension-context-fixture';
 
-const safeReadToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
+const safeReadToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+];
 
 test('upward wheel on a non-scrollable conversation keeps auto-scroll enabled', async () => {
   const fixture = await startFixtureServer();

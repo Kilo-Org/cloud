@@ -136,6 +136,7 @@ export function SessionDetailContent({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
@@ -271,6 +272,7 @@ export function SessionDetailContent({
     modelOptions,
     selectedModel: sessionModels.selectedValue,
     selectedVariant: sessionModels.selectedVariant,
+    cloudAgentModelOverride,
   });
 
   const viewTrackedRef = useRef<string | null>(null);
@@ -413,6 +415,10 @@ export function SessionDetailContent({
         return;
       }
 
+      manager.setCloudAgentModelOverride({
+        model: value,
+        ...(variant ? { variant } : {}),
+      });
       setCurrentModel(value);
       setCurrentVariant(variant);
       savePersistedModel(organizationId, { model: value, variant });

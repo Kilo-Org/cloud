@@ -101,11 +101,11 @@ export const OrganizationCreditAccountSelect = ({
   organizationOptions: KiloOrganizationOption[];
   selectedOrganizationId: string;
 }): JSX.Element => (
-  <label className="grid gap-1 text-xs font-medium text-zinc-500">
+  <label className="grid gap-1 type-label text-foreground-muted">
     Credit account
     <select
       aria-label="Credit account"
-      className="h-8 rounded-md border border-zinc-800 bg-zinc-950 px-2 text-sm text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
+      className="h-8 rounded-md border border-border-strong bg-input-bg px-2 type-body text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
       onChange={event => {
         onChange(event.currentTarget.value);
       }}

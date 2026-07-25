@@ -163,6 +163,7 @@ export function SessionDetailContent({
     handleRespondToPermission,
   } = useInteractionHandlers({
     manager,
+    kiloSessionId: sessionId,
     activeQuestion,
     activePermission,
     surface: analyticsSurface,

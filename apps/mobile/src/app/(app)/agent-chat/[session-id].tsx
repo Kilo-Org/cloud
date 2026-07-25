@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
-import { useAckSessionAttentionOnOpen } from '@/lib/session-attention';
 
 export default function SessionDetailScreen() {
   const {
@@ -40,7 +39,6 @@ export default function SessionDetailScreen() {
   }>();
   const trpc = useTRPC();
   const router = useRouter();
-  useAckSessionAttentionOnOpen(sessionId);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
       { session_id: sessionId },

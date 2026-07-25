@@ -14,7 +14,13 @@ import {
 } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 
-const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'] as const;
+const safeToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+] as const;
 
 const modelWithContextLength = [
   {

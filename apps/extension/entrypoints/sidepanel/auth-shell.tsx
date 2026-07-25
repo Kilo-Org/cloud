@@ -102,27 +102,29 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
   };
 
   return (
-    <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+    <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-zinc-200">Share usage analytics</p>
-          <p className="mt-0.5 text-xs leading-4 text-zinc-500">
+          <p className="type-body font-medium text-foreground">Share usage analytics</p>
+          <p className="type-label mt-0.5 leading-4 text-foreground-muted">
             Helps improve Kilo. No page content is collected.
           </p>
           {showFirefoxHint ? (
-            <p className="mt-1 text-xs leading-4 text-zinc-500">
+            <p className="type-label mt-1 leading-4 text-foreground-muted">
               {FIREFOX_USAGE_DATA_BLOCKED_HINT}
             </p>
           ) : null}
           {state.errorMessage === null ? null : (
-            <p className="mt-1 text-xs leading-4 text-red-400">{state.errorMessage}</p>
+            <p className="type-label mt-1 leading-4 text-status-red-400">{state.errorMessage}</p>
           )}
         </div>
         <button
           aria-checked={state.checked}
           aria-label="Share usage analytics"
-          className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
-            state.checked ? 'border-[#EDFF00]/40 bg-[#EDFF00]/20' : 'border-zinc-700 bg-zinc-800'
+          className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected ${
+            state.checked
+              ? 'border-border-strong bg-surface-selected'
+              : 'border-border bg-surface-overlay'
           }`}
           disabled={!interactive}
           onClick={onToggle}
@@ -132,7 +134,7 @@ const AnalyticsSettingsRow = ({ userEmail }: { userEmail: string | undefined }):
           <span
             aria-hidden="true"
             className={`absolute top-0.5 size-3.5 rounded-full transition ${
-              state.checked ? 'left-4 bg-[#EDFF00]' : 'left-0.5 bg-zinc-400'
+              state.checked ? 'left-4 bg-foreground' : 'left-0.5 bg-foreground-muted'
             }`}
           />
         </button>

@@ -1,6 +1,13 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 
+const posthogApiKey = process.env['VITE_POSTHOG_API_KEY'];
+if (typeof posthogApiKey !== 'string' || posthogApiKey.trim().length === 0) {
+  console.warn(
+    'VITE_POSTHOG_API_KEY is not set; extension analytics will be disabled in this build.'
+  );
+}
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   manifest: ({ browser }) => ({
@@ -10,7 +17,8 @@ export default defineConfig({
     browser_specific_settings: {
       gecko: {
         data_collection_permissions: {
-          required: ['none'],
+          optional: ['technicalAndInteraction'],
+          required: ['personallyIdentifyingInfo'],
         },
         id: 'browser-agent@kilo.ai',
       },

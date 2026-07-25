@@ -41,6 +41,9 @@ import {
   openRouterToVercelInferenceProviderId,
   VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeProviderModelsWithDataPolicy,
+} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -318,29 +321,24 @@ async function syncProviders(
 
   // Create simplified structure with providers containing their models directly
   const normalizedProviders: NormalizedProvider[] = filteredProviderModelData.map(data => {
-    // Deduplicate models within each provider by slug
-    const uniqueModelsMap = new Map<string, OpenRouterModel>();
-    data.models.forEach(model => {
-      uniqueModelsMap.set(normalizeModelId(model.slug), model);
-    });
-    const uniqueModels = Array.from(uniqueModelsMap.values());
+    const normalized = normalizeProviderModelsWithDataPolicy(
+      data.provider,
+      data.models,
+      kiloExclusiveModels
+    );
 
     // Sort models by name
-    uniqueModels.sort((a, b) => a.name.localeCompare(b.name));
+    normalized.models.sort((a, b) => a.name.localeCompare(b.name));
 
     return {
       name: data.provider.name,
       displayName: data.provider.displayName,
       slug: data.provider.slug,
-      dataPolicy: {
-        training: data.provider.dataPolicy.training,
-        retainsPrompts: data.provider.dataPolicy.retainsPrompts,
-        canPublish: data.provider.dataPolicy.canPublish,
-      },
+      dataPolicy: normalized.dataPolicy,
       headquarters: data.provider.headquarters,
       datacenters: data.provider.datacenters,
       icon: data.provider.icon,
-      models: uniqueModels, // Use deduplicated and sorted models
+      models: normalized.models,
     };
   });
 
@@ -356,22 +354,32 @@ async function syncProviders(
 
   for (const provider of missingProviders.values()) {
     const iconInitials = provider.slug.slice(0, 2).toUpperCase();
+    const normalized = normalizeProviderModelsWithDataPolicy(
+      {
+        name: provider.name,
+        displayName: provider.name,
+        slug: provider.slug,
+        dataPolicy: {
+          training: provider.training,
+          retainsPrompts: provider.retainsPrompts,
+          canPublish: false,
+        },
+      },
+      mappedExtraModels.filter(m => m.provider.slug === provider.slug).map(m => m.model),
+      kiloExclusiveModels
+    );
     allProviders.push({
       name: provider.name,
       displayName: provider.name,
       slug: provider.slug,
-      dataPolicy: {
-        training: provider.training,
-        retainsPrompts: provider.retainsPrompts,
-        canPublish: false,
-      },
+      dataPolicy: normalized.dataPolicy,
       headquarters: 'Unknown',
       datacenters: ['Global'],
       icon: {
         url: `https://placehold.co/100?text=${iconInitials}&font=roboto`,
         className: 'rounded-sm',
       },
-      models: mappedExtraModels.filter(m => m.provider.slug === provider.slug).map(m => m.model),
+      models: normalized.models,
     });
   }
 

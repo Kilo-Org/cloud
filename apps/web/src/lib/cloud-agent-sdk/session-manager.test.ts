@@ -1485,6 +1485,46 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('uses cloud-agent model override on send and clears it on switchSession', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      // Mock connect auto-resolves as cloud-agent.
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.setCloudAgentModelOverride({ model: 'openai/gpt-5', variant: 'high' });
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual({
+        model: 'openai/gpt-5',
+        variant: 'high',
+      });
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'use override',
+          mode: 'code',
+          // Stale composer payload must not win over the manager override.
+          model: 'stale/composer-model',
+          variant: 'stale',
+        },
+      });
+
+      expect(mockSession.send).toHaveBeenLastCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'use override',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'openai/gpt-5' },
+          variant: 'high',
+        },
+        images: undefined,
+      });
+
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
+    });
+
     it('sends only the explicit remote override and omits stale session model fields after clear', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

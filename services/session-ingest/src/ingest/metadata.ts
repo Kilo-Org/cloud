@@ -1,12 +1,16 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 
 import type { Env } from '../env';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
+import { isNeedsInputStatus } from '../dos/session-ingest-attention';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
+
+/** Stored status written when a CLI disconnects while the session is waiting on input. */
+export const CLI_DISCONNECT_ATTENTION_RESET_STATUS = 'retry' as const;
 
 type SessionMetadataUpdates = Partial<
   Pick<
@@ -244,4 +248,100 @@ export async function flushPartialMetadataChanges(
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/**
+ * Clear a stored attention status when the owning CLI disconnects.
+ *
+ * Only rows currently in `question`/`permission` are updated (to `retry`). Uses a
+ * conditional write so concurrent non-attention updates are not overwritten. Emits
+ * `session.status.updated` via the metadata path only — never enters the ingest
+ * completion pipeline, so no "Task completed" push can fire.
+ */
+export async function resetAttentionStatusOnCliDisconnect(
+  env: Env,
+  kiloUserId: string,
+  sessionId: string,
+  ctx?: { waitUntil(promise: Promise<unknown>): void }
+): Promise<void> {
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+  const statusUpdatedAt = new Date().toISOString();
+
+  const notification = await db.transaction(async tx => {
+    const [statusRow] = await tx
+      .select({ status: cli_sessions_v2.status })
+      .from(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+      )
+      .limit(1)
+      .for('update');
+
+    if (!statusRow) return null;
+
+    const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
+    if (!isNeedsInputStatus(previousStatus)) return null;
+
+    await tx
+      .update(cli_sessions_v2)
+      .set({
+        status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        status_updated_at: statusUpdatedAt,
+      })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, sessionId),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+          // Re-check in WHERE so a concurrent non-attention write wins.
+          inArray(cli_sessions_v2.status, ['question', 'permission'])
+        )
+      );
+
+    const [persistedRow] = await tx
+      .select({
+        session_id: cli_sessions_v2.session_id,
+        created_at: cli_sessions_v2.created_at,
+        updated_at: cli_sessions_v2.updated_at,
+        title: cli_sessions_v2.title,
+        created_on_platform: cli_sessions_v2.created_on_platform,
+        organization_id: cli_sessions_v2.organization_id,
+        git_url: cli_sessions_v2.git_url,
+        git_branch: cli_sessions_v2.git_branch,
+        parent_session_id: cli_sessions_v2.parent_session_id,
+        status: cli_sessions_v2.status,
+        status_updated_at: cli_sessions_v2.status_updated_at,
+      })
+      .from(cli_sessions_v2)
+      .where(
+        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+      )
+      .limit(1);
+
+    if (!persistedRow) return null;
+    if (persistedRow.status !== CLI_DISCONNECT_ATTENTION_RESET_STATUS) return null;
+
+    return {
+      previousStatus,
+      session: mapSessionEventRow(persistedRow),
+    };
+  });
+
+  if (!notification) return;
+
+  notifyUserSessionEvent(
+    env,
+    kiloUserId,
+    {
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: notification.session,
+        previousStatus: notification.previousStatus,
+        status: notification.session.status,
+        statusUpdatedAt: notification.session.statusUpdatedAt,
+        changedAt: notification.session.updatedAt,
+      },
+    },
+    ctx
+  );
 }

@@ -846,7 +846,11 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // If another CLI socket already has this connectionId, this is a stale
     // close from a reconnect — the replacement socket is already active.
+    // Exclude the closing socket: under wrangler/workerd, getWebSockets() still
+    // includes it during webSocketClose, so matching self would always look "replaced"
+    // and skip ownership cleanup + attention reset (DEF-5 E2E failure).
     const replaced = this.ctx.getWebSockets('cli').some(ws => {
+      if (ws === disconnectedWs) return false;
       const att = ws.deserializeAttachment() as WSAttachment | null;
       return att?.role === 'cli' && att.connectionId === connectionId;
     });

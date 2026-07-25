@@ -1475,7 +1475,7 @@ describe('UserConnectionDO', () => {
         ).toBe(false);
       });
 
-      mockCtx.removeSocket(cliWs);
+      // Leave the socket in getWebSockets() — matches workerd during webSocketClose.
       await disconnectCli(doInstance, cliWs);
 
       callOrder.push('disconnect');
@@ -1500,6 +1500,34 @@ describe('UserConnectionDO', () => {
       );
       expect(callOrder.filter(step => step === 'reset')).toHaveLength(2);
       expect(callOrder.at(-1)).toBe('disconnect');
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('resets attention when the closing socket is still listed in getWebSockets (workerd)', async () => {
+      // Production wrangler/workerd keeps the closing WebSocket in getWebSockets()
+      // during webSocketClose. Matching connectionId without excluding self would
+      // treat every disconnect as a stale reconnect and skip the attention reset.
+      // Prior unit tests always called removeSocket first, so they never caught this.
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s-question', 'question')]);
+      webWs.send.mockClear();
+      sessionIngestMocks.getSessionIngestDO.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockClear();
+
+      // Do NOT removeSocket — mirrors workerd during webSocketClose.
+      expect(mockCtx.sockets).toContain(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledTimes(1);
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's-question'
+      );
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
         true
       );
@@ -1580,7 +1608,7 @@ describe('UserConnectionDO', () => {
         new Error('db down')
       );
 
-      mockCtx.removeSocket(cliWs);
+      // Leave socket listed (workerd close semantics).
       await disconnectCli(doInstance, cliWs);
 
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(

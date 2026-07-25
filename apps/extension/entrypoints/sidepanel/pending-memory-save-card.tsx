@@ -20,10 +20,10 @@ const CONFIRMATION_MESSAGE = 'Saved to memory';
 const TRUNCATION_NOTICE = 'Selection truncated to 8,000 characters';
 
 const secondaryButtonClass =
-  'h-8 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50';
+  'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle';
 
 const primaryButtonClass =
-  'h-8 rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500';
+  'type-label h-8 rounded-md bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle';
 
 export const PendingMemorySaveCard = (): JSX.Element | null => {
   const { isLoaded, loadError, memories, pendingDraft, reload } = useAgentMemories();
@@ -117,12 +117,12 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   return (
     <section
       aria-label="Add to memory"
-      className="shrink-0 border-b border-zinc-800 bg-zinc-950 px-3 py-3"
+      className="shrink-0 border-b border-border bg-surface-background px-3 py-3"
     >
-      <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+      <div className="rounded-xl border border-border bg-surface-raised p-3">
         {view.kind === 'confirmation' ? (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-zinc-200">{CONFIRMATION_MESSAGE}</p>
+            <p className="type-body text-foreground">{CONFIRMATION_MESSAGE}</p>
             <div className="flex justify-end">
               <button className={primaryButtonClass} onClick={handleDone} type="button">
                 Done
@@ -133,7 +133,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
 
         {view.kind === 'loadError' ? (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-zinc-300">{LOAD_ERROR_MESSAGE}</p>
+            <p className="type-body text-status-red-400">{LOAD_ERROR_MESSAGE}</p>
             <div className="flex justify-end">
               <button className={primaryButtonClass} onClick={reload} type="button">
                 Retry
@@ -146,7 +146,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
           <div className="flex flex-col gap-3">
             {view.kind === 'full' ? (
               <div className="flex flex-col gap-2">
-                <p className="text-sm text-zinc-300">{FULL_MESSAGE}</p>
+                <p className="type-body text-foreground">{FULL_MESSAGE}</p>
                 <div className="flex justify-end">
                   <button
                     className={secondaryButtonClass}
@@ -163,7 +163,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
 
             {view.kind === 'saveError' ? (
               <div className="flex flex-col gap-2">
-                <p className="text-sm text-zinc-300">{view.message}</p>
+                <p className="type-body text-status-red-400">{view.message}</p>
                 <div className="flex justify-end">
                   <button
                     className={primaryButtonClass}
@@ -182,22 +182,22 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
             {pendingDraft === undefined ? null : (
               <>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-zinc-500">Selection</p>
-                  <p className="whitespace-pre-wrap break-words text-sm text-zinc-200">
+                  <p className="type-label text-foreground-muted">Selection</p>
+                  <p className="type-body whitespace-pre-wrap break-words text-foreground">
                     {buildDraftSelectionPreview(pendingDraft.text)}
                   </p>
                   {pendingDraft.truncated === true ? (
-                    <p className="text-xs text-zinc-500">{TRUNCATION_NOTICE}</p>
+                    <p className="type-label text-foreground-muted">{TRUNCATION_NOTICE}</p>
                   ) : null}
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-zinc-500" htmlFor="memory-note">
+                  <label className="type-label text-foreground-muted" htmlFor="memory-note">
                     Note (optional)
                   </label>
                   <textarea
                     aria-label="Memory note (optional)"
-                    className="min-h-16 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-sm leading-5 text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
+                    className="type-body min-h-16 w-full resize-y rounded-md border border-border-strong bg-input-bg px-2 py-1.5 text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
                     id="memory-note"
                     maxLength={MAX_MEMORY_NOTE_LENGTH}
                     onChange={event => {
@@ -205,7 +205,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
                     }}
                     value={note}
                   />
-                  <p className="text-right text-xs text-zinc-500">
+                  <p className="type-label text-right text-foreground-muted">
                     {noteCount.count}/{noteCount.max}
                   </p>
                 </div>

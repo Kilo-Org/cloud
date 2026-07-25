@@ -3,6 +3,7 @@ import { browser, storage } from '#imports';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import { AlertTriangle } from 'lucide-react';
 import {
   compactingConversationIdsAtom,
   contextUsageAtomFamily,
@@ -863,8 +864,9 @@ export const AgentChatPanel = ({
       <ConversationList items={groupedEvents} streamingMessageId={streamingMessageId} />
 
       {remoteMcpToolWarning === undefined ? null : (
-        <p className="border-t border-amber-500/30 bg-amber-950/20 px-4 py-2 text-xs text-amber-300">
-          {remoteMcpToolWarning}
+        <p className="flex items-start gap-2 border-t border-status-yellow-500/30 bg-status-yellow-500/10 px-4 py-2 text-xs text-status-yellow-300">
+          <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0 text-status-yellow-400" />
+          <span className="min-w-0">{remoteMcpToolWarning}</span>
         </p>
       )}
 
@@ -876,7 +878,7 @@ export const AgentChatPanel = ({
         onSubmit={submitDraft}
       />
 
-      <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
+      <footer className="border-t border-border bg-surface-raised px-4 py-2">
         <AgentFooterControls
           contextDonut={contextDonut}
           inspectableTabs={inspectableTabs}

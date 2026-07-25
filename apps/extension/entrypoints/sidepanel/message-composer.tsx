@@ -20,7 +20,7 @@ export const MessageComposer = ({
 
   return (
     <form
-      className="border-t border-zinc-900 px-4 py-3"
+      className="border-t border-border bg-surface-background px-4 py-3"
       onSubmit={event => {
         event.preventDefault();
         onSubmit();
@@ -30,7 +30,7 @@ export const MessageComposer = ({
         Message agent
       </label>
       <textarea
-        className="min-h-20 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm leading-5 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
+        className="type-body min-h-20 w-full resize-none rounded-md border border-border-strong bg-input-bg px-3 py-2 text-foreground outline-none transition placeholder:text-foreground-subtle focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
         id="agent-message"
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
           setDraft(event.currentTarget.value);
@@ -46,7 +46,11 @@ export const MessageComposer = ({
       />
       <div className="mt-2 grid gap-2">
         <button
-          className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+          className={
+            isRunning
+              ? 'type-label h-9 w-full rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background'
+              : 'type-label h-9 w-full rounded-md border border-transparent bg-brand-primary px-3 text-brand-primary-foreground transition hover:bg-brand-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle'
+          }
           disabled={isRunning ? false : isSendDisabled}
           onClick={isRunning ? onStop : undefined}
           type={isRunning ? 'button' : 'submit'}

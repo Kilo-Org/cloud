@@ -52,13 +52,13 @@ export const CollapsibleCodeBlock = ({
         {expanded ? null : (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b bg-gradient-to-t from-[rgb(9_9_11)] to-transparent"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b bg-gradient-to-t from-surface-inset to-transparent"
           />
         )}
       </div>
       <button
         aria-expanded={expanded}
-        className="mt-1 flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] font-medium text-zinc-400 outline-none transition hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-[#EDFF00] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+        className="type-label mt-1 flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-foreground-muted outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
         onClick={() => {
           setExpanded(current => !current);
         }}

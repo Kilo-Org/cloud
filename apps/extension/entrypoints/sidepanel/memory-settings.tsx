@@ -10,7 +10,7 @@ const EMPTY_MESSAGE =
 const LOAD_ERROR_MESSAGE = "Couldn't load memories. Try again.";
 
 const secondaryButtonClass =
-  'h-8 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950';
+  'type-label h-8 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background';
 
 export const MemorySettings = (): JSX.Element => {
   const { isLoaded, loadError, memories, reload } = useAgentMemories();
@@ -19,15 +19,17 @@ export const MemorySettings = (): JSX.Element => {
   return (
     <section
       aria-label="Memories"
-      className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3"
+      className="min-w-0 rounded-xl border border-border bg-surface-raised p-3"
     >
-      <h2 className="text-xs font-medium text-zinc-500">Memories</h2>
+      <h2 className="type-label text-foreground-muted">Memories</h2>
 
-      {view.kind === 'loading' ? <p className="mt-2 text-sm text-zinc-400">Loading…</p> : null}
+      {view.kind === 'loading' ? (
+        <p className="type-body mt-2 text-foreground-muted">Loading…</p>
+      ) : null}
 
       {view.kind === 'loadError' ? (
         <div className="mt-2 flex flex-col gap-2">
-          <p className="text-sm text-zinc-300">{LOAD_ERROR_MESSAGE}</p>
+          <p className="type-body text-status-red-400">{LOAD_ERROR_MESSAGE}</p>
           <div className="flex justify-end">
             <button className={secondaryButtonClass} onClick={reload} type="button">
               Retry
@@ -36,20 +38,22 @@ export const MemorySettings = (): JSX.Element => {
         </div>
       ) : null}
 
-      {view.kind === 'empty' ? <p className="mt-2 text-sm text-zinc-400">{EMPTY_MESSAGE}</p> : null}
+      {view.kind === 'empty' ? (
+        <p className="type-body mt-2 text-foreground-muted">{EMPTY_MESSAGE}</p>
+      ) : null}
 
       {view.kind === 'list' ? (
         <ul className="mt-2 flex flex-col gap-2">
           {view.items.map(item => (
             <li
-              className="flex min-w-0 items-start gap-2 rounded-md border border-zinc-800/80 bg-zinc-950/40 p-2"
+              className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface-background p-2"
               key={item.id}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-zinc-100" title={item.preview}>
+                <p className="type-body truncate font-medium text-foreground" title={item.preview}>
                   {item.preview}
                 </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
+                <p className="type-label mt-0.5 text-foreground-muted">
                   {item.domain === undefined
                     ? item.dateLabel
                     : `${item.domain} · ${item.dateLabel}`}
@@ -57,7 +61,7 @@ export const MemorySettings = (): JSX.Element => {
               </div>
               <button
                 aria-label={item.deleteAriaLabel}
-                className="flex size-7 shrink-0 items-center justify-center rounded-md border border-zinc-800 text-zinc-400 transition hover:border-red-500/70 hover:bg-red-950/30 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-400/50"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:border-status-red-500/50 hover:bg-status-red-500/10 hover:text-status-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
                 onClick={() => {
                   void deleteAgentMemory(storage, item.id);
                 }}

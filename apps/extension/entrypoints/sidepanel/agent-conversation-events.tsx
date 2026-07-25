@@ -126,8 +126,8 @@ const MessageEvent = ({
       <div
         className={
           isUser
-            ? 'max-w-[88%] rounded-lg bg-zinc-100 px-3 py-2 text-sm leading-5 text-zinc-950'
-            : 'max-w-[88%] rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm leading-5 text-zinc-200'
+            ? 'max-w-[88%] rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm leading-5 text-foreground'
+            : 'max-w-[88%] rounded-lg px-3 py-2 text-sm leading-5 text-foreground'
         }
       >
         <div className="agent-message-markdown">
@@ -145,11 +145,11 @@ const ThinkingEvent = ({
 }: {
   event: Extract<AgentConversationEvent, { readonly type: 'thinking' }>;
 }): JSX.Element => (
-  <details className="group rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2">
-    <summary className="cursor-pointer list-none text-xs font-semibold text-zinc-400 outline-none transition hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-[#EDFF00] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+  <details className="group rounded-lg border border-border bg-surface-inset px-3 py-2">
+    <summary className="cursor-pointer list-none text-xs font-semibold text-foreground-muted outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background">
       thinking
     </summary>
-    <div className="agent-message-markdown mt-2 text-xs leading-5 text-zinc-400">
+    <div className="agent-message-markdown mt-2 text-xs leading-5 text-foreground-muted">
       <ReactMarkdown remarkPlugins={remarkPlugins}>{event.text}</ReactMarkdown>
     </div>
   </details>
@@ -166,22 +166,30 @@ const ToolExchangeEvent = ({
     : undefined;
 
   const panelClassName = isSuccessful
-    ? 'group min-w-0 rounded-md border border-zinc-800 bg-zinc-900/70 px-3 py-2'
-    : 'group min-w-0 rounded-md border border-red-500/30 bg-red-950/20 px-3 py-2';
+    ? 'group min-w-0 rounded-lg border border-border bg-surface-inset px-3 py-2'
+    : 'group min-w-0 rounded-lg border border-status-red-500 bg-diff-delete-surface px-3 py-2';
   const titleClassName = isSuccessful
-    ? 'text-xs font-semibold text-zinc-300'
-    : 'text-xs font-semibold text-red-200';
-  const tabClassName = isSuccessful ? 'text-[11px] text-zinc-500' : 'text-[11px] text-red-200/70';
+    ? 'text-xs font-semibold text-foreground'
+    : 'text-xs font-semibold text-status-red-300';
+  const tabClassName = isSuccessful
+    ? 'text-xs text-foreground-subtle'
+    : 'text-xs text-status-red-400';
   const codeLabelClassName = isSuccessful
-    ? 'text-[11px] font-medium text-zinc-300'
-    : 'text-[11px] font-medium text-red-200/80';
+    ? 'text-xs font-medium text-foreground-muted'
+    : 'text-xs font-medium text-status-red-400';
   const codeBlockClassName = isSuccessful
-    ? 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400'
-    : 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-100/90';
+    ? 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-4 text-foreground-muted'
+    : 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-4 text-status-red-300/80';
+  const resultLabelClassName = isSuccessful
+    ? 'text-xs font-medium text-foreground-muted'
+    : 'text-xs font-medium text-status-red-300';
+  const resultBlockClassName = isSuccessful
+    ? 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-4 text-foreground-muted'
+    : 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-4 text-status-red-300/80';
 
   return (
     <details className={panelClassName}>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 outline-none transition focus-visible:ring-2 focus-visible:ring-[#EDFF00] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 outline-none transition focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background">
         <span className={titleClassName}>
           {item.toolCall.name} {isSuccessful ? 'completed' : 'failed'}
         </span>
@@ -203,17 +211,15 @@ const ToolExchangeEvent = ({
           </div>
         ) : null}
         <div className="min-w-0">
-          <p className="text-[11px] font-medium text-zinc-300">
-            {isSuccessful ? 'Result' : 'Error'}
-          </p>
+          <p className={resultLabelClassName}>{isSuccessful ? 'Result' : 'Error'}</p>
           {screenshotDataUrl === undefined ? (
-            <pre className="mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
+            <pre className={resultBlockClassName}>
               {isSuccessful ? formatToolValue(item.result.value) : item.result.error}
             </pre>
           ) : (
             <img
               alt="Viewport screenshot captured by get_viewport_screenshot"
-              className="mt-1 max-h-40 max-w-full rounded border border-zinc-800 object-contain"
+              className="mt-1 max-h-40 max-w-full rounded-md border border-border object-contain"
               src={screenshotDataUrl}
             />
           )}
@@ -238,12 +244,21 @@ const StandaloneToolEvent = ({
     body = formatToolValue(event.value);
   }
 
+  const isFailure = event.type === 'tool-result' && !event.ok;
+  const rootClassName = isFailure
+    ? 'rounded-lg border border-status-red-500 bg-diff-delete-surface px-3 py-2'
+    : 'rounded-lg border border-border bg-surface-inset px-3 py-2';
+  const titleClassName = isFailure
+    ? 'text-xs font-semibold text-status-red-300'
+    : 'text-xs font-semibold text-foreground';
+  const bodyClassName = isFailure
+    ? 'mt-2 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-4 text-status-red-300/80'
+    : 'mt-2 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-4 text-foreground-muted';
+
   return (
-    <div className="rounded-md border border-zinc-800 bg-zinc-900/70 px-3 py-2">
-      <p className="text-xs font-semibold text-zinc-300">{title}</p>
-      <pre className="mt-2 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
-        {body}
-      </pre>
+    <div className={rootClassName}>
+      <p className={titleClassName}>{title}</p>
+      <pre className={bodyClassName}>{body}</pre>
     </div>
   );
 };

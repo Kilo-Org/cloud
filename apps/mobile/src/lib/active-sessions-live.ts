@@ -276,7 +276,7 @@ export function hasUnenrichedLiveId(rows: readonly CachedActiveSession[]): boole
 }
 
 /** Actions produced by routing a live-sync system event. */
-export type LiveSystemEventAction =
+type LiveSystemEventAction =
   | { type: 'write'; updater: (current: readonly CachedActiveSession[]) => CachedActiveSession[] }
   | { type: 'refresh'; reason: 'cli-connected' | 'cli-disconnected' };
 

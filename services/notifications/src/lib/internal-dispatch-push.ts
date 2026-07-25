@@ -50,10 +50,7 @@ function securityFindingTitle(
   }
 }
 
-function buildDispatchInput(
-  userId: string,
-  input: InternalDispatchRequest
-): DispatchPushInput {
+function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
   if (input.kind === 'low_balance') {
     return {
       userId,

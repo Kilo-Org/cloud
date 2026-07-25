@@ -146,15 +146,16 @@ describe('dispatchInternalPushCore', () => {
     });
     const result = await dispatchInternalPushCore(securityFinding(), deps);
 
-    expect(result.perRecipient).toEqual([
-      { userId: 'user-a', outcome: 'suppressed_preference' },
-    ]);
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'suppressed_preference' }]);
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
   it('null prefs row is default-on and dispatches', async () => {
     const { deps, calls } = fakeDeps({ preferences: null });
-    const result = await dispatchInternalPushCore(lowBalance({ recipientUserIds: ['user-a'] }), deps);
+    const result = await dispatchInternalPushCore(
+      lowBalance({ recipientUserIds: ['user-a'] }),
+      deps
+    );
 
     expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
     expect(calls.dispatchPushInputs).toHaveLength(1);
@@ -163,7 +164,10 @@ describe('dispatchInternalPushCore', () => {
 
   it('readPreferences throw → failed with zero dispatchPush calls', async () => {
     const { deps, calls } = fakeDeps({ preferencesThrows: true });
-    const result = await dispatchInternalPushCore(lowBalance({ recipientUserIds: ['user-a'] }), deps);
+    const result = await dispatchInternalPushCore(
+      lowBalance({ recipientUserIds: ['user-a'] }),
+      deps
+    );
 
     expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
     expect(calls.dispatchPushInputs).toHaveLength(0);
@@ -172,9 +176,7 @@ describe('dispatchInternalPushCore', () => {
   it('mixed recipients: one disabled, one enabled', async () => {
     const { deps, calls } = fakeDeps({
       preferences: userId =>
-        userId === 'user-a'
-          ? { ...ALL_ON, balanceAlertsEnabled: false }
-          : ALL_ON,
+        userId === 'user-a' ? { ...ALL_ON, balanceAlertsEnabled: false } : ALL_ON,
     });
     const result = await dispatchInternalPushCore(lowBalance(), deps);
 

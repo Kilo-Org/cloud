@@ -7,9 +7,7 @@ import type {
 } from '@kilocode/notifications';
 import { INTERNAL_API_SECRET, NOTIFICATIONS_WORKER_URL } from '@/lib/config.server';
 
-type DispatchBody =
-  | InternalDispatchLowBalanceRequest
-  | InternalDispatchSecurityFindingRequest;
+type DispatchBody = InternalDispatchLowBalanceRequest | InternalDispatchSecurityFindingRequest;
 
 /**
  * Best-effort POST to the notifications worker internal dispatch endpoint.

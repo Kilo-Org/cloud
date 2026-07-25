@@ -11,6 +11,9 @@ import { settingsDialogOpenAtom } from './settings-dialog-state';
 
 const emptyOrganizationOptions: KiloOrganizationOption[] = [];
 
+const iconButtonClassName =
+  'flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background';
+
 const IconButton = ({
   ariaLabel,
   children,
@@ -20,12 +23,7 @@ const IconButton = ({
   children: ReactNode;
   onClick: () => void;
 }): JSX.Element => (
-  <button
-    aria-label={ariaLabel}
-    className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
-    onClick={onClick}
-    type="button"
-  >
+  <button aria-label={ariaLabel} className={iconButtonClassName} onClick={onClick} type="button">
     {children}
   </button>
 );
@@ -63,14 +61,14 @@ const HeaderActions = ({
         <div
           aria-label="Settings panel"
           aria-modal="true"
-          className="fixed inset-0 z-30 flex flex-col bg-zinc-950"
+          className="fixed inset-0 z-30 flex flex-col bg-surface-background"
           role="dialog"
         >
-          <div className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-800 px-4">
-            <p className="text-sm font-semibold text-zinc-100">Settings</p>
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-4">
+            <p className="text-sm font-semibold text-foreground">Settings</p>
             <button
               aria-label="Close settings"
-              className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+              className={iconButtonClassName}
               onClick={() => {
                 setIsSettingsOpen(false);
               }}
@@ -80,9 +78,11 @@ const HeaderActions = ({
             </button>
           </div>
           <div className="agent-conversation-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 py-4">
-            <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
-              <p className="text-xs font-medium text-zinc-500">Signed in</p>
-              <p className="mt-1 truncate text-sm text-zinc-200">{auth.userEmail ?? 'Kilo user'}</p>
+            <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
+              <p className="type-label text-foreground-muted">Signed in</p>
+              <p className="type-body mt-1 truncate text-foreground">
+                {auth.userEmail ?? 'Kilo user'}
+              </p>
             </div>
             <MemorySettings />
             <OrganizationCreditAccountSelect
@@ -92,7 +92,7 @@ const HeaderActions = ({
             />
             <RemoteMcpSettings />
             <button
-              className="h-9 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+              className="type-label h-9 rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
               onClick={() => {
                 setIsSettingsOpen(false);
                 onSignOut();
@@ -123,9 +123,9 @@ const Header = ({
   organizationOptions?: KiloOrganizationOption[] | undefined;
   selectedOrganizationId?: string | undefined;
 }): JSX.Element => (
-  <div className="border-b border-zinc-800 px-4 py-3">
+  <div className="border-b border-border bg-surface-background px-4 py-3">
     <div className="flex min-w-0 items-center justify-between gap-3">
-      <KiloLogo className="size-8 shrink-0 text-[#EDFF00]" />
+      <KiloLogo className="size-8 shrink-0 text-brand-primary" />
       <span className="sr-only">Kilo</span>
       {auth === undefined ||
       onOrganizationChange === undefined ||
@@ -160,7 +160,7 @@ export const Shell = ({
   organizationOptions?: KiloOrganizationOption[] | undefined;
   selectedOrganizationId?: string | undefined;
 }): JSX.Element => (
-  <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 text-zinc-50">
+  <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-surface-background text-foreground">
     <Header
       auth={auth}
       headerBeforeSettings={headerBeforeSettings}

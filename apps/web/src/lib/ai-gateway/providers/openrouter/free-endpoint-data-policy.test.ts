@@ -118,19 +118,22 @@ describe('free endpoint data policy sync', () => {
     });
   });
 
-  test('ignores disabled free Kilo-exclusive models', () => {
-    const disabledModel = kiloExclusiveModel('example/model:free', []);
-    disabledModel.status = 'disabled';
-    const result = normalizeProviderModelsWithDataPolicy(
-      provider,
-      [model('example/model', false)],
-      [disabledModel]
-    );
+  test.each(['hidden', 'disabled'] as const)(
+    'ignores %s free Kilo-exclusive models',
+    status => {
+      const nonPublicModel = kiloExclusiveModel('example/model:free', []);
+      nonPublicModel.status = status;
+      const result = normalizeProviderModelsWithDataPolicy(
+        provider,
+        [model('example/model', false)],
+        [nonPublicModel]
+      );
 
-    expect(result.dataPolicy).toEqual(provider.dataPolicy);
-    expect(result.models[0]?.endpoint?.data_policy).toEqual({
-      training: false,
-      retainsPrompts: false,
-    });
-  });
+      expect(result.dataPolicy).toEqual(provider.dataPolicy);
+      expect(result.models[0]?.endpoint?.data_policy).toEqual({
+        training: false,
+        retainsPrompts: false,
+      });
+    }
+  );
 });

@@ -32,7 +32,7 @@ export function normalizeProviderModelsWithDataPolicy(
   for (const model of kiloExclusiveModels) {
     const normalizedModelId = normalizeModelId(model.public_id);
     if (
-      model.status !== 'disabled' &&
+      model.status === 'public' &&
       model.pricing === null &&
       uniqueModelsMap.has(normalizedModelId) &&
       kiloExclusiveModelAppliesToProvider(model, provider.slug)

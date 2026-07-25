@@ -19,7 +19,7 @@ type MutationErrorDisplay = {
 const COMPOSER_BAD_REQUEST =
   "This comment can't be posted. The selected line may have changed, or the PR may have been updated.";
 const SUBMIT_BAD_REQUEST =
-  "This review can't be submitted as is. The PR may have changed, or you can't approve your own pull request.";
+  "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.";
 const COMPOSER_RETRYABLE_FALLBACK = 'Could not post comment.';
 const SUBMIT_RETRYABLE = 'Could not submit review. Check your connection and try again.';
 const RECONNECT_MESSAGE = 'GitHub connection expired.';

@@ -8,6 +8,11 @@
  * between CLI connections. The functions here never touch React, the
  * network, or a QueryClient — they are pure and exhaustively unit-tested
  * alongside this file.
+ *
+ * Status resolution for live rows: CLI heartbeats/snapshots often report
+ * only idle/busy while `cli_sessions_v2` holds question/permission. A
+ * held attention status is sticky across WS snapshots and heartbeats;
+ * only an explicit `session.status.updated` (or disconnect) clears it.
  */
 
 import {
@@ -17,15 +22,13 @@ import {
   heartbeatDataSchema,
   type SessionsListData,
   sessionsListDataSchema,
+  type SessionStatusUpdatedPayload,
+  sessionStatusUpdatedPayloadSchema,
 } from 'cloud-agent-sdk/schemas';
 
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
-/**
- * Incoming WS session row (per the SDK schemas). Carries
- * `parentSessionId` so the root filter can drop subagent sessions; the
- * cached `ActiveSession` (from the tRPC router) does not.
- */
+/** Incoming WS row; carries `parentSessionId` for the root filter. */
 type IncomingWsSession = {
   id: string;
   status: string;
@@ -36,25 +39,34 @@ type IncomingWsSession = {
   connectionId?: string;
 };
 
-/**
- * Cached active session: `ActiveSession` (tRPC output) plus the
- * enrichment fields `createdOnPlatform` / `createdAt` / `updatedAt` that
- * the live-sync owner preserves across WS updates.
- */
+/** Cached active session (tRPC output); enrichment fields preserved across WS. */
 export type CachedActiveSession = ActiveSession;
 
 export type CachedActiveSessionsData = {
   sessions: CachedActiveSession[];
 };
 
-/**
- * The three enrichment fields that the live-sync owner preserves across
- * WS updates. Every other field comes from the latest WS payload (this
- * includes `connectionId`, so ownership transfer between CLIs lands
- * correctly on the next heartbeat/snapshot).
- */
 const ENRICHMENT_FIELDS = ['createdOnPlatform', 'createdAt', 'updatedAt'] as const;
 type EnrichmentField = (typeof ENRICHMENT_FIELDS)[number];
+
+/** Structured question/permission — the Active Now "NEEDS INPUT" badge. */
+export function isAttentionStatus(status: string | null | undefined): boolean {
+  return status === 'question' || status === 'permission';
+}
+
+/**
+ * Prefer stored attention over live idle/busy so released-CLI heartbeats
+ * do not clear NEEDS INPUT. Non-attention stored values yield to live.
+ */
+export function effectiveStatus(
+  live: string | null | undefined,
+  stored: string | null | undefined
+): string {
+  if (isAttentionStatus(stored) && stored != null) {
+    return stored;
+  }
+  return live ?? '';
+}
 
 function isRootWsSession(session: IncomingWsSession): boolean {
   return !session.parentSessionId;
@@ -98,6 +110,30 @@ export function parseCliConnectionPayload(value: unknown): CliConnectionData | n
   return parsed.data;
 }
 
+/**
+ * Dual-shaped `session.status.updated` (full session row vs lightweight
+ * sessionId). Null payload status becomes `''` for the cache string field.
+ */
+export function parseSessionStatusUpdatedPayload(
+  value: unknown
+): { sessionId: string; status: string } | null {
+  const parsed = sessionStatusUpdatedPayloadSchema.safeParse(value);
+  if (!parsed.success) {
+    return null;
+  }
+  const data: SessionStatusUpdatedPayload = parsed.data;
+  if ('session' in data) {
+    return {
+      sessionId: data.session.sessionId,
+      status: data.status ?? data.session.status ?? '',
+    };
+  }
+  return {
+    sessionId: data.sessionId,
+    status: data.status ?? '',
+  };
+}
+
 // ── Enrichment-preserving merge helpers ──────────────────────────────
 
 function readEnrichment(
@@ -121,7 +157,9 @@ function withEnrichmentAndConnectionId(
   const enrichment = readEnrichment(current);
   return {
     id: row.id,
-    status: row.status,
+    // Sticky attention: a non-attention WS status must not clear a held
+    // question/permission. "stored" for WS paths is the cached row status.
+    status: effectiveStatus(row.status, current?.status),
     title: row.title,
     gitUrl: row.gitUrl,
     gitBranch: row.gitBranch,
@@ -132,9 +170,10 @@ function withEnrichmentAndConnectionId(
 
 /**
  * Replace the entire cache with the snapshot. Rows whose id is in both
- * the snapshot and the cache keep ONLY the three enrichment fields from
- * the cache; every other field (including `connectionId`) comes from the
- * snapshot. Rows absent from the snapshot are dropped.
+ * the snapshot and the cache keep the three enrichment fields and any
+ * held attention status from the cache; every other field (including
+ * `connectionId`) comes from the snapshot. Rows absent from the snapshot
+ * are dropped.
  */
 export function mergeSnapshotForActiveSessions(
   current: readonly CachedActiveSession[],
@@ -163,6 +202,9 @@ export function mergeSnapshotForActiveSessions(
  * the payload under a DIFFERENT connectionId — so ownership transfer
  * between CLIs (same session id, new owner) reflects the new owner on
  * the next heartbeat without leaving a stale copy under the old one.
+ *
+ * A non-attention heartbeat status does not overwrite a currently-held
+ * attention status (sticky overlay for released CLIs).
  */
 export function mergeHeartbeatForActiveSessions(
   current: readonly CachedActiveSession[],
@@ -194,6 +236,20 @@ export function mergeHeartbeatForActiveSessions(
   return result;
 }
 
+/**
+ * Apply an explicit status transition (including leaving attention).
+ * Unknown session ids are ignored — live cache only holds active rows.
+ */
+export function applySessionStatusUpdated(
+  current: readonly CachedActiveSession[],
+  sessionId: string,
+  status: string
+): CachedActiveSession[] {
+  return current.map(row =>
+    row.id === sessionId && row.status !== status ? { ...row, status } : row
+  );
+}
+
 export function removeActiveSessionsForConnection(
   current: readonly CachedActiveSession[],
   connectionId: string
@@ -217,4 +273,73 @@ export function isEnriched(row: CachedActiveSession): boolean {
 
 export function hasUnenrichedLiveId(rows: readonly CachedActiveSession[]): boolean {
   return rows.some(row => !isEnriched(row));
+}
+
+/** Actions produced by routing a live-sync system event. */
+export type LiveSystemEventAction =
+  | { type: 'write'; updater: (current: readonly CachedActiveSession[]) => CachedActiveSession[] }
+  | { type: 'refresh'; reason: 'cli-connected' | 'cli-disconnected' };
+
+/**
+ * Pure routing for ActiveSessionsLiveSync system events. session.status.updated
+ * is included here so the owner can handle it via onSystemEvent only.
+ */
+export function planLiveSystemEventActions(event: {
+  event: string;
+  data: unknown;
+}): LiveSystemEventAction[] {
+  if (event.event === 'sessions.list') {
+    const sessions = parseSessionsListPayload(event.data);
+    if (!sessions) {
+      return [];
+    }
+    const roots = selectRootWsSessions(sessions);
+    return [{ type: 'write', updater: current => mergeSnapshotForActiveSessions(current, roots) }];
+  }
+  if (event.event === 'sessions.heartbeat') {
+    const payload = parseHeartbeatPayload(event.data);
+    if (!payload) {
+      return [];
+    }
+    const roots = selectRootWsSessions(payload.sessions);
+    return [
+      {
+        type: 'write',
+        updater: current =>
+          mergeHeartbeatForActiveSessions(current, {
+            connectionId: payload.connectionId,
+            sessions: roots,
+          }),
+      },
+    ];
+  }
+  if (event.event === 'session.status.updated') {
+    const payload = parseSessionStatusUpdatedPayload(event.data);
+    if (!payload) {
+      return [];
+    }
+    return [
+      {
+        type: 'write',
+        updater: current => applySessionStatusUpdated(current, payload.sessionId, payload.status),
+      },
+    ];
+  }
+  if (event.event === 'cli.disconnected') {
+    const payload = parseCliConnectionPayload(event.data);
+    if (!payload) {
+      return [];
+    }
+    return [
+      {
+        type: 'write',
+        updater: current => removeActiveSessionsForConnection(current, payload.connectionId),
+      },
+      { type: 'refresh', reason: 'cli-disconnected' },
+    ];
+  }
+  if (event.event === 'cli.connected' && parseCliConnectionPayload(event.data)) {
+    return [{ type: 'refresh', reason: 'cli-connected' }];
+  }
+  return [];
 }

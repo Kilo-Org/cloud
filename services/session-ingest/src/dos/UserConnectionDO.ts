@@ -331,26 +331,32 @@ export class UserConnectionDO extends DurableObject<Env> {
     }
   }
 
-  webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
+  webSocketClose(
+    ws: WebSocket,
+    _code: number,
+    _reason: string,
+    _wasClean: boolean
+  ): void | Promise<void> {
     this.ensureState();
 
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     if (!attachment) return;
 
     if (attachment.role === 'cli') {
-      this.handleCliDisconnect(ws, attachment);
-    } else {
-      this.handleWebDisconnect(ws);
+      // Await attention resets so cli.disconnected is not broadcast until the
+      // stored status write has committed (mobile history refetch races otherwise).
+      return this.handleCliDisconnect(ws, attachment);
     }
+    this.handleWebDisconnect(ws);
   }
 
-  webSocketError(ws: WebSocket): void {
+  webSocketError(ws: WebSocket): void | Promise<void> {
     const attachment = ws.deserializeAttachment() as WSAttachment | null;
     console.error('WebSocket error', {
       role: attachment?.role ?? 'unknown',
       connectionId: attachment?.connectionId ?? 'unknown',
     });
-    this.webSocketClose(ws, 0, '', false);
+    return this.webSocketClose(ws, 0, '', false);
   }
 
   async alarm(): Promise<void> {
@@ -832,10 +838,10 @@ export class UserConnectionDO extends DurableObject<Env> {
   // Disconnect handling
   // ---------------------------------------------------------------------------
 
-  private handleCliDisconnect(
+  private async handleCliDisconnect(
     disconnectedWs: WebSocket,
     attachment: WSAttachment & { role: 'cli' }
-  ): void {
+  ): Promise<void> {
     const { connectionId } = attachment;
 
     // If another CLI socket already has this connectionId, this is a stale
@@ -875,11 +881,51 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // Leave webSubscriptions intact — a reconnecting CLI can resume
 
+    // Reset stored attention before broadcasting disconnect so the mobile
+    // departure refetch observes `retry` rather than a stuck `question`.
+    // kiloUserId comes from the CLI attachment (authenticated /user/cli route);
+    // without it we cannot safely target rows and must no-op.
+    await this.resetOwnedSessionAttentionOnDisconnect(attachment.kiloUserId, ownedSessions);
+
     this.broadcastToWeb({
       type: 'system',
       event: 'cli.disconnected',
       data: { connectionId },
     });
+  }
+
+  /**
+   * Commit attention clears for owned sessions before `cli.disconnected`.
+   * Identity: attachment `kiloUserId` only — never guess from DO name.
+   */
+  private async resetOwnedSessionAttentionOnDisconnect(
+    kiloUserId: string | undefined,
+    ownedSessions: ReadonlySet<string>
+  ): Promise<void> {
+    if (ownedSessions.size === 0) return;
+
+    if (!kiloUserId) {
+      console.warn(
+        'Skipping attention status reset on CLI disconnect: missing kiloUserId on attachment',
+        { ownedSessionCount: ownedSessions.size }
+      );
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      [...ownedSessions].map(async sessionId => {
+        const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
+        await stub.resetAttentionStatusOnCliDisconnect(kiloUserId, sessionId);
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('Failed to reset attention status on CLI disconnect', {
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
   }
 
   private handleWebDisconnect(ws: WebSocket): void {

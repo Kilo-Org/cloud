@@ -38,6 +38,7 @@ import {
   readKiloSdkSessionSnapshot,
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
+import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -446,6 +447,15 @@ export class SessionIngestDO extends DurableObject<Env> {
         });
       })
     );
+  }
+
+  /**
+   * Clear a stored attention status when the owning CLI disconnects.
+   * Metadata owner entry point — UserConnectionDO has no Postgres write path.
+   * Attention check and conditional write live in `resetAttentionStatusOnCliDisconnect`.
+   */
+  async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
+    await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
   }
 
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */

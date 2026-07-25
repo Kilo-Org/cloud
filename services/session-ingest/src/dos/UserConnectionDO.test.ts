@@ -12,6 +12,16 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
+const sessionIngestMocks = vi.hoisted(() => ({
+  resetAttentionStatusOnCliDisconnect: vi.fn(async () => undefined),
+  claimSessionReadyPush: vi.fn(async () => undefined),
+  getSessionIngestDO: vi.fn(),
+}));
+
+vi.mock('./SessionIngestDO', () => ({
+  getSessionIngestDO: sessionIngestMocks.getSessionIngestDO,
+}));
+
 import { MAX_CATALOG_RESULT_BYTES, UserConnectionDO } from './UserConnectionDO';
 
 // ---------------------------------------------------------------------------
@@ -195,15 +205,18 @@ function addCliSocket(
     title: string;
     platform?: string;
   }> = [],
-  instance?: { name: string; projectName: string; version?: string }
+  instance?: { name: string; projectName: string; version?: string },
+  kiloUserId?: string
 ): MockWS {
   const attachment: {
     role: 'cli';
     connectionId: string;
     sessions: typeof sessions;
     instance?: typeof instance;
+    kiloUserId?: string;
   } = { role: 'cli', connectionId, sessions };
   if (instance) attachment.instance = instance;
+  if (kiloUserId) attachment.kiloUserId = kiloUserId;
   const ws = createMockWs(['cli'], attachment);
   mockCtx.addSocket(ws);
   return ws;
@@ -308,14 +321,14 @@ function createUtf8OversizedResult(): { padding: string } {
   return result;
 }
 
-/** Trigger CLI disconnect */
-function disconnectCli(doInstance: UserConnectionDO, cliWs: MockWS) {
-  doInstance.webSocketClose(cliWs as never, 0, '', false);
+/** Trigger CLI disconnect (awaits attention reset before broadcast). */
+async function disconnectCli(doInstance: UserConnectionDO, cliWs: MockWS) {
+  await doInstance.webSocketClose(cliWs as never, 0, '', false);
 }
 
 /** Trigger web disconnect */
 function disconnectWeb(doInstance: UserConnectionDO, webWs: MockWS) {
-  doInstance.webSocketClose(webWs as never, 0, '', false);
+  void doInstance.webSocketClose(webWs as never, 0, '', false);
 }
 
 // ===========================================================================
@@ -325,6 +338,14 @@ function disconnectWeb(doInstance: UserConnectionDO, webWs: MockWS) {
 describe('UserConnectionDO', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockReset();
+    sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockResolvedValue(undefined);
+    sessionIngestMocks.claimSessionReadyPush.mockReset();
+    sessionIngestMocks.getSessionIngestDO.mockReset();
+    sessionIngestMocks.getSessionIngestDO.mockReturnValue({
+      resetAttentionStatusOnCliDisconnect: sessionIngestMocks.resetAttentionStatusOnCliDisconnect,
+      claimSessionReadyPush: sessionIngestMocks.claimSessionReadyPush,
+    });
   });
 
   afterEach(() => {
@@ -377,7 +398,7 @@ describe('UserConnectionDO', () => {
   });
 
   describe('hasActiveCliSession', () => {
-    it('tracks whether a connected CLI heartbeat currently owns the session', () => {
+    it('tracks whether a connected CLI heartbeat currently owns the session', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
 
@@ -388,7 +409,7 @@ describe('UserConnectionDO', () => {
       expect(doInstance.hasActiveCliSession('ses_1')).toBe(true);
 
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       expect(doInstance.hasActiveCliSession('ses_1')).toBe(false);
     });
@@ -1168,7 +1189,7 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('CLI disconnect', () => {
-    it('cleans up session ownership and broadcasts cli.disconnected', () => {
+    it('cleans up session ownership and broadcasts cli.disconnected', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1178,7 +1199,7 @@ describe('UserConnectionDO', () => {
 
       // Remove from sockets before disconnect (simulates runtime closing)
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       // Web receives cli.disconnected
       expect(webWs.send).toHaveBeenCalled();
@@ -1198,7 +1219,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(web2)).toMatchObject({ type: 'response', error: 'Session owner not found' });
     });
 
-    it('sends error responses for pending commands on disconnect', () => {
+    it('sends error responses for pending commands on disconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1211,7 +1232,7 @@ describe('UserConnectionDO', () => {
 
       // CLI disconnects
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       // Web receives error response with original id
       const msgs = allSent(webWs);
@@ -1221,7 +1242,7 @@ describe('UserConnectionDO', () => {
       expect(errorResp).toMatchObject({ type: 'response', id: 'cmd-1', error: 'CLI disconnected' });
     });
 
-    it('reports owner change when an owner-fenced command target disconnects', () => {
+    it('reports owner change when an owner-fenced command target disconnects', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1236,7 +1257,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       expect(parseSent(webWs)).toEqual({
         type: 'response',
@@ -1278,7 +1299,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('sends error for connection-routed pending commands on CLI disconnect', () => {
+    it('sends error for connection-routed pending commands on CLI disconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1295,7 +1316,7 @@ describe('UserConnectionDO', () => {
 
       // CLI disconnects before responding
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       const msgs = allSent(webWs);
       const errorResp = msgs.find(
@@ -1308,7 +1329,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('sends error for fallback-routed pending commands on CLI disconnect', () => {
+    it('sends error for fallback-routed pending commands on CLI disconnect', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1320,7 +1341,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       mockCtx.removeSocket(cliWs);
-      disconnectCli(doInstance, cliWs);
+      await disconnectCli(doInstance, cliWs);
 
       const msgs = allSent(webWs);
       const errorResp = msgs.find(
@@ -1333,7 +1354,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('reconnecting CLI — old socket close does not destroy state', () => {
+    it('reconnecting CLI — old socket close does not destroy state', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1348,7 +1369,7 @@ describe('UserConnectionDO', () => {
       // DON'T remove cli2 from sockets — cli2 is the replacement
       // Just remove cli1 to simulate it being closed
       mockCtx.removeSocket(cli1);
-      disconnectCli(doInstance, cli1);
+      await disconnectCli(doInstance, cli1);
 
       // State should NOT be cleaned up — cli2 is live
       // Verify by routing a command to s1 — should reach cli2
@@ -1358,7 +1379,7 @@ describe('UserConnectionDO', () => {
       expect(parseSent(cli2)).toEqual({ type: 'subscribe', sessionId: 's1' });
     });
 
-    it('reconnecting CLI — commands sent to replacement socket are not spuriously failed', () => {
+    it('reconnecting CLI — commands sent to replacement socket are not spuriously failed', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1383,7 +1404,7 @@ describe('UserConnectionDO', () => {
       webWs.send.mockClear();
 
       // Now cli1's close event fires (stale socket teardown)
-      disconnectCli(doInstance, cli1);
+      await disconnectCli(doInstance, cli1);
 
       // Web should NOT have received an error for cmd-new — it was sent to cli2, not cli1
       const errorMsgs = allSent(webWs).filter(
@@ -1403,7 +1424,7 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('reconnecting CLI — pending commands from old socket get error responses', () => {
+    it('reconnecting CLI — pending commands from old socket get error responses', async () => {
       const { doInstance, mockCtx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1420,7 +1441,7 @@ describe('UserConnectionDO', () => {
 
       // cli1's close event fires — cmd-1 was sent on cli1's wire, cli2 never saw it
       mockCtx.removeSocket(cli1);
-      disconnectCli(doInstance, cli1);
+      await disconnectCli(doInstance, cli1);
 
       // Web should receive an error for the stranded command
       const msgs = allSent(webWs);
@@ -1432,6 +1453,143 @@ describe('UserConnectionDO', () => {
         id: 'cmd-1',
         error: 'CLI disconnected',
       });
+    });
+
+    it('resets attention status for owned sessions before broadcasting cli.disconnected', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('s-question', 'question'),
+        makeSession('s-busy', 'busy'),
+      ]);
+      webWs.send.mockClear();
+
+      const callOrder: string[] = [];
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockImplementation(async () => {
+        callOrder.push('reset');
+        // Disconnect must not have been broadcast yet (ordering guarantee).
+        expect(
+          allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')
+        ).toBe(false);
+      });
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      callOrder.push('disconnect');
+
+      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: 'usr_1',
+        sessionId: 's-question',
+      });
+      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: 'usr_1',
+        sessionId: 's-busy',
+      });
+      // Both owned sessions are delegated; attention-only filtering is on the metadata side.
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledTimes(2);
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's-question'
+      );
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's-busy'
+      );
+      expect(callOrder.filter(step => step === 'reset')).toHaveLength(2);
+      expect(callOrder.at(-1)).toBe('disconnect');
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('does not reset attention when kiloUserId is missing on the attachment', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Skipping attention status reset on CLI disconnect: missing kiloUserId on attachment',
+        { ownedSessionCount: 1 }
+      );
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('does not reset attention for sessions owned by another live connection', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cli1, [makeSession('s1', 'question')]);
+      // cli2 takes ownership of s1
+      sendHeartbeat(doInstance, cli2, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+      sessionIngestMocks.getSessionIngestDO.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockClear();
+
+      mockCtx.removeSocket(cli1);
+      await disconnectCli(doInstance, cli1);
+
+      // cli1 no longer owns s1, so no reset for that session
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+    });
+
+    it('stale reconnect close does not reset attention status', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const cli2 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+
+      sendHeartbeat(doInstance, cli1, [makeSession('s1', 'question')]);
+      sendHeartbeat(doInstance, cli2, [makeSession('s1', 'question')]);
+      sessionIngestMocks.getSessionIngestDO.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockClear();
+
+      mockCtx.removeSocket(cli1);
+      await disconnectCli(doInstance, cli1);
+
+      expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+    });
+
+    it('still broadcasts cli.disconnected when attention reset fails', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      webWs.send.mockClear();
+      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockRejectedValueOnce(
+        new Error('db down')
+      );
+
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
+        true
+      );
+      expect(error).toHaveBeenCalledWith(
+        'Failed to reset attention status on CLI disconnect',
+        expect.objectContaining({ error: 'db down' })
+      );
     });
   });
 
@@ -3539,7 +3697,7 @@ describe('UserConnectionDO', () => {
       expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
     });
 
-    it('webSocketError triggers webSocketClose', () => {
+    it('webSocketError triggers webSocketClose', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -3549,7 +3707,7 @@ describe('UserConnectionDO', () => {
 
       // Remove CLI so disconnect can clean up
       mockCtx.removeSocket(cliWs);
-      doInstance.webSocketError(cliWs as never);
+      await doInstance.webSocketError(cliWs as never);
 
       // Should broadcast cli.disconnected
       const msgs = allSent(webWs);
@@ -3575,13 +3733,11 @@ describe('UserConnectionDO', () => {
       const mockCtx = createMockCtx();
       const ctx = mockCtx.build();
       const claimSessionReadyPush = vi.fn(async () => {});
-      const env = {
-        SESSION_INGEST_DO: {
-          idFromName: vi.fn((name: string) => name),
-          get: vi.fn(() => ({ claimSessionReadyPush })),
-        },
-      };
-      const doInstance = new UserConnectionDO(ctx as never, env as never);
+      sessionIngestMocks.getSessionIngestDO.mockReturnValue({
+        claimSessionReadyPush,
+        resetAttentionStatusOnCliDisconnect: sessionIngestMocks.resetAttentionStatusOnCliDisconnect,
+      });
+      const doInstance = new UserConnectionDO(ctx as never, {} as never);
       return { doInstance, mockCtx, claimSessionReadyPush };
     }
 

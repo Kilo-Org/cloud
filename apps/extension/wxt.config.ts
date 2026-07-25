@@ -34,8 +34,8 @@ export default defineConfig({
     name: 'Kilo Code',
     permissions:
       browser === 'firefox'
-        ? ['identity', 'scripting', 'storage', 'tabs']
-        : ['debugger', 'identity', 'scripting', 'storage'],
+        ? ['contextMenus', 'identity', 'scripting', 'storage', 'tabs']
+        : ['contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

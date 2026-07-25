@@ -7,34 +7,22 @@ import {
 } from './pr-link-helper-slot';
 
 describe('selectPrLinkHelperSlotState', () => {
-  it('returns hint when the field is empty and no message is active', () => {
-    expect(selectPrLinkHelperSlotState({ hasInput: false, message: null })).toBe('hint');
+  it('returns none when no message is active', () => {
+    expect(selectPrLinkHelperSlotState({ message: null })).toBe('none');
   });
 
-  it('returns none when the field has text and no message is active', () => {
-    expect(selectPrLinkHelperSlotState({ hasInput: true, message: null })).toBe('none');
+  it('returns invalid when the invalid message is active', () => {
+    expect(selectPrLinkHelperSlotState({ message: 'invalid' })).toBe('invalid');
   });
 
-  it('returns invalid when the invalid message is active, regardless of input', () => {
-    expect(selectPrLinkHelperSlotState({ hasInput: false, message: 'invalid' })).toBe('invalid');
-    expect(selectPrLinkHelperSlotState({ hasInput: true, message: 'invalid' })).toBe('invalid');
+  it('returns clipboard-empty when that message is active', () => {
+    expect(selectPrLinkHelperSlotState({ message: 'clipboard-empty' })).toBe('clipboard-empty');
   });
 
-  it('returns clipboard-empty when that message is active, regardless of input', () => {
-    expect(selectPrLinkHelperSlotState({ hasInput: false, message: 'clipboard-empty' })).toBe(
-      'clipboard-empty'
-    );
-    expect(selectPrLinkHelperSlotState({ hasInput: true, message: 'clipboard-empty' })).toBe(
-      'clipboard-empty'
-    );
-  });
-
-  it('gives messages priority over hint and none (last-set wins at the call site)', () => {
+  it('gives messages priority over none (last-set wins at the call site)', () => {
     // Single message field — whichever the UI last set is what we select.
-    expect(selectPrLinkHelperSlotState({ hasInput: false, message: 'invalid' })).toBe('invalid');
-    expect(selectPrLinkHelperSlotState({ hasInput: false, message: 'clipboard-empty' })).toBe(
-      'clipboard-empty'
-    );
+    expect(selectPrLinkHelperSlotState({ message: 'invalid' })).toBe('invalid');
+    expect(selectPrLinkHelperSlotState({ message: 'clipboard-empty' })).toBe('clipboard-empty');
   });
 
   it('exports the pinned helper copy strings', () => {

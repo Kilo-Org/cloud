@@ -21,7 +21,9 @@ import {
   getContextTone,
 } from './context-usage-display';
 import {
+  getModelsSectionCount,
   getSessionCostBreakdown,
+  getVisibleSessionCostModels,
   type SessionCostBreakdown,
   type SessionCostBreakdownModel,
 } from './session-cost-breakdown';
@@ -70,7 +72,12 @@ export function SessionContextSheet({
     () => getSessionCostBreakdown(messages, totalCost),
     [messages, totalCost]
   );
-  const modelsSectionCount = breakdown.models.length + (breakdown.subagentCostUsd > 0 ? 1 : 0);
+  // Render-only filter: totals/subagent residual still use the full breakdown.
+  const visibleModels = useMemo(
+    () => getVisibleSessionCostModels(breakdown.models),
+    [breakdown.models]
+  );
+  const modelsSectionCount = getModelsSectionCount(breakdown.models, breakdown.subagentCostUsd);
 
   return (
     <Modal
@@ -176,7 +183,7 @@ export function SessionContextSheet({
                 Models ({modelsSectionCount})
               </Text>
               <View className="gap-2">
-                {breakdown.models.map(model => (
+                {visibleModels.map(model => (
                   <ModelRow
                     key={`${model.providerID}:${model.modelID}`}
                     model={model}

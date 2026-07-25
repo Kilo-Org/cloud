@@ -2,8 +2,10 @@ export type AgentMode = 'dangerous' | 'safe';
 export type SafeToolName =
   | 'find_in_page'
   | 'get_element_details'
+  | 'get_memory'
   | 'get_page_snapshot'
-  | 'get_viewport_screenshot';
+  | 'get_viewport_screenshot'
+  | 'search_memories';
 export type RemoteMcpAgentToolName = `mcp_${string}`;
 export type AgentToolName = 'eval' | RemoteMcpAgentToolName | SafeToolName;
 
@@ -32,6 +34,7 @@ export type AgentConversationEvent =
   | {
       readonly elementId?: string;
       readonly id: string;
+      readonly memoryId?: string;
       readonly name: SafeToolName;
       readonly providerToolCallId?: string;
       readonly query?: string;
@@ -88,6 +91,7 @@ interface CreateEvalToolCallOptions {
 
 interface CreateSafeToolCallOptions {
   readonly elementId?: string;
+  readonly memoryId?: string;
   readonly name: SafeToolName;
   readonly providerToolCallId?: string;
   readonly query?: string;
@@ -159,6 +163,7 @@ export const createEvalToolCall = ({
 
 export const createSafeToolCall = ({
   elementId,
+  memoryId,
   name,
   providerToolCallId,
   query,
@@ -168,6 +173,7 @@ export const createSafeToolCall = ({
   id: createEventId(),
   name,
   ...(elementId === undefined ? {} : { elementId }),
+  ...(memoryId === undefined ? {} : { memoryId }),
   ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
   ...(query === undefined ? {} : { query }),
   ...(snapshotId === undefined ? {} : { snapshotId }),

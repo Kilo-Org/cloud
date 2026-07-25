@@ -121,7 +121,6 @@ export function PrReviewEntryScreen() {
   };
 
   const slotState = selectPrLinkHelperSlotState({
-    hasInput,
     message: helperMessage,
   });
   const isInvalid = helperMessage === 'invalid';
@@ -133,12 +132,6 @@ export function PrReviewEntryScreen() {
     helperContent = (
       <Text variant="muted" className="text-sm">
         {PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY}
-      </Text>
-    );
-  } else if (slotState === 'hint') {
-    helperContent = (
-      <Text variant="muted" className="text-sm">
-        Paste a link like {URL_PLACEHOLDER}
       </Text>
     );
   }

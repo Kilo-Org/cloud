@@ -148,7 +148,7 @@ function buildDevContainerTrustEnv(sessionHome: string): Record<string, string> 
  * `wrangler.jsonc#image_vars` so the kilo running in the dev container
  * matches the one we use on the outer sandbox.
  */
-export const KILO_CLI_VERSION = '7.3.54';
+export const KILO_CLI_VERSION = '7.3.63';
 
 const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
 const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;

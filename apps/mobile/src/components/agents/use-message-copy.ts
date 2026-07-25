@@ -32,7 +32,12 @@ export function useMessageCopy() {
   return { copyMessage };
 }
 
-async function performCopy(text: string) {
+/**
+ * Immediate clipboard write used by the message-details sheet and by the
+ * a11y/ActionSheet copy path after the user confirms. Success haptic + toast;
+ * failure → error toast (caller keeps its UI open).
+ */
+export async function performCopy(text: string): Promise<void> {
   try {
     await Clipboard.setStringAsync(text);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

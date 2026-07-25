@@ -65,14 +65,14 @@ type NewSessionPromptProps = {
 };
 
 /**
- * New-session prompt surface: attachment strip, paperclip + multiline text
- * input + voice toggle row, and the model/mode toolbar. Owns the prompt
- * ref (for voice input to read), the height-measuring TextInput machinery,
- * and the `useVoiceInput` hook. The route listens to `onChangeText` so the
- * create handler can read the live prompt value after
- * `settleVoiceInputBeforeSubmit` resolves; the attachment, repository, and
- * create flows stay in the route so navigation and tRPC mutations stay
- * colocated.
+ * New-session prompt surface: attachment strip, full-width multiline text
+ * input, bottom action row (paperclip leading, voice toggle trailing), and
+ * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
+ * route listens to `onChangeText` so the create handler can read the live
+ * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
+ * repository, and create flows stay in the route so navigation and tRPC
+ * mutations stay colocated.
  */
 export function NewSessionPrompt({
   attachments,
@@ -165,29 +165,15 @@ export function NewSessionPrompt({
         onRemove={onRemoveAttachment}
         onRetry={onRetryAttachment}
       />
-      <View className="flex-row items-end px-2 pt-2">
+      <View className="px-2 pt-2">
         {promptMeasure.measureElement}
-        <Pressable
-          onPress={handlePaperclipPress}
-          disabled={paperclipDisabled}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          className={cn(
-            'mb-1 h-9 w-9 items-center justify-center rounded-full active:opacity-70',
-            paperclipDisabled && 'opacity-50'
-          )}
-          accessibilityRole="button"
-          accessibilityLabel="Add attachment"
-          accessibilityState={{ disabled: paperclipDisabled }}
-        >
-          <Paperclip size={18} color={colors.mutedForeground} />
-        </Pressable>
         <RNTextInput
           ref={promptInputRef}
           placeholder="What would you like to work on?"
           placeholderTextColor={colors.mutedForeground}
           multiline
           className={cn(
-            'flex-1 px-2 py-2 text-base leading-6 text-foreground',
+            'w-full px-2 py-2 text-base leading-6 text-foreground',
             isCreating && 'opacity-50'
           )}
           style={[
@@ -205,16 +191,30 @@ export function NewSessionPrompt({
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
         />
-        {voiceInput.available ? (
-          <View className="ml-1">
+        <View className="flex-row items-center justify-between pb-1">
+          <Pressable
+            onPress={handlePaperclipPress}
+            disabled={paperclipDisabled}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className={cn(
+              'h-9 w-9 items-center justify-center rounded-full active:opacity-70',
+              paperclipDisabled && 'opacity-50'
+            )}
+            accessibilityRole="button"
+            accessibilityLabel="Add attachment"
+            accessibilityState={{ disabled: paperclipDisabled }}
+          >
+            <Paperclip size={18} color={colors.mutedForeground} />
+          </Pressable>
+          {voiceInput.available ? (
             <VoiceInputButton
               disabled={control.voiceDisabled}
               size="md"
               status={voiceInput.status}
               onPress={handleVoiceToggle}
             />
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </View>
       {voiceInput.available ? (
         <View className="min-h-[20px] px-3 pb-1">

@@ -69,8 +69,10 @@ const builtInToolNameSchema = z.enum([
   'eval',
   'find_in_page',
   'get_element_details',
+  'get_memory',
   'get_page_snapshot',
   'get_viewport_screenshot',
+  'search_memories',
 ]);
 // Built-in tools plus dynamically mapped remote MCP tools (mcp_<slug>_<tool>).
 const gatewayToolNameSchema = z.union([

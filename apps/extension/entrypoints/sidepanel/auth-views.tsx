@@ -4,6 +4,7 @@ import type { StoredAuth } from '@/src/shared/auth';
 import { AgentChatPanel } from './agent-chat-panel';
 import { Shell } from './auth-shell';
 import { useOrganizationCreditAccount } from './organization-credit-account';
+import { PendingMemorySaveCard } from './pending-memory-save-card';
 
 export const LoadingView = (): JSX.Element => (
   <Shell>
@@ -147,6 +148,7 @@ export const SignedInView = ({
       organizationOptions={organizationOptions}
       selectedOrganizationId={selectedOrganizationId}
     >
+      <PendingMemorySaveCard />
       <AgentChatPanel
         auth={auth}
         onHeaderBeforeSettingsChange={setHeaderBeforeSettings}

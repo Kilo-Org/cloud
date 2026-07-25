@@ -29,6 +29,8 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/roboto-mono": "^5.3.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-virtual": "^3.14.3",

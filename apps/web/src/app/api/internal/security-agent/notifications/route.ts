@@ -13,6 +13,7 @@ import type { SecurityFindingNotificationKind } from '@kilocode/db/schema-types'
 import { db } from '@/lib/drizzle';
 import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail, type TemplateName } from '@/lib/email';
+import { dispatchSecurityFindingPush } from '@/lib/notifications-worker-client';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 import {
   SecurityNotificationPolicySchema,
@@ -281,7 +282,23 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   }
-  if (result.sent) return NextResponse.json({ outcome: 'sent' }, { status: 200 });
+  if (result.sent) {
+    try {
+      await dispatchSecurityFindingPush({
+        recipientUserId: row.recipientUserId,
+        notificationId: row.notificationId,
+        findingId: row.findingId,
+        scope: row.ownedByOrganizationId ?? 'personal',
+        notificationKind: row.kind,
+        severity: row.severity,
+        repoFullName: row.repoFullName,
+        title: row.title,
+      });
+    } catch {
+      // Push is best-effort: the email was sent; the response stays `sent`.
+    }
+    return NextResponse.json({ outcome: 'sent' }, { status: 200 });
+  }
   if (result.reason === 'neverbounce_rejected') {
     return NextResponse.json(
       { outcome: 'permanent_failure', reason: 'email_verification_rejected' },

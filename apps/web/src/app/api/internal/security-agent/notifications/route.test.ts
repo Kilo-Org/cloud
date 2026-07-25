@@ -29,9 +29,16 @@ jest.mock('@/lib/email', () => {
   };
 });
 
+jest.mock('@/lib/notifications-worker-client', () => ({
+  dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
+  dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { POST } from './route';
+import { dispatchSecurityFindingPush } from '@/lib/notifications-worker-client';
 
 const mockSendEmail = jest.mocked(sendEmail);
+const mockDispatchSecurityFindingPush = jest.mocked(dispatchSecurityFindingPush);
 
 function createRequest(notificationId: string, secret = 'security-notification-secret') {
   return new NextRequest('http://localhost:3000/api/internal/security-agent/notifications', {
@@ -193,7 +200,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
   });
 
   it('sends eligible personal new-finding notifications', async () => {
-    const { notification, user } = await insertPersonalNotification({});
+    const { notification, user, finding } = await insertPersonalNotification({});
 
     const response = await POST(createRequest(notification.id));
 
@@ -225,6 +232,38 @@ describe('POST /api/internal/security-agent/notifications', () => {
     );
     expect(findingDetails.html).toContain('CVSS 7.5');
     expect(findingDetails.html).not.toContain('Lodash merge allows prototype pollution');
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledTimes(1);
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledWith({
+      recipientUserId: user.id,
+      notificationId: notification.id,
+      findingId: finding.id,
+      scope: 'personal',
+      notificationKind: 'new_finding',
+      severity: 'high',
+      repoFullName: 'acme/api',
+      title: 'Prototype Pollution in lodash',
+    });
+  });
+
+  it('keeps sent response when security-finding push dispatch rejects', async () => {
+    mockDispatchSecurityFindingPush.mockRejectedValueOnce(new Error('push worker down'));
+    const { notification, user, finding } = await insertPersonalNotification({});
+
+    const response = await POST(createRequest(notification.id));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ outcome: 'sent' });
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledWith({
+      recipientUserId: user.id,
+      notificationId: notification.id,
+      findingId: finding.id,
+      scope: 'personal',
+      notificationKind: 'new_finding',
+      severity: 'high',
+      repoFullName: 'acme/api',
+      title: 'Prototype Pollution in lodash',
+    });
   });
 
   it('cancels new-finding notifications when they are disabled by default', async () => {
@@ -285,6 +324,17 @@ describe('POST /api/internal/security-agent/notifications', () => {
           action_url: `https://app.example.test/organizations/${organization.id}/security-agent/findings`,
           manage_notifications_url: `https://app.example.test/organizations/${organization.id}/security-agent/config?tab=notifications`,
         }),
+      })
+    );
+    expect(mockDispatchSecurityFindingPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: recipient.id,
+        notificationId: notification.id,
+        scope: organization.id,
+        notificationKind: 'new_finding',
+        severity: 'critical',
+        repoFullName: 'acme/org-api',
+        title: 'Unauthenticated admin token exchange',
       })
     );
   });
@@ -356,6 +406,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
       outcome: 'retryable_failure',
       reason: 'provider_unavailable',
     });
+    expect(mockDispatchSecurityFindingPush).not.toHaveBeenCalled();
   });
 
   it('returns cancelled when notification was no longer claimed', async () => {
@@ -368,6 +419,7 @@ describe('POST /api/internal/security-agent/notifications', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ outcome: 'cancelled', reason: 'not_sending' });
     expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(mockDispatchSecurityFindingPush).not.toHaveBeenCalled();
   });
 
   it('persists no mutation itself; sweep owns state transition', async () => {

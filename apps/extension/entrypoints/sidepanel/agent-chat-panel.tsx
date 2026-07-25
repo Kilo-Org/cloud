@@ -1,5 +1,5 @@
 /* eslint-disable import/max-dependencies, max-lines */
-import { storage } from '#imports';
+import { browser, storage } from '#imports';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
@@ -49,7 +49,7 @@ import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { addSessionCost } from '@/src/shared/session-cost';
-import { useTabDebugger } from './use-tab-debugger';
+import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 import { ConversationTabs } from './conversation-tabs';
 import { MessageComposer } from './message-composer';
@@ -78,15 +78,21 @@ interface ConversationRunState {
   readonly token: number;
 }
 
-const getSelectedInspectableTabId = ({
+export const getSelectedInspectableTabId = ({
+  activeTabId,
   inspectableTabs,
   selectedTabId,
 }: {
+  readonly activeTabId?: number | undefined;
   readonly inspectableTabs: readonly { readonly id: number }[];
   readonly selectedTabId: number | undefined;
 }): number | undefined => {
   if (selectedTabId !== undefined && inspectableTabs.some(tab => tab.id === selectedTabId)) {
     return selectedTabId;
+  }
+
+  if (activeTabId !== undefined && inspectableTabs.some(tab => tab.id === activeTabId)) {
+    return activeTabId;
   }
 
   return inspectableTabs[0]?.id;
@@ -145,7 +151,12 @@ export const AgentChatPanel = ({
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
   const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
-  const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
+  const [pendingCreateDefaultConversationId, setPendingCreateDefaultConversationId] = useState<
+    string | undefined
+  >();
+  const { activeTabId, inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
+  const inspectableTabsRef = useRef(inspectableTabs);
+  const isCreateDefaultInFlightRef = useRef(false);
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
     organizationId,
@@ -153,9 +164,11 @@ export const AgentChatPanel = ({
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
   const selectedTabId = getSelectedInspectableTabId({
+    activeTabId,
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
   });
+  inspectableTabsRef.current = inspectableTabs;
   const model = activeConversation.model ?? modelOptions[0]?.id ?? '';
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
@@ -348,7 +361,16 @@ export const AgentChatPanel = ({
   }, [inspectableTabs, isLoadingTabs]);
 
   useEffect(() => {
+    if (!isConversationStoreLoaded || inspectableTabs.length === 0) {
+      return;
+    }
+
+    if (pendingCreateDefaultConversationId === activeConversationId) {
+      return;
+    }
+
     const nextSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
       inspectableTabs,
       selectedTabId: activeConversation.selectedTabId,
     });
@@ -357,15 +379,36 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setConversationStore(currentStore =>
-      updateStoredConversationSettings(currentStore, activeConversationId, {
-        selectedTabId: nextSelectedTabId,
-      })
-    );
+    setConversationStore(currentStore => {
+      const currentConversation = currentStore.conversations.find(
+        item => item.id === activeConversationId
+      );
+
+      if (currentConversation === undefined) {
+        return currentStore;
+      }
+
+      const applyTimeSelectedTabId = getSelectedInspectableTabId({
+        activeTabId,
+        inspectableTabs,
+        selectedTabId: currentConversation.selectedTabId,
+      });
+
+      if (currentConversation.selectedTabId === applyTimeSelectedTabId) {
+        return currentStore;
+      }
+
+      return updateStoredConversationSettings(currentStore, activeConversationId, {
+        selectedTabId: applyTimeSelectedTabId,
+      });
+    });
   }, [
     activeConversation.selectedTabId,
     activeConversationId,
+    activeTabId,
     inspectableTabs,
+    isConversationStoreLoaded,
+    pendingCreateDefaultConversationId,
     setConversationStore,
   ]);
 
@@ -454,6 +497,7 @@ export const AgentChatPanel = ({
     const runThinkingOptions = runSelectedModel?.variants ?? [];
     const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
     const runSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
@@ -596,6 +640,7 @@ export const AgentChatPanel = ({
     const conversation = getActiveStoredConversation(conversationStoreRef.current);
     const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
     const conversationSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
@@ -624,14 +669,13 @@ export const AgentChatPanel = ({
   };
 
   const createConversation = (): void => {
-    if (!isConversationStoreLoaded) {
+    if (!isConversationStoreLoaded || isCreateDefaultInFlightRef.current) {
       return;
     }
 
     const settings = {
       mode,
       model,
-      ...(selectedTabId === undefined ? {} : { selectedTabId }),
       thinkingEffort,
     };
 
@@ -641,6 +685,39 @@ export const AgentChatPanel = ({
       settings
     );
     setConversationStore(conversationStoreRef.current);
+
+    const newConversationId = conversationStoreRef.current.activeConversationId;
+
+    isCreateDefaultInFlightRef.current = true;
+    setPendingCreateDefaultConversationId(newConversationId);
+
+    void (async (): Promise<void> => {
+      try {
+        const freshActiveTabId = await getActiveTabId(browser.tabs);
+        const latestTabs = inspectableTabsRef.current;
+
+        if (freshActiveTabId !== undefined && latestTabs.some(tab => tab.id === freshActiveTabId)) {
+          setConversationStore(currentStore => {
+            const conversation = currentStore.conversations.find(
+              item => item.id === newConversationId
+            );
+
+            if (conversation === undefined || conversation.selectedTabId !== undefined) {
+              return currentStore;
+            }
+
+            return updateStoredConversationSettings(currentStore, newConversationId, {
+              selectedTabId: freshActiveTabId,
+            });
+          });
+        }
+      } finally {
+        isCreateDefaultInFlightRef.current = false;
+        setPendingCreateDefaultConversationId(current =>
+          current === newConversationId ? undefined : current
+        );
+      }
+    })();
   };
 
   const selectConversation = (conversationId: string): void => {

@@ -84,7 +84,13 @@ export const ConversationList = ({
   const scrollKey = getConversationScrollKey(items);
   const virtualizer = useVirtualizer({
     count: items.length,
-    estimateSize: () => 46,
+    /*
+     * Recorded deviation: measured collapsed row heights are 42-46px, but pinning
+     * the estimate into that band destabilized the scroll-pin E2E on the CI browser
+     * (wheel-up poll timeouts at 44/46/48). The pre-existing 52 stays; measureElement
+     * reconciles real rows regardless.
+     */
+    estimateSize: () => 52,
     getScrollElement: () => listRef.current,
     overscan: 8,
   });

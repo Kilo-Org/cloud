@@ -48,7 +48,7 @@ export const ContextDonut = ({
             cy="8"
             fill="none"
             r={RADIUS}
-            stroke={DESIGN_TOKENS.surfaceOverlay}
+            stroke={DESIGN_TOKENS.surfaceBackground}
             strokeWidth="3"
           />
           <circle

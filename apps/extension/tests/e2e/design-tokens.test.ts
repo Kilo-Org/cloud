@@ -514,6 +514,14 @@ test('Case D — donut status stroke', async () => {
     const stroke = await donut.locator('circle[stroke-dasharray]').getAttribute('stroke');
     expect(stroke?.toLowerCase(), `donut stroke ${stroke}`).toBe('#f0a900');
     expect(stroke?.toLowerCase()).not.toBe('#edff00');
+
+    // Track circle (no dasharray) must step down from the overlay button fill.
+    const trackStroke = await donut
+      .locator('circle:not([stroke-dasharray])')
+      .getAttribute('stroke');
+    expect(trackStroke?.toLowerCase(), `donut track stroke ${trackStroke}`).toBe('#151515');
+    const donutBg = await donut.evaluate(element => getComputedStyle(element).backgroundColor);
+    expectRgb(donutBg, { blue: 51, green: 51, red: 51 }, 'donut summary button background');
   } finally {
     await context.close();
     await fixture.close();
@@ -541,24 +549,54 @@ test('Case E — eyebrow + old-paint scan', async () => {
     expect(chipStyles.textTransform, 'Open chip text-transform').toBe('uppercase');
 
     // Bounded old-paint scan: no legacy brand yellow or zinc-950 body paint.
-    const offenders = await sidePanel.locator('body *').evaluateAll(elements => {
-      const banned = new Set(['rgb(237, 255, 0)', 'rgb(9, 9, 11)']);
-
-      return elements.flatMap(element => {
+    // Compare parsed RGB channels (alpha-agnostic) so serialization form does not matter.
+    const colorSamples = await sidePanel.locator('body *').evaluateAll(elements =>
+      elements.flatMap(element => {
         if (!(element instanceof HTMLElement)) {
           return [];
         }
 
         const { backgroundColor, color } = getComputedStyle(element);
 
-        if (banned.has(color) || banned.has(backgroundColor)) {
-          return [
-            `${element.tagName.toLowerCase()}.${element.className}: color=${color} bg=${backgroundColor}`,
-          ];
-        }
+        return [
+          {
+            backgroundColor,
+            className: String(element.className),
+            color,
+            tag: element.tagName.toLowerCase(),
+          },
+        ];
+      })
+    );
 
+    const bannedChannels = [
+      { blue: 0, green: 255, red: 237 },
+      { blue: 11, green: 9, red: 9 },
+    ] as const;
+
+    const offenders = colorSamples.flatMap(sample => {
+      const matchesBanned = (value: string): boolean => {
+        try {
+          const parsed = parseRgba(value);
+
+          return bannedChannels.some(
+            banned =>
+              parsed.red === banned.red &&
+              parsed.green === banned.green &&
+              parsed.blue === banned.blue
+          );
+        } catch {
+          return false;
+        }
+      };
+
+      if (!matchesBanned(sample.color) && !matchesBanned(sample.backgroundColor)) {
         return [];
-      });
+      }
+
+      return [
+        `${sample.tag}.${sample.className}: color=${sample.color} bg=${sample.backgroundColor}`,
+      ];
     });
 
     expect(offenders, offenders.join('\n')).toStrictEqual([]);

@@ -165,7 +165,7 @@ const formatFindings = (findings: Finding[]): string =>
 /** Join string parts without writing complete banned class literals in source. */
 const concatParts = (parts: string[]): string => parts.join('');
 
-/** StatusGreen500 → status-green-500; surfaceOverlay → surface-overlay. */
+/** StatusGreen500 → status-green-500; surfaceBackground → surface-background. */
 const camelToKebab = (value: string): string =>
   value
     .replaceAll(/([a-z0-9])([A-Z])/gu, '$1-$2')

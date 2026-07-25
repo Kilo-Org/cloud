@@ -23,7 +23,7 @@ const waitMs = 15_000;
 
 const chromeWorkflowNames = [
   'conversation automatically continues through another eval request',
-  'new conversation inherits the selected target tab',
+  'new conversation does not inherit the selected target tab',
   'conversation tabs can run in parallel',
   'conversation tabs persist across side panel reloads',
   'closing a conversation removes only that tab',
@@ -49,6 +49,7 @@ const chromeWorkflowNames = [
   'switching credit accounts clears the model while the next catalog loads',
   'stale organization model loads cannot overwrite the current catalog',
   'new conversation keeps the running request in its original tab',
+  'analytics opt-out toggle persists across side panel reloads',
   'memories can be saved from a pending draft and listed in settings',
   'memories save card cancel discards the draft',
   'memory index is included in the chat request context',
@@ -554,6 +555,45 @@ const seedFirefoxAuth = async (driver: WebDriver): Promise<void> => {
   });
 
   assert.equal(result, 'ok');
+};
+
+const readFirefoxSyncStorage = async (driver: WebDriver, key: string): Promise<unknown> => {
+  const result = await driver.executeAsyncScript(
+    (storageKey: string, done: (value: unknown) => void) => {
+      const browserApi = (
+        globalThis as typeof globalThis & {
+          browser?: {
+            storage?: {
+              sync?: {
+                get: (keys: string[]) => Promise<Record<string, unknown>>;
+              };
+            };
+          };
+        }
+      ).browser;
+
+      browserApi?.storage?.sync
+        ?.get([storageKey])
+        .then(items => {
+          done({ ok: true, value: items[storageKey] });
+          return null;
+        })
+        .catch((error: unknown) => {
+          done({
+            error: error instanceof Error ? error.message : String(error),
+            ok: false,
+          });
+        });
+    },
+    key
+  );
+
+  assert.equal(
+    isRecord(result) && result['ok'],
+    true,
+    `readFirefoxSyncStorage failed: ${String(result)}`
+  );
+  return isRecord(result) ? result['value'] : undefined;
 };
 
 const seedFirefoxStorage = async (
@@ -1222,18 +1262,46 @@ const scenarios: FirefoxScenario[] = [
       ),
   },
   {
-    name: 'new conversation inherits the selected target tab',
+    // R3 non-inheritance without activation (A9 probe FAIL / harness-limited).
+    name: 'new conversation does not inherit the selected target tab',
     run: context =>
       withSession(context.api, {}, async session => {
         await session.openTargetPage('First target tab');
         await session.openTargetPage('Second target tab');
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
-        await setSelectByText(session.driver, 'Target tab', 'Second target tab');
-        await waitForTargetTab(session.driver, 'Second target tab');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const optionsText = await getSelectOptionsText(session.driver, 'Target tab');
+
+            return (
+              optionsText.includes('First target tab') && optionsText.includes('Second target tab')
+            );
+          },
+          'Timed out waiting for both target tab options'
+        );
+
+        const optionsText = await getSelectOptionsText(session.driver, 'Target tab');
+        const optionLabels = optionsText
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0 && line !== 'No tab selected');
+        const [firstListed] = optionLabels;
+        const nonFirstListed = optionLabels.find(label => label !== firstListed);
+
+        assert.ok(firstListed !== undefined, 'expected a first-listed target tab option');
+        assert.ok(nonFirstListed !== undefined, 'expected a non-first-listed target tab option');
+
+        // Conv1 picks non-first-listed so inheritance would differ from first-listed.
+        await setSelectByText(session.driver, 'Target tab', nonFirstListed);
+        await waitForTargetTab(session.driver, nonFirstListed);
 
         await clickButtonByLabel(session.driver, 'New conversation');
-        await waitForTargetTab(session.driver, 'Second target tab');
+        // New conversation must not inherit conv1's pick; defaults to first-listed.
+        await waitForTargetTab(session.driver, firstListed);
+        assert.notEqual(firstListed, nonFirstListed);
       }),
   },
   {
@@ -2371,6 +2439,60 @@ const scenarios: FirefoxScenario[] = [
         }
       );
     },
+  },
+  {
+    name: 'analytics opt-out toggle persists across side panel reloads',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await openAuthenticatedPanel(session);
+        await clickButtonByLabel(session.driver, 'Settings');
+
+        const switchSelector = 'button[role="switch"][aria-label="Share usage analytics"]';
+        await waitUntil(
+          session.driver,
+          async () => {
+            const elements = await session.driver.findElements(By.css(switchSelector));
+            return elements.length > 0;
+          },
+          'Timed out waiting for Share usage analytics switch'
+        );
+
+        const analyticsSwitch = await session.driver.findElement(By.css(switchSelector));
+        assert.equal(await analyticsSwitch.getAttribute('aria-checked'), 'true');
+
+        await analyticsSwitch.click();
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const element = await session.driver.findElement(By.css(switchSelector));
+            return (await element.getAttribute('aria-checked')) === 'false';
+          },
+          'Timed out waiting for analytics switch to turn off'
+        );
+
+        await waitUntil(
+          session.driver,
+          async () => (await readFirefoxSyncStorage(session.driver, 'analyticsOptOut')) === true,
+          'Timed out waiting for analyticsOptOut in browser.storage.sync'
+        );
+
+        await session.driver.navigate().refresh();
+        await waitForText(session.driver, 'Kilo');
+        await clickButtonByLabel(session.driver, 'Settings');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const elements = await session.driver.findElements(By.css(switchSelector));
+            if (elements.length === 0) {
+              return false;
+            }
+            return (await elements[0]?.getAttribute('aria-checked')) === 'false';
+          },
+          'Timed out waiting for analytics switch to stay off after reload'
+        );
+      }),
   },
   {
     name: 'memories can be saved from a pending draft and listed in settings',

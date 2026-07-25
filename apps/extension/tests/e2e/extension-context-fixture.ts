@@ -1,10 +1,17 @@
-/* eslint-disable import/no-nodejs-modules, promise/avoid-new, promise/prefer-await-to-callbacks */
+/* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, promise/prefer-await-to-callbacks */
 import { chromium, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { access, mkdtemp } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
+import {
+  applyPosthogE2eBrowserWorkarounds,
+  EXTENSION_E2E_LAUNCH_ARGS,
+  EXTENSION_E2E_USER_AGENT,
+  installPosthogStub,
+} from './posthog-fixture';
+import type { NormalizedPosthogEvent } from './posthog-fixture';
 
 export const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
@@ -62,6 +69,10 @@ export const startFixtureServer = async ({
 export const launchExtensionContext = async (): Promise<{
   context: BrowserContext;
   extensionId: string;
+  /** `/flags` and `/decide/` URLs that hit the stub (must stay empty with flags disabled). */
+  posthogFlagsOrDecideHits: string[];
+  /** Capture-class PostHog events (normalized). Additive; existing callers ignore it. */
+  posthogRequests: NormalizedPosthogEvent[];
   userDataDir: string;
 }> => {
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-extension-e2e-'));
@@ -69,17 +80,31 @@ export const launchExtensionContext = async (): Promise<{
   const isHeaded = process.env['EXTENSION_E2E_HEADED'] === '1';
 
   const context = await chromium.launchPersistentContext(userDataDir, {
-    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+      ...EXTENSION_E2E_LAUNCH_ARGS,
+    ],
     channel: 'chromium',
     headless: !isHeaded,
+    ignoreDefaultArgs: ['--enable-automation'],
+    userAgent: EXTENSION_E2E_USER_AGENT,
   });
+
+  await applyPosthogE2eBrowserWorkarounds(context);
+  const posthogRecorder = await installPosthogStub(context);
 
   const [existingServiceWorker] = context.serviceWorkers();
   const serviceWorker = existingServiceWorker ?? (await context.waitForEvent('serviceworker'));
-
   const extensionId = new URL(serviceWorker.url()).host;
 
-  return { context, extensionId, userDataDir };
+  return {
+    context,
+    extensionId,
+    posthogFlagsOrDecideHits: posthogRecorder.flagsOrDecideHits,
+    posthogRequests: posthogRecorder.events,
+    userDataDir,
+  };
 };
 
 export const setExtensionStorage = async (
@@ -127,6 +152,127 @@ export const setExtensionStorage = async (
 
 export const seedExtensionAuth = (page: Page): Promise<void> =>
   setExtensionStorage(page, { kiloAuth: { token: 'token-1', userEmail: 'user@kilo.ai' } });
+
+export const setExtensionSyncStorage = async (
+  page: Page,
+  items: Record<string, unknown>
+): Promise<void> => {
+  await page.evaluate(
+    storageItems =>
+      new Promise<void>((resolve, reject) => {
+        const chromeApi = (
+          globalThis as typeof globalThis & {
+            chrome?: {
+              runtime?: { lastError?: { message?: string } };
+              storage?: {
+                sync?: {
+                  set: (items: Record<string, unknown>, callback: () => void) => void;
+                };
+              };
+            };
+          }
+        ).chrome;
+
+        const runtime = chromeApi?.runtime;
+        const storage = chromeApi?.storage?.sync;
+
+        if (runtime === undefined || storage === undefined) {
+          reject(new Error('Extension sync storage is unavailable.'));
+          return;
+        }
+
+        storage.set(storageItems, () => {
+          const message = runtime.lastError?.message;
+
+          if (message !== undefined && message !== '') {
+            reject(new Error(message));
+            return;
+          }
+
+          resolve();
+        });
+      }),
+    items
+  );
+};
+
+export const readExtensionSyncStorage = (page: Page, key: string): Promise<unknown> =>
+  page.evaluate(
+    storageKey =>
+      new Promise<unknown>((resolve, reject) => {
+        const chromeApi = (
+          globalThis as typeof globalThis & {
+            chrome?: {
+              runtime?: { lastError?: { message?: string } };
+              storage?: {
+                sync?: {
+                  get: (keys: string[], callback: (items: Record<string, unknown>) => void) => void;
+                };
+              };
+            };
+          }
+        ).chrome;
+
+        const runtime = chromeApi?.runtime;
+        const storage = chromeApi?.storage?.sync;
+
+        if (runtime === undefined || storage === undefined) {
+          reject(new Error('Extension sync storage is unavailable.'));
+          return;
+        }
+
+        storage.get([storageKey], items => {
+          const message = runtime.lastError?.message;
+
+          if (message !== undefined && message !== '') {
+            reject(new Error(message));
+            return;
+          }
+
+          resolve(items[storageKey]);
+        });
+      }),
+    key
+  );
+
+export const readExtensionLocalStorage = (page: Page, key: string): Promise<unknown> =>
+  page.evaluate(
+    storageKey =>
+      new Promise<unknown>((resolve, reject) => {
+        const chromeApi = (
+          globalThis as typeof globalThis & {
+            chrome?: {
+              runtime?: { lastError?: { message?: string } };
+              storage?: {
+                local?: {
+                  get: (keys: string[], callback: (items: Record<string, unknown>) => void) => void;
+                };
+              };
+            };
+          }
+        ).chrome;
+
+        const runtime = chromeApi?.runtime;
+        const storage = chromeApi?.storage?.local;
+
+        if (runtime === undefined || storage === undefined) {
+          reject(new Error('Extension local storage is unavailable.'));
+          return;
+        }
+
+        storage.get([storageKey], items => {
+          const message = runtime.lastError?.message;
+
+          if (message !== undefined && message !== '') {
+            reject(new Error(message));
+            return;
+          }
+
+          resolve(items[storageKey]);
+        });
+      }),
+    key
+  );
 
 export const waitForStoredConversationText = async (page: Page, text: string): Promise<void> => {
   await expect

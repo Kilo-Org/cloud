@@ -351,6 +351,11 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `DOCKER_PROXY_SOCKET` - Path to the Docker privileged proxy socket. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
 
+## Browser Extension (apps/extension)
+
+- `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
+- `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
+
 ## Mobile
 
 - `API_BASE_URL` - Base HTTPS URL for the mobile app's API (e.g. `https://api.kilo.ai`). Bundled into the binary. [PUBLIC]

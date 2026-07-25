@@ -207,7 +207,13 @@ test('analytics captures message sent and user-created conversation events', asy
   try {
     await mockKiloApi(context, {
       firstCompletionEvents: [{ choices: [{ delta: { content: 'Analytics reply.' } }] }],
-      toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'search_memories',
+        'get_memory',
+      ],
     });
 
     const page = await context.newPage();

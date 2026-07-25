@@ -34,6 +34,8 @@ function fullRow(overrides: Partial<NotificationPreferences> = {}): Notification
     agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
     kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
+    balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
     agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
     ...overrides,
   };
@@ -46,13 +48,15 @@ describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
 });
 
 describe('NOTIFICATION_CATEGORY_KEYS', () => {
-  it('lists the 5 categories rendered on the dedicated screen', () => {
+  it('lists the categories rendered on the dedicated screen including balance and security', () => {
     expect([...NOTIFICATION_CATEGORY_KEYS]).toEqual([
       'chatMessages',
       'agentAttention',
       'agentUpdates',
       'sessionStatus',
       'kiloclawActivity',
+      'balanceAlerts',
+      'securityFindings',
     ]);
   });
 });
@@ -101,6 +105,8 @@ describe('readAgentPushPreference', () => {
       agentUpdates: true,
       sessionStatus: false,
       kiloclawActivity: true,
+      balanceAlerts: false,
+      securityFindings: true,
       agentPushEnabled: true,
     });
     expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(true);
@@ -108,6 +114,8 @@ describe('readAgentPushPreference', () => {
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'sessionStatus')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'kiloclawActivity')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
   it('maps the legacy `agentPushEnabled` snapshot to the agentUpdates category', () => {
@@ -117,6 +125,10 @@ describe('readAgentPushPreference', () => {
     // Non-agentUpdates categories fall back to the default when only the
     // legacy field is present.
     expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
+      DEFAULT_NOTIFICATION_PREFERENCE
+    );
   });
 
   it('defaults to the agentUpdates category when no category is passed', () => {
@@ -146,7 +158,7 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     expect(context.previousWasLegacy).toBe(false);
   });
 
-  it('flips a non-agentUpdates category in a real 6-key snapshot without corrupting the other keys', async () => {
+  it('flips a non-agentUpdates category in a real full snapshot without corrupting the other keys', async () => {
     const qc = makeQueryClient();
     const original = {
       chatMessages: true,
@@ -154,6 +166,8 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
       agentUpdates: true,
       sessionStatus: false,
       kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
       agentPushEnabled: true,
     } as const satisfies NotificationPreferences;
     qc.setQueryData(key, original);
@@ -171,6 +185,8 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     expect(after.agentAttention).toBe(true);
     expect(after.agentUpdates).toBe(true);
     expect(after.kiloclawActivity).toBe(true);
+    expect(after.balanceAlerts).toBe(true);
+    expect(after.securityFindings).toBe(true);
     expect(after.agentPushEnabled).toBe(true);
 
     expect(context.previous).toEqual(original);
@@ -211,6 +227,8 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     // consistently while the mutation is in flight.
     expect(context.previous).toBeUndefined();
     expect(readRow(qc).agentUpdates).toBe(false);
+    expect(readRow(qc).balanceAlerts).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readRow(qc).securityFindings).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
 
     rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
     // No prior snapshot => cache restored to the absent state, not a fabricated true.
@@ -251,6 +269,8 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     const after = readRow(qc);
     expect(after.agentAttention).toBe(false);
     expect(after.agentUpdates).toBe(true);
+    expect(after.balanceAlerts).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(after.securityFindings).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
     expect(context.previous).toBe(legacy);
     expect(context.previousWasLegacy).toBe(true);
 
@@ -277,6 +297,8 @@ describe('per-category flip flow (each category in turn)', () => {
     { category: 'agentUpdates', next: false },
     { category: 'sessionStatus', next: true },
     { category: 'kiloclawActivity', next: false },
+    { category: 'balanceAlerts', next: false },
+    { category: 'securityFindings', next: true },
   ];
 
   for (const { category, next } of scenarios) {

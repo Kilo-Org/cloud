@@ -14,7 +14,9 @@ import {
   type LucideIcon,
   MessageSquare,
   RefreshCw,
+  ShieldAlert,
   Sparkles,
+  Wallet,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
@@ -113,6 +115,18 @@ const CATEGORY_META: readonly CategoryMeta[] = [
     title: 'KiloClaw activity',
     subtitle: 'instance ready/failed, scheduled actions',
     icon: Sparkles,
+  },
+  {
+    key: 'balanceAlerts',
+    title: 'Balance alerts',
+    subtitle: 'low organization balance warnings',
+    icon: Wallet,
+  },
+  {
+    key: 'securityFindings',
+    title: 'Security findings',
+    subtitle: 'new findings and SLA reminders',
+    icon: ShieldAlert,
   },
 ] as const;
 

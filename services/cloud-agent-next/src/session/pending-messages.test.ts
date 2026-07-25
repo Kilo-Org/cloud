@@ -403,6 +403,34 @@ describe('recordPendingFlushFailure', () => {
     expect(delays).toEqual([10_000, 30_000, 60_000, undefined]);
   });
 
+  it('starts the capacity retry budget fresh after a different earlier failure', async () => {
+    const storage = createMemoryStorage();
+    const message = makeMessage({
+      createdAt: 1,
+      flushAttempts: 2,
+      lastFlushFailureCode: 'WRAPPER_START_FAILED',
+    });
+    await storePendingSessionMessage(storage, message);
+
+    const result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'sandbox storage full',
+      100_000,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'sandbox_storage_full',
+      }
+    );
+
+    // Reset to attempt 1 so the full 10s/30s/60s budget applies, not truncated
+    // by the two earlier non-capacity attempts.
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    expect(result.nextFlushAttemptAt).toBe(110_000);
+  });
+
   it('retries a sandbox connection failure once after exactly five seconds', async () => {
     const storage = createMemoryStorage();
     let message = makeMessage({ createdAt: 100_000 });

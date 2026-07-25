@@ -540,9 +540,17 @@ export async function recordPendingFlushFailure(
     : options.code === 'WORKSPACE_SETUP_FAILED'
       ? options.safeFailureMessage
       : undefined;
+  // A newly-observed sandbox-capacity failure starts its own retry budget, the
+  // same way a sandbox-connection failure does, so the full 10s/30s/60s backoff
+  // applies even if the message already failed under a different code first.
+  const enteringSandboxCapacityRetry =
+    flushFailureCode === 'WORKSPACE_SETUP_FAILED' &&
+    failureSubtype === 'sandbox_storage_full' &&
+    message.lastFlushFailureSubtype !== 'sandbox_storage_full';
   const attempts =
-    flushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
-    message.lastFlushFailureCode !== 'SANDBOX_CONNECT_FAILED'
+    (flushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
+      message.lastFlushFailureCode !== 'SANDBOX_CONNECT_FAILED') ||
+    enteringSandboxCapacityRetry
       ? 1
       : (message.flushAttempts ?? 0) + 1;
   const retryDelays =

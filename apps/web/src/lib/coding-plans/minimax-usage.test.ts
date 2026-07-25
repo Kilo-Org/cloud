@@ -147,7 +147,13 @@ describe('MiniMax managed usage transport', () => {
     [
       'missing reset timestamps',
       payload({
-        model_remains: [{ model_name: 'general', current_interval_remaining_percent: 50 }],
+        model_remains: [
+          {
+            model_name: 'general',
+            current_interval_remaining_percent: 50,
+            remains_time: 3_600_000,
+          },
+        ],
       }),
     ],
   ])('rejects %s without exposing provider data', async (_description, body) => {

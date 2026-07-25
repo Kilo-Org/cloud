@@ -20,7 +20,6 @@ const MiniMaxModelRemainsSchema = z.object({
   current_interval_usage_count: NativeIntegerSchema.nonnegative().optional(),
   start_time: NativeIntegerSchema.nonnegative().optional(),
   end_time: NativeIntegerSchema.nonnegative().optional(),
-  remains_time: NativeIntegerSchema.nonnegative().optional(),
   interval_boost_permill: NativeIntegerSchema.nonnegative().optional(),
   interval_boost_permille: NativeIntegerSchema.nonnegative().optional(),
   current_interval_remaining_percent: NativePercentSchema.optional(),
@@ -29,7 +28,6 @@ const MiniMaxModelRemainsSchema = z.object({
   current_weekly_usage_count: NativeIntegerSchema.nonnegative().optional(),
   weekly_start_time: NativeIntegerSchema.nonnegative().optional(),
   weekly_end_time: NativeIntegerSchema.nonnegative().optional(),
-  weekly_remains_time: NativeIntegerSchema.nonnegative().optional(),
   weekly_boost_permill: NativeIntegerSchema.nonnegative().optional(),
   weekly_boost_permille: NativeIntegerSchema.nonnegative().optional(),
   current_weekly_remaining_percent: NativePercentSchema.optional(),
@@ -117,30 +115,17 @@ function isoTimestamp(value: number | undefined): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function resetTimestamp(
-  end: number | undefined,
-  remains: number | undefined,
-  fetchedAt: string
-): string | undefined {
-  const absolute = isoTimestamp(end);
-  if (absolute) return absolute;
-  if (remains === undefined || remains <= 0) return undefined;
-  return isoTimestamp(Date.parse(fetchedAt) + remains);
-}
-
 function quotaWindow(input: {
   id: 'short_term' | 'weekly';
   percent: number | undefined;
   status: number | undefined;
   start: number | undefined;
   end: number | undefined;
-  remains: number | undefined;
   boostPermille: number | undefined;
   period: CodingPlanQuotaWindow['period'];
-  fetchedAt: string;
 }): CodingPlanQuotaWindow | null {
   if (input.status === 3 || input.percent === undefined) return null;
-  const resetsAt = resetTimestamp(input.end, input.remains, input.fetchedAt);
+  const resetsAt = isoTimestamp(input.end);
   if (!resetsAt) return null;
 
   const boost =
@@ -157,7 +142,7 @@ function quotaWindow(input: {
   };
 }
 
-function normalizeUsage(native: MiniMaxUsageNative, fetchedAt: string): CodingPlanQuotaWindow[] {
+function normalizeUsage(native: MiniMaxUsageNative): CodingPlanQuotaWindow[] {
   const aggregateRows = native.model_remains.filter(row => row.model_name === 'general');
   if (aggregateRows.length !== 1) {
     throw new MiniMaxUsageError('invalid_schema');
@@ -170,10 +155,8 @@ function normalizeUsage(native: MiniMaxUsageNative, fetchedAt: string): CodingPl
       status: aggregate.current_interval_status,
       start: aggregate.start_time,
       end: aggregate.end_time,
-      remains: aggregate.remains_time,
       boostPermille: aggregate.interval_boost_permille ?? aggregate.interval_boost_permill,
       period: { unit: 'hour', value: 5 },
-      fetchedAt,
     }),
     quotaWindow({
       id: 'weekly',
@@ -181,10 +164,8 @@ function normalizeUsage(native: MiniMaxUsageNative, fetchedAt: string): CodingPl
       status: aggregate.current_weekly_status,
       start: aggregate.weekly_start_time,
       end: aggregate.weekly_end_time,
-      remains: aggregate.weekly_remains_time,
       boostPermille: aggregate.weekly_boost_permille ?? aggregate.weekly_boost_permill,
       period: { unit: 'week', value: 1 },
-      fetchedAt,
     }),
   ].filter((window): window is CodingPlanQuotaWindow => window !== null);
   const result = CodingPlanQuotaWindowsSchema.safeParse(windows);
@@ -238,6 +219,6 @@ export async function getMiniMaxUsage(apiKey: string) {
   const fetchedAt = new Date().toISOString();
   return {
     fetchedAt,
-    windows: normalizeUsage(result.data, fetchedAt),
+    windows: normalizeUsage(result.data),
   };
 }

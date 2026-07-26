@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import { cacheDirectory, copyAsync } from 'expo-file-system/legacy';
+import { cacheDirectory, copyAsync, deleteAsync } from 'expo-file-system/legacy';
 import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -20,14 +20,37 @@ type ShareIntentLike = Pick<ShareIntent, 'text' | 'webUrl' | 'meta' | 'files'>;
 
 type CopyToCache = (args: { from: string; fileName: string }) => Promise<string>;
 
+type DeleteCachedFile = (uri: string) => Promise<void>;
+
 const payloads = new Map<ShareId, SharePayload>();
 const insertionOrder: ShareId[] = [];
+
+async function defaultDeleteCachedFile(uri: string): Promise<void> {
+  try {
+    await deleteAsync(uri, { idempotent: true });
+  } catch {
+    // Best-effort hygiene; ignore delete failures.
+  }
+}
+
+let deleteCachedFile: DeleteCachedFile = defaultDeleteCachedFile;
+
+/** Fire-and-forget delete of each file uri in a dropped payload. */
+function discardPayloadCacheFiles(payload: SharePayload): void {
+  for (const file of payload.files) {
+    void deleteCachedFile(file.uri);
+  }
+}
 
 function evictOldestIfNeeded(): void {
   while (payloads.size > SHARE_PAYLOAD_MAX_ENTRIES && insertionOrder.length > 0) {
     const oldest = insertionOrder.shift();
     if (oldest !== undefined) {
+      const evicted = payloads.get(oldest);
       payloads.delete(oldest);
+      if (evicted) {
+        discardPayloadCacheFiles(evicted);
+      }
     }
   }
 }
@@ -41,7 +64,10 @@ export function putSharePayload(payload: SharePayload): ShareId {
   return id;
 }
 
-/** Read-and-delete. Null if `id` is unknown or already consumed. */
+/**
+ * Read-and-delete map entry only. Never deletes cache files here — the
+ * composer's uploads still read those uris after take.
+ */
 export function takeSharePayload(id: ShareId): SharePayload | null {
   const payload = payloads.get(id) ?? null;
   if (payload === null) {
@@ -62,7 +88,8 @@ export function peekSharePayload(id: ShareId): SharePayload | null {
 
 /** Id-scoped abandonment. Never clears another id's entry. */
 export function clearSharePayload(id: ShareId): void {
-  if (!payloads.has(id)) {
+  const payload = payloads.get(id);
+  if (payload === undefined) {
     return;
   }
   payloads.delete(id);
@@ -70,12 +97,19 @@ export function clearSharePayload(id: ShareId): void {
   if (index !== -1) {
     insertionOrder.splice(index, 1);
   }
+  discardPayloadCacheFiles(payload);
 }
 
 /** Test-only: wipe the module store between cases. */
 export function __resetSharePayloadStoreForTests(): void {
   payloads.clear();
   insertionOrder.length = 0;
+  deleteCachedFile = defaultDeleteCachedFile;
+}
+
+/** Test-only: replace the cache-file delete implementation. */
+export function __setDeleteCachedFileForTests(fn: DeleteCachedFile | null): void {
+  deleteCachedFile = fn ?? defaultDeleteCachedFile;
 }
 
 export function composeShareText(shareIntent: ShareIntentLike): string {

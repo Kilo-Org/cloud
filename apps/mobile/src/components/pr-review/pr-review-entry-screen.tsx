@@ -253,6 +253,8 @@ export function PrReviewEntryScreen() {
                   }}
                 />
                 {showClearButton ? (
+                  // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
+                  // 38pt in this app — do not "simplify" back to h-11/w-11.
                   <Pressable
                     onPress={() => {
                       applyFieldText('');
@@ -260,7 +262,7 @@ export function PrReviewEntryScreen() {
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="Clear pull request link"
-                    className="h-11 w-11 items-center justify-center active:opacity-70"
+                    className="h-13 w-13 items-center justify-center active:opacity-70"
                   >
                     <X size={16} color={colors.mutedForeground} />
                   </Pressable>

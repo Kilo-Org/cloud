@@ -350,7 +350,14 @@ function normalizePayload(raw: StatusUpdatePayload): {
 
   // Infer workspace capacity (transient sandbox disk pressure) so it is
   // classified distinctly instead of counted as an unknown delivery failure.
-  if (!terminalReason && isWorkspaceCapacityFailure(failure, raw.errorMessage)) {
+  // Capacity arrives either with no terminal reason (delivery path) or with a
+  // generic 'sandbox_error' (orchestrator session-start path), so override that
+  // one generic value too — otherwise the column stays 'sandbox_error' and only
+  // the admin router's message match recovers the category.
+  if (
+    (!terminalReason || terminalReason === 'sandbox_error') &&
+    isWorkspaceCapacityFailure(failure, raw.errorMessage)
+  ) {
     terminalReason = 'workspace_capacity';
   }
 
@@ -382,6 +389,12 @@ function normalizePayload(raw: StatusUpdatePayload): {
  * `workspace_capacity` terminal reason. Prefers the structured failure subtype
  * from cloud-agent-next and falls back to the safe error message for older
  * payloads.
+ *
+ * The message fallback is intentionally broad ('admission rejected'); a stricter,
+ * phrasing-anchored variant lives in
+ * services/code-review-infra/src/code-review-orchestrator.ts
+ * (isWorkspaceAdmissionCapacityFailure). Keep the two in mind together if the
+ * admission-rejection message format ever changes.
  */
 export function isWorkspaceCapacityFailure(
   failure: CloudAgentSafeFailure | undefined,

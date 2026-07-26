@@ -271,6 +271,7 @@ export function createMobileAgentSessionManager({
         initialMessageId: rs?.initialMessageId ?? null,
         associatedPr: sessionResult.associatedPr,
         runtimeAgents: rs?.runtimeAgents,
+        totalCostMicrodollars: sessionResult.total_cost_microdollars,
       };
     },
   });

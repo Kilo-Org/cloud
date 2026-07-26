@@ -1,6 +1,7 @@
+import { useScrollToTop } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -78,6 +79,9 @@ export function AgentSessionListContent({
   onCreateSession,
   sortBy,
 }: Readonly<AgentSessionListContentProps>) {
+  const listRef = useRef<SectionList<StoredSession, SessionSection>>(null);
+  useScrollToTop(listRef);
+
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -127,23 +131,18 @@ export function AgentSessionListContent({
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
-  // is pushed the Agents list is frozen. react-freeze reveals the previously
-  // rendered (cached) cells on return WITHOUT re-running them, so the attention
-  // store's `useSyncExternalStore` subscription does not re-render the list and
-  // the detail-screen mount ack is not reflected. Snapshot the attention
-  // revision only when the tab (re)gains focus, via `useFocusEffect`, which
-  // fires reliably after unfreeze. Keying the list on that focus snapshot
-  // remounts it exactly when an ack/reconcile happened while the list was away
-  // (e.g. returning from a session that was just opened) so frozen cells re-read
-  // the ack store — while a revision bump for some unrelated session that occurs
-  // *during* browsing does not touch the snapshot, so scroll is preserved.
+  // is pushed the Agents list is frozen. On return, each row re-reads the ack
+  // store via its own `useSyncExternalStore` subscription
+  // (`useSessionAttentionRevision`). Snapshot the attention revision only when
+  // the tab (re)gains focus via `useFocusEffect` (fires after unfreeze) and
+  // pass it as `extraData` so visible cells re-render without remounting the
+  // list — preserving scroll. Remount only on sort change (`key={sortBy}`).
   const [attentionFocusRevision, setAttentionFocusRevision] = useState(getRevisionSnapshot);
   useFocusEffect(
     useCallback(() => {
       setAttentionFocusRevision(getRevisionSnapshot());
     }, [])
   );
-  const attentionListKey = `${sortBy}:${attentionFocusRevision}`;
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -252,12 +251,13 @@ export function AgentSessionListContent({
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
       <SectionList<StoredSession, SessionSection>
-        key={attentionListKey}
+        ref={listRef}
+        key={sortBy}
         sections={sections}
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
-        extraData={attentionListKey}
+        extraData={attentionFocusRevision}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (

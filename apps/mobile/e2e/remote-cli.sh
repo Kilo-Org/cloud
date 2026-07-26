@@ -21,7 +21,7 @@
 #   apps/mobile/e2e/remote-cli.sh exec run "say hello"
 #
 # When no email is given, defaults to the per-worktree-unique login account
-# (e2e-mobile+<worktree-slug>@example.com), matching e2e/login.sh. The user must
+# (e2e-mobile-<worktree-slug>@example.com), matching e2e/login.sh. The user must
 # already exist (sign in on the device first, or seed one). Pass an explicit
 # email to target a specific account (e.g. the one the app is signed in as).
 # `exec` reuses an already-prepared env and only prepares (mints a token) when
@@ -37,7 +37,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 WORKTREE_SLUG="$(basename "$REPO_ROOT" | tr -cs 'a-zA-Z0-9' '-' | sed 's/^-*//;s/-*$//')"
-DEFAULT_EMAIL="e2e-mobile+${WORKTREE_SLUG}@example.com"
+DEFAULT_EMAIL="e2e-mobile-$(printf '%s' "$WORKTREE_SLUG" | tr 'A-Z' 'a-z')@example.com"
 SESSION="kilo-e2e-cli-${WORKTREE_SLUG}"
 CLI_HOME="$REPO_ROOT/dev/.dev-logs/remote-cli/${WORKTREE_SLUG}"
 ENV_FILE="$CLI_HOME/.cli-env"

@@ -107,11 +107,11 @@ xcrun simctl openurl <udid> \
 Backend and Metro must be running. These idempotent wrappers verify simulator ownership, required services, the generated API port, and Metro project provenance, then reconnect the dev client to this worktree's exact Metro URL before Maestro runs. Never bypass their preflight or call the login YAML flows directly:
 
 ```bash
-apps/mobile/e2e/login.sh <udid> [email]   # default: e2e-mobile+<worktree-basename>@example.com
+apps/mobile/e2e/login.sh <udid> [email]   # default: e2e-mobile-<worktree-basename>@example.com
 apps/mobile/e2e/logout.sh <udid>
 ```
 
-The default email uses a plus-tag per worktree (`e2e-mobile+<worktree-basename>@example.com`), but `normalizeEmail` in `apps/web/src/lib/utils.ts` strips plus-tags, so every worktree's default login resolves to one shared backend user (`e2e-mobile@example.com`). Seeded token rows and any rows inserted into shared tables are therefore visible across worktrees; assertions must target run-unique values, never list length, emptiness, or position. Pass an explicit email only when a test needs a specific account.
+The default email is `e2e-mobile-<worktree-basename>@example.com`, derived deterministically from the worktree directory name. Hyphens are preserved by `normalizeEmail`, so each worktree signs into a distinct backend user. Pass an explicit email only when a test needs a specific account.
 
 Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. It retries the known dev-client launch boundary once. `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.yaml` is the standalone cold-launch flow.
 
@@ -175,7 +175,7 @@ The orchestrator starts a local CLI as a remote session for this worktree:
 apps/mobile/e2e/remote-cli.sh start [email]
 ```
 
-The helper resolves this worktree's stack ports, mints a token for the given user (default: the per-worktree login account, `e2e-mobile+<worktree-slug>@example.com`), installs the CLI into a disposable per-worktree directory, and launches it in a `kilo-e2e-cli-<worktree-slug>` tmux session already pointed at the local API, session-ingest, and event-service. Pass the account the app is signed in as when it differs from the default. Manage it with `remote-cli.sh status` and `remote-cli.sh stop`.
+The helper resolves this worktree's stack ports, mints a token for the given user (default: the per-worktree login account, `e2e-mobile-<worktree-slug>@example.com`), installs the CLI into a disposable per-worktree directory, and launches it in a `kilo-e2e-cli-<worktree-slug>` tmux session already pointed at the local API, session-ingest, and event-service. Pass the account the app is signed in as when it differs from the default. Manage it with `remote-cli.sh status` and `remote-cli.sh stop`.
 
 Run any one-off CLI command against the same prepared stack with `exec` instead of the interactive TUI:
 

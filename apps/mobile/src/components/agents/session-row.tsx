@@ -16,7 +16,7 @@ import {
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatMeta,
-  formatSessionListCost,
+  formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import {
@@ -159,7 +159,7 @@ export function StoredSessionRow({
   // When a cost is present, both forms fold it in first (matches the row's
   // "$0.12 · time" order). Needs-input sessions have no persisted cost.
   const visibleMeta = composeStoredSessionVisibleMeta(
-    formatSessionListCost(session.total_cost_microdollars),
+    formatSessionTotalCost(session.total_cost_microdollars),
     formatMeta(timestamp)
   );
   const spokenMeta = needsInput

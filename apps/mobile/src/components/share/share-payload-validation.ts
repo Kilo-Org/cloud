@@ -5,7 +5,7 @@ import {
 } from '@/lib/agent-attachments/validate';
 import { type SharePayload } from '@/lib/share-payload';
 
-export type ClassificationReason = 'empty' | 'denied' | 'too-large';
+export type ClassificationReason = 'empty' | 'denied' | 'too-large' | 'unreadable';
 
 export type RejectedNote = {
   name: string;
@@ -55,6 +55,7 @@ type MeasuredFileInput = {
 export function validateMeasuredShareFiles(input: {
   text: string;
   files: readonly MeasuredFileInput[];
+  failedCopies?: readonly string[];
 }): SharePayloadValidation {
   const rejectedNotes: RejectedNote[] = [];
   const classifiedAccepted: AcceptedShareFile[] = [];
@@ -76,6 +77,12 @@ export function validateMeasuredShareFiles(input: {
       }
       classifiedAccepted.push(accepted);
     }
+  }
+
+  // Failed cache copies are not classified files; surface them after
+  // classification notes and never count them toward usable/accepted.
+  for (const name of input.failedCopies ?? []) {
+    rejectedNotes.push({ name, reason: 'unreadable' });
   }
 
   const hasUsableText = input.text.trim() !== '';
@@ -136,7 +143,11 @@ export async function validateSharePayload(
     })
   );
 
-  return validateMeasuredShareFiles({ text: payload.text, files: measured });
+  return validateMeasuredShareFiles({
+    text: payload.text,
+    files: measured,
+    failedCopies: payload.failedFiles,
+  });
 }
 
 async function loadDefaultMeasure(): Promise<MeasureFn> {

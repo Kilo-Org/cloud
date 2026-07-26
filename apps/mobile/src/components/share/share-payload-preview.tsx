@@ -5,6 +5,7 @@ import { ScrollView, View } from 'react-native';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SharePayload } from '@/lib/share-payload';
@@ -119,7 +120,7 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
       ) : null}
       {validation.truncated ? (
         <Text className="text-xs text-muted-foreground">
-          Only the first 5 files will be attached.
+          Only the first {AGENT_ATTACHMENT_MAX_FILES} files will be attached.
         </Text>
       ) : null}
       <RejectionNotes notes={validation.rejectedNotes} />

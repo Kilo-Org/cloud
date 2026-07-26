@@ -49,8 +49,10 @@ import { resolvePendingNotificationNavigation } from '@/lib/pending-notification
 import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
+  resolveSupersededPendingShareId,
 } from '@/lib/pending-share-navigation';
 import {
+  clearSharePayload,
   normalizeShareIntent,
   putSharePayload,
   type ShareId,
@@ -148,10 +150,14 @@ function RootLayoutNav() {
     error: shareIntentError,
   } = useShareIntentContext();
   // expo-share-intent rebuilds resetShareIntent every render; keep it out of
-  // the ingest effect deps via ref (same pattern as share-prefill.ts).
+  // the ingest/error effect deps via ref (same pattern as share-prefill.ts).
   const resetShareIntentRef = useRef(resetShareIntent);
   resetShareIntentRef.current = resetShareIntent;
   const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
+  // Mirror pendingShareId so the ingest effect can release a superseded share
+  // without reading stale state or adding the id to effect deps.
+  const pendingShareIdRef = useRef(pendingShareId);
+  pendingShareIdRef.current = pendingShareId;
 
   // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
   const isShellReady = isShellReadyForShare({
@@ -230,9 +236,9 @@ function RootLayoutNav() {
     if (shareIntentError) {
       Sentry.captureException(new Error(shareIntentError));
       toast.error("Couldn't read the shared content");
-      resetShareIntent();
+      resetShareIntentRef.current();
     }
-  }, [shareIntentError, resetShareIntent]);
+  }, [shareIntentError]);
 
   // Keyed per shareIntent identity so a newer intent cancels and supersedes
   // an in-flight ingest. Success/failure reset for the happy path lives here
@@ -254,6 +260,11 @@ function RootLayoutNav() {
         }
         const shareId = putSharePayload(payload);
         resetShareIntentRef.current();
+        // Latest-wins: a superseded pending share is released — never silently orphaned.
+        const superseded = resolveSupersededPendingShareId(pendingShareIdRef.current, shareId);
+        if (superseded !== null) {
+          clearSharePayload(superseded);
+        }
         setPendingShareId(shareId);
       } catch (error) {
         if (cancelled) {

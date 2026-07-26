@@ -9,7 +9,7 @@ import {
 } from './share-gate-state';
 import { type SharePayloadValidation } from './share-payload-validation';
 
-const payload: SharePayload = { text: 'hello', files: [] };
+const payload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
 
 const okValidation: SharePayloadValidation = {
   kind: 'ok',

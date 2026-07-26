@@ -132,30 +132,30 @@ describe('share payload store', () => {
   });
 
   it('put returns unique ids', () => {
-    const a = putSharePayload({ text: 'a', files: [] });
-    const b = putSharePayload({ text: 'b', files: [] });
+    const a = putSharePayload({ text: 'a', files: [], failedFiles: [] });
+    const b = putSharePayload({ text: 'b', files: [], failedFiles: [] });
     expect(a).not.toBe(b);
     expect(peekSharePayload(a)?.text).toBe('a');
     expect(peekSharePayload(b)?.text).toBe('b');
   });
 
   it('take is read-and-clear and returns null on second read or unknown id', () => {
-    const id = putSharePayload({ text: 'once', files: [] });
-    expect(takeSharePayload(id)).toEqual({ text: 'once', files: [] });
+    const id = putSharePayload({ text: 'once', files: [], failedFiles: [] });
+    expect(takeSharePayload(id)).toEqual({ text: 'once', files: [], failedFiles: [] });
     expect(takeSharePayload(id)).toBeNull();
     expect(takeSharePayload('missing')).toBeNull();
   });
 
   it('peek does not consume', () => {
-    const id = putSharePayload({ text: 'peek', files: [] });
+    const id = putSharePayload({ text: 'peek', files: [], failedFiles: [] });
     expect(peekSharePayload(id)?.text).toBe('peek');
     expect(peekSharePayload(id)?.text).toBe('peek');
     expect(takeSharePayload(id)?.text).toBe('peek');
   });
 
   it('clear is id-scoped', () => {
-    const a = putSharePayload({ text: 'a', files: [] });
-    const b = putSharePayload({ text: 'b', files: [] });
+    const a = putSharePayload({ text: 'a', files: [], failedFiles: [] });
+    const b = putSharePayload({ text: 'b', files: [], failedFiles: [] });
     clearSharePayload(a);
     expect(peekSharePayload(a)).toBeNull();
     expect(peekSharePayload(b)?.text).toBe('b');
@@ -164,7 +164,7 @@ describe('share payload store', () => {
   it('evicts oldest first beyond the cap', () => {
     const ids: string[] = [];
     for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES + 2; i += 1) {
-      ids.push(putSharePayload({ text: `t-${i}`, files: [] }));
+      ids.push(putSharePayload({ text: `t-${i}`, files: [], failedFiles: [] }));
     }
     const first = ids[0];
     const second = ids[1];
@@ -188,6 +188,7 @@ describe('share payload store', () => {
           { name: 'a.jpg', uri: 'file:///cache/share-a.jpg' },
           { name: 'b.png', uri: 'file:///cache/share-b.png' },
         ],
+        failedFiles: [],
       });
       clearSharePayload(id);
       await vi.waitFor(() => {
@@ -201,9 +202,10 @@ describe('share payload store', () => {
       putSharePayload({
         text: 'oldest',
         files: [{ name: 'old.txt', uri: 'file:///cache/share-old.txt' }],
+        failedFiles: [],
       });
       for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
-        putSharePayload({ text: `keep-${i}`, files: [] });
+        putSharePayload({ text: `keep-${i}`, files: [], failedFiles: [] });
       }
       await vi.waitFor(() => {
         expect(deleted).toEqual(['file:///cache/share-old.txt']);
@@ -216,6 +218,7 @@ describe('share payload store', () => {
       const id = putSharePayload({
         text: 'take-me',
         files: [{ name: 'kept.bin', uri: 'file:///cache/share-kept.bin' }],
+        failedFiles: [],
       });
       expect(takeSharePayload(id)?.files[0]?.uri).toBe('file:///cache/share-kept.bin');
       await Promise.resolve();
@@ -228,6 +231,7 @@ describe('share payload store', () => {
       const id = putSharePayload({
         text: 'taken-then-cleared',
         files: [{ name: 'upload-me.bin', uri: 'file:///cache/share-upload-me.bin' }],
+        failedFiles: [],
       });
       expect(takeSharePayload(id)?.files[0]?.uri).toBe('file:///cache/share-upload-me.bin');
       expect(peekSharePayload(id)).toBeNull();
@@ -274,6 +278,7 @@ describe('normalizeShareIntent', () => {
         size: 12,
       },
     ]);
+    expect(payload.failedFiles).toEqual([]);
     const file = payload.files[0];
     expect(file).toBeDefined();
     expect(file?.uri).not.toBe(incoming);

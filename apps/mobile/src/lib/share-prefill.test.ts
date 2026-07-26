@@ -140,6 +140,7 @@ describe('applySharePrefill', () => {
     const id = putSharePayload({
       text: 'shared body',
       files: [{ name: 'a.png', uri: 'file:///a.png' }],
+      failedFiles: [],
     });
     const { input, calls: nativeCalls } = makeInput();
     const order: string[] = [];
@@ -191,6 +192,7 @@ describe('applySharePrefill', () => {
     const id = putSharePayload({
       text: 'keep me',
       files: [{ name: 'bad.png', uri: 'file:///bad.png' }],
+      failedFiles: [],
     });
     const { input, calls: nativeCalls } = makeInput();
     const { onChangeText, calls: changeCalls } = makeChange();
@@ -230,7 +232,7 @@ describe('applySharePrefill', () => {
   });
 
   it('clears the route param after a successful prefill', async () => {
-    const id = putSharePayload({ text: 'ok', files: [] });
+    const id = putSharePayload({ text: 'ok', files: [], failedFiles: [] });
     const clearCalls: number[] = [];
 
     await applySharePrefill({
@@ -249,8 +251,8 @@ describe('applySharePrefill', () => {
   });
 
   it('re-applies when a second share arrives with a new id', async () => {
-    const firstId = putSharePayload({ text: 'first', files: [] });
-    const secondId = putSharePayload({ text: 'second', files: [] });
+    const firstId = putSharePayload({ text: 'first', files: [], failedFiles: [] });
+    const secondId = putSharePayload({ text: 'second', files: [], failedFiles: [] });
     const { onChangeText, calls: changeCalls } = makeChange();
 
     await applySharePrefill({
@@ -275,7 +277,7 @@ describe('applySharePrefill', () => {
 
   it('skips the text call for empty text + files-only payloads', async () => {
     const files = [{ name: 'only.png', uri: 'file:///only.png' }];
-    const id = putSharePayload({ text: '', files });
+    const id = putSharePayload({ text: '', files, failedFiles: [] });
     const { input, calls: nativeCalls } = makeInput();
     const { onChangeText, calls: changeCalls } = makeChange();
     const addCandidatesCalls: AgentAttachmentCandidate[][] = [];

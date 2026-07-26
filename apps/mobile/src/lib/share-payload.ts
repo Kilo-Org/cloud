@@ -9,6 +9,8 @@ export type ShareId = string;
 export type SharePayload = {
   text: string;
   files: AgentAttachmentCandidate[];
+  /** Names of incoming files whose cache copy threw; empty when none failed. */
+  failedFiles: string[];
 };
 
 /** Mirrors PROMPT_INPUT_MAX_CHARS in new-session-prompt.tsx (module-local; composer clamps again). */
@@ -144,7 +146,7 @@ export async function normalizeShareIntent(
 ): Promise<SharePayload> {
   const text = composeShareText(shareIntent);
   const incomingFiles = shareIntent.files ?? [];
-  const copied = await Promise.all(
+  const outcomes = await Promise.all(
     incomingFiles.map(async file => {
       const name = file.fileName || 'shared-file';
       try {
@@ -156,14 +158,23 @@ export async function normalizeShareIntent(
         if (file.size != null) {
           candidate.size = file.size;
         }
-        return candidate;
+        return { ok: true as const, candidate };
       } catch {
         // Drop only this file; text and other successful copies still count.
-        return null;
+        // Name is kept so the gate preview can surface the silent loss.
+        return { ok: false as const, name };
       }
     })
   );
-  const files = copied.filter((file): file is AgentAttachmentCandidate => file !== null);
+  const files: AgentAttachmentCandidate[] = [];
+  const failedFiles: string[] = [];
+  for (const outcome of outcomes) {
+    if (outcome.ok) {
+      files.push(outcome.candidate);
+    } else {
+      failedFiles.push(outcome.name);
+    }
+  }
 
   // Throw only when nothing usable remains: no text and zero successful copies
   // while at least one file was attempted.
@@ -171,5 +182,5 @@ export async function normalizeShareIntent(
     throw new Error('Failed to copy shared files');
   }
 
-  return { text, files };
+  return { text, files, failedFiles };
 }

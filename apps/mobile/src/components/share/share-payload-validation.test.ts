@@ -155,4 +155,62 @@ describe('validateMeasuredShareFiles', () => {
       expect(result.message).toBe(describeClassificationFailure('denied'));
     }
   });
+
+  it('appends unreadable notes after classification notes', () => {
+    const result = validateMeasuredShareFiles({
+      text: 'caption',
+      files: [file('good.png', 100), file('bad.exe', 10)],
+      failedCopies: ['lost.jpg', 'gone.png'],
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.accepted.map(f => f.name)).toEqual(['good.png']);
+      expect(result.rejectedNotes).toEqual([
+        { name: 'bad.exe', reason: 'denied' },
+        { name: 'lost.jpg', reason: 'unreadable' },
+        { name: 'gone.png', reason: 'unreadable' },
+      ]);
+      expect(result.usable).toBe(true);
+    }
+  });
+
+  it('text + all-copies-failed is ok/usable with unreadable notes (not clean text-only)', () => {
+    const result = validateMeasuredShareFiles({
+      text: 'caption only',
+      files: [],
+      failedCopies: ['a.jpg', 'b.jpg'],
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.usable).toBe(true);
+      expect(result.accepted).toHaveLength(0);
+      expect(result.rejectedNotes).toEqual([
+        { name: 'a.jpg', reason: 'unreadable' },
+        { name: 'b.jpg', reason: 'unreadable' },
+      ]);
+    }
+
+    const cleanTextOnly = validateMeasuredShareFiles({
+      text: 'caption only',
+      files: [],
+    });
+    expect(cleanTextOnly.kind).toBe('ok');
+    if (cleanTextOnly.kind === 'ok') {
+      expect(cleanTextOnly.rejectedNotes).toEqual([]);
+      expect(result).not.toEqual(cleanTextOnly);
+    }
+  });
+
+  it('failed copies alone without text remain all-rejected and do not invent usable', () => {
+    const result = validateMeasuredShareFiles({
+      text: '',
+      files: [],
+      failedCopies: ['a.jpg'],
+    });
+    expect(result.kind).toBe('all-rejected');
+    if (result.kind === 'all-rejected') {
+      expect(result.reason).toBe('unreadable');
+      expect(result.message).toBe(describeClassificationFailure('unreadable'));
+    }
+  });
 });

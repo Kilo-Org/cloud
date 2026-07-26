@@ -68,9 +68,10 @@ describe('normalizeShareIntent partial copy failures', () => {
         size: 1,
       },
     ]);
+    expect(payload.failedFiles).toEqual(['bad.jpg']);
   });
 
-  it('all copy failures with text present return a text-only payload', async () => {
+  it('all copy failures with text present return a text-only payload with failed names', async () => {
     const payload = await normalizeShareIntent(
       {
         text: 'text survives',
@@ -103,7 +104,11 @@ describe('normalizeShareIntent partial copy failures', () => {
       }
     );
 
-    expect(payload).toEqual({ text: 'text survives', files: [] });
+    expect(payload).toEqual({
+      text: 'text survives',
+      files: [],
+      failedFiles: ['a.jpg', 'b.jpg'],
+    });
   });
 
   it('all copy failures without text throw', async () => {

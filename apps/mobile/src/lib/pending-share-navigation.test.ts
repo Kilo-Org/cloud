@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { isShellReadyForShare, resolvePendingShareNavigation } from './pending-share-navigation';
+import {
+  isShellReadyForShare,
+  resolvePendingShareNavigation,
+  resolveSupersededPendingShareId,
+} from './pending-share-navigation';
 
 const ready = {
   hasToken: true,
@@ -105,5 +109,25 @@ describe('resolvePendingShareNavigation', () => {
   it('includes the share id in the href', () => {
     const result = resolvePendingShareNavigation({ shareId: 'share-42', onGateRoute: false });
     expect(result?.href).toContain('shareId=share-42');
+  });
+});
+
+describe('resolveSupersededPendingShareId', () => {
+  // 2×2: current null|set × next same|different
+  it('returns null when the slot is empty', () => {
+    expect(resolveSupersededPendingShareId(null, 'next')).toBeNull();
+  });
+
+  it('returns null when current equals next', () => {
+    expect(resolveSupersededPendingShareId('same', 'same')).toBeNull();
+  });
+
+  it('returns current when it differs from next', () => {
+    expect(resolveSupersededPendingShareId('old', 'new')).toBe('old');
+  });
+
+  it('returns the prior id for any distinct pair', () => {
+    expect(resolveSupersededPendingShareId('a', 'b')).toBe('a');
+    expect(resolveSupersededPendingShareId('b', 'a')).toBe('b');
   });
 });

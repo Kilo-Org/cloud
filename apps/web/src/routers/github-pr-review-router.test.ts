@@ -481,7 +481,7 @@ describe('githubPrReviewRouter.listReviewThreads conversation comments', () => {
     const caller = createCaller({ user: { id: 'user-1' } as User });
     let conversationCalls = 0;
     mockGraphqlByOperation(buildOctokit('t1'), {
-      conversation: vars => {
+      conversation: () => {
         conversationCalls += 1;
         // Always report another page so the loop hits the hard cap.
         const pageIndex = conversationCalls;

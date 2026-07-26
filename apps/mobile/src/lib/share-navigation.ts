@@ -1,18 +1,40 @@
-import { type ShareId } from '@/lib/share-payload';
+import { SHARE_PAYLOAD_MAX_ENTRIES, type ShareId } from '@/lib/share-payload';
 
 export type PendingShareNavigation = { href: string; shareId: ShareId };
 
-let pending: PendingShareNavigation | null = null;
+/** FIFO of committed share destinations waiting for gate dismiss + delivery. */
+const pendingQueue: PendingShareNavigation[] = [];
 
 export function setPendingShareNavigation(next: PendingShareNavigation): void {
-  pending = next;
+  pendingQueue.push(next);
+  // Store evicts oldest beyond the same cap; keep navigation queue in lockstep.
+  while (pendingQueue.length > SHARE_PAYLOAD_MAX_ENTRIES) {
+    pendingQueue.shift();
+  }
 }
 
-/** Read-and-clear. */
+/** Read-and-remove the oldest pending navigation, or null when empty. */
 export function takePendingShareNavigation(): PendingShareNavigation | null {
-  const current = pending;
-  pending = null;
-  return current;
+  return pendingQueue.shift() ?? null;
+}
+
+/** Parse the destination params a focused delivery must set from a pending href. */
+export function parseShareHrefParams(href: string): { organizationId: string | undefined } {
+  const queryStart = href.indexOf('?');
+  if (queryStart === -1) {
+    return { organizationId: undefined };
+  }
+  const query = href.slice(queryStart + 1);
+  if (!query) {
+    return { organizationId: undefined };
+  }
+  try {
+    const params = new URLSearchParams(query);
+    const organizationId = params.get('organizationId');
+    return { organizationId: organizationId ?? undefined };
+  } catch {
+    return { organizationId: undefined };
+  }
 }
 
 /**
@@ -66,7 +88,7 @@ export function navigationContainsShareGate(state: unknown): boolean {
   return false;
 }
 
-/** Test-only: wipe the module slot between cases. */
+/** Test-only: wipe the pending queue between cases. */
 export function __resetPendingShareNavigationForTests(): void {
-  pending = null;
+  pendingQueue.length = 0;
 }

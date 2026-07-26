@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import {
   isShareNavigationTargetFocused,
   navigationContainsShareGate,
+  parseShareHrefParams,
   type PendingShareNavigation,
   takePendingShareNavigation,
 } from '@/lib/share-navigation';
@@ -12,7 +13,7 @@ import {
  * Invisible mount: when a pending share navigation exists and the gate route
  * is absent from the navigation state, take it and route to the destination.
  * - Target not focused → router.push(href)
- * - Target already focused → router.setParams({ shareId }) only
+ * - Target already focused → router.setParams({ shareId, organizationId }) only
  * Never cross-presentation replace; back stack stays intact.
  */
 export function SharePayloadNavigator(): null {
@@ -45,7 +46,12 @@ function deliver(
 ): void {
   const focused = isShareNavigationTargetFocused(pending.href, pathname);
   if (focused) {
-    router.setParams({ shareId: pending.shareId });
+    // Committed href's org is the destination identity; path-only focus is
+    // about the screen, not its params. undefined clears a stale org param.
+    router.setParams({
+      shareId: pending.shareId,
+      organizationId: parseShareHrefParams(pending.href).organizationId,
+    });
     return;
   }
   router.push(pending.href as Href);

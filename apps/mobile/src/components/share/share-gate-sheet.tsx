@@ -135,7 +135,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const abandon = useCallback(() => {
     const id = ownedShareIdRef.current;
-    if (id) {
+    // Committed ids survive every gate-side clear; delivery owns consumption.
+    if (id && id !== committedShareIdRef.current) {
       clearSharePayload(id);
     }
     // Never resetShareIntent here — a newly arriving intent is the layout

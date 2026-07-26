@@ -180,6 +180,8 @@ Start and inspect the local stack, simulator, login, and E2E flows per [e2e/AGEN
 
 Env sync between the app bundle, Metro, and this worktree is validated by `apps/mobile/e2e/preflight.sh` (run by `login.sh`). Trust its failure output instead of re-checking URLs by hand.
 
+When several workflows run on one machine, device-bound work is capped by the slot semaphore [`e2e-slot.sh`](e2e-slot.sh) (default 3 slots, machine-global). Run `e2e-slot.sh acquire <tmux-session>` before any phase that drives a simulator, emulator, local backend stack, or native build — the repro gate, prewarm, and every E2E round — and `e2e-slot.sh release <tmux-session>` the moment that phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them. Slots are owned by tmux session name and reclaimed automatically when the session dies, so a crashed run cannot wedge the queue. `e2e-slot.sh status` shows holders.
+
 ## Execution Ledger
 
 Split the accepted plan into the smallest behaviorally meaningful, independently testable slices. Before dispatching anything, record each slice:

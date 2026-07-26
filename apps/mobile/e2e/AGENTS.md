@@ -21,6 +21,8 @@ xcrun simctl list devices booted
 
 If a complete stack is already running for this worktree, reuse it. Never start a competing stack or stop an unrelated `kilo-dev-*` session.
 
+When other workflows may be running on this machine, acquire a device slot before starting a stack, simulator, or native build, and release it when the device phase ends: `../.kilo/e2e-slot.sh acquire|release <tmux-session>` (see the Local Tooling section of [.kilo/MOBILE_WORKFLOW.md](../.kilo/MOBILE_WORKFLOW.md)).
+
 If this worktree has no stack, start the complete mobile flow:
 
 ```bash

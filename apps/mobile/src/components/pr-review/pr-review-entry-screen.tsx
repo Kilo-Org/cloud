@@ -6,6 +6,7 @@ import {
   Clock,
   Link2,
   SearchX,
+  X,
 } from 'lucide-react-native';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
@@ -21,6 +22,7 @@ import {
   PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY,
   PR_LINK_HELPER_INVALID_COPY,
   type PrLinkHelperMessage,
+  selectPrLinkClearButtonVisible,
   selectPrLinkHelperSlotState,
 } from '@/lib/pr-review/pr-link-helper-slot';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
@@ -123,6 +125,7 @@ export function PrReviewEntryScreen() {
   const slotState = selectPrLinkHelperSlotState({
     message: helperMessage,
   });
+  const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
   const isInvalid = helperMessage === 'invalid';
 
   let helperContent: ReactNode = null;
@@ -200,77 +203,92 @@ export function PrReviewEntryScreen() {
               Paste a PR link
             </Text>
           </View>
-          <View className="flex-row items-center gap-2">
-            <TextInput
-              ref={inputRef}
-              defaultValue=""
-              placeholder={URL_PLACEHOLDER}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={value => {
-                // Don't setState on every keystroke; track only whether the
-                // input has any text. The raw value lives in the ref so
-                // handleSubmit reads the latest text without re-rendering.
-                const decision = consumePrLinkInputEcho(pendingProgrammaticTextsRef.current, value);
-                pendingProgrammaticTextsRef.current = [...decision.pending];
-                if (decision.kind === 'echo') {
-                  // Echo of setNativeProps: inputValueRef already holds the
-                  // intentional value from applyFieldText — do not clobber it
-                  // with a delayed/stale echo, and do not clear helpers.
-                  return;
-                }
-                inputValueRef.current = value;
-                setHasInput(value.length > 0);
-                // Any real edit clears transient helper messages (invalid /
-                // clipboard-empty). Last-set message is replaced by null.
-                if (helperMessage !== null) {
-                  setHelperMessage(null);
-                }
-              }}
-              onFocus={() => {
-                // clipboard-empty clears on input focus; invalid stays until edit.
-                if (helperMessage === 'clipboard-empty') {
-                  setHelperMessage(null);
-                }
-              }}
-              // explicit line-height so the placeholder + typed text render
-              // at the same vertical position on every iOS version.
-              className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-3 text-base text-foreground leading-[22px]"
-              accessibilityLabel="GitHub pull request URL"
-              returnKeyType="go"
-              onSubmitEditing={() => {
+          <View className="gap-3">
+            <View className="flex-row items-center gap-2">
+              <View className="min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card">
+                <TextInput
+                  ref={inputRef}
+                  defaultValue=""
+                  placeholder={URL_PLACEHOLDER}
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  onChangeText={value => {
+                    // Don't setState on every keystroke; track only whether the
+                    // input has any text. The raw value lives in the ref so
+                    // handleSubmit reads the latest text without re-rendering.
+                    const decision = consumePrLinkInputEcho(
+                      pendingProgrammaticTextsRef.current,
+                      value
+                    );
+                    pendingProgrammaticTextsRef.current = [...decision.pending];
+                    if (decision.kind === 'echo') {
+                      // Echo of setNativeProps: inputValueRef already holds the
+                      // intentional value from applyFieldText — do not clobber it
+                      // with a delayed/stale echo, and do not clear helpers.
+                      return;
+                    }
+                    inputValueRef.current = value;
+                    setHasInput(value.length > 0);
+                    // Any real edit clears transient helper messages (invalid /
+                    // clipboard-empty). Last-set message is replaced by null.
+                    if (helperMessage !== null) {
+                      setHelperMessage(null);
+                    }
+                  }}
+                  onFocus={() => {
+                    // clipboard-empty clears on input focus; invalid stays until edit.
+                    if (helperMessage === 'clipboard-empty') {
+                      setHelperMessage(null);
+                    }
+                  }}
+                  // explicit line-height so the placeholder + typed text render
+                  // at the same vertical position on every iOS version.
+                  className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[22px]"
+                  accessibilityLabel="GitHub pull request URL"
+                  returnKeyType="go"
+                  onSubmitEditing={() => {
+                    void handleSubmit();
+                  }}
+                />
+                {showClearButton ? (
+                  <Pressable
+                    onPress={() => {
+                      applyFieldText('');
+                      inputRef.current?.focus();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear pull request link"
+                    className="h-11 w-11 items-center justify-center active:opacity-70"
+                  >
+                    <X size={16} color={colors.mutedForeground} />
+                  </Pressable>
+                ) : null}
+              </View>
+              <Pressable
+                onPress={() => {
+                  void handlePaste();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Paste pull request link"
+                hitSlop={4}
+                className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
+              >
+                <ClipboardIcon size={18} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+            {helperContent}
+            <Button
+              disabled={!hasInput || isInvalid}
+              onPress={() => {
                 void handleSubmit();
               }}
-            />
-            <Pressable
-              onPress={() => {
-                void handlePaste();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Paste pull request link"
-              hitSlop={4}
-              className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
+              accessibilityLabel="Open pull request"
             >
-              <ClipboardIcon size={18} color={colors.mutedForeground} />
-            </Pressable>
+              <Text>Open</Text>
+            </Button>
           </View>
-          {/*
-            Reserved-height slot: always mounted at min-h-5 (one text-sm line)
-            so Open/Recent never shift when helper content swaps.
-          */}
-          <View className="min-h-5 justify-center">{helperContent}</View>
-          <Button
-            className="mt-1"
-            disabled={!hasInput || isInvalid}
-            onPress={() => {
-              void handleSubmit();
-            }}
-            accessibilityLabel="Open pull request"
-          >
-            <Text>Open</Text>
-          </Button>
         </View>
 
         <View className="gap-2">

@@ -2,6 +2,8 @@
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
+import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
+
 import {
   JetBrainsMono_500Medium,
   JetBrainsMono_600SemiBold,
@@ -50,6 +52,9 @@ import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
 });
+
+// No-op unless E2E_LATENCY_WS_MS is set at bundle time (see lib/e2e-ws-latency).
+installE2EWebSocketLatency();
 
 // Session replay, screenshots, and view-hierarchy capture are gated on
 // stored consent (see src/lib/sentry-consent.ts) — the consent copy only

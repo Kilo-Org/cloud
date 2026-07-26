@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useShareIntentContext } from 'expo-share-intent';
 import { Plus, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
@@ -16,6 +16,10 @@ import { useOrganization } from '@/lib/organization-context';
 import { setPendingShareNavigation } from '@/lib/share-navigation';
 import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
 
+import {
+  resolveShareDestinationAdmission,
+  type ShareDestinationAdmission,
+} from './share-cli-admission';
 import { selectShareDestinations, type ShareDestinationRow } from './share-destinations';
 import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
@@ -40,8 +44,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const colors = useThemeColors();
   const { resetShareIntent } = useShareIntentContext();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  // Org-scoped stored page only (cloud-agent + cli). Active list is an
+  // id/capability lookup — never a row source (no organizationId filter).
   const sessions = useAgentSessions({
-    createdOnPlatform: expandPlatformFilter(['cloud-agent']),
+    createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,
     enabled: orgLoaded,
   });
@@ -94,6 +100,14 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     () => selectShareDestinations(sessions.storedSessions, sessions.activeSessionIds),
     [sessions.storedSessions, sessions.activeSessionIds]
   );
+
+  const attachmentsCapableBySessionId = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const session of sessions.activeSessions) {
+      map.set(session.id, session.capabilities?.attachments === true);
+    }
+    return map;
+  }, [sessions.activeSessions]);
 
   const state = useMemo(
     () =>
@@ -172,11 +186,23 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!shareId) {
         return;
       }
+      const admission: ShareDestinationAdmission = resolveShareDestinationAdmission({
+        createdOnPlatform: row.created_on_platform,
+        live: row.live,
+        attachmentsCapable: attachmentsCapableBySessionId.get(row.session_id) ?? false,
+        hasFiles: (payload?.files.length ?? 0) > 0,
+      });
+      if (!admission.ok) {
+        // Keep the gate open and the payload staged so the user can pick
+        // another destination.
+        Alert.alert(admission.title, admission.message);
+        return;
+      }
       const org = row.organization_id ?? undefined;
       const base = getAgentSessionPath(row.session_id, org) as string;
       commit(appendShareId(base, shareId));
     },
-    [commit, shareId]
+    [attachmentsCapableBySessionId, commit, payload, shareId]
   );
 
   const handleRetry = useCallback(() => {

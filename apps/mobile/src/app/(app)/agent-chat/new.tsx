@@ -40,7 +40,12 @@ import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-subm
 export default function NewSessionScreen() {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
-  const { organizationId } = useLocalSearchParams<{ organizationId?: string }>();
+  const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
+    organizationId?: string;
+    shareId?: string;
+  }>();
+  // Param can be string | string[] depending on how the route was opened.
+  const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
   // ── Selectors state ──────────────────────────────────────────────
   const [mode, setMode] = useState<AgentMode>('code');
@@ -297,6 +302,8 @@ export default function NewSessionScreen() {
             onRefetchModels={() => {
               void refetchModels();
             }}
+            onPrefillAttachments={addCandidates}
+            shareId={shareId}
             voiceInputSettlerRef={voiceInputSettlerRef}
           />
 

@@ -96,6 +96,8 @@ import { cn } from '@/lib/utils';
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
   openedVia?: 'push' | 'app';
+  /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
+  shareId?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -106,6 +108,7 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
 export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
+  shareId,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -786,6 +789,7 @@ export function SessionDetailContent({
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
                 commandState={remoteCommandState}
+                shareId={shareId}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

@@ -143,20 +143,33 @@ export async function normalizeShareIntent(
   copyToCache: CopyToCache = defaultCopyToCache
 ): Promise<SharePayload> {
   const text = composeShareText(shareIntent);
-  const files = await Promise.all(
-    (shareIntent.files ?? []).map(async file => {
+  const incomingFiles = shareIntent.files ?? [];
+  const copied = await Promise.all(
+    incomingFiles.map(async file => {
       const name = file.fileName || 'shared-file';
-      const uri = await copyToCache({ from: file.path, fileName: name });
-      const candidate: AgentAttachmentCandidate = { name, uri };
-      if (file.mimeType) {
-        candidate.mimeType = file.mimeType;
+      try {
+        const uri = await copyToCache({ from: file.path, fileName: name });
+        const candidate: AgentAttachmentCandidate = { name, uri };
+        if (file.mimeType) {
+          candidate.mimeType = file.mimeType;
+        }
+        if (file.size != null) {
+          candidate.size = file.size;
+        }
+        return candidate;
+      } catch {
+        // Drop only this file; text and other successful copies still count.
+        return null;
       }
-      if (file.size != null) {
-        candidate.size = file.size;
-      }
-      return candidate;
     })
   );
+  const files = copied.filter((file): file is AgentAttachmentCandidate => file !== null);
+
+  // Throw only when nothing usable remains: no text and zero successful copies
+  // while at least one file was attempted.
+  if (text === '' && files.length === 0 && incomingFiles.length > 0) {
+    throw new Error('Failed to copy shared files');
+  }
 
   return { text, files };
 }

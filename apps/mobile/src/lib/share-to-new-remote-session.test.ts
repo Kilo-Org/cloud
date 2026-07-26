@@ -46,7 +46,7 @@ describe('share-to-new-remote-session copy', () => {
     expect(SHARE_TO_NEW_REMOTE_SESSION_ALERT).toEqual({
       title: "Can't share to a new remote session",
       message:
-        "A session started on a remote CLI can't receive shared text or files. Start a cloud session, or go back and pick the running CLI session from the share list.",
+        "A session started on a remote CLI can't receive shared text or files. Start a cloud session, or share again and pick the running CLI session.",
     });
   });
 

@@ -17,6 +17,7 @@ import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-p
 
 import {
   resolveShareDestinationAdmission,
+  resolveShareHasFiles,
   type ShareDestinationAdmission,
 } from './share-cli-admission';
 import { selectShareDestinations, type ShareDestinationRow } from './share-destinations';
@@ -187,7 +188,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         createdOnPlatform: row.created_on_platform,
         live: row.live,
         attachmentsCapable: attachmentsCapableBySessionId.get(row.session_id) ?? false,
-        hasFiles: (payload?.files.length ?? 0) > 0,
+        hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {
         // Keep the gate open and the payload staged so the user can pick
@@ -199,7 +200,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       const base = getAgentSessionPath(row.session_id, org) as string;
       commit(appendShareId(base, shareId));
     },
-    [attachmentsCapableBySessionId, commit, payload, shareId]
+    [attachmentsCapableBySessionId, commit, payload, shareId, validation]
   );
 
   const handleRetry = useCallback(() => {

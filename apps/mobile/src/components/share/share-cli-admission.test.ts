@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveShareDestinationAdmission } from './share-cli-admission';
+import { resolveShareDestinationAdmission, resolveShareHasFiles } from './share-cli-admission';
+import { type SharePayloadValidation } from './share-payload-validation';
 
 const NOT_CONNECTED_TITLE = 'Session not connected';
 const NOT_CONNECTED_MESSAGE =
@@ -9,6 +10,51 @@ const NOT_CONNECTED_MESSAGE =
 const CANT_RECEIVE_FILES_TITLE = "This session can't receive files";
 const CANT_RECEIVE_FILES_MESSAGE =
   "The Kilo CLI running this session can't receive files. Update the CLI on that machine, or share to a new session instead.";
+
+describe('resolveShareHasFiles', () => {
+  it('pending validation uses the raw file count (0 and >0)', () => {
+    expect(resolveShareHasFiles(null, 0)).toBe(false);
+    expect(resolveShareHasFiles(null, 2)).toBe(true);
+  });
+
+  it('ok with accepted files is true', () => {
+    const validation: SharePayloadValidation = {
+      kind: 'ok',
+      accepted: [
+        {
+          name: 'a.jpg',
+          uri: 'file:///a.jpg',
+          measuredSize: 1,
+          kind: 'image',
+        },
+      ],
+      rejectedNotes: [],
+      truncated: false,
+      usable: true,
+    };
+    expect(resolveShareHasFiles(validation, 1)).toBe(true);
+  });
+
+  it('ok with zero accepted is false even when raw count > 0', () => {
+    const validation: SharePayloadValidation = {
+      kind: 'ok',
+      accepted: [],
+      rejectedNotes: [{ name: 'bad.exe', reason: 'denied' }],
+      truncated: false,
+      usable: true,
+    };
+    expect(resolveShareHasFiles(validation, 3)).toBe(false);
+  });
+
+  it('all-rejected is false', () => {
+    const validation: SharePayloadValidation = {
+      kind: 'all-rejected',
+      reason: 'denied',
+      message: 'None of the shared files can be attached.',
+    };
+    expect(resolveShareHasFiles(validation, 2)).toBe(false);
+  });
+});
 
 describe('resolveShareDestinationAdmission', () => {
   it('passes non-cli platforms through untouched', () => {

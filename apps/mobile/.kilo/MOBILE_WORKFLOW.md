@@ -61,6 +61,10 @@ Any step where an agent or LLM must respond — cloud-agent sessions, chat flows
 
 Hard ceilings: `mobile-plan-reviewer` 40, `mobile-implementer` 80, `mobile-reviewer` 50, `mobile-e2e-verifier` 100. Size every handoff below 75% of the role's limit; an implementation slice should fit in roughly 60 planned steps. Never raise a limit to fit an oversized task — split the task.
 
+### Workflow Learnings
+
+[`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md) is a durable log of environment blockers — broken local stacks, credential and env-var traps, simulator quirks, tool wedges — and their fixes. Product bugs never go in it. Immediately after resolving such a blocker, record it in the section matching your role: symptom, cause, fix, a few lines each, reusable by a future run that hits the same wall. Read the file before writing; when an existing entry covers the blocker, update that entry instead of appending a duplicate. Only the planner and the orchestrator write the log; the orchestrator records blockers role agents hit. Kilo's edit tool rejects `.kilo/` paths — kilo sessions write entries through shell commands instead.
+
 ## Interaction Modes
 
 The planner's first message asks the user exactly one question: is this run `hands on` or `hands off`? The mode governs the planner, the orchestrator, and every later decision.
@@ -93,7 +97,7 @@ Rules:
 
 ## Planning
 
-1. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
+1. Read [`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md); re-read it before any environment-dependent phase, such as the bug reproduction gate. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
 2. Create the dedicated worktrees.
 3. For defect work, run the bug reproduction gate before writing the plan.
 4. Write the complete draft plan.
@@ -188,7 +192,7 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 
 ## Orchestration
 
-1. Ingest the handoff. Split the work into ledger slices.
+1. Ingest the handoff and read [`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md); re-read it before prewarm and before each E2E round. Split the work into ledger slices.
 2. Dispatch ready independent slices in a wave of at most two or three concurrent `mobile-implementer`s. Each handoff lists the other active slices and their ownership boundaries. While a wave is active, run only ownership-safe narrow checks.
 3. When the whole wave has returned, synchronize: inspect each result, ownership adherence, and the combined diff; resolve integration and architecture decisions yourself; run shared mutating commands and shared checks once. If one slice failed, preserve the successful ones.
 4. Dispatch one fresh `mobile-reviewer` over the wave diff. Triage findings yourself: route valid findings through a bounded repair wave; record rejected findings with a short rationale. Loop repair wave → fresh reviewer, steering each round per the escalation ladder, until a fresh reviewer reports no valid actionable findings. Running this loop is the orchestrator's primary job, not a preamble to doing the work itself.

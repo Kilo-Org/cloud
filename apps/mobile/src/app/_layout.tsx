@@ -22,7 +22,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -147,6 +147,10 @@ function RootLayoutNav() {
     resetShareIntent,
     error: shareIntentError,
   } = useShareIntentContext();
+  // expo-share-intent rebuilds resetShareIntent every render; keep it out of
+  // the ingest effect deps via ref (same pattern as share-prefill.ts).
+  const resetShareIntentRef = useRef(resetShareIntent);
+  resetShareIntentRef.current = resetShareIntent;
   const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
 
   // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
@@ -230,7 +234,11 @@ function RootLayoutNav() {
     }
   }, [shareIntentError, resetShareIntent]);
 
-  // Keyed on hasShareIntent false→true only — not shareIntent identity.
+  // Keyed per shareIntent identity so a newer intent cancels and supersedes
+  // an in-flight ingest. Success/failure reset for the happy path lives here
+  // (gate must never reset); the shareIntentError effect also resets on the
+  // error path. Calls go through resetShareIntentRef so the unstable context
+  // function stays out of the deps.
   useEffect(() => {
     if (!hasShareIntent) {
       return undefined;
@@ -245,7 +253,7 @@ function RootLayoutNav() {
           return;
         }
         const shareId = putSharePayload(payload);
-        resetShareIntent();
+        resetShareIntentRef.current();
         setPendingShareId(shareId);
       } catch (error) {
         if (cancelled) {
@@ -253,7 +261,7 @@ function RootLayoutNav() {
         }
         Sentry.captureException(error);
         toast.error("Couldn't read the shared content");
-        resetShareIntent();
+        resetShareIntentRef.current();
       }
     };
 
@@ -262,8 +270,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- false→true on hasShareIntent only
-  }, [hasShareIntent]);
+  }, [hasShareIntent, shareIntent]);
 
   useEffect(() => {
     if (isLoading) {

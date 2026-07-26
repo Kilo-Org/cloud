@@ -1,6 +1,5 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useShareIntentContext } from 'expo-share-intent';
 import { Plus, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
@@ -42,7 +41,6 @@ type ShareGateSheetProps = {
 export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { resetShareIntent } = useShareIntentContext();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   // Org-scoped stored page only (cloud-agent + cli). Active list is an
   // id/capability lookup — never a row source (no organizationId filter).
@@ -139,8 +137,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (id) {
       clearSharePayload(id);
     }
-    resetShareIntent();
-  }, [resetShareIntent]);
+    // Never resetShareIntent here — a newly arriving intent is the layout
+    // effect's to read.
+  }, []);
 
   const dismiss = useCallback(() => {
     abandon();
@@ -150,14 +149,12 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   useEffect(
     () => () => {
       const id = ownedShareIdRef.current;
-      if (id !== committedShareIdRef.current) {
-        if (id) {
-          clearSharePayload(id);
-        }
-        resetShareIntent();
+      // Never resetShareIntent — layout ingest owns intent reset.
+      if (id && id !== committedShareIdRef.current) {
+        clearSharePayload(id);
       }
     },
-    [resetShareIntent]
+    []
   );
 
   const commit = useCallback(

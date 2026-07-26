@@ -490,6 +490,22 @@ export function shouldSkipPendingFlush(message: PendingSessionMessage, now: numb
   return message.nextFlushAttemptAt !== undefined && message.nextFlushAttemptAt > now;
 }
 
+/**
+ * Reset-eligible modes each start a fresh retry budget on entry (sandbox-connect
+ * has a short reconnect budget; sandbox-capacity has a longer backed-off budget
+ * for transient disk pressure). Alternating between them must NOT keep resetting,
+ * so callers only reset when entering one of these from a non-reset-eligible state.
+ */
+function isResetEligibleFailure(
+  code: PendingFlushFailureCode | undefined,
+  subtype: WorkspaceFailureSubtype | undefined
+): boolean {
+  return (
+    code === 'SANDBOX_CONNECT_FAILED' ||
+    (code === 'WORKSPACE_SETUP_FAILED' && subtype === 'sandbox_storage_full')
+  );
+}
+
 export async function recordPendingFlushFailure(
   storage: SessionQueueStorage,
   message: PendingSessionMessage,
@@ -540,17 +556,15 @@ export async function recordPendingFlushFailure(
     : options.code === 'WORKSPACE_SETUP_FAILED'
       ? options.safeFailureMessage
       : undefined;
-  // A newly-observed sandbox-capacity failure starts its own retry budget, the
-  // same way a sandbox-connection failure does, so the full 10s/30s/60s backoff
-  // applies even if the message already failed under a different code first.
-  const enteringSandboxCapacityRetry =
-    flushFailureCode === 'WORKSPACE_SETUP_FAILED' &&
-    failureSubtype === 'sandbox_storage_full' &&
-    message.lastFlushFailureSubtype !== 'sandbox_storage_full';
+  // Reset the attempt counter only when a message ENTERS a reset-eligible
+  // transient mode (sandbox-connect or sandbox-capacity) from a state that is
+  // not itself reset-eligible, so each fresh sequence gets its full backoff
+  // budget. When failures alternate between the two reset-eligible modes the
+  // counter is NOT reset, so attempts accumulate and the message still exhausts
+  // instead of flapping between modes forever.
   const attempts =
-    (flushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
-      message.lastFlushFailureCode !== 'SANDBOX_CONNECT_FAILED') ||
-    enteringSandboxCapacityRetry
+    isResetEligibleFailure(flushFailureCode, failureSubtype) &&
+    !isResetEligibleFailure(message.lastFlushFailureCode, message.lastFlushFailureSubtype)
       ? 1
       : (message.flushAttempts ?? 0) + 1;
   const retryDelays =

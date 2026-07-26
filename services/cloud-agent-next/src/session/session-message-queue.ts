@@ -15,7 +15,6 @@ import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
-import { WorkspaceCapacityAdmissionRejectedError } from '../workspace-errors.js';
 import {
   WrapperCleanupBlockedError,
   type WrapperCleanupBlock,
@@ -466,26 +465,6 @@ export async function flushNextPendingSessionMessage(params: {
         nextFlushAttemptAt: error.block.kind === 'retryable' ? error.block.retryAt : undefined,
         remainingCount: totalCount,
       };
-    }
-    if (error instanceof WorkspaceCapacityAdmissionRejectedError) {
-      // A full workspace disk is transient backpressure, not a review failure.
-      // Route it through the sandbox_storage_full path so it is classified as a
-      // capacity failure and retried with a longer backoff (cleanup and other
-      // reviews finishing free space) instead of dying after one attempt.
-      const failure = await recordPendingFlushFailure(
-        params.storage,
-        message,
-        error.message,
-        Date.now(),
-        {
-          policy,
-          code: 'WORKSPACE_SETUP_FAILED',
-          subtype: 'sandbox_storage_full',
-          retryable: true,
-          scheduleTerminalizationRepair: params.scheduleTerminalizationRepair,
-        }
-      );
-      return toFailureResult(failure, totalCount);
     }
     const code =
       error instanceof MessageDeliveryRequestValidationError

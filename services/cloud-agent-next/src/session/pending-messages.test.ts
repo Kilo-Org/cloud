@@ -431,6 +431,41 @@ describe('recordPendingFlushFailure', () => {
     expect(result.nextFlushAttemptAt).toBe(110_000);
   });
 
+  it('bounds retries when failures alternate between reset-eligible modes', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+    const now = 100_000;
+
+    // Fresh sandbox-connect failure resets to attempt 1.
+    let result = await recordPendingFlushFailure(storage, message, 'connect failed', now, {
+      policy: 'warm-followup',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    message = result.message;
+
+    // Switching to capacity (both modes reset-eligible) does NOT reset; attempts accumulate.
+    result = await recordPendingFlushFailure(storage, message, 'sandbox storage full', now, {
+      policy: 'warm-followup',
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'sandbox_storage_full',
+    });
+    expect(result.attempts).toBe(2);
+    message = result.message;
+
+    // Switching back to connect keeps accumulating and exceeds the connect budget,
+    // so the flapping message exhausts instead of resetting forever.
+    result = await recordPendingFlushFailure(storage, message, 'connect failed', now, {
+      policy: 'warm-followup',
+      code: 'SANDBOX_CONNECT_FAILED',
+    });
+    expect(result.attempts).toBe(3);
+    expect(result.exhausted).toBe(true);
+    expect(result.nextFlushAttemptAt).toBeUndefined();
+  });
+
   it('retries a sandbox connection failure once after exactly five seconds', async () => {
     const storage = createMemoryStorage();
     let message = makeMessage({ createdAt: 100_000 });

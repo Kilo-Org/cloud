@@ -383,7 +383,7 @@ function normalizePayload(raw: StatusUpdatePayload): {
  * from cloud-agent-next and falls back to the safe error message for older
  * payloads.
  */
-function isWorkspaceCapacityFailure(
+export function isWorkspaceCapacityFailure(
   failure: CloudAgentSafeFailure | undefined,
   errorMessage: string | undefined
 ): boolean {
@@ -441,10 +441,6 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     terminalReason === 'user_cancelled' ||
     terminalReason === 'superseded' ||
     terminalReason === 'interrupted' ||
-    // Capacity failures are already retried at the delivery layer in
-    // cloud-agent-next. A fresh web-level retry would re-dispatch onto the same
-    // full shared sandbox and restart the storm, so terminalize instead.
-    terminalReason === 'workspace_capacity' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }

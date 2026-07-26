@@ -83,6 +83,9 @@ const excludeModelNotFoundAttempt = sql`COALESCE(${cloud_agent_code_review_attem
  */
 const errorCategoryExpr = sql<string>`CASE
   WHEN ${cloud_agent_code_reviews.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'gitlab_project_access_required', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
+  WHEN ${cloud_agent_code_reviews.terminal_reason} = 'workspace_capacity' THEN 'Sandbox Capacity'
+  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_reviews.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_reviews.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
+  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%429%' THEN 'Rate Limited'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%timeout%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_reviews.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_reviews.error_message} LIKE '%timed out%' THEN 'Timeout'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%context window%' OR ${cloud_agent_code_reviews.error_message} LIKE '%token limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%too large%' OR ${cloud_agent_code_reviews.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
@@ -91,8 +94,6 @@ const errorCategoryExpr = sql<string>`CASE
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%500%' OR ${cloud_agent_code_reviews.error_message} LIKE '%502%' OR ${cloud_agent_code_reviews.error_message} LIKE '%503%' OR ${cloud_agent_code_reviews.error_message} LIKE '%internal server%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_reviews.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_reviews.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_reviews.error_message} LIKE '%network%' THEN 'Network Error'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%parse%' OR ${cloud_agent_code_reviews.error_message} LIKE '%JSON%' OR ${cloud_agent_code_reviews.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
-  WHEN ${cloud_agent_code_reviews.terminal_reason} = 'workspace_capacity' OR ${cloud_agent_code_reviews.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_reviews.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_reviews.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%could not be delivered%' THEN 'Delivery Failure'
   WHEN ${cloud_agent_code_reviews.error_message} LIKE '%repository_not_installed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%app installation required%' THEN 'Action Required'
   WHEN ${cloud_agent_code_reviews.error_message} IS NULL THEN 'Unknown Error'
@@ -101,6 +102,9 @@ END`;
 
 const attemptErrorCategoryExpr = sql<string>`CASE
   WHEN ${cloud_agent_code_review_attempts.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'gitlab_project_access_required', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
+  WHEN ${cloud_agent_code_review_attempts.terminal_reason} = 'workspace_capacity' THEN 'Sandbox Capacity'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
+  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%429%' THEN 'Rate Limited'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%timed out%' THEN 'Timeout'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%context window%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%token limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%too large%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
@@ -109,8 +113,6 @@ const attemptErrorCategoryExpr = sql<string>`CASE
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%500%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%502%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%503%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%internal server%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%network%' THEN 'Network Error'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%parse%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%JSON%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
-  WHEN ${cloud_agent_code_review_attempts.terminal_reason} = 'workspace_capacity' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%could not be delivered%' THEN 'Delivery Failure'
   WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%repository_not_installed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%app installation required%' THEN 'Action Required'
   WHEN ${cloud_agent_code_review_attempts.error_message} IS NULL THEN 'Unknown Error'

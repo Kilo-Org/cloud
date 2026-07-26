@@ -20,9 +20,11 @@ import {
   useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
@@ -44,6 +46,16 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import {
+  isShellReadyForShare,
+  resolvePendingShareNavigation,
+} from '@/lib/pending-share-navigation';
+import {
+  normalizeShareIntent,
+  putSharePayload,
+  type ShareId,
+  type SharePayload,
+} from '@/lib/share-payload';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
@@ -128,6 +140,30 @@ function RootLayoutNav() {
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
+  const onGateRoute = (segments as readonly string[]).includes('share-gate');
+  const {
+    hasShareIntent,
+    shareIntent,
+    resetShareIntent,
+    error: shareIntentError,
+  } = useShareIntentContext();
+  const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
+
+  // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
+  const isShellReady = isShellReadyForShare({
+    hasToken: token != null,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inForceUpdate,
+    userIdLoading,
+    userIdError,
+    consentCheckError: consentCheckError != null,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+    onConsentReviewRoute,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +221,49 @@ function RootLayoutNav() {
   useTrackingPermissionPrompt(!isLoading);
   useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
   useScreenTracking();
+
+  useEffect(() => {
+    if (shareIntentError) {
+      Sentry.captureException(new Error(shareIntentError));
+      toast.error("Couldn't read the shared content");
+      resetShareIntent();
+    }
+  }, [shareIntentError, resetShareIntent]);
+
+  // Keyed on hasShareIntent false→true only — not shareIntent identity.
+  useEffect(() => {
+    if (!hasShareIntent) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const ingestShareIntent = async () => {
+      try {
+        const payload: SharePayload = await normalizeShareIntent(shareIntent);
+        if (cancelled) {
+          return;
+        }
+        const shareId = putSharePayload(payload);
+        resetShareIntent();
+        setPendingShareId(shareId);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        Sentry.captureException(error);
+        toast.error("Couldn't read the shared content");
+        resetShareIntent();
+      }
+    };
+
+    void ingestShareIntent();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- false→true on hasShareIntent only
+  }, [hasShareIntent]);
 
   useEffect(() => {
     if (isLoading) {
@@ -246,6 +325,7 @@ function RootLayoutNav() {
       if (pendingNavigation) {
         router.navigate(pendingNavigation.href as Href);
       }
+      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
     }
   }, [
     token,
@@ -262,6 +342,29 @@ function RootLayoutNav() {
     onConsentRoute,
     onConsentReviewRoute,
   ]);
+
+  // Declared after the auth effect so that on the same flush a pending
+  // notification navigate runs first and the share gate opens on top.
+  useEffect(() => {
+    if (pendingShareId === null || !isShellReady) {
+      return;
+    }
+
+    const navigation = resolvePendingShareNavigation({
+      shareId: pendingShareId,
+      onGateRoute,
+    });
+    if (!navigation) {
+      return;
+    }
+
+    if (navigation.mode === 'replace') {
+      router.replace(navigation.href as Href);
+    } else {
+      router.push(navigation.href as Href);
+    }
+    setPendingShareId(null);
+  }, [pendingShareId, isShellReady, onGateRoute, router]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
@@ -352,12 +455,14 @@ function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <AppRootProviders>
-        <StatusBar style="auto" />
-        <RootLayoutNav />
-      </AppRootProviders>
-    </ThemeProvider>
+    <ShareIntentProvider>
+      <ThemeProvider value={navigationTheme}>
+        <AppRootProviders>
+          <StatusBar style="auto" />
+          <RootLayoutNav />
+        </AppRootProviders>
+      </ThemeProvider>
+    </ShareIntentProvider>
   );
 }
 

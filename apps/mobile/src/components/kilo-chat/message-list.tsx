@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   createMessageListKeyboardScrollScheduler,
   createMessageListNewestScrollScheduler,
@@ -33,7 +32,6 @@ type Props = {
   members?: readonly MessageAuthorMember[];
   botName?: string | null;
   fetchOlder?: () => void;
-  isFetchingOlder: boolean;
   pendingAction: PendingAction | null;
   scrollToNewestRequest: number;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
@@ -50,7 +48,6 @@ export function MessageList({
   members,
   botName,
   fetchOlder,
-  isFetchingOlder,
   pendingAction,
   scrollToNewestRequest,
   onExecuteAction,
@@ -205,18 +202,11 @@ export function MessageList({
         onContentSizeChange={handleContentSizeChange}
         scrollEventThrottle={16}
         onStartReached={fetchOlder}
-        onStartReachedThreshold={0.5}
+        onStartReachedThreshold={2}
         maintainVisibleContentPosition={{
           // Start rendering from the bottom so the newest message is visible on first render.
           startRenderingFromBottom: true,
         }}
-        ListHeaderComponent={
-          isFetchingOlder ? (
-            <View className="px-4 py-2">
-              <Skeleton className="h-16 rounded-md" />
-            </View>
-          ) : null
-        }
       />
     </View>
   );

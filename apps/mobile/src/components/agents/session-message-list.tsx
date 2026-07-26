@@ -17,7 +17,7 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // flight. The manager dedupes too, but the UI guard keeps us from issuing
 // repeated `onStartReached` callbacks during a single drag, which would
 // otherwise spam the FlashList event log.
-const ON_START_REACHED_THRESHOLD = 0.5;
+const ON_START_REACHED_THRESHOLD = 2;
 
 type SessionMessageListProps<T> = {
   sessionId: string;

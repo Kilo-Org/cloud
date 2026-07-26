@@ -88,6 +88,7 @@ export const metadata: Metadata = {
           ]),
     ],
   },
+  itunes: { appId: '6761193135' },
   other: {
     _foundr: 'e63f9874cd5c7caaf51e42c7309aee22',
   },

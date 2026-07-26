@@ -53,6 +53,7 @@ import {
 } from '@/lib/pending-share-navigation';
 import {
   clearSharePayload,
+  discardUnstoredSharePayload,
   normalizeShareIntent,
   putSharePayload,
   type ShareId,
@@ -256,6 +257,8 @@ function RootLayoutNav() {
       try {
         const payload: SharePayload = await normalizeShareIntent(shareIntent);
         if (cancelled) {
+          // Superseded mid-copy: never stored, so no lifecycle path can clean it.
+          discardUnstoredSharePayload(payload);
           return;
         }
         const shareId = putSharePayload(payload);

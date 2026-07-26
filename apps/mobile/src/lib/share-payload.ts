@@ -44,6 +44,11 @@ function discardPayloadCacheFiles(payload: SharePayload): void {
   }
 }
 
+/** Best-effort delete of copies for a payload that never entered the store. */
+export function discardUnstoredSharePayload(payload: SharePayload): void {
+  discardPayloadCacheFiles(payload);
+}
+
 function evictOldestIfNeeded(): void {
   while (payloads.size > SHARE_PAYLOAD_MAX_ENTRIES && insertionOrder.length > 0) {
     const oldest = insertionOrder.shift();

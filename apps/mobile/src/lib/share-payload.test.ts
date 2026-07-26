@@ -5,6 +5,7 @@ import {
   __setDeleteCachedFileForTests,
   clearSharePayload,
   composeShareText,
+  discardUnstoredSharePayload,
   normalizeShareIntent,
   peekSharePayload,
   putSharePayload,
@@ -237,6 +238,34 @@ describe('share payload store', () => {
       expect(peekSharePayload(id)).toBeNull();
       // Composer may still be uploading; clear after take must not delete uris.
       clearSharePayload(id);
+      await Promise.resolve();
+      expect(deleted).toEqual([]);
+    });
+  });
+
+  it('discardUnstoredSharePayload deletes copied file uris', async () => {
+    await withDeleteTracking(async deleted => {
+      discardUnstoredSharePayload({
+        text: 'never-stored',
+        files: [
+          { name: 'a.jpg', uri: 'file:///cache/share-a.jpg' },
+          { name: 'b.png', uri: 'file:///cache/share-b.png' },
+        ],
+        failedFiles: ['lost.pdf'],
+      });
+      await vi.waitFor(() => {
+        expect(deleted).toEqual(['file:///cache/share-a.jpg', 'file:///cache/share-b.png']);
+      });
+    });
+  });
+
+  it('discardUnstoredSharePayload is a no-op for empty files', async () => {
+    await withDeleteTracking(async deleted => {
+      discardUnstoredSharePayload({
+        text: 'text-only',
+        files: [],
+        failedFiles: ['lost.pdf'],
+      });
       await Promise.resolve();
       expect(deleted).toEqual([]);
     });

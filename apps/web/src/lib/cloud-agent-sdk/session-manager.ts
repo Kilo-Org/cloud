@@ -1186,6 +1186,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onReplayComplete: () => {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
+        store.set(isLoadingAtom, false);
       },
 
       onBranchChanged: branch => {
@@ -1277,7 +1278,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onFirstActivity: () => {
         // Fallback: clear loading when events flow even if no root
         // session.created was replayed (e.g. CLI snapshot failure).
-        store.set(isLoadingAtom, false);
+        // While a remote session's initial history replay is in flight,
+        // onReplayComplete owns the clear; clearing here would flash the
+        // empty state before replayed messages land.
+        if (!(activeSessionType === 'remote' && remoteHistoryReplaying)) {
+          store.set(isLoadingAtom, false);
+        }
         if (activeSessionType === 'remote') {
           config.onRemoteSessionOpened?.({ kiloSessionId });
         }

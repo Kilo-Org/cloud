@@ -183,108 +183,143 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
   it('listReviewThreads accepts direction: "forward"', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
-    buildOctokit('t1').request.mockResolvedValue({
-      data: {
-        data: {
-          repository: {
-            pullRequest: {
-              reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+    // First page issues PrReviewThreads + PrReviewConversationComments in parallel.
+    buildOctokit('t1').request.mockImplementation(
+      async (_path: string, body: { query: string }) => {
+        if (body.query.includes('PrReviewConversationComments')) {
+          return {
+            data: {
+              data: {
+                repository: {
+                  pullRequest: {
+                    comments: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                  },
+                },
+              },
+            },
+          };
+        }
+        return {
+          data: {
+            data: {
+              repository: {
+                pullRequest: {
+                  reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                },
+              },
             },
           },
-        },
-      },
-    });
+        };
+      }
+    );
 
     await expect(
       caller.listReviewThreads({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
-    ).resolves.toBeDefined();
+    ).resolves.toMatchObject({ threads: [], conversation: [], nextCursor: null });
   });
 
   it('listReviewThreads maps reactionGroups to non-zero DTO reactions only', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
-    buildOctokit('t1').request.mockResolvedValue({
-      data: {
-        data: {
-          repository: {
-            pullRequest: {
-              reviewThreads: {
-                pageInfo: { hasNextPage: false, endCursor: null },
-                nodes: [
-                  {
-                    id: 'PRRT_1',
-                    isResolved: false,
-                    isOutdated: false,
-                    subjectType: 'LINE',
-                    path: 'src/foo.ts',
-                    line: 4,
-                    startLine: null,
-                    originalLine: 4,
-                    originalStartLine: null,
-                    diffSide: 'RIGHT',
-                    comments: {
-                      pageInfo: { hasNextPage: false, endCursor: null },
-                      nodes: [
-                        {
-                          databaseId: 11,
-                          id: 'PRRC_11',
-                          body: 'nit',
-                          createdAt: '2024-01-01T00:00:00Z',
-                          author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
-                          // Live schema: all group types present; zero-count filtered out.
-                          reactionGroups: [
+    buildOctokit('t1').request.mockImplementation(
+      async (_path: string, body: { query: string }) => {
+        if (body.query.includes('PrReviewConversationComments')) {
+          return {
+            data: {
+              data: {
+                repository: {
+                  pullRequest: {
+                    comments: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                  },
+                },
+              },
+            },
+          };
+        }
+        return {
+          data: {
+            data: {
+              repository: {
+                pullRequest: {
+                  reviewThreads: {
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    nodes: [
+                      {
+                        id: 'PRRT_1',
+                        isResolved: false,
+                        isOutdated: false,
+                        subjectType: 'LINE',
+                        path: 'src/foo.ts',
+                        line: 4,
+                        startLine: null,
+                        originalLine: 4,
+                        originalStartLine: null,
+                        diffSide: 'RIGHT',
+                        comments: {
+                          pageInfo: { hasNextPage: false, endCursor: null },
+                          nodes: [
                             {
-                              content: 'THUMBS_UP',
-                              viewerHasReacted: true,
-                              reactors: { totalCount: 2 },
-                            },
-                            {
-                              content: 'THUMBS_DOWN',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 0 },
-                            },
-                            {
-                              content: 'LAUGH',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 0 },
-                            },
-                            {
-                              content: 'HOORAY',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 0 },
-                            },
-                            {
-                              content: 'CONFUSED',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 0 },
-                            },
-                            {
-                              content: 'HEART',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 1 },
-                            },
-                            {
-                              content: 'ROCKET',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 0 },
-                            },
-                            {
-                              content: 'EYES',
-                              viewerHasReacted: false,
-                              reactors: { totalCount: 0 },
+                              databaseId: 11,
+                              id: 'PRRC_11',
+                              body: 'nit',
+                              createdAt: '2024-01-01T00:00:00Z',
+                              author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
+                              // Live schema: all group types present; zero-count filtered out.
+                              reactionGroups: [
+                                {
+                                  content: 'THUMBS_UP',
+                                  viewerHasReacted: true,
+                                  reactors: { totalCount: 2 },
+                                },
+                                {
+                                  content: 'THUMBS_DOWN',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 0 },
+                                },
+                                {
+                                  content: 'LAUGH',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 0 },
+                                },
+                                {
+                                  content: 'HOORAY',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 0 },
+                                },
+                                {
+                                  content: 'CONFUSED',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 0 },
+                                },
+                                {
+                                  content: 'HEART',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 1 },
+                                },
+                                {
+                                  content: 'ROCKET',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 0 },
+                                },
+                                {
+                                  content: 'EYES',
+                                  viewerHasReacted: false,
+                                  reactors: { totalCount: 0 },
+                                },
+                              ],
                             },
                           ],
                         },
-                      ],
-                    },
+                      },
+                    ],
                   },
-                ],
+                },
               },
             },
           },
-        },
-      },
-    });
+        };
+      }
+    );
 
     const result = await caller.listReviewThreads({
       owner: 'octocat',
@@ -294,10 +329,263 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
     });
 
     expect(result.threads).toHaveLength(1);
+    expect(result.conversation).toEqual([]);
     expect(result.threads[0]?.comments[0]?.reactions).toEqual([
       { content: 'THUMBS_UP', count: 2, viewerHasReacted: true },
       { content: 'HEART', count: 1, viewerHasReacted: false },
     ]);
+  });
+});
+
+describe('githubPrReviewRouter.listReviewThreads conversation comments', () => {
+  const emptyThreads = {
+    nodes: [] as unknown[],
+    pageInfo: { hasNextPage: false, endCursor: null as string | null },
+  };
+
+  function conversationNode(overrides: {
+    databaseId: number;
+    id: string;
+    body: string;
+    createdAt?: string;
+  }) {
+    return {
+      databaseId: overrides.databaseId,
+      id: overrides.id,
+      body: overrides.body,
+      createdAt: overrides.createdAt ?? '2026-01-01T00:00:00Z',
+      author: { login: 'alice', avatarUrl: 'https://avatars.example/alice' },
+      reactionGroups: [
+        { content: 'THUMBS_UP', viewerHasReacted: false, reactors: { totalCount: 1 } },
+        { content: 'HEART', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      ],
+    };
+  }
+
+  function mockGraphqlByOperation(
+    octokit: OctokitMock,
+    handlers: {
+      threads?: (vars: Record<string, unknown>) => unknown;
+      conversation?: (vars: Record<string, unknown>) => unknown;
+    }
+  ) {
+    octokit.request.mockImplementation(
+      async (_path: string, body: { query: string; variables: Record<string, unknown> }) => {
+        if (body.query.includes('query PrReviewConversationComments')) {
+          const payload = handlers.conversation?.(body.variables) ?? {
+            nodes: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          };
+          return {
+            data: {
+              data: { repository: { pullRequest: { comments: payload } } },
+            },
+          };
+        }
+        if (body.query.includes('query PrReviewThreads')) {
+          const payload = handlers.threads?.(body.variables) ?? emptyThreads;
+          return {
+            data: {
+              data: { repository: { pullRequest: { reviewThreads: payload } } },
+            },
+          };
+        }
+        throw new Error(`unexpected GraphQL operation: ${body.query.slice(0, 80)}`);
+      }
+    );
+  }
+
+  it('returns mapped conversation comments on the first page', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockGraphqlByOperation(buildOctokit('t1'), {
+      conversation: () => ({
+        nodes: [conversationNode({ databaseId: 42, id: 'IC_42', body: 'top-level' })],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      }),
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    expect(result.conversation).toEqual([
+      {
+        commentId: 42,
+        nodeId: 'IC_42',
+        author: { login: 'alice', avatarUrl: 'https://avatars.example/alice' },
+        bodyMarkdown: 'top-level',
+        createdAt: '2026-01-01T00:00:00Z',
+        reactions: [{ content: 'THUMBS_UP', count: 1, viewerHasReacted: false }],
+      },
+    ]);
+    expect(result.threads).toEqual([]);
+  });
+
+  it('returns conversation: [] when the PR has no conversation comments', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockGraphqlByOperation(buildOctokit('t1'), {
+      conversation: () => ({
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      }),
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    expect(result.conversation).toEqual([]);
+  });
+
+  it('paginates conversation comments to completion across multiple pages', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    let conversationCalls = 0;
+    mockGraphqlByOperation(buildOctokit('t1'), {
+      conversation: vars => {
+        conversationCalls += 1;
+        if (vars.after == null) {
+          return {
+            nodes: [conversationNode({ databaseId: 1, id: 'IC_1', body: 'page-1' })],
+            pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+          };
+        }
+        if (vars.after === 'cursor-1') {
+          return {
+            nodes: [conversationNode({ databaseId: 2, id: 'IC_2', body: 'page-2' })],
+            pageInfo: { hasNextPage: false, endCursor: 'cursor-2' },
+          };
+        }
+        throw new Error(`unexpected after cursor: ${String(vars.after)}`);
+      },
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    expect(conversationCalls).toBe(2);
+    expect(result.conversation.map((c: { commentId: number }) => c.commentId)).toEqual([1, 2]);
+  });
+
+  it('truncates conversation comments after CONVERSATION_COMMENTS_MAX_PAGES', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    let conversationCalls = 0;
+    mockGraphqlByOperation(buildOctokit('t1'), {
+      conversation: vars => {
+        conversationCalls += 1;
+        // Always report another page so the loop hits the hard cap.
+        const pageIndex = conversationCalls;
+        return {
+          nodes: [
+            conversationNode({
+              databaseId: pageIndex,
+              id: `IC_${pageIndex}`,
+              body: `page-${pageIndex}`,
+            }),
+          ],
+          pageInfo: {
+            hasNextPage: true,
+            endCursor: `cursor-${pageIndex}`,
+          },
+        };
+      },
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    // Cap is 5 pages (CONVERSATION_COMMENTS_MAX_PAGES); further pages are dropped.
+    expect(conversationCalls).toBe(5);
+    expect(result.conversation).toHaveLength(5);
+    expect(result.conversation.map((c: { commentId: number }) => c.commentId)).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+  });
+
+  it('returns conversation: [] on a cursored page and does not issue PrReviewConversationComments', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+    let conversationCalls = 0;
+    mockGraphqlByOperation(octokit, {
+      conversation: () => {
+        conversationCalls += 1;
+        return {
+          nodes: [conversationNode({ databaseId: 99, id: 'IC_99', body: 'should-not-fetch' })],
+          pageInfo: { hasNextPage: false, endCursor: null },
+        };
+      },
+      threads: () => ({
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      }),
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      cursor: 'Y3Vyc29yOnYyOpHOAAAAAA==',
+    });
+
+    expect(result.conversation).toEqual([]);
+    expect(conversationCalls).toBe(0);
+    const queries = octokit.request.mock.calls.map(
+      (call: unknown[]) => (call[1] as { query: string }).query
+    );
+    expect(queries.some((q: string) => q.includes('PrReviewConversationComments'))).toBe(false);
+    expect(queries.some((q: string) => q.includes('PrReviewThreads'))).toBe(true);
+  });
+
+  it('null-connection return shape includes conversation: [] via the builder', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const octokit = buildOctokit('t1');
+    // Null pullRequest on PrReviewThreads → early null-connection path through the builder.
+    octokit.request.mockImplementation(async (_path: string, body: { query: string }) => {
+      if (body.query.includes('query PrReviewConversationComments')) {
+        return {
+          data: {
+            data: {
+              repository: {
+                pullRequest: {
+                  comments: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                },
+              },
+            },
+          },
+        };
+      }
+      if (body.query.includes('query PrReviewThreads')) {
+        return {
+          data: {
+            data: { repository: { pullRequest: null } },
+          },
+        };
+      }
+      throw new Error(`unexpected GraphQL operation: ${body.query.slice(0, 80)}`);
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    expect(result).toEqual({ threads: [], conversation: [], nextCursor: null });
   });
 });
 

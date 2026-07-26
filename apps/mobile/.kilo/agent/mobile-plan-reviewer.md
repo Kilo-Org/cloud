@@ -23,7 +23,7 @@ Report:
 - Unclear requirements, unsupported assumptions or claims, and missing or conflicting acceptance criteria
 - Missing feature states, non-goals, dependencies, ownership boundaries, or cross-repository contracts
 - Infeasible or ambiguous sequencing, unsafe parallel work, and underspecified verification or E2E coverage
-- Steps that are not the simplest maintainable implementation, or that add unneeded scope or abstraction
+- Steps that are not the simplest maintainable implementation, feature shapes needlessly more complex than what delivers the same user value, or unneeded scope or abstraction
 - Handoffs missing information an implementer, reviewer, verifier, or orchestrator needs to act without guessing
 
 Check repository files for claims that materially affect feasibility or correctness. Do not invent requirements beyond the request. A recorded, evidence-backed decision is not a defect just because uncertainty remains.

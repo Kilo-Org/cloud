@@ -97,6 +97,8 @@ Rules:
 
 ## Planning
 
+Plan the simplest viable shape of every item — feature-wise as much as code-wise. When the request as stated is needlessly complex and a simpler shape delivers the same user value, challenge it: hands-on, raise it with the user before planning the complex shape; hands-off, decide with best judgment, plan the simpler shape, and record the decision and reasoning in the plan, the handoff, and the PR description.
+
 1. Read [`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md); re-read it before any environment-dependent phase, such as the bug reproduction gate. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
 2. Create the dedicated worktrees.
 3. For defect work, run the bug reproduction gate before writing the plan.
@@ -132,6 +134,7 @@ The handoff must contain:
 - The absolute path of the accepted plan and any approved design
 - The dedicated worktree path for every repository in scope, with each worktree's current branch, commit, and working-tree state
 - Acceptance criteria, feature-state matrix, execution ledger, non-goals, and unresolved risks
+- Any simpler-shape decision and its reasoning (see Planning)
 - For defect work: the reported defect, the confirmed reproduction steps and failure classification, and the repro run's resource manifest
 - Existing changes and resources that must be preserved
 - The completion gate, with a direct instruction to continue until the PR is mergeable and conflict-free with all expected CI checks green on the latest head
@@ -198,7 +201,7 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 4. Dispatch one fresh `mobile-reviewer` over the wave diff. Triage findings yourself: route valid findings through a bounded repair wave; record rejected findings with a short rationale. Loop repair wave → fresh reviewer, steering each round per the escalation ladder, until a fresh reviewer reports no valid actionable findings. Running this loop is the orchestrator's primary job, not a preamble to doing the work itself.
 5. After checks and review pass, create the commits at the ledger's per-slice boundaries. If a slice exhausts its implementer budget, split it or re-dispatch it with a sharper handoff; take over only per the escalation ladder.
 6. When device E2E is likely, prewarm concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Record a resource manifest for the final verifier. Do not judge acceptance behavior while implementation is still changing.
-7. After review passes, perform the final full-diff review yourself, push the reviewed head, create the PR, and assign it to the requesting human — before starting E2E, so CI and Kilobot run concurrently with the E2E run. Do not read or triage any review comment yet (step 9).
+7. After review passes, perform the final full-diff review yourself, push the reviewed head, create the PR — its description records any simpler-shape decision from the handoff — and assign it to the requesting human — before starting E2E, so CI and Kilobot run concurrently with the E2E run. Do not read or triage any review comment yet (step 9).
 8. Dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Loop triage → repair wave → fresh reviewer → fresh verifier, steering each round per the escalation ladder, until a fresh verifier passes every applicable feature state. You may reproduce a failure once to triage it; the repair itself — with your diagnosis and acceptance criteria attached — goes through the implementer-reviewer loop. Never sit in an edit-run-verify loop yourself. Review the full diff of any E2E-driven repair, commit it at the right boundary, and push.
 
 ### Reviewer and CI Loop

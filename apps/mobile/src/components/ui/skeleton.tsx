@@ -31,6 +31,8 @@ const DARK_SHIMMER = [
 ] as const;
 
 const SHIMMER_DURATION_MS = 1800;
+/** Half-cycle for opacity breathe (0.4→1.0). Old value was 1000 ms; full cycle is 1700 ms. */
+const PULSE_HALF_CYCLE_MS = 850;
 
 /** LinearGradient is not NativeWind-mapped; fill the absolute overlay. */
 const GRADIENT_FILL = { flex: 1 } as const;
@@ -73,16 +75,19 @@ export function Skeleton({ className }: Readonly<SkeletonProps>) {
   const reducedMotion = useReducedMotion();
   const colorScheme = useColorScheme();
   const layoutWidth = useSharedValue(0);
+  const pulse = useSharedValue(0.4);
 
   useEffect(() => {
     if (reducedMotion) {
       return undefined;
     }
     retainShimmerClock();
+    pulse.value = withRepeat(withTiming(1, { duration: PULSE_HALF_CYCLE_MS }), -1, true);
     return () => {
+      cancelAnimation(pulse);
       releaseShimmerClock();
     };
-  }, [reducedMotion]);
+  }, [pulse, reducedMotion]);
 
   const shimmerStyle = useAnimatedStyle(() => {
     const width = layoutWidth.value;
@@ -101,6 +106,8 @@ export function Skeleton({ className }: Readonly<SkeletonProps>) {
     };
   });
 
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
+
   const onLayout = (event: LayoutChangeEvent) => {
     layoutWidth.value = event.nativeEvent.layout.width;
   };
@@ -113,7 +120,11 @@ export function Skeleton({ className }: Readonly<SkeletonProps>) {
   const shimmerColors = colorScheme === 'dark' ? DARK_SHIMMER : LIGHT_SHIMMER;
 
   return (
-    <View className={cn('overflow-hidden rounded-md bg-muted', className)} onLayout={onLayout}>
+    <Animated.View
+      className={cn('overflow-hidden rounded-md bg-muted', className)}
+      onLayout={onLayout}
+      style={pulseStyle}
+    >
       <Animated.View className="absolute inset-0 w-full" pointerEvents="none" style={shimmerStyle}>
         <LinearGradient
           colors={shimmerColors}
@@ -122,6 +133,6 @@ export function Skeleton({ className }: Readonly<SkeletonProps>) {
           style={GRADIENT_FILL}
         />
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }

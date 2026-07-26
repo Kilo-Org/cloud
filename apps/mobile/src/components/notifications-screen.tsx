@@ -28,6 +28,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import {
   applyAgentPushOptimistic,
   deriveAgentPushEditable,
+  deriveGateSettled,
   deriveShowEnableCta,
   NOTIFICATION_CATEGORY_KEYS,
   type NotificationCategoryKey,
@@ -197,6 +198,7 @@ export function NotificationsScreen() {
     data: permissionGranted = false,
     isLoading: permissionLoading,
     isError: permissionError,
+    isFetched: permissionFetched,
     refetch: refetchPermission,
   } = useQuery({
     queryKey: permissionQueryKey,
@@ -209,6 +211,7 @@ export function NotificationsScreen() {
   const {
     data: deviceToken,
     isError: deviceTokenError,
+    isFetched: deviceTokenFetched,
     refetch: refetchDeviceToken,
   } = useQuery({
     queryKey: deviceTokenQueryKey,
@@ -219,6 +222,7 @@ export function NotificationsScreen() {
   const {
     data: pushTokens,
     isError: pushTokensError,
+    isFetched: pushTokensFetched,
     refetch: refetchPushTokens,
   } = useQuery({
     ...trpc.user.getMyPushTokens.queryOptions(),
@@ -227,6 +231,16 @@ export function NotificationsScreen() {
   const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =
     deviceToken != null && (pushTokens ?? []).some(t => t.token === deviceToken);
+
+  // Each *Settled is isFetched || isError for the enabled query. Do not invent
+  // a "disabled → settled" mapping for deviceToken — deriveGateSettled
+  // short-circuits when permission is denied so disabled flags are never read.
+  const gateSettled = deriveGateSettled({
+    permissionSettled: permissionFetched || permissionError,
+    permissionGranted,
+    pushTokensSettled: pushTokensFetched || pushTokensError,
+    deviceTokenSettled: deviceTokenFetched || deviceTokenError,
+  });
 
   const {
     data: preferences,
@@ -429,7 +443,12 @@ export function NotificationsScreen() {
                   : 'Permission or device registration is off.'}
               </Text>
             </View>
-            {permissionLoading && <Skeleton className="h-8 w-12 rounded-full" />}
+            {/* Master trailing slot — first match wins:
+                1. permissionLoading → skeleton
+                2. permissionError → InlineRetry
+                3. !gateSettled → skeleton (token queries still settling)
+                4. else → real Switch (+ optional isMasterBusy spinner) */}
+            {permissionLoading && <Skeleton className="h-[31px] w-[51px] rounded-full" />}
             {!permissionLoading && permissionError && (
               <InlineRetry
                 label="Retry checking notification permission"
@@ -437,7 +456,10 @@ export function NotificationsScreen() {
                 onPress={() => void refetchPermission()}
               />
             )}
-            {!permissionLoading && !permissionError && (
+            {!permissionLoading && !permissionError && !gateSettled && (
+              <Skeleton className="h-[31px] w-[51px] rounded-full" />
+            )}
+            {!permissionLoading && !permissionError && gateSettled && (
               <>
                 {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
                 <Switch
@@ -456,11 +478,13 @@ export function NotificationsScreen() {
             )}
           </View>
 
-          {/* Empty-state CTA: only shown when the master gate is closed. The
-              retryable unhappy path (a category mutation rejection) is handled
-              by the toggle itself — there is no terminal failure mode for
-              these preferences, so a non-retryable CTA is structurally absent. */}
-          {showEnableCta && !permissionLoading && !permissionError && (
+          {/* Empty-state CTA: only shown when the master gate is closed and the
+              gate has settled (avoids a transient flash while token queries
+              resolve for an already-registered user). The retryable unhappy
+              path (a category mutation rejection) is handled by the toggle
+              itself — there is no terminal failure mode for these preferences,
+              so a non-retryable CTA is structurally absent. */}
+          {!permissionLoading && !permissionError && gateSettled && showEnableCta && (
             <View className="rounded-lg border border-border bg-card p-4">
               <View className="flex-row items-start gap-3">
                 <CircleCheck size={18} color={colors.foreground} />
@@ -497,11 +521,19 @@ export function NotificationsScreen() {
           </Text>
           {preferencesLoading && (
             <>
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <Skeleton className="h-16 w-full rounded-lg" />
-              <Skeleton className="h-16 w-full rounded-lg" />
+              {CATEGORY_META.map(meta => (
+                <View
+                  key={meta.key}
+                  className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3"
+                >
+                  <Skeleton className="h-[18px] w-[18px] rounded" />
+                  <View className="flex-1">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="mt-0.5 h-4 w-40" />
+                  </View>
+                  <Skeleton className="h-[31px] w-[51px] rounded-full" />
+                </View>
+              ))}
             </>
           )}
           {preferencesError && (

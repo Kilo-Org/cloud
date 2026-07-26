@@ -63,6 +63,36 @@ export function deriveShowEnableCta(notificationsEnabled: boolean): boolean {
   return !notificationsEnabled;
 }
 
+type GateSettledArgs = Readonly<{
+  permissionSettled: boolean;
+  permissionGranted: boolean;
+  pushTokensSettled: boolean;
+  deviceTokenSettled: boolean;
+}>;
+
+/**
+ * Whether the master push gate has enough settled inputs to render the real
+ * Switch / Enable CTA without a transient wrong value or layout flap.
+ *
+ * Short-circuits when permission is denied (or errored → granted is falsy):
+ * token queries are irrelevant to a closed gate, and `deviceToken` is
+ * `enabled: permissionGranted` so it would never settle while denied.
+ */
+export function deriveGateSettled({
+  permissionSettled,
+  permissionGranted,
+  pushTokensSettled,
+  deviceTokenSettled,
+}: GateSettledArgs): boolean {
+  if (!permissionSettled) {
+    return false;
+  }
+  if (!permissionGranted) {
+    return true;
+  }
+  return pushTokensSettled && deviceTokenSettled;
+}
+
 /** Map the legacy single-key cache shape to the new per-category shape. */
 function readFromSnapshot(snapshot: NotificationPreferencesSnapshot): NotificationPreferences {
   if (!snapshot) {

@@ -388,10 +388,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
    * Pins: Postgres total_cost_microdollars persist runs before the unguarded
    * O11Y.ingestSessionMetrics RPC. An O11Y rejection must not skip the persist.
    */
-  function makeAlarmHarness(options: {
-    totalCostDollars: number;
-    o11yImpl: () => Promise<void>;
-  }) {
+  function makeAlarmHarness(options: { totalCostDollars: number; o11yImpl: () => Promise<void> }) {
     const operations: string[] = [];
     const meta = new Map<string, string | null>([
       ['kiloUserId', 'usr_cost'],

@@ -64,6 +64,7 @@ import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
+import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -482,6 +483,8 @@ export function SessionDetailContent({
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+  const isComposerMounted = !isReadOnly || messages.length === 0;
+  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
@@ -645,7 +648,13 @@ export function SessionDetailContent({
         </KeyboardAvoidingView>
       )}
 
-      <View style={{ height: bottom }} className="bg-background" />
+      {isComposerVisible ? (
+        <BlurBar className="border-t-0">
+          <View style={{ height: bottom }} />
+        </BlurBar>
+      ) : (
+        <View style={{ height: bottom }} className="bg-background" />
+      )}
 
       {sheetMountState.mounted ? (
         <SessionContextSheet
@@ -756,7 +765,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {!isReadOnly || messages.length === 0 ? (
+        {isComposerMounted ? (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}

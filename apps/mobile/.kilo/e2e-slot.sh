@@ -21,12 +21,15 @@ POLL=${E2E_POLL:-60}
 mkdir -p "$DIR"
 
 reap() {
+  # If tmux cannot answer (missing binary, no server, socket error), liveness
+  # cannot be judged — keep every slot rather than wipe live ones. Acquirers
+  # always run inside tmux, so the server is up whenever reaping matters.
+  alive=$(tmux list-sessions -F '#{session_name}' 2>/dev/null) || return 0
   for s in "$DIR"/slot-*; do
     [ -d "$s" ] || continue
     owner=$(cat "$s/owner" 2>/dev/null || echo)
     [ -n "$owner" ] || { rm -rf "$s"; continue; }
-    # legacy holders predate this protocol; only tmux liveness decides
-    tmux has-session -t "=$owner" 2>/dev/null || rm -rf "$s"
+    printf '%s\n' "$alive" | grep -qxF -- "$owner" || rm -rf "$s"
   done
 }
 

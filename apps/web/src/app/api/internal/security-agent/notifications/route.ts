@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -283,20 +283,24 @@ export async function POST(req: NextRequest) {
     );
   }
   if (result.sent) {
-    try {
-      await dispatchSecurityFindingPush({
-        recipientUserId: row.recipientUserId,
-        notificationId: row.notificationId,
-        findingId: row.findingId,
-        scope: row.ownedByOrganizationId ?? 'personal',
-        notificationKind: row.kind,
-        severity: row.severity,
-        repoFullName: row.repoFullName,
-        title: row.title,
-      });
-    } catch {
-      // Push is best-effort: the email was sent; the response stays `sent`.
-    }
+    // Push must not extend route latency: the security-sync sweep aborts at 10s
+    // and would reschedule, re-entering this route and re-sending the email.
+    after(async () => {
+      try {
+        await dispatchSecurityFindingPush({
+          recipientUserId: row.recipientUserId,
+          notificationId: row.notificationId,
+          findingId: row.findingId,
+          scope: row.ownedByOrganizationId ?? 'personal',
+          notificationKind: row.kind,
+          severity: row.severity,
+          repoFullName: row.repoFullName,
+          title: row.title,
+        });
+      } catch {
+        // Push is best-effort: the email was sent; the response stays `sent`.
+      }
+    });
     return NextResponse.json({ outcome: 'sent' }, { status: 200 });
   }
   if (result.reason === 'neverbounce_rejected') {

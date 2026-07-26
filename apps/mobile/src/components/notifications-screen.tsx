@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 5 per-category toggles
+ * OS-permission gate, the push-token registration flow, and 7 per-category toggles
  * with their optimistic-mutation + retry + loading patterns. Extracting subcomponents
  * would re-encode the same hooks. The screen stays a single rendered surface. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

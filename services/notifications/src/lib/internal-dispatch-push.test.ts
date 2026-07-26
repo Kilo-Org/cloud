@@ -41,7 +41,7 @@ function securityFinding(
     recipientUserId: 'user-a',
     notificationId: 'notif-1',
     findingId: 'finding-1',
-    scope: 'org:org-1',
+    scope: 'org-1',
     notificationKind: 'new_finding',
     severity: 'critical',
     repoFullName: 'acme/api',
@@ -224,7 +224,7 @@ describe('dispatchInternalPushCore', () => {
           data: {
             type: 'security_finding',
             findingId: 'finding-1',
-            scope: 'org:org-1',
+            scope: 'org-1',
           },
           sound: 'default',
           priority: 'high',

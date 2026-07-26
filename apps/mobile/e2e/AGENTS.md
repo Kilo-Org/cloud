@@ -59,7 +59,19 @@ pnpm dev:capture mobile
 - Never guess a tmux window from `tmux ls` or address `<session>:<service>` directly; a service pane may be joined into the dashboard with no same-named window. Use `pnpm dev:capture <service>`.
 - Use raw tmux only for an interactive process, after reading the exact `session` from `pnpm dev:status --json` and resolving the pane with `tmux list-panes -a`.
 - Put any extra long-lived CLI, recorder, or log follower in a clearly named `kilo-e2e-*` tmux session so it is visible and easy to remove.
-- Never commit E2E fixtures. Generate them in a temporary directory (`mktemp -d`) and delete it before finishing.
+- Never commit E2E fixtures. Generate them in a temporary directory (`mktemp -d`) and delete it before finishing. Committed harness code under `e2e/` (this directory's `login.sh`, `preflight.sh`, `remote-cli.sh`, and `github-api-stub/`) is not a generated fixture; the rule targets per-run generated data only.
+
+## Hermetic PR-review GitHub stub
+
+PR-review E2E needs a local GitHub API instead of `api.github.com`. Three steps, all reversible:
+
+1. Set `GITHUB_API_BASE_URL` in the **worktree root** `.env.local` to the stub's base URL (for example `http://127.0.0.1:<port>`). Next.js reads it via `apps/web/src/lib/github-pr-review/client.ts` (the web `dev` script symlinks root `.env.local` into `apps/web/` when that file is missing). Remove the variable after the run.
+2. Seed a GitHub user token with the dev-only tRPC mutation `githubApps.devSeedUserGithubToken`. Any non-empty token string works. Use the stable fake `githubUserId` `999001` so the upsert matches across worktrees; a `false` upsert result means a sibling already seeded it, not failure.
+3. Start the stub in a `kilo-e2e-*` tmux session, for example:
+   `tmux new-session -d -s "kilo-e2e-github-stub-$(basename "$PWD")" -c "$PWD/apps/mobile/e2e/github-api-stub" "node server.mjs <port>"`.
+   Stop that session when finished. Request logs go to `GITHUB_STUB_LOG` or `./github-api-stub-requests.log` under the process cwd — keep them out of the tree (temp dir) and delete them after the run.
+
+Pinned surface only: REST pull/repo/check-runs/statuses plus GraphQL ops `PrReviewDecision`, `PrReviewThreads`, `PrReviewThreadComments`, `PrReviewConversationComments`. Fixture identities: `kilo-stub/discussion-mixed#1`, `kilo-stub/discussion-conversation-only#2`, `kilo-stub/discussion-empty#3`.
 
 ## iOS Simulator
 
@@ -99,7 +111,7 @@ apps/mobile/e2e/login.sh <udid> [email]   # default: e2e-mobile+<worktree-basena
 apps/mobile/e2e/logout.sh <udid>
 ```
 
-The default email is unique per worktree, so concurrent worktrees sign into distinct backend users. Pass an explicit email only when a test needs a specific account.
+The default email uses a plus-tag per worktree (`e2e-mobile+<worktree-basename>@example.com`), but `normalizeEmail` in `apps/web/src/lib/utils.ts` strips plus-tags, so every worktree's default login resolves to one shared backend user (`e2e-mobile@example.com`). Seeded token rows and any rows inserted into shared tables are therefore visible across worktrees; assertions must target run-unique values, never list length, emptiness, or position. Pass an explicit email only when a test needs a specific account.
 
 Login requests an email OTP, waits up to 30 seconds for the worktree-local outbox, verifies the code, accepts first-account consent, and asserts Home. It retries the known dev-client launch boundary once. `flows/settle-app.yaml` handles late tracking and Expo developer-menu prompts without restarting the app; `flows/open-app.yaml` is the standalone cold-launch flow.
 

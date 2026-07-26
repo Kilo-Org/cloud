@@ -7,11 +7,12 @@ import {
 import { LEADERBOARD_PROVIDER_RACE_REDIS_KEY } from '@/lib/redis-keys';
 
 // Weekly token volume per model lab, from a fixed start date through the most
-// recent complete day. Grouped at week x model_provider_company x
+// recent complete week. Grouped at week x model_provider_company x
 // is_open_weights so a single payload drives both the per-lab "race" view and
 // an open-weight vs proprietary toggle. model_provider_company and
 // is_open_weights are maintained in the dbt model_dim seed (kilocode-dbt), so
 // the lab mapping lives in one place rather than being re-derived here.
+// The partial current week is excluded so every returned week is complete.
 const LEADERBOARD_PROVIDER_RACE_QUERY = `
 select
     to_char(date_trunc('week', ud.usage_date), 'YYYY-MM-DD') as week_start
@@ -21,7 +22,7 @@ select
 from kilo_dw.dbt_prod.usage_daily as ud
 where
     ud.usage_date >= '2025-07-01'
-    and ud.usage_date < current_date()
+    and date_trunc('week', ud.usage_date) < date_trunc('week', current_date())
     and ud.total_tokens > 0
 group by 1, 2, 3
 order by 1, 4 desc;

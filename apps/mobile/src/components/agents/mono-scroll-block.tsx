@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { type LayoutChangeEvent, ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -25,12 +26,18 @@ type MonoScrollBlockProps = {
 /**
  * Horizontally scrollable monospace block for tool-card / preparation output.
  *
- * C-b delivery: mono Text uses `shrink-0` so Yoga does not compress it to the
- * card width (which made the ScrollView content width equal the viewport and
- * left line tails unreachable). Scroll props hand horizontal pans to this
- * view and vertical pans to the parent list.
+ * Nested-scroll delivery (device-proven): RN 0.83 Fabric does not hand
+ * horizontal pans to a stock RN ScrollView nested inside the session FlashList
+ * — content is wide enough, but the inner scroller never receives the pan.
+ * This block uses `ScrollView` from `react-native-gesture-handler` with
+ * `activeOffsetX` / `failOffsetY` so horizontal pans activate the block and
+ * vertical pans fail over to the conversation list (same hazard family as
+ * nested scrolls in the markdown renderer).
  *
- * D10 height: pin ScrollView height from the content's onLayout measurement so
+ * Intrinsic width: mono Text keeps `shrink-0 self-start` so content lays out
+ * at its natural width inside the horizontal scroller.
+ *
+ * Height pin: pin ScrollView height from the content's onLayout measurement so
  * RN 0.83 Fabric cannot inflate a horizontal ScrollView inside a width-
  * constrained parent (~10× spurious height). The pin is keyed to displayText
  * so a taller payload remeasures instead of clipping into a stale height.
@@ -64,7 +71,7 @@ export function MonoScrollBlock({
         <Text
           selectable
           onLayout={handleContentLayout}
-          className={cn('shrink-0 font-mono text-xs leading-4', textClassName)}
+          className={cn('shrink-0 self-start font-mono text-xs leading-4', textClassName)}
         >
           {displayText}
         </Text>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  MONO_SCROLL_GESTURE_OFFSETS,
   MONO_SCROLL_VIEW_PROPS,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
@@ -82,5 +83,12 @@ describe('MONO_SCROLL_VIEW_PROPS — overflow affordance and nested delivery', (
     expect(MONO_SCROLL_VIEW_PROPS.directionalLockEnabled).toBe(true);
     expect(MONO_SCROLL_VIEW_PROPS.nestedScrollEnabled).toBe(true);
     expect(MONO_SCROLL_VIEW_PROPS.canCancelContentTouches).toBe(true);
+  });
+
+  it('uses RNGH directional activation so horizontal pans reach the block', () => {
+    expect(MONO_SCROLL_GESTURE_OFFSETS.activeOffsetX).toEqual([-10, 10]);
+    expect(MONO_SCROLL_GESTURE_OFFSETS.failOffsetY).toEqual([-10, 10]);
+    expect(MONO_SCROLL_VIEW_PROPS.activeOffsetX).toEqual([-10, 10]);
+    expect(MONO_SCROLL_VIEW_PROPS.failOffsetY).toEqual([-10, 10]);
   });
 });

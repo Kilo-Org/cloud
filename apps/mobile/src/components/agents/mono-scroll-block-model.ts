@@ -42,6 +42,16 @@ export function nextMonoScrollHeightPin(
   return { text: displayText, height: measuredHeight };
 }
 
+/**
+ * Directional activation for the RNGH ScrollView nested in the session
+ * FlashList. Horizontal pans beyond this dead-zone activate the block;
+ * vertical pans beyond it fail the inner gesture so the conversation takes over.
+ */
+export const MONO_SCROLL_GESTURE_OFFSETS = {
+  activeOffsetX: [-10, 10] as [number, number],
+  failOffsetY: [-10, 10] as [number, number],
+};
+
 /** Props applied to the horizontal ScrollView so tests can assert the contract. */
 export const MONO_SCROLL_VIEW_PROPS = {
   horizontal: true as const,
@@ -55,4 +65,5 @@ export const MONO_SCROLL_VIEW_PROPS = {
   // Do not let the scroller steal the vertical list's bounce/cancel path on
   // primarily vertical drags that begin on the block.
   canCancelContentTouches: true as const,
+  ...MONO_SCROLL_GESTURE_OFFSETS,
 };

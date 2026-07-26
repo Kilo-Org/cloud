@@ -1,7 +1,7 @@
 import { useScrollToTop } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -56,6 +56,8 @@ type AgentSessionListContentProps = {
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
   hasActiveQuery: boolean;
   isSearching: boolean;
+  /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
+  searchQuery: string;
   onClearQuery: () => void;
   onCreateSession: () => void;
   sortBy: AgentSessionSortBy;
@@ -75,12 +77,30 @@ export function AgentSessionListContent({
   onSessionPress,
   hasActiveQuery,
   isSearching,
+  searchQuery,
   onClearQuery,
   onCreateSession,
   sortBy,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<SectionList<StoredSession, SessionSection>>(null);
   useScrollToTop(listRef);
+
+  // Scroll to top on committed-query change only. Skip the initial mount
+  // (offset is already 0). Must not fire on focus refetch, attention
+  // revision, sort remount, pagination, pull-to-refresh, or section-data
+  // identity changes with an unchanged query.
+  const prevSearchQueryRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevSearchQueryRef.current === null) {
+      prevSearchQueryRef.current = searchQuery;
+      return;
+    }
+    if (prevSearchQueryRef.current === searchQuery) {
+      return;
+    }
+    prevSearchQueryRef.current = searchQuery;
+    listRef.current?.getScrollResponder()?.scrollTo({ y: 0, animated: false });
+  }, [searchQuery]);
 
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();

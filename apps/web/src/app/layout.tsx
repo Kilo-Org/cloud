@@ -8,6 +8,7 @@ import { DataLayerProvider } from '../components/DataLayerProvider';
 import { ImpactIdentify } from '@/components/ImpactIdentify';
 import { StagingEnvironmentBanner } from '@/components/shared/StagingEnvironmentBanner';
 import { APP_URL } from '@/lib/constants';
+import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -88,7 +89,7 @@ export const metadata: Metadata = {
           ]),
     ],
   },
-  itunes: { appId: '6761193135' },
+  itunes: smartAppBannerItunes(),
   other: {
     _foundr: 'e63f9874cd5c7caaf51e42c7309aee22',
   },

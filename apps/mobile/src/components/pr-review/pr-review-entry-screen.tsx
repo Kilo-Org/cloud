@@ -257,7 +257,15 @@ export function PrReviewEntryScreen() {
                   // 38pt in this app — do not "simplify" back to h-11/w-11.
                   <Pressable
                     onPress={() => {
-                      applyFieldText('');
+                      // clear() is the iOS-safe native empty after real typing.
+                      // setNativeProps({ text: '' }) loses the most-recent-event-count
+                      // race and leaves the typed text visible while React state
+                      // thinks the field is empty. Do not route through
+                      // applyFieldText('') (paste-only path) and do not push an
+                      // echo for '' — a non-arriving echo would stale the FIFO.
+                      inputValueRef.current = '';
+                      setHasInput(false);
+                      inputRef.current?.clear();
                       inputRef.current?.focus();
                     }}
                     accessibilityRole="button"

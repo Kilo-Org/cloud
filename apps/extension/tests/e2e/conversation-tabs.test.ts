@@ -121,7 +121,15 @@ const conversationStoreWithTitle = (title: string): unknown => ({
   activeConversationId: 'conversation-1',
   conversations: [
     {
-      events: [],
+      // History only lists conversations with at least one user message.
+      events: [
+        {
+          id: `${title}-user`,
+          role: 'user',
+          text: title,
+          type: 'message',
+        },
+      ],
       id: 'conversation-1',
       title,
       updatedAt: '2026-06-24T10:00:00.000Z',
@@ -512,6 +520,34 @@ test('conversation tabs persist across side panel reloads', async () => {
   }
 });
 
+test('closing the sole empty tab discards an unsent draft', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+    await expect(messageInput).toBeVisible();
+    await messageInput.fill('Unsent draft that must not survive close');
+    await expect(messageInput).toHaveValue('Unsent draft that must not survive close');
+
+    await sidePanel.getByLabel('Close Conversation 1').click();
+
+    await expect(sidePanel.getByLabel('Message agent')).toHaveValue('');
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('Pick a tab and ask Kilo to inspect it.')
+    ).toBeVisible();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('closing a conversation removes only that tab', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -710,11 +746,19 @@ test('history virtualizes and pages large stored conversation lists', async () =
         activeConversationId: 'conversation-1',
         conversations: Array.from({ length: 250 }, (_value, index) => {
           const conversationNumber = index + 1;
+          const title = `Seeded conversation ${conversationNumber}`;
 
           return {
-            events: [],
+            events: [
+              {
+                id: `user-${conversationNumber}`,
+                role: 'user',
+                text: title,
+                type: 'message',
+              },
+            ],
             id: `conversation-${conversationNumber}`,
-            title: `Seeded conversation ${conversationNumber}`,
+            title,
             updatedAt: new Date(2026, 0, conversationNumber).toISOString(),
           };
         }),

@@ -175,7 +175,9 @@ export const getOpenStoredConversations = (
 export const getSortedStoredConversationHistory = (
   store: StoredAgentConversationStore
 ): StoredAgentConversation[] =>
-  store.conversations.toSorted((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+  store.conversations
+    .filter(conversation => !isStoredConversationEmpty(conversation))
+    .toSorted((first, second) => second.updatedAt.localeCompare(first.updatedAt));
 
 export const isStoredConversationOpen = (
   store: StoredAgentConversationStore,
@@ -284,15 +286,23 @@ export const closeStoredConversationTab = (
     return store;
   }
 
+  const closedConversation = store.conversations.find(
+    conversation => conversation.id === conversationId
+  );
   const openConversationIds = getOpenConversationIds(store).filter(
     currentId => currentId !== conversationId
   );
+  const conversations =
+    closedConversation !== undefined && isStoredConversationEmpty(closedConversation)
+      ? store.conversations.filter(conversation => conversation.id !== conversationId)
+      : store.conversations;
   const nextStore = {
     ...store,
     activeConversationId:
       store.activeConversationId === conversationId
         ? (openConversationIds[0] ?? '')
         : store.activeConversationId,
+    conversations,
     openConversationIds,
   };
 
@@ -404,14 +414,23 @@ export const normalizeStoredConversations = ({
       store.openConversationIds.length === 0
         ? strippedConversations.map(conversation => conversation.id)
         : store.openConversationIds.filter(conversationId => conversationIds.has(conversationId));
-    const hasActiveConversation = openConversationIds.includes(store.activeConversationId);
+    const openIdSet = new Set(openConversationIds);
+    // Drop empty conversations that are not open (legacy greeting-only rows, closed empties).
+    const conversations = strippedConversations.filter(
+      conversation => openIdSet.has(conversation.id) || !isStoredConversationEmpty(conversation)
+    );
+    const retainedIds = new Set(conversations.map(conversation => conversation.id));
+    const retainedOpenIds = openConversationIds.filter(conversationId =>
+      retainedIds.has(conversationId)
+    );
+    const hasActiveConversation = retainedOpenIds.includes(store.activeConversationId);
 
     return ensureOpenConversation({
       activeConversationId: hasActiveConversation
         ? store.activeConversationId
-        : (openConversationIds[0] ?? strippedConversations[0]?.id ?? ''),
-      conversations: strippedConversations,
-      openConversationIds,
+        : (retainedOpenIds[0] ?? conversations[0]?.id ?? ''),
+      conversations,
+      openConversationIds: retainedOpenIds,
     });
   }
 

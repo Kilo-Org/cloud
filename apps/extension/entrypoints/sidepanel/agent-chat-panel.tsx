@@ -760,9 +760,36 @@ export const AgentChatPanel = ({
       }
 
       abortConversationRun(conversationId);
-      setConversationStore(currentStore =>
-        closeStoredConversationTab(currentStore, conversationId, emptyDefaultConversationEvents())
+      const currentStore = conversationStoreRef.current;
+      const closedConversation = currentStore.conversations.find(
+        conversation => conversation.id === conversationId
       );
+      const wasEmpty =
+        closedConversation !== undefined && isStoredConversationEmpty(closedConversation);
+      const nextStore = closeStoredConversationTab(
+        currentStore,
+        conversationId,
+        emptyDefaultConversationEvents()
+      );
+      conversationStoreRef.current = nextStore;
+      setConversationStore(nextStore);
+
+      // Evict outside the state updater (StrictMode may double-invoke updaters).
+      // Empty closed tabs are deleted: always free their atoms, including when ensureOpen
+      // Recreates a fallback with the same id so drafts do not survive onto the fresh tab.
+      // Non-empty closed tabs keep drafts for History reopen.
+      const idsToEvict = new Set<string>();
+      if (wasEmpty) {
+        idsToEvict.add(conversationId);
+      }
+      for (const conversation of currentStore.conversations) {
+        if (!nextStore.conversations.some(next => next.id === conversation.id)) {
+          idsToEvict.add(conversation.id);
+        }
+      }
+      for (const id of idsToEvict) {
+        evictConversationAtoms(id);
+      }
     },
     [abortConversationRun, isConversationStoreLoaded, setConversationStore]
   );

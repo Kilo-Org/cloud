@@ -16,12 +16,6 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
-  /**
-   * Optional non-interactive content between the back button and the title
-   * (e.g. session platform icon). Outside the title pressable when rename
-   * is enabled. Unset ⇒ header layout is unchanged.
-   */
-  leadingAccessory?: React.ReactNode;
   modal?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
@@ -43,7 +37,6 @@ export function ScreenHeader({
   eyebrow,
   size = 'default',
   headerRight,
-  leadingAccessory,
   modal,
   showBackButton,
   onBack,
@@ -76,6 +69,9 @@ export function ScreenHeader({
         {title}
       </Text>
     );
+    // Title caret removed: rename stays available via the pressable title
+    // itself. The backIcon === 'close' ChevronDown on the back control is
+    // unrelated and stays.
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
@@ -84,10 +80,9 @@ export function ScreenHeader({
         accessibilityLabel={
           onTitlePressAccessibilityLabel ?? (title ? `Open menu for ${title}` : 'Open menu')
         }
-        className="flex-row items-center gap-1 active:opacity-70"
+        className="active:opacity-70"
       >
         {titleText}
-        <ChevronDown size={16} color={colors.mutedForeground} />
       </Pressable>
     ) : (
       titleText
@@ -119,7 +114,6 @@ export function ScreenHeader({
               )}
             </Pressable>
           )}
-          {leadingAccessory != null ? <View className="shrink-0">{leadingAccessory}</View> : null}
           <View className="flex-1">
             {eyebrow ? <Eyebrow className="mb-0.5">{eyebrow}</Eyebrow> : null}
             {titleNode}

@@ -1,3 +1,4 @@
+import { platformLabel } from '@/lib/platform-label';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionTotalCost } from './session-list-helpers';
@@ -85,28 +86,55 @@ export function formatRemainingTokens(remaining: number): string {
   return formatExactTokens(remaining);
 }
 
-type HeaderSummary = {
-  primary: string;
-  secondary?: string;
+export type HeaderPillContent = {
+  primary: string | null;
+  secondary: string | null;
   hasCost: boolean;
   tone: ContextTone;
+  /** `undefined` = indeterminate arc; `0` = track only (no usage asserted). */
+  arcFraction: number | undefined;
+  interactive: boolean;
 };
 
-export function getHeaderSummary(
-  info: SessionContextInfo | undefined,
-  totalCostMicrodollars: number | null
-): HeaderSummary | null {
-  if (!info) {
-    return null;
+/**
+ * Single selector for the session-detail header pill. Always returns content
+ * so the pill can reserve a fixed height before context usage resolves.
+ */
+export function getHeaderPillContent({
+  info,
+  totalCostMicrodollars,
+  hasMessages,
+}: {
+  info: SessionContextInfo | undefined;
+  totalCostMicrodollars: number | null;
+  hasMessages: boolean;
+}): HeaderPillContent {
+  if (info) {
+    const tone = getContextTone(info.percentage);
+    const primary =
+      info.percentage !== undefined
+        ? `${info.percentage}%`
+        : formatCompactTokens(info.contextTokens);
+    const secondary = formatSessionTotalCost(totalCostMicrodollars);
+    return {
+      primary,
+      secondary,
+      hasCost: secondary !== null,
+      tone,
+      arcFraction: getArcFraction(info.percentage),
+      interactive: true,
+    };
   }
-  const tone = getContextTone(info.percentage);
-  const primary =
-    info.percentage !== undefined ? `${info.percentage}%` : formatCompactTokens(info.contextTokens);
-  const secondary = formatSessionTotalCost(totalCostMicrodollars);
-  if (secondary === null) {
-    return { primary, hasCost: false, tone };
-  }
-  return { primary, secondary, hasCost: true, tone };
+
+  const costText = hasMessages ? formatSessionTotalCost(totalCostMicrodollars) : null;
+  return {
+    primary: costText,
+    secondary: null,
+    hasCost: costText !== null,
+    tone: 'neutral',
+    arcFraction: 0,
+    interactive: false,
+  };
 }
 
 type ContextSheetContent = {
@@ -163,17 +191,39 @@ export function getContextSheetContent(
   };
 }
 
-export function getMetricsAccessibilityLabel(
-  info: SessionContextInfo,
-  totalCostMicrodollars: number | null
-): string {
+export function getMetricsAccessibilityLabel({
+  info,
+  totalCostMicrodollars,
+  platform,
+  interactive,
+}: {
+  info: SessionContextInfo | undefined;
+  totalCostMicrodollars: number | null;
+  /** Spoken only when the caller has a mapped platform glyph. */
+  platform?: string | null;
+  interactive: boolean;
+}): string {
+  const platformPart = platform != null && platform !== '' ? platformLabel(platform) : null;
   const spoken = formatSpokenCost(totalCostMicrodollars);
-  const costPart = spoken ? `, cost ${spoken}` : '';
-  if (info.contextWindow === undefined) {
-    return `Context ${formatExactTokens(info.contextTokens)} tokens, window unavailable${costPart}. Tap to view context details.`;
+  const tapPart = interactive ? ' Tap to view context details.' : '';
+
+  if (!info) {
+    const parts: string[] = [];
+    if (platformPart) {
+      parts.push(platformPart);
+    }
+    if (spoken) {
+      parts.push(`cost ${spoken}`);
+    }
+    return parts.join(', ');
   }
-  const realPercentage = info.percentage ?? 0;
-  return `Context ${formatExactTokens(info.contextTokens)} of ${formatExactTokens(info.contextWindow)} tokens, ${realPercentage}% used${costPart}. Tap to view context details.`;
+
+  const costPart = spoken ? `, cost ${spoken}` : '';
+  const body =
+    info.contextWindow === undefined
+      ? `Context ${formatExactTokens(info.contextTokens)} tokens, window unavailable${costPart}.`
+      : `Context ${formatExactTokens(info.contextTokens)} of ${formatExactTokens(info.contextWindow)} tokens, ${info.percentage ?? 0}% used${costPart}.`;
+  return platformPart ? `${platformPart}. ${body}${tapPart}` : `${body}${tapPart}`;
 }
 
 type SheetMountState =

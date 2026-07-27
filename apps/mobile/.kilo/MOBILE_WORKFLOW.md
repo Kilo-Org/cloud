@@ -110,7 +110,7 @@ Plan the simplest viable shape of every item — feature-wise as much as code-wi
 
 ### Bug Reproduction Gate
 
-For defect work, dispatch a fresh `mobile-e2e-verifier` in repro mode on the unmodified baseline in the dedicated worktree before writing the draft plan. Its assignment: reproduce the reported issue — fix nothing — and return exact reproduction steps, evidence, and a failure classification. It claims iOS with `--phase prewarm`. The claimed device and warmed services carry into the planner handoff as resources to preserve; the final verifier later reclaims the same device with `--phase verify`.
+For defect work, dispatch a fresh `mobile-e2e-verifier` in repro mode on the unmodified baseline in the dedicated worktree before writing the draft plan. Its assignment: reproduce the reported issue — fix nothing — and return exact reproduction steps, evidence, and a failure classification. It acquires a device slot first, then claims iOS with `--phase prewarm`. The claimed device and warmed services carry into the planner handoff as resources to preserve; the final verifier later reclaims the same device with `--phase verify`.
 
 A confirmed reproduction feeds the plan: the steps and classification inform the root-cause hypothesis, and the confirmed repro flow passing becomes an acceptance criterion the final verifier must rerun.
 
@@ -182,7 +182,21 @@ Start and inspect the local stack, simulator, login, and E2E flows per [e2e/AGEN
 
 Env sync between the app bundle, Metro, and this worktree is validated by `apps/mobile/e2e/preflight.sh` (run by `login.sh`). Trust its failure output instead of re-checking URLs by hand.
 
-When several workflows run on one machine, device-bound work is capped by the slot semaphore [`e2e-slot.sh`](e2e-slot.sh) (default 3 slots, machine-global). Run `e2e-slot.sh acquire <tmux-session>` before any phase that drives a simulator, emulator, local backend stack, or native build — the repro gate, prewarm, and every E2E round — and `e2e-slot.sh release <tmux-session>` the moment that phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them. Slots are owned by tmux session name and reclaimed automatically when the session dies, so a crashed run cannot wedge the queue. `e2e-slot.sh status` shows holders.
+### Device Slots Are Mandatory
+
+The machine is shared by parallel workflows, and unslotted device work overloads it. Every phase that drives a simulator, emulator, local backend stack, or native build — the repro gate, prewarm, and every E2E round — runs inside a slot from the semaphore [`e2e-slot.sh`](e2e-slot.sh) (default 3, machine-global):
+
+```bash
+.kilo/e2e-slot.sh acquire <tmux-session>   # blocks until a slot frees
+.kilo/e2e-slot.sh status                   # current holders
+.kilo/e2e-slot.sh release <tmux-session>   # the moment the device phase ends
+```
+
+- This holds on every run, not only when another workflow is visibly active. "No one else seems to be running" is not an exemption, and neither is a stack that is already up.
+- `acquire` blocking is correct behavior, never a wedge to route around and never a reason to start device work unslotted. A blocked acquire is not a stuck state for the escalation ladder.
+- Release immediately when the device phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them.
+- Slots are owned by tmux session name and reclaimed automatically when the session dies, so a crashed run cannot wedge the queue.
+- The orchestrator is accountable for this: every device-phase handoff states the slot rule, and a role agent that reports device work with no acquire gets re-dispatched.
 
 ## Execution Ledger
 
@@ -204,7 +218,7 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 3. When the whole wave has returned, synchronize: inspect each result, ownership adherence, and the combined diff; resolve integration and architecture decisions yourself; run shared mutating commands and shared checks once. If one slice failed, preserve the successful ones.
 4. Dispatch one fresh `mobile-reviewer` over the wave diff. Triage findings yourself: route valid findings through a bounded repair wave; record rejected findings with a short rationale. Loop repair wave → fresh reviewer, steering each round per the escalation ladder, until a fresh reviewer reports no valid actionable findings. Running this loop is the orchestrator's primary job, not a preamble to doing the work itself.
 5. After checks and review pass, create the commits at the ledger's per-slice boundaries. If a slice exhausts its implementer budget, split it or re-dispatch it with a sharper handoff; take over only per the escalation ladder.
-6. When device E2E is likely, prewarm concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Record a resource manifest for the final verifier. Do not judge acceptance behavior while implementation is still changing.
+6. When device E2E is likely, prewarm concurrently with implementation, inside an acquired device slot: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Record a resource manifest for the final verifier. Do not judge acceptance behavior while implementation is still changing.
 7. After review passes, perform the final full-diff review yourself, push the reviewed head, create the PR — its description records any simpler-shape decision from the handoff — and assign it to the requesting human — before starting E2E, so CI and Kilobot run concurrently with the E2E run. Do not read or triage any review comment yet (step 9).
 8. Dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Loop triage → repair wave → fresh reviewer → fresh verifier, steering each round per the escalation ladder, until a fresh verifier passes every applicable feature state. You may reproduce a failure once to triage it; the repair itself — with your diagnosis and acceptance criteria attached — goes through the implementer-reviewer loop. Never sit in an edit-run-verify loop yourself. Review the full diff of any E2E-driven repair, commit it at the right boundary, and push.
 
@@ -234,6 +248,7 @@ Every dispatch to a role agent must include:
 - The dedicated worktree path for every repository in scope, including sibling repositories
 - Existing uncommitted changes that must be preserved
 - The exact checks or user flows expected for that stage
+- For any device phase: the mandatory `e2e-slot.sh acquire`/`release` rule with the tmux session name to own the slot (see Device Slots Are Mandatory)
 - Prior findings being addressed, including rejected findings that must not reopen without new evidence
 - The intended commit boundary for the assigned slice
 - Priority order, minimum complete outcome, optional work to drop, and a clean stopping rule before budget exhaustion

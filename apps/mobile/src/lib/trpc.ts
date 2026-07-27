@@ -52,7 +52,8 @@ const e2eLatencyFetch: typeof fetch = async (url, init) => {
   return fetch(url, init);
 };
 
-const e2eFetch = E2E_LATENCY_SESSION_MS > 0 || E2E_LATENCY_MESSAGES_MS > 0 ? e2eLatencyFetch : fetch;
+const e2eFetch =
+  E2E_LATENCY_SESSION_MS > 0 || E2E_LATENCY_MESSAGES_MS > 0 ? e2eLatencyFetch : fetch;
 
 async function getAuthHeaders() {
   const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);

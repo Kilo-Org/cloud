@@ -308,6 +308,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
+        ListHeaderComponent={activeNowSection}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (

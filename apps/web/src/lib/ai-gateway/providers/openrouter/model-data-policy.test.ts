@@ -1,6 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  modelProviderDisplayName,
   modelRetainsPrompts,
+  modelRetentionDays,
   modelTrains,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { OpenRouterSearchResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -25,7 +27,8 @@ describe('model data policy', () => {
           {
             ...baseModel,
             endpoint: {
-              provider_display_name: 'Amazon Bedrock (BYOK Only)',
+              provider_display_name: 'Claude Platform on AWS',
+              provider_slug: 'amazon-bedrock/claude-on-aws',
               is_free: false,
               pricing: { prompt: '0.000005', completion: '0.000025' },
               data_policy: {
@@ -40,9 +43,17 @@ describe('model data policy', () => {
     });
 
     const model = response.data.models[0];
-    expect(model?.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: true });
+    expect(model?.endpoint).toMatchObject({
+      provider_display_name: 'Claude Platform on AWS',
+      provider_slug: 'amazon-bedrock/claude-on-aws',
+      data_policy: { training: false, retainsPrompts: true, retentionDays: 30 },
+    });
     expect(model && modelTrains(model, true)).toBe(false);
     expect(model && modelRetainsPrompts(model, false)).toBe(true);
+    expect(model && modelRetentionDays(model)).toBe(30);
+    expect(model && modelProviderDisplayName(model, 'Amazon Bedrock')).toBe(
+      'Claude Platform on AWS'
+    );
   });
 
   test('falls back to the provider policy for snapshots without endpoint policy', () => {
@@ -64,5 +75,7 @@ describe('model data policy', () => {
     const model = response.data.models[0];
     expect(model && modelTrains(model, true)).toBe(true);
     expect(model && modelRetainsPrompts(model, true)).toBe(true);
+    expect(model && modelRetentionDays(model)).toBeUndefined();
+    expect(model && modelProviderDisplayName(model, 'Amazon Bedrock')).toBe('Amazon Bedrock');
   });
 });

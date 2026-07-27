@@ -121,7 +121,7 @@ export function ProviderDetailsDialog({
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
                 <TableHead>Trains</TableHead>
-                <TableHead>Retains prompts</TableHead>
+                <TableHead>Endpoint retention</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,6 +141,11 @@ export function ProviderDetailsDialog({
                     <TableCell>
                       <div className="font-medium">{model.modelName}</div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{model.modelId}</div>
+                      {model.endpointProviderDisplayName ? (
+                        <div className="text-muted-foreground mt-0.5 text-xs">
+                          Endpoint: {model.endpointProviderDisplayName}
+                        </div>
+                      ) : null}
                     </TableCell>
                     <TableCell>{formatPriceCompact(model.promptPrice)}</TableCell>
                     <TableCell>{formatPriceCompact(model.completionPrice)}</TableCell>
@@ -148,7 +153,11 @@ export function ProviderDetailsDialog({
                       <PolicyPill value={model.trains} variant="trains" />
                     </TableCell>
                     <TableCell>
-                      <PolicyPill value={model.retainsPrompts} variant="retainsPrompts" />
+                      <PolicyPill
+                        value={model.retainsPrompts}
+                        variant="retainsPrompts"
+                        retentionDays={model.retentionDays}
+                      />
                     </TableCell>
                   </TableRow>
                 );

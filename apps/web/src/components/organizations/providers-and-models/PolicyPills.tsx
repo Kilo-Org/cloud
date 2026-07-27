@@ -1,6 +1,15 @@
+import React from 'react';
 import type { PolicyPillVariant } from '@/components/organizations/providers-and-models/providersAndModels.types';
 
-export function PolicyPill({ value, variant }: { value: boolean; variant: PolicyPillVariant }) {
+export function PolicyPill({
+  value,
+  variant,
+  retentionDays,
+}: {
+  value: boolean;
+  variant: PolicyPillVariant;
+  retentionDays?: number;
+}) {
   const base =
     'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none';
 
@@ -13,7 +22,9 @@ export function PolicyPill({ value, variant }: { value: boolean; variant: Policy
   }
 
   return (
-    <span className={`${base} border-orange-500/30 bg-orange-500/15 text-orange-300`}>Yes</span>
+    <span className={`${base} border-orange-500/30 bg-orange-500/15 text-orange-300`}>
+      {retentionDays === undefined ? 'Yes' : `${retentionDays} days`}
+    </span>
   );
 }
 

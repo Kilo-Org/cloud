@@ -20,6 +20,7 @@ import type {
   ModelRow,
   ProviderOffering,
 } from '@/components/organizations/providers-and-models/providersAndModels.types';
+import { ProviderAttribution } from '@/components/organizations/providers-and-models/ProviderAttribution';
 
 export function ModelDetailsDialog({
   open,
@@ -117,7 +118,7 @@ export function ModelDetailsDialog({
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
                 <TableHead>Trains</TableHead>
-                <TableHead>Retains prompts</TableHead>
+                <TableHead>Endpoint retention</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -145,7 +146,10 @@ export function ModelDetailsDialog({
                             />
                           ) : null}
                         </div>
-                        <span>{offering.providerDisplayName}</span>
+                        <ProviderAttribution
+                          providerDisplayName={offering.providerDisplayName}
+                          routingProviderDisplayName={offering.routingProviderDisplayName}
+                        />
                       </div>
                     </TableCell>
                     <TableCell>{formatPriceCompact(offering.promptPrice)}</TableCell>
@@ -154,7 +158,11 @@ export function ModelDetailsDialog({
                       <PolicyPill value={offering.trains} variant="trains" />
                     </TableCell>
                     <TableCell>
-                      <PolicyPill value={offering.retainsPrompts} variant="retainsPrompts" />
+                      <PolicyPill
+                        value={offering.retainsPrompts}
+                        variant="retainsPrompts"
+                        retentionDays={offering.retentionDays}
+                      />
                     </TableCell>
                   </TableRow>
                 );

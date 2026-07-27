@@ -32,7 +32,9 @@ import {
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
+  modelProviderDisplayName,
   modelRetainsPrompts,
+  modelRetentionDays,
   modelTrains,
 } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 
@@ -271,10 +273,12 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
 
       offerings.push({
         providerSlug: provider.slug,
-        providerDisplayName: provider.displayName,
+        providerDisplayName: modelProviderDisplayName(model, provider.displayName),
+        routingProviderDisplayName: provider.displayName,
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
+        retentionDays: modelRetentionDays(model),
         promptPrice: model.endpoint.pricing.prompt,
         completionPrice: model.endpoint.pricing.completion,
       });
@@ -421,6 +425,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         completionPrice: model.endpoint.pricing.completion,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
+        retentionDays: modelRetentionDays(model),
+        endpointProviderDisplayName:
+          model.endpoint.provider_display_name === provider.displayName
+            ? undefined
+            : model.endpoint.provider_display_name,
       });
     }
 

@@ -22,9 +22,11 @@ export type ProviderRow = {
 export type ProviderOffering = {
   providerSlug: string;
   providerDisplayName: string;
+  routingProviderDisplayName: string;
   providerIconUrl: string | null;
   trains: boolean;
   retainsPrompts: boolean;
+  retentionDays: number | undefined;
   promptPrice: string;
   completionPrice: string;
 };
@@ -38,4 +40,6 @@ export type ProviderModelRow = {
   completionPrice: string;
   trains: boolean;
   retainsPrompts: boolean;
+  retentionDays: number | undefined;
+  endpointProviderDisplayName: string | undefined;
 };

@@ -218,6 +218,8 @@ function injectExtraProviderModels(
           endpoint: {
             ...model.endpoint,
             provider_display_name: providerData.provider.displayName,
+            provider_slug: providerData.provider.slug,
+            data_policy: undefined,
             is_free: !endpoint.pricing?.prompt,
             pricing: endpoint.pricing ?? { prompt: '0', completion: '0' },
           },

@@ -10,3 +10,14 @@ export function modelRetainsPrompts(
 ): boolean {
   return model.endpoint?.data_policy?.retainsPrompts ?? providerRetainsPrompts;
 }
+
+export function modelRetentionDays(model: OpenRouterModel): number | undefined {
+  return model.endpoint?.data_policy?.retentionDays;
+}
+
+export function modelProviderDisplayName(
+  model: OpenRouterModel,
+  providerDisplayName: string
+): string {
+  return model.endpoint?.provider_display_name ?? providerDisplayName;
+}

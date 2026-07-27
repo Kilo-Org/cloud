@@ -1713,12 +1713,14 @@ export const OpenRouterBaseModel = z.object({
 export type OpenRouterEndpoint = z.infer<typeof OpenRouterEndpoint>;
 export const OpenRouterEndpoint = z.object({
   provider_display_name: z.string(),
+  provider_slug: z.string().optional(),
   is_free: z.boolean(),
   pricing: OpenRouterPricing,
   data_policy: z
     .object({
       training: z.boolean().optional(),
       retainsPrompts: z.boolean().optional(),
+      retentionDays: z.number().int().nonnegative().optional(),
     })
     .nullish(),
 });

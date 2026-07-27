@@ -213,9 +213,30 @@ const signInWithLocalDeviceAuth = async ({
 
   const authPage = await context.newPage();
   const callbackPath = `/device-auth?code=${encodeURIComponent(code)}&app=1`;
+  // Shared stack may run with APP_URL_OVERRIDE at a LAN IP.
+  // Cookies set off-origin make the post-login redirect silently drop authentication.
+  let authOrigin = localBackendUrl;
+
+  try {
+    const probe = await context.request.get(`${localBackendUrl}/users/after-sign-in`, {
+      maxRedirects: 0,
+    });
+    const { location } = probe.headers();
+
+    if (
+      probe.status() >= 300 &&
+      probe.status() < 400 &&
+      location !== undefined &&
+      location !== ''
+    ) {
+      authOrigin = new URL(location).origin;
+    }
+  } catch {
+    // Fall back to localBackendUrl on non-redirect, missing/invalid location, or request error.
+  }
 
   await authPage.goto(
-    `${localBackendUrl}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
+    `${authOrigin}/users/sign_in?fakeUser=${encodeURIComponent(localUserEmail)}&callbackPath=${encodeURIComponent(callbackPath)}`
   );
   await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
   await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });

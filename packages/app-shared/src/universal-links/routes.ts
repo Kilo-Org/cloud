@@ -252,7 +252,10 @@ function splitSegments(pathname: string): string[] {
 function substituteCaptures(appPath: string, captures: string[]): string {
   let result = appPath;
   for (const [i, capture] of captures.entries()) {
-    result = result.replaceAll(`<${i + 1}>`, capture);
+    // Function replacement: a captured segment is external input and must be
+    // inserted literally — string replacement would interpret `$&`, `` $` ``,
+    // and `$'` (ECMA-262 GetSubstitution applies even for string searches).
+    result = result.replaceAll(`<${i + 1}>`, () => capture);
   }
   return result;
 }

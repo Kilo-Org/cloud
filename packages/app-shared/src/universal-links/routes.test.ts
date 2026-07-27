@@ -125,6 +125,20 @@ describe('wildcard capture substitution', () => {
       '/(app)/(tabs)/(3_profile)/code-reviewer/org_123/reviews/rev_9'
     );
   });
+
+  it('inserts captures literally — dollar substitution patterns stay verbatim', () => {
+    // String replacement would run ECMA-262 GetSubstitution on the capture:
+    // `$&` re-inserts the placeholder, `$'` splices the un-substituted tail.
+    expect(resolveIncomingUrl(`${WEB}/code-reviews/a$&b`)).toBe(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/a$&b'
+    );
+    expect(resolveIncomingUrl(`${WEB}/organizations/a$'b/code-reviews/rev_9`)).toBe(
+      "/(app)/(tabs)/(3_profile)/code-reviewer/a$'b/reviews/rev_9"
+    );
+    expect(resolveIncomingUrl(`${WEB}/organizations/a$b/code-reviews/rev_9`)).toBe(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/a$b/reviews/rev_9'
+    );
+  });
 });
 
 describe('exclusions', () => {

@@ -36,6 +36,7 @@ const MetadataIdentitySchema = z
     orgId: z.string().optional(),
     botId: z.string().optional(),
     createdOnPlatform: z.string().max(100).optional(),
+    billingOrigin: z.string().max(100).optional(),
   })
   .strip();
 

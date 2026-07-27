@@ -21,6 +21,7 @@ vi.mock('@cloudflare/sandbox', () => ({
   Sandbox: sdk.StockSandbox,
   ContainerProxy: sdk.ContainerProxy,
 }));
+vi.mock('./container-usage.js', () => ({ MeteredSandbox: sdk.StockSandbox }));
 vi.mock('./logger.js', () => ({ logger: logging.logger }));
 
 import {

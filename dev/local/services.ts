@@ -100,6 +100,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'nextjs',
       'cloudflare-session-ingest',
       'cloudflare-git-token-service',
+      'container-usage-meter',
       'notifications',
     ],
     dir: 'services/cloud-agent-next',

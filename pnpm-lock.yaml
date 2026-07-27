@@ -1855,6 +1855,9 @@ importers:
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
         version: link:../../packages/cloud-agent-profile
+      '@kilocode/container-usage':
+        specifier: workspace:*
+        version: link:../../packages/container-usage
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db

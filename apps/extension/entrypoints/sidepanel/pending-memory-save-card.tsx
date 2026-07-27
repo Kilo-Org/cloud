@@ -33,10 +33,13 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const lastDraftKeyRef = useRef<string | null>(null);
+  const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const focusedDraftKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (pendingDraft === undefined) {
       lastDraftKeyRef.current = null;
+      focusedDraftKeyRef.current = null;
       return;
     }
 
@@ -62,6 +65,24 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
     saveError,
     savedConfirmation,
   });
+
+  const showsDraftForm =
+    pendingDraft !== undefined &&
+    (view.kind === 'draft' || view.kind === 'full' || view.kind === 'saveError');
+
+  useEffect(() => {
+    if (!showsDraftForm || pendingDraft === undefined) {
+      return;
+    }
+
+    const draftKey = `${pendingDraft.createdAt}:${pendingDraft.text}`;
+    if (focusedDraftKeyRef.current === draftKey) {
+      return;
+    }
+
+    focusedDraftKeyRef.current = draftKey;
+    noteTextareaRef.current?.focus();
+  }, [pendingDraft, showsDraftForm]);
 
   if (view.kind === 'hidden') {
     return null;
@@ -115,11 +136,13 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
   const noteCount = deriveNoteCharacterCount(note);
 
   return (
-    <section
+    <div
       aria-label="Add to memory"
-      className="shrink-0 border-b border-border bg-surface-background px-3 py-3"
+      aria-modal="true"
+      className="fixed inset-0 z-[25] flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
     >
-      <div className="rounded-xl border border-border bg-surface-raised p-3">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-raised p-3 shadow-lg shadow-black/50">
         {view.kind === 'confirmation' ? (
           <div className="flex flex-col gap-3">
             <p className="type-body text-foreground">{CONFIRMATION_MESSAGE}</p>
@@ -203,6 +226,7 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
                     onChange={event => {
                       setNote(event.target.value);
                     }}
+                    ref={noteTextareaRef}
                     value={note}
                   />
                   <p className="type-label text-right text-foreground-muted">
@@ -230,6 +254,6 @@ export const PendingMemorySaveCard = (): JSX.Element | null => {
           </div>
         ) : null}
       </div>
-    </section>
+    </div>
   );
 };

@@ -12,8 +12,9 @@ if (missing.length > 0) {
   }
 }
 
-// ponytail: Google OAuth client IDs aren't created yet — plugin/config below tolerate absence
-// so the app still builds; the native Google button (Task 6) hides itself when undefined.
+// Google OAuth client IDs are public identifiers (committed .env, all EAS
+// environments). The conditional below tolerates their absence so the app still builds when a
+// checkout lacks them; the native Google button hides itself when undefined.
 const googleIosClientId = process.env[OPTIONAL_ENV_KEYS.googleIosClientId];
 const googleIosUrlScheme = googleIosClientId
   ? `com.googleusercontent.apps.${googleIosClientId.replace(/\.apps\.googleusercontent\.com$/, '')}`
@@ -178,8 +179,8 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
-    // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
-    // Google OAuth clients exist.
+    // Registered only when GOOGLE_IOS_CLIENT_ID is set — a guard for checkouts
+    // whose environment does not provide it.
     ...googleSignInPlugins,
   ],
   experiments: {

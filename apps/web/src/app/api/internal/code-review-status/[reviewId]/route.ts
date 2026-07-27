@@ -348,6 +348,19 @@ function normalizePayload(raw: StatusUpdatePayload): {
     terminalReason = 'billing';
   }
 
+  // Infer workspace capacity (transient sandbox disk pressure) so it is
+  // classified distinctly instead of counted as an unknown delivery failure.
+  // Capacity arrives either with no terminal reason (delivery path) or with a
+  // generic 'sandbox_error' (orchestrator session-start path), so override that
+  // one generic value too — otherwise the column stays 'sandbox_error' and only
+  // the admin router's message match recovers the category.
+  if (
+    (!terminalReason || terminalReason === 'sandbox_error') &&
+    isWorkspaceCapacityFailure(failure, raw.errorMessage)
+  ) {
+    terminalReason = 'workspace_capacity';
+  }
+
   if (
     (raw.status === 'failed' || raw.status === 'interrupted') &&
     isModelNotFoundCodeReviewTerminalReason(terminalReason, raw.errorMessage)
@@ -369,6 +382,29 @@ function normalizePayload(raw: StatusUpdatePayload): {
     gateResult: raw.gateResult,
     failure,
   };
+}
+
+/**
+ * Detects a workspace disk-capacity failure so it is recorded with a distinct
+ * `workspace_capacity` terminal reason. Prefers the structured failure subtype
+ * from cloud-agent-next and falls back to the safe error message for older
+ * payloads.
+ *
+ * The message fallback is intentionally broad ('admission rejected'); a stricter,
+ * phrasing-anchored variant lives in
+ * services/code-review-infra/src/code-review-orchestrator.ts
+ * (isWorkspaceAdmissionCapacityFailure). Keep the two in mind together if the
+ * admission-rejection message format ever changes.
+ */
+export function isWorkspaceCapacityFailure(
+  failure: CloudAgentSafeFailure | undefined,
+  errorMessage: string | undefined
+): boolean {
+  if (failure?.code === 'workspace_setup_failed' && failure.subtype === 'sandbox_storage_full') {
+    return true;
+  }
+  const message = (errorMessage ?? '').toLowerCase();
+  return message.includes('sandbox storage full') || message.includes('admission rejected');
 }
 
 function isBillingCodeReviewTerminalReason(

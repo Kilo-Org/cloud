@@ -829,6 +829,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         created_at: z.coerce.date(),
         updated_at: z.coerce.date(),
         version: z.number(),
+        total_cost_microdollars: z.number().nullable(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
         // Associated GitHub pull request for this session's branch, if any.
@@ -943,6 +944,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         created_at: session.created_at,
         updated_at: session.updated_at,
         version: session.version,
+        total_cost_microdollars: session.total_cost_microdollars,
         runtimeState,
         associatedPr: formatAssociatedPr(row),
       };

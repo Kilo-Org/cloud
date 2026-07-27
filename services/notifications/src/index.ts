@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import {
@@ -15,6 +16,7 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
+  internalDispatchRequestSchema,
   markBadgeReadInputSchema,
   type ClearBadgeBucketForUserInput,
   type ClearBadgeBucketForUserOutput,
@@ -49,6 +51,7 @@ import {
 import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
+import { dispatchInternalPushCore } from './lib/internal-dispatch-push';
 import {
   dispatchScheduledActionPush,
   type SendScheduledActionNoticeParams,
@@ -109,6 +112,55 @@ app.post('/v1/badges/mark-read', async c => {
   const badgeCount = await stub.markBucketRead(parsedBody.data.badgeBucket);
   const response = { badgeCount } satisfies MarkBadgeReadResponse;
   return c.json(response);
+});
+
+async function hasValidInternalSecret(c: {
+  req: { header(name: string): string | undefined };
+  env: Env;
+}): Promise<boolean> {
+  const provided = c.req.header('X-Internal-Secret');
+  const expected = await c.env.INTERNAL_API_SECRET.get();
+  if (!provided || !expected) return false;
+
+  const encoder = new TextEncoder();
+  const providedBytes = encoder.encode(provided);
+  const expectedBytes = encoder.encode(expected);
+  if (providedBytes.byteLength !== expectedBytes.byteLength) {
+    // timingSafeEqual requires equal lengths; self-compare so a length
+    // mismatch is not observably faster to reject than a value mismatch.
+    timingSafeEqual(providedBytes, providedBytes);
+    return false;
+  }
+
+  return timingSafeEqual(providedBytes, expectedBytes);
+}
+
+// Internal service-to-service dispatch (low-balance + security-finding).
+// Intentionally outside `/v1/*` so user-JWT auth middleware does not apply.
+app.post('/internal/v1/dispatch', async c => {
+  if (!(await hasValidInternalSecret(c))) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const body: unknown = await c.req.json().catch(() => null);
+  if (body === null) {
+    return c.json({ error: 'Invalid body' }, 400);
+  }
+
+  const parsed = internalDispatchRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid body' }, 400);
+  }
+
+  const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
+  const result = await dispatchInternalPushCore(parsed.data, {
+    getRecipientDOStub: (userId: string) =>
+      c.env.NOTIFICATION_CHANNEL_DO.get(
+        c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
+      ) as unknown as RecipientDOStub,
+    readPreferences: async userId => readPreferencesRow(db, userId),
+  });
+  return c.json(result);
 });
 
 type RecipientDOStub = {
@@ -456,6 +508,8 @@ async function readPreferencesRow(
       agentAttentionEnabled: user_notification_preferences.agent_attention_enabled,
       sessionStatusEnabled: user_notification_preferences.session_status_enabled,
       kiloclawActivityEnabled: user_notification_preferences.kiloclaw_activity_enabled,
+      balanceAlertsEnabled: user_notification_preferences.balance_alerts_enabled,
+      securityFindingsEnabled: user_notification_preferences.security_findings_enabled,
     })
     .from(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId))

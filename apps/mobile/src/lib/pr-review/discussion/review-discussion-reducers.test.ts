@@ -36,7 +36,7 @@ function makeThread(overrides: Partial<ReviewThread> = {}): ReviewThread {
 
 function makeData(threads: ReviewThread[]): ReviewThreadsInfiniteData {
   return {
-    pages: [{ threads, nextCursor: null }],
+    pages: [{ threads, conversation: [], nextCursor: null }],
     pageParams: [null],
   };
 }
@@ -68,8 +68,8 @@ describe('applyResolveToggle', () => {
   it('walks all pages, not just the first', () => {
     const data: ReviewThreadsInfiniteData = {
       pages: [
-        { threads: [makeThread({ threadId: 'A' })], nextCursor: 'p2' },
-        { threads: [makeThread({ threadId: 'B' })], nextCursor: null },
+        { threads: [makeThread({ threadId: 'A' })], conversation: [], nextCursor: 'p2' },
+        { threads: [makeThread({ threadId: 'B' })], conversation: [], nextCursor: null },
       ],
       pageParams: [null, 'p2'],
     };

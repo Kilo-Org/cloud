@@ -3,6 +3,7 @@ import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@k
 import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
+  AccessibilityInfo,
   Keyboard,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -11,6 +12,10 @@ import {
 } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
+import {
+  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  shouldAnnounceOlderMessagesArrival,
+} from '@/components/agents/older-messages-a11y';
 import {
   createMessageListKeyboardScrollScheduler,
   createMessageListNewestScrollScheduler,
@@ -160,6 +165,35 @@ export function MessageList({
     scrollToNewestRequestRef.current = scrollToNewestRequest;
     scrollToNewest();
   }, [scrollToNewest, scrollToNewestRequest]);
+
+  // Non-visual a11y signal for older-page arrival (no visual loading header).
+  // Announce only when items were actually prepended after the list painted.
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+  }, [conversationId]);
+  useEffect(() => {
+    const nextNewestKey = messageListNewestScrollKey(newestMessage);
+    const nextCount = chronological.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey,
+      })
+    ) {
+      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = nextNewestKey;
+  }, [chronological, newestMessage]);
 
   return (
     <View className="flex-1 bg-background">

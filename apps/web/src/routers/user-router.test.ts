@@ -571,6 +571,8 @@ describe('user router - notification preferences', () => {
       agentUpdates: true,
       sessionStatus: true,
       kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
       agentPushEnabled: true,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
@@ -585,6 +587,8 @@ describe('user router - notification preferences', () => {
       agent_attention_enabled: false,
       session_status_enabled: true,
       kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: true,
     });
 
     const caller = await createCallerForUser(firstUser.id);
@@ -596,6 +600,8 @@ describe('user router - notification preferences', () => {
       agentUpdates: false,
       sessionStatus: true,
       kiloclawActivity: false,
+      balanceAlerts: false,
+      securityFindings: true,
       agentPushEnabled: false,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
@@ -611,6 +617,8 @@ describe('user router - notification preferences', () => {
       agentUpdates: false,
       sessionStatus: true,
       kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
       agentPushEnabled: false,
     });
 
@@ -624,6 +632,8 @@ describe('user router - notification preferences', () => {
     expect(row?.agent_attention_enabled).toBe(true);
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
 
     // Calling again with true must update, not insert
     await caller.user.setNotificationPreferences({ agentPushEnabled: true });
@@ -649,6 +659,8 @@ describe('user router - notification preferences', () => {
       agentUpdates: true,
       sessionStatus: true,
       kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
       agentPushEnabled: true,
     });
 
@@ -659,6 +671,8 @@ describe('user router - notification preferences', () => {
       agentUpdates: false,
       sessionStatus: true,
       kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
       agentPushEnabled: false,
     });
 
@@ -693,6 +707,8 @@ describe('user router - notification preferences', () => {
       agentUpdates: true,
       sessionStatus: false,
       kiloclawActivity: true,
+      balanceAlerts: true,
+      securityFindings: true,
       agentPushEnabled: true,
     });
 
@@ -707,6 +723,59 @@ describe('user router - notification preferences', () => {
     expect(row?.agent_attention_enabled).toBe(false);
     // kiloclawActivity and agent_push_enabled still at DB default.
     expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+  });
+
+  it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const afterBalance = await caller.user.setNotificationPreferences({ balanceAlerts: false });
+    expect(afterBalance).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      balanceAlerts: false,
+      securityFindings: true,
+      agentPushEnabled: true,
+    });
+
+    const [afterBalanceRow] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(afterBalanceRow?.balance_alerts_enabled).toBe(false);
+    expect(afterBalanceRow?.security_findings_enabled).toBe(true);
+
+    const afterSecurity = await caller.user.setNotificationPreferences({
+      securityFindings: false,
+    });
+    expect(afterSecurity).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      balanceAlerts: false,
+      securityFindings: false,
+      agentPushEnabled: true,
+    });
+
+    const got = await caller.user.getNotificationPreferences();
+    expect(got.balanceAlerts).toBe(false);
+    expect(got.securityFindings).toBe(false);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.balance_alerts_enabled).toBe(false);
+    expect(row?.security_findings_enabled).toBe(false);
+    // Unrelated columns remain at default.
+    expect(row?.chat_messages_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
   });
 
@@ -731,5 +800,7 @@ describe('user router - notification preferences', () => {
     expect(row?.agent_attention_enabled).toBe(true);
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
   });
 });

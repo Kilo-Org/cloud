@@ -22,9 +22,11 @@ import {
   useSegments,
 } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { toast } from 'sonner-native';
 
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
@@ -46,6 +48,19 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import {
+  isShellReadyForShare,
+  resolvePendingShareNavigation,
+  resolveSupersededPendingShareId,
+} from '@/lib/pending-share-navigation';
+import {
+  clearSharePayload,
+  discardUnstoredSharePayload,
+  normalizeShareIntent,
+  putSharePayload,
+  type ShareId,
+  type SharePayload,
+} from '@/lib/share-payload';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
@@ -133,6 +148,38 @@ function RootLayoutNav() {
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
   const onConsentReviewRoute = onConsentRoute && consentModeForSearchParam(mode) === 'review';
+  const onGateRoute = (segments as readonly string[]).includes('share-gate');
+  const {
+    hasShareIntent,
+    shareIntent,
+    resetShareIntent,
+    error: shareIntentError,
+  } = useShareIntentContext();
+  // expo-share-intent rebuilds resetShareIntent every render; keep it out of
+  // the ingest/error effect deps via ref (same pattern as share-prefill.ts).
+  const resetShareIntentRef = useRef(resetShareIntent);
+  resetShareIntentRef.current = resetShareIntent;
+  const [pendingShareId, setPendingShareId] = useState<ShareId | null>(null);
+  // Mirror pendingShareId so the ingest effect can release a superseded share
+  // without reading stale state or adding the id to effect deps.
+  const pendingShareIdRef = useRef(pendingShareId);
+  pendingShareIdRef.current = pendingShareId;
+
+  // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
+  const isShellReady = isShellReadyForShare({
+    hasToken: token != null,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inForceUpdate,
+    userIdLoading,
+    userIdError,
+    consentCheckError: consentCheckError != null,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+    onConsentReviewRoute,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -190,6 +237,59 @@ function RootLayoutNav() {
   useTrackingPermissionPrompt(!isLoading);
   useAnalyticsConsentGate({ hasToken: token != null, consentChecked, needsConsent, email });
   useScreenTracking();
+
+  useEffect(() => {
+    if (shareIntentError) {
+      Sentry.captureException(new Error(shareIntentError));
+      toast.error("Couldn't read the shared content");
+      resetShareIntentRef.current();
+    }
+  }, [shareIntentError]);
+
+  // Keyed per shareIntent identity so a newer intent cancels and supersedes
+  // an in-flight ingest. Success/failure reset for the happy path lives here
+  // (gate must never reset); the shareIntentError effect also resets on the
+  // error path. Calls go through resetShareIntentRef so the unstable context
+  // function stays out of the deps.
+  useEffect(() => {
+    if (!hasShareIntent) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const ingestShareIntent = async () => {
+      try {
+        const payload: SharePayload = await normalizeShareIntent(shareIntent);
+        if (cancelled) {
+          // Superseded mid-copy: never stored, so no lifecycle path can clean it.
+          discardUnstoredSharePayload(payload);
+          return;
+        }
+        const shareId = putSharePayload(payload);
+        resetShareIntentRef.current();
+        // Latest-wins: a superseded pending share is released — never silently orphaned.
+        const superseded = resolveSupersededPendingShareId(pendingShareIdRef.current, shareId);
+        if (superseded !== null) {
+          clearSharePayload(superseded);
+        }
+        setPendingShareId(shareId);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        Sentry.captureException(error);
+        toast.error("Couldn't read the shared content");
+        resetShareIntentRef.current();
+      }
+    };
+
+    void ingestShareIntent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasShareIntent, shareIntent]);
 
   useEffect(() => {
     if (isLoading) {
@@ -251,6 +351,7 @@ function RootLayoutNav() {
       if (pendingNavigation) {
         router.navigate(pendingNavigation.href as Href);
       }
+      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
     }
   }, [
     token,
@@ -267,6 +368,29 @@ function RootLayoutNav() {
     onConsentRoute,
     onConsentReviewRoute,
   ]);
+
+  // Declared after the auth effect so that on the same flush a pending
+  // notification navigate runs first and the share gate opens on top.
+  useEffect(() => {
+    if (pendingShareId === null || !isShellReady) {
+      return;
+    }
+
+    const navigation = resolvePendingShareNavigation({
+      shareId: pendingShareId,
+      onGateRoute,
+    });
+    if (!navigation) {
+      return;
+    }
+
+    if (navigation.mode === 'replace') {
+      router.replace(navigation.href as Href);
+    } else {
+      router.push(navigation.href as Href);
+    }
+    setPendingShareId(null);
+  }, [pendingShareId, isShellReady, onGateRoute, router]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
@@ -357,12 +481,14 @@ function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <AppRootProviders>
-        <StatusBar style="auto" />
-        <RootLayoutNav />
-      </AppRootProviders>
-    </ThemeProvider>
+    <ShareIntentProvider>
+      <ThemeProvider value={navigationTheme}>
+        <AppRootProviders>
+          <StatusBar style="auto" />
+          <RootLayoutNav />
+        </AppRootProviders>
+      </ThemeProvider>
+    </ShareIntentProvider>
   );
 }
 

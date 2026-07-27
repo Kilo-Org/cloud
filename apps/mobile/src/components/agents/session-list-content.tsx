@@ -28,6 +28,7 @@ import {
 } from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
+import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { EmptyState } from '@/components/empty-state';
@@ -104,18 +105,14 @@ export function AgentSessionListContent({
   // Scroll to top on committed-query change only. Skip the initial mount
   // (offset is already 0). Must not fire on focus refetch, attention
   // revision, sort remount, pagination, pull-to-refresh, or section-data
-  // identity changes with an unchanged query. Offset 0 shows the tray
-  // (list header) first.
+  // identity changes with an unchanged query.
   const prevSearchQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    if (prevSearchQueryRef.current === null) {
-      prevSearchQueryRef.current = searchQuery;
-      return;
-    }
-    if (prevSearchQueryRef.current === searchQuery) {
-      return;
-    }
+    const prev = prevSearchQueryRef.current;
     prevSearchQueryRef.current = searchQuery;
+    if (!shouldResetScrollOnCommittedQuery(prev, searchQuery)) {
+      return;
+    }
     listRef.current?.getScrollResponder()?.scrollTo({ y: 0, animated: false });
   }, [searchQuery]);
 
@@ -311,7 +308,6 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
-        ListHeaderComponent={activeNowSection}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (

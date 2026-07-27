@@ -126,7 +126,7 @@ export function SessionRow({
       branchContent == null ? (
         platformIcon
       ) : (
-        <View className="flex-row items-center gap-1.5">
+        <View className="shrink flex-row items-center gap-1.5">
           {platformIcon}
           {branchContent}
         </View>

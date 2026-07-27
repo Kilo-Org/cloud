@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 5 per-category toggles
+ * OS-permission gate, the push-token registration flow, and 7 per-category toggles
  * with their optimistic-mutation + retry + loading patterns. Extracting subcomponents
  * would re-encode the same hooks. The screen stays a single rendered surface. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,12 +14,15 @@ import {
   type LucideIcon,
   MessageSquare,
   RefreshCw,
+  ShieldAlert,
   Sparkles,
+  Wallet,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -114,6 +117,18 @@ const CATEGORY_META: readonly CategoryMeta[] = [
     title: 'KiloClaw activity',
     subtitle: 'instance ready/failed, scheduled actions',
     icon: Sparkles,
+  },
+  {
+    key: 'balanceAlerts',
+    title: 'Balance alerts',
+    subtitle: 'low organization balance warnings',
+    icon: Wallet,
+  },
+  {
+    key: 'securityFindings',
+    title: 'Security findings',
+    subtitle: 'new findings and SLA reminders',
+    icon: ShieldAlert,
   },
 ] as const;
 
@@ -413,6 +428,12 @@ export function NotificationsScreen() {
   }, []);
 
   const isMasterBusy = isTogglingPermission || isRegisteringToken;
+  const masterLeading = deriveMasterGateLeadingPresentation({
+    permissionLoading,
+    permissionError,
+    gateSettled,
+    notificationsEnabled,
+  });
 
   return (
     <View className="flex-1 bg-background">
@@ -428,20 +449,24 @@ export function NotificationsScreen() {
             Push
           </Text>
           <View
-            className={`flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${!notificationsEnabled ? 'opacity-50' : ''}`}
+            className={`flex-row items-center gap-3 rounded-lg bg-secondary p-3 ${masterLeading === 'off' ? 'opacity-50' : ''}`}
           >
-            {notificationsEnabled ? (
-              <Bell size={18} color={colors.secondaryForeground} />
-            ) : (
-              <BellOff size={18} color={colors.secondaryForeground} />
-            )}
+            {masterLeading === 'neutral' && <Skeleton className="h-[18px] w-[18px] rounded" />}
+            {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
+            {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
               <Text className="text-sm font-medium">Notifications enabled</Text>
-              <Text variant="muted" className="mt-0.5 text-xs">
-                {notificationsEnabled
-                  ? 'Push notifications are on for this device.'
-                  : 'Permission or device registration is off.'}
-              </Text>
+              {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
+              {masterLeading === 'on' && (
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  Push notifications are on for this device.
+                </Text>
+              )}
+              {masterLeading === 'off' && (
+                <Text variant="muted" className="mt-0.5 text-xs">
+                  Permission or device registration is off.
+                </Text>
+              )}
             </View>
             {/* Master trailing slot — first match wins:
                 1. permissionLoading → skeleton

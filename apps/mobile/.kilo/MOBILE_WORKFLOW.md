@@ -230,8 +230,8 @@ Kilobot is the only reviewer whose review is waited for. Comments already posted
 10. Valid finding: send the smallest coherent repair to `mobile-implementer`, run the required narrow checks, dispatch a fresh `mobile-reviewer`, commit, push, reply in the thread, and resolve it. Invalid finding: reply in the thread with technical evidence and do not change correct code. A fix without its in-thread reply and thread resolution is not done.
 11. Repeat steps 9-10 until Kilobot has reviewed the latest head and no actionable posted comment from any reviewer is unresolved.
 12. Rerun local mobile E2E after any review-driven repair that affects behavior, build or runtime configuration, or the E2E workflow. A documentation-only or test-only repair may skip it when you record why the verified behavior is unaffected.
-13. When the base branch advances, integrate the current base in the dedicated worktree and push the new head. Then:
-    - No conflicts, or conflicts resolved and certainly behavior-neutral: no reruns. CI and Kilobot run on the new SHA anyway.
+13. A base branch that merely advances is not a reason to touch the head. Integrate the base **only when GitHub reports an actual conflict** (`mergeable: CONFLICTING`), or when the run itself needs something that has since landed on the base. When GitHub reports `mergeable: MERGEABLE`, leave the head SHA alone: rebasing a conflict-free branch invalidates green CI and a completed Kilobot review, forces both to run again, and can lose a race against the next push to the base. `mergeStateStatus: BLOCKED` on a `MERGEABLE` PR means a required human review is pending — that is the expected terminal state, not a conflict to resolve.
+    - Conflicts resolved and certainly behavior-neutral: no reruns. CI and Kilobot run on the new SHA anyway.
     - Conflicts resolved with possible behavioral impact: rerun the affected checks and local E2E and get a fresh review before pushing.
 14. Always wait for CI and Kilobot on the exact latest head SHA, and confirm GitHub reports it mergeable.
 

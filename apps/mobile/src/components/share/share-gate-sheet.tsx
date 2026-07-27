@@ -69,6 +69,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   const { spawn } = useRemoteInstanceSpawn();
   const [spawningConnectionId, setSpawningConnectionId] = useState<string | null>(null);
+  // Per-attempt token so a stale spawn's finally cannot clear a newer lock
+  // (share replace mid-flight, or same-connection re-tap after replace).
+  const spawnAttemptRef = useRef(0);
   const isSpawning = spawningConnectionId !== null;
 
   const { data: instancesData, refetch: refetchInstances } = useQuery({
@@ -89,11 +92,16 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
   // When S1 replaces an open gate with a newer shareId, clear the older id
   // only if it was not committed. A committed previous id must survive the
-  // dismiss animation while a newer shareId is focused.
+  // dismiss animation while a newer shareId is focused. Also drop the spawn
+  // lock so a stale in-flight spawn cannot leave the new gate's commit
+  // affordances disabled until it settles.
   useEffect(() => {
     const previous = previousShareIdRef.current;
-    if (previous && previous !== shareId && previous !== committedShareIdRef.current) {
-      clearSharePayload(previous);
+    if (previous && previous !== shareId) {
+      if (previous !== committedShareIdRef.current) {
+        clearSharePayload(previous);
+      }
+      setSpawningConnectionId(null);
     }
     previousShareIdRef.current = shareId;
   }, [shareId]);
@@ -265,6 +273,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       }
 
       void (async () => {
+        spawnAttemptRef.current += 1;
+        const attempt = spawnAttemptRef.current;
         setSpawningConnectionId(instance.connectionId);
         try {
           const outcome = await spawn(instance.connectionId);
@@ -300,7 +310,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
 
           toast.error(action.toast);
         } finally {
-          setSpawningConnectionId(null);
+          // Only the attempt that still owns the lock may clear it.
+          if (spawnAttemptRef.current === attempt) {
+            setSpawningConnectionId(null);
+          }
         }
       })();
     },

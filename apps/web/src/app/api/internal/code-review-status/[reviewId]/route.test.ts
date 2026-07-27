@@ -1367,6 +1367,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    // errorMessage is deliberately omitted. The real payment_required safe
+    // message contains 'insufficient credits', which the earlier text-based
+    // billing heuristic matches, so including it would set terminalReason before
+    // the structured branch runs and the assertion would pass even if the
+    // payment_required mapping were deleted.
     it('normalizes status to failed for a structured payment_required failure', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
@@ -1374,7 +1379,6 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeRequest({
           cloudAgentSessionId: 'agent_1',
           status: 'interrupted',
-          errorMessage: 'Assistant request failed: insufficient credits',
           failure: { code: 'payment_required' },
         }),
         makeParams(REVIEW_ID)

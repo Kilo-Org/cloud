@@ -973,8 +973,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
-      // The upstream response is replaced by a more readable error and is not
-      // processed further, so log its body separately.
       await logUnrewrittenResponse(
         response,
         effectiveModelIdLowerCased,
@@ -985,9 +983,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Request logging and response rewriting are combined so the event stream
-  // is only processed once: rewriteModelResponse captures the body for the
-  // request log while rewriting it.
   const rewrittenResponse = await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,

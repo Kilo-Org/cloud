@@ -22,14 +22,11 @@ import type Anthropic from '@anthropic-ai/sdk';
  * logging and once for rewriting.
  */
 export type RequestLogCapture = {
-  /** Record the full upstream response body. Called at most once. */
   setBody(text: string): void;
-  /** Record that the upstream response body could not be read. Called at most once. */
   setReadError(error: unknown): void;
 };
 
-/** Parameters needed to write the request to api_request_log. */
-export type RequestLogging = {
+export type RequestLoggingParams = {
   user: User | null;
   organization_id: string | null;
   session_id: string | null;
@@ -56,7 +53,7 @@ async function createRequestLogCapture(
   response: Response,
   model: string,
   provider: string,
-  logging: RequestLogging
+  logging: RequestLoggingParams
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
   if (!(await isLoggingEnabledForUser(user, organization_id))) {
@@ -126,16 +123,12 @@ async function createRequestLogCapture(
   };
 }
 
-/**
- * Logs the request and response body for paths where the upstream response is
- * not passed through rewriteModelResponse (e.g. when an upstream error is
- * replaced by a more readable one). Reads the response body once.
- */
+/** For paths where the upstream response is not passed through rewriteModelResponse. */
 export async function logUnrewrittenResponse(
   response: Response,
   model: string,
   providerId: ProviderId,
-  logging: RequestLogging
+  logging: RequestLoggingParams
 ): Promise<void> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   if (!capture) {
@@ -399,7 +392,6 @@ export async function rewriteModelResponse_ChatCompletions(
       );
     },
     cancel() {
-      // The client disconnected before the stream completed.
       capture?.setReadError(new Error('response stream was cancelled'));
     },
   });
@@ -550,7 +542,6 @@ export async function rewriteModelResponse_Messages(
       );
     },
     cancel() {
-      // The client disconnected before the stream completed.
       capture?.setReadError(new Error('response stream was cancelled'));
     },
   });
@@ -674,7 +665,6 @@ export async function rewriteModelResponse_Responses(
       );
     },
     cancel() {
-      // The client disconnected before the stream completed.
       capture?.setReadError(new Error('response stream was cancelled'));
     },
   });
@@ -691,7 +681,7 @@ export async function rewriteModelResponse(
   model: string,
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
-  logging: RequestLogging
+  logging: RequestLoggingParams
 ): Promise<NextResponse | null> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
   const isFreeModelRequiringCostRemoval =
@@ -706,34 +696,16 @@ export async function rewriteModelResponse(
   }
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
-  try {
-    if (kind === 'chat_completions') {
-      return await rewriteModelResponse_ChatCompletions(
-        response,
-        isFreeModelRequiringCostRemoval,
-        capture
-      );
-    }
-    if (kind === 'responses') {
-      return await rewriteModelResponse_Responses(
-        response,
-        isFreeModelRequiringCostRemoval,
-        capture
-      );
-    }
-    if (kind === 'messages') {
-      return await rewriteModelResponse_Messages(
-        response,
-        isFreeModelRequiringCostRemoval,
-        capture
-      );
-    }
-  } catch (error) {
-    capture?.setReadError(error);
-    throw error;
+  if (kind === 'chat_completions') {
+    return rewriteModelResponse_ChatCompletions(response, isFreeModelRequiringCostRemoval, capture);
+  }
+  if (kind === 'responses') {
+    return rewriteModelResponse_Responses(response, isFreeModelRequiringCostRemoval, capture);
+  }
+  if (kind === 'messages') {
+    return rewriteModelResponse_Messages(response, isFreeModelRequiringCostRemoval, capture);
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);
-  capture?.setReadError(new Error('response was not processed'));
   return null;
 }

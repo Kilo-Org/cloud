@@ -1,10 +1,10 @@
-import { describe, test, expect, jest, beforeEach } from '@jest/globals';
+import { describe, test, expect, beforeEach } from '@jest/globals';
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
   rewriteModelResponse,
-  type RequestLogging,
+  type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
@@ -495,13 +495,13 @@ describe('rewriteModelResponse_Responses', () => {
   });
 });
 
-function makeLogging(overrides?: Partial<RequestLogging>): RequestLogging {
+function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingParams {
   return {
     user: null,
     organization_id: null,
     session_id: null,
     vercel_request_id: null,
-    request: { body: {} } as unknown as RequestLogging['request'],
+    request: { body: {} } as unknown as RequestLoggingParams['request'],
     ...overrides,
   };
 }

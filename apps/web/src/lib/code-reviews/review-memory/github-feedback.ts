@@ -18,7 +18,6 @@ export const KILO_GITHUB_BOT_LOGINS: ReadonlySet<string> = new Set([
   'kilo-code-review-bot',
   'kilo-code-review-bot[bot]',
   'kilocode[bot]',
-  'kilocode-bot',
 ]);
 
 export const REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH = 2_000;

@@ -99,11 +99,9 @@ Then wait event-driven with an `until grep -q EXITCODE= "$LOG"` loop that also b
   the separate GitHub *User* `kilocode-bot` (`gh api users/kilocode-bot` returns 200).
 - Fix: write `@kilocode-bot` in the retrigger comment (still prefixed `(bot) ` per GitHub
   Communication). Keep matching the *author* login as `kilo-code-bot[bot]` when reading threads — the
-  handle you tag and the login you match are deliberately different, so never remove the App login or
-  its `[bot]` suffix from author-login allowlists such as `KILO_GITHUB_BOT_LOGINS` in
-  `apps/web/src/lib/code-reviews/review-memory/github-feedback.ts`. Adding the separate User login
-  `kilocode-bot` alongside them is a different, deliberate act (done on request in PR #4807): the
-  User account can author comments, and `isLikelyKiloBotActor` must classify them as bot actors.
+  handle you tag and the login you match are deliberately different, so do not "correct" author-login
+  allowlists such as `KILO_GITHUB_BOT_LOGINS` in
+  `apps/web/src/lib/code-reviews/review-memory/github-feedback.ts`.
 - If the mention still draws a "link your GitHub account to Kilo" reply, fall back to the empty-commit
   retrigger (`git commit --allow-empty`), which needs no account linking.
 ### PR-review E2E env traps (stub token path)

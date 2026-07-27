@@ -61,7 +61,9 @@ import {
   type ShareId,
   type SharePayload,
 } from '@/lib/share-payload';
+import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
@@ -89,6 +91,7 @@ function initSentry(consented: boolean) {
 
     enableLogs: true,
     tracesSampleRate: 0,
+    environment: resolveSentryEnvironment(SENTRY_ENVIRONMENT, __DEV__),
     ...sentryOptionsForConsent(consented),
 
     integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],

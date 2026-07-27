@@ -986,42 +986,50 @@ const restoreFrontierFavoriteIfNeeded = async (
     return;
   }
 
-  const dialog = sidePanel.locator('[role="dialog"][aria-modal="true"][aria-label="Select model"]');
-  const isOpen = (await dialog.count()) > 0;
+  // Best-effort: the panel may have crashed or closed after a test-level timeout.
+  // A throw here would mask the original failure and skip context cleanup in the caller.
+  try {
+    const dialog = sidePanel.locator(
+      '[role="dialog"][aria-modal="true"][aria-label="Select model"]'
+    );
+    const isOpen = (await dialog.count()) > 0;
 
-  if (!isOpen) {
-    const trigger = sidePanel.getByLabel('Model');
-    const canOpen = await trigger.isEnabled().catch(() => false);
+    if (!isOpen) {
+      const trigger = sidePanel.getByLabel('Model');
+      const canOpen = await trigger.isEnabled().catch(() => false);
 
-    if (!canOpen) {
+      if (!canOpen) {
+        return;
+      }
+
+      await trigger.click().catch(() => null);
+      await dialog.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null);
+    }
+
+    if ((await dialog.count()) === 0) {
       return;
     }
 
-    await trigger.click().catch(() => null);
-    await dialog.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null);
+    const frontierRow = dialog.locator(`button[data-model-id="${frontierModel}"]`);
+    const frontierName = (await frontierRow.getAttribute('aria-label').catch(() => null)) ?? '';
+
+    if (frontierName.length === 0) {
+      return;
+    }
+
+    const removeStar = dialog.getByLabel(`Remove ${frontierName} from favorites`);
+
+    if ((await removeStar.count()) === 0) {
+      return;
+    }
+
+    await removeStar.click().catch(() => null);
+    await expect(dialog.getByLabel(`Add ${frontierName} to favorites`))
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => null);
+  } catch {
+    // Restore is best-effort; the original test outcome stands.
   }
-
-  if ((await dialog.count()) === 0) {
-    return;
-  }
-
-  const frontierRow = dialog.locator(`button[data-model-id="${frontierModel}"]`);
-  const frontierName = (await frontierRow.getAttribute('aria-label').catch(() => null)) ?? '';
-
-  if (frontierName.length === 0) {
-    return;
-  }
-
-  const removeStar = dialog.getByLabel(`Remove ${frontierName} from favorites`);
-
-  if ((await removeStar.count()) === 0) {
-    return;
-  }
-
-  await removeStar.click().catch(() => null);
-  await expect(dialog.getByLabel(`Add ${frontierName} to favorites`))
-    .toBeVisible({ timeout: 30_000 })
-    .catch(() => null);
 };
 
 test('live local backend personal favorites round-trip for frontier', async () => {

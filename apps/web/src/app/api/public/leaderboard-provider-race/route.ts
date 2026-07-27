@@ -13,6 +13,12 @@ import { LEADERBOARD_PROVIDER_RACE_REDIS_KEY } from '@/lib/redis-keys';
 // is_open_weights are maintained in the dbt model_dim seed (kilocode-dbt), so
 // the lab mapping lives in one place rather than being re-derived here.
 // The partial current week is excluded so every returned week is complete.
+// Infrastructure-artifact BYOK model ids are excluded here (not in the base
+// dbt model, which stays complete): URI/path ids (s3://, gs://, ...), ckpt:
+// checkpoint refs, and HuggingFace class names (e.g. AtlasForCausalLM). These
+// are customers pointing Kilo at their own checkpoints/endpoints - single-org
+// noise that cannot be attributed to a model lab and would otherwise dominate
+// the "other" bucket.
 const LEADERBOARD_PROVIDER_RACE_QUERY = `
 select
     to_char(date_trunc('week', ud.usage_date), 'YYYY-MM-DD') as week_start
@@ -24,6 +30,11 @@ where
     ud.usage_date >= '2025-07-01'
     and date_trunc('week', ud.usage_date) < date_trunc('week', current_date())
     and ud.total_tokens > 0
+    and not (
+        ud.model like '%://%'
+        or ud.model ilike 'ckpt:%'
+        or ud.model ilike '%ForCausalLM'
+    )
 group by 1, 2, 3
 order by 1, 4 desc;
 `;

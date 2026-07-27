@@ -75,7 +75,8 @@ import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import {
   GASTOWN_CONTAINER_SKU,
-  isGastownBillingEnabled,
+  isContainerUsageMeteringEnabled,
+  isGastownBillingEnforced,
   type ContainerRunPolicy,
   type GastownBillingStatus,
   type UsageActor,
@@ -285,7 +286,7 @@ export class TownDO extends DurableObject<Env> {
       emitEvent: data => this.emitEvent(data),
       prepareContainerBilling: async () => {
         await this.prepareContainerBilling();
-        if (isGastownBillingEnabled(this.env)) {
+        if (isContainerUsageMeteringEnabled(this.env)) {
           await getTownContainerStub(this.env, this.townId).warmUp();
           this._billingBlocked = false;
           await this.ctx.storage.put('billing:blocked', false);
@@ -956,7 +957,7 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getBillingStatus(): Promise<GastownBillingStatus> {
-    if (isGastownBillingEnabled(this.env)) await this.prepareContainerBilling();
+    if (isContainerUsageMeteringEnabled(this.env)) await this.prepareContainerBilling();
     const status = await getTownContainerStub(this.env, this.townId).getBillingStatus();
     await this.syncContainerRunPolicy(status.runPolicy);
     return status;
@@ -982,7 +983,7 @@ export class TownDO extends DurableObject<Env> {
     actor?: UsageActor,
     providedConfig?: TownConfig
   ): Promise<void> {
-    if (!isGastownBillingEnabled(this.env)) return;
+    if (!isContainerUsageMeteringEnabled(this.env)) return;
 
     const townConfig = providedConfig ?? (await this.getTownConfig());
     const ownerId = townConfig.owner_id ?? townConfig.organization_id ?? townConfig.owner_user_id;
@@ -1033,14 +1034,31 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async updateContainerBilling(): Promise<GastownBillingStatus> {
-    if (!isGastownBillingEnabled(this.env)) {
-      return { enabled: false, state: 'idle', runPolicy: this._containerRunPolicy };
+    if (!isContainerUsageMeteringEnabled(this.env)) {
+      return {
+        enabled: false,
+        enforcing: false,
+        state: 'idle',
+        runPolicy: this._containerRunPolicy,
+      };
     }
 
+    // Usage is always metered and reported. The blocked/graceful-stop reactions
+    // below are enforcement and only apply when GASTOWN_BILLING_ENABLED is on;
+    // with enforcement off we collect shadow usage without affecting the town.
     await this.prepareContainerBilling();
     const container = getTownContainerStub(this.env, this.townId);
     const status = await container.recordUsageHeartbeat();
     await this.syncContainerRunPolicy(status.runPolicy);
+
+    if (!isGastownBillingEnforced(this.env)) {
+      if (this._billingBlocked) {
+        this._billingBlocked = false;
+        await this.ctx.storage.put('billing:blocked', false);
+      }
+      return status;
+    }
+
     const blocked =
       status.runPolicy === 'automatic' &&
       (status.state === 'blocked' || status.state === 'stopping');
@@ -2893,7 +2911,7 @@ export class TownDO extends DurableObject<Env> {
   }> {
     const townId = this.townId;
     await this.prepareContainerBilling(actorUserId ? { type: 'user', id: actorUserId } : undefined);
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       await getTownContainerStub(this.env, townId).warmUp();
       this._billingBlocked = false;
       await this.ctx.storage.put('billing:blocked', false);
@@ -3107,7 +3125,7 @@ export class TownDO extends DurableObject<Env> {
   }> {
     const townId = this.townId;
     await this.prepareContainerBilling(actorUserId ? { type: 'user', id: actorUserId } : undefined);
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       await getTownContainerStub(this.env, townId).warmUp();
       this._billingBlocked = false;
       await this.ctx.storage.put('billing:blocked', false);
@@ -4288,16 +4306,18 @@ export class TownDO extends DurableObject<Env> {
     const hasRigs = rigList.length > 0;
     let billingStatus: GastownBillingStatus = {
       enabled: false,
+      enforcing: false,
       state: 'idle',
       runPolicy: this._containerRunPolicy,
     };
 
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       try {
         billingStatus = await this.updateContainerBilling();
       } catch (err) {
         billingStatus = {
           enabled: true,
+          enforcing: isGastownBillingEnforced(this.env),
           state: 'degraded',
           runPolicy: this._containerRunPolicy,
         };
@@ -5601,10 +5621,11 @@ export class TownDO extends DurableObject<Env> {
 
     const billing =
       cached?.billingStatus ??
-      (isGastownBillingEnabled(this.env)
+      (isContainerUsageMeteringEnabled(this.env)
         ? await getTownContainerStub(this.env, this.townId).getBillingStatus()
         : {
             enabled: false,
+            enforcing: false,
             state: 'idle' as const,
             runPolicy: this._containerRunPolicy,
           });

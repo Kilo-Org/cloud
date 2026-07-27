@@ -104,6 +104,7 @@ export const MayorStatusOutput = z.object({
 
 export const BillingStatusOutput = z.object({
   enabled: z.boolean(),
+  enforcing: z.boolean(),
   state: z.enum([
     'idle',
     'starting',

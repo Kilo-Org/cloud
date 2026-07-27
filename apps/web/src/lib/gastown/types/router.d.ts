@@ -552,6 +552,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         }[];
         billing: {
           enabled: boolean;
+          enforcing: boolean;
           state:
             | 'blocked'
             | 'degraded'
@@ -585,6 +586,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         enabled: boolean;
+        enforcing: boolean;
         state:
           | 'blocked'
           | 'degraded'
@@ -618,6 +620,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       output: {
         enabled: boolean;
+        enforcing: boolean;
         state:
           | 'blocked'
           | 'degraded'
@@ -2277,6 +2280,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             }[];
             billing: {
               enabled: boolean;
+              enforcing: boolean;
               state:
                 | 'blocked'
                 | 'degraded'
@@ -2310,6 +2314,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           };
           output: {
             enabled: boolean;
+            enforcing: boolean;
             state:
               | 'blocked'
               | 'degraded'
@@ -2343,6 +2348,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           };
           output: {
             enabled: boolean;
+            enforcing: boolean;
             state:
               | 'blocked'
               | 'degraded'

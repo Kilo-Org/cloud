@@ -1409,7 +1409,7 @@ function MayorTerminalPane({
 
   const ensuredTownRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!billing || billing.enabled || billing.runPolicy === 'paused_by_user') return;
+    if (!billing || billing.enforcing || billing.runPolicy === 'paused_by_user') return;
     if (ensuredTownRef.current === townId) return;
     ensuredTownRef.current = townId;
     ensureMayor.mutate({ townId });
@@ -1428,12 +1428,13 @@ function MayorTerminalPane({
   const mayorAgentId = statusQuery.data?.session?.agentId ?? null;
   const userPaused = billing?.runPolicy === 'paused_by_user';
   const userPauseStopping = userPaused && billing?.state === 'stopping';
-  const creditPaused =
-    billing?.enabled && (billing.state === 'blocked' || billing.state === 'stopping');
+  const creditPaused = billing?.enforcing && billing.state === 'blocked';
+  const automaticStopInProgress =
+    billing?.enforcing && billing.runPolicy === 'automatic' && billing.state === 'stopping';
   const terminalEnabled =
     billing !== undefined &&
     billing.runPolicy === 'automatic' &&
-    (!billing.enabled ||
+    (!billing.enforcing ||
       billing.state === 'running' ||
       billing.state === 'warning' ||
       billing.state === 'starting');
@@ -1492,7 +1493,9 @@ function MayorTerminalPane({
                   : 'Automatic starts are paused'
                 : creditPaused
                   ? 'Gas Town is paused'
-                  : 'Start the Mayor when you are ready'}
+                  : automaticStopInProgress
+                    ? 'Saving work and stopping Gas Town...'
+                    : 'Start the Mayor when you are ready'}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
               {userPaused
@@ -1501,9 +1504,11 @@ function MayorTerminalPane({
                   : `The container is stopped and scheduled work remains queued.${billing.estimatedRunCharge === undefined ? '' : ` Estimated last run: $${billing.estimatedRunCharge.toFixed(2)}.`} Enable automatic starts when you are ready to continue.`
                 : creditPaused
                   ? 'Add credits to the billing account, then resume. Your town state is preserved.'
-                  : billing.estimatedHourlyCharge === undefined
-                    ? 'Container usage is charged only while Gas Town is running.'
-                    : `Estimated container charge: $${billing.estimatedHourlyCharge.toFixed(2)}/hour while running.`}
+                  : automaticStopInProgress
+                    ? 'The container is shutting down after becoming idle. You can start it again when shutdown completes.'
+                    : billing.estimatedHourlyCharge === undefined
+                      ? 'Container usage is charged only while Gas Town is running.'
+                      : `Estimated container charge: $${billing.estimatedHourlyCharge.toFixed(2)}/hour while running.`}
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {creditPaused && !userPaused && (
@@ -1532,9 +1537,11 @@ function MayorTerminalPane({
                 >
                   {ensureMayor.isPending
                     ? 'Starting Gas Town...'
-                    : creditPaused
-                      ? 'Resume Gas Town'
-                      : 'Start Mayor'}
+                    : automaticStopInProgress
+                      ? 'Stopping Gas Town...'
+                      : creditPaused
+                        ? 'Resume Gas Town'
+                        : 'Start Mayor'}
                 </button>
               )}
             </div>
@@ -1564,7 +1571,7 @@ function AgentTerminalPane({
   const enabled =
     billing !== undefined &&
     billing.runPolicy === 'automatic' &&
-    (!billing.enabled || billing.state === 'running' || billing.state === 'warning');
+    (!billing.enforcing || billing.state === 'running' || billing.state === 'warning');
   const { terminalRef, connectionStatus, status } = useXtermPty({
     townId,
     agentId,

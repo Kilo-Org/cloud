@@ -4,7 +4,8 @@ import { ContainerBillingError } from '../billing/ContainerBilling.error';
 import {
   clientUsageContext,
   getContainerUsageClient,
-  isGastownBillingEnabled,
+  isContainerUsageMeteringEnabled,
+  isGastownBillingEnforced,
   isUsageIntervalNotFoundError,
   USAGE_HEARTBEAT_INTERVAL_MS,
   type ContainerRunPolicy,
@@ -13,7 +14,9 @@ import {
 } from '../billing/container-usage.billing';
 import {
   createPendingStop,
+  isRuntimeStoppedStatus,
   BILLING_STATE_VERSION,
+  MAX_SETTLEMENT_ATTEMPTS,
   migrateStoredUsageState,
   toBillingStatus,
   type OpenUsageInterval,
@@ -109,7 +112,7 @@ export class TownContainerDO extends Container<Env> {
       await this.stop();
       return;
     }
-    if (!isGastownBillingEnabled(this.env)) return;
+    if (!isContainerUsageMeteringEnabled(this.env)) return;
 
     try {
       const state = await this.ensureBillingInterval();
@@ -139,7 +142,7 @@ export class TownContainerDO extends Container<Env> {
    */
   async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
     await this.assertAutomaticStartsEnabled();
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       await this.ensureBillingInterval();
     }
     await this.assertAutomaticStartsEnabled();
@@ -163,7 +166,7 @@ export class TownContainerDO extends Container<Env> {
     console.log(
       `${TC_LOG} container stopped: exitCode=${exitCode} reason=${reason} id=${this.ctx.id.toString()}`
     );
-    if (!isGastownBillingEnabled(this.env)) return;
+    if (!isContainerUsageMeteringEnabled(this.env)) return;
 
     const current = await this.getUsageState();
     const stopReason =
@@ -178,7 +181,7 @@ export class TownContainerDO extends Container<Env> {
   }
 
   override async onActivityExpired(): Promise<void> {
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       const state = await this.getUsageState();
       if (state.phase !== 'idle' && state.phase !== 'stopping') {
         await this.ctx.storage.put(BILLING_STATE_KEY, {
@@ -197,7 +200,7 @@ export class TownContainerDO extends Container<Env> {
 
   override async fetch(request: Request): Promise<Response> {
     await this.assertAutomaticStartsEnabled();
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       await this.ensureBillingInterval();
     }
     await this.assertAutomaticStartsEnabled();
@@ -222,14 +225,16 @@ export class TownContainerDO extends Container<Env> {
 
   async getBillingStatus(): Promise<GastownBillingStatus> {
     return toBillingStatus(
-      isGastownBillingEnabled(this.env),
+      isContainerUsageMeteringEnabled(this.env),
       await this.getUsageState(),
-      await this.getRunPolicy()
+      await this.getRunPolicy(),
+      Date.now(),
+      isGastownBillingEnforced(this.env)
     );
   }
 
   async recordUsageHeartbeat(): Promise<GastownBillingStatus> {
-    if (!isGastownBillingEnabled(this.env)) return this.getBillingStatus();
+    if (!isContainerUsageMeteringEnabled(this.env)) return this.getBillingStatus();
 
     let state = await this.getUsageState();
     if (state.phase === 'starting') {
@@ -248,50 +253,54 @@ export class TownContainerDO extends Container<Env> {
         }
       } catch (error) {
         if (error instanceof ContainerBillingError && error.code === 'INSUFFICIENT_CREDITS') {
-          await this.stopForBilling();
+          // Only stop the container when enforcement is on. With enforcement
+          // off we keep running and continue metering; the block is advisory.
+          if (isGastownBillingEnforced(this.env)) {
+            await this.stopForBilling();
+          }
           return this.getBillingStatus();
         }
         throw error;
       }
     }
     const runPolicy = await this.getRunPolicy();
-    if (state.phase === 'idle') return toBillingStatus(true, state, runPolicy);
+    const enforcing = isGastownBillingEnforced(this.env);
+    if (state.phase === 'idle')
+      return toBillingStatus(true, state, runPolicy, Date.now(), enforcing);
     if (state.phase === 'stopping') {
-      const stoppingRuntimeState = await this.getState();
-      if (
-        stoppingRuntimeState.status === 'running' ||
-        stoppingRuntimeState.status === 'healthy' ||
-        stoppingRuntimeState.status === 'stopping'
-      ) {
-        return toBillingStatus(true, state, runPolicy);
+      if (!(await this.isRuntimeStopped())) {
+        return toBillingStatus(true, state, runPolicy, Date.now(), enforcing);
       }
       await this.closeBillingInterval(state.stopReason ?? 'runtime_signal');
       return this.getBillingStatus();
     }
 
-    const runtimeState = await this.getState();
-    if (runtimeState.status !== 'running' && runtimeState.status !== 'healthy') {
+    // Only close a running interval once the runtime has definitively stopped.
+    // A freshly started container briefly reports transient non-running states
+    // (and onStop is the authoritative close), so reacting to a single
+    // non-running reading here would shut down a just-created town.
+    if (await this.isRuntimeStopped()) {
       await this.closeBillingInterval('runtime_signal', state.lastReportedAt);
       return this.getBillingStatus();
     }
 
     const observedAt = Date.now();
     if (observedAt - state.lastReportedAt < USAGE_HEARTBEAT_INTERVAL_MS) {
-      return toBillingStatus(true, state, runPolicy);
+      return toBillingStatus(true, state, runPolicy, observedAt, enforcing);
     }
 
     try {
       const updated = await this.captureHeartbeat(state, observedAt);
-      return toBillingStatus(true, updated, runPolicy);
+      return toBillingStatus(true, updated, runPolicy, Date.now(), enforcing);
     } catch (error) {
       console.error(`${TC_LOG} billing heartbeat failed`, error);
-      const status = toBillingStatus(true, state, runPolicy);
+      const status = toBillingStatus(true, state, runPolicy, Date.now(), enforcing);
       return { ...status, state: 'degraded' };
     }
   }
 
   async stopForBilling(): Promise<void> {
-    if (!isGastownBillingEnabled(this.env)) return;
+    if (!isContainerUsageMeteringEnabled(this.env)) return;
     const state = await this.getUsageState();
     if (state.phase !== 'idle') {
       if (state.phase !== 'stopping') {
@@ -306,7 +315,7 @@ export class TownContainerDO extends Container<Env> {
   }
 
   async stopForInactivity(): Promise<void> {
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       const state = await this.getUsageState();
       if (state.phase !== 'idle' && state.phase !== 'stopping') {
         await this.ctx.storage.put(BILLING_STATE_KEY, {
@@ -325,7 +334,7 @@ export class TownContainerDO extends Container<Env> {
       const state = await this.getUsageState();
       const canCloseBillingInterval =
         state.phase === 'running' || (state.phase === 'starting' && state.startRecorded);
-      if (isGastownBillingEnabled(this.env) && canCloseBillingInterval) {
+      if (isContainerUsageMeteringEnabled(this.env) && canCloseBillingInterval) {
         await this.ctx.storage.put(BILLING_STATE_KEY, {
           ...state,
           phase: 'stopping',
@@ -338,7 +347,7 @@ export class TownContainerDO extends Container<Env> {
   }
 
   async destroyWithBilling(): Promise<void> {
-    if (isGastownBillingEnabled(this.env)) {
+    if (isContainerUsageMeteringEnabled(this.env)) {
       const state = await this.getUsageState();
       if (state.phase !== 'idle') {
         await this.stopForBilling();
@@ -370,7 +379,7 @@ export class TownContainerDO extends Container<Env> {
 
   private async ensureBillingInterval(): Promise<StoredUsageState> {
     await this.assertAutomaticStartsEnabled();
-    if (!isGastownBillingEnabled(this.env)) return { phase: 'idle' };
+    if (!isContainerUsageMeteringEnabled(this.env)) return { phase: 'idle' };
 
     const existing = await this.getUsageState();
     if (existing.phase === 'running') return existing;
@@ -615,8 +624,68 @@ export class TownContainerDO extends Container<Env> {
         } satisfies StoredUsageState);
       }
     } catch (error) {
-      console.error(`${TC_LOG} failed to close billing interval; will retry`, error);
+      await this.handleSettlementFailure(stopping, stopObservedAt, error);
     }
+  }
+
+  /**
+   * Records a failed settlement attempt. While the meter is unreachable the
+   * interval stays open and retries on the next alarm. After
+   * MAX_SETTLEMENT_ATTEMPTS, Gastown force-closes the interval locally so the
+   * town cannot be stranded in the stopping/draining state, and flags it
+   * unsettled for later reconciliation.
+   */
+  private async handleSettlementFailure(
+    stopping: OpenUsageInterval,
+    stopObservedAt: number,
+    error: unknown
+  ): Promise<void> {
+    const attempts = await this.ctx.storage.transaction(async transaction => {
+      const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
+      if (!latest || latest.phase === 'idle' || latest.startEpochMs !== stopping.startEpochMs) {
+        return undefined;
+      }
+      const nextAttempts = (latest.settlementAttempts ?? 0) + 1;
+      await transaction.put(BILLING_STATE_KEY, {
+        ...latest,
+        settlementAttempts: nextAttempts,
+      } satisfies OpenUsageInterval);
+      return nextAttempts;
+    });
+
+    if (attempts === undefined || attempts < MAX_SETTLEMENT_ATTEMPTS) {
+      console.error(`${TC_LOG} failed to close billing interval; will retry`, error);
+      return;
+    }
+
+    console.error(
+      `${TC_LOG} giving up on meter settlement after ${attempts} attempts; closing interval locally and flagging for reconciliation`,
+      error
+    );
+    await this.ctx.storage.transaction(async transaction => {
+      const latest = await transaction.get<StoredUsageState>(BILLING_STATE_KEY);
+      if (!latest || latest.phase === 'idle' || latest.startEpochMs !== stopping.startEpochMs) {
+        return;
+      }
+      const usageSeconds =
+        (latest.reportedUsageSeconds ?? 0) + (latest.pendingStop?.usageSinceLast ?? 0);
+      const estimatedCharge =
+        latest.estimatedHourlyCharge === undefined
+          ? undefined
+          : (usageSeconds / 3600) * latest.estimatedHourlyCharge;
+      await transaction.put(BILLING_STATE_KEY, {
+        version: BILLING_STATE_VERSION,
+        phase: 'idle',
+        context: latest.context,
+        lastRun: {
+          startedAt: latest.startEpochMs,
+          stoppedAt: latest.stopObservedAt ?? stopObservedAt,
+          usageSeconds,
+          unsettled: true,
+          ...(estimatedCharge === undefined ? {} : { estimatedCharge }),
+        },
+      } satisfies StoredUsageState);
+    });
   }
 
   private async getUsageState(): Promise<StoredUsageState> {
@@ -637,6 +706,16 @@ export class TownContainerDO extends Container<Env> {
       ...clientUsageContext(state.context),
       startEpochMs: state.startEpochMs,
     });
+  }
+
+  /**
+   * Whether the container runtime has definitively stopped. Delegates to the
+   * pure isRuntimeStoppedStatus predicate so the tolerance policy is unit
+   * tested independently of the Durable Object.
+   */
+  private async isRuntimeStopped(): Promise<boolean> {
+    const runtimeState = await this.getState();
+    return isRuntimeStoppedStatus(runtimeState.status);
   }
 
   private async getRunPolicy(): Promise<ContainerRunPolicy> {

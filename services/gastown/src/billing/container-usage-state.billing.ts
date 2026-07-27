@@ -34,6 +34,7 @@ export type OpenUsageInterval = {
   reportedUsageSeconds?: number;
   stopReason?: 'exit' | 'runtime_signal' | 'activity_expired';
   stopObservedAt?: number;
+  settlementAttempts?: number;
 };
 
 export type StoredUsageState =
@@ -48,11 +49,20 @@ export type StoredUsageState =
         stoppedAt: number;
         usageSeconds: number;
         estimatedCharge?: number;
+        unsettled?: boolean;
       };
     }
   | OpenUsageInterval;
 
 export const BILLING_STATE_VERSION = 2 as const;
+
+/**
+ * How many alarm-driven attempts to settle a stopping interval with the meter
+ * before Gastown gives up locally. This prevents an unreachable meter from
+ * stranding a town in the draining/stopping state indefinitely; the interval is
+ * flagged unsettled for later reconciliation.
+ */
+export const MAX_SETTLEMENT_ATTEMPTS = 5;
 
 export function migrateStoredUsageState(
   state: StoredUsageState | undefined,
@@ -75,6 +85,17 @@ export function migrateStoredUsageState(
   };
 }
 
+/**
+ * Whether a Cloudflare container runtime status means the runtime has
+ * definitively stopped. Transient boot-time and shutdown states (running,
+ * healthy, stopping, or any unknown value) are treated as still-live so a
+ * just-started billing interval is not force-closed by a single heartbeat
+ * observation; the authoritative close happens in the container's onStop.
+ */
+export function isRuntimeStoppedStatus(status: string): boolean {
+  return status === 'stopped' || status === 'stopped_with_code';
+}
+
 export function createPendingStop(
   state: OpenUsageInterval,
   stopObservedAt: number,
@@ -93,14 +114,16 @@ export function toBillingStatus(
   enabled: boolean,
   state: StoredUsageState,
   runPolicy: ContainerRunPolicy = 'automatic',
-  now = Date.now()
+  now = Date.now(),
+  enforcing = false
 ): GastownBillingStatus {
-  if (!enabled) return { enabled: false, state: 'idle', runPolicy };
+  if (!enabled) return { enabled: false, enforcing, state: 'idle', runPolicy };
 
   const payer = state.context?.subject;
   if (state.phase === 'idle') {
     return {
       enabled: true,
+      enforcing,
       state: runPolicy === 'paused_by_user' ? 'paused' : state.blocked ? 'blocked' : 'idle',
       runPolicy,
       ...(payer ? { payer } : {}),
@@ -145,6 +168,7 @@ export function toBillingStatus(
 
   return {
     enabled: true,
+    enforcing,
     state: publicState,
     runPolicy,
     payer,

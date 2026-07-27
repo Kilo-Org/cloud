@@ -51,7 +51,7 @@ export function MayorChat({ townId }: MayorChatProps) {
   useEffect(() => {
     if (
       !billingQuery.isSuccess ||
-      billingQuery.data.enabled ||
+      billingQuery.data.enforcing ||
       billingQuery.data.runPolicy === 'paused_by_user'
     )
       return;
@@ -79,7 +79,7 @@ export function MayorChat({ townId }: MayorChatProps) {
     enabled:
       billingQuery.isSuccess &&
       billingQuery.data.runPolicy === 'automatic' &&
-      (!billingQuery.data.enabled ||
+      (!billingQuery.data.enforcing ||
         billingQuery.data.state === 'running' ||
         billingQuery.data.state === 'warning' ||
         billingQuery.data.state === 'starting'),

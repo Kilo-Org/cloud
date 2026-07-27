@@ -447,11 +447,24 @@ Rollout SHOULD proceed through a single default-off backend flag:
 
 Before charging customers, shadow data MUST demonstrate that starts and stops reconcile with
 Cloudflare runtime observations, duplicate RPCs do not duplicate charges, and aggregate base cost is
-reasonably consistent with the Cloudflare invoice. `GASTOWN_BILLING_ENABLED` controls metering,
-admission, debits, warnings, and stops together. A separate default-off
-`GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` web flag MAY show advance notice while actual billing remains
-disabled; it MUST NOT alter backend billing behavior. Both flags are always enabled in local
-development while retaining default-off production behavior.
+reasonably consistent with the Cloudflare invoice.
+
+Metering and enforcement are separately controlled:
+
+- **Metering (reporting)** runs whenever the `CONTAINER_USAGE` binding is present, regardless of any
+  flag. Usage intervals are recorded for every town so realized usage can be monitored before
+  charging. This is the mechanism that produces the shadow data above.
+- **Enforcement** — admission blocks, low-balance stops, and treating a billing block as draining —
+  is gated by `GASTOWN_BILLING_ENABLED` (`isGastownBillingEnforced`). With it off, the meter is still
+  called on every start, heartbeat, and stop, but a `blocked`/`stop` outcome MUST NOT stop the
+  container or block starts.
+- **Announcement** — the default-off `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` web flag MAY show advance
+  notice; it MUST NOT alter backend billing behavior.
+
+The status object distinguishes these: `enabled` means metering is active (drives the run estimate
+and the automatic-start control), while `enforcing` gates cold-start/terminal blocking in the UI.
+Enforcement and announcement flags are always enabled in local development while retaining
+default-off production behavior; metering runs in development because the meter binding is present.
 
 Dashboards MUST expose awake seconds, base Cloudflare cost, customer charge, gross multiplier,
 unclosed intervals, SKU admission denials, RPC failures, graceful-stop duration, forced stops, and
@@ -489,6 +502,12 @@ counts of `warn` and `stop` verdicts.
    graceful-save window.
 
 ## Changelog
+
+### 2026-07-24 -- Separate reporting from enforcement
+
+- Metering now always reports to the meter when the `CONTAINER_USAGE` binding is present;
+  `GASTOWN_BILLING_ENABLED` gates enforcement only. Added an `enforcing` field to the billing status
+  so the UI blocks cold starts only under enforcement while still showing the run estimate.
 
 ### 2026-07-22 -- User circuit breaker
 

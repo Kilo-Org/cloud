@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPendingStop,
+  isRuntimeStoppedStatus,
   BILLING_STATE_VERSION,
   migrateStoredUsageState,
   toBillingStatus,
@@ -28,7 +29,19 @@ describe('toBillingStatus', () => {
         blocked: true,
         latestBudget: { verdict: 'stop', remaining: 0 },
       })
-    ).toEqual({ enabled: false, state: 'idle', runPolicy: 'automatic' });
+    ).toEqual({ enabled: false, enforcing: false, state: 'idle', runPolicy: 'automatic' });
+  });
+
+  it('reports metering without enforcement by default', () => {
+    const status = toBillingStatus(true, { phase: 'idle', context });
+    expect(status.enabled).toBe(true);
+    expect(status.enforcing).toBe(false);
+  });
+
+  it('reflects the enforcing flag when passed', () => {
+    const status = toBillingStatus(true, { phase: 'idle', context }, 'automatic', Date.now(), true);
+    expect(status.enabled).toBe(true);
+    expect(status.enforcing).toBe(true);
   });
 
   it('returns a payer-aware blocked state', () => {
@@ -41,6 +54,7 @@ describe('toBillingStatus', () => {
       })
     ).toEqual({
       enabled: true,
+      enforcing: false,
       state: 'blocked',
       runPolicy: 'automatic',
       payer: { type: 'org', id: 'org-1' },
@@ -107,6 +121,46 @@ describe('toBillingStatus', () => {
       estimatedRunCharge: 0.3,
       runUsageSeconds: 900,
     });
+  });
+});
+
+describe('locally force-closed interval', () => {
+  it('returns to a non-blocked idle state after unsettled shutdown', () => {
+    const status = toBillingStatus(
+      true,
+      {
+        version: BILLING_STATE_VERSION,
+        phase: 'idle',
+        context,
+        lastRun: {
+          startedAt: 1_000,
+          stoppedAt: 5_000,
+          usageSeconds: 4,
+          estimatedCharge: 0.02,
+          unsettled: true,
+        },
+      },
+      'automatic'
+    );
+
+    expect(status.state).toBe('idle');
+    expect(status.estimatedRunCharge).toBeCloseTo(0.02, 6);
+  });
+});
+
+describe('isRuntimeStoppedStatus', () => {
+  it('treats definitively stopped runtimes as stopped', () => {
+    expect(isRuntimeStoppedStatus('stopped')).toBe(true);
+    expect(isRuntimeStoppedStatus('stopped_with_code')).toBe(true);
+  });
+
+  it('treats live and transient boot/shutdown states as not stopped', () => {
+    // A freshly created town briefly reports these before it is healthy;
+    // treating any of them as stopped would immediately close the interval and
+    // shut the new container down.
+    for (const status of ['running', 'healthy', 'stopping', 'starting', 'scheduling', '']) {
+      expect(isRuntimeStoppedStatus(status)).toBe(false);
+    }
   });
 });
 

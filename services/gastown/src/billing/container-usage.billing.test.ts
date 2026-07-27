@@ -3,19 +3,42 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   GASTOWN_CONTAINER_SKU,
   getContainerUsageClient,
-  isGastownBillingEnabled,
+  isContainerUsageMeteringEnabled,
+  isGastownBillingEnforced,
   isUsageIntervalNotFoundError,
 } from './container-usage.billing';
+
+const usageBinding = {
+  recordStart: vi.fn(),
+  recordHeartbeat: vi.fn(),
+  recordStop: vi.fn(),
+} satisfies ContainerUsageRpcMethods;
 
 function envFixture(overrides: Partial<Env>): Env {
   return overrides as Env;
 }
 
 describe('Gastown billing configuration', () => {
-  it('enables billing only for the exact true value', () => {
-    expect(isGastownBillingEnabled(envFixture({ GASTOWN_BILLING_ENABLED: 'true' }))).toBe(true);
-    expect(isGastownBillingEnabled(envFixture({ GASTOWN_BILLING_ENABLED: 'false' }))).toBe(false);
-    expect(isGastownBillingEnabled(envFixture({}))).toBe(false);
+  it('enforces billing only for the exact true value', () => {
+    expect(isGastownBillingEnforced(envFixture({ GASTOWN_BILLING_ENABLED: 'true' }))).toBe(true);
+    expect(isGastownBillingEnforced(envFixture({ GASTOWN_BILLING_ENABLED: 'false' }))).toBe(false);
+    expect(isGastownBillingEnforced(envFixture({}))).toBe(false);
+  });
+
+  it('meters usage whenever the binding exists, regardless of the enforcement flag', () => {
+    // Reporting must run even with enforcement off so we can monitor real usage
+    // before turning enforcement on.
+    expect(
+      isContainerUsageMeteringEnabled(
+        envFixture({ CONTAINER_USAGE: usageBinding, GASTOWN_BILLING_ENABLED: 'false' })
+      )
+    ).toBe(true);
+    expect(
+      isContainerUsageMeteringEnabled(
+        envFixture({ CONTAINER_USAGE: usageBinding, GASTOWN_BILLING_ENABLED: 'true' })
+      )
+    ).toBe(true);
+    expect(isContainerUsageMeteringEnabled(envFixture({}))).toBe(false);
   });
 
   it('uses the production Gastown SKU', () => {

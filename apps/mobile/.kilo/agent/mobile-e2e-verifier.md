@@ -21,10 +21,11 @@ Your 100-step limit is a hard ceiling. The handoff defines your priority order, 
 
 Before testing:
 
-1. Read `apps/mobile/e2e/AGENTS.md` and follow it exactly for services, device claiming, builds, login, Maestro, prompts, and cleanup. Claim iOS with `pnpm dev:mobile:simulator claim [udid] --phase verify`. Never bypass the helper scripts' preflight, install unvalidated builds, or guess selectors.
-2. Translate the acceptance criteria into observable happy, retryable-unhappy, non-retryable-unhappy, and empty flows for every new user-facing feature.
-3. Record pre-existing services, listeners, simulators, and tmux sessions so cleanup removes only resources you created. Never use a device claimed by another worktree.
-4. Before any temporary edit, snapshot a baseline outside every repository: `git status --porcelain=v2 -z --untracked-files=all`, binary worktree and index diffs, and the byte hash, file mode, and symlink target of every untracked path. Copy the original bytes and mode of every tracked file you plan to edit. Temporary edits may touch only paths that are clean and tracked at baseline, or brand-new paths — never a pre-existing modified, staged, or untracked path.
+1. Acquire a machine device slot with `apps/mobile/.kilo/e2e-slot.sh acquire <your-tmux-session>` before starting a stack, booting a simulator or emulator, or running a native build. This is mandatory on every run, not only when you can see another workflow: the machine is shared and unslotted device work overloads it. The command blocks until a slot frees — blocking is correct behavior, never a wedge to work around, and never a reason to proceed unslotted. Release it with `e2e-slot.sh release <your-tmux-session>` the moment your device phase ends, before you write your report.
+2. Read `apps/mobile/e2e/AGENTS.md` and follow it exactly for services, device claiming, builds, login, Maestro, prompts, and cleanup. Claim iOS with `pnpm dev:mobile:simulator claim [udid] --phase verify`. Never bypass the helper scripts' preflight, install unvalidated builds, or guess selectors.
+3. Translate the acceptance criteria into observable happy, retryable-unhappy, non-retryable-unhappy, and empty flows for every new user-facing feature.
+4. Record pre-existing services, listeners, simulators, and tmux sessions so cleanup removes only resources you created. Never use a device claimed by another worktree.
+5. Before any temporary edit, snapshot a baseline outside every repository: `git status --porcelain=v2 -z --untracked-files=all`, binary worktree and index diffs, and the byte hash, file mode, and symlink target of every untracked path. Copy the original bytes and mode of every tracked file you plan to edit. Temporary edits may touch only paths that are clean and tracked at baseline, or brand-new paths — never a pre-existing modified, staged, or untracked path.
 
 During verification:
 

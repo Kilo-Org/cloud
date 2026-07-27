@@ -45,18 +45,21 @@ export function SessionContextMetrics({
 }: Readonly<SessionContextMetricsProps>) {
   const colors = useThemeColors();
   const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
+  // Single source for element kind and a11y affordance wording so a future
+  // caller with interactive content but no onPress cannot advertise a tap.
+  const pressable = content.interactive && onPress != null;
   const accessibilityLabel = getMetricsAccessibilityLabel({
     info,
     totalCostMicrodollars,
     platform,
-    interactive: content.interactive,
+    interactive: pressable,
   });
 
-  // Fixed 44pt height (h-11). Baseline measured 40pt with min-h-11 + py-1.5
-  // (ring 28 + vertical padding), so min-h was inert; h-11 makes the claimed
-  // 44pt minimum touch target real and identical in every pill state.
+  // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with
+  // NativeWind 5 preview (rem ≈ 14px here), so an arbitrary px value is required
+  // for the 44pt minimum touch target; height is identical in every pill state.
   const pillClassName =
-    'h-11 flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5';
+    'h-[44px] flex-row items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5';
 
   const body = (
     <>
@@ -90,7 +93,7 @@ export function SessionContextMetrics({
     </>
   );
 
-  if (content.interactive && onPress) {
+  if (pressable) {
     return (
       <Pressable
         onPress={onPress}

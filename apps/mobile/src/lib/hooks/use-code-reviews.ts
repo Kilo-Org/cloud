@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { hasInFlightReview, isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -73,13 +73,13 @@ export function useCancelReview(scope: string) {
       trpcClient.codeReviews.cancel.mutate({ reviewId: vars.reviewId }),
     onSuccess: (data, vars) => {
       if (!data.success) {
-        toast.error(data.error);
+        announcingToast.error(data.error);
         return;
       }
       invalidateReviews(vars.reviewId);
     },
     onError: error => {
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
   });
 }
@@ -93,13 +93,13 @@ export function useRetriggerReview(scope: string) {
       trpcClient.codeReviews.retrigger.mutate({ reviewId: vars.reviewId }),
     onSuccess: (data, vars) => {
       if (!data.success) {
-        toast.error(data.error);
+        announcingToast.error(data.error);
         return;
       }
       invalidateReviews(vars.reviewId);
     },
     onError: error => {
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
   });
 }
@@ -126,7 +126,7 @@ export function useCreateManualReview(scope: string) {
       invalidateReviews();
     },
     onError: error => {
-      toast.error(error.message);
+      announcingToast.error(error.message);
     },
   });
 }

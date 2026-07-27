@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { ExternalLink } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -80,104 +80,120 @@ export function LoginScreen() {
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="flex-grow items-center justify-center gap-6 px-6"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <View className="items-center gap-2">
-        <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
-        <Text className="text-lg">Welcome to Kilo Code</Text>
-      </View>
+    // Defect B / QB-A1: on small Android phones (e.g. kilo_small_phone_api35,
+    // 720x1280) the IME covers the primary submit button. The window is
+    // adjustResize but the outer ScrollView's automaticallyAdjustKeyboardInsets
+    // does not push the form up. Placing the KeyboardAvoidingView at the root
+    // gives it a window-relative frame (y ~ 0, height ~ screen height), so
+    // behavior="height" computes a non-zero shrink and resizes the ScrollView so
+    // the form stays above the IME. iOS is disabled because the ScrollView's
+    // automaticallyAdjustKeyboardInsets already handles the offset.
+    <KeyboardAvoidingView behavior="height" enabled={Platform.OS === 'android'} className="flex-1">
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="w-full max-w-sm items-center gap-2">
+          <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
+          <Text className="text-center text-lg">Welcome to Kilo Code</Text>
+        </View>
 
-      <Animated.View className="w-full max-w-sm gap-3" layout={LinearTransition}>
-        {status === 'idle' && (
-          <Animated.View
-            className="gap-3"
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
-            <IdleAuth start={start} />
-          </Animated.View>
-        )}
-
-        {status === 'pending' && code && (
-          <Animated.View
-            className="items-center gap-4"
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
-            <Text variant="muted">Your sign-in code:</Text>
-            <Text
-              variant="h2"
-              className="border-b-0 pb-0 tracking-widest"
-              // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
-              accessibilityLabel={`Sign in code: ${[...code].join(' ')}`}
-              selectable
+        <Animated.View className="w-full max-w-sm gap-3" layout={LinearTransition}>
+          {status === 'idle' && (
+            <Animated.View
+              className="w-full gap-3"
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
             >
-              {code}
-            </Text>
-            <View className="flex-row gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-row gap-1"
-                onPress={() => {
-                  void openBrowser();
-                }}
-                accessibilityLabel="Open sign-in page in browser"
-              >
-                <ExternalLink size={14} color={colors.foreground} />
-                <Text>Open in browser</Text>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => {
-                  if (verificationUrl) {
-                    void Clipboard.setStringAsync(verificationUrl);
-                    toast('Copied to clipboard');
-                  }
-                }}
-                accessibilityLabel="Copy sign-in link"
-              >
-                <Text numberOfLines={1}>Copy link</Text>
-              </Button>
-            </View>
-            <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
-              <Text>Cancel</Text>
-            </Button>
-          </Animated.View>
-        )}
+              <IdleAuth start={start} />
+            </Animated.View>
+          )}
 
-        {status === 'pending' && !code && (
-          <Animated.View
-            className="items-center gap-3"
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-            <Text variant="muted">Starting sign in...</Text>
-            <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
-              <Text>Cancel</Text>
-            </Button>
-          </Animated.View>
-        )}
+          {status === 'pending' && code && (
+            <Animated.View
+              className="w-full items-center gap-4"
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+            >
+              <Text variant="muted" className="text-center">
+                Your sign-in code:
+              </Text>
+              <Text
+                variant="h2"
+                className="border-b-0 pb-0 text-center tracking-widest"
+                // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
+                accessibilityLabel={`Sign in code: ${[...code].join(' ')}`}
+                selectable
+              >
+                {code}
+              </Text>
+              {/* Stack actions full-width so labels never clip side-by-side at max text */}
+              <View className="w-full gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full flex-row flex-wrap gap-1"
+                  onPress={() => {
+                    void openBrowser();
+                  }}
+                  accessibilityLabel="Open sign-in page in browser"
+                >
+                  <ExternalLink size={14} color={colors.foreground} />
+                  <Text className="text-center">Open in browser</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onPress={() => {
+                    if (verificationUrl) {
+                      void Clipboard.setStringAsync(verificationUrl);
+                      toast('Copied to clipboard');
+                    }
+                  }}
+                  accessibilityLabel="Copy sign-in link"
+                >
+                  <Text className="text-center">Copy link</Text>
+                </Button>
+              </View>
+              <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
+                <Text>Cancel</Text>
+              </Button>
+            </Animated.View>
+          )}
 
-        {(status === 'denied' || status === 'expired' || status === 'error') && (
-          <Animated.View
-            className="gap-3"
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-          >
-            <Text className="text-center text-sm text-destructive">
-              {errorMessage(status, error)}
-            </Text>
-            <IdleAuth start={start} />
-          </Animated.View>
-        )}
-      </Animated.View>
-    </ScrollView>
+          {status === 'pending' && !code && (
+            <Animated.View
+              className="w-full items-center gap-3"
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+            >
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+              <Text variant="muted" className="text-center">
+                Starting sign in...
+              </Text>
+              <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">
+                <Text>Cancel</Text>
+              </Button>
+            </Animated.View>
+          )}
+
+          {(status === 'denied' || status === 'expired' || status === 'error') && (
+            <Animated.View
+              className="w-full gap-3"
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+            >
+              <Text className="text-center text-sm text-destructive">
+                {errorMessage(status, error)}
+              </Text>
+              <IdleAuth start={start} />
+            </Animated.View>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

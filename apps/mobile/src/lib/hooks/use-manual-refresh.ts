@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner-native';
+
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 // Wraps a pull-to-refresh refetch with a "refreshing" flag and a toast on
 // failure. Callers with multiple queries to refetch should reduce their
@@ -16,7 +17,7 @@ export function useManualRefresh(
       try {
         const result = await refetch();
         if (result.isError) {
-          toast.error(errorMessage);
+          announcingToast.error(errorMessage);
         }
       } finally {
         setRefreshing(false);

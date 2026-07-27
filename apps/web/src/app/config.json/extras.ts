@@ -50,6 +50,11 @@ export const kiloExtras = {
         'Small model to use for tasks like title generation in the format of provider/model',
       ...nullableModel,
     },
+    snapshot: {
+      description:
+        'Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.',
+      type: 'boolean',
+    },
     remote_control: {
       description:
         'Enable remote control of sessions via Kilo Cloud. Equivalent to running /remote on startup.',

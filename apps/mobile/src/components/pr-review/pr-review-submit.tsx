@@ -8,7 +8,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, Pressable, ScrollView, type TextInput, View } from 'react-native';
 
 import {
@@ -26,6 +26,7 @@ import {
 import {
   buildSubmitReviewInput,
   type ReviewEvent,
+  reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -59,6 +60,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
+  const [hasSummary, setHasSummary] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
@@ -71,6 +73,11 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
   const hasStaleItems = pending.items.some(item => item.commitSha !== headSha);
+  const blockReason = reviewSubmitBlockReason({
+    event,
+    hasSummary,
+    commentCount: queuedCount,
+  });
 
   useEffect(() => {
     if (submitReview.error) {
@@ -156,6 +163,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const submitDisabled =
     isSubmitting ||
+    blockReason !== null ||
     inlineErrorKind === 'bad-request' ||
     inlineErrorKind === 'forbidden' ||
     inlineErrorKind === 'reconnect';
@@ -164,6 +172,20 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   // Keyboard-open viewport is tight; keep count, hide per-item rows so
   // Submit + Cancel stay above the keyboard at scroll offset 0.
   const showPendingRows = !keyboardVisible;
+
+  // Hint only when empty/stale — skips the long happy-path line that
+  // pushed footer CTAs below half-detent. blockReason replaces
+  // PendingQueueHint so empty-queue + COMMENT is not contradictory.
+  let queueHint: ReactNode = null;
+  if (blockReason !== null) {
+    queueHint = (
+      <Text variant="muted" className="text-xs">
+        {blockReason}
+      </Text>
+    );
+  } else if (!keyboardVisible && (queuedCount === 0 || hasStaleItems)) {
+    queueHint = <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />;
+  }
 
   // PickerSheet invariant: [header, ScrollView]; footer is trailing content.
   return (
@@ -192,7 +214,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               bodyRef={bodyRef}
               inputRef={bodyInputRef}
               isDisabled={isSubmitting}
-              onChange={clearRecoverableError}
+              onChange={() => {
+                setHasSummary(bodyRef.current.trim().length > 0);
+                clearRecoverableError();
+              }}
             />
           </View>
 
@@ -200,11 +225,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             <Text className="text-sm font-medium text-foreground">
               {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
             </Text>
-            {/* Hint only when empty/stale — skips the long happy-path line that
-                pushed footer CTAs below half-detent. */}
-            {!keyboardVisible && (queuedCount === 0 || hasStaleItems) ? (
-              <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />
-            ) : null}
+            {queueHint}
             {showPendingRows
               ? pending.items.map(item => (
                   <PrReviewPendingCommentRow

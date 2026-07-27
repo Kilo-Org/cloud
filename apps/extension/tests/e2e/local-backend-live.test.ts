@@ -955,3 +955,116 @@ test('live local backend manual Compact now compacts a frontier conversation', a
     await rm(userDataDir, { force: true, recursive: true });
   }
 });
+
+const restoreFrontierFavoriteIfNeeded = async (
+  sidePanel: Page,
+  wasFavoriteBefore: 'unknown' | boolean
+): Promise<void> => {
+  // Only undo a starring we performed after observing prior state as non-favorite.
+  if (wasFavoriteBefore !== false) {
+    return;
+  }
+
+  const dialog = sidePanel.locator('[role="dialog"][aria-modal="true"][aria-label="Select model"]');
+  const isOpen = (await dialog.count()) > 0;
+
+  if (!isOpen) {
+    const trigger = sidePanel.getByLabel('Model');
+    const canOpen = await trigger.isEnabled().catch(() => false);
+
+    if (!canOpen) {
+      return;
+    }
+
+    await trigger.click().catch(() => null);
+    await dialog.waitFor({ state: 'visible', timeout: 30_000 }).catch(() => null);
+  }
+
+  if ((await dialog.count()) === 0) {
+    return;
+  }
+
+  const frontierRow = dialog.locator(`button[data-model-id="${frontierModel}"]`);
+  const frontierName = (await frontierRow.getAttribute('aria-label').catch(() => null)) ?? '';
+
+  if (frontierName.length === 0) {
+    return;
+  }
+
+  const removeStar = dialog.getByLabel(`Remove ${frontierName} from favorites`);
+
+  if ((await removeStar.count()) === 0) {
+    return;
+  }
+
+  await removeStar.click().catch(() => null);
+  await expect(dialog.getByLabel(`Add ${frontierName} to favorites`))
+    .toBeVisible({ timeout: 30_000 })
+    .catch(() => null);
+};
+
+test('live local backend personal favorites round-trip for frontier', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  const sidePanel = await context.newPage();
+  // Tri-state prior: never default to "not favorite"; restore only when observed false.
+  let wasFavoriteBefore: 'unknown' | boolean = 'unknown';
+
+  try {
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
+
+    await sidePanel.getByLabel('Model').click();
+    const dialog = sidePanel.locator(
+      '[role="dialog"][aria-modal="true"][aria-label="Select model"]'
+    );
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+
+    const frontierRow = dialog.locator(`button[data-model-id="${frontierModel}"]`);
+    await expect(frontierRow).toBeVisible({ timeout: 30_000 });
+
+    const frontierName = (await frontierRow.getAttribute('aria-label')) ?? '';
+    expect(frontierName.length).toBeGreaterThan(0);
+
+    const addLabel = `Add ${frontierName} to favorites`;
+    const removeLabel = `Remove ${frontierName} from favorites`;
+    const removeStar = dialog.getByLabel(removeLabel);
+    const addStar = dialog.getByLabel(addLabel);
+
+    // Sample prior only when preferences are ready: star enabled and no retryable banner.
+    // Stars also enable in retryable (empty in-memory set + "Couldn't load favorites.").
+    const favoritesBanner = dialog.getByText("Couldn't load favorites.");
+    await expect(addStar.or(removeStar)).toBeEnabled({ timeout: 60_000 });
+    await expect(favoritesBanner).toHaveCount(0, { timeout: 60_000 });
+
+    wasFavoriteBefore = (await removeStar.count()) > 0;
+
+    if (wasFavoriteBefore) {
+      await expect(removeStar).toHaveAttribute('aria-pressed', 'true');
+    } else {
+      await expect(addStar).toBeVisible();
+      await addStar.click();
+      await expect(dialog.getByLabel(removeLabel)).toHaveAttribute('aria-pressed', 'true', {
+        timeout: 30_000,
+      });
+    }
+
+    await sidePanel.getByLabel('Close model picker').click();
+    await expect(dialog).toHaveCount(0);
+
+    await sidePanel.reload();
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
+    await sidePanel.getByLabel('Model').click();
+    await expect(dialog).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.locator(`button[data-model-id="${frontierModel}"]`)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(dialog.getByLabel(removeLabel)).toHaveAttribute('aria-pressed', 'true', {
+      timeout: 30_000,
+    });
+    await expect(dialog.locator('p.type-eyebrow', { hasText: /^FAVORITES$/u })).toBeVisible();
+  } finally {
+    await restoreFrontierFavoriteIfNeeded(sidePanel, wasFavoriteBefore);
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});

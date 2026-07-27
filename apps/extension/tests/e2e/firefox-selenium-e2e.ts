@@ -55,6 +55,7 @@ const chromeWorkflowNames = [
   'memory index is included in the chat request context',
   'memory tools search and read saved memories',
   'settings memories list supports delete and shows the empty state',
+  'model picker search filters and selects by model id',
 ] as const;
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
@@ -974,16 +975,24 @@ const modelOptionByIdLocator = (modelId: string): ReturnType<typeof By.xpath> =>
 
 /** Select model by `data-model-id` (never by name). Mirrors Playwright helper. */
 const selectModelByIdFirefox = async (driver: WebDriver, modelId: string): Promise<void> => {
-  await waitUntil(
-    driver,
-    async () => {
-      const elements = await driver.findElements(By.css(modelTriggerSelector));
+  const dialogAlreadyOpen = async (): Promise<boolean> => {
+    const dialogs = await driver.findElements(By.css(modelDialogSelector));
 
-      return elements.length > 0 && (await elements[0]?.isDisplayed()) === true;
-    },
-    'Timed out waiting for Model trigger'
-  );
-  await driver.findElement(By.css(modelTriggerSelector)).click();
+    return dialogs.length > 0 && (await dialogs[0]?.isDisplayed()) === true;
+  };
+
+  if (!(await dialogAlreadyOpen())) {
+    await waitUntil(
+      driver,
+      async () => {
+        const elements = await driver.findElements(By.css(modelTriggerSelector));
+
+        return elements.length > 0 && (await elements[0]?.isDisplayed()) === true;
+      },
+      'Timed out waiting for Model trigger'
+    );
+    await driver.findElement(By.css(modelTriggerSelector)).click();
+  }
 
   const optionLocator = modelOptionByIdLocator(modelId);
 
@@ -1008,13 +1017,6 @@ const selectModelByIdFirefox = async (driver: WebDriver, modelId: string): Promi
     `Timed out waiting for model dialog to close after selecting ${modelId}`
   );
 };
-
-// Retain unused-until-M3 helpers without rewiring existing name-based waits.
-const modelPickerSeleniumHelpers = {
-  getModelTriggerSelectedId,
-  selectModelByIdFirefox,
-} as const;
-void modelPickerSeleniumHelpers;
 
 const getSelectOptionsText = async (driver: WebDriver, ariaLabel: string): Promise<string> => {
   const result = await driver.executeScript((label: string) => {
@@ -2857,6 +2859,57 @@ const scenarios: FirefoxScenario[] = [
         );
         assert.equal(regionButtons.length, 0);
         await closeFirefoxSettings(session.driver);
+      }),
+  },
+  {
+    name: 'model picker search filters and selects by model id',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        const modelId = 'anthropic/claude-sonnet-4';
+
+        await openAuthenticatedPanel(session);
+        await waitForModel(session.driver);
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const elements = await session.driver.findElements(By.css(modelTriggerSelector));
+
+            return elements.length > 0 && (await elements[0]?.isEnabled()) === true;
+          },
+          'Timed out waiting for Model trigger to enable'
+        );
+
+        await session.driver.findElement(By.css(modelTriggerSelector)).click();
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const dialogs = await session.driver.findElements(By.css(modelDialogSelector));
+
+            return dialogs.length > 0 && (await dialogs[0]?.isDisplayed()) === true;
+          },
+          'Timed out waiting for model picker dialog'
+        );
+
+        const searchInput = await session.driver.findElement(
+          By.css(`${modelDialogSelector} input[aria-label="Search models"]`)
+        );
+        await searchInput.clear();
+        await searchInput.sendKeys('claude-sonnet');
+
+        await waitUntil(
+          session.driver,
+          async () => {
+            const options = await session.driver.findElements(modelOptionByIdLocator(modelId));
+
+            return options.length > 0 && (await options[0]?.isDisplayed()) === true;
+          },
+          `Timed out waiting for filtered model option ${modelId}`
+        );
+
+        await selectModelByIdFirefox(session.driver, modelId);
+        assert.equal(await getModelTriggerSelectedId(session.driver), modelId);
       }),
   },
 ];

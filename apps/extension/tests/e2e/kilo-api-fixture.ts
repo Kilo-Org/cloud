@@ -59,10 +59,18 @@ const dangerousToolNames = [
 ];
 interface MockGatewayModel {
   readonly contextLength?: number;
+  readonly hasUserByokAvailable?: boolean;
   readonly id: string;
+  readonly isFree?: boolean;
+  readonly mayTrainOnYourPrompts?: boolean;
   readonly name: string;
+  readonly preferredIndex?: number;
   readonly variants?: Record<string, unknown>;
 }
+
+const favoriteMutationBodySchema = z.object({
+  model: z.string().min(1),
+});
 
 type ChatAbortObserverWindow = typeof globalThis & {
   __kiloChatCompletionAborted?: boolean;
@@ -85,7 +93,9 @@ export const mockKiloApi = async (
     modelNameByOrganizationId?: Record<string, string>;
     modelFailuresBeforeSuccess?: number;
     modelPreferencesFavorites?: string[];
+    modelPreferencesGetFailuresBeforeSuccess?: number;
     modelPreferencesGetStatus?: number;
+    modelPreferencesMutationFailuresBeforeSuccess?: number;
     modelPreferencesMutationStatus?: number;
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
@@ -100,6 +110,10 @@ export const mockKiloApi = async (
   let chatCompletionCalls = 0;
   let modelCalls = 0;
   const modelCallsByOrganizationId = new Map<string, number>();
+  const favorites = [...(options.modelPreferencesFavorites ?? [])];
+  let modelPreferencesGetFailuresRemaining = options.modelPreferencesGetFailuresBeforeSuccess ?? 0;
+  let modelPreferencesMutationFailuresRemaining =
+    options.modelPreferencesMutationFailuresBeforeSuccess ?? 0;
 
   await context.route('https://app.kilo.ai/api/user', route =>
     route.fulfill({
@@ -131,11 +145,17 @@ export const mockKiloApi = async (
           return;
         }
 
+        if (modelPreferencesGetFailuresRemaining > 0) {
+          modelPreferencesGetFailuresRemaining -= 1;
+          await route.fulfill({ status: 500 });
+          return;
+        }
+
         await route.fulfill({
           json: {
             result: {
               data: {
-                favorites: options.modelPreferencesFavorites ?? [],
+                favorites: [...favorites],
                 lastSelected: null,
               },
             },
@@ -152,6 +172,36 @@ export const mockKiloApi = async (
         if (options.modelPreferencesMutationStatus !== undefined) {
           await route.fulfill({ status: options.modelPreferencesMutationStatus });
           return;
+        }
+
+        if (modelPreferencesMutationFailuresRemaining > 0) {
+          modelPreferencesMutationFailuresRemaining -= 1;
+          await route.fulfill({ status: 500 });
+          return;
+        }
+
+        let postData: unknown = null;
+
+        try {
+          postData = route.request().postDataJSON();
+        } catch {
+          postData = null;
+        }
+
+        const parsedBody = favoriteMutationBodySchema.safeParse(postData);
+
+        if (parsedBody.success) {
+          const modelId = parsedBody.data.model;
+          const isAdd = pathname.endsWith('/modelPreferences.addFavorite');
+          const favoriteIndex = favorites.indexOf(modelId);
+
+          if (isAdd && favoriteIndex === -1) {
+            favorites.push(modelId);
+          }
+
+          if (!isAdd && favoriteIndex !== -1) {
+            favorites.splice(favoriteIndex, 1);
+          }
         }
 
         await route.fulfill({
@@ -193,19 +243,38 @@ export const mockKiloApi = async (
     ];
 
     const data = models.map((model, index) => {
+      const {
+        contextLength,
+        hasUserByokAvailable,
+        id,
+        isFree,
+        mayTrainOnYourPrompts,
+        name,
+        preferredIndex: explicitPreferredIndex,
+        variants,
+      } = model;
+      let preferredIndex = explicitPreferredIndex;
+
+      if (preferredIndex === undefined && index === 0) {
+        preferredIndex = 0;
+      }
+
       const item = {
-        id: model.id,
-        name: model.name,
-        opencode: { variants: model.variants ?? { high: {}, low: {}, medium: {} } },
-        ...(model.contextLength === undefined ? {} : { context_length: model.contextLength }),
+        id,
+        name,
+        opencode: { variants: variants ?? { high: {}, low: {}, medium: {} } },
+        ...(contextLength === undefined ? {} : { context_length: contextLength }),
+        ...(hasUserByokAvailable === undefined ? {} : { hasUserByokAvailable }),
+        ...(isFree === undefined ? {} : { isFree }),
+        ...(mayTrainOnYourPrompts === undefined ? {} : { mayTrainOnYourPrompts }),
+        ...(preferredIndex === undefined ? {} : { preferredIndex }),
       };
 
       return Object.assign(
         item,
         options.modelInputModalities === undefined
           ? {}
-          : { architecture: { input_modalities: options.modelInputModalities } },
-        index === 0 ? { preferredIndex: 0 } : {}
+          : { architecture: { input_modalities: options.modelInputModalities } }
       );
     });
 

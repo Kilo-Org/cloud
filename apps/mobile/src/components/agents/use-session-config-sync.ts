@@ -1,4 +1,4 @@
-import { type ResolvedSession } from 'cloud-agent-sdk';
+import { type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 import { useEffect, useState } from 'react';
 
 import { normalizeAgentMode } from '@/components/agents/mode-options';

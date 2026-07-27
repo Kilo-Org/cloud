@@ -10,7 +10,7 @@ import {
   type SessionManager,
   type SessionSnapshot,
   type UserWebConnection,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
 import {
   formatSafeCloudAgentFailureDiagnostic,

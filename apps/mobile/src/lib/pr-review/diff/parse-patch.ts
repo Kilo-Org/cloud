@@ -21,6 +21,51 @@
 
 export type DiffLineType = 'context' | 'add' | 'del';
 
+/** Human-readable, screen-reader-friendly status word for a diff line. */
+type DiffLineStatusWord = 'Added' | 'Deleted' | 'Context';
+
+/**
+ * Single-character gutter glyph for a diff line. The CHARACTER is the
+ * non-color signal (every diff viewer relies on it being readable in
+ * monochrome printouts); a tinted color reinforces but never replaces it.
+ *
+ *   add     → '+'  (matched against `+` line prefix in the unified diff)
+ *   del     → '-'  (matched against `-` line prefix)
+ *   context → '·'  (U+00B7 MIDDLE DOT — tasteful pair with +/-, no diff
+ *                     content to mirror so a neutral dot signals "no
+ *                     change here" without cheapening the diff)
+ */
+type DiffLineMarker = '+' | '-' | '·';
+
+/**
+ * The status word for a diff line. Used in accessibility labels and any
+ * future surface that needs to describe the line type in prose.
+ */
+export function diffLineStatusWord(type: DiffLineType): DiffLineStatusWord {
+  if (type === 'add') {
+    return 'Added';
+  }
+  if (type === 'del') {
+    return 'Deleted';
+  }
+  return 'Context';
+}
+
+/**
+ * The single-character gutter glyph for a diff line. Pure: depends only
+ * on the parsed `type` so the same input always produces the same
+ * glyph (testable in plain Node, no React Native required).
+ */
+export function diffLineMarker(type: DiffLineType): DiffLineMarker {
+  if (type === 'add') {
+    return '+';
+  }
+  if (type === 'del') {
+    return '-';
+  }
+  return '·';
+}
+
 export type ParsedDiffLine = {
   type: DiffLineType;
   /** 1-indexed line number in the old file. Undefined for `add` lines. */
@@ -36,6 +81,27 @@ export type ParsedDiffLine = {
    */
   noNewlineAtEndOfFile: boolean;
 };
+
+/**
+ * Build a screen-reader label for a diff line. Always includes BOTH the
+ * status word ("Added" / "Deleted" / "Context") AND the line text — the
+ * status word is the non-color signal, the line text is what the line
+ * actually contains.
+ *
+ * The line number is included when known (helps orient the listener in
+ * a long diff) but is omitted for synthetic lines without a number.
+ *
+ * Empty / whitespace-only text is rendered as `(empty)` so the listener
+ * hears a meaningful token instead of a silent label.
+ */
+export function buildDiffLineAccessibilityLabel(line: ParsedDiffLine): string {
+  const status = diffLineStatusWord(line.type);
+  const lineNumber = line.newLine ?? line.oldLine;
+  const linePart = lineNumber !== undefined ? ` line ${lineNumber}` : '';
+  const trimmed = line.text.trim();
+  const text = trimmed === '' ? '(empty)' : line.text;
+  return `${status}${linePart}: ${text}`;
+}
 
 export type ParsedHunk = {
   /** The raw `@@ -a,b +c,d @@` header line, minus the trailing section heading. */

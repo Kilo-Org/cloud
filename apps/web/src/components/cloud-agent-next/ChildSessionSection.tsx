@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { ChevronRight, ChevronDown, Bot, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
+import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
 import { MessageErrorBoundary } from './MessageErrorBoundary';

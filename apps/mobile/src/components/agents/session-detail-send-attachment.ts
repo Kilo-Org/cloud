@@ -1,4 +1,4 @@
-import { type RemoteAttachmentPart, type ResolvedSession } from 'cloud-agent-sdk';
+import { type RemoteAttachmentPart, type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 

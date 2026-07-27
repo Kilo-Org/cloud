@@ -15,7 +15,7 @@ import {
   planLiveSystemEventActions,
 } from './active-sessions-live';
 
-import { type UserWebConnection, type UserWebSystemEvent } from 'cloud-agent-sdk';
+import { type UserWebConnection, type UserWebSystemEvent } from '@kilocode/cloud-agent-sdk';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
 

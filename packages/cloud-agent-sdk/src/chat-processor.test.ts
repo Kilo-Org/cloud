@@ -1,0 +1,359 @@
+import type { FilePart, Message, Part, TextPart, UserMessage } from '@kilocode/app-shared/opencode';
+import { createChatProcessor } from './chat-processor';
+import type { ChatEvent } from './normalizer';
+import { createMemoryStorage } from './storage/memory';
+
+// Helpers that return properly typed stubs (literal role/type fields).
+function makeUserMsg(id: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    role: 'user' as const,
+    time: { created: 1 },
+    agent: 'build',
+    model: { providerID: 'a', modelID: 'b' },
+  } satisfies Message;
+}
+
+function makeAssistantMsg(id: string, parentID: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    role: 'assistant' as const,
+    time: { created: 2 },
+    parentID,
+    modelID: 'claude',
+    providerID: 'anthropic',
+    mode: 'code',
+    agent: 'build',
+    path: { cwd: '/', root: '/' },
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+  } satisfies Message;
+}
+
+function makeTextPart(id: string, messageID: string, text: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: 'text' as const,
+    text,
+  } satisfies Part;
+}
+
+function makeFilePart(id: string, messageID: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: 'file' as const,
+    mime: 'text/plain',
+    filename: 'readme.txt',
+    url: 'data:text/plain;base64,aGVsbG8=',
+    source: {
+      type: 'file' as const,
+      path: '/readme.txt',
+      text: { value: 'file content here', start: 0, end: 17 },
+    },
+  } satisfies FilePart;
+}
+
+describe('createChatProcessor', () => {
+  describe('message.updated', () => {
+    it('upserts message info into storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const msg = makeUserMsg('msg-1');
+
+      processor.process({ type: 'message.updated', info: msg });
+
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+      expect(storage.getMessageInfo('msg-1')).toEqual(msg);
+    });
+  });
+
+  describe('message.part.updated', () => {
+    it('upserts part into storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = makeTextPart('part-1', 'msg-1', 'hello');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect(stored[0].id).toBe('part-1');
+      expect((stored[0] satisfies Part as TextPart).text).toBe('hello');
+    });
+
+    it('strips file content before storing', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = makeFilePart('part-file', 'msg-1');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      const storedFile = stored[0] satisfies Part as FilePart;
+      expect(storedFile.url).toBe('');
+      expect(storedFile.source?.text.value).toBe('');
+    });
+
+    it('does not replace text with empty non-synthetic part', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      // Add synthetic optimistic part with text
+      const syntheticPart = {
+        id: 'part-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text' as const,
+        text: 'user message text',
+        synthetic: true,
+      };
+      processor.process({ type: 'message.part.updated', part: syntheticPart });
+      expect((storage.getParts('msg-1')[0] satisfies Part as TextPart).text).toBe(
+        'user message text'
+      );
+
+      // Server sends non-synthetic part with empty text
+      const nonSyntheticEmptyPart = {
+        id: 'part-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text' as const,
+        text: '',
+        synthetic: false,
+      };
+      processor.process({ type: 'message.part.updated', part: nonSyntheticEmptyPart });
+
+      // Should preserve the existing text
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
+    });
+
+    it('does not replace text with empty server part that omits synthetic', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: {
+          id: 'part-1',
+          sessionID: 'ses-1',
+          messageID: 'msg-1',
+          type: 'text',
+          text: 'user message text',
+          synthetic: true,
+        },
+      });
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('part-1', 'msg-1', ''),
+      });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
+    });
+  });
+
+  describe('message.part.delta', () => {
+    it('applies text delta to storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      const delta: ChatEvent = {
+        type: 'message.part.delta',
+        sessionId: 'ses-1',
+        messageId: 'msg-1',
+        partId: 'part-1',
+        field: 'text',
+        delta: 'hello',
+      };
+
+      processor.process(delta);
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('hello');
+    });
+  });
+
+  describe('message.part.removed', () => {
+    it('deletes part from storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = makeTextPart('part-1', 'msg-1', 'hello');
+
+      processor.process({ type: 'message.part.updated', part });
+      expect(storage.getParts('msg-1')).toHaveLength(1);
+
+      processor.process({
+        type: 'message.part.removed',
+        sessionId: 'ses-1',
+        messageId: 'msg-1',
+        partId: 'part-1',
+      });
+
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+  });
+
+  describe('synthesizeQueuedUserMessage', () => {
+    it('inserts a synthetic user message with text part when storage is empty', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: 'hello',
+      });
+
+      expect(storage.getMessageIds()).toEqual(['msg-queued']);
+      const info = storage.getMessageInfo('msg-queued') as UserMessage;
+      expect(info?.role).toBe('user');
+      expect(info?.sessionID).toBe('ses-1');
+      const parts = storage.getParts('msg-queued');
+      expect(parts).toHaveLength(1);
+      const textPart = parts[0] satisfies Part as TextPart;
+      expect(textPart.type).toBe('text');
+      expect(textPart.text).toBe('hello');
+      expect(textPart.synthetic).toBe(true);
+    });
+
+    it('is idempotent when the message already exists in storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const authoritativeMsg = makeUserMsg('msg-1');
+      processor.process({ type: 'message.updated', info: authoritativeMsg });
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('part-real', 'msg-1', 'authoritative text'),
+      });
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: 'duplicate',
+      });
+
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+      expect(storage.getMessageInfo('msg-1')).toEqual(authoritativeMsg);
+      const parts = storage.getParts('msg-1');
+      expect(parts).toHaveLength(1);
+      expect(parts[0]?.id).toBe('part-real');
+      expect((parts[0] satisfies Part as TextPart).text).toBe('authoritative text');
+    });
+
+    it('authoritative message.updated arriving after synthesizer overwrites synthetic info', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-1',
+        sessionId: 'ses-1',
+        content: 'placeholder',
+      });
+
+      const authoritativeMsg = makeUserMsg('msg-1');
+      processor.process({ type: 'message.updated', info: authoritativeMsg });
+
+      expect(storage.getMessageInfo('msg-1')).toEqual(authoritativeMsg);
+    });
+
+    it('does nothing when content is undefined and storage has no existing message', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: undefined,
+      });
+
+      expect(storage.getMessageIds()).toEqual([]);
+    });
+
+    it('does nothing when content is an empty string', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.synthesizeQueuedUserMessage({
+        messageId: 'msg-queued',
+        sessionId: 'ses-1',
+        content: '',
+      });
+
+      expect(storage.getMessageIds()).toEqual([]);
+    });
+  });
+
+  describe('sequential processing', () => {
+    it('produces correct final state from multiple events', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      const user = makeUserMsg('msg-1');
+      const assistant = makeAssistantMsg('msg-2', 'msg-1');
+
+      // 1. User message arrives
+      processor.process({ type: 'message.updated', info: user });
+
+      // 2. Assistant message arrives
+      processor.process({ type: 'message.updated', info: assistant });
+
+      // 3. Text part with streaming deltas
+      processor.process({
+        type: 'message.part.delta',
+        sessionId: 'ses-1',
+        messageId: 'msg-2',
+        partId: 'part-1',
+        field: 'text',
+        delta: 'Hello ',
+      });
+      processor.process({
+        type: 'message.part.delta',
+        sessionId: 'ses-1',
+        messageId: 'msg-2',
+        partId: 'part-1',
+        field: 'text',
+        delta: 'world',
+      });
+
+      // 4. Full part update replaces the delta-seeded part
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('part-1', 'msg-2', 'Hello world!'),
+      });
+
+      // 5. Second part arrives then gets removed
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('part-2', 'msg-2', 'ephemeral'),
+      });
+      processor.process({
+        type: 'message.part.removed',
+        sessionId: 'ses-1',
+        messageId: 'msg-2',
+        partId: 'part-2',
+      });
+
+      // Verify final state
+      expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
+      expect(storage.getMessageInfo('msg-1')).toEqual(user);
+      expect(storage.getMessageInfo('msg-2')).toEqual(assistant);
+
+      const parts = storage.getParts('msg-2');
+      expect(parts).toHaveLength(1);
+      expect(parts[0].id).toBe('part-1');
+      expect((parts[0] satisfies Part as TextPart).text).toBe('Hello world!');
+    });
+  });
+});

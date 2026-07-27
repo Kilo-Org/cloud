@@ -1,4 +1,4 @@
-import { type KiloSessionId } from 'cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';

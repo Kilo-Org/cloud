@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Model option tests mirror the SDK/web suite. */
 import { describe, expect, it } from 'vitest';
-import { type ContextUsage } from 'cloud-agent-sdk/context-usage';
+import { type ContextUsage } from '@kilocode/cloud-agent-sdk/context-usage';
 
 import {
   buildSessionModelOptions,

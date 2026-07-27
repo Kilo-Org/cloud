@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Sparkles } from 'lucide-react-native';
-import { type StandaloneSuggestion, type SuggestionAction } from 'cloud-agent-sdk';
+import { type StandaloneSuggestion, type SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';

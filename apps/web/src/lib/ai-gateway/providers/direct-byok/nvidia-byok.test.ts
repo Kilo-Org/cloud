@@ -62,6 +62,19 @@ describe('NVIDIA direct BYOK', () => {
     expect(body).not.toHaveProperty('include_reasoning');
   });
 
+  test('removes gateway attribution and cache-hint fields NVIDIA rejects', () => {
+    const body = transform({
+      model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID,
+      safety_identifier: 'user-hash',
+      user: 'user-hash',
+      prompt_cache_key: 'task-hash',
+    });
+
+    expect(body).not.toHaveProperty('safety_identifier');
+    expect(body).not.toHaveProperty('user');
+    expect(body).not.toHaveProperty('prompt_cache_key');
+  });
+
   test('uses the documented reasoning efforts for Super and Ultra', () => {
     expect(
       transform({ model: NVIDIA_NEMOTRON_3_SUPER_MODEL_ID, reasoning: { effort: 'low' } })

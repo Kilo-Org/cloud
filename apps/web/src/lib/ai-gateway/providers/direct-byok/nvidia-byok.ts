@@ -38,6 +38,11 @@ export default {
     delete request.body.transforms;
     delete request.body.reasoning;
     delete request.body.include_reasoning;
+    // NVIDIA validates unknown fields and rejects the gateway's caller-attribution
+    // and cache-hint parameters.
+    delete request.body.safety_identifier;
+    delete request.body.user;
+    delete request.body.prompt_cache_key;
   },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'nvidia-byok',

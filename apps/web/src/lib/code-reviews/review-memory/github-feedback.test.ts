@@ -12,11 +12,18 @@ import { eq } from 'drizzle-orm';
 
 import {
   handleGitHubReviewCommentReply,
+  isLikelyKiloBotActor,
   REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH,
   type FetchParentReviewComment,
   type FetchRepositoryPermission,
 } from './github-feedback';
 import { setReviewMemoryEnabled } from './settings';
+
+describe('isLikelyKiloBotActor', () => {
+  it('treats kilocode-bot as a Kilo bot actor', () => {
+    expect(isLikelyKiloBotActor('kilocode-bot')).toBe(true);
+  });
+});
 
 describe('GitHub review memory feedback', () => {
   afterEach(async () => {

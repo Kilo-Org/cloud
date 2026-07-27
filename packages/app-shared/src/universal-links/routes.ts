@@ -215,8 +215,8 @@ function matchPattern(pattern: string, path: string): string[] | null {
   const captures: string[] = [];
 
   for (let i = 0; i < patternSegments.length; i++) {
-    const pSeg = patternSegments[i]!;
-    const pathSeg = pathSegments[i]!;
+    const pSeg = patternSegments[i];
+    const pathSeg = pathSegments[i];
 
     if (pSeg === '*') {
       // Single non-empty segment; empty segments never appear after split.
@@ -249,7 +249,7 @@ function splitSegments(pathname: string): string[] {
 function substituteCaptures(appPath: string, captures: string[]): string {
   let result = appPath;
   for (let i = 0; i < captures.length; i++) {
-    result = result.replaceAll(`<${i + 1}>`, captures[i]!);
+    result = result.replaceAll(`<${i + 1}>`, captures[i]);
   }
   return result;
 }

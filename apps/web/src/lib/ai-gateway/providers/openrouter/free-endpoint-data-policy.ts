@@ -1,31 +1,24 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  isForbiddenFreeModel,
+  isForbiddenFreeModelFamily,
+} from '@/lib/ai-gateway/forbidden-free-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { StoredModel } from '@kilocode/db/schema-types';
 
 type ProviderModels = Array<{
   provider: { slug: string };
   models: OpenRouterModel[];
 }>;
 
-function isZeroPrice(price: string | undefined): boolean {
-  if (price === undefined || price.trim() === '') return false;
-  const value = Number(price);
-  return Number.isFinite(value) && value === 0;
-}
-
-function freeOpenRouterEndpointKeys(openRouterModels: Record<string, StoredModel>): Set<string> {
+export function getOpenRouterFreeEndpointKeys(providerModelData: ProviderModels): Set<string> {
   const keys = new Set<string>();
-  for (const model of Object.values(openRouterModels)) {
-    const modelId = normalizeModelId(model.id);
-    for (const endpoint of model.endpoints) {
-      if (
-        endpoint.tag &&
-        isZeroPrice(endpoint.pricing?.prompt) &&
-        isZeroPrice(endpoint.pricing?.completion)
-      ) {
-        keys.add(`${modelId}:${normalizeInferenceProviderId(endpoint.tag)}`);
+  for (const { provider, models } of providerModelData) {
+    const providerId = normalizeInferenceProviderId(provider.slug);
+    for (const model of models) {
+      if (model.endpoint?.is_free && !isForbiddenFreeModelFamily(model.slug)) {
+        keys.add(`${normalizeModelId(model.slug)}:${providerId}`);
       }
     }
   }
@@ -38,7 +31,8 @@ function dataCollectingKiloExclusiveModels(
   const models = new Map<string, ReadonlySet<string> | null>();
   for (const model of kiloExclusiveModels) {
     const collectsData = model.pricing === null || model.flags.includes('requires-data-collection');
-    if (model.status !== 'public' || !collectsData) continue;
+    if (model.status !== 'public' || !collectsData || isForbiddenFreeModel(model.public_id))
+      continue;
     const modelId = normalizeModelId(model.public_id);
     if (model.inference_provider_restriction.length === 0) {
       models.set(modelId, null);
@@ -61,14 +55,13 @@ function dataCollectingKiloExclusiveModels(
 
 export function applyFreeEndpointDataPolicy({
   providerModelData,
-  openRouterModels,
+  openRouterFreeEndpointKeys,
   kiloExclusiveModels,
 }: {
   providerModelData: ProviderModels;
-  openRouterModels: Record<string, StoredModel>;
+  openRouterFreeEndpointKeys: ReadonlySet<string>;
   kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>;
 }): void {
-  const openRouterEndpointKeys = freeOpenRouterEndpointKeys(openRouterModels);
   const exclusiveModels = dataCollectingKiloExclusiveModels(kiloExclusiveModels);
 
   for (const { provider, models } of providerModelData) {
@@ -80,7 +73,7 @@ export function applyFreeEndpointDataPolicy({
       const restrictions = exclusiveModels.get(modelId);
       const hasFreeExclusiveEndpoint =
         exclusiveModels.has(modelId) && (restrictions === null || restrictions?.has(providerId));
-      const hasFreeOpenRouterEndpoint = openRouterEndpointKeys.has(`${modelId}:${providerId}`);
+      const hasFreeOpenRouterEndpoint = openRouterFreeEndpointKeys.has(`${modelId}:${providerId}`);
       if (!hasFreeExclusiveEndpoint && !hasFreeOpenRouterEndpoint) continue;
 
       model.endpoint.data_policy = {

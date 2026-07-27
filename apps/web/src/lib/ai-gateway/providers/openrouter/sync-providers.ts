@@ -41,7 +41,11 @@ import {
   openRouterToVercelInferenceProviderId,
   VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { applyFreeEndpointDataPolicy } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import {
+  applyFreeEndpointDataPolicy,
+  getOpenRouterFreeEndpointKeys,
+} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -236,7 +240,6 @@ function injectExtraProviderModels(
 
 async function syncProviders(
   providers: OpenRouterProvider[],
-  openRouterModels: Record<string, StoredModel>,
   vercelModels: Record<string, StoredModel>
 ) {
   if (providers.length === 0) {
@@ -267,6 +270,7 @@ async function syncProviders(
       })
     )
   );
+  const openRouterFreeEndpointKeys = getOpenRouterFreeEndpointKeys(providerModelData);
 
   injectExtraProviderModels(vercelModels, providerModelData);
 
@@ -297,9 +301,10 @@ async function syncProviders(
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
-            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) && {
-              data_policy: { training: true, retainsPrompts: true },
-            }),
+            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
+              !isForbiddenFreeModel(kfm.public_id) && {
+                data_policy: { training: true, retainsPrompts: true },
+              }),
           },
         },
         provider: inferenceProvider,
@@ -320,7 +325,7 @@ async function syncProviders(
 
   applyFreeEndpointDataPolicy({
     providerModelData,
-    openRouterModels,
+    openRouterFreeEndpointKeys,
     kiloExclusiveModels,
   });
 
@@ -509,7 +514,7 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const providers = await syncProviders(openrouterProviders, openrouter_data, vercel_data);
+  const providers = await syncProviders(openrouterProviders, vercel_data);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

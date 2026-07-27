@@ -1,10 +1,12 @@
 import { describe, expect, test } from '@jest/globals';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { applyFreeEndpointDataPolicy } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import {
+  applyFreeEndpointDataPolicy,
+  getOpenRouterFreeEndpointKeys,
+} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import type { StoredModel } from '@kilocode/db/schema-types';
 
-function offering(slug: string): OpenRouterModel {
+function offering(slug: string, isFree = false): OpenRouterModel {
   return {
     slug,
     name: slug,
@@ -17,18 +19,10 @@ function offering(slug: string): OpenRouterModel {
     updated_at: '2026-07-27T00:00:00.000Z',
     endpoint: {
       provider_display_name: 'Test',
-      is_free: false,
+      is_free: isFree,
       pricing: { prompt: '0.1', completion: '0.2' },
       data_policy: { training: false, retainsPrompts: false },
     },
-  };
-}
-
-function storedModel(id: string, tag: string, prompt: string, completion: string): StoredModel {
-  return {
-    id,
-    name: id,
-    endpoints: [{ tag, pricing: { prompt, completion } }],
   };
 }
 
@@ -73,21 +67,22 @@ function dataCollectionExclusiveModel(
 
 describe('applyFreeEndpointDataPolicy', () => {
   test('applies free OpenRouter endpoint policy by normalized model and provider', () => {
+    const freeVariant = offering('example/model:free', true);
     const matching = offering('example/model');
     const otherProvider = offering('example/model');
     const providerModelData = [
-      { provider: { slug: 'novita' }, models: [matching] },
+      { provider: { slug: 'novita' }, models: [freeVariant, matching] },
       { provider: { slug: 'deepinfra' }, models: [otherProvider] },
     ];
+    const openRouterFreeEndpointKeys = getOpenRouterFreeEndpointKeys(providerModelData);
 
     applyFreeEndpointDataPolicy({
       providerModelData,
-      openRouterModels: {
-        'example/model:free': storedModel('example/model:free', 'novita/fp8', '0', '0.000'),
-      },
+      openRouterFreeEndpointKeys,
       kiloExclusiveModels: [],
     });
 
+    expect(freeVariant.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
     expect(matching.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
     expect(otherProvider.endpoint?.data_policy).toEqual({
       training: false,
@@ -95,28 +90,16 @@ describe('applyFreeEndpointDataPolicy', () => {
     });
   });
 
-  test('requires both OpenRouter token prices to be zero', () => {
+  test('does not infer free status from zero token prices', () => {
     const model = offering('example/model');
+    if (!model.endpoint) throw new Error('expected endpoint');
+    model.endpoint.pricing = { prompt: '0', completion: '0' };
 
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterModels: {
-        'example/model': storedModel('example/model', 'novita', '0', '0.1'),
-      },
-      kiloExclusiveModels: [],
-    });
-
-    expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
-  });
-
-  test('does not treat malformed OpenRouter prices as zero', () => {
-    const model = offering('example/model');
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterModels: {
-        'example/model': storedModel('example/model', 'novita', '0foo', '0'),
-      },
+      openRouterFreeEndpointKeys: getOpenRouterFreeEndpointKeys([
+        { provider: { slug: 'novita' }, models: [model] },
+      ]),
       kiloExclusiveModels: [],
     });
 
@@ -132,7 +115,7 @@ describe('applyFreeEndpointDataPolicy', () => {
         { provider: { slug: 'novita' }, models: [first] },
         { provider: { slug: 'deepinfra' }, models: [second] },
       ],
-      openRouterModels: {},
+      openRouterFreeEndpointKeys: new Set(),
       kiloExclusiveModels: [freeExclusiveModel('example/model:free', [])],
     });
 
@@ -147,7 +130,7 @@ describe('applyFreeEndpointDataPolicy', () => {
 
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterModels: {},
+      openRouterFreeEndpointKeys: new Set(),
       kiloExclusiveModels: [hidden],
     });
 
@@ -159,7 +142,7 @@ describe('applyFreeEndpointDataPolicy', () => {
 
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'deepseek' }, models: [model] }],
-      openRouterModels: {},
+      openRouterFreeEndpointKeys: new Set(),
       kiloExclusiveModels: [dataCollectionExclusiveModel('example/model:discounted', ['deepseek'])],
     });
 
@@ -175,7 +158,7 @@ describe('applyFreeEndpointDataPolicy', () => {
         { provider: { slug: 'stepfun' }, models: [allowed] },
         { provider: { slug: 'novita' }, models: [blocked] },
       ],
-      openRouterModels: {},
+      openRouterFreeEndpointKeys: new Set(),
       kiloExclusiveModels: [freeExclusiveModel('example/model:free', ['stepfun'])],
     });
 
@@ -192,7 +175,7 @@ describe('applyFreeEndpointDataPolicy', () => {
         { provider: { slug: 'stepfun' }, models: [first] },
         { provider: { slug: 'novita' }, models: [second] },
       ],
-      openRouterModels: {},
+      openRouterFreeEndpointKeys: new Set(),
       kiloExclusiveModels: [
         freeExclusiveModel('example/model:free', ['stepfun']),
         freeExclusiveModel('example/model:promo', ['novita']),
@@ -222,8 +205,38 @@ describe('applyFreeEndpointDataPolicy', () => {
 
     applyFreeEndpointDataPolicy({
       providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterModels: {},
+      openRouterFreeEndpointKeys: new Set(),
       kiloExclusiveModels: [disabled, paid],
+    });
+
+    expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
+  });
+
+  test('ignores forbidden OpenRouter and exclusive free models', () => {
+    const freeVariant = offering('openai/gpt-oss-20b', true);
+    const model = offering('openai/gpt-oss-20b');
+    const providerModelData = [{ provider: { slug: 'darkbloom' }, models: [freeVariant, model] }];
+
+    applyFreeEndpointDataPolicy({
+      providerModelData,
+      openRouterFreeEndpointKeys: getOpenRouterFreeEndpointKeys(providerModelData),
+      kiloExclusiveModels: [freeExclusiveModel('openai/gpt-oss-20b:free', [])],
+    });
+
+    expect(freeVariant.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
+    expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
+  });
+
+  test('does not collect free keys from offerings injected later', () => {
+    const model = offering('example/model');
+    const providerModelData = [{ provider: { slug: 'novita' }, models: [model] }];
+    const openRouterFreeEndpointKeys = getOpenRouterFreeEndpointKeys(providerModelData);
+    providerModelData[0].models.push(offering('example/model:free', true));
+
+    applyFreeEndpointDataPolicy({
+      providerModelData,
+      openRouterFreeEndpointKeys,
+      kiloExclusiveModels: [],
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });

@@ -1,4 +1,5 @@
 import { claude_sonnet_clawsetup_model } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'auto:free', // this is not a free model, OpenRouter can map it to a paid model
@@ -55,4 +56,12 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
 
 export function isForbiddenFreeModel(modelId: string): boolean {
   return forbiddenFreeModelIds.has(modelId);
+}
+
+const forbiddenFreeModelFamilies: ReadonlySet<string> = new Set(
+  [...forbiddenFreeModelIds].map(normalizeModelId)
+);
+
+export function isForbiddenFreeModelFamily(modelId: string): boolean {
+  return forbiddenFreeModelFamilies.has(normalizeModelId(modelId));
 }

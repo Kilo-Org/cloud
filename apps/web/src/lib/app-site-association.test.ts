@@ -5,8 +5,12 @@ import { aasaComponents } from '@kilocode/app-shared/universal-links';
 
 const wellKnownDir = join(__dirname, '../../public/.well-known');
 
+// EAS upload certificate: covers internal-distribution and dev-client builds.
 const ANDROID_UPLOAD_CERT_FINGERPRINT =
   '39:87:0D:39:0E:45:88:4F:B8:B0:2D:A5:0C:E4:97:9B:EC:67:B2:CF:5F:69:D9:A8:84:79:5E:65:FD:B8:85:E7';
+// Google Play app signing certificate: covers everything installed from the store.
+const ANDROID_PLAY_SIGNING_CERT_FINGERPRINT =
+  '89:8E:D2:CA:DA:01:0D:76:D1:CE:B4:98:A1:40:0D:E4:51:42:D3:E0:47:07:0C:CE:B6:0E:CB:E7:73:38:9D:6B';
 
 describe('apple-app-site-association', () => {
   const raw = readFileSync(join(wellKnownDir, 'apple-app-site-association'), 'utf8');
@@ -59,7 +63,10 @@ describe('assetlinks.json', () => {
     expect(entry?.target.package_name).toBe('com.kilocode.kiloapp');
   });
 
-  it('lists only the verified EAS upload-certificate fingerprint', () => {
-    expect(parsed[0]?.target.sha256_cert_fingerprints).toEqual([ANDROID_UPLOAD_CERT_FINGERPRINT]);
+  it('lists the upload and Play app signing certificate fingerprints', () => {
+    expect(parsed[0]?.target.sha256_cert_fingerprints).toEqual([
+      ANDROID_UPLOAD_CERT_FINGERPRINT,
+      ANDROID_PLAY_SIGNING_CERT_FINGERPRINT,
+    ]);
   });
 });

@@ -51,6 +51,26 @@ function freeExclusiveModel(
   };
 }
 
+function dataCollectionExclusiveModel(
+  public_id: string,
+  inference_provider_restriction: KiloExclusiveModel['inference_provider_restriction']
+): KiloExclusiveModel {
+  const model = freeExclusiveModel(public_id, inference_provider_restriction);
+  model.pricing = [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 1,
+        completion_per_million: 1,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    },
+  ];
+  model.flags = ['requires-data-collection'];
+  return model;
+}
+
 describe('applyFreeEndpointDataPolicy', () => {
   test('applies free OpenRouter endpoint policy by normalized model and provider', () => {
     const matching = offering('example/model');
@@ -120,6 +140,32 @@ describe('applyFreeEndpointDataPolicy', () => {
     expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
   });
 
+  test('ignores hidden free exclusive models', () => {
+    const model = offering('example/model');
+    const hidden = freeExclusiveModel('example/model:free', []);
+    hidden.status = 'hidden';
+
+    applyFreeEndpointDataPolicy({
+      providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
+      openRouterModels: {},
+      kiloExclusiveModels: [hidden],
+    });
+
+    expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
+  });
+
+  test('applies public data-collection exclusive model policy', () => {
+    const model = offering('example/model');
+
+    applyFreeEndpointDataPolicy({
+      providerModelData: [{ provider: { slug: 'deepseek' }, models: [model] }],
+      openRouterModels: {},
+      kiloExclusiveModels: [dataCollectionExclusiveModel('example/model:discounted', ['deepseek'])],
+    });
+
+    expect(model.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
+  });
+
   test('respects free exclusive model provider restrictions', () => {
     const allowed = offering('example/model');
     const blocked = offering('example/model');
@@ -157,7 +203,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
   });
 
-  test('ignores disabled and paid exclusive models', () => {
+  test('ignores disabled and paid exclusive models without data collection', () => {
     const model = offering('example/model');
     const disabled = freeExclusiveModel('example/model:free', []);
     disabled.status = 'disabled';

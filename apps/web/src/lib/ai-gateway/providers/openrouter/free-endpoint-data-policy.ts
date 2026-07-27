@@ -32,12 +32,13 @@ function freeOpenRouterEndpointKeys(openRouterModels: Record<string, StoredModel
   return keys;
 }
 
-function freeKiloExclusiveModels(
+function dataCollectingKiloExclusiveModels(
   kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>
 ): Map<string, ReadonlySet<string> | null> {
   const models = new Map<string, ReadonlySet<string> | null>();
   for (const model of kiloExclusiveModels) {
-    if (model.status === 'disabled' || model.pricing !== null) continue;
+    const collectsData = model.pricing === null || model.flags.includes('requires-data-collection');
+    if (model.status !== 'public' || !collectsData) continue;
     const modelId = normalizeModelId(model.public_id);
     if (model.inference_provider_restriction.length === 0) {
       models.set(modelId, null);
@@ -68,7 +69,7 @@ export function applyFreeEndpointDataPolicy({
   kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>;
 }): void {
   const openRouterEndpointKeys = freeOpenRouterEndpointKeys(openRouterModels);
-  const exclusiveModels = freeKiloExclusiveModels(kiloExclusiveModels);
+  const exclusiveModels = dataCollectingKiloExclusiveModels(kiloExclusiveModels);
 
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);

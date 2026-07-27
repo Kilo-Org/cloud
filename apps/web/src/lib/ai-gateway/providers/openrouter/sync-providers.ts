@@ -297,7 +297,7 @@ async function syncProviders(
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
-            ...(!kfm.pricing && {
+            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) && {
               data_policy: { training: true, retainsPrompts: true },
             }),
           },

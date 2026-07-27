@@ -86,24 +86,21 @@ function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string |
 }
 
 function mapContainerBillingError(error: unknown): TRPCError | null {
-  let code: unknown;
-  if (error instanceof ContainerBillingError) {
-    code = error.code;
-  } else if (typeof error === 'object' && error !== null && 'code' in error) {
-    code = error.code;
-  }
+  // Only classify errors we actually own. Matching on message substrings is
+  // unreliable (the fallback message itself contains "billing"), so a
+  // non-billing failure could be misreported as a billing error and mask the
+  // real cause. Classify strictly on the ContainerBillingError code.
+  if (!(error instanceof ContainerBillingError)) return null;
 
-  const message = error instanceof Error ? error.message : 'Container billing is unavailable';
-  if (code === 'INSUFFICIENT_CREDITS' || message.includes('in credits to start')) {
-    return new TRPCError({ code: 'PRECONDITION_FAILED', message, cause: error });
+  switch (error.code) {
+    case 'INSUFFICIENT_CREDITS':
+    case 'CONTAINER_PAUSED':
+      return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message, cause: error });
+    case 'BILLING_UNAVAILABLE':
+      return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: error.message, cause: error });
+    default:
+      return null;
   }
-  if (code === 'CONTAINER_PAUSED') {
-    return new TRPCError({ code: 'PRECONDITION_FAILED', message, cause: error });
-  }
-  if (code === 'BILLING_UNAVAILABLE' || message.includes('billing')) {
-    return new TRPCError({ code: 'SERVICE_UNAVAILABLE', message, cause: error });
-  }
-  return null;
 }
 
 /** Look up a user's membership for a specific org from the JWT claims. */

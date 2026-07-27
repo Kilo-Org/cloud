@@ -957,10 +957,25 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getBillingStatus(): Promise<GastownBillingStatus> {
-    if (isContainerUsageMeteringEnabled(this.env)) await this.prepareContainerBilling();
-    const status = await getTownContainerStub(this.env, this.townId).getBillingStatus();
-    await this.syncContainerRunPolicy(status.runPolicy);
-    return status;
+    try {
+      if (isContainerUsageMeteringEnabled(this.env)) await this.prepareContainerBilling();
+      const status = await getTownContainerStub(this.env, this.townId).getBillingStatus();
+      await this.syncContainerRunPolicy(status.runPolicy);
+      return status;
+    } catch (error) {
+      // A read-only status query must never fail the dashboard. Fall back to a
+      // degraded status if billing setup or the container DO is unreachable.
+      logger.warn('billing: getBillingStatus failed, returning degraded', {
+        townId: this.townId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        enabled: isContainerUsageMeteringEnabled(this.env),
+        enforcing: isGastownBillingEnforced(this.env),
+        state: 'degraded',
+        runPolicy: this._containerRunPolicy,
+      };
+    }
   }
 
   async setContainerRunPolicy(policy: ContainerRunPolicy): Promise<GastownBillingStatus> {
@@ -987,7 +1002,15 @@ export class TownDO extends DurableObject<Env> {
 
     const townConfig = providedConfig ?? (await this.getTownConfig());
     const ownerId = townConfig.owner_id ?? townConfig.organization_id ?? townConfig.owner_user_id;
-    if (!ownerId) throw new Error('Town has no billing owner');
+    if (!ownerId) {
+      // A town without a resolvable billing owner (e.g. a freshly created town
+      // before its owner is set) simply isn't metered yet. Skip billing setup
+      // rather than throwing so unrelated config/token updates aren't broken.
+      logger.warn('billing: skipping container billing setup, town has no billing owner', {
+        townId: this.townId,
+      });
+      return;
+    }
 
     const subject =
       townConfig.owner_type === 'org'
@@ -5622,7 +5645,10 @@ export class TownDO extends DurableObject<Env> {
     const billing =
       cached?.billingStatus ??
       (isContainerUsageMeteringEnabled(this.env)
-        ? await getTownContainerStub(this.env, this.townId).getBillingStatus()
+        ? // getBillingStatus is guarded and falls back to a degraded status, so
+          // the Status tab never fails just because the container DO is
+          // momentarily unreachable.
+          await this.getBillingStatus()
         : {
             enabled: false,
             enforcing: false,
@@ -5984,9 +6010,19 @@ export class TownDO extends DurableObject<Env> {
       console.warn(`${TOWN_LOG} destroy: agent cleanup failed`, err);
     }
 
-    // Usage settlement must be acknowledged before container state is destroyed.
+    // Attempt to settle usage before destroying container state, but never let
+    // a billing-settlement failure block storage teardown — otherwise the town
+    // would be left un-destroyable until the container/billing path recovers.
+    // The container DO force-closes stale intervals for reconciliation anyway.
     const containerStub = getTownContainerStub(this.env, this.townId);
-    await containerStub.destroyWithBilling();
+    try {
+      await containerStub.destroyWithBilling();
+    } catch (err) {
+      console.warn(`${TOWN_LOG} destroy: container billing settlement failed`, err);
+      await containerStub.destroy().catch(destroyErr => {
+        console.warn(`${TOWN_LOG} destroy: container cleanup failed`, destroyErr);
+      });
+    }
 
     await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();

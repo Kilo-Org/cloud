@@ -82,7 +82,10 @@ export function MayorChat({ townId }: MayorChatProps) {
       (!billingQuery.data.enforcing ||
         billingQuery.data.state === 'running' ||
         billingQuery.data.state === 'warning' ||
-        billingQuery.data.state === 'starting'),
+        billingQuery.data.state === 'starting' ||
+        // `degraded` is a transient metering hiccup; the container keeps
+        // running per spec, so don't disconnect the terminal.
+        billingQuery.data.state === 'degraded'),
     retries: 10,
     retryDelay: 3_000,
   });

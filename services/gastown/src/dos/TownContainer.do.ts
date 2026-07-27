@@ -237,31 +237,27 @@ export class TownContainerDO extends Container<Env> {
     if (!isContainerUsageMeteringEnabled(this.env)) return this.getBillingStatus();
 
     let state = await this.getUsageState();
-    if (state.phase === 'starting') {
-      state = await this.completeBillingStart(state);
-    }
-    const initialRuntimeState = state.phase === 'idle' ? await this.getState() : null;
-    if (
-      state.phase === 'idle' &&
-      (initialRuntimeState?.status === 'running' || initialRuntimeState?.status === 'healthy')
-    ) {
-      try {
-        state = await this.ensureBillingInterval();
-        if (state.phase === 'starting' && state.startRecorded) {
-          state = { ...state, phase: 'running' };
-          await this.ctx.storage.put(BILLING_STATE_KEY, state);
-        }
-      } catch (error) {
-        if (error instanceof ContainerBillingError && error.code === 'INSUFFICIENT_CREDITS') {
-          // Only stop the container when enforcement is on. With enforcement
-          // off we keep running and continue metering; the block is advisory.
-          if (isGastownBillingEnforced(this.env)) {
-            await this.stopForBilling();
-          }
-          return this.getBillingStatus();
-        }
-        throw error;
+    try {
+      if (state.phase === 'starting') {
+        state = await this.promoteStartedInterval(await this.completeBillingStart(state));
       }
+      const initialRuntimeState = state.phase === 'idle' ? await this.getState() : null;
+      if (
+        state.phase === 'idle' &&
+        (initialRuntimeState?.status === 'running' || initialRuntimeState?.status === 'healthy')
+      ) {
+        state = await this.promoteStartedInterval(await this.ensureBillingInterval());
+      }
+    } catch (error) {
+      if (error instanceof ContainerBillingError && error.code === 'INSUFFICIENT_CREDITS') {
+        // Only stop the container when enforcement is on. With enforcement
+        // off we keep running and continue metering; the block is advisory.
+        if (isGastownBillingEnforced(this.env)) {
+          await this.stopForBilling();
+        }
+        return this.getBillingStatus();
+      }
+      throw error;
     }
     const runPolicy = await this.getRunPolicy();
     const enforcing = isGastownBillingEnforced(this.env);
@@ -297,6 +293,21 @@ export class TownContainerDO extends Container<Env> {
       const status = toBillingStatus(true, state, runPolicy, Date.now(), enforcing);
       return { ...status, state: 'degraded' };
     }
+  }
+
+  /**
+   * Once the start RPC has been recorded, promote the interval from `starting`
+   * to `running` and persist it, mirroring what onStart does. This prevents
+   * callers from observing a stale `starting` status for up to a heartbeat
+   * interval after the interval has actually started.
+   */
+  private async promoteStartedInterval(state: StoredUsageState): Promise<StoredUsageState> {
+    if (state.phase === 'starting' && state.startRecorded) {
+      const running = { ...state, phase: 'running' as const };
+      await this.ctx.storage.put(BILLING_STATE_KEY, running);
+      return running;
+    }
+    return state;
   }
 
   async stopForBilling(): Promise<void> {

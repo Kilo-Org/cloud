@@ -1437,7 +1437,10 @@ function MayorTerminalPane({
     (!billing.enforcing ||
       billing.state === 'running' ||
       billing.state === 'warning' ||
-      billing.state === 'starting');
+      billing.state === 'starting' ||
+      // `degraded` is a transient metering hiccup; per spec the container keeps
+      // running, so we must not tear down the terminal.
+      billing.state === 'degraded');
   const creditsHref =
     billing?.payer?.type === 'org' ? `/organizations/${billing.payer.id}` : '/credits';
 
@@ -1568,10 +1571,17 @@ function AgentTerminalPane({
   agentId: string;
   billing?: BillingStatus;
 }) {
+  // Keep the agent terminal's connect/retry gating consistent with the Mayor
+  // panes: allow `starting` (still coming up) and `degraded` (transient
+  // metering hiccup, container keeps running per spec).
   const enabled =
     billing !== undefined &&
     billing.runPolicy === 'automatic' &&
-    (!billing.enforcing || billing.state === 'running' || billing.state === 'warning');
+    (!billing.enforcing ||
+      billing.state === 'running' ||
+      billing.state === 'warning' ||
+      billing.state === 'starting' ||
+      billing.state === 'degraded');
   const { terminalRef, connectionStatus, status } = useXtermPty({
     townId,
     agentId,

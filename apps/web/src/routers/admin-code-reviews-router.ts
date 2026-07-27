@@ -100,8 +100,12 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   sandbox_connection: 'Sandbox Connection',
   container_shutdown: 'Container Shutdown',
   assistant_rate_limited: 'Rate Limited',
+  // Named by owner rather than by the internal `providerOwnership` value.
+  // "managed key" required knowing that 'managed' means Kilo's own credential,
+  // which is the wrong thing to have to recall while triaging: one of these
+  // should page us and the other should not.
   assistant_rate_limited_byok: 'Rate Limited (customer key)',
-  assistant_rate_limited_managed: 'Rate Limited (managed key)',
+  assistant_rate_limited_managed: 'Rate Limited (Kilo key)',
   assistant_unavailable: 'Assistant Unavailable',
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',

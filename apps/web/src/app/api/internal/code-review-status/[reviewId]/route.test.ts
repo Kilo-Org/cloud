@@ -2953,6 +2953,99 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    // Notification only: the customer is told the cause, but the check stays a
+    // plain failure and Code Reviewer is not disabled. A provider rate limit is
+    // transient and there is nothing to reconfigure.
+    it('names the customer key for a byok rate limit without requiring action', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review rate limited',
+            summary: 'Your provider API key hit its rate limit.',
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    // A customer's exhausted quota will still be exhausted a moment later, so
+    // retrying burns a second review against the same closed door.
+    it('does not auto-retry a byok rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+    });
+
+    // The GitLab commit status is built by a separate function from the GitHub
+    // check run, so it needs its own coverage.
+    it('names the customer key in the GitLab commit status', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Your provider API key hit its rate limit.',
+        }),
+        'https://gitlab.com'
+      );
+    });
+
+    // Our own capacity can free up, so this one stays retryable.
+    it('still auto-retries a managed key rate limit', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_managed',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalled();
+    });
+
     it('uses failure conclusion for non-billing failures', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 

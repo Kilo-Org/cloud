@@ -128,7 +128,7 @@ patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
   metro-runtime@0.84.4: patches/metro-runtime@0.84.4.patch
   metro@0.84.4: patches/metro@0.84.4.patch
-  react-native-appsflyer@6.17.9: patches/react-native-appsflyer@6.17.9.patch
+  react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

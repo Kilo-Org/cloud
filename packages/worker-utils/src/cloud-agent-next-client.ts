@@ -174,6 +174,8 @@ export const CLOUD_AGENT_TERMINAL_REASONS = [
   'workspace_capacity',
   'assistant_failed',
   'assistant_rate_limited',
+  'assistant_rate_limited_byok',
+  'assistant_rate_limited_managed',
   'assistant_unavailable',
   'assistant_timeout',
   'assistant_unauthorized',

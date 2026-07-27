@@ -81,6 +81,11 @@ export function captureLaunchDeepLink(): void {
   }
 }
 
+/** Whether the synchronous launch capture already stashed this process's launch link. */
+export function wasLaunchLinkHandled(): boolean {
+  return launchLinkHandled;
+}
+
 /** Test-only: reset module-private latch and pending slot between cases. */
 export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;

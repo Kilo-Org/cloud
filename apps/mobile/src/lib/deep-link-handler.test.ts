@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as UniversalLinks from '@kilocode/app-shared/universal-links';
 
 import { redirectSystemPath } from './deep-link-handler';
-import { _resetDeepLinkLaunchForTests, getPendingDeepLink } from './deep-link-launch';
+import {
+  _resetDeepLinkLaunchForTests,
+  _setGetLinkingURLForTests,
+  captureLaunchDeepLink,
+  getPendingDeepLink,
+} from './deep-link-launch';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -112,6 +117,29 @@ describe('redirectSystemPath', () => {
       expect(mocks.navigate).toHaveBeenCalledOnce();
       expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
       expect(getPendingDeepLink()).toBeNull();
+    });
+  });
+
+  describe('launch-capture dedup', () => {
+    it('cold initial does not restash when the launch capture already stashed the link', () => {
+      _setGetLinkingURLForTests(() => 'kiloapp:///profile');
+      captureLaunchDeepLink();
+      // The gate effect can consume the slot before expo-router's cold path resolves.
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+      const result = redirectSystemPath({ path: 'kiloapp:///profile', initial: true });
+      expect(result).toBeNull();
+      // No restash — a later, unrelated effect re-run must find the slot empty.
+      expect(getPendingDeepLink()).toBeNull();
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it('cold initial still stashes when the launch capture found no link', () => {
+      _setGetLinkingURLForTests(() => null);
+      captureLaunchDeepLink();
+      const result = redirectSystemPath({ path: 'kiloapp:///profile', initial: true });
+      expect(result).toBeNull();
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+      expect(mocks.navigate).not.toHaveBeenCalled();
     });
   });
 

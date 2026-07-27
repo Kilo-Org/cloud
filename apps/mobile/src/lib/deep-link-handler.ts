@@ -2,7 +2,7 @@ import { type Href, router } from 'expo-router';
 
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
-import { setPendingDeepLink } from './deep-link-launch';
+import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
 
 /**
  * expo-router `+native-intent` `redirectSystemPath` implementation.
@@ -31,7 +31,13 @@ export function redirectSystemPath({
     }
     if (initial) {
       // COLD: stash only. Never navigate — router isn't mounted.
-      setPendingDeepLink(href, 'universal-link');
+      // Skip when the synchronous launch capture already stashed this launch
+      // URL: expo-router's cold path can land AFTER the gate effect consumed
+      // the slot, and a restash would surface as a duplicate navigation on a
+      // later, unrelated effect re-run (e.g. token refresh).
+      if (!wasLaunchLinkHandled()) {
+        setPendingDeepLink(href, 'universal-link');
+      }
     } else {
       // WARM: router is mounted; group hrefs work here.
       router.navigate(href as Href);

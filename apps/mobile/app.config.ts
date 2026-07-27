@@ -88,7 +88,7 @@ const config: ExpoConfig = {
       'expo-build-properties',
       {
         android: {
-          enableProguardInReleaseBuilds: true,
+          enableMinifyInReleaseBuilds: true,
         },
         ios: {
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop

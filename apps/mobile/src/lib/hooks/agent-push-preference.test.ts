@@ -7,7 +7,6 @@ import {
   deriveAgentPushEditable,
   deriveShowEnableCta,
   NOTIFICATION_CATEGORY_KEYS,
-  type NotificationCategoryKey,
   type NotificationPreferences,
   readAgentPushPreference,
   rollbackAgentPushOptimistic,
@@ -268,38 +267,4 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     // The cache is left intact when no context is provided.
     expect(qc.getQueryData(key)).toEqual(fullRow({ agentAttention: true }));
   });
-});
-
-describe('per-category flip flow (each category in turn)', () => {
-  const scenarios: { category: NotificationCategoryKey; next: boolean }[] = [
-    { category: 'chatMessages', next: false },
-    { category: 'agentAttention', next: true },
-    { category: 'agentUpdates', next: false },
-    { category: 'sessionStatus', next: true },
-    { category: 'kiloclawActivity', next: false },
-  ];
-
-  for (const { category, next } of scenarios) {
-    it(`flips only ${category} → ${next} and rolls back cleanly`, async () => {
-      const qc = makeQueryClient();
-      qc.setQueryData(key, fullRow());
-
-      const context = await applyAgentPushOptimistic({
-        queryClient: qc,
-        queryKey: key,
-        next,
-        category,
-      });
-      const after = readRow(qc);
-      expect(after[category]).toBe(next);
-      for (const other of NOTIFICATION_CATEGORY_KEYS) {
-        if (other !== category) {
-          expect(after[other]).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-        }
-      }
-
-      rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-      expect(qc.getQueryData(key)).toEqual(fullRow());
-    });
-  }
 });

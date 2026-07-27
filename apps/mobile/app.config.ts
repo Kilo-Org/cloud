@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -36,6 +37,7 @@ const config: ExpoConfig = {
     requireFullScreen: true,
     supportsTablet: true,
     usesAppleSignIn: true,
+    associatedDomains: ['applinks:app.kilo.ai'],
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
@@ -70,6 +72,18 @@ const config: ExpoConfig = {
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.READ_MEDIA_AUDIO',
+    ],
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: UNIVERSAL_LINK_PATH_PATTERNS.map(pathPattern => ({
+          scheme: 'https',
+          host: 'app.kilo.ai',
+          pathPattern,
+        })),
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
     ],
   },
   plugins: [

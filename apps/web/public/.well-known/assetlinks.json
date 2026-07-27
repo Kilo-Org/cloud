@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.kilocode.kiloapp",
+      "sha256_cert_fingerprints": [
+        "39:87:0D:39:0E:45:88:4F:B8:B0:2D:A5:0C:E4:97:9B:EC:67:B2:CF:5F:69:D9:A8:84:79:5E:65:FD:B8:85:E7"
+      ]
+    }
+  }
+]

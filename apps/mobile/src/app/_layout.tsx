@@ -41,13 +41,13 @@ import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import { applyThemePreference, useThemePreference } from '@/lib/hooks/use-theme-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
+import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
 import {
   checkInitialNotification,
-  getPendingNotificationLink,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
-import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
+import { resolvePendingNavigation } from '@/lib/pending-navigation';
 import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
@@ -103,6 +103,7 @@ initSentry(false);
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 checkInitialNotification();
+captureLaunchDeepLink();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading, signOut } = useAuth();
@@ -346,8 +347,8 @@ function RootLayoutNav() {
       }
 
       void SplashScreen.hideAsync();
-      // Navigate to pending notification deep link (cold start / background tap)
-      const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
+      // Navigate to pending deep link (cold start universal link / notification tap)
+      const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
       if (pendingNavigation) {
         router.navigate(pendingNavigation.href as Href);
       }

@@ -945,10 +945,17 @@ describe('queue organization changes', () => {
       status: null,
       status_updated_at: null,
     };
-    const selectResults: unknown[][] = [[{ session_id: sessionId }], [persistedSession]];
+    // loadSession → membership join (authorized) → read-back after org write.
+    const selectResults: unknown[][] = [
+      [{ session_id: sessionId }],
+      [{ id: 'mem_1' }],
+      [persistedSession],
+    ];
     const selectResult = vi.fn(async () => selectResults.shift() ?? []);
     const select = {
       from: vi.fn(() => select),
+      // hasOrganizationAccess joins memberships → organizations (deleted_at IS NULL).
+      innerJoin: vi.fn(() => select),
       where: vi.fn(() => select),
       limit: vi.fn(() => select),
       for: vi.fn(() => select),

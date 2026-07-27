@@ -3,6 +3,7 @@ export { createSessionManager } from './session-manager';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 export type {
   ActiveSessionType,
+  CloudAgentModelOverride,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createSafeToolCall,
   createToolResult,
   createUserMessage,
 } from './agent-conversation';
@@ -82,6 +83,17 @@ describe('render events as transcript', () => {
     expect(text).toContain('Tool call (eval): return document.title;');
     expect(text).toContain('Tool result (ok): Example Domain');
     expect(text).toContain('Tool result (error): boom');
+  });
+
+  it('keeps memoryId in compacted get_memory tool-call lines', () => {
+    const text = renderEventsAsTranscript([
+      createSafeToolCall({
+        memoryId: 'memory-42',
+        name: 'get_memory',
+        tabId: 1,
+      }),
+    ]);
+    expect(text).toContain('Tool call (get_memory): memory-42');
   });
 
   it('omits screenshot data URLs instead of dumping base64 into the transcript', () => {

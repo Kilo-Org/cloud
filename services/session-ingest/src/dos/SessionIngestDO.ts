@@ -38,6 +38,7 @@ import {
   readKiloSdkSessionSnapshot,
   type KiloSdkSessionSnapshotRead,
 } from './kilo-sdk-materialization';
+import { resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -448,6 +449,15 @@ export class SessionIngestDO extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Clear a stored attention status when the owning CLI disconnects.
+   * Metadata owner entry point — UserConnectionDO has no Postgres write path.
+   * Attention check and conditional write live in `resetAttentionStatusOnCliDisconnect`.
+   */
+  async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
+    await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
+  }
+
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
   private buildAssistantExcerptForMessage(messageId: string): string {
     const range = getPartItemIdentityRange(messageId);
@@ -694,17 +704,9 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
-    await this.env.O11Y.ingestSessionMetrics({
-      kiloUserId,
-      sessionId,
-      ingestVersion,
-      model,
-      ...metrics,
-    });
-
     // Best-effort persist the per-session total cost to Postgres so the session
-    // list can surface it. Runs once per close under the metricsEmitted dedup.
-    // Failures are logged and swallowed — must never break metrics emission.
+    // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
+    // skip it. Failures are logged and swallowed — must never break metrics emission.
     try {
       if (Number.isFinite(metrics.totalCost)) {
         const totalCostMicrodollars = Math.max(0, Math.round(metrics.totalCost * 1_000_000));
@@ -726,6 +728,14 @@ export class SessionIngestDO extends DurableObject<Env> {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
+
+    await this.env.O11Y.ingestSessionMetrics({
+      kiloUserId,
+      sessionId,
+      ingestVersion,
+      model,
+      ...metrics,
+    });
 
     // Mark metrics as emitted to prevent duplicates
     this.db

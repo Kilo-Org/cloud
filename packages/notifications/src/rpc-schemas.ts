@@ -259,3 +259,37 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('failed'), error: z.string() }),
 ]);
 export type DispatchPushOutcome = z.infer<typeof dispatchPushOutcomeSchema>;
+
+// ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
+
+export const internalDispatchLowBalanceRequestSchema = z.object({
+  kind: z.literal('low_balance'),
+  recipientUserIds: z.array(z.string().min(1)).min(1),
+  organizationId: z.string().min(1),
+  organizationName: z.string().min(1),
+  minimumBalanceUsd: z.number().nonnegative(),
+});
+export type InternalDispatchLowBalanceRequest = z.infer<
+  typeof internalDispatchLowBalanceRequestSchema
+>;
+
+export const internalDispatchSecurityFindingRequestSchema = z.object({
+  kind: z.literal('security_finding'),
+  recipientUserId: z.string().min(1),
+  notificationId: z.string().min(1),
+  findingId: z.string().min(1),
+  scope: z.string().min(1),
+  notificationKind: z.enum(['new_finding', 'sla_warning', 'sla_breach']),
+  severity: z.string().min(1),
+  repoFullName: z.string().min(1),
+  title: z.string().min(1),
+});
+export type InternalDispatchSecurityFindingRequest = z.infer<
+  typeof internalDispatchSecurityFindingRequestSchema
+>;
+
+export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
+  internalDispatchLowBalanceRequestSchema,
+  internalDispatchSecurityFindingRequestSchema,
+]);
+export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

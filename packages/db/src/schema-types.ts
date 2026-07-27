@@ -1351,6 +1351,11 @@ export const CouncilSpecialistSchema = z.object({
 });
 export type CouncilSpecialist = z.infer<typeof CouncilSpecialistSchema>;
 
+// Caps for the council `required_labels` selection gate. Exported so the config UI can enforce the
+// same limits client-side and keep frontend/backend validation in sync.
+export const COUNCIL_MAX_REQUIRED_LABELS = 20;
+export const COUNCIL_REQUIRED_LABEL_MAX_LENGTH = 100;
+
 // The council definition: what the council IS (specialists + how their votes
 // aggregate). It carries no trigger/selection logic — whether a given run is a
 // council run is recorded per-run via `review_type`.
@@ -1389,6 +1394,15 @@ export const CodeReviewCouncilConfigSchema = z.object({
         seen.add(specialist.id);
       }
     }),
+  // Optional selection gate for AUTOMATED (webhook) reviews: when non-empty, an opted-in repo's PR
+  // runs council only if it carries at least one of these labels (any-match, case-insensitive).
+  // Absent/empty = no label requirement (every eligible PR on an opted-in repo gets council, as
+  // before). Narrows only: it never widens who gets council and never overrides a hard exclusion
+  // (draft/bot/fork). Manual runs ignore it.
+  required_labels: z
+    .array(z.string().min(1).max(COUNCIL_REQUIRED_LABEL_MAX_LENGTH))
+    .max(COUNCIL_MAX_REQUIRED_LABELS)
+    .optional(),
 });
 export type CodeReviewCouncilConfig = z.infer<typeof CodeReviewCouncilConfigSchema>;
 
@@ -1986,6 +2000,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'timeout',
   'upstream_error',
   'sandbox_error',
+  'workspace_capacity',
   'unknown',
 ] as const;
 

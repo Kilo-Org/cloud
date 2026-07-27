@@ -147,6 +147,7 @@ describe('describeClassificationFailure', () => {
     expect(describeClassificationFailure('denied')).toMatch(/can't be attached/i);
     expect(describeClassificationFailure('empty')).toMatch(/empty/i);
     expect(describeClassificationFailure('too-large')).toMatch(/5 MB/);
+    expect(describeClassificationFailure('unreadable')).toBe("Couldn't read this file");
   });
 });
 

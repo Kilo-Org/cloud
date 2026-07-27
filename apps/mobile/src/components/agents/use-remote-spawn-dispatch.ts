@@ -42,6 +42,14 @@ type UseRemoteSpawnDispatchArgs = {
    * membership fallback if the refetch fails.
    */
   instanceList: InstancePickerInstance[];
+  /**
+   * When true on a ready outcome, skip `router.replace` so a share that
+   * arrived mid-spawn is not stranded by navigating away. Optional —
+   * only the new-session route passes this today.
+   */
+  shouldCancelReadyNavigation?: () => boolean;
+  /** Called when ready navigation is cancelled by `shouldCancelReadyNavigation`. */
+  onReadyNavigationCancelled?: () => void;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -95,6 +103,8 @@ export function useRemoteSpawnDispatch({
   setRunOnInstance,
   refetchInstances,
   instanceList,
+  shouldCancelReadyNavigation,
+  onReadyNavigationCancelled,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
   const remoteSpawn: {
@@ -117,6 +127,16 @@ export function useRemoteSpawnDispatch({
     runOnInstanceRef.current = runOnInstance;
   }, [runOnInstance]);
 
+  // Same lifetime concern as runOnInstanceRef: the cancel predicate and
+  // cancelled callback must be read at ready-time, not captured from the
+  // render that started the spawn.
+  const shouldCancelReadyNavigationRef = useRef(shouldCancelReadyNavigation);
+  const onReadyNavigationCancelledRef = useRef(onReadyNavigationCancelled);
+  useEffect(() => {
+    shouldCancelReadyNavigationRef.current = shouldCancelReadyNavigation;
+    onReadyNavigationCancelledRef.current = onReadyNavigationCancelled;
+  }, [shouldCancelReadyNavigation, onReadyNavigationCancelled]);
+
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
       return;
@@ -125,6 +145,13 @@ export function useRemoteSpawnDispatch({
     void (async () => {
       const outcome = await remoteSpawn.spawn(selectedConnectionId);
       if (outcome.status === 'ready') {
+        if (shouldCancelReadyNavigationRef.current?.() === true) {
+          // Cancel contract: toast via callback, then leave the user on the
+          // cloud composer — not on RemoteSpawnComposer with a live selection.
+          onReadyNavigationCancelledRef.current?.();
+          setRunOnInstance(null);
+          return;
+        }
         router.replace(getSpawnedAgentSessionPath(outcome.sessionID, organizationId));
         return;
       }

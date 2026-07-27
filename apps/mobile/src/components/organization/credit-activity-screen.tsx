@@ -1,6 +1,7 @@
 import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { useLocalSearchParams } from 'expo-router';
 import { Receipt } from 'lucide-react-native';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { FlatList, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -16,6 +17,8 @@ import {
   useOrgBoundary,
   useOrgCreditTransactions,
 } from '@/lib/hooks/use-organization-queries';
+import { useOrganization } from '@/lib/organization-context';
+import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
 import { cn, firstNonEmpty, formatDate, parseTimestamp } from '@/lib/utils';
 
 function humanizeCategory(category: string): string {
@@ -66,17 +69,64 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
   );
 }
 
+function firstSearchParam(value: string | string[] | undefined): string | undefined {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+  if (Array.isArray(value) && typeof value[0] === 'string' && value[0].length > 0) {
+    return value[0];
+  }
+  return undefined;
+}
+
 export function OrganizationCreditActivityScreen() {
-  const { organizationId, org, isResolving } = useOrgBoundary();
-  const query = useOrgCreditTransactions(organizationId);
+  const { org: orgParamRaw } = useLocalSearchParams<{ org?: string | string[] }>();
+  const orgParam = firstSearchParam(orgParamRaw);
+
+  const { organizationId: contextOrganizationId, isLoaded, setOrganizationId } = useOrganization();
+  // When `org` is present, resolve role/membership against the param only — never
+  // the pre-tap context selection — so wrong-org data cannot render.
+  const { org, orgs, isLoading: orgsLoading, isResolving, isError } = useOrgBoundary(orgParam);
+
+  // While the list is loading, pass `undefined` so reconcile marks `isResolving`.
+  // Once settled (success or error), pass the array (or empty) so a foreign param
+  // cannot fall through to the context org's transactions.
+  const reconcile = reconcileOrgDeepLink({
+    orgParam,
+    contextOrganizationId,
+    orgs: orgsLoading ? undefined : (orgs ?? []),
+  });
+
+  useEffect(() => {
+    // Wait for SecureStore hydration so the deep-link selection always wins over stored org.
+    if (isLoaded && reconcile.shouldPersistOverride && reconcile.effectiveOrganizationId != null) {
+      setOrganizationId(reconcile.effectiveOrganizationId);
+    }
+  }, [
+    isLoaded,
+    reconcile.shouldPersistOverride,
+    reconcile.effectiveOrganizationId,
+    setOrganizationId,
+  ]);
+
+  // Key transactions only on the reconcile query id — never the pre-tap context
+  // org while a deep-link param is present and unvalidated/invalid.
+  const query = useOrgCreditTransactions(reconcile.queryOrganizationId);
   const paddingBottom = useTabBarBottomPadding();
 
-  if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title="Credit activity" />;
+  const showBoundary =
+    isResolving ||
+    reconcile.isResolving ||
+    isError ||
+    reconcile.queryOrganizationId == null ||
+    org == null;
+
+  if (showBoundary) {
+    return <OrganizationBoundary title="Credit activity" organizationIdOverride={orgParam} />;
   }
 
   const isLoading = query.isLoading;
-  const isError = query.isError && !query.data;
+  const isQueryError = query.isError && !query.data;
   const transactions = query.data ?? [];
 
   let body: ReactNode = null;
@@ -88,7 +138,7 @@ export function OrganizationCreditActivityScreen() {
         <CreditRowSkeleton />
       </Animated.View>
     );
-  } else if (isError) {
+  } else if (isQueryError) {
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
         <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />

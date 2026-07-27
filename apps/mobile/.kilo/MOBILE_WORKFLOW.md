@@ -10,6 +10,7 @@ These apply to every session and role. Later sections do not repeat them.
 - The first session is the planner. After plan approval, a fresh session becomes the orchestrator.
 - The orchestrator owns product judgment, architecture, loop control, final verification, Git, and the PR. Role agents never dispatch agents, commit, push, or create or update a PR.
 - Every reviewer and verifier invocation is a fresh session, so earlier conclusions cannot anchor later passes.
+- Monitoring is event-driven down the chain planner → orchestrator → role agents: when a dispatched process exits, its dispatcher reacts immediately, never after a sleep or fixed wait. Periodic checks exist only to detect a wedge.
 - Choose the simplest maintainable implementation that fully satisfies the accepted requirements. Reuse existing code and contracts. Do not add abstraction or scope without evidence it is required.
 - Commit in small, logically scoped commits. Never squash everything into one catch-all commit unless the user asks.
 
@@ -37,6 +38,10 @@ kilo run \
   "Please review the attached plan."
 ```
 
+While a role agent runs, the orchestrator checks on it about every 7 minutes and unsticks infrastructure failures: a wedged or crashed kilo CLI, a dead tmux window, or a hung service or simulator the agent cannot restart itself. Product, logic, or review problems are not stuck states — route those through the escalation ladder (Delegation and Escalation). When the agent's CLI process exits, react immediately: collect its result and continue the loop. The 7-minute cadence is only the ceiling for detecting a wedge, never a wait between dispatch and result.
+
+Agent definitions allow every command and edit. The only remaining permission denial is `task`, kept because it removes the accidental dispatch path at zero cost — it is not airtight, since a shell `kilo run` can still dispatch; the workflow has exactly one dispatcher, the orchestrator, and role agents never dispatch agents by instruction. Every boundary — no dispatch, reviewers never modify the tree, the implementer never commits, pushes, or opens a PR — is enforced by instruction, not permission. Deny lists caused void review rounds (a reviewer whose blocked command made it exit with no verdict, which read as a pass) and takeover churn; the workflow trades enforcement for reliable rounds and accepts that a misbehaving agent can do what it was previously blocked from.
+
 ### Delegation and Escalation
 
 The orchestrator is the expensive model driving cheap role agents. Its output is judgment — handoffs, steering, triage, verification — not diffs.
@@ -57,6 +62,10 @@ Any step where an agent or LLM must respond — cloud-agent sessions, chat flows
 ### Step Limits
 
 Hard ceilings: `mobile-plan-reviewer` 40, `mobile-implementer` 80, `mobile-reviewer` 50, `mobile-e2e-verifier` 100. Size every handoff below 75% of the role's limit; an implementation slice should fit in roughly 60 planned steps. Never raise a limit to fit an oversized task — split the task.
+
+### Workflow Learnings
+
+[`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md) is a durable log of environment blockers — broken local stacks, credential and env-var traps, simulator quirks, tool wedges — and their fixes. Product bugs never go in it. Immediately after resolving such a blocker, record it in the section matching your role: symptom, cause, fix, a few lines each, reusable by a future run that hits the same wall. Read the file before writing; when an existing entry covers the blocker, update that entry instead of appending a duplicate. Only the planner and the orchestrator write the log; the orchestrator records blockers role agents hit. Kilo's edit tool rejects `.kilo/` paths — kilo sessions write entries through shell commands instead. Learnings written during a run are part of the run's deliverable: the orchestrator commits and pushes them with the run's PR so future runs can use them once merged.
 
 ## Interaction Modes
 
@@ -90,7 +99,9 @@ Rules:
 
 ## Planning
 
-1. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
+Plan the simplest viable shape of every item — feature-wise as much as code-wise. When the request as stated is needlessly complex and a simpler shape delivers the same user value, challenge it: hands-on, raise it with the user before planning the complex shape; hands-off, decide with best judgment, plan the simpler shape, and record the decision and reasoning in the plan, the handoff, and the PR description.
+
+1. Read [`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md); re-read it before any environment-dependent phase, such as the bug reproduction gate. Explore requirements in the selected mode. Inspect the affected repositories. Define acceptance criteria, the feature-state matrix, and non-goals.
 2. Create the dedicated worktrees.
 3. For defect work, run the bug reproduction gate before writing the plan.
 4. Write the complete draft plan.
@@ -125,6 +136,7 @@ The handoff must contain:
 - The absolute path of the accepted plan and any approved design
 - The dedicated worktree path for every repository in scope, with each worktree's current branch, commit, and working-tree state
 - Acceptance criteria, feature-state matrix, execution ledger, non-goals, and unresolved risks
+- Any simpler-shape decision and its reasoning (see Planning)
 - For defect work: the reported defect, the confirmed reproduction steps and failure classification, and the repro run's resource manifest
 - Existing changes and resources that must be preserved
 - The completion gate, with a direct instruction to continue until the PR is mergeable and conflict-free with all expected CI checks green on the latest head
@@ -150,15 +162,15 @@ After the handoff the planner stops all hands-on work: no planning, implementati
 - Unblock: a wedged or crashed kilo CLI, a dead orchestrator tmux window, a hung service or simulator the orchestrator cannot restart itself.
 - Do not intervene: product, logic, design, or review problems. Those are the orchestrator's, handled by its escalation ladder.
 
-Everything the orchestrator does runs in the shared tmux session; inspect its windows and service logs directly. Run one check about every 30 minutes and stay idle between checks. Stop when the orchestrator reaches the completion gate or returns a blocker report.
+Everything the orchestrator does runs in the shared tmux session; inspect its windows and service logs directly. Run one check about every 30 minutes and stay idle between checks. When the orchestrator's CLI process exits, react immediately — completion, blocker report, or crash — instead of waiting for the next scheduled check. The 30-minute cadence is only the ceiling for detecting a wedge, never a wait. Stop when the orchestrator reaches the completion gate or returns a blocker report.
 
 ## Roles
 
 | Agent | Responsibility | Repository edits |
 |---|---|---|
-| `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | Denied |
+| `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | None |
 | `mobile-implementer` | Implements one bounded task from the accepted plan and runs narrow checks | Where the task requires |
-| `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
+| `mobile-reviewer` | Independently reviews the full relevant diff and tests | None |
 | `mobile-e2e-verifier` | Exercises accepted behavior; in repro mode, reproduces a reported defect on the unmodified baseline | Temporary only |
 
 ## Local Tooling
@@ -169,6 +181,8 @@ Start and inspect the local stack, simulator, login, and E2E flows per [e2e/AGEN
 - Remote CLI sessions: for session discovery, mirroring, or mobile-to-CLI messaging, the orchestrator runs `apps/mobile/e2e/remote-cli.sh start [email]` to launch a local kilo CLI as a remote session against this worktree's stack. Use `remote-cli.sh exec <kilo args...>` for one-off CLI commands (`remote`, `session list`, `run`, ...) against the same prepared stack. Role agents reuse the prepared session; they never mint tokens or install the CLI.
 
 Env sync between the app bundle, Metro, and this worktree is validated by `apps/mobile/e2e/preflight.sh` (run by `login.sh`). Trust its failure output instead of re-checking URLs by hand.
+
+When several workflows run on one machine, device-bound work is capped by the slot semaphore [`e2e-slot.sh`](e2e-slot.sh) (default 3 slots, machine-global). Run `e2e-slot.sh acquire <tmux-session>` before any phase that drives a simulator, emulator, local backend stack, or native build — the repro gate, prewarm, and every E2E round — and `e2e-slot.sh release <tmux-session>` the moment that phase ends. Planning, implementation, review, checks, and CI waits are uncapped; never hold a slot through them. Slots are owned by tmux session name and reclaimed automatically when the session dies, so a crashed run cannot wedge the queue. `e2e-slot.sh status` shows holders.
 
 ## Execution Ledger
 
@@ -185,13 +199,13 @@ Two slices are parallel-safe only when all of these hold: their write sets do no
 
 ## Orchestration
 
-1. Ingest the handoff. Split the work into ledger slices.
+1. Ingest the handoff and read [`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md); re-read it before prewarm and before each E2E round. Split the work into ledger slices.
 2. Dispatch ready independent slices in a wave of at most two or three concurrent `mobile-implementer`s. Each handoff lists the other active slices and their ownership boundaries. While a wave is active, run only ownership-safe narrow checks.
 3. When the whole wave has returned, synchronize: inspect each result, ownership adherence, and the combined diff; resolve integration and architecture decisions yourself; run shared mutating commands and shared checks once. If one slice failed, preserve the successful ones.
 4. Dispatch one fresh `mobile-reviewer` over the wave diff. Triage findings yourself: route valid findings through a bounded repair wave; record rejected findings with a short rationale. Loop repair wave → fresh reviewer, steering each round per the escalation ladder, until a fresh reviewer reports no valid actionable findings. Running this loop is the orchestrator's primary job, not a preamble to doing the work itself.
 5. After checks and review pass, create the commits at the ledger's per-slice boundaries. If a slice exhausts its implementer budget, split it or re-dispatch it with a sharper handoff; take over only per the escalation ladder.
 6. When device E2E is likely, prewarm concurrently with implementation: stable services, a claimed and labeled device, a baseline native build (only when unaffected by active slices), the exact Metro URL, and login state. Record a resource manifest for the final verifier. Do not judge acceptance behavior while implementation is still changing.
-7. After review passes, perform the final full-diff review yourself, push the reviewed head, create the PR, and assign it to the requesting human — before starting E2E, so CI and Kilobot run concurrently with the E2E run. Do not read or triage any review comment yet (step 9).
+7. After review passes, perform the final full-diff review yourself, push the reviewed head, create the PR — its description records any simpler-shape decision from the handoff — and assign it to the requesting human — before starting E2E, so CI and Kilobot run concurrently with the E2E run. Do not read or triage any review comment yet (step 9).
 8. Dispatch a fresh final `mobile-e2e-verifier` with the resource manifest. Loop triage → repair wave → fresh reviewer → fresh verifier, steering each round per the escalation ladder, until a fresh verifier passes every applicable feature state. You may reproduce a failure once to triage it; the repair itself — with your diagnosis and acceptance criteria attached — goes through the implementer-reviewer loop. Never sit in an edit-run-verify loop yourself. Review the full diff of any E2E-driven repair, commit it at the right boundary, and push.
 
 ### Reviewer and CI Loop

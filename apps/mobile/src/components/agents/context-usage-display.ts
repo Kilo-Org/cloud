@@ -1,5 +1,8 @@
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
+import { formatSessionTotalCost } from './session-list-helpers';
+import { formatSpokenCost } from './session-row-accessibility-label';
+
 export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
 
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
@@ -91,7 +94,7 @@ type HeaderSummary = {
 
 export function getHeaderSummary(
   info: SessionContextInfo | undefined,
-  totalCost: number
+  totalCostMicrodollars: number | null
 ): HeaderSummary | null {
   if (!info) {
     return null;
@@ -99,10 +102,11 @@ export function getHeaderSummary(
   const tone = getContextTone(info.percentage);
   const primary =
     info.percentage !== undefined ? `${info.percentage}%` : formatCompactTokens(info.contextTokens);
-  if (totalCost <= 0) {
+  const secondary = formatSessionTotalCost(totalCostMicrodollars);
+  if (secondary === null) {
     return { primary, hasCost: false, tone };
   }
-  return { primary, secondary: formatCost(totalCost), hasCost: true, tone };
+  return { primary, secondary, hasCost: true, tone };
 }
 
 type ContextSheetContent = {
@@ -114,17 +118,17 @@ type ContextSheetContent = {
   percentage: string | null;
   remainingTokens: string | null;
   remainingPercentage: string | null;
-  cost: string;
+  cost: string | null;
   tone: ContextTone;
 };
 
 export function getContextSheetContent(
   info: SessionContextInfo,
-  totalCost: number
+  totalCostMicrodollars: number | null
 ): ContextSheetContent {
   const tone = getContextTone(info.percentage);
   const usedTokens = formatExactTokens(info.contextTokens);
-  const cost = formatCost(totalCost);
+  const cost = formatSessionTotalCost(totalCostMicrodollars);
   if (info.contextWindow === undefined) {
     return {
       usedTokens,
@@ -159,8 +163,12 @@ export function getContextSheetContent(
   };
 }
 
-export function getMetricsAccessibilityLabel(info: SessionContextInfo, totalCost: number): string {
-  const costPart = totalCost > 0 ? `, cost ${formatCost(totalCost)}` : '';
+export function getMetricsAccessibilityLabel(
+  info: SessionContextInfo,
+  totalCostMicrodollars: number | null
+): string {
+  const spoken = formatSpokenCost(totalCostMicrodollars);
+  const costPart = spoken ? `, cost ${spoken}` : '';
   if (info.contextWindow === undefined) {
     return `Context ${formatExactTokens(info.contextTokens)} tokens, window unavailable${costPart}. Tap to view context details.`;
   }

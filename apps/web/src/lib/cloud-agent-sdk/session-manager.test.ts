@@ -1341,6 +1341,145 @@ describe('createSessionManager', () => {
       mgr.destroy();
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
+
+    it('keeps isLoading true for remote sessions until initial history replay completes', async () => {
+      // Reproduces: CLI heartbeats leave `connecting` while the snapshot page
+      // fetch is still in flight. Clearing isLoading on first activity would
+      // flash the empty state before replayed messages land.
+      const subscriberCallbackRef: { current: (() => void) | null } = { current: null };
+      const onRemoteSessionOpened = jest.fn();
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'connecting' as const });
+      mockSession.state.subscribe.mockImplementation((callback: () => void) => {
+        subscriberCallbackRef.current = callback;
+        callback();
+        return () => {};
+      });
+
+      // Capture the default mock factory before overriding connect for this case.
+      type SessionFactory = (sessionConfig: {
+        kiloSessionId: string;
+        onResolved?: (resolved: ResolvedSession) => void;
+      }) => MockSession;
+      const defaultFactory = (createCloudAgentSession as jest.Mock).getMockImplementation() as
+        | SessionFactory
+        | undefined;
+      expect(defaultFactory).toBeDefined();
+
+      (createCloudAgentSession as jest.Mock).mockImplementationOnce(
+        (sessionConfig: Parameters<SessionFactory>[0]) => {
+          const session = defaultFactory!(sessionConfig);
+          mockSession.connect.mockImplementation(() => {
+            // Resolve as remote without session.created / replay — snapshot still in flight.
+            sessionConfig.onResolved?.({
+              type: 'remote',
+              kiloSessionId: kiloId(sessionConfig.kiloSessionId),
+            });
+          });
+          return session;
+        }
+      );
+
+      const config = createMockConfig({ onRemoteSessionOpened });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      expect(atomValue(config.store, mgr.atoms.activeSessionType)).toBe('remote');
+
+      // Activity leaves connecting while replay is still pending.
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' as const });
+      subscriberCallbackRef.current!();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      expect(onRemoteSessionOpened).toHaveBeenCalledWith({ kiloSessionId: kiloId('ses-1') });
+
+      mockSessionCallbacks.onReplayComplete?.();
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+    });
+
+    it('clears isLoading on first activity after remote replay completes and for non-remote sessions', async () => {
+      type SessionFactory = (sessionConfig: {
+        kiloSessionId: string;
+        onResolved?: (resolved: ResolvedSession) => void;
+      }) => MockSession;
+      const defaultFactory = (createCloudAgentSession as jest.Mock).getMockImplementation() as
+        | SessionFactory
+        | undefined;
+      expect(defaultFactory).toBeDefined();
+
+      // --- Remote fallback: first activity after replay still clears loading ---
+      const remoteSubscriberRef: { current: (() => void) | null } = { current: null };
+      mockSession.state.getActivity.mockReturnValue({ type: 'connecting' as const });
+      mockSession.state.subscribe.mockImplementation((callback: () => void) => {
+        remoteSubscriberRef.current = callback;
+        callback();
+        return () => {};
+      });
+
+      (createCloudAgentSession as jest.Mock).mockImplementationOnce(
+        (sessionConfig: Parameters<SessionFactory>[0]) => {
+          const session = defaultFactory!(sessionConfig);
+          mockSession.connect.mockImplementation(() => {
+            sessionConfig.onResolved?.({
+              type: 'remote',
+              kiloSessionId: kiloId(sessionConfig.kiloSessionId),
+            });
+          });
+          return session;
+        }
+      );
+
+      const remoteConfig = createMockConfig();
+      const remoteMgr = createSessionManager(remoteConfig);
+      await remoteMgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(remoteConfig.store, remoteMgr.atoms.isLoading)).toBe(true);
+
+      // Replay finishes while still connecting; loading clears here.
+      mockSessionCallbacks.onReplayComplete?.();
+      expect(atomValue<boolean>(remoteConfig.store, remoteMgr.atoms.isLoading)).toBe(false);
+
+      // Re-arm loading to prove post-replay first-activity still clears (fallback path).
+      remoteConfig.store.set(remoteMgr.atoms.isLoading, true);
+      mockSession.state.getActivity.mockReturnValue({ type: 'busy' as const });
+      remoteSubscriberRef.current!();
+      expect(atomValue<boolean>(remoteConfig.store, remoteMgr.atoms.isLoading)).toBe(false);
+
+      remoteMgr.destroy();
+
+      // --- Non-remote: first activity clears loading without waiting for replay ---
+      const cloudSubscriberRef: { current: (() => void) | null } = { current: null };
+      mockSession.state.getActivity.mockReturnValue({ type: 'connecting' as const });
+      mockSession.state.subscribe.mockImplementation((callback: () => void) => {
+        cloudSubscriberRef.current = callback;
+        callback();
+        return () => {};
+      });
+
+      (createCloudAgentSession as jest.Mock).mockImplementationOnce(
+        (sessionConfig: Parameters<SessionFactory>[0]) => {
+          const session = defaultFactory!(sessionConfig);
+          mockSession.connect.mockImplementation(() => {
+            sessionConfig.onResolved?.({
+              type: 'cloud-agent',
+              kiloSessionId: kiloId(sessionConfig.kiloSessionId),
+              cloudAgentSessionId: cloudAgentId('agent-1'),
+            });
+            // No session.created — fallback path is first activity alone.
+          });
+          return session;
+        }
+      );
+
+      const cloudConfig = createMockConfig();
+      const cloudMgr = createSessionManager(cloudConfig);
+      await cloudMgr.switchSession(kiloId('ses-2'));
+      expect(atomValue<boolean>(cloudConfig.store, cloudMgr.atoms.isLoading)).toBe(true);
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' as const });
+      cloudSubscriberRef.current!();
+      expect(atomValue<boolean>(cloudConfig.store, cloudMgr.atoms.isLoading)).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1483,6 +1622,46 @@ describe('createSessionManager', () => {
         },
         images: undefined,
       });
+    });
+
+    it('uses cloud-agent model override on send and clears it on switchSession', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      // Mock connect auto-resolves as cloud-agent.
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.setCloudAgentModelOverride({ model: 'openai/gpt-5', variant: 'high' });
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toEqual({
+        model: 'openai/gpt-5',
+        variant: 'high',
+      });
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'use override',
+          mode: 'code',
+          // Stale composer payload must not win over the manager override.
+          model: 'stale/composer-model',
+          variant: 'stale',
+        },
+      });
+
+      expect(mockSession.send).toHaveBeenLastCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'use override',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'openai/gpt-5' },
+          variant: 'high',
+        },
+        images: undefined,
+      });
+
+      await mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue(config.store, mgr.atoms.cloudAgentModelOverride)).toBeNull();
     });
 
     it('sends only the explicit remote override and omits stale session model fields after clear', async () => {

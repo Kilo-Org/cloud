@@ -1,5 +1,13 @@
+import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ChevronRight, Clock, Link2, SearchX } from 'lucide-react-native';
+import {
+  ChevronRight,
+  Clipboard as ClipboardIcon,
+  Clock,
+  Link2,
+  SearchX,
+  X,
+} from 'lucide-react-native';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 
@@ -10,6 +18,15 @@ import { Text } from '@/components/ui/text';
 import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import {
+  PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY,
+  PR_LINK_HELPER_INVALID_COPY,
+  type PrLinkHelperMessage,
+  selectPrLinkClearButtonVisible,
+  selectPrLinkHelperSlotState,
+} from '@/lib/pr-review/pr-link-helper-slot';
+import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
+import { decidePrLinkPaste } from '@/lib/pr-review/pr-link-paste';
 import { getRecentPrs, type RecentPr, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
@@ -20,12 +37,16 @@ export function PrReviewEntryScreen() {
   // Uncontrolled iOS input — keep the raw text in a ref so the submit
   // handler reads the latest value without re-rendering on every
   // keystroke. State is only for derived UI (whether there's any text,
-  // whether the user already tried an invalid value). The TextInput
-  // component ref is for focus() (e.g. the empty-state CTA).
+  // active helper message). The TextInput component ref is for focus()
+  // and setNativeProps on programmatic paste.
   const inputRef = useRef<TextInput>(null);
   const inputValueRef = useRef<string>('');
+  // FIFO of values written via setNativeProps. Matching onChangeText values
+  // are treated as programmatic echoes (do not clear helpers / clobber ref).
+  // Order-agnostic membership so double-taps and delayed native echoes work.
+  const pendingProgrammaticTextsRef = useRef<string[]>([]);
   const [hasInput, setHasInput] = useState(false);
-  const [invalid, setInvalid] = useState(false);
+  const [helperMessage, setHelperMessage] = useState<PrLinkHelperMessage | null>(null);
   const [recent, setRecent] = useState<RecentPr[] | null>(null);
 
   useFocusEffect(
@@ -43,14 +64,24 @@ export function PrReviewEntryScreen() {
     }, [])
   );
 
+  const applyFieldText = (text: string) => {
+    pendingProgrammaticTextsRef.current = pushPrLinkInputEcho(
+      pendingProgrammaticTextsRef.current,
+      text
+    );
+    inputValueRef.current = text;
+    inputRef.current?.setNativeProps({ text });
+    setHasInput(text.length > 0);
+  };
+
   const handleSubmit = async () => {
     const raw = inputValueRef.current;
     const parsed = parseGitHubPrUrl(raw.trim());
     if (!parsed) {
-      setInvalid(true);
+      setHelperMessage('invalid');
       return;
     }
-    setInvalid(false);
+    setHelperMessage(null);
     // Title is backfilled on first successful load (S5).
     await upsertRecentPr({
       owner: parsed.owner,
@@ -60,6 +91,23 @@ export function PrReviewEntryScreen() {
       lastOpenedAt: Date.now(),
     });
     router.push(getPrReviewPath(parsed.owner, parsed.repo, parsed.number));
+  };
+
+  const handlePaste = async () => {
+    const clipboard = await Clipboard.getStringAsync();
+    const decision = decidePrLinkPaste(clipboard);
+    if (decision.kind === 'empty') {
+      setHelperMessage('clipboard-empty');
+      return;
+    }
+    // Replace entire field (never append-at-cursor): native field + ref + hasInput.
+    applyFieldText(decision.text);
+    if (decision.kind === 'non-url-text') {
+      setHelperMessage('invalid');
+      return;
+    }
+    setHelperMessage(null);
+    await handleSubmit();
   };
 
   const focusInput = () => {
@@ -74,13 +122,19 @@ export function PrReviewEntryScreen() {
     router.push(getPrReviewPath(entry.owner, entry.repo, entry.number));
   };
 
-  let helper: ReactNode = null;
-  if (invalid) {
-    helper = <Text className="text-sm text-destructive">Not a GitHub pull request link</Text>;
-  } else if (!hasInput) {
-    helper = (
+  const slotState = selectPrLinkHelperSlotState({
+    message: helperMessage,
+  });
+  const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
+  const isInvalid = helperMessage === 'invalid';
+
+  let helperContent: ReactNode = null;
+  if (slotState === 'invalid') {
+    helperContent = <Text className="text-sm text-destructive">{PR_LINK_HELPER_INVALID_COPY}</Text>;
+  } else if (slotState === 'clipboard-empty') {
+    helperContent = (
       <Text variant="muted" className="text-sm">
-        Paste a link like {URL_PLACEHOLDER}
+        {PR_LINK_HELPER_CLIPBOARD_EMPTY_COPY}
       </Text>
     );
   }
@@ -149,45 +203,102 @@ export function PrReviewEntryScreen() {
               Paste a PR link
             </Text>
           </View>
-          <TextInput
-            ref={inputRef}
-            defaultValue=""
-            placeholder={URL_PLACEHOLDER}
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            onChangeText={value => {
-              // Don't setState on every keystroke; track only whether the
-              // input has any text and whether the user has tried to
-              // submit an invalid value. The raw value lives in the ref
-              // so handleSubmit reads the latest text without re-rendering.
-              inputValueRef.current = value;
-              setHasInput(value.length > 0);
-              if (invalid) {
-                setInvalid(false);
-              }
-            }}
-            // explicit line-height so the placeholder + typed text render
-            // at the same vertical position on every iOS version.
-            className="rounded-md border border-border bg-card px-3 py-3 text-base text-foreground leading-[22px]"
-            accessibilityLabel="GitHub pull request URL"
-            returnKeyType="go"
-            onSubmitEditing={() => {
-              void handleSubmit();
-            }}
-          />
-          {helper}
-          <Button
-            className="mt-1"
-            disabled={!hasInput || invalid}
-            onPress={() => {
-              void handleSubmit();
-            }}
-            accessibilityLabel="Open pull request"
-          >
-            <Text>Open</Text>
-          </Button>
+          <View className="gap-3">
+            <View className="flex-row items-center gap-2">
+              <View className="min-w-0 flex-1 flex-row items-center rounded-md border border-border bg-card">
+                <TextInput
+                  ref={inputRef}
+                  defaultValue=""
+                  placeholder={URL_PLACEHOLDER}
+                  placeholderTextColor={colors.mutedForeground}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  onChangeText={value => {
+                    // Don't setState on every keystroke; track only whether the
+                    // input has any text. The raw value lives in the ref so
+                    // handleSubmit reads the latest text without re-rendering.
+                    const decision = consumePrLinkInputEcho(
+                      pendingProgrammaticTextsRef.current,
+                      value
+                    );
+                    pendingProgrammaticTextsRef.current = [...decision.pending];
+                    if (decision.kind === 'echo') {
+                      // Echo of setNativeProps: inputValueRef already holds the
+                      // intentional value from applyFieldText — do not clobber it
+                      // with a delayed/stale echo, and do not clear helpers.
+                      return;
+                    }
+                    inputValueRef.current = value;
+                    setHasInput(value.length > 0);
+                    // Any real edit clears transient helper messages (invalid /
+                    // clipboard-empty). Last-set message is replaced by null.
+                    if (helperMessage !== null) {
+                      setHelperMessage(null);
+                    }
+                  }}
+                  onFocus={() => {
+                    // clipboard-empty clears on input focus; invalid stays until edit.
+                    if (helperMessage === 'clipboard-empty') {
+                      setHelperMessage(null);
+                    }
+                  }}
+                  // explicit line-height so the placeholder + typed text render
+                  // at the same vertical position on every iOS version.
+                  className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[22px]"
+                  accessibilityLabel="GitHub pull request URL"
+                  returnKeyType="go"
+                  onSubmitEditing={() => {
+                    void handleSubmit();
+                  }}
+                />
+                {showClearButton ? (
+                  // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
+                  // 38pt in this app — do not "simplify" back to h-11/w-11.
+                  <Pressable
+                    onPress={() => {
+                      // clear() is the iOS-safe native empty after real typing.
+                      // setNativeProps({ text: '' }) loses the most-recent-event-count
+                      // race and leaves the typed text visible while React state
+                      // thinks the field is empty. Do not route through
+                      // applyFieldText('') (paste-only path) and do not push an
+                      // echo for '' — a non-arriving echo would stale the FIFO.
+                      inputValueRef.current = '';
+                      setHasInput(false);
+                      inputRef.current?.clear();
+                      inputRef.current?.focus();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear pull request link"
+                    className="h-13 w-13 items-center justify-center active:opacity-70"
+                  >
+                    <X size={16} color={colors.mutedForeground} />
+                  </Pressable>
+                ) : null}
+              </View>
+              <Pressable
+                onPress={() => {
+                  void handlePaste();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Paste pull request link"
+                hitSlop={4}
+                className="h-11 w-11 items-center justify-center rounded-md border border-border bg-card active:opacity-70"
+              >
+                <ClipboardIcon size={18} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+            {helperContent}
+            <Button
+              disabled={!hasInput || isInvalid}
+              onPress={() => {
+                void handleSubmit();
+              }}
+              accessibilityLabel="Open pull request"
+            >
+              <Text>Open</Text>
+            </Button>
+          </View>
         </View>
 
         <View className="gap-2">

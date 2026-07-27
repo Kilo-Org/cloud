@@ -7,11 +7,17 @@ import {
   PERMISSION_RESPONDED_EVENT,
   QUESTION_ANSWERED_EVENT,
 } from '@/lib/analytics/posthog';
+import { ackSessionAttention } from '@/lib/session-attention';
 
 import { type useSessionManager } from './session-provider';
 
 type InteractionHandlersArgs = {
   manager: ReturnType<typeof useSessionManager>;
+  /**
+   * Kilo session id (route `session-id` / list `session.id`). Keys the
+   * attention ack store. Must not be the cloud-agent session id.
+   */
+  kiloSessionId: string;
   activeQuestion: { requestId: string; questions?: unknown[] } | null;
   activePermission: { requestId: string } | null;
   surface: AnalyticsSurface;
@@ -19,6 +25,7 @@ type InteractionHandlersArgs = {
 
 export function useInteractionHandlers({
   manager,
+  kiloSessionId,
   activeQuestion,
   activePermission,
   surface,
@@ -34,6 +41,7 @@ export function useInteractionHandlers({
       setIsAnswering(true);
       try {
         await manager.answerQuestion(activeQuestion.requestId, answers);
+        ackSessionAttention(kiloSessionId);
         captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: false });
       } catch {
         toast.error('Failed to submit answer');
@@ -41,7 +49,7 @@ export function useInteractionHandlers({
         setIsAnswering(false);
       }
     },
-    [manager, activeQuestion, surface]
+    [manager, kiloSessionId, activeQuestion, surface]
   );
 
   const handleRejectQuestion = useCallback(async () => {
@@ -51,13 +59,14 @@ export function useInteractionHandlers({
     setIsAnswering(true);
     try {
       await manager.rejectQuestion(activeQuestion.requestId);
+      ackSessionAttention(kiloSessionId);
       captureEvent(QUESTION_ANSWERED_EVENT, { surface, skipped: true });
     } catch {
       toast.error('Failed to skip question');
     } finally {
       setIsAnswering(false);
     }
-  }, [manager, activeQuestion, surface]);
+  }, [manager, kiloSessionId, activeQuestion, surface]);
 
   const handleRespondToPermission = useCallback(
     async (response: 'once' | 'always' | 'reject') => {
@@ -67,6 +76,7 @@ export function useInteractionHandlers({
       setIsRespondingToPermission(true);
       try {
         await manager.respondToPermission(activePermission.requestId, response);
+        ackSessionAttention(kiloSessionId);
         captureEvent(PERMISSION_RESPONDED_EVENT, { surface, response });
       } catch {
         toast.error('Failed to respond to permission request');
@@ -74,7 +84,7 @@ export function useInteractionHandlers({
         setIsRespondingToPermission(false);
       }
     },
-    [manager, activePermission, surface]
+    [manager, kiloSessionId, activePermission, surface]
   );
 
   return {

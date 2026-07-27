@@ -1671,7 +1671,7 @@ describe('SessionMessageQueue', () => {
     });
 
     await harness.queue.drainNextPendingMessage();
-    const [pending] = await listPendingSessionMessages(harness.storage);
+    let [pending] = await listPendingSessionMessages(harness.storage);
     expect(pending?.lastFlushFailureCode).toBe('WORKSPACE_SETUP_FAILED');
     expect(pending?.lastFlushError).toBe(error);
     expect(pending?.lastFlushFailureSubtype).toBe('sandbox_storage_full');
@@ -1680,9 +1680,14 @@ describe('SessionMessageQueue', () => {
       throw new Error('Expected workspace setup failure to be retried before terminalization');
     }
 
-    vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
-    await harness.queue.drainNextPendingMessage();
-    vi.restoreAllMocks();
+    // A full disk is transient backpressure, so it now retries on a longer
+    // backoff (10s, 30s, 60s). Drain through the whole budget until exhaustion.
+    for (let attempt = 0; attempt < 5 && pending?.nextFlushAttemptAt !== undefined; attempt++) {
+      vi.spyOn(Date, 'now').mockReturnValueOnce(pending.nextFlushAttemptAt);
+      await harness.queue.drainNextPendingMessage();
+      vi.restoreAllMocks();
+      [pending] = await listPendingSessionMessages(harness.storage);
+    }
 
     expect(harness.terminalizations.at(-1)?.params).toMatchObject({
       kind: 'failed',

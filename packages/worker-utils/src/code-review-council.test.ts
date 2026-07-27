@@ -9,6 +9,7 @@ import {
   computeCouncilDecision,
   councilDecisionBlocksMerge,
   councilHardExcludeReason,
+  councilSelectionSkipReason,
   decideCouncilFromManifest,
   deriveSpecialistVote,
   determineAutomatedReviewType,
@@ -601,6 +602,52 @@ describe('determineAutomatedReviewType', () => {
         { ...ALL_ON, councilEnabledForRepo: false }
       )
     ).toBe('standard');
+  });
+
+  it('a required-label gate narrows council to labeled PRs (unset gate is a no-op)', () => {
+    const gated = { ...ALL_ON, selection: { requiredLabels: ['council'] } };
+    // Labeled → council; unlabeled → standard.
+    expect(determineAutomatedReviewType({ labels: ['council'] }, gated)).toBe('council');
+    expect(determineAutomatedReviewType({ labels: ['bug'] }, gated)).toBe('standard');
+    expect(determineAutomatedReviewType({}, gated)).toBe('standard');
+    // No gate configured → labels are irrelevant, council still runs.
+    expect(determineAutomatedReviewType({ labels: [] }, ALL_ON)).toBe('council');
+  });
+
+  it('a hard exclude wins over a satisfied required-label gate', () => {
+    // Even a correctly-labeled fork PR is downgraded — floors beat customer gates.
+    expect(
+      determineAutomatedReviewType(
+        { isFork: true, labels: ['council'] },
+        { ...ALL_ON, selection: { requiredLabels: ['council'] } }
+      )
+    ).toBe('standard');
+  });
+});
+
+describe('councilSelectionSkipReason', () => {
+  it('is a no-op when no gate is configured', () => {
+    expect(councilSelectionSkipReason({ labels: [] }, undefined)).toBeNull();
+    expect(councilSelectionSkipReason({ labels: [] }, {})).toBeNull();
+    expect(councilSelectionSkipReason({ labels: [] }, { requiredLabels: [] })).toBeNull();
+    // Blank/whitespace-only configured labels do not form a gate.
+    expect(councilSelectionSkipReason({ labels: [] }, { requiredLabels: ['  ', ''] })).toBeNull();
+  });
+
+  it('matches any required label case-insensitively / trimmed', () => {
+    const gate = { requiredLabels: ['Council', ' needs-review '] };
+    expect(councilSelectionSkipReason({ labels: ['council'] }, gate)).toBeNull();
+    expect(councilSelectionSkipReason({ labels: ['NEEDS-REVIEW'] }, gate)).toBeNull();
+    expect(councilSelectionSkipReason({ labels: ['other', 'council'] }, gate)).toBeNull();
+  });
+
+  it('skips when none of the required labels are present', () => {
+    expect(councilSelectionSkipReason({ labels: ['bug'] }, { requiredLabels: ['council'] })).toBe(
+      'missing-required-label'
+    );
+    expect(councilSelectionSkipReason({}, { requiredLabels: ['council'] })).toBe(
+      'missing-required-label'
+    );
   });
 });
 

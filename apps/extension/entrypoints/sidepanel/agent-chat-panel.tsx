@@ -1,8 +1,9 @@
 /* eslint-disable import/max-dependencies, max-lines */
-import { storage } from '#imports';
+import { browser, storage } from '#imports';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import { AlertTriangle } from 'lucide-react';
 import {
   compactingConversationIdsAtom,
   contextUsageAtomFamily,
@@ -10,6 +11,8 @@ import {
   evictConversationAtoms,
   remoteMcpStoreAtom,
   runningConversationIdsAtom,
+  sessionCostAtomFamily,
+  streamingMessageIdAtomFamily,
 } from './agent-chat-atoms';
 import {
   createAssistantMessage,
@@ -23,7 +26,13 @@ import {
   compactConversationEvents,
   hasCompactableHistory,
 } from '@/src/shared/agent-context-compaction';
+import type { TurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
+import {
+  captureEvent,
+  CONVERSATION_CREATED_EVENT,
+  MESSAGE_SENT_EVENT,
+} from '@/src/shared/analytics';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import {
@@ -45,7 +54,8 @@ import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
-import { useTabDebugger } from './use-tab-debugger';
+import { addSessionCost } from '@/src/shared/session-cost';
+import { getActiveTabId, useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 import { ConversationTabs } from './conversation-tabs';
 import { MessageComposer } from './message-composer';
@@ -56,6 +66,10 @@ import { buildRemoteMcpToolDefinitions } from '@/src/shared/remote-mcp-tools';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import { toRemoteMcpToolCallEvents } from './agent-tool-call-events';
 import { executeRemoteMcpToolCall } from './agent-remote-mcp-tool-runtime';
+import { useAgentMemories } from './use-agent-memories';
+import type { AgentMemory } from '@/src/shared/agent-memories';
+import { formatAgentMemoryIndex } from '@/src/shared/agent-memories';
+import { sanitizeTabContextText, sanitizeTabContextUrl } from '@/src/shared/tab-context-sanitize';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
@@ -70,10 +84,12 @@ interface ConversationRunState {
   readonly token: number;
 }
 
-const getSelectedInspectableTabId = ({
+export const getSelectedInspectableTabId = ({
+  activeTabId,
   inspectableTabs,
   selectedTabId,
 }: {
+  readonly activeTabId?: number | undefined;
   readonly inspectableTabs: readonly { readonly id: number }[];
   readonly selectedTabId: number | undefined;
 }): number | undefined => {
@@ -81,31 +97,43 @@ const getSelectedInspectableTabId = ({
     return selectedTabId;
   }
 
+  if (activeTabId !== undefined && inspectableTabs.some(tab => tab.id === activeTabId)) {
+    return activeTabId;
+  }
+
   return inspectableTabs[0]?.id;
 };
 
-const sanitizeTabContextText = (text: string): string =>
-  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-const sanitizeTabContextUrl = (url: string): string => {
-  try {
-    const parsedUrl = new URL(url);
-
-    parsedUrl.search = '';
-    parsedUrl.hash = '';
-
-    return parsedUrl.toString();
-  } catch {
-    return '[invalid URL]';
+export const formatSystemEnvironment = ({
+  selectedTab,
+  memories,
+}: {
+  readonly selectedTab: { readonly title: string; readonly url: string } | undefined;
+  readonly memories: readonly AgentMemory[];
+}): string | undefined => {
+  if (selectedTab === undefined) {
+    return undefined;
   }
+
+  const lines = [
+    `Selected tab title: ${sanitizeTabContextText(selectedTab.title)}`,
+    `Selected tab URL: ${sanitizeTabContextUrl(selectedTab.url)}`,
+    `Current time: ${new Date().toISOString()}`,
+    `Timezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}`,
+  ];
+  const memoryIndex = formatAgentMemoryIndex(memories);
+  const body = memoryIndex === undefined ? lines.join('\n') : `${lines.join('\n')}\n${memoryIndex}`;
+
+  return `<system_environment>\n${body}\n</system_environment>`;
 };
+
 export const formatSelectedTabSystemEnvironment = ({
   title,
   url,
 }: {
   readonly title: string;
   readonly url: string;
-}): string =>
-  `<system_environment>\nSelected tab title: ${sanitizeTabContextText(title)}\nSelected tab URL: ${sanitizeTabContextUrl(url)}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
+}): string => formatSystemEnvironment({ memories: [], selectedTab: { title, url } }) ?? '';
 
 export const AgentChatPanel = ({
   auth,
@@ -119,15 +147,22 @@ export const AgentChatPanel = ({
   const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
+  const { memories } = useAgentMemories();
   const runningConversationIds = useAtomValue(runningConversationIdsAtom);
   const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
   const compactingConversationIds = useAtomValue(compactingConversationIdsAtom);
   const setCompactingConversationIds = useSetAtom(compactingConversationIdsAtom);
   const conversationStoreRef = useRef(conversationStore);
+  const memoriesRef = useRef(memories);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
   const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
-  const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
+  const [pendingCreateDefaultConversationId, setPendingCreateDefaultConversationId] = useState<
+    string | undefined
+  >();
+  const { activeTabId, inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
+  const inspectableTabsRef = useRef(inspectableTabs);
+  const isCreateDefaultInFlightRef = useRef(false);
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
     organizationId,
@@ -135,9 +170,11 @@ export const AgentChatPanel = ({
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
   const selectedTabId = getSelectedInspectableTabId({
+    activeTabId,
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
   });
+  inspectableTabsRef.current = inspectableTabs;
   const model = activeConversation.model ?? modelOptions[0]?.id ?? '';
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
@@ -161,6 +198,8 @@ export const AgentChatPanel = ({
   const isCompacting = compactingConversationIds.includes(activeConversationId);
   const activeUsage = useAtomValue(contextUsageAtomFamily(activeConversationId));
   const activePromptTokens = activeUsage?.promptTokens ?? 0;
+  const activeSessionCostUsd = useAtomValue(sessionCostAtomFamily(activeConversationId));
+  const streamingMessageId = useAtomValue(streamingMessageIdAtomFamily(activeConversationId));
   const contextLength = selectedModel?.contextLength;
 
   const compactConversation = useCallback(
@@ -244,10 +283,12 @@ export const AgentChatPanel = ({
           void compactActiveConversation();
         }}
         promptTokens={activePromptTokens}
+        sessionCostUsd={activeSessionCostUsd}
       />
     ),
     [
       activePromptTokens,
+      activeSessionCostUsd,
       canCompactActive,
       compactActiveConversation,
       contextLength,
@@ -266,6 +307,7 @@ export const AgentChatPanel = ({
     !isCompacting;
 
   conversationStoreRef.current = conversationStore;
+  memoriesRef.current = memories;
 
   useEffect(
     () => () => {
@@ -325,7 +367,16 @@ export const AgentChatPanel = ({
   }, [inspectableTabs, isLoadingTabs]);
 
   useEffect(() => {
+    if (!isConversationStoreLoaded || inspectableTabs.length === 0) {
+      return;
+    }
+
+    if (pendingCreateDefaultConversationId === activeConversationId) {
+      return;
+    }
+
     const nextSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
       inspectableTabs,
       selectedTabId: activeConversation.selectedTabId,
     });
@@ -334,15 +385,36 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setConversationStore(currentStore =>
-      updateStoredConversationSettings(currentStore, activeConversationId, {
-        selectedTabId: nextSelectedTabId,
-      })
-    );
+    setConversationStore(currentStore => {
+      const currentConversation = currentStore.conversations.find(
+        item => item.id === activeConversationId
+      );
+
+      if (currentConversation === undefined) {
+        return currentStore;
+      }
+
+      const applyTimeSelectedTabId = getSelectedInspectableTabId({
+        activeTabId,
+        inspectableTabs,
+        selectedTabId: currentConversation.selectedTabId,
+      });
+
+      if (currentConversation.selectedTabId === applyTimeSelectedTabId) {
+        return currentStore;
+      }
+
+      return updateStoredConversationSettings(currentStore, activeConversationId, {
+        selectedTabId: applyTimeSelectedTabId,
+      });
+    });
   }, [
     activeConversation.selectedTabId,
     activeConversationId,
+    activeTabId,
     inspectableTabs,
+    isConversationStoreLoaded,
+    pendingCreateDefaultConversationId,
     setConversationStore,
   ]);
 
@@ -431,13 +503,20 @@ export const AgentChatPanel = ({
     const runThinkingOptions = runSelectedModel?.variants ?? [];
     const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
     const runSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
     const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
     const userEvent = createUserMessage(
       text,
-      selectedTab === undefined ? undefined : formatSelectedTabSystemEnvironment(selectedTab)
+      formatSystemEnvironment({
+        memories: memoriesRef.current,
+        selectedTab:
+          selectedTab === undefined
+            ? undefined
+            : { title: selectedTab.title, url: selectedTab.url },
+      })
     );
     const conversationWithUserMessage = [...conversationEvents, userEvent];
 
@@ -469,10 +548,15 @@ export const AgentChatPanel = ({
       }
     };
     let currentRunHasUsage = false;
-    const updateRunUsage = (usage: { promptTokens: number }): void => {
+    const updateRunUsage = (usage: TurnUsage): void => {
       if (isCurrentRun()) {
         currentRunHasUsage = true;
         store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });
+        const previousCost = store.get(sessionCostAtomFamily(conversationId));
+        store.set(
+          sessionCostAtomFamily(conversationId),
+          addSessionCost(previousCost, usage.costUsd)
+        );
       }
     };
 
@@ -497,6 +581,7 @@ export const AgentChatPanel = ({
       try {
         const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
 
+        captureEvent(MESSAGE_SENT_EVENT, { mode: runMode });
         await runTurn({
           apiBaseUrl,
           appendEvents: appendRunEvents,
@@ -513,6 +598,11 @@ export const AgentChatPanel = ({
             }),
           fetch: fetchFromWindow,
           model: runModel,
+          onAssistantStreaming: eventId => {
+            if (isCurrentRun()) {
+              store.set(streamingMessageIdAtomFamily(conversationId), eventId);
+            }
+          },
           onUsage: updateRunUsage,
           organizationId,
           remoteMcpTools,
@@ -528,6 +618,7 @@ export const AgentChatPanel = ({
         });
       } finally {
         if (isCurrentRun()) {
+          store.set(streamingMessageIdAtomFamily(conversationId), undefined);
           runStatesRef.current.delete(conversationId);
           setRunningConversationIds(currentIds =>
             currentIds.filter(currentId => currentId !== conversationId)
@@ -556,6 +647,7 @@ export const AgentChatPanel = ({
     const conversation = getActiveStoredConversation(conversationStoreRef.current);
     const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
     const conversationSelectedTabId = getSelectedInspectableTabId({
+      activeTabId,
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
@@ -584,14 +676,15 @@ export const AgentChatPanel = ({
   };
 
   const createConversation = (): void => {
-    if (!isConversationStoreLoaded) {
+    if (!isConversationStoreLoaded || isCreateDefaultInFlightRef.current) {
       return;
     }
+
+    captureEvent(CONVERSATION_CREATED_EVENT);
 
     const settings = {
       mode,
       model,
-      ...(selectedTabId === undefined ? {} : { selectedTabId }),
       thinkingEffort,
     };
 
@@ -601,6 +694,39 @@ export const AgentChatPanel = ({
       settings
     );
     setConversationStore(conversationStoreRef.current);
+
+    const newConversationId = conversationStoreRef.current.activeConversationId;
+
+    isCreateDefaultInFlightRef.current = true;
+    setPendingCreateDefaultConversationId(newConversationId);
+
+    void (async (): Promise<void> => {
+      try {
+        const freshActiveTabId = await getActiveTabId(browser.tabs);
+        const latestTabs = inspectableTabsRef.current;
+
+        if (freshActiveTabId !== undefined && latestTabs.some(tab => tab.id === freshActiveTabId)) {
+          setConversationStore(currentStore => {
+            const conversation = currentStore.conversations.find(
+              item => item.id === newConversationId
+            );
+
+            if (conversation === undefined || conversation.selectedTabId !== undefined) {
+              return currentStore;
+            }
+
+            return updateStoredConversationSettings(currentStore, newConversationId, {
+              selectedTabId: freshActiveTabId,
+            });
+          });
+        }
+      } finally {
+        isCreateDefaultInFlightRef.current = false;
+        setPendingCreateDefaultConversationId(current =>
+          current === newConversationId ? undefined : current
+        );
+      }
+    })();
   };
 
   const selectConversation = (conversationId: string): void => {
@@ -619,11 +745,14 @@ export const AgentChatPanel = ({
     (conversationId: string): void => {
       runStatesRef.current.get(conversationId)?.abort.abort();
       runStatesRef.current.delete(conversationId);
+      // Required: deleting run-state makes the run's later finally see isCurrentRun() === false
+      // And skip cleanup; without this, close/delete mid-stream leaks a stale streaming id.
+      store.set(streamingMessageIdAtomFamily(conversationId), undefined);
       setRunningConversationIds(currentIds =>
         currentIds.filter(currentId => currentId !== conversationId)
       );
     },
-    [setRunningConversationIds]
+    [setRunningConversationIds, store]
   );
 
   const closeConversation = useCallback(
@@ -732,11 +861,12 @@ export const AgentChatPanel = ({
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}
       />
-      <ConversationList items={groupedEvents} />
+      <ConversationList items={groupedEvents} streamingMessageId={streamingMessageId} />
 
       {remoteMcpToolWarning === undefined ? null : (
-        <p className="border-t border-amber-500/30 bg-amber-950/20 px-4 py-2 text-xs text-amber-300">
-          {remoteMcpToolWarning}
+        <p className="flex items-start gap-2 border-t border-status-yellow-500/30 bg-status-yellow-500/10 px-4 py-2 text-xs text-status-yellow-300">
+          <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0 text-status-yellow-400" />
+          <span className="min-w-0">{remoteMcpToolWarning}</span>
         </p>
       )}
 
@@ -748,7 +878,7 @@ export const AgentChatPanel = ({
         onSubmit={submitDraft}
       />
 
-      <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
+      <footer className="border-t border-border bg-surface-raised px-4 py-2">
         <AgentFooterControls
           contextDonut={contextDonut}
           inspectableTabs={inspectableTabs}

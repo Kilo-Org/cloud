@@ -101,6 +101,92 @@ describe('active-sessions-router.list', () => {
     }
   });
 
+  it('overlays stored question status over a live busy heartbeat status', async () => {
+    const sessionId = 'ses_active_attention_question_1234';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      status: 'question',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'busy',
+        title: 'needs input',
+        connectionId: 'conn-attn',
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0]?.status).toBe('question');
+      expect(result.sessions[0]?.title).toBe('needs input');
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
+  it('overlays stored permission status over a live idle heartbeat status', async () => {
+    const sessionId = 'ses_active_attention_permission_1234';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      status: 'permission',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'idle',
+        title: 'needs permission',
+        connectionId: 'conn-perm',
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions[0]?.status).toBe('permission');
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
+  it('keeps the live status when the stored DB status is not attention', async () => {
+    const sessionId = 'ses_active_attention_non_attn_1234';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      status: 'idle',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'busy',
+        title: 'working',
+        connectionId: 'conn-busy',
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions[0]?.status).toBe('busy');
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
   it('passes sessions with undefined enrichment fields when no matching row exists', async () => {
     const unmatchedId = 'ses_active_enrich_unmatched_1234';
 

@@ -409,6 +409,42 @@ describe('handlePullRequest', () => {
         expect.objectContaining({ reviewType: 'standard' })
       );
     });
+
+    const labelGatedConfig = {
+      ...councilConfig,
+      config: {
+        ...councilConfig.config,
+        council: { ...councilConfig.config.council, required_labels: ['council'] },
+      },
+    };
+
+    it('runs council when the required-label gate is satisfied', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(labelGatedConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.labels = [{ name: 'Council' }]; // case-insensitive match
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'council' })
+      );
+    });
+
+    it('downgrades to standard when the required label is missing', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue(labelGatedConfig);
+      mockIsCouncilEntitledForOwner.mockResolvedValue(true);
+
+      const payload = pullRequestPayload();
+      payload.pull_request.labels = [{ name: 'bug' }];
+      await handlePullRequest(payload, platformIntegration());
+
+      expect(mockCreateCodeReview).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewType: 'standard' })
+      );
+    });
   });
 
   it('cancels superseded DB rows, interrupts queued/running only, and creates the new review', async () => {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
@@ -23,11 +24,13 @@ const ConversationVirtualRow = ({
   item,
   measureElement,
   start,
+  streamingMessageId,
 }: {
   index: number;
   item: GroupedConversationItem;
   measureElement: (element: HTMLElement) => void;
   start: number;
+  streamingMessageId?: string | undefined;
 }): JSX.Element => {
   const rowRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,12 +62,18 @@ const ConversationVirtualRow = ({
       ref={rowRef}
       style={getVirtualRowStyle(start)}
     >
-      <AgentConversationItemView item={item} />
+      <AgentConversationItemView item={item} streamingMessageId={streamingMessageId} />
     </div>
   );
 };
 
-export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
+export const ConversationList = ({
+  items,
+  streamingMessageId,
+}: {
+  items: GroupedConversationItem[];
+  streamingMessageId?: string | undefined;
+}): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
   // Source of truth for auto-scroll, owned outside React so a streaming render cannot race it. The state mirror below only drives the jump button.
   const isStuckToBottomRef = useRef(true);
@@ -75,6 +84,12 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
   const scrollKey = getConversationScrollKey(items);
   const virtualizer = useVirtualizer({
     count: items.length,
+    /*
+     * Recorded deviation: measured collapsed row heights are 42-46px, but pinning
+     * the estimate into that band destabilized the scroll-pin E2E on the CI browser
+     * (wheel-up poll timeouts at 44/46/48). The pre-existing 52 stays; measureElement
+     * reconciles real rows regardless.
+     */
     estimateSize: () => 52,
     getScrollElement: () => listRef.current,
     overscan: 8,
@@ -280,6 +295,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
                 key={getConversationItemKey(item)}
                 measureElement={virtualizer.measureElement}
                 start={virtualItem.start}
+                streamingMessageId={streamingMessageId}
               />
             );
           })}
@@ -288,7 +304,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       {showJumpButton ? (
         <button
           aria-label="Jump to latest"
-          className="absolute bottom-3 right-3 z-10 flex size-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-lg shadow-zinc-950/60 outline-none transition hover:border-[#EDFF00] hover:text-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/50"
+          className="absolute bottom-3 right-3 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-surface-overlay text-foreground shadow-lg shadow-black/50 outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
           onClick={jumpToLatest}
           type="button"
         >

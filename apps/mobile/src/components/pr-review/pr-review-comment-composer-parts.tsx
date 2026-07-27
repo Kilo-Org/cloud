@@ -5,6 +5,10 @@
 import { type ReactNode, type RefObject } from 'react';
 import { TextInput, View } from 'react-native';
 
+import {
+  PrFormSheetFooter,
+  useFormSheetKeyboardVisible,
+} from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -25,6 +29,7 @@ export function CommentBodyField({
   onChangeText: (value: string) => void;
 }) {
   const colors = useThemeColors();
+  const keyboardVisible = useFormSheetKeyboardVisible();
   return (
     <TextInput
       ref={inputRef}
@@ -37,9 +42,12 @@ export function CommentBodyField({
       multiline
       textAlignVertical="top"
       // Explicit line-height (no `text-center` per the repo's iOS rule).
+      // Compact min-height so half-detent + keyboard-open both keep footer
+      // CTAs on-screen at scroll offset 0; multiline still grows on type.
       className={cn(
-        'min-h-32 rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground',
-        'focus:border-ring'
+        'rounded-md border border-input bg-background px-3 py-1.5 text-sm leading-5 text-foreground',
+        'focus:border-ring',
+        keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-28'
       )}
     />
   );
@@ -63,14 +71,18 @@ export function ComposerFooter({
   onCancel: () => void;
 }): ReactNode {
   return (
-    <View className="border-t-[0.5px] border-hair-soft bg-background px-6 pb-6 pt-3">
+    // Lives inside the formSheet ScrollView (not a sticky sibling).
+    // size=sm + tight footer: half-detent + empty-body error must keep Cancel
+    // above the closed-sheet limit (~874) without scrolling.
+    <PrFormSheetFooter className="pb-1 pt-1">
       {isEdit ? (
-        <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel="Save">
+        <Button size="sm" onPress={onSave} disabled={primaryDisabled} accessibilityLabel="Save">
           <Text>Save</Text>
         </Button>
       ) : (
         <>
           <Button
+            size="sm"
             onPress={onCommentNow}
             loading={isSubmitting}
             disabled={primaryDisabled}
@@ -79,10 +91,11 @@ export function ComposerFooter({
             <Text>Comment now</Text>
           </Button>
           <Button
+            size="sm"
             variant="secondary"
             onPress={onAddToReview}
             disabled={isSubmitting}
-            className="mt-2"
+            className="mt-0.5"
             accessibilityLabel="Add to review"
           >
             <Text>Add to review</Text>
@@ -90,15 +103,16 @@ export function ComposerFooter({
         </>
       )}
       <Button
+        size="sm"
         variant="ghost"
         onPress={onCancel}
         disabled={isSubmitting}
-        className="mt-2"
+        className="mt-0.5"
         accessibilityLabel="Cancel"
       >
         <Text>Cancel</Text>
       </Button>
-    </View>
+    </PrFormSheetFooter>
   );
 }
 
@@ -123,20 +137,17 @@ export function ContextPreview({
       ? fallbackLineLabel
       : composerRangeLabel(selection.line, selection.startLine);
   const previewText = preferFallback ? '' : (selection?.selectedText ?? '');
+  // Single-line context keeps half-detent + keyboard-open room for CTAs.
   return (
-    <View className="gap-2 rounded-lg border border-hair-soft bg-secondary p-3">
+    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
       <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
         {path} {side} {lineLabel}
       </Text>
       {previewText.length > 0 ? (
-        <Text className="font-mono-medium text-[12px] leading-5 text-foreground" numberOfLines={6}>
+        <Text className="font-mono-medium text-[12px] leading-4 text-foreground" numberOfLines={1}>
           {previewText}
         </Text>
-      ) : (
-        <Text variant="muted" className="text-xs">
-          {preferFallback ? 'Editing a queued comment.' : 'Selected line context will appear here.'}
-        </Text>
-      )}
+      ) : null}
     </View>
   );
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRemoteMcpToolCall, createToolResult } from '@/src/shared/agent-conversation';
+import {
+  createRemoteMcpToolCall,
+  createSafeToolCall,
+  createToolResult,
+} from '@/src/shared/agent-conversation';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 
 // This module transitively imports the WXT '#imports' virtual module; stub it so the graph loads under vitest.
@@ -70,5 +74,44 @@ describe('remote MCP tool-call persistence round-trip', () => {
         value: { tempC: 21 },
       },
     ]);
+  });
+});
+
+describe('safe memory tool-call persistence round-trip', () => {
+  it('keeps memoryId through a persist -> reload cycle', () => {
+    const toolCall = createSafeToolCall({
+      memoryId: 'memory-42',
+      name: 'get_memory',
+      tabId: 7,
+    });
+    const store: StoredAgentConversationStore = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            toolCall,
+            createToolResult({
+              ok: true,
+              toolCallId: toolCall.id,
+              value: { id: 'memory-42', text: 'saved' },
+            }),
+          ],
+          id: 'conversation-1',
+          title: 'Memory chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    const reloaded = normalizeStoredConversationStore(toPersistedConversationStore(store));
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      id: toolCall.id,
+      memoryId: 'memory-42',
+      name: 'get_memory',
+      tabId: 7,
+      type: 'tool-call',
+    });
   });
 });

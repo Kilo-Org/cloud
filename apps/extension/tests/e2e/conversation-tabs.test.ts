@@ -11,7 +11,13 @@ import {
   waitForStoredConversationText,
 } from './extension-context-fixture';
 
-const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
+const safeToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+];
 const getSelectedOptionText = (page: Page, label: string): Promise<string> =>
   page.getByLabel(label).evaluate(element => {
     if (!(element instanceof HTMLSelectElement)) {

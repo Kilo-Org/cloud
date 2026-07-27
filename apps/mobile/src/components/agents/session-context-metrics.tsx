@@ -12,10 +12,12 @@ import {
   getHeaderSummary,
   getMetricsAccessibilityLabel,
 } from './context-usage-display';
+import { formatSessionTotalCost } from './session-list-helpers';
+import { formatSpokenCost } from './session-row-accessibility-label';
 
 type SessionContextMetricsProps = {
   info: SessionContextInfo;
-  totalCost: number;
+  totalCostMicrodollars: number | null;
   onPress: () => void;
 };
 
@@ -35,16 +37,16 @@ function toneTextClass(tone: ContextTone): string {
 
 export function SessionContextMetrics({
   info,
-  totalCost,
+  totalCostMicrodollars,
   onPress,
 }: Readonly<SessionContextMetricsProps>) {
-  const summary = getHeaderSummary(info, totalCost);
+  const summary = getHeaderSummary(info, totalCostMicrodollars);
   if (!summary) {
     return null;
   }
   const tone = getContextTone(info.percentage);
   const arcFraction = getArcFraction(info.percentage);
-  const accessibilityLabel = getMetricsAccessibilityLabel(info, totalCost);
+  const accessibilityLabel = getMetricsAccessibilityLabel(info, totalCostMicrodollars);
 
   return (
     <Pressable
@@ -82,18 +84,22 @@ export function SessionContextMetrics({
   );
 }
 
-// Preserves the legacy positive-cost header text when no completed context
-// usage exists. Marked noninteractive; VoiceOver reads the cost directly.
-export function SessionContextCostFallback({ totalCost }: Readonly<{ totalCost: number }>) {
-  if (totalCost <= 0) {
+// Preserves the positive-cost header text when no completed context usage
+// exists. Marked noninteractive; VoiceOver reads the humanized cost.
+export function SessionContextCostFallback({
+  totalCostMicrodollars,
+}: Readonly<{ totalCostMicrodollars: number | null }>) {
+  const visible = formatSessionTotalCost(totalCostMicrodollars);
+  if (visible === null) {
     return null;
   }
+  const spoken = formatSpokenCost(totalCostMicrodollars);
   return (
     <Text
       className="text-sm text-muted-foreground"
-      accessibilityLabel={`Session cost $${totalCost.toFixed(4)}`}
+      accessibilityLabel={spoken ? `Session cost ${spoken}` : undefined}
     >
-      ${totalCost.toFixed(4)}
+      {visible}
     </Text>
   );
 }

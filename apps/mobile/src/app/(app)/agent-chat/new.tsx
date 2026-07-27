@@ -1,22 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { toast } from 'sonner-native';
 
-import { InstanceSelector } from '@/components/agents/instance-selector';
-import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
-import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
+import { NewSessionCloudForm } from '@/components/agents/new-session-cloud-form';
 import { RemoteSpawnComposer } from '@/components/agents/remote-spawn-composer';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
-import { useRemoteSpawnDispatch } from '@/components/agents/use-remote-spawn-dispatch';
-import { REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE } from '@/lib/remote-submit-outcome';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import {
   getGitHubIntegrationUrl,
@@ -29,18 +23,22 @@ import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isRepositorySectionVisible } from '@/lib/is-repository-section-visible';
 import { resolveNewSessionSubmitDisabled } from '@/lib/new-session-submit';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
+import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
 export default function NewSessionScreen() {
-  const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
-  const { organizationId } = useLocalSearchParams<{ organizationId?: string }>();
+  const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
+    organizationId?: string;
+    shareId?: string;
+  }>();
+  // Param can be string | string[] depending on how the route was opened.
+  const shareId: string | undefined = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
 
   // ── Selectors state ──────────────────────────────────────────────
   const [mode, setMode] = useState<AgentMode>('code');
@@ -154,12 +152,9 @@ export default function NewSessionScreen() {
     variant,
   });
 
-  // ── Remote-instance spawn transport (kilo remote) ────────────────
-  // C3b: dispatches the remote submit and owns the outcome -> UX
-  // (toast, refetch, selection reset, nav). See
-  // `@/components/agents/use-remote-spawn-dispatch` and
-  // `@/lib/remote-submit-outcome` for the contract.
-  const remoteSpawn = useRemoteSpawnDispatch({
+  // Share latch + remote spawn + share-aware Run-on (F1/F2).
+  const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
+    shareId,
     organizationId,
     runOnInstance,
     setRunOnInstance,
@@ -250,104 +245,61 @@ export default function NewSessionScreen() {
     void submitCreate();
   }, [remoteSpawn, runOnInstance, submitCreate]);
 
-  // oxlint's `jsx-handler-names` rule requires the value of an
-  // `onX`-prefixed prop to start with `handle`. The dispatch hook's
-  // stable `onChangeRunOnInstance` reference is a closure over
-  // several pieces of state, so wrap the call here.
-  const handleRunOnInstanceChange = useCallback(
-    (next: InstancePickerInstance | null) => {
-      remoteSpawn.onChangeRunOnInstance(next);
-    },
-    [remoteSpawn]
-  );
-
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="New session" />
 
       {isRepositorySectionVisible(runOnInstance) ? (
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="flex-grow px-4 pb-8 pt-4"
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-        >
-          <NewSessionPrompt
-            attachments={attachments.attachments}
-            attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
-            isCreating={isCreating}
-            isModelsError={isModelsError}
-            isLoadingModels={isLoadingModels}
-            mode={mode}
-            model={model}
-            variant={variant}
-            modelOptions={models}
-            onChangeText={handlePromptChange}
-            onModeChange={setMode}
-            onModelSelect={handleModelSelect}
-            onAddAttachment={() => {
-              void handleAddAttachment();
-            }}
-            onRemoveAttachment={id => {
-              attachments.removeAttachment(id);
-            }}
-            onRetryAttachment={id => {
-              attachments.retryAttachment(id);
-            }}
-            onRefetchModels={() => {
-              void refetchModels();
-            }}
-            voiceInputSettlerRef={voiceInputSettlerRef}
-          />
-
-          {showRunOnSelector ? (
-            <View className="mt-5">
-              <Text className="mb-2 text-sm font-medium text-muted-foreground">Run on</Text>
-              <InstanceSelector
-                value={runOnInstance}
-                instances={instanceList}
-                isLoading={isLoadingInstances}
-                onChange={handleRunOnInstanceChange}
-                disabled={isCreating}
-              />
-              {remoteSpawn.showInstanceDisconnectedNote ? (
-                <Text className="mt-2 text-sm text-muted-foreground">
-                  {REMOTE_SPAWN_INSTANCE_DISCONNECTED_NOTE}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-
-          <NewSessionRepositorySection
-            disabled={isCreating}
-            isError={isReposError}
-            isLoading={isLoadingRepos}
-            isRefetching={isRefetchingRepos}
-            onChange={setSelectedRepo}
-            onOpenGitHubIntegration={() => {
-              void handleOpenGitHubIntegration();
-            }}
-            onRefetch={() => {
-              void refetchRepos();
-            }}
-            repositories={repositories}
-            showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
-            value={selectedRepo}
-          />
-
-          <Button
-            size="lg"
-            className="mt-6"
-            disabled={isStartDisabled}
-            onPress={handleStartSession}
-          >
-            {isCreating ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
-              <Text>Start session</Text>
-            )}
-          </Button>
-        </ScrollView>
+        <NewSessionCloudForm
+          attachments={attachments.attachments}
+          attachmentMax={AGENT_ATTACHMENT_MAX_FILES}
+          isCreating={isCreating}
+          isModelsError={isModelsError}
+          isLoadingModels={isLoadingModels}
+          mode={mode}
+          model={model}
+          variant={variant}
+          modelOptions={models}
+          onChangeText={handlePromptChange}
+          onModeChange={setMode}
+          onModelSelect={handleModelSelect}
+          onAddAttachment={() => {
+            void handleAddAttachment();
+          }}
+          onRemoveAttachment={id => {
+            attachments.removeAttachment(id);
+          }}
+          onRetryAttachment={id => {
+            attachments.retryAttachment(id);
+          }}
+          onRefetchModels={() => {
+            void refetchModels();
+          }}
+          onPrefillAttachments={addCandidates}
+          shareId={shareId}
+          voiceInputSettlerRef={voiceInputSettlerRef}
+          showRunOnSelector={showRunOnSelector}
+          runOnInstance={runOnInstance}
+          instanceList={instanceList}
+          isLoadingInstances={isLoadingInstances}
+          onChangeRunOnInstance={handleRunOnInstanceChange}
+          showInstanceDisconnectedNote={remoteSpawn.showInstanceDisconnectedNote}
+          isReposError={isReposError}
+          isLoadingRepos={isLoadingRepos}
+          isRefetchingRepos={isRefetchingRepos}
+          onChangeRepo={setSelectedRepo}
+          onOpenGitHubIntegration={() => {
+            void handleOpenGitHubIntegration();
+          }}
+          onRefetchRepos={() => {
+            void refetchRepos();
+          }}
+          repositories={repositories}
+          showGitHubIntegrationPrompt={showGitHubIntegrationPrompt}
+          selectedRepo={selectedRepo}
+          isStartDisabled={isStartDisabled}
+          onStartSession={handleStartSession}
+        />
       ) : (
         <RemoteSpawnComposer
           runOnInstance={runOnInstance}

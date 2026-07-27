@@ -13,6 +13,7 @@ import {
   microdollar_usage,
   sharedCliSessions,
   cloud_agent_code_reviews,
+  kilocode_users,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
@@ -25,6 +26,7 @@ import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { startInactiveSpan } from '@sentry/nextjs';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { sendBalanceAlertEmail } from '@/lib/email';
+import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
 import { maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
@@ -312,15 +314,58 @@ export function scheduleOrganizationLowBalanceAlert(
   logExceptInTest(
     `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organizationId}: threshold=${fromMicrodollars(minimumBalanceMicrodollars)} recipients=${recipients.length}`
   );
-  after(() =>
-    sendBalanceAlertEmail({
+  after(async () => {
+    await sendBalanceAlertEmail({
       organizationId,
       minimum_balance: fromMicrodollars(minimumBalanceMicrodollars),
       to: recipients,
     }).catch(err => {
       console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
-    })
-  );
+    });
+
+    // Best-effort mobile push: never block or fail the email path.
+    try {
+      const [org] = await db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .limit(1);
+      if (!org) {
+        console.error(
+          `[ingestOrganizationTokenUsage] Skipping low-balance push: org ${organizationId} not found`
+        );
+        return;
+      }
+
+      if (recipients.length === 0) return;
+
+      const memberUsers = await db
+        .select({ id: kilocode_users.id })
+        .from(kilocode_users)
+        .innerJoin(
+          organization_memberships,
+          and(
+            eq(organization_memberships.kilo_user_id, kilocode_users.id),
+            eq(organization_memberships.organization_id, organizationId)
+          )
+        )
+        .where(inArray(kilocode_users.google_user_email, recipients));
+
+      const recipientUserIds = [...new Set(memberUsers.map(u => u.id))];
+      if (recipientUserIds.length === 0) return;
+
+      await dispatchLowBalancePush({
+        recipientUserIds,
+        organizationId,
+        organizationName: org.name,
+        minimumBalanceUsd: fromMicrodollars(minimumBalanceMicrodollars),
+      }).catch(err => {
+        console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
+      });
+    } catch (err) {
+      console.error('[ingestOrganizationTokenUsage] Failed to dispatch low-balance push:', err);
+    }
+  });
 }
 
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {

@@ -2,29 +2,19 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
 import {
-  applyAgentPushOptimistic,
   DEFAULT_NOTIFICATION_PREFERENCE,
   deriveAgentPushEditable,
+  deriveGateSettled,
   deriveShowEnableCta,
   NOTIFICATION_CATEGORY_KEYS,
-  type NotificationCategoryKey,
   type NotificationPreferences,
   readAgentPushPreference,
-  rollbackAgentPushOptimistic,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;
 
 function makeQueryClient(): QueryClient {
   return new QueryClient();
-}
-
-function readRow(qc: QueryClient): NotificationPreferences {
-  const data = qc.getQueryData(key);
-  if (!data) {
-    throw new Error('expected query data to be present');
-  }
-  return data as NotificationPreferences;
 }
 
 function fullRow(overrides: Partial<NotificationPreferences> = {}): NotificationPreferences {
@@ -34,6 +24,8 @@ function fullRow(overrides: Partial<NotificationPreferences> = {}): Notification
     agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
     kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
+    balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
     agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
     ...overrides,
   };
@@ -46,13 +38,15 @@ describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
 });
 
 describe('NOTIFICATION_CATEGORY_KEYS', () => {
-  it('lists the 5 categories rendered on the dedicated screen', () => {
+  it('lists the categories rendered on the dedicated screen including balance and security', () => {
     expect([...NOTIFICATION_CATEGORY_KEYS]).toEqual([
       'chatMessages',
       'agentAttention',
       'agentUpdates',
       'sessionStatus',
       'kiloclawActivity',
+      'balanceAlerts',
+      'securityFindings',
     ]);
   });
 });
@@ -85,6 +79,42 @@ describe('deriveShowEnableCta (empty-state CTA presence)', () => {
   });
 });
 
+describe('deriveGateSettled (master gate settle flap)', () => {
+  // Truth table: permissionSettled, granted, pushTokensSettled, deviceTokenSettled → result
+  const cases: [boolean, boolean, boolean, boolean, boolean, string][] = [
+    [false, false, false, false, false, 'permission loading'],
+    [false, true, true, true, false, 'permission loading ignores settled tokens'],
+    // Denied / permission-error (granted falsy): short-circuit; token flags irrelevant
+    [true, false, false, false, true, 'denied short-circuits unsettled tokens'],
+    [true, false, true, true, true, 'denied with settled tokens still true'],
+    // Granted: both token queries must settle (isFetched || isError each)
+    [true, true, false, true, false, 'granted, pushTokens in flight'],
+    [true, true, true, false, false, 'granted, deviceToken in flight'],
+    [true, true, false, false, false, 'granted, both tokens in flight'],
+    [true, true, true, true, true, 'granted, both tokens settled'],
+  ];
+
+  for (const [
+    permissionSettled,
+    permissionGranted,
+    pushTokensSettled,
+    deviceTokenSettled,
+    expected,
+    label,
+  ] of cases) {
+    it(label, () => {
+      expect(
+        deriveGateSettled({
+          permissionSettled,
+          permissionGranted,
+          pushTokensSettled,
+          deviceTokenSettled,
+        })
+      ).toBe(expected);
+    });
+  }
+});
+
 describe('readAgentPushPreference', () => {
   it('returns the default for the requested category when the cache has no snapshot', () => {
     const qc = makeQueryClient();
@@ -101,6 +131,8 @@ describe('readAgentPushPreference', () => {
       agentUpdates: true,
       sessionStatus: false,
       kiloclawActivity: true,
+      balanceAlerts: false,
+      securityFindings: true,
       agentPushEnabled: true,
     });
     expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(true);
@@ -108,6 +140,8 @@ describe('readAgentPushPreference', () => {
     expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'sessionStatus')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'kiloclawActivity')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
   it('maps the legacy `agentPushEnabled` snapshot to the agentUpdates category', () => {
@@ -117,6 +151,10 @@ describe('readAgentPushPreference', () => {
     // Non-agentUpdates categories fall back to the default when only the
     // legacy field is present.
     expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
+      DEFAULT_NOTIFICATION_PREFERENCE
+    );
   });
 
   it('defaults to the agentUpdates category when no category is passed', () => {
@@ -124,182 +162,4 @@ describe('readAgentPushPreference', () => {
     qc.setQueryData(key, fullRow({ agentUpdates: false }));
     expect(readAgentPushPreference(qc, key)).toBe(false);
   });
-});
-
-describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)', () => {
-  it('flips the requested category and leaves the others unchanged', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(key, fullRow({ agentAttention: true, sessionStatus: true }));
-
-    const context = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
-      category: 'agentAttention',
-    });
-
-    const after = readRow(qc);
-    expect(after.agentAttention).toBe(false);
-    expect(after.sessionStatus).toBe(true);
-    expect(after.agentUpdates).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-    expect(context.previous).toEqual(fullRow({ agentAttention: true, sessionStatus: true }));
-    expect(context.previousWasLegacy).toBe(false);
-  });
-
-  it('flips a non-agentUpdates category in a real 6-key snapshot without corrupting the other keys', async () => {
-    const qc = makeQueryClient();
-    const original = {
-      chatMessages: true,
-      agentAttention: true,
-      agentUpdates: true,
-      sessionStatus: false,
-      kiloclawActivity: true,
-      agentPushEnabled: true,
-    } as const satisfies NotificationPreferences;
-    qc.setQueryData(key, original);
-
-    const context = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: true,
-      category: 'sessionStatus',
-    });
-
-    const after = readRow(qc);
-    expect(after.sessionStatus).toBe(true);
-    expect(after.chatMessages).toBe(true);
-    expect(after.agentAttention).toBe(true);
-    expect(after.agentUpdates).toBe(true);
-    expect(after.kiloclawActivity).toBe(true);
-    expect(after.agentPushEnabled).toBe(true);
-
-    expect(context.previous).toEqual(original);
-    expect(context.previousWasLegacy).toBe(false);
-
-    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-    expect(qc.getQueryData(key)).toEqual(original);
-  });
-
-  it('rolls back to the previous snapshot on error', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(key, fullRow({ agentAttention: true }));
-
-    const context = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
-      category: 'agentAttention',
-    });
-    expect(readRow(qc).agentAttention).toBe(false);
-
-    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-    expect(qc.getQueryData(key)).toEqual(fullRow({ agentAttention: true }));
-  });
-
-  it('rolls back from a default-ON starting state (no prior cache entry)', async () => {
-    const qc = makeQueryClient();
-    expect(qc.getQueryData(key)).toBeUndefined();
-
-    const context = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
-      category: 'agentUpdates',
-    });
-    // No prior cache entry => previous is undefined; the optimistic write
-    // materializes the full row with the flipped value so the row reads
-    // consistently while the mutation is in flight.
-    expect(context.previous).toBeUndefined();
-    expect(readRow(qc).agentUpdates).toBe(false);
-
-    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-    // No prior snapshot => cache restored to the absent state, not a fabricated true.
-    expect(qc.getQueryData(key)).toBeUndefined();
-  });
-
-  it('rolls back each category independently and removes the empty-cache entry', async () => {
-    await Promise.all(
-      NOTIFICATION_CATEGORY_KEYS.map(async category => {
-        const qc = makeQueryClient();
-        const context = await applyAgentPushOptimistic({
-          queryClient: qc,
-          queryKey: key,
-          next: false,
-          category,
-        });
-        expect(readRow(qc)[category]).toBe(false);
-        rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-        expect(qc.getQueryData(key)).toBeUndefined();
-      })
-    );
-  });
-
-  it('preserves the legacy `agentPushEnabled`-only snapshot exactly on rollback', async () => {
-    const qc = makeQueryClient();
-    const legacy = { agentPushEnabled: true } as const;
-    qc.setQueryData(key, legacy);
-
-    const context = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
-      category: 'agentAttention',
-    });
-    // After applying, the cache holds the promoted per-category shape with
-    // agentAttention flipped to false and agentUpdates carrying the legacy
-    // value (true).
-    const after = readRow(qc);
-    expect(after.agentAttention).toBe(false);
-    expect(after.agentUpdates).toBe(true);
-    expect(context.previous).toBe(legacy);
-    expect(context.previousWasLegacy).toBe(true);
-
-    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-    // Rollback must restore the exact legacy shape, not the promoted one.
-    expect(qc.getQueryData(key)).toEqual(legacy);
-  });
-
-  it('treats an undefined context as a no-op rollback (defensive against missing context)', () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(key, fullRow({ agentAttention: true }));
-    expect(() => {
-      rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context: undefined });
-    }).not.toThrow();
-    // The cache is left intact when no context is provided.
-    expect(qc.getQueryData(key)).toEqual(fullRow({ agentAttention: true }));
-  });
-});
-
-describe('per-category flip flow (each category in turn)', () => {
-  const scenarios: { category: NotificationCategoryKey; next: boolean }[] = [
-    { category: 'chatMessages', next: false },
-    { category: 'agentAttention', next: true },
-    { category: 'agentUpdates', next: false },
-    { category: 'sessionStatus', next: true },
-    { category: 'kiloclawActivity', next: false },
-  ];
-
-  for (const { category, next } of scenarios) {
-    it(`flips only ${category} → ${next} and rolls back cleanly`, async () => {
-      const qc = makeQueryClient();
-      qc.setQueryData(key, fullRow());
-
-      const context = await applyAgentPushOptimistic({
-        queryClient: qc,
-        queryKey: key,
-        next,
-        category,
-      });
-      const after = readRow(qc);
-      expect(after[category]).toBe(next);
-      for (const other of NOTIFICATION_CATEGORY_KEYS) {
-        if (other !== category) {
-          expect(after[other]).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
-        }
-      }
-
-      rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
-      expect(qc.getQueryData(key)).toEqual(fullRow());
-    });
-  }
 });

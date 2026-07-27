@@ -68,15 +68,18 @@ const formFromServer = (server: RemoteMcpServer): FormState => {
 };
 
 const inputClass =
-  'h-8 w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 text-sm text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30';
+  'h-8 w-full rounded-md border border-border-strong bg-input-bg px-2 type-body text-foreground outline-none transition placeholder:text-foreground-subtle focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background';
 
-const labelClass = 'text-xs font-medium text-zinc-500';
+const labelClass = 'type-label text-foreground-muted';
+
+const filledSecondaryButtonClass =
+  'rounded-md border border-border bg-surface-overlay type-label text-foreground-on-secondary outline-none transition hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background';
 
 const SavedSecret = ({ onReplace }: { onReplace: () => void }): JSX.Element => (
   <div className="flex items-center gap-2">
-    <span className="text-sm text-zinc-500">••••••• saved</span>
+    <span className="type-body text-foreground-muted">••••••• saved</span>
     <button
-      className="text-xs text-zinc-400 underline hover:text-zinc-200"
+      className="type-label text-foreground-muted underline hover:text-foreground"
       onClick={onReplace}
       type="button"
     >
@@ -268,42 +271,42 @@ const ServerForm = ({
       <div className="flex items-center gap-2">
         <input
           checked={form.enabled}
-          className="rounded border-zinc-700"
+          className="rounded border border-border-strong"
           id="enabled"
           onChange={ev => {
             set('enabled', ev.target.checked);
           }}
           type="checkbox"
         />
-        <label className="text-sm text-zinc-300" htmlFor="enabled">
+        <label className="type-body text-foreground" htmlFor="enabled">
           Enabled
         </label>
       </div>
       <div className="flex items-center gap-2">
         <input
           checked={form.allowInSafeMode}
-          className="rounded border-zinc-700"
+          className="rounded border border-border-strong"
           id="allowInSafeMode"
           onChange={ev => {
             set('allowInSafeMode', ev.target.checked);
           }}
           type="checkbox"
         />
-        <label className="text-sm text-zinc-300" htmlFor="allowInSafeMode">
+        <label className="type-body text-foreground" htmlFor="allowInSafeMode">
           Allow in safe mode
         </label>
       </div>
-      {error === null ? null : <p className="text-xs text-red-400">{error}</p>}
+      {error === null ? null : <p className="type-label text-status-red-400">{error}</p>}
       <div className="flex gap-2">
         <button
-          className="h-9 flex-1 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:opacity-50"
+          className={`h-9 flex-1 px-3 ${filledSecondaryButtonClass} disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle`}
           disabled={saving}
           type="submit"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
         <button
-          className="h-9 rounded-md border border-zinc-800 px-3 text-sm text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+          className={`h-9 px-3 ${filledSecondaryButtonClass}`}
           onClick={onCancel}
           type="button"
         >
@@ -338,7 +341,7 @@ const ServerRow = ({
   };
 
   return (
-    <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+    <div className="min-w-0 rounded-xl border border-border bg-surface-raised p-3">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <button
@@ -349,24 +352,24 @@ const ServerRow = ({
             type="button"
           >
             {expanded ? (
-              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-zinc-500" />
+              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-foreground-muted" />
             ) : (
-              <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-zinc-500" />
+              <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-foreground-muted" />
             )}
-            <span className="text-sm font-medium text-zinc-100">{server.displayName}</span>
+            <span className="type-body font-medium text-foreground">{server.displayName}</span>
           </button>
-          <p className="ml-5 truncate text-xs text-zinc-500">{server.url}</p>
-          <p className="ml-5 text-xs text-zinc-500">
+          <p className="ml-5 truncate type-label text-foreground-muted">{server.url}</p>
+          <p className="ml-5 type-label text-foreground-muted">
             {formatToolCount(server.cachedTools.length)} ·{' '}
             {formatLastConnected(server.lastConnectedAt)}
           </p>
           {server.lastError === undefined ? null : (
-            <p className="ml-5 truncate text-xs text-red-400">{server.lastError}</p>
+            <p className="ml-5 truncate type-label text-status-red-400">{server.lastError}</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
-            className="flex h-9 items-center gap-1 rounded-md border border-zinc-700 px-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:opacity-50"
+            className={`flex h-9 items-center gap-1 px-2 ${filledSecondaryButtonClass} disabled:cursor-not-allowed disabled:bg-surface-selected disabled:text-foreground-subtle`}
             disabled={connecting}
             onClick={() => void handleConnect()}
             type="button"
@@ -376,7 +379,7 @@ const ServerRow = ({
           </button>
           <button
             aria-label={`Edit ${server.displayName}`}
-            className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+            className={`flex size-8 items-center justify-center ${filledSecondaryButtonClass}`}
             onClick={() => {
               onEdit(server);
             }}
@@ -386,7 +389,7 @@ const ServerRow = ({
           </button>
           <button
             aria-label={`Remove ${server.displayName}`}
-            className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+            className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary outline-none transition hover:border-status-red-500/50 hover:bg-status-red-500/10 hover:text-status-red-300 focus-visible:ring-2 focus-visible:ring-brand-primary-ring ring-offset-2 ring-offset-surface-background"
             onClick={() => {
               onRemove(server.id);
             }}
@@ -398,7 +401,7 @@ const ServerRow = ({
       </div>
       {expanded && server.cachedTools.length > 0 ? (
         <div className="mt-2 overflow-x-auto">
-          <pre className="font-mono text-xs text-zinc-400">
+          <pre className="font-mono text-xs text-foreground-muted">
             {toolsToJsonString(server.cachedTools)}
           </pre>
         </div>
@@ -480,7 +483,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
       <p className={labelClass}>Remote MCP servers</p>
       {store.servers.map(server =>
         editingServer?.id === server.id ? (
-          <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3" key={server.id}>
+          <div className="rounded-xl border border-border bg-surface-raised p-3" key={server.id}>
             <ServerForm existingServer={server} onCancel={handleCancelForm} onSave={handleSave} />
           </div>
         ) : (
@@ -494,12 +497,12 @@ export const RemoteMcpSettings = (): JSX.Element => {
         )
       )}
       {showAddForm ? (
-        <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+        <div className="rounded-xl border border-border bg-surface-raised p-3">
           <ServerForm onCancel={handleCancelForm} onSave={handleSave} />
         </div>
       ) : (
         <button
-          className="flex h-9 items-center gap-2 rounded-md border border-zinc-700 px-3 text-sm text-zinc-400 transition hover:border-zinc-600 hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+          className={`flex h-9 items-center gap-2 px-3 ${filledSecondaryButtonClass}`}
           onClick={() => {
             setEditingServer(null);
             setShowAddForm(true);

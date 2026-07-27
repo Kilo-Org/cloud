@@ -1,4 +1,150 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/roboto-mono';
+
+/* static: emit all token CSS variables even when unused in this slice (S2 will use them). Not @theme inline — literals stay here. */
+@theme static {
+  /* surfaces */
+  --color-surface-inset: #101010;
+  --color-surface-background: #151515;
+  --color-surface-raised: #202020;
+  --color-surface-overlay: #333333;
+  --color-surface-hover: #3a3a3a;
+  --color-surface-selected: #454545;
+  /* foreground */
+  --color-foreground: #fafafa;
+  --color-foreground-muted: #a3a3a3;
+  --color-foreground-subtle: #7a7a7a;
+  --color-foreground-on-secondary: #fafafa;
+  --color-foreground-on-destructive: #ffffff;
+  /* border */
+  --color-border: #ffffff1a;
+  --color-border-strong: #ffffff2e;
+  --color-input-bg: #ffffff0a;
+  /* brand */
+  --color-brand-primary: #f7f586;
+  --color-brand-primary-hover: #e6e475;
+  --color-brand-primary-foreground: #1f1f1f;
+  --color-brand-primary-ring: #f7f58659;
+  /* status families */
+  --color-status-blue-300: #93c5fd;
+  --color-status-blue-400: #60a5fa;
+  --color-status-blue-500: #3b82f6;
+  --color-status-blue-600: #2563eb;
+  --color-status-purple-300: #d8b4fe;
+  --color-status-purple-400: #c084fc;
+  --color-status-purple-500: #a855f7;
+  --color-status-purple-600: #9333ea;
+  --color-status-teal-300: #4ce7d7;
+  --color-status-teal-400: #00d4c2;
+  --color-status-teal-500: #00baa9;
+  --color-status-teal-600: #009689;
+  --color-status-gray-300: #d4d4d8;
+  --color-status-gray-400: #a1a1aa;
+  --color-status-gray-500: #71717a;
+  --color-status-gray-600: #52525b;
+  --color-status-orange-300: #fdba74;
+  --color-status-orange-400: #fb923c;
+  --color-status-orange-500: #f97316;
+  --color-status-orange-600: #ea580c;
+  --color-status-green-300: #86efac;
+  --color-status-green-400: #4ade80;
+  --color-status-green-500: #22c55e;
+  --color-status-green-600: #16a34a;
+  --color-status-yellow-300: #fdd94a;
+  --color-status-yellow-400: #fbc51c;
+  --color-status-yellow-500: #f0a900;
+  --color-status-yellow-600: #d28100;
+  --color-status-red-300: #fca5a5;
+  --color-status-red-400: #f87171;
+  --color-status-red-500: #ef4444;
+  --color-status-red-600: #dc2626;
+  /* syntax */
+  --color-syntax-plain: #e8e8e8;
+  --color-syntax-comment: #7a7a7a;
+  --color-syntax-keyword: #ff9ae2;
+  --color-syntax-string: #ecf58c;
+  --color-syntax-number: #f2b36b;
+  --color-syntax-function: #93e9f6;
+  --color-syntax-type: #00ceb9;
+  --color-syntax-property: #9cdcfe;
+  --color-syntax-constant: #c792ea;
+  --color-syntax-operator: #a3a3a3;
+  /* diff */
+  --color-diff-add-text: #9bcd97;
+  --color-diff-add-surface: #1a2919;
+  --color-diff-delete-text: #fc533a;
+  --color-diff-delete-surface: #42120b;
+  /* radius remap (do NOT set a --radius DEFAULT override; bare `rounded` already = 4px = sm) */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  /* fonts */
+  --font-sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-mono: 'Roboto Mono Variable', 'Roboto Mono', ui-monospace, monospace;
+}
+
+@utility type-title {
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+@utility type-heading {
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+@utility type-body-lg {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+@utility type-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+@utility type-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@utility type-code {
+  font-family: var(--font-mono) !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+}
 
 html,
 body,
@@ -9,7 +155,8 @@ body,
 }
 
 body {
-  background: #09090b;
+  background: var(--color-surface-background);
+  font-family: var(--font-sans);
   margin: 0;
 }
 
@@ -22,7 +169,7 @@ body {
 }
 
 .agent-conversation-scrollbar {
-  scrollbar-color: #52525b #09090b;
+  scrollbar-color: var(--color-surface-selected) var(--color-surface-background);
   scrollbar-width: thin;
 }
 
@@ -31,17 +178,17 @@ body {
 }
 
 .agent-conversation-scrollbar::-webkit-scrollbar-track {
-  background: #09090b;
+  background: var(--color-surface-background);
 }
 
 .agent-conversation-scrollbar::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border: 0.1875rem solid #09090b;
+  background: var(--color-surface-selected);
+  border: 0.1875rem solid var(--color-surface-background);
   border-radius: 9999px;
 }
 
 .agent-conversation-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--color-surface-hover);
 }
 
 .agent-message-markdown {
@@ -56,6 +203,7 @@ body {
 }
 
 .agent-message-markdown :where(a) {
+  color: var(--color-status-blue-400);
   text-decoration: underline;
   text-underline-offset: 0.125rem;
 }
@@ -75,16 +223,17 @@ body {
 }
 
 .agent-message-markdown :where(code) {
-  background: rgb(9 9 11 / 70%);
+  background: var(--color-surface-inset);
   border-radius: 0.25rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
   overflow-wrap: anywhere;
   padding: 0.125rem 0.25rem;
 }
 
 .agent-message-markdown :where(table) {
   /* display:block + overflow-x lets a wide table scroll inside its own box instead of stretching the panel. */
+  /* font-size 0.75rem equals the contract label step (type-label). */
   border-collapse: collapse;
   display: block;
   font-size: 0.75rem;
@@ -93,19 +242,20 @@ body {
 }
 
 .agent-message-markdown :where(th, td) {
-  border: 1px solid rgb(63 63 70 / 100%);
+  border: 1px solid var(--color-border);
   padding: 0.25rem 0.5rem;
   text-align: left;
 }
 
 .agent-message-markdown :where(th) {
-  background: rgb(9 9 11 / 70%);
+  background: var(--color-surface-inset);
   font-weight: 600;
 }
 
 .agent-message-markdown :where(pre) {
-  background: rgb(9 9 11 / 70%);
+  background: var(--color-surface-inset);
   border-radius: 0.25rem;
+  font-family: var(--font-mono);
   overflow-x: hidden;
   padding: 0.5rem;
   white-space: pre-wrap;

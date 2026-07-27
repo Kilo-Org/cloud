@@ -25,9 +25,44 @@ const sendTabDebuggerRequest = async (
   return response;
 };
 
+interface TabsQueryApi {
+  readonly query: (queryInfo: {
+    readonly active: true;
+    readonly currentWindow: true;
+  }) => Promise<readonly { readonly id?: number | undefined }[]>;
+}
+
+/**
+ * Best-effort active-tab lookup for the side panel's own window.
+ * Never throws: query failures and invalid ids degrade to `undefined`.
+ */
+export const getActiveTabId = async (tabsApi: TabsQueryApi): Promise<number | undefined> => {
+  try {
+    const tabs: unknown = await tabsApi.query({ active: true, currentWindow: true });
+
+    if (!Array.isArray(tabs) || tabs.length === 0) {
+      return undefined;
+    }
+
+    const [firstTabCandidate] = tabs as unknown[];
+    const firstTab: unknown = firstTabCandidate;
+
+    if (typeof firstTab !== 'object' || firstTab === null || !('id' in firstTab)) {
+      return undefined;
+    }
+
+    const { id } = firstTab;
+
+    return typeof id === 'number' ? id : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 let rememberedSelectedTabId: number | null = null;
 
 export const useTabDebugger = (): {
+  readonly activeTabId: number | undefined;
   readonly inspectableTabs: InspectableTab[];
   readonly isLoadingTabs: boolean;
   readonly loadInspectableTabs: (options?: { readonly showLoading?: boolean }) => Promise<void>;
@@ -42,7 +77,7 @@ export const useTabDebugger = (): {
   );
   const hasLoadedTabsRef = useRef(false);
   const {
-    data: tabs,
+    data,
     error: tabsError,
     isError,
     isLoading,
@@ -59,11 +94,16 @@ export const useTabDebugger = (): {
         throw new Error('Extension background returned the wrong response.');
       }
 
-      return response.tabs;
+      const activeTabId = await getActiveTabId(browser.tabs);
+
+      return { activeTabId, tabs: response.tabs };
     },
     queryKey: getTabListQueryKey(),
     refetchInterval: 2000,
   });
+
+  const tabs = data?.tabs;
+  const activeTabId = data?.activeTabId;
 
   useEffect(() => {
     const nextState = deriveInspectableTabState({
@@ -113,6 +153,7 @@ export const useTabDebugger = (): {
   }, [inspectableTabs]);
 
   return {
+    activeTabId,
     inspectableTabs,
     isLoadingTabs: isLoading,
     loadInspectableTabs,

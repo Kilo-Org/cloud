@@ -196,3 +196,5 @@ export type {
   SecurityFindingAuditSnapshotSource,
   SecurityFindingAuditWriterDb,
 } from './security-finding-audit.js';
+
+export { hasOrganizationAccess } from './organization-membership.js';

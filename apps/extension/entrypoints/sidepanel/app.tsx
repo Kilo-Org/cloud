@@ -1,7 +1,8 @@
 import { browser, storage } from '#imports';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
+import { resetAnalyticsUser } from '@/src/shared/analytics';
 import {
   clearStoredSession,
   createDeviceAuthRequest,
@@ -22,6 +23,8 @@ import {
   ValidationErrorView,
 } from './auth-views';
 import { clearPerConversationAtoms } from './agent-chat-atoms';
+import { useAnalyticsIdentity } from './use-analytics-identity';
+import type { SignInSource } from './use-analytics-identity';
 
 const pollIntervalMs = 3000;
 const apiBaseUrl = getKiloApiBaseUrl();
@@ -45,6 +48,11 @@ export const App = (): JSX.Element => {
   const queryClient = useQueryClient();
   const [pendingAuthRequest, setPendingAuthRequest] = useState<DeviceAuthRequest | undefined>();
   const [signedOutMessage, setSignedOutMessage] = useState<string | undefined>();
+  /*
+   * Ref (not state): device-approval must write the source synchronously before
+   * the signed-in cache write, so the identity hook never sees a stale source.
+   */
+  const signInSourceRef = useRef<SignInSource>('stored_session');
   const {
     data: storedAuth,
     isLoading: isStoredAuthLoading,
@@ -135,6 +143,8 @@ export const App = (): JSX.Element => {
     if (authValidationData?.status === 'signedOut') {
       setSignedOutMessage(authValidationData.message);
       queryClient.setQueryData(storedAuthQueryKey, undefined);
+      signInSourceRef.current = 'stored_session';
+      void resetAnalyticsUser({ reason: 'expired' });
     }
   }, [authValidationData, queryClient]);
 
@@ -157,6 +167,11 @@ export const App = (): JSX.Element => {
         }
 
         setSignedOutMessage(undefined);
+        /*
+         * Must precede the signed-in cache writes so the identity hook reads
+         * device_auth for this transition (ref is sync; useState would race).
+         */
+        signInSourceRef.current = 'device_auth';
         queryClient.setQueryData(storedAuthQueryKey, persistence.auth);
         queryClient.setQueryData(getAuthValidationQueryKey(persistence.auth.token), {
           auth: persistence.auth,
@@ -179,6 +194,14 @@ export const App = (): JSX.Element => {
     }
   }, [devicePollQuery.isError]);
 
+  useAnalyticsIdentity({
+    email:
+      authValidationData?.status === 'signedIn' ? authValidationData.auth.userEmail : undefined,
+    signInSource: signInSourceRef,
+    status: authValidationData?.status,
+    storageArea: storage,
+  });
+
   const cancelSignIn = useCallback((): void => {
     setPendingAuthRequest(undefined);
   }, []);
@@ -186,6 +209,8 @@ export const App = (): JSX.Element => {
   const signOut = useCallback((): void => {
     setPendingAuthRequest(undefined);
     setSignedOutMessage(undefined);
+    signInSourceRef.current = 'stored_session';
+    void resetAnalyticsUser({ reason: 'explicit' });
     void (async (): Promise<void> => {
       try {
         await clearStoredSession(storage);

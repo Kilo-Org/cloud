@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
-import { useAckSessionAttentionOnOpen } from '@/lib/session-attention';
 
 export default function SessionDetailScreen() {
   const {
@@ -22,6 +21,7 @@ export default function SessionDetailScreen() {
     organizationId: routeOrganizationId,
     via,
     spawned,
+    shareId: shareIdParam,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -37,10 +37,12 @@ export default function SessionDetailScreen() {
      * shows the same permanent state it always did.
      */
     spawned?: string;
+    shareId?: string;
   }>();
+  // Param can be string | string[] depending on how the route was opened.
+  const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const trpc = useTRPC();
   const router = useRouter();
-  useAckSessionAttentionOnOpen(sessionId);
   const sessionQuery = useQuery({
     ...trpc.cliSessionsV2.get.queryOptions(
       { session_id: sessionId },
@@ -125,6 +127,7 @@ export default function SessionDetailScreen() {
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
         openedVia={via === 'push' ? 'push' : 'app'}
+        shareId={shareId}
       />
     </AgentSessionProvider>
   );

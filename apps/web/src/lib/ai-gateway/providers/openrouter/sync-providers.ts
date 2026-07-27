@@ -41,6 +41,11 @@ import {
   openRouterToVercelInferenceProviderId,
   VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  applyFreeEndpointDataPolicy,
+  getOpenRouterFreeEndpoints,
+} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -265,6 +270,7 @@ async function syncProviders(
       })
     )
   );
+  const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
 
   injectExtraProviderModels(vercelModels, providerModelData);
 
@@ -295,6 +301,10 @@ async function syncProviders(
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
+            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
+              !isForbiddenFreeModel(kfm.public_id) && {
+                data_policy: { training: true, retainsPrompts: true },
+              }),
           },
         },
         provider: inferenceProvider,
@@ -312,6 +322,12 @@ async function syncProviders(
       providerData.models.splice(0, 0, extraModel.model);
     }
   }
+
+  applyFreeEndpointDataPolicy({
+    providerModelData,
+    openRouterFreeEndpoints,
+    kiloExclusiveModels,
+  });
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);

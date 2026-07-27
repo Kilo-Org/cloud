@@ -224,6 +224,10 @@ const openSignedInPanel = async (
 const conversationPane = (sidePanel: Page): Locator => sidePanel.getByLabel('Agent conversation');
 
 const seedConversationAndReload = async (sidePanel: Page): Promise<void> => {
+  // Wait for boot hydration before seeding. Once loaded, the panel persists its default
+  // Conversation store, which clobbers any seed written earlier. The Model trigger stays
+  // Disabled until the conversation store is loaded (and models resolve).
+  await expect(sidePanel.getByLabel('Model')).toBeEnabled({ timeout: 30_000 });
   await setExtensionStorage(sidePanel, { kiloAgentConversations: designTokenConversationStore });
   await sidePanel.reload();
   // Scope to the transcript pane — the tab label also mirrors the first user message.

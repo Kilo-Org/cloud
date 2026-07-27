@@ -78,46 +78,101 @@ const excludeModelNotFoundAttempt = sql`COALESCE(${cloud_agent_code_review_attem
   AND COALESCE(${cloud_agent_code_review_attempts.error_message}, '') NOT ILIKE '%model not found%'`;
 
 /**
- * Categorize error messages into high-level buckets via SQL CASE WHEN.
+ * Display label for each structured terminal reason.
+ *
+ * cloud-agent-next sends a structured `failure` ({ stage, code, subtype }) on
+ * the status callback, and the callback now maps it onto `terminal_reason`
+ * (see apps/web/src/lib/code-reviews/terminal-reason-from-failure.ts). Reading
+ * that column is exact, so it is consulted before any message matching.
+ *
+ * Reasons deliberately absent (user_cancelled, superseded) are not failures and
+ * never reach this expression.
+ */
+const TERMINAL_REASON_LABELS: Record<string, string> = {
+  github_installation_required: 'Action Required',
+  github_ip_allow_list: 'Action Required',
+  gitlab_project_access_required: 'Action Required',
+  byok_invalid_key: 'Action Required',
+  selected_model_unavailable: 'Action Required',
+  billing: 'Billing',
+  model_not_found: 'Model Not Found',
+  workspace_capacity: 'Sandbox Capacity',
+  sandbox_connection: 'Sandbox Connection',
+  container_shutdown: 'Container Shutdown',
+  assistant_rate_limited: 'Rate Limited',
+  assistant_unavailable: 'Assistant Unavailable',
+  assistant_timeout: 'Assistant Timeout',
+  assistant_unauthorized: 'Assistant Unauthorized',
+  assistant_invalid_request: 'Assistant Invalid Request',
+  assistant_failed: 'Assistant Error',
+  assistant_no_reply: 'Assistant No Reply',
+  wrapper_failed: 'Agent Wrapper Failure',
+  runtime_startup_failed: 'Runtime Startup Failure',
+  delivery_failed: 'Delivery Failure',
+  workspace_setup_failed: 'Workspace Setup Failure',
+  repository_clone_failed: 'Repository Clone Failure',
+  repository_auth_failed: 'Repository Auth Failure',
+  repository_checkout_failed: 'Repository Checkout Failure',
+  repeated_repository_clone_timeout: 'Repository Clone Failure',
+  session_import_failed: 'Session Import Failure',
+  setup_command_failed: 'Setup Command Failure',
+  timeout: 'Timeout',
+  upstream_error: 'Upstream Server Error',
+  interrupted: 'Interrupted',
+};
+
+/**
+ * Categorize failures into high-level buckets.
+ *
+ * Structured `terminal_reason` wins. The message patterns below are a fallback
+ * for rows written before the callback consumed `failure.code` — they are
+ * intentionally not being extended, since new rows no longer need them.
  * Pattern matching is ordered from most-specific to least-specific.
  */
-const errorCategoryExpr = sql<string>`CASE
-  WHEN ${cloud_agent_code_reviews.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'gitlab_project_access_required', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
-  WHEN ${cloud_agent_code_reviews.terminal_reason} = 'workspace_capacity' THEN 'Sandbox Capacity'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_reviews.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_reviews.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%429%' THEN 'Rate Limited'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%timeout%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_reviews.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_reviews.error_message} LIKE '%timed out%' THEN 'Timeout'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%context window%' OR ${cloud_agent_code_reviews.error_message} LIKE '%token limit%' OR ${cloud_agent_code_reviews.error_message} LIKE '%too large%' OR ${cloud_agent_code_reviews.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%authentication%' OR ${cloud_agent_code_reviews.error_message} LIKE '%401%' OR ${cloud_agent_code_reviews.error_message} LIKE '%403%' OR ${cloud_agent_code_reviews.error_message} LIKE '%permission%' THEN 'Auth / Permission Error'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%not found%' OR ${cloud_agent_code_reviews.error_message} LIKE '%404%' THEN 'Not Found'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%500%' OR ${cloud_agent_code_reviews.error_message} LIKE '%502%' OR ${cloud_agent_code_reviews.error_message} LIKE '%503%' OR ${cloud_agent_code_reviews.error_message} LIKE '%internal server%' OR ${cloud_agent_code_reviews.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_reviews.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_reviews.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_reviews.error_message} LIKE '%network%' THEN 'Network Error'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%parse%' OR ${cloud_agent_code_reviews.error_message} LIKE '%JSON%' OR ${cloud_agent_code_reviews.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%could not be delivered%' THEN 'Delivery Failure'
-  WHEN ${cloud_agent_code_reviews.error_message} LIKE '%repository_not_installed%' OR ${cloud_agent_code_reviews.error_message} LIKE '%app installation required%' THEN 'Action Required'
-  WHEN ${cloud_agent_code_reviews.error_message} IS NULL THEN 'Unknown Error'
-  ELSE 'Other'
-END`;
+function buildErrorCategoryExpr(terminalReasonColumn: PgColumn, errorMessageColumn: PgColumn) {
+  // Inlined as literals rather than bound parameters: this expression appears in
+  // both SELECT and GROUP BY, and parameter placeholders are renumbered per
+  // position, so Postgres would no longer recognize the two as the same
+  // expression. Both sides are compile-time constants from TERMINAL_REASON_LABELS,
+  // and quotes are doubled so a label containing an apostrophe stays safe.
+  const literal = (value: string) => sql.raw(`'${value.replaceAll("'", "''")}'`);
+  const reasonCases = Object.entries(TERMINAL_REASON_LABELS).map(
+    ([reason, label]) =>
+      sql`WHEN ${terminalReasonColumn} = ${literal(reason)} THEN ${literal(label)}`
+  );
 
-const attemptErrorCategoryExpr = sql<string>`CASE
-  WHEN ${cloud_agent_code_review_attempts.terminal_reason} IN ('github_installation_required', 'github_ip_allow_list', 'gitlab_project_access_required', 'byok_invalid_key', 'selected_model_unavailable') THEN 'Action Required'
-  WHEN ${cloud_agent_code_review_attempts.terminal_reason} = 'workspace_capacity' THEN 'Sandbox Capacity'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%sandbox storage full%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%admission rejected%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%storage full%' THEN 'Sandbox Capacity'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%connect to the sandbox%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Sandbox connection failed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%container shut down%' THEN 'Sandbox Connection'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Rate limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%429%' THEN 'Rate Limited'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Timeout%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ETIMEDOUT%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%timed out%' THEN 'Timeout'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%context window%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%token limit%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%too large%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%authentication%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%401%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%403%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%permission%' THEN 'Auth / Permission Error'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%not found%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%404%' THEN 'Not Found'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%500%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%502%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%503%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%internal server%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%Internal Server%' THEN 'Upstream Server Error'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNREFUSED%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%ECONNRESET%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%socket hang up%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%network%' THEN 'Network Error'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%parse%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%JSON%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%unexpected token%' THEN 'Parse Error'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%could not be delivered%' THEN 'Delivery Failure'
-  WHEN ${cloud_agent_code_review_attempts.error_message} LIKE '%repository_not_installed%' OR ${cloud_agent_code_review_attempts.error_message} LIKE '%app installation required%' THEN 'Action Required'
-  WHEN ${cloud_agent_code_review_attempts.error_message} IS NULL THEN 'Unknown Error'
+  return sql<string>`CASE
+  ${sql.join(reasonCases, sql.raw(' '))}
+  WHEN ${errorMessageColumn} LIKE '%sandbox storage full%' OR ${errorMessageColumn} LIKE '%admission rejected%' OR ${errorMessageColumn} LIKE '%storage full%' THEN 'Sandbox Capacity'
+  WHEN ${errorMessageColumn} LIKE '%connect to the sandbox%' OR ${errorMessageColumn} LIKE '%Sandbox connection failed%' OR ${errorMessageColumn} LIKE '%container shut down%' THEN 'Sandbox Connection'
+  WHEN ${errorMessageColumn} LIKE '%rate limit%' OR ${errorMessageColumn} LIKE '%Rate limit%' OR ${errorMessageColumn} LIKE '%429%' THEN 'Rate Limited'
+  WHEN ${errorMessageColumn} LIKE '%timeout%' OR ${errorMessageColumn} LIKE '%Timeout%' OR ${errorMessageColumn} LIKE '%ETIMEDOUT%' OR ${errorMessageColumn} LIKE '%timed out%' THEN 'Timeout'
+  WHEN ${errorMessageColumn} LIKE '%context window%' OR ${errorMessageColumn} LIKE '%token limit%' OR ${errorMessageColumn} LIKE '%too large%' OR ${errorMessageColumn} LIKE '%maximum context length%' THEN 'Context Window Exceeded'
+  WHEN ${errorMessageColumn} LIKE '%authentication%' OR ${errorMessageColumn} LIKE '%401%' OR ${errorMessageColumn} LIKE '%403%' OR ${errorMessageColumn} LIKE '%permission%' THEN 'Auth / Permission Error'
+  WHEN ${errorMessageColumn} LIKE '%not found%' OR ${errorMessageColumn} LIKE '%404%' THEN 'Not Found'
+  WHEN ${errorMessageColumn} LIKE '%500%' OR ${errorMessageColumn} LIKE '%502%' OR ${errorMessageColumn} LIKE '%503%' OR ${errorMessageColumn} LIKE '%internal server%' OR ${errorMessageColumn} LIKE '%Internal Server%' THEN 'Upstream Server Error'
+  WHEN ${errorMessageColumn} LIKE '%ECONNREFUSED%' OR ${errorMessageColumn} LIKE '%ECONNRESET%' OR ${errorMessageColumn} LIKE '%socket hang up%' OR ${errorMessageColumn} LIKE '%network%' THEN 'Network Error'
+  WHEN ${errorMessageColumn} LIKE '%parse%' OR ${errorMessageColumn} LIKE '%JSON%' OR ${errorMessageColumn} LIKE '%unexpected token%' THEN 'Parse Error'
+  WHEN ${errorMessageColumn} LIKE '%could not be delivered%' THEN 'Delivery Failure'
+  WHEN ${errorMessageColumn} LIKE '%repository_not_installed%' OR ${errorMessageColumn} LIKE '%app installation required%' THEN 'Action Required'
+  -- Deliberately last: 'sandbox_error' is the orchestrator's generic bucket for a
+  -- failed session start, and the patterns above refine it into the specific
+  -- cause (most often Sandbox Capacity). Matching it earlier would mask that.
+  WHEN ${terminalReasonColumn} = 'sandbox_error' THEN 'Sandbox Error'
+  WHEN ${errorMessageColumn} IS NULL THEN 'Unknown Error'
   ELSE 'Other'
 END`;
+}
+
+const errorCategoryExpr = buildErrorCategoryExpr(
+  cloud_agent_code_reviews.terminal_reason,
+  cloud_agent_code_reviews.error_message
+);
+
+const attemptErrorCategoryExpr = buildErrorCategoryExpr(
+  cloud_agent_code_review_attempts.terminal_reason,
+  cloud_agent_code_review_attempts.error_message
+);
 
 const FilterSchemaShape = {
   startDate: z.string().datetime(), // ISO datetime string

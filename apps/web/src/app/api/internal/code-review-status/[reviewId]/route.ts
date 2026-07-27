@@ -61,6 +61,7 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -367,6 +368,14 @@ function normalizePayload(raw: StatusUpdatePayload): {
   ) {
     status = 'cancelled';
     terminalReason = 'model_not_found';
+  }
+
+  // Consume the structured failure cloud-agent-next already sends. This runs
+  // after the specific inferences above so they keep priority, and before the
+  // generic 'interrupted' fallback so an interrupt with a known cause is still
+  // attributed to that cause.
+  if (!terminalReason) {
+    terminalReason = terminalReasonFromCloudAgentFailure(failure, raw.errorMessage);
   }
 
   if (!terminalReason && raw.status === 'interrupted') {

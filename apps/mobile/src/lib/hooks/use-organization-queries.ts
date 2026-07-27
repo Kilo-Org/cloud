@@ -13,7 +13,7 @@ import { useTRPC } from '@/lib/trpc';
  * Pass `organizationIdOverride` to resolve role/membership against an explicit
  * org id (e.g. a deep-link `?org=` param) instead of the persisted selection.
  */
-export function useOrgRole(organizationIdOverride?: string) {
+function useOrgRole(organizationIdOverride?: string) {
   const trpc = useTRPC();
   const { token } = useAuth();
   const { organizationId: contextOrganizationId } = useOrganization();
@@ -100,7 +100,7 @@ export function useOrgWithMembers(organizationId: string | null) {
 }
 
 export type OrgWithMembers = NonNullable<ReturnType<typeof useOrgWithMembers>['data']>;
-export type OrgMember = OrgWithMembers['members'][number];
+type OrgMember = OrgWithMembers['members'][number];
 export type ActiveOrgMember = Extract<OrgMember, { status: 'active' }>;
 export type InvitedOrgMember = Extract<OrgMember, { status: 'invited' }>;
 

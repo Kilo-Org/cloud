@@ -17,13 +17,13 @@ import {
 } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow } from '@/lib/pr-review/diff/side-by-side';
 
-export type TruncationBannerItem = {
+type TruncationBannerItem = {
   kind: 'truncation-banner';
   key: string;
   text: string;
 };
 
-export type FileHeaderItem = {
+type FileHeaderItem = {
   kind: 'file-header';
   key: string;
   file: PrReviewFile;
@@ -32,7 +32,7 @@ export type FileHeaderItem = {
   viewed: boolean;
 };
 
-export type FilePatchMissingItem = {
+type FilePatchMissingItem = {
   kind: 'file-patch-missing';
   key: string;
   file: PrReviewFile;
@@ -40,13 +40,13 @@ export type FilePatchMissingItem = {
   githubUrl: string;
 };
 
-export type HunkHeaderItem = {
+type HunkHeaderItem = {
   kind: 'hunk-header';
   key: string;
   header: string;
 };
 
-export type DiffLineItem = {
+type DiffLineItem = {
   kind: 'diff-line';
   key: string;
   lineKey: string;
@@ -65,7 +65,7 @@ export type DiffLineItem = {
   selectable?: boolean;
 };
 
-export type SideBySideRowItem = {
+type SideBySideRowItem = {
   kind: 'side-by-side-row';
   key: string;
   rowKey: string;
@@ -77,7 +77,7 @@ export type SideBySideRowItem = {
   rowKeyId: string;
 };
 
-export type HunkSideBySideHeaderItem = {
+type HunkSideBySideHeaderItem = {
   kind: 'hunk-side-by-side';
   key: string;
   hunk: ParsedHunk;

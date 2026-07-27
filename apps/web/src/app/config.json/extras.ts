@@ -76,10 +76,9 @@ export const kiloExtras = {
       type: 'boolean',
     },
     web_search: {
-      description:
-        'Make web search available to models from all providers (default: true). Set to false to limit it to managed providers.',
+      description: 'Make web search available to models from all providers (default: false)',
       type: 'boolean',
-      default: true,
+      default: false,
     },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',

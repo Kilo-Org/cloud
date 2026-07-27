@@ -91,6 +91,7 @@ const config: ExpoConfig = {
           enableMinifyInReleaseBuilds: true,
         },
         ios: {
+          ccacheEnabled: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
           // modules, so pod install fails unless we force module maps on them. Unconditional

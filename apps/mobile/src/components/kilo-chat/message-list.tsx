@@ -3,6 +3,7 @@ import { type ExecApprovalDecision, type KiloChatClient, type Message } from '@k
 import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
+  AccessibilityInfo,
   Keyboard,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -11,7 +12,10 @@ import {
 } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  shouldAnnounceOlderMessagesArrival,
+} from '@/components/agents/older-messages-a11y';
 import {
   createMessageListKeyboardScrollScheduler,
   createMessageListNewestScrollScheduler,
@@ -33,7 +37,6 @@ type Props = {
   members?: readonly MessageAuthorMember[];
   botName?: string | null;
   fetchOlder?: () => void;
-  isFetchingOlder: boolean;
   pendingAction: PendingAction | null;
   scrollToNewestRequest: number;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
@@ -50,7 +53,6 @@ export function MessageList({
   members,
   botName,
   fetchOlder,
-  isFetchingOlder,
   pendingAction,
   scrollToNewestRequest,
   onExecuteAction,
@@ -164,6 +166,35 @@ export function MessageList({
     scrollToNewest();
   }, [scrollToNewest, scrollToNewestRequest]);
 
+  // Non-visual a11y signal for older-page arrival (no visual loading header).
+  // Announce only when items were actually prepended after the list painted.
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+  }, [conversationId]);
+  useEffect(() => {
+    const nextNewestKey = messageListNewestScrollKey(newestMessage);
+    const nextCount = chronological.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey,
+      })
+    ) {
+      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = nextNewestKey;
+  }, [chronological, newestMessage]);
+
   return (
     <View className="flex-1 bg-background">
       <FlashList
@@ -205,18 +236,11 @@ export function MessageList({
         onContentSizeChange={handleContentSizeChange}
         scrollEventThrottle={16}
         onStartReached={fetchOlder}
-        onStartReachedThreshold={0.5}
+        onStartReachedThreshold={2}
         maintainVisibleContentPosition={{
           // Start rendering from the bottom so the newest message is visible on first render.
           startRenderingFromBottom: true,
         }}
-        ListHeaderComponent={
-          isFetchingOlder ? (
-            <View className="px-4 py-2">
-              <Skeleton className="h-16 rounded-md" />
-            </View>
-          ) : null
-        }
       />
     </View>
   );

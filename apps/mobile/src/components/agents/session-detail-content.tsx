@@ -34,6 +34,7 @@ import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-m
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
+  shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
@@ -64,7 +65,12 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
+import {
+  SessionPlatformIcon,
+  sessionPlatformIconKind,
+} from '@/components/agents/session-platform-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -86,6 +92,8 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { platformLabel } from '@/lib/platform-label';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -97,6 +105,8 @@ import { cn } from '@/lib/utils';
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
   openedVia?: 'push' | 'app';
+  /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
+  shareId?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -107,9 +117,11 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
 export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
+  shareId,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
+  const colors = useThemeColors();
   const [childSession, setChildSession] = useState<{
     sessionId: KiloSessionId;
     title: string;
@@ -484,9 +496,23 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
+  const platform = isSessionLoaded ? (fetchedData.createdOnPlatform ?? null) : null;
+  const platformKind = sessionPlatformIconKind(platform);
+  const leadingAccessory =
+    platform != null && platformKind != null ? (
+      <View
+        accessibilityRole="image"
+        accessibilityLabel={platformLabel(platform)}
+        testID={`platform-icon-${platformKind}`}
+      >
+        <SessionPlatformIcon platform={platform} size={14} color={colors.mutedForeground} />
+      </View>
+    ) : null;
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+  const isComposerMounted = !isReadOnly || messages.length === 0;
+  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
@@ -518,6 +544,12 @@ export function SessionDetailContent({
         supportsAttachments,
         attachments !== undefined
       );
+      if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
+        const message =
+          "This session can't receive files. Remove the attachments to send your message.";
+        toast.error(message);
+        throw new Error(message);
+      }
       let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
         undefined;
       if (kind === 'remote-capable' && submission) {
@@ -630,6 +662,7 @@ export function SessionDetailContent({
       <ScreenHeader
         title={rename.title}
         headerRight={headerRight}
+        leadingAccessory={leadingAccessory}
         {...(rename.isTitleInteractive
           ? {
               onTitlePress: rename.openModal,
@@ -650,7 +683,13 @@ export function SessionDetailContent({
         </KeyboardAvoidingView>
       )}
 
-      <View style={{ height: bottom }} className="bg-background" />
+      {isComposerVisible ? (
+        <BlurBar className="border-t-0">
+          <View style={{ height: bottom }} />
+        </BlurBar>
+      ) : (
+        <View style={{ height: bottom }} className="bg-background" />
+      )}
 
       {sheetMountState.mounted ? (
         <SessionContextSheet
@@ -762,7 +801,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {!isReadOnly || messages.length === 0 ? (
+        {isComposerMounted ? (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -792,6 +831,7 @@ export function SessionDetailContent({
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
                 commandState={remoteCommandState}
+                shareId={shareId}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

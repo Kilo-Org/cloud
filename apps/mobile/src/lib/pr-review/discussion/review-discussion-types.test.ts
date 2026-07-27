@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  groupThreadsByPath,
   type ReviewThread,
   selectCommentAuthorName,
   selectThreadAnchorLabel,
@@ -172,24 +171,5 @@ describe('selectCommentAuthorName', () => {
 
   it('returns the "deleted user" fallback when author is null', () => {
     expect(selectCommentAuthorName(null)).toBe('deleted user');
-  });
-});
-
-describe('groupThreadsByPath', () => {
-  it('groups threads by path, preserving insertion order', () => {
-    const a = makeThread({ threadId: 'A', path: 'src/a.ts' });
-    const b = makeThread({ threadId: 'B', path: 'src/b.ts' });
-    const a2 = makeThread({ threadId: 'A2', path: 'src/a.ts' });
-    const groups = groupThreadsByPath([a, b, a2]);
-    expect(groups.map(g => g.path)).toEqual(['src/a.ts', 'src/b.ts']);
-    expect(groups[0]?.threads.map(t => t.threadId)).toEqual(['A', 'A2']);
-    expect(groups[1]?.threads.map(t => t.threadId)).toEqual(['B']);
-  });
-
-  it('buckets null-path threads under "(no file)"', () => {
-    const orphan = makeThread({ threadId: 'X', path: null });
-    const a = makeThread({ threadId: 'A', path: 'src/a.ts' });
-    const groups = groupThreadsByPath([a, orphan]);
-    expect(groups.map(g => g.path)).toEqual(['src/a.ts', '(no file)']);
   });
 });

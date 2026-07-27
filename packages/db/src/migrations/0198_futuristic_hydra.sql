@@ -1,0 +1,2 @@
+ALTER TABLE "user_notification_preferences" ADD COLUMN "balance_alerts_enabled" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "user_notification_preferences" ADD COLUMN "security_findings_enabled" boolean DEFAULT true NOT NULL;

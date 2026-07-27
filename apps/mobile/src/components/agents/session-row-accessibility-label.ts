@@ -1,3 +1,4 @@
+import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -114,6 +115,14 @@ type SessionRowAccessibilityLabelInputs = {
    * no meta).
    */
   meta?: string | null;
+  /**
+   * Backend `created_on_platform` string. When truthy, appended as the
+   * FINAL spoken part (`from ${platformLabel(platform)}`). The caller
+   * gates this: only pass when an icon is rendered, not needs-input, and
+   * the eyebrow badge is a repo name (otherwise the badge already speaks
+   * the platform label and appending would be redundant).
+   */
+  platform?: string | null;
 };
 
 /**
@@ -121,7 +130,8 @@ type SessionRowAccessibilityLabelInputs = {
  * content in the order the row renders parts: title, then `needs input`
  * (only when the needs-input eyebrow is shown), then the always-visible
  * left-eyebrow badge, then the meta text (only when the row visibly
- * renders meta). Empty parts are skipped; the order is fixed.
+ * renders meta), then an optional platform origin (`from <LABEL>`). Empty
+ * parts are skipped; the order is fixed.
  *
  * Three exclusive variants, aligned with `selectSessionRowEyebrowRight`:
  *   - **needs-input variant**  (`needs-input` eyebrow):
@@ -140,6 +150,7 @@ export function sessionRowAccessibilityLabel({
   needsInput,
   badge,
   meta,
+  platform,
 }: SessionRowAccessibilityLabelInputs): string {
   const parts: string[] = [title];
   if (needsInput) {
@@ -150,6 +161,9 @@ export function sessionRowAccessibilityLabel({
   }
   if (meta) {
     parts.push(meta);
+  }
+  if (platform) {
+    parts.push(`from ${platformLabel(platform)}`);
   }
   return parts.join(', ');
 }

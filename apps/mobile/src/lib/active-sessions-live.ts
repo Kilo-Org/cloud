@@ -5,9 +5,11 @@
  * `updatedAt`); the merge helpers preserve those fields for ids already in
  * the cache while letting every other field (including `connectionId`)
  * come from the latest WS payload, so session ownership can transfer
- * between CLI connections. The functions here never touch React, the
- * network, or a QueryClient — they are pure and exhaustively unit-tested
- * alongside this file.
+ * between CLI connections. `capabilities` is the hybrid exception: the WS
+ * value wins when present (upgrade or downgrade), and the cached value is
+ * preserved only when the WS row omits the field. The functions here never
+ * touch React, the network, or a QueryClient — they are pure and
+ * exhaustively unit-tested alongside this file.
  *
  * Status resolution for live rows: CLI heartbeats/snapshots often report
  * only idle/busy while `cli_sessions_v2` holds question/permission. A
@@ -37,6 +39,7 @@ type IncomingWsSession = {
   gitBranch?: string;
   parentSessionId?: string;
   connectionId?: string;
+  capabilities?: { attachments?: boolean };
 };
 
 /** Cached active session (tRPC output); enrichment fields preserved across WS. */
@@ -164,6 +167,9 @@ function withEnrichmentAndConnectionId(
     gitUrl: row.gitUrl,
     gitBranch: row.gitBranch,
     connectionId,
+    // Wire capabilities win when present (upgrade and downgrade); cache
+    // only when the WS row omits the field (legacy payloads).
+    capabilities: row.capabilities ?? current?.capabilities,
     ...enrichment,
   };
 }
@@ -171,9 +177,10 @@ function withEnrichmentAndConnectionId(
 /**
  * Replace the entire cache with the snapshot. Rows whose id is in both
  * the snapshot and the cache keep the three enrichment fields and any
- * held attention status from the cache; every other field (including
- * `connectionId`) comes from the snapshot. Rows absent from the snapshot
- * are dropped.
+ * held attention status from the cache; `capabilities` comes from the
+ * snapshot when present and from the cache when omitted; every other
+ * field (including `connectionId`) comes from the snapshot. Rows absent
+ * from the snapshot are dropped.
  */
 export function mergeSnapshotForActiveSessions(
   current: readonly CachedActiveSession[],

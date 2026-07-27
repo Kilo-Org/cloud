@@ -111,6 +111,15 @@ overrides:
   lightningcss: 1.30.1
   axios: 1.16.1
   fast-uri: 3.1.2
+packageExtensions:
+  # Undeclared upstream deps that break config evaluation outside the Expo CLI
+  # under pnpm's isolated linker (autoInstallPeers is false).
+  '@sentry/react-native':
+    dependencies:
+      '@expo/config-plugins': '*'
+  expo-share-intent:
+    dependencies:
+      '@expo/plist': '*'
 patchedDependencies:
   expo-server-sdk: patches/expo-server-sdk.patch
   react-native-appsflyer@6.17.9: patches/react-native-appsflyer@6.17.9.patch

@@ -106,12 +106,15 @@ const CLASSIFICATION_FAILURE_MESSAGES = {
   denied: "Executable files can't be attached",
   empty: 'File is empty',
   'too-large': 'Files must be 5 MB or smaller',
-} as const satisfies Record<'denied' | 'empty' | 'too-large', string>;
+  unreadable: "Couldn't read this file",
+} as const satisfies Record<'denied' | 'empty' | 'too-large' | 'unreadable', string>;
 
 /**
  * Human-readable copy for a single classification outcome. Centralized so
  * the picker, the upload hook, and the chip surface use the same strings.
  */
-export function describeClassificationFailure(reason: 'denied' | 'empty' | 'too-large'): string {
+export function describeClassificationFailure(
+  reason: 'denied' | 'empty' | 'too-large' | 'unreadable'
+): string {
   return CLASSIFICATION_FAILURE_MESSAGES[reason];
 }

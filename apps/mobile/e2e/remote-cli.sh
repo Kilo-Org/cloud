@@ -29,6 +29,9 @@
 #
 # Env overrides:
 #   KILO_CLI_VERSION   npm version/tag of @kilocode/cli to install (default: latest)
+#   KILO_CLI_BIN       absolute path to a locally built kilo binary; skips npm install,
+#                      prepends its directory to PATH, and emits KILO_NO_DAEMON=1,
+#                      KILO_DEBUG_SESSION_INGEST=true, and KILO_REMOTE=1 into the env file
 #
 # Requires: node, tmux, npm, a running stack (see e2e/AGENTS.md). Never reads
 # .env files directly; the token is minted by the dev:seed command.
@@ -87,7 +90,22 @@ prepare_env() {
 
   echo "==> preparing kilo CLI in $CLI_HOME" >&2
   mkdir -p "$CLI_HOME"
-  if [ "$reinstall" = "1" ] || [ ! -x "$CLI_HOME/node_modules/.bin/kilo" ]; then
+  local cli_path_prefix="${CLI_HOME}/node_modules/.bin"
+  local local_cli_exports=""
+  if [ -n "${KILO_CLI_BIN:-}" ]; then
+    if [ ! -x "$KILO_CLI_BIN" ] || [ ! -f "$KILO_CLI_BIN" ]; then
+      echo "KILO_CLI_BIN is set but is not an executable file: $KILO_CLI_BIN" >&2
+      exit 1
+    fi
+    cli_path_prefix="$(cd "$(dirname "$KILO_CLI_BIN")" && pwd)"
+    echo "   using local CLI binary: $KILO_CLI_BIN (skipped npm install)" >&2
+    local_cli_exports=$(cat <<'LOCAL_EOF'
+export KILO_NO_DAEMON="1"
+export KILO_DEBUG_SESSION_INGEST="true"
+export KILO_REMOTE="1"
+LOCAL_EOF
+)
+  elif [ "$reinstall" = "1" ] || [ ! -x "$CLI_HOME/node_modules/.bin/kilo" ]; then
     [ -f "$CLI_HOME/package.json" ] || (cd "$CLI_HOME" && npm init -y >/dev/null 2>&1)
     echo "   installing @kilocode/cli@${KILO_CLI_VERSION:-latest} (this can take a moment)" >&2
     (cd "$CLI_HOME" && npm install "@kilocode/cli@${KILO_CLI_VERSION:-latest}" >"$CLI_HOME/install.log" 2>&1) \
@@ -122,8 +140,11 @@ export KILO_CONFIG_DIR="${CLI_HOME}/.config"
 export XDG_DATA_HOME="${xdg_data}"
 export XDG_CONFIG_HOME="${xdg_config}"
 export KILO_DISABLE_AUTOUPDATE="true"
-export PATH="${CLI_HOME}/node_modules/.bin:\$PATH"
+export PATH="${cli_path_prefix}:\$PATH"
 EOF
+  if [ -n "$local_cli_exports" ]; then
+    printf '%s\n' "$local_cli_exports" >>"$ENV_FILE"
+  fi
 
   PREP_EMAIL="$email" PREP_USER_ID="$user_id"
   PREP_NEXTJS="$nextjs_port" PREP_INGEST="$ingest_port" PREP_EVENT="$event_port"

@@ -67,6 +67,16 @@ type StoredSessionRowProps = {
    * Tap is preserved either way. Defaults to `true`.
    */
   interactive?: boolean;
+  /**
+   * Forwarded to the base `SessionRow` live dot. Defaults to `false` so
+   * Home and the Agents list stay behavior-identical.
+   */
+  live?: boolean;
+  /**
+   * Forwarded to the base `SessionRow` meta-while-live opt-in. Defaults to
+   * `false` so existing call sites are unchanged.
+   */
+  metaWhileLive?: boolean;
 };
 
 export function StoredSessionRow({
@@ -77,6 +87,8 @@ export function StoredSessionRow({
   onRename,
   variant = 'list',
   interactive = true,
+  live = false,
+  metaWhileLive = false,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const title = session.title && session.title.length > 0 ? session.title : 'Untitled session';
@@ -213,6 +225,8 @@ export function StoredSessionRow({
           title={title}
           subtitle={session.git_branch}
           meta={visibleMeta}
+          live={live}
+          metaWhileLive={metaWhileLive}
           needsInput={needsInput}
           platformIcon={platformIcon}
           stripMode={variant === 'card' ? 'edge' : 'inline'}

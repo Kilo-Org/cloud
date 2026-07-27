@@ -33,6 +33,7 @@ import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-m
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
   resolveSendAttachmentKind,
+  shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
@@ -103,6 +104,8 @@ import { cn } from '@/lib/utils';
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
   openedVia?: 'push' | 'app';
+  /** Share-gate delivery id; threaded to the composer for one-shot prefill. */
+  shareId?: string;
 };
 
 const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
@@ -113,6 +116,7 @@ const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
 export function SessionDetailContent({
   sessionId,
   openedVia = 'app',
+  shareId,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
@@ -535,6 +539,12 @@ export function SessionDetailContent({
         supportsAttachments,
         attachments !== undefined
       );
+      if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
+        const message =
+          "This session can't receive files. Remove the attachments to send your message.";
+        toast.error(message);
+        throw new Error(message);
+      }
       let attachmentParts: Awaited<ReturnType<typeof buildRemoteAttachmentParts>> | undefined =
         undefined;
       if (kind === 'remote-capable' && submission) {
@@ -815,6 +825,7 @@ export function SessionDetailContent({
                 activeSessionType={activeSessionType}
                 commands={availableCommands}
                 commandState={remoteCommandState}
+                shareId={shareId}
               />
             </ModelPickerSelectionScopeProvider>
           </View>

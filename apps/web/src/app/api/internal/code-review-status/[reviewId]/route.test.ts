@@ -3002,6 +3002,34 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
     });
 
+    // The GitLab commit status is built by a separate function from the GitHub
+    // check run, so it needs its own coverage.
+    it('names the customer key in the GitLab commit status', async () => {
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          terminalReason: 'assistant_rate_limited_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Your provider API key hit its rate limit.',
+        }),
+        'https://gitlab.com'
+      );
+    });
+
     // Our own capacity can free up, so this one stays retryable.
     it('still auto-retries a managed key rate limit', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());

@@ -53,11 +53,6 @@ const config: ExpoConfig = {
       LSSupportsOpeningDocumentsInPlace: true,
     },
   },
-  splash: {
-    image: './assets/images/logo.png',
-    resizeMode: 'contain',
-    backgroundColor: '#FAF74F',
-  },
   android: {
     googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',

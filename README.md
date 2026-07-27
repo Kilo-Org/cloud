@@ -38,3 +38,5 @@ pnpm dev:start
 
 - [Vercel project](https://vercel.com/kilocode/kilocode-app)
 - [Google Cloud OAuth](https://console.cloud.google.com/auth/clients?project=kilocode)
+
+cloud-agent test

@@ -698,6 +698,9 @@ importers:
       '@kilocode/mcp-gateway':
         specifier: workspace:*
         version: link:../../packages/mcp-gateway
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@kilocode/organization-entitlement':
         specifier: workspace:*
         version: link:../../packages/organization-entitlement

@@ -2,12 +2,12 @@ import { type QueryClient } from '@tanstack/react-query';
 
 /**
  * Pure logic for the per-user notification-preference settings (S3 — the
- * dedicated Notifications screen with 5 category toggles + master gate).
+ * dedicated Notifications screen with category toggles + master gate).
  *
  * The preferences are per-user, cross-device, and server-resolved: a successful
  * query with no row means every category is enabled (default ON). The same row
  * also exposes a `agentUpdates` value that mirrors the legacy `agentPushEnabled`
- * column, so this module accepts any one of the six keys when applying a
+ * column, so this module accepts any one of the category keys when applying a
  * per-category optimistic flip.
  */
 export const DEFAULT_NOTIFICATION_PREFERENCE = true as const;
@@ -19,6 +19,8 @@ export const NOTIFICATION_CATEGORY_KEYS = [
   'agentUpdates',
   'sessionStatus',
   'kiloclawActivity',
+  'balanceAlerts',
+  'securityFindings',
 ] as const;
 
 export type NotificationCategoryKey = (typeof NOTIFICATION_CATEGORY_KEYS)[number];
@@ -30,6 +32,8 @@ export type NotificationPreferences = Readonly<{
   agentUpdates: boolean;
   sessionStatus: boolean;
   kiloclawActivity: boolean;
+  balanceAlerts: boolean;
+  securityFindings: boolean;
   agentPushEnabled: boolean;
 }>;
 
@@ -64,26 +68,31 @@ export function deriveShowEnableCta(notificationsEnabled: boolean): boolean {
 }
 
 /** Map the legacy single-key cache shape to the new per-category shape. */
+function defaultPreferences(
+  overrides: Partial<NotificationPreferences> = {}
+): NotificationPreferences {
+  return {
+    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
+    sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
+    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
+    balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
+    ...overrides,
+  };
+}
+
 function readFromSnapshot(snapshot: NotificationPreferencesSnapshot): NotificationPreferences {
   if (!snapshot) {
-    return {
-      chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
-      sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-      kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
-    };
+    return defaultPreferences();
   }
   if (isLegacySnapshot(snapshot)) {
-    return {
-      chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
+    return defaultPreferences({
       agentUpdates: snapshot.agentPushEnabled,
-      sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-      kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
       agentPushEnabled: snapshot.agentPushEnabled,
-    };
+    });
   }
   return snapshot;
 }
@@ -131,16 +140,8 @@ export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<Op
   if (rawPrevious === undefined) {
     // Empty cache: seed the full row with the flipped value so the optimistic
     // read is consistent across categories. The next refetch will replace it.
-    const seeded: NotificationPreferences = {
-      chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
-      sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
-      kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
-      agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
-    };
     args.queryClient.setQueryData(args.queryKey, {
-      ...seeded,
+      ...defaultPreferences(),
       [args.category]: args.next,
     });
     return { previous: undefined, previousWasLegacy: false };

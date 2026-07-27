@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { after } from 'next/server';
 import { sendBalanceAlertEmail } from '@/lib/email';
+import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
 import { db } from '@/lib/drizzle';
 import {
   organizations,
@@ -30,16 +31,32 @@ jest.mock('@/lib/email', () => ({
   sendBalanceAlertEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock next/server's after function which requires request context
+jest.mock('@/lib/notifications-worker-client', () => ({
+  dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
+  dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Mock next/server's after function which requires request context.
+// Track async after bodies on the mock so tests can drain email+push work.
 jest.mock('next/server', () => {
+  const pending: Promise<unknown>[] = [];
+  const afterMock = jest.fn((fn: () => void | Promise<void>) => {
+    const result = fn();
+    if (result != null && typeof (result as Promise<unknown>).then === 'function') {
+      pending.push(Promise.resolve(result));
+    }
+  });
   return {
     ...jest.requireActual('next/server'),
-    after: jest.fn((fn: () => Promise<void>) => {
-      // Execute the function asynchronously as Next.js would
-      void fn();
-    }),
+    after: Object.assign(afterMock, { pending }),
   };
 });
+
+async function drainAfterCallbacks(): Promise<void> {
+  const mock = after as typeof after & { pending: Promise<unknown>[] };
+  const batch = mock.pending.splice(0);
+  await Promise.all(batch);
+}
 
 describe('Organization Usage Functions', () => {
   afterEach(async () => {
@@ -200,6 +217,7 @@ describe('Organization Usage Functions', () => {
       expect(jest.mocked(sendBalanceAlertEmail)).not.toHaveBeenCalled();
 
       scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
 
       expect(jest.mocked(after)).toHaveBeenCalledTimes(1);
       expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
@@ -208,6 +226,109 @@ describe('Organization Usage Functions', () => {
         minimum_balance: 0.04,
         to: ['billing@example.com'],
       });
+    });
+
+    test('dispatches low-balance push for configured email matching an org member', async () => {
+      const user = await insertTestUser({ google_user_email: 'member-push@example.com' });
+      const organization = await createTestOrganization('Push Alert Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: [user.google_user_email],
+      });
+      const usage = await createOrganizationUsage(20_000, user.id, organization.id);
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
+
+      expect(jest.mocked(dispatchLowBalancePush)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(dispatchLowBalancePush)).toHaveBeenCalledWith({
+        recipientUserIds: [user.id],
+        organizationId: organization.id,
+        organizationName: 'Push Alert Org',
+        minimumBalanceUsd: 0.04,
+      });
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+    });
+
+    test('does not dispatch low-balance push for unmatched alert email', async () => {
+      const user = await insertTestUser({ google_user_email: 'owner-unmatched@example.com' });
+      const organization = await createTestOrganization('Unmatched Email Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: ['nobody-on-kilo@example.com'],
+      });
+      const usage = await createOrganizationUsage(20_000, user.id, organization.id);
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
+
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(dispatchLowBalancePush)).not.toHaveBeenCalled();
+    });
+
+    test('does not dispatch low-balance push when matching user is not an org member', async () => {
+      const owner = await insertTestUser({ google_user_email: 'owner-nonmember@example.com' });
+      const nonMember = await insertTestUser({
+        google_user_email: 'non-member-alert@example.com',
+      });
+      const organization = await createTestOrganization('Nonmember Push Org', owner.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: [nonMember.google_user_email],
+      });
+      const usage = await createOrganizationUsage(20_000, owner.id, organization.id);
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
+
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(dispatchLowBalancePush)).not.toHaveBeenCalled();
+    });
+
+    test('skips low-balance push when org row is missing but still sends email', async () => {
+      const user = await insertTestUser({ google_user_email: 'missing-org-push@example.com' });
+      const organization = await createTestOrganization('Soon Deleted Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: [user.google_user_email],
+      });
+      const result = {
+        crossedMinimumBalance: true as const,
+        recipients: [user.google_user_email],
+        minimumBalanceMicrodollars: 40_000,
+      };
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
+
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledWith({
+        organizationId: organization.id,
+        minimum_balance: 0.04,
+        to: [user.google_user_email],
+      });
+      expect(jest.mocked(dispatchLowBalancePush)).not.toHaveBeenCalled();
+    });
+
+    test('does not call low-balance push client when recipients resolve to zero users', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Empty Recipients Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: [],
+      });
+      // Force a crossing result with empty recipients (email no-ops; push must skip).
+      const result = {
+        crossedMinimumBalance: true as const,
+        recipients: [] as string[],
+        minimumBalanceMicrodollars: 40_000,
+      };
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
+
+      expect(jest.mocked(after)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(dispatchLowBalancePush)).not.toHaveBeenCalled();
     });
 
     test('does not report low-balance crossing when usage stays above threshold', async () => {
@@ -227,9 +348,11 @@ describe('Organization Usage Functions', () => {
       });
 
       scheduleOrganizationLowBalanceAlert(organization.id, result);
+      await drainAfterCallbacks();
 
       expect(jest.mocked(after)).not.toHaveBeenCalled();
       expect(jest.mocked(sendBalanceAlertEmail)).not.toHaveBeenCalled();
+      expect(jest.mocked(dispatchLowBalancePush)).not.toHaveBeenCalled();
     });
 
     test('returns no organization balance alert result for missing organization', async () => {

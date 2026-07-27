@@ -24,6 +24,8 @@ export type UserNotificationPreferences = {
   agentAttentionEnabled: boolean;
   sessionStatusEnabled: boolean;
   kiloclawActivityEnabled: boolean;
+  balanceAlertsEnabled: boolean;
+  securityFindingsEnabled: boolean;
 };
 
 const TITLE_MAX_LENGTH = 80;
@@ -92,6 +94,8 @@ async function dispatchSessionPush(
       agentAttentionEnabled: true,
       sessionStatusEnabled: true,
       kiloclawActivityEnabled: true,
+      balanceAlertsEnabled: true,
+      securityFindingsEnabled: true,
     };
   } catch {
     return { dispatched: false, reason: 'dispatch_failed' };

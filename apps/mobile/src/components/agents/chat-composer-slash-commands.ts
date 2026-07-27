@@ -1,5 +1,5 @@
-import { type ActiveSessionType, type SlashCommandInfo } from 'cloud-agent-sdk';
-import { type RemoteCommandState } from 'cloud-agent-sdk/remote-command-catalog';
+import { type ActiveSessionType, type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
 /**
  * Local reserved /new command — surfaced only for remote sessions, never

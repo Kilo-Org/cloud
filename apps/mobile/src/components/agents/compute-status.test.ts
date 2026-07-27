@@ -1,4 +1,4 @@
-import { type ReasoningPart, type TextPart, type ToolPart } from 'cloud-agent-sdk';
+import { type ReasoningPart, type TextPart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import { computeStatus, SNAPSHOT_PROGRESS_STATUS } from './compute-status';

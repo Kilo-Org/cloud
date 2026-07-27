@@ -1,7 +1,6 @@
-import { type TransportSendPayload } from 'cloud-agent-sdk';
+import { type SendMessagePayload, type TransportSendPayload } from '@kilocode/cloud-agent-sdk';
 
 import { normalizeAgentMode } from '@/components/agents/mode-options';
-import { type SendMessagePayload } from '@/lib/cloud-agent-next/types';
 
 /**
  * Normalize a transport send payload into the wire `SendMessagePayload`.

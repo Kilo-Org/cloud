@@ -1,5 +1,5 @@
 import { AlertCircle, Check } from 'lucide-react';
-import type { PreparationAttempt } from '@/lib/cloud-agent-sdk';
+import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import {
   extractTickerLines,

@@ -1,4 +1,4 @@
-import { type RemoteAttachmentPart } from 'cloud-agent-sdk';
+import { type RemoteAttachmentPart } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
 import { buildRemoteAttachmentPartsWithRetryableFeedback } from './session-detail-send-attachment';

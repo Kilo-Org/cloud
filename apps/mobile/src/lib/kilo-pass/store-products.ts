@@ -1,6 +1,6 @@
-import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
-type RouterOutputs = inferRouterOutputs<RootRouter>;
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 type BackendStoreKiloPassProductOutput =
   RouterOutputs['kiloPass']['getMobileStoreProducts']['products'][number];

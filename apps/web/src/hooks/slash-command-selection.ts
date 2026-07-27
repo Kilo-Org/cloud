@@ -1,6 +1,6 @@
 import { commandsOrDefault } from '@cloud-agent-shared';
-import type { SlashCommandInfo } from '@/lib/cloud-agent-sdk';
-import type { ActiveSessionType } from '@/lib/cloud-agent-sdk';
+import type { SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import type { ActiveSessionType } from '@kilocode/cloud-agent-sdk';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 
 /**

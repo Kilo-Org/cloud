@@ -15,7 +15,7 @@ import {
   type CloudAgentSessionId,
   type TransportSendPayload,
   type UserWebConnection,
-} from '@/lib/cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
 import { usePostHog } from 'posthog-js/react';

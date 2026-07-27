@@ -10,7 +10,7 @@ import {
   heartbeatDataSchema,
   sessionsListDataSchema,
   type ActiveSessionWithConnectionData,
-} from '@/lib/cloud-agent-sdk/schemas';
+} from '@kilocode/cloud-agent-sdk/schemas';
 import { useUserWebConnection } from '../CloudAgentProvider';
 
 export type ActiveSession = ActiveSessionWithConnectionData;

@@ -5,7 +5,7 @@ import {
   type KiloSdkStoredMessage,
   type KiloSessionId,
   type SessionSnapshotPageOutcome,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 const mocks = vi.hoisted(() => ({
   getSessionMessagesPageQuery: vi.fn(),

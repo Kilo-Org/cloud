@@ -21,6 +21,8 @@ xcrun simctl list devices booted
 
 If a complete stack is already running for this worktree, reuse it. Never start a competing stack or stop an unrelated `kilo-dev-*` session.
 
+When other workflows may be running on this machine, acquire a device slot before starting a stack, simulator, or native build, and release it when the device phase ends: `apps/mobile/.kilo/e2e-slot.sh acquire|release <tmux-session>` (see the Local Tooling section of [.kilo/MOBILE_WORKFLOW.md](../.kilo/MOBILE_WORKFLOW.md)).
+
 If this worktree has no stack, start the complete mobile flow:
 
 ```bash
@@ -190,22 +192,72 @@ Do not conclude Android is unavailable from `command -v adb` or the inherited `P
 pnpm dev:mobile:android doctor
 ```
 
-Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied:
+Use the wrappers for all Android tooling, including the Expo/Gradle build, so the resolved SDK/JDK environment is applied. Ordered glue: acquire e2e slot → launch emulator → bounded boot wait (serial discovered at visibility) → `claim` → `build` → `login.sh`. Never unbounded `adb wait-for-device`. Never put manual `adb reverse` or dev-client `am start` on the primary path — `login.sh` preflight does both.
+
+### Launch and GPU policy
+
+Two launch attempts total, then a test-environment blocker with the tail of `$EMULATOR_LOG`. Attempt 1 uses `-gpu host` (Mac GPU; fastest; software rendering competes for the CPU under parallel-workflow load). Keep `-no-snapshot-save -no-boot-anim` on every launch. Attempt 2 switches GPU only on an observed process-death signal (`pgrep -f "qemu.*<avd-name>"` empty, or the log shows the emulator exiting/erroring — the pane mirrors it live but dies with the session) → `-gpu swiftshader_indirect`. If the process is still alive but the boot envelope expired → repeat `-gpu host`. Never a third launch.
 
 ```bash
+# After e2e-slot acquire (see Fresh Worktree Quickstart)
 ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
+EMULATOR_LOG="/tmp/${ANDROID_SESSION}.log"
+GPU_FLAG=host   # attempt 2: swiftshader_indirect only after process death; else host again
 tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
-  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect"
-pnpm dev:mobile:android adb wait-for-device
-pnpm dev:mobile:android claim <serial>
-pnpm dev:mobile:android adb reverse tcp:<nextjs-port> tcp:<nextjs-port>
-pnpm dev:mobile:android adb reverse tcp:<metro-port> tcp:<metro-port>
-pnpm dev:mobile:android build <serial>
+  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu $GPU_FLAG 2>&1 | tee \"$EMULATOR_LOG\""
 ```
 
-The build command installs a validated cached APK when the Android native fingerprint and toolchain match. Never install an APK from another output path or invoke Gradle directly.
+### Bounded boot wait
 
-ADB fallback commands (Maestro stays the primary driver):
+From the moment of launch, poll about every 15 s until the envelope expires. Cold boot on an idle host ≈ 1–3 minutes; under parallel-workflow load allow up to 8 minutes before declaring the attempt failed (relaunch-rule bounds, not SLAs). Each poll, check in order:
+
+1. **Liveness** — `pgrep -f "qemu.*<avd-name>"` still prints a PID. If empty, the attempt failed with the process-death signal.
+2. **Visibility** — device appears with state `device` in `pnpm dev:mobile:android adb devices -l` (this is where the serial is discovered; a single local emulator is `emulator-5554`).
+3. **Readiness** — once visible, `pnpm dev:mobile:android adb -s <serial> shell getprop sys.boot_completed` prints `1`.
+
+Device visibility is not readiness. Never gate on `adb devices` output alone, and never wait on any one stage without the liveness check.
+
+### Failed attempt → kill hard → relaunch once
+
+On failure: `tmux kill-session -t "$ANDROID_SESSION" 2>/dev/null` (session may already be gone if the emulator exited), then confirm the emulator process is actually gone — `pgrep -f "qemu.*<avd-name>"` prints nothing. If it survives: with a known serial, `pnpm dev:mobile:android adb -s <serial> emu kill`; with no serial yet (process died or never became visible to adb), `pkill -f "qemu.*<avd-name>"`. Re-check `pgrep` either way — a surviving emulator holds the AVD lock and dooms any relaunch. Then relaunch once per the GPU policy with the same envelope. If the second attempt also fails to boot, stop and return a test-environment blocker with the tail of `$EMULATOR_LOG` (survives session death; never a third launch, never an early give-up).
+
+### Claim, build, login
+
+```bash
+pnpm dev:mobile:android claim <serial>
+pnpm dev:mobile:android build <serial>   # validated cached APK only
+apps/mobile/e2e/login.sh <serial>
+```
+
+`build` installs a validated cached APK when the Android native fingerprint and toolchain match. Never install an APK from another output path or invoke Gradle directly. Reinstall via `build <serial>` only when the native fingerprint changed, never to reset app state.
+
+`login.sh` and `logout.sh` accept an iOS simulator UDID or an Android ADB serial. On Android, `login.sh`'s shared preflight verifies the claim, applies both `adb reverse` mappings (the `nextjs` service's API port and the `mobile` service's Metro port, both from `pnpm dev:status --json` — there is no service named `metro`), and opens the dev-client deep link itself. On the primary path no manual reverse or `am start` is needed.
+
+### Mid-test recovery
+
+`pnpm dev:mobile:android adb -s <serial> shell pm clear com.kilocode.kiloapp` resets app state and forgets the saved Metro URL. Afterwards, either rerun `apps/mobile/e2e/login.sh <serial>` (restores claim check, both reverses, and the deep link), or manually restore both reverses and re-open the dev client:
+
+```bash
+# Ports from pnpm dev:status --json: nextjs = API, mobile = Metro (not a service named metro)
+pnpm dev:mobile:android adb -s <serial> reverse tcp:<nextjs-port> tcp:<nextjs-port>
+pnpm dev:mobile:android adb -s <serial> reverse tcp:<metro-port> tcp:<metro-port>
+pnpm dev:mobile:android adb -s <serial> shell am start -a android.intent.action.VIEW \
+  -d "exp+kilo-app://expo-development-client/?url=<url-encoded-metro-url>"
+```
+
+Use the exact Metro URL from the `mobile` pane. Android's `localhost` is the emulator itself — reverses are required for host reachability.
+
+### App Links
+
+```bash
+pnpm dev:mobile:android adb -s <serial> shell am start -a android.intent.action.VIEW -d "https://<host>/<path>"
+```
+
+Drives a real App Link through Android intent resolution.
+
+### ADB fallback (Maestro stays primary)
+
+Derive tap coordinates from the current `uiautomator` bounds, never from screenshots or remembered positions. Re-dump after every navigation or prompt.
 
 ```bash
 pnpm dev:mobile:android adb devices -l
@@ -217,13 +269,6 @@ pnpm dev:mobile:android adb -s <serial> shell input text '<text>'
 pnpm dev:mobile:android adb -s <serial> shell input keyevent KEYCODE_BACK
 ```
 
-Android specifics:
-
-- Derive tap coordinates from the current `uiautomator` bounds, never from screenshots or remembered positions. Re-dump after every navigation or prompt.
-- Android's `localhost` is the emulator itself. Restore both `adb reverse` mappings after clearing app data.
-- The dev-client scheme is `exp+kilo-app`. `adb shell pm clear com.kilocode.kiloapp` also forgets the Metro URL; re-open the dev-client URL afterward with `adb shell am start`.
-- `login.sh` and `logout.sh` accept an iOS simulator UDID or an Android ADB serial; their shared preflight applies platform-specific ownership checks and reconnects the dev client to this worktree.
-
 ## Cleanup
 
 Clean up only resources you started. The remote CLI session and its disposable install belong to the orchestrator; never kill `kilo-e2e-cli-*` sessions or remove CLI scratch directories you did not create.
@@ -231,10 +276,12 @@ Clean up only resources you started. The remote CLI session and its disposable i
 ```bash
 tmux kill-session -t "$ANDROID_SESSION"      # if created
 rm -f "$LOGIN_LOG"                           # if created
+rm -f "$EMULATOR_LOG"                        # if created
 pnpm dev:stop                                # only if you started this worktree's stack
 xcrun simctl shutdown <udid>                 # only if you booted it
 pnpm dev:mobile:simulator release <udid>     # every simulator you claimed
 pnpm dev:mobile:android release <serial>     # every Android device you claimed
+apps/mobile/.kilo/e2e-slot.sh release <tmux-session>   # if you acquired a device slot
 ```
 
 Also stop recorders, log followers, and emulator processes you created. Never use `tmux kill-server`, kill an unrelated `kilo-dev-*` session, shut down a simulator that was already booted, or use `pnpm dev:stop --force` while sibling worktrees are active.

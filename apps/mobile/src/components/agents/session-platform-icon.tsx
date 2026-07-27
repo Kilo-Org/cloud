@@ -5,7 +5,7 @@ import { GitHubIcon } from '@/components/icons/github-icon';
 import { SlackIcon } from '@/components/icons/slack-icon';
 import { repoNameFromGitUrl } from './session-list-helpers';
 
-export type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'slack' | 'github';
+type SessionPlatformIconKind = 'cloud' | 'terminal' | 'code' | 'slack' | 'github';
 
 const PLATFORM_TO_KIND: Readonly<Record<string, SessionPlatformIconKind>> = {
   'cloud-agent': 'cloud',

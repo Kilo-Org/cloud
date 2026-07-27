@@ -8,6 +8,7 @@ import {
   type GitHubPrReviewChecksResult,
   type GitHubPrReviewFile,
   type GitHubPrReviewFilesResult,
+  type GitHubPrReviewReviewComment,
   type GitHubPrReviewReviewThread,
   type GitHubPrReviewReviewThreadsResult,
   GitHubPrReviewFilesResultSchema,
@@ -290,13 +291,32 @@ export type GraphQlReviewCommentInput = {
   reactions: Array<{ content: string; count: number; viewerHasReacted: boolean }>;
 };
 
+/** Map a pre-DTO GraphQL comment (normalizeComment output) into the wire DTO. */
+export function mapReviewComment(comment: GraphQlReviewCommentInput): GitHubPrReviewReviewComment {
+  return {
+    commentId: comment.databaseId,
+    nodeId: comment.id,
+    author: comment.author
+      ? { login: comment.author.login, avatarUrl: comment.author.avatarUrl }
+      : null,
+    bodyMarkdown: comment.body,
+    createdAt: comment.createdAt,
+    reactions: comment.reactions.map(r => ({
+      content: r.content,
+      count: r.count,
+      viewerHasReacted: r.viewerHasReacted,
+    })),
+  };
+}
+
 export function buildReviewThreadsResult(args: {
   threads: GraphQlReviewThreadInput[];
+  conversation: GraphQlReviewCommentInput[];
   page: number;
   hasNextPage: boolean;
   endCursor: string | null;
 }): GitHubPrReviewReviewThreadsResult {
-  const { threads, page, hasNextPage, endCursor } = args;
+  const { threads, conversation, page, hasNextPage, endCursor } = args;
   const dtos: GitHubPrReviewReviewThread[] = threads.map(t => {
     const subjectType: 'LINE' | 'FILE' = t.subjectType === 'FILE' ? 'FILE' : 'LINE';
     const diffSide = t.diffSide === 'LEFT' || t.diffSide === 'RIGHT' ? t.diffSide : null;
@@ -311,18 +331,7 @@ export function buildReviewThreadsResult(args: {
       originalLine: t.originalLine ?? null,
       originalStartLine: t.originalStartLine ?? null,
       diffSide,
-      comments: t.comments.map(c => ({
-        commentId: c.databaseId,
-        nodeId: c.id,
-        author: c.author ? { login: c.author.login, avatarUrl: c.author.avatarUrl } : null,
-        bodyMarkdown: c.body,
-        createdAt: c.createdAt,
-        reactions: c.reactions.map(r => ({
-          content: r.content,
-          count: r.count,
-          viewerHasReacted: r.viewerHasReacted,
-        })),
-      })),
+      comments: t.comments.map(mapReviewComment),
     };
   });
   const nextCursor =
@@ -331,6 +340,7 @@ export function buildReviewThreadsResult(args: {
       : null;
   return GitHubPrReviewReviewThreadsResultSchema.parse({
     threads: dtos,
+    conversation: conversation.map(mapReviewComment),
     nextCursor,
   });
 }

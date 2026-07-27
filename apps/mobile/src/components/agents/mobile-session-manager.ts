@@ -272,6 +272,7 @@ export function createMobileAgentSessionManager({
         associatedPr: sessionResult.associatedPr,
         runtimeAgents: rs?.runtimeAgents,
         totalCostMicrodollars: sessionResult.total_cost_microdollars,
+        createdOnPlatform: sessionResult.created_on_platform,
       };
     },
   });

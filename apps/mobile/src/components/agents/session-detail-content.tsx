@@ -64,7 +64,12 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { PartRenderer } from '@/components/agents/part-renderer';
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
+import {
+  SessionPlatformIcon,
+  sessionPlatformIconKind,
+} from '@/components/agents/session-platform-icon';
 import { ScreenHeader } from '@/components/screen-header';
+import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -86,6 +91,8 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { platformLabel } from '@/lib/platform-label';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -110,6 +117,7 @@ export function SessionDetailContent({
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const router = useRouter();
+  const colors = useThemeColors();
   const [childSession, setChildSession] = useState<{
     sessionId: KiloSessionId;
     title: string;
@@ -484,9 +492,23 @@ export function SessionDetailContent({
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
+  const platform = isSessionLoaded ? (fetchedData.createdOnPlatform ?? null) : null;
+  const platformKind = sessionPlatformIconKind(platform);
+  const leadingAccessory =
+    platform != null && platformKind != null ? (
+      <View
+        accessibilityRole="image"
+        accessibilityLabel={platformLabel(platform)}
+        testID={`platform-icon-${platformKind}`}
+      >
+        <SessionPlatformIcon platform={platform} size={14} color={colors.mutedForeground} />
+      </View>
+    ) : null;
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   const hasBlockingInteraction = blockingInteraction !== 'none';
+  const isComposerMounted = !isReadOnly || messages.length === 0;
+  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
   const isComposerDisabled =
     isReadOnly ||
     !canSend ||
@@ -630,6 +652,7 @@ export function SessionDetailContent({
       <ScreenHeader
         title={rename.title}
         headerRight={headerRight}
+        leadingAccessory={leadingAccessory}
         {...(rename.isTitleInteractive
           ? {
               onTitlePress: rename.openModal,
@@ -650,7 +673,13 @@ export function SessionDetailContent({
         </KeyboardAvoidingView>
       )}
 
-      <View style={{ height: bottom }} className="bg-background" />
+      {isComposerVisible ? (
+        <BlurBar className="border-t-0">
+          <View style={{ height: bottom }} />
+        </BlurBar>
+      ) : (
+        <View style={{ height: bottom }} className="bg-background" />
+      )}
 
       {sheetMountState.mounted ? (
         <SessionContextSheet
@@ -762,7 +791,7 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        {!isReadOnly || messages.length === 0 ? (
+        {isComposerMounted ? (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}

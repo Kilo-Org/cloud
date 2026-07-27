@@ -236,4 +236,75 @@ describe('sessionRowAccessibilityLabel', () => {
       ).toBe('Orphan, 1 day ago');
     });
   });
+
+  describe('platform segment (title → needs input → badge → meta → platform)', () => {
+    it('repo-badged row with icon: appends from CLOUD AGENT', () => {
+      // Shape of a repo-badged mapped row (e.g. seed session 09). Fixed
+      // literal inputs only — never derive from live timestamps.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'X',
+          needsInput: false,
+          badge: 'CLOUD',
+          meta: '9 hours ago',
+          platform: 'cloud-agent',
+        })
+      ).toBe('X, CLOUD, 9 hours ago, from CLOUD AGENT');
+    });
+
+    it('platform-badged row without repo: caller omits platform (label unchanged)', () => {
+      // Shape of seed session 08: badge already speaks CLI; caller does
+      // not pass platform. Gating lives in the caller.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'X',
+          needsInput: false,
+          badge: 'CLI',
+          meta: 'cost 1 dollar 10 cents, 8 hours ago',
+        })
+      ).toBe('X, CLI, cost 1 dollar 10 cents, 8 hours ago');
+    });
+
+    it('needs-input row: no platform segment', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'X',
+          needsInput: true,
+          badge: 'CLOUD',
+          meta: null,
+        })
+      ).toBe('X, needs input, CLOUD');
+    });
+
+    it('unmapped / absent platform: no segment appended', () => {
+      // Caller passes nothing when kind is null.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'X',
+          needsInput: false,
+          badge: 'GASTOWN',
+          meta: '1 hour ago',
+        })
+      ).toBe('X, GASTOWN, 1 hour ago');
+      // Direct call with null/undefined also appends nothing.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'X',
+          needsInput: false,
+          badge: 'GASTOWN',
+          meta: '1 hour ago',
+          platform: null,
+        })
+      ).toBe('X, GASTOWN, 1 hour ago');
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'X',
+          needsInput: false,
+          badge: 'GASTOWN',
+          meta: '1 hour ago',
+          platform: undefined,
+        })
+      ).toBe('X, GASTOWN, 1 hour ago');
+    });
+  });
 });

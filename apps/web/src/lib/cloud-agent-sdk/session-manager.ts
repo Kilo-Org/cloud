@@ -153,6 +153,8 @@ type FetchedSessionData = {
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
   associatedPr: AssociatedPrData | null;
   totalCostMicrodollars?: number | null;
+  /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
+  createdOnPlatform?: string | null;
 };
 
 type PrepareInput = {

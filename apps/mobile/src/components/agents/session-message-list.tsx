@@ -2,13 +2,17 @@ import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flas
 import { type OlderMessagesError } from 'cloud-agent-sdk';
 import { ChevronDown } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  shouldAnnounceOlderMessagesArrival,
+} from '@/components/agents/older-messages-a11y';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
@@ -17,7 +21,7 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // flight. The manager dedupes too, but the UI guard keeps us from issuing
 // repeated `onStartReached` callbacks during a single drag, which would
 // otherwise spam the FlashList event log.
-const ON_START_REACHED_THRESHOLD = 0.5;
+const ON_START_REACHED_THRESHOLD = 2;
 
 type SessionMessageListProps<T> = {
   sessionId: string;
@@ -108,6 +112,36 @@ export function SessionMessageList<T>({
   useEffect(() => {
     inFlightRef.current = false;
   }, [sessionId]);
+
+  // Non-visual a11y signal for older-page arrival (visual loading skeleton
+  // was removed). Announce only when items were actually prepended.
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+  }, [sessionId]);
+  useEffect(() => {
+    const newestItem = items.at(-1);
+    const nextNewestKey = newestItem === undefined ? null : keyExtractor(newestItem);
+    const nextCount = items.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey,
+      })
+    ) {
+      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = nextNewestKey;
+  }, [items, keyExtractor]);
 
   // Defensive: the structural list ref is required by the hook but
   // downstream types may infer it as nullable.

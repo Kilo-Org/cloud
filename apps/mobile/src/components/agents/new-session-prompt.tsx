@@ -191,7 +191,7 @@ export function NewSessionPrompt({
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           autoFocus
         />
-        <View className="flex-row items-center justify-between pb-1">
+        <View className="flex-row items-center justify-between pb-2">
           <Pressable
             onPress={handlePaperclipPress}
             disabled={paperclipDisabled}
@@ -207,6 +207,11 @@ export function NewSessionPrompt({
             <Paperclip size={18} color={colors.mutedForeground} />
           </Pressable>
           {voiceInput.available ? (
+            <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
+              <VoiceInputStatus status={voiceInput.status} />
+            </View>
+          ) : null}
+          {voiceInput.available ? (
             <VoiceInputButton
               disabled={control.voiceDisabled}
               size="md"
@@ -216,11 +221,6 @@ export function NewSessionPrompt({
           ) : null}
         </View>
       </View>
-      {voiceInput.available ? (
-        <View className="min-h-[20px] px-3 pb-1">
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-      ) : null}
       {isModelsError && modelOptions.length === 0 ? (
         <QueryError
           placement="top"

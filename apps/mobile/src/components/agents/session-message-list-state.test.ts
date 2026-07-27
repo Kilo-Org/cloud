@@ -81,8 +81,9 @@ describe('selectSessionMessageListHeaderState', () => {
   });
 
   it('hides omitted noise while a page is loading and the count is non-zero', () => {
-    // The skeleton replaces the calm informational message; once the page
-    // resolves, the omitted message returns only if no error overrides it.
+    // State layer still prioritizes loading over omitted. The render model
+    // maps loading+omitted>0 back to the omitted banner so it stays stable
+    // through the load (no skeleton, no hide/show flap).
     expect(
       selectSessionMessageListHeaderState({
         isLoadingOlderMessages: true,

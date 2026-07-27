@@ -177,6 +177,8 @@ export const runOptimisticFavoriteToggle = async ({
     );
     return { error, ok: false };
   } finally {
-    await queryClient.invalidateQueries({ queryKey });
+    /* Reconcile outside the serial chain (app parity): awaiting the refetch
+       would delay the next queued toggle by the refetch's retry/backoff. */
+    void queryClient.invalidateQueries({ queryKey });
   }
 };

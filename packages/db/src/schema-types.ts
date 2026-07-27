@@ -1512,6 +1512,13 @@ export const CodeReviewAgentConfigSchema = z.object({
   // council-entitled and `council` is configured + active; the automated trigger re-checks both.
   // Matched against the platform repository ID the same way as `selected_repository_ids`.
   council_enabled_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
+  // Feature-level guardrail: when true (the default when absent), skip automated (webhook) code
+  // reviews for bot-authored pull requests (dependabot/renovate/etc.). Applies to standard and
+  // council reviews alike; manual reviews are unaffected. Set false to review bot PRs.
+  // Enforced on GitHub, where the bot signal (`user.type`) is in the webhook payload. GitLab and
+  // Bitbucket do not expose an authoritative bot flag in their webhooks, so the setting has no
+  // effect there yet.
+  skip_bot_pull_requests: z.boolean().optional(),
   disable_review_md: z.boolean().optional(),
   // Controls when the PR gate check (GitHub Check Run / GitLab commit status)
   // reports a failure based on review findings.
@@ -2001,6 +2008,30 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'upstream_error',
   'sandbox_error',
   'workspace_capacity',
+  // Derived from the structured CloudAgentSafeFailure payload cloud-agent-next
+  // already sends on the status callback. Before these existed the callback
+  // dropped `failure.code` for every case except sandbox_storage_full, so these
+  // outcomes landed with a NULL terminal_reason and were only recoverable by
+  // pattern-matching the human-readable error_message in the admin router.
+  // See apps/web/src/lib/code-reviews/terminal-reason-from-failure.ts.
+  'assistant_failed',
+  'assistant_rate_limited',
+  'assistant_unavailable',
+  'assistant_timeout',
+  'assistant_unauthorized',
+  'assistant_invalid_request',
+  'assistant_no_reply',
+  'wrapper_failed',
+  'runtime_startup_failed',
+  'sandbox_connection',
+  'delivery_failed',
+  'workspace_setup_failed',
+  'repository_clone_failed',
+  'repository_auth_failed',
+  'repository_checkout_failed',
+  'session_import_failed',
+  'setup_command_failed',
+  'container_shutdown',
   'unknown',
 ] as const;
 
@@ -2025,6 +2056,11 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   'selected_model_unavailable',
   'user_cancelled',
   'superseded',
+  // The repository's own setup command failed. That is the customer's script,
+  // not our infrastructure, so it must not page us. Every other new reason is
+  // deliberately left as a system failure: under-alerting is how the Jul 2026
+  // publish-rate collapse ran for three days unnoticed.
+  'setup_command_failed',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

@@ -1,5 +1,5 @@
 import { describe, test, expect, jest } from '@jest/globals';
-import type * as SnowflakeModule from '@/lib/snowflake';
+import type { resolveSnowflakeConfig } from '@/lib/snowflake';
 import type { GET as RouteGet } from './route';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -7,7 +7,7 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/redis', () => ({
   redisClient: {
     get: jest.fn<() => Promise<string | null>>().mockResolvedValue(null),
-    set: jest.fn().mockResolvedValue('OK'),
+    set: jest.fn<() => Promise<string>>().mockResolvedValue('OK'),
   },
 }));
 
@@ -16,23 +16,23 @@ jest.mock('@/lib/snowflake', () => ({
   executeSnowflakeStatement: jest.fn(),
 }));
 
-const FAKE_CONFIG = { accountHost: 'test.snowflakecomputing.com' };
+type SnowflakeConfig = ReturnType<typeof resolveSnowflakeConfig>;
+
+const FAKE_CONFIG = { accountHost: 'test.snowflakecomputing.com' } as SnowflakeConfig;
 
 // The route builds a module-level in-process cache (1h TTL) at import time, so
 // each test loads it in an isolated module registry to keep that cache from
 // leaking between cases.
 async function loadGet(opts: {
-  config?: unknown;
+  config?: SnowflakeConfig;
   rows?: string[][];
   statementError?: Error;
 }): Promise<typeof RouteGet> {
   let GET!: typeof RouteGet;
   await jest.isolateModulesAsync(async () => {
-    const snowflake = (await import('@/lib/snowflake')) as SnowflakeModule;
+    const snowflake = await import('@/lib/snowflake');
     const config = opts.config === undefined ? FAKE_CONFIG : opts.config;
-    jest
-      .mocked(snowflake.resolveSnowflakeConfig)
-      .mockReturnValue(config as ReturnType<SnowflakeModule['resolveSnowflakeConfig']>);
+    jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(config);
     if (opts.statementError) {
       jest.mocked(snowflake.executeSnowflakeStatement).mockRejectedValue(opts.statementError);
     } else {

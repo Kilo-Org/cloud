@@ -82,8 +82,8 @@ vi.mock('@kilocode/app-shared/code-review', () => ({
   isInFlightReviewStatus: () => false,
 }));
 
-vi.mock('sonner-native', () => ({
-  toast: { error: (msg: string) => toastErrorMock(msg) },
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
 const CREATE_VARS = {

@@ -88,8 +88,8 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
-vi.mock('sonner-native', () => ({
-  toast: { error: (msg: string) => toastErrorMock(msg) },
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { error: (msg: string) => toastErrorMock(msg) },
 }));
 
 // use-code-reviewer.ts re-exports from use-reviewer-permission, which

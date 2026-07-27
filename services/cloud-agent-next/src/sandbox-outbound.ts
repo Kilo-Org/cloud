@@ -1,8 +1,10 @@
 import { Buffer } from 'node:buffer';
-import { ContainerProxy, Sandbox as StockSandbox } from '@cloudflare/sandbox';
+import { ContainerProxy } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 import type { GitTokenService } from './types.js';
+import { MeteredSandbox } from './container-usage.js';
+import type { SandboxClassName } from './container-usage-context.js';
 
 export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
@@ -659,27 +661,42 @@ const managedScmOutboundHandlers = {
   [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
 };
 
-export class Sandbox extends StockSandbox<Cloudflare.Env> {
+export class Sandbox extends MeteredSandbox {
+  protected get sandboxClassName(): SandboxClassName {
+    return 'Sandbox';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
-export class SandboxSmall extends StockSandbox<Cloudflare.Env> {
+export class SandboxSmall extends MeteredSandbox {
+  protected get sandboxClassName(): SandboxClassName {
+    return 'SandboxSmall';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
-export class SandboxDIND extends StockSandbox<Cloudflare.Env> {
+export class SandboxDIND extends MeteredSandbox {
+  protected get sandboxClassName(): SandboxClassName {
+    return 'SandboxDIND';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
-export class SandboxCodeReview extends StockSandbox<Cloudflare.Env> {
+export class SandboxCodeReview extends MeteredSandbox {
+  protected get sandboxClassName(): SandboxClassName {
+    return 'SandboxCodeReview';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
 export class SandboxContainment extends Sandbox {
+  protected override get sandboxClassName(): SandboxClassName {
+    return 'SandboxContainment';
+  }
   interceptHttps = true;
 }
 // Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
@@ -688,11 +705,17 @@ export class SandboxContainment extends Sandbox {
 SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export class SandboxSmallContainment extends SandboxSmall {
+  protected override get sandboxClassName(): SandboxClassName {
+    return 'SandboxSmallContainment';
+  }
   interceptHttps = true;
 }
 SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export class SandboxCodeReviewContainment extends SandboxCodeReview {
+  protected override get sandboxClassName(): SandboxClassName {
+    return 'SandboxCodeReviewContainment';
+  }
   interceptHttps = true;
 }
 SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;

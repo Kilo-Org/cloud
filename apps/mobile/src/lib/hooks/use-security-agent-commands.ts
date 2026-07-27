@@ -9,8 +9,8 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type SecurityCommand } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -213,7 +213,9 @@ export function useSecurityAgentCommands(scope: string): void {
     }
 
     if (unavailableIds.length > 0) {
-      toast.error('A queued action could no longer be tracked. Refresh to see the latest state.');
+      announcingToast.error(
+        'A queued action could no longer be tracked. Refresh to see the latest state.'
+      );
       for (const id of unavailableIds) {
         processedTerminalIdsRef.current.add(id);
       }
@@ -222,9 +224,9 @@ export function useSecurityAgentCommands(scope: string): void {
     for (const command of terminalCommands) {
       processedTerminalIdsRef.current.add(command.id);
       if (command.status === 'failed') {
-        toast.error(getSecurityCommandFailureMessage(command));
+        announcingToast.error(getSecurityCommandFailureMessage(command));
       } else {
-        toast.success(successMessageForCommand(command));
+        announcingToast.success(successMessageForCommand(command));
       }
       invalidateSecurityQueryScopes(
         { trpc, queryClient },

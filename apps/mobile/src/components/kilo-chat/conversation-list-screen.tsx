@@ -24,7 +24,7 @@ import { Text } from '@/components/ui/text';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
-import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 import { EmptyConversationList } from './empty-conversation-list';
 import { groupConversationsByActivity } from './conversation-list-groups';
@@ -114,22 +114,26 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
-  const tabBarOverlayHeight = getTabBarOverlayHeight(bottom, Platform.OS, fontScale);
+  const tabBarHeight = getEffectiveTabBarHeight({
+    bottomInset: bottom,
+    platform: Platform.OS,
+    fontScale,
+  });
   const listContentContainerStyle = useMemo(
     () =>
       ({
         flexGrow: 1,
-        paddingBottom: tabBarOverlayHeight + FAB_SIZE + FAB_MARGIN,
+        paddingBottom: tabBarHeight + FAB_SIZE + FAB_MARGIN,
       }) satisfies ViewStyle,
-    [tabBarOverlayHeight]
+    [tabBarHeight]
   );
   const createButtonStyle = useMemo(
     () =>
       ({
-        bottom: tabBarOverlayHeight + FAB_MARGIN,
+        bottom: tabBarHeight + FAB_MARGIN,
         right: 20,
       }) satisfies ViewStyle,
-    [tabBarOverlayHeight]
+    [tabBarHeight]
   );
 
   useInstancePresence(sandboxId);
@@ -197,7 +201,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
         <Animated.View
           entering={FadeIn.duration(200)}
           className="flex-1"
-          style={{ paddingBottom: tabBarOverlayHeight }}
+          style={{ paddingBottom: tabBarHeight }}
         >
           <QueryError
             className="flex-1"

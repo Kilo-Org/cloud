@@ -199,3 +199,44 @@ describe('organization review agent router: council config', () => {
     expect(cfg.council?.required_labels).toEqual(['council', 'needs-deep-review']);
   });
 });
+
+describe('organization review agent router: skip bot pull requests', () => {
+  afterAll(async () => {
+    for (const organizationId of createdOrganizationIds) {
+      await db
+        .delete(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+  });
+
+  it('defaults skipBotPullRequests to true and round-trips an explicit false', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    // Default (no config saved) is to skip bot PRs.
+    const defaults = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(defaults.skipBotPullRequests).toBe(true);
+
+    // Saving false persists and reloads as false.
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      skipBotPullRequests: false,
+    });
+    const cfg = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(cfg.skipBotPullRequests).toBe(false);
+  });
+});

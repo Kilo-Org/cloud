@@ -80,6 +80,7 @@ import {
   getCodeReviewDetailHref,
   type CodeReviewUiPlatform,
 } from '@/lib/code-reviews/code-review-links';
+import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
 import {
   CODE_REVIEW_STATUS_LABELS,
   hasInFlightReview,
@@ -894,12 +895,24 @@ export function CodeReviewJobsCard({
                         )}
                       </div>
 
-                      {/* Error Message */}
-                      {review.error_message && (
-                        <div className="text-destructive mt-1 text-xs">
-                          Error: {review.error_message}
-                        </div>
-                      )}
+                      {/* Error Message. Reasons with customer-facing copy render
+                          muted instead of destructive: the cause is stated
+                          plainly and nothing is broken on our side. */}
+                      {(() => {
+                        const reasonCopy = getCodeReviewTerminalReasonCopy(review.terminal_reason);
+                        if (reasonCopy) {
+                          return (
+                            <div className="text-muted-foreground mt-1 text-xs">
+                              {reasonCopy.label}: {reasonCopy.message}
+                            </div>
+                          );
+                        }
+                        return review.error_message ? (
+                          <div className="text-destructive mt-1 text-xs">
+                            Error: {review.error_message}
+                          </div>
+                        ) : null;
+                      })()}
 
                       {/* View Progress Button */}
                       {canShowStream && (

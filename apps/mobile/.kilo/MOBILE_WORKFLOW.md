@@ -40,6 +40,8 @@ kilo run \
 
 While a role agent runs, the orchestrator checks on it about every 7 minutes and unsticks infrastructure failures: a wedged or crashed kilo CLI, a dead tmux window, or a hung service or simulator the agent cannot restart itself. Product, logic, or review problems are not stuck states — route those through the escalation ladder (Delegation and Escalation). When the agent's CLI process exits, react immediately: collect its result and continue the loop. The 7-minute cadence is only the ceiling for detecting a wedge, never a wait between dispatch and result.
 
+Agent definitions allow every command and edit. The only remaining permission denial is `task`, kept because it removes the accidental dispatch path at zero cost — it is not airtight, since a shell `kilo run` can still dispatch; the workflow has exactly one dispatcher, the orchestrator, and role agents never dispatch agents by instruction. Every boundary — no dispatch, reviewers never modify the tree, the implementer never commits, pushes, or opens a PR — is enforced by instruction, not permission. Deny lists caused void review rounds (a reviewer whose blocked command made it exit with no verdict, which read as a pass) and takeover churn; the workflow trades enforcement for reliable rounds and accepts that a misbehaving agent can do what it was previously blocked from.
+
 ### Delegation and Escalation
 
 The orchestrator is the expensive model driving cheap role agents. Its output is judgment — handoffs, steering, triage, verification — not diffs.
@@ -63,7 +65,7 @@ Hard ceilings: `mobile-plan-reviewer` 40, `mobile-implementer` 80, `mobile-revie
 
 ### Workflow Learnings
 
-[`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md) is a durable log of environment blockers — broken local stacks, credential and env-var traps, simulator quirks, tool wedges — and their fixes. Product bugs never go in it. Immediately after resolving such a blocker, record it in the section matching your role: symptom, cause, fix, a few lines each, reusable by a future run that hits the same wall. Read the file before writing; when an existing entry covers the blocker, update that entry instead of appending a duplicate. Only the planner and the orchestrator write the log; the orchestrator records blockers role agents hit. Kilo's edit tool rejects `.kilo/` paths — kilo sessions write entries through shell commands instead.
+[`WORKFLOW_LEARNINGS.md`](WORKFLOW_LEARNINGS.md) is a durable log of environment blockers — broken local stacks, credential and env-var traps, simulator quirks, tool wedges — and their fixes. Product bugs never go in it. Immediately after resolving such a blocker, record it in the section matching your role: symptom, cause, fix, a few lines each, reusable by a future run that hits the same wall. Read the file before writing; when an existing entry covers the blocker, update that entry instead of appending a duplicate. Only the planner and the orchestrator write the log; the orchestrator records blockers role agents hit. Kilo's edit tool rejects `.kilo/` paths — kilo sessions write entries through shell commands instead. Learnings written during a run are part of the run's deliverable: the orchestrator commits and pushes them with the run's PR so future runs can use them once merged.
 
 ## Interaction Modes
 
@@ -166,9 +168,9 @@ Everything the orchestrator does runs in the shared tmux session; inspect its wi
 
 | Agent | Responsibility | Repository edits |
 |---|---|---|
-| `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | Denied |
+| `mobile-plan-reviewer` | Reviews a complete draft plan for ambiguity, unsupported claims, and missing execution detail | None |
 | `mobile-implementer` | Implements one bounded task from the accepted plan and runs narrow checks | Where the task requires |
-| `mobile-reviewer` | Independently reviews the full relevant diff and tests | Denied |
+| `mobile-reviewer` | Independently reviews the full relevant diff and tests | None |
 | `mobile-e2e-verifier` | Exercises accepted behavior; in repro mode, reproduces a reported defect on the unmodified baseline | Temporary only |
 
 ## Local Tooling

@@ -6,6 +6,7 @@ export { createSessionManager } from './session-manager';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 export type {
   ActiveSessionType,
+  CloudAgentModelOverride,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,
@@ -130,7 +131,8 @@ export { createJotaiStorage } from './storage/jotai';
 export type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 export type { SessionStorage, StorageMutation } from './storage/types';
 
-export { stripPartContentIfFile } from './part-utils';
+export { stripPartContentIfFile, getStepFinishRoutedModel } from './part-utils';
+export type { RoutedModelRef } from './part-utils';
 export { splitByContiguousPrefix } from './array-utils';
 
 export { calculateContextUsagePercentage } from './context-usage';

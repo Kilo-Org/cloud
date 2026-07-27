@@ -11,6 +11,7 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { DEMO_SOURCE_OWNER, DEMO_SOURCE_REPO_NAME } from '@/components/cloud-agent/demo-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
   type PlatformRepository,
@@ -128,6 +129,10 @@ export async function fetchGitHubRepositoriesForOrganization(
     return missingIntegrationResponse('No GitHub integration found for this organization');
   }
 
+  if (isPlatformIntegrationSuspended(integration)) {
+    return missingIntegrationResponse('GitHub integration is suspended');
+  }
+
   if (!integration.platform_installation_id) {
     return missingIntegrationResponse('GitHub integration is not properly configured');
   }
@@ -171,6 +176,10 @@ export async function fetchGitHubRepositoriesForUser(
 
   if (!integration) {
     return missingIntegrationResponse('No GitHub integration found for this user');
+  }
+
+  if (isPlatformIntegrationSuspended(integration)) {
+    return missingIntegrationResponse('GitHub integration is suspended');
   }
 
   if (!integration.platform_installation_id) {

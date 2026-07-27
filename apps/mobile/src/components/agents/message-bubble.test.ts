@@ -179,3 +179,75 @@ describe('MessageBubble regressions', () => {
     expect(findText(dequeuedTree, t => t === 'Queued')).toBe(false);
   });
 });
+
+function pressableProps(node: unknown): Record<string, unknown> | null {
+  if (node == null || typeof node !== 'object') {
+    return null;
+  }
+  const element = node as { type?: unknown; props?: Record<string, unknown> };
+  if (element.type === 'Pressable' && element.props) {
+    return element.props;
+  }
+  const children = element.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const found = pressableProps(child);
+      if (found) {
+        return found;
+      }
+    }
+  } else if (children && typeof children === 'object') {
+    return pressableProps(children);
+  }
+  return null;
+}
+
+describe('MessageBubble long-press details', () => {
+  it('uses the details accessibility hint on user messages', async () => {
+    const tree = await renderBubble(userMessage('m-hint-user'));
+    const props = pressableProps(tree);
+    expect(props?.accessibilityHint).toBe('Long press for message details');
+    expect(props?.accessibilityActions).toEqual([{ name: 'copy', label: 'Copy message' }]);
+  });
+
+  it('uses the details accessibility hint on assistant messages', async () => {
+    const base = userMessage('m-hint-asst');
+    const assistant: StoredMessage = {
+      info: {
+        id: base.info.id,
+        sessionID: base.info.sessionID,
+        role: 'assistant',
+        time: { created: base.info.time.created },
+        parentID: 'm0',
+        modelID: 'anthropic/claude-sonnet-4',
+        providerID: 'kilo',
+        mode: 'code',
+        agent: 'build',
+        path: { cwd: '/', root: '/' },
+        cost: 0,
+        tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      },
+      parts: [],
+    };
+    const tree = await renderBubble(assistant);
+    const props = pressableProps(tree);
+    expect(props?.accessibilityHint).toBe('Long press for message details');
+  });
+
+  it('invokes onLongPressDetails on long-press, not copyMessage', async () => {
+    const onLongPressDetails = vi.fn((..._args: unknown[]) => {
+      // void-returning callback matching MessageBubble's prop type
+    });
+    const { MessageBubble } = await import('./message-bubble');
+    const message = userMessage('m-long');
+    // eslint-disable-next-line new-cap
+    const tree = MessageBubble({ message, onLongPressDetails });
+    const props = pressableProps(tree);
+    expect(props).not.toBeNull();
+    const handler = props === null ? undefined : props.onLongPress;
+    expect(typeof handler).toBe('function');
+    const invoke = handler as (() => void) | undefined;
+    invoke?.();
+    expect(onLongPressDetails).toHaveBeenCalledWith(message);
+  });
+});

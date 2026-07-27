@@ -21,18 +21,42 @@ describe('GatewayPercentageSchema', () => {
   test('accepts a numeric percentage', () => {
     expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
       vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: null,
     });
   });
 
   test('accepts null (written when an admin clears the override)', () => {
     expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: null })).toEqual({
       vercel_routing_percentage: null,
+      vercel_routing_percentage_free: null,
     });
+  });
+
+  test('defaults the free percentage to null for pre-existing entries', () => {
+    expect(GatewayPercentageSchema.parse({ vercel_routing_percentage: 25 })).toEqual({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: null,
+    });
+  });
+
+  test('accepts a separate free percentage', () => {
+    expect(
+      GatewayPercentageSchema.parse({
+        vercel_routing_percentage: 25,
+        vercel_routing_percentage_free: 80,
+      })
+    ).toEqual({ vercel_routing_percentage: 25, vercel_routing_percentage_free: 80 });
   });
 
   test('rejects out-of-range values', () => {
     expect(() => GatewayPercentageSchema.parse({ vercel_routing_percentage: 101 })).toThrow();
     expect(() => GatewayPercentageSchema.parse({ vercel_routing_percentage: -1 })).toThrow();
+    expect(() =>
+      GatewayPercentageSchema.parse({
+        vercel_routing_percentage: 25,
+        vercel_routing_percentage_free: 101,
+      })
+    ).toThrow();
   });
 });
 
@@ -62,20 +86,37 @@ describe('GatewayConfigSchema', () => {
 describe('GatewayConfigInputSchema', () => {
   test('accepts a note alongside a percentage', () => {
     expect(
-      GatewayConfigInputSchema.parse({ vercel_routing_percentage: 75, note: 'Rollout stable' })
-    ).toEqual({ vercel_routing_percentage: 75, note: 'Rollout stable' });
+      GatewayConfigInputSchema.parse({
+        vercel_routing_percentage: 75,
+        vercel_routing_percentage_free: 60,
+        note: 'Rollout stable',
+      })
+    ).toEqual({
+      vercel_routing_percentage: 75,
+      vercel_routing_percentage_free: 60,
+      note: 'Rollout stable',
+    });
   });
 
   test('accepts a null note', () => {
-    expect(GatewayConfigInputSchema.parse({ vercel_routing_percentage: null, note: null })).toEqual(
-      { vercel_routing_percentage: null, note: null }
-    );
+    expect(
+      GatewayConfigInputSchema.parse({
+        vercel_routing_percentage: null,
+        vercel_routing_percentage_free: null,
+        note: null,
+      })
+    ).toEqual({
+      vercel_routing_percentage: null,
+      vercel_routing_percentage_free: null,
+      note: null,
+    });
   });
 
   test('rejects notes longer than the maximum', () => {
     expect(() =>
       GatewayConfigInputSchema.parse({
         vercel_routing_percentage: 50,
+        vercel_routing_percentage_free: 50,
         note: 'x'.repeat(NOTE_MAX_LENGTH + 1),
       })
     ).toThrow();

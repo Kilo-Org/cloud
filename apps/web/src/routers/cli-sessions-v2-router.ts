@@ -215,6 +215,7 @@ const commonSessionFieldsWithPr = {
   pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
   pr_review_decision: github_branch_pull_requests.pr_review_decision,
   review_decision_pending: github_branch_pull_requests.review_decision_pending,
+  total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
 } as const;
 
 /**
@@ -469,6 +470,41 @@ async function addOrganizationCondition(
   whereConditions.push(eq(cli_sessions_v2.organization_id, organizationId));
 }
 
+/**
+ * Hide never-ingested placeholder rows from list/search.
+ *
+ * POST /api/session creates bare placeholders (title/status/cost NULL,
+ * created_on_platform default 'unknown') before any user turn. Metadata and
+ * cost arrive later via ingest; if the client dies in that window the row
+ * stays permanently unwritten.
+ *
+ * All four columns unwritten proves only that no metadata projection ever
+ * succeeded and no metrics emission ever persisted a cost. It does not prove
+ * the row has no content — content lives in the DO and R2 and commits
+ * independently of the metadata projection.
+ *
+ * total_cost_microdollars is written by the alarm-driven metrics emission in
+ * SessionIngestDO.emitSessionMetrics (best-effort: stays NULL when the metric
+ * is non-finite or the UPDATE throws and is swallowed), not per flush — so
+ * presence proves the session reached a metrics emission and must be shown;
+ * absence proves nothing.
+ *
+ * Invariant: any row whose four list columns are all unwritten is hidden,
+ * regardless of whether the DO holds content. The predicate is the definition
+ * of what gets hidden; no Postgres-visible signal can do better on a
+ * paginated list query.
+ */
+function addHideUningestedPlaceholderCondition(whereConditions: SQL[]): void {
+  whereConditions.push(
+    sql`(
+      ${isNotNull(cli_sessions_v2.title)}
+      OR ${isNotNull(cli_sessions_v2.status)}
+      OR ${cli_sessions_v2.created_on_platform} != 'unknown'
+      OR ${isNotNull(cli_sessions_v2.total_cost_microdollars)}
+    )`
+  );
+}
+
 function joinWithAnd(fragments: SQL[]): SQL {
   return sql.join(fragments, sql` AND `);
 }
@@ -505,6 +541,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     await addOrganizationCondition(whereConditions, ctx, organizationId);
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
+    addHideUningestedPlaceholderCondition(whereConditions);
 
     if (cursor) {
       whereConditions.push(lt(orderColumn, cursor));
@@ -585,6 +622,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     await addOrganizationCondition(whereConditions, ctx, organizationId);
     addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
     addGitUrlConditions(whereConditions, gitUrl);
+    addHideUningestedPlaceholderCondition(whereConditions);
 
     if (!includeChildren) {
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
@@ -824,9 +862,11 @@ export const cliSessionsV2Router = createTRPCRouter({
         organization_id: z.string().nullable(),
         git_url: z.string().nullable(),
         git_branch: z.string().nullable(),
+        created_on_platform: z.string(),
         created_at: z.coerce.date(),
         updated_at: z.coerce.date(),
         version: z.number(),
+        total_cost_microdollars: z.number().nullable(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
         // Associated GitHub pull request for this session's branch, if any.
@@ -937,9 +977,11 @@ export const cliSessionsV2Router = createTRPCRouter({
         organization_id: session.organization_id ?? null,
         git_url: session.git_url ?? null,
         git_branch: session.git_branch ?? null,
+        created_on_platform: session.created_on_platform,
         created_at: session.created_at,
         updated_at: session.updated_at,
         version: session.version,
+        total_cost_microdollars: session.total_cost_microdollars,
         runtimeState,
         associatedPr: formatAssociatedPr(row),
       };

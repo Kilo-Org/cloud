@@ -578,6 +578,7 @@ export function createMessageSettlementOutbox(
         cliSessionId,
         executionId: state.messageId,
         status: state.status,
+        category: 'status',
         body: buildCloudAgentPushBody(state.status, lastAssistantMessageText, failureMessage),
         suppressIfViewingSession: true,
       });

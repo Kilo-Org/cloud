@@ -11,6 +11,11 @@ export function isTextPart(part: Part): part is TextPart {
   return part.type === 'text';
 }
 
+/** CLI snapshot-init progress injected as a synthetic text part (matches kilo-vscode). */
+export function isSnapshotProgressPart(part: Part): boolean {
+  return isTextPart(part) && part.synthetic === true && part.text.includes('Initializing snapshot');
+}
+
 export function isToolPart(part: Part): part is ToolPart {
   return part.type === 'tool';
 }

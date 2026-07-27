@@ -1,9 +1,10 @@
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { Terminal } from 'lucide-react-native';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 import { truncateText } from '../tool-card-utils';
 
@@ -31,11 +32,11 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
             </View>
           ) : null}
           {output ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <Text selectable className="font-mono text-xs leading-4 text-muted-foreground">
-                {output.slice(0, 2000)}
-              </Text>
-            </ScrollView>
+            <MonoScrollBlock
+              content={output}
+              maxLength={2000}
+              textClassName="text-muted-foreground"
+            />
           ) : null}
           {error ? (
             <Text selectable className="text-xs text-destructive">

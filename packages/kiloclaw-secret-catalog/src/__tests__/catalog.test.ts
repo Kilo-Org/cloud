@@ -8,6 +8,7 @@ import {
   FIELD_KEY_TO_ENTRY,
   ALL_SECRET_ENV_VARS,
   INTERNAL_SENSITIVE_ENV_VARS,
+  RETAINED_SENSITIVE_ENV_VARS,
   getEntriesByCategory,
   getFieldKeysByCategory,
   isValidCustomSecretKey,
@@ -129,8 +130,7 @@ describe('Secret Catalog', () => {
         'GITHUB_EMAIL',
         'BRAVE_API_KEY',
         'LINEAR_API_KEY',
-        'COMPOSIO_USER_API_KEY',
-        'COMPOSIO_ORG',
+        'COMPOSIO_CONSUMER_KEY',
       ]);
 
       const catalogEnvVars = new Set(FIELD_KEY_TO_ENV_VAR.values());
@@ -149,8 +149,7 @@ describe('Secret Catalog', () => {
       expect(FIELD_KEY_TO_ENV_VAR.get('githubUsername')).toBe('GITHUB_USERNAME');
       expect(FIELD_KEY_TO_ENV_VAR.get('githubEmail')).toBe('GITHUB_EMAIL');
       expect(FIELD_KEY_TO_ENV_VAR.get('braveSearchApiKey')).toBe('BRAVE_API_KEY');
-      expect(FIELD_KEY_TO_ENV_VAR.get('composioUserApiKey')).toBe('COMPOSIO_USER_API_KEY');
-      expect(FIELD_KEY_TO_ENV_VAR.get('composioOrg')).toBe('COMPOSIO_ORG');
+      expect(FIELD_KEY_TO_ENV_VAR.get('composioConsumerKey')).toBe('COMPOSIO_CONSUMER_KEY');
     });
 
     it('ENV_VAR_TO_FIELD_KEY is the exact reverse of FIELD_KEY_TO_ENV_VAR', () => {
@@ -169,8 +168,7 @@ describe('Secret Catalog', () => {
       expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_USERNAME')).toBe('githubUsername');
       expect(ENV_VAR_TO_FIELD_KEY.get('GITHUB_EMAIL')).toBe('githubEmail');
       expect(ENV_VAR_TO_FIELD_KEY.get('BRAVE_API_KEY')).toBe('braveSearchApiKey');
-      expect(ENV_VAR_TO_FIELD_KEY.get('COMPOSIO_USER_API_KEY')).toBe('composioUserApiKey');
-      expect(ENV_VAR_TO_FIELD_KEY.get('COMPOSIO_ORG')).toBe('composioOrg');
+      expect(ENV_VAR_TO_FIELD_KEY.get('COMPOSIO_CONSUMER_KEY')).toBe('composioConsumerKey');
     });
   });
 
@@ -246,9 +244,8 @@ describe('Secret Catalog', () => {
       expect(keys).toContain('agentcardApiKey');
       expect(keys).toContain('onepasswordServiceAccountToken');
       expect(keys).toContain('braveSearchApiKey');
-      expect(keys).toContain('composioUserApiKey');
-      expect(keys).toContain('composioOrg');
-      expect(keys.size).toBe(9);
+      expect(keys).toContain('composioConsumerKey');
+      expect(keys.size).toBe(8);
     });
 
     it('returns empty set for categories with no entries', () => {
@@ -400,17 +397,18 @@ describe('Secret Catalog', () => {
       expect(validateFieldValue('bsa' + 'A'.repeat(20), pattern)).toBe(false);
     });
 
-    it('accepts valid Composio user API keys', () => {
-      const pattern = '^uak_[A-Za-z0-9_-]{16,}$';
-      expect(validateFieldValue('uak_FAKE_TEST_KEY_1234567890', pattern)).toBe(true);
-      expect(validateFieldValue('uak_' + 'A'.repeat(16), pattern)).toBe(true);
+    it('accepts valid Composio consumer keys', () => {
+      const pattern = '^ck_[A-Za-z0-9_-]{8,}$';
+      expect(validateFieldValue('ck_FAKE_TEST_KEY_1234567890', pattern)).toBe(true);
+      expect(validateFieldValue('ck_' + 'A'.repeat(8), pattern)).toBe(true);
     });
 
-    it('rejects invalid Composio user API keys', () => {
-      const pattern = '^uak_[A-Za-z0-9_-]{16,}$';
+    it('rejects invalid Composio consumer keys', () => {
+      const pattern = '^ck_[A-Za-z0-9_-]{8,}$';
       expect(validateFieldValue('invalid', pattern)).toBe(false);
-      expect(validateFieldValue('uak_short', pattern)).toBe(false);
-      expect(validateFieldValue('ak_' + 'A'.repeat(16), pattern)).toBe(false);
+      expect(validateFieldValue('ck_short', pattern)).toBe(false);
+      // uak_ is the CLI's user API key — a different credential family.
+      expect(validateFieldValue('uak_' + 'A'.repeat(16), pattern)).toBe(false);
     });
 
     it('rejects empty strings', () => {
@@ -467,13 +465,12 @@ describe('Secret Catalog', () => {
       ]);
     });
 
-    it('composio entry requires user API key and organization', () => {
+    it('composio entry takes a single consumer key', () => {
       const composio = SECRET_CATALOG_MAP.get('composio');
-      expect(composio?.allFieldsRequired).toBe(true);
-      expect(composio?.fields.map(f => f.key)).toEqual(['composioUserApiKey', 'composioOrg']);
-      expect(
-        composio?.fields.find(f => f.key === 'composioOrg')?.validationPattern
-      ).toBeUndefined();
+      // One field, so there is nothing to require together.
+      expect(composio?.allFieldsRequired).toBeFalsy();
+      expect(composio?.fields.map(f => f.key)).toEqual(['composioConsumerKey']);
+      expect(composio?.fields[0]?.envVar).toBe('COMPOSIO_CONSUMER_KEY');
     });
 
     it('telegram and discord do not have allFieldsRequired', () => {
@@ -504,6 +501,27 @@ describe('Secret Catalog', () => {
     it('does not overlap with catalog-derived ALL_SECRET_ENV_VARS', () => {
       for (const envVar of INTERNAL_SENSITIVE_ENV_VARS) {
         expect(ALL_SECRET_ENV_VARS.has(envVar)).toBe(false);
+      }
+    });
+  });
+
+  describe('RETAINED_SENSITIVE_ENV_VARS', () => {
+    it('keeps retired Composio CLI names classified sensitive', () => {
+      expect(RETAINED_SENSITIVE_ENV_VARS.has('COMPOSIO_USER_API_KEY')).toBe(true);
+      expect(RETAINED_SENSITIVE_ENV_VARS.has('COMPOSIO_ORG')).toBe(true);
+    });
+
+    it('does not re-add retired names to the catalog', () => {
+      for (const envVar of RETAINED_SENSITIVE_ENV_VARS) {
+        expect(ALL_SECRET_ENV_VARS.has(envVar)).toBe(false);
+      }
+    });
+
+    // Retained names stay visible/deletable in the Custom Secrets UI — the
+    // reason they live here rather than in INTERNAL_SENSITIVE_ENV_VARS.
+    it('leaves retired names visible as custom secrets', () => {
+      for (const envVar of RETAINED_SENSITIVE_ENV_VARS) {
+        expect(isCustomSecretEnvVar(envVar)).toBe(true);
       }
     });
   });

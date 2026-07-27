@@ -7,6 +7,16 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
+// `upstreamRequest` schedules its timeout-listener cleanup through `next/server`'s
+// `after()` post-response hook, which only works in a request context. Replace it
+// with an immediate invocation so the test can run outside a request scope.
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: jest.fn((work: Promise<unknown> | (() => Promise<unknown>)) => {
+    void (typeof work === 'function' ? work() : work);
+  }),
+}));
+
 const mockCaptureException = jest.mocked(captureException);
 const originalFetch = global.fetch;
 

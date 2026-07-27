@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -36,12 +37,15 @@ const config: ExpoConfig = {
     requireFullScreen: true,
     supportsTablet: true,
     usesAppleSignIn: true,
+    associatedDomains: ['applinks:app.kilo.ai'],
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
-      AdAttributionKit: {
-        PostbackCopyURL: 'https://appsflyer-skadnetwork.com/',
-      },
+      // Apple's raw key for AdAttributionKit postback copies is the top-level
+      // string `AttributionCopyEndpoint` (Xcode displays it as "AdAttributionKit -
+      // Postback Copy URL"). A nested AdAttributionKit dictionary is silently
+      // ignored by iOS, so copies never reached AppsFlyer.
+      AttributionCopyEndpoint: 'https://appsflyer-skadnetwork.com/',
       // Make the app's Documents directory user-visible in the iOS Files
       // app so downloaded any-file attachments (uploaded via the cloud-agent
       // composer) can be opened in place.
@@ -68,6 +72,18 @@ const config: ExpoConfig = {
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.READ_MEDIA_AUDIO',
+    ],
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: UNIVERSAL_LINK_PATH_PATTERNS.map(pathPattern => ({
+          scheme: 'https',
+          host: 'app.kilo.ai',
+          pathPattern,
+        })),
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
     ],
   },
   plugins: [
@@ -146,7 +162,26 @@ const config: ExpoConfig = {
           'This identifier is used to measure the effectiveness of advertising campaigns.',
       },
     ],
-    ['react-native-appsflyer', {}],
+    ['react-native-appsflyer', { shouldUsePurchaseConnector: true }],
+    // Local wrapper: pnpm isolation + Kilo target-name collision (see plugin).
+    [
+      './plugins/withExpoShareIntent',
+      {
+        iosActivationRules: {
+          NSExtensionActivationSupportsText: true,
+          NSExtensionActivationSupportsWebURLWithMaxCount: 1,
+          NSExtensionActivationSupportsWebPageWithMaxCount: 1,
+          NSExtensionActivationSupportsImageWithMaxCount: 5,
+          NSExtensionActivationSupportsFileWithMaxCount: 5,
+        },
+        androidIntentFilters: ['text/*', '*/*'],
+        androidMultiIntentFilters: ['*/*'],
+        iosAppGroupIdentifier: 'group.com.kilocode.kiloapp',
+        // Display name "Kilo" is applied by the wrapper; target is ShareExtension
+        // because iosShareExtensionName "Kilo" collides with the main app target.
+        iosShareExtensionName: 'Kilo',
+      },
+    ],
     './plugins/withAndroidManifestFix',
     // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
     // Google OAuth clients exist.

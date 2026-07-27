@@ -360,7 +360,7 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     await expect(orchestrator.execute(basePlan)).rejects.toBe(finalizingError);
   });
 
-  it('does not recover the shared sandbox for plain capacity admission rejection', async () => {
+  it('translates a capacity admission rejection to a retryable sandbox_storage_full failure without recovering the shared sandbox', async () => {
     const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator();
     ensureWrapper.mockRejectedValueOnce(
       new WorkspaceCapacityAdmissionRejectedError({
@@ -371,7 +371,13 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
       })
     );
 
-    await expect(orchestrator.execute(basePlan)).rejects.toThrow('Failed to start wrapper');
+    // Must not degrade to a generic WRAPPER_START_FAILED: the subtype is what
+    // routes the pending flush to the capacity-specific retry backoff.
+    await expect(orchestrator.execute(basePlan)).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      workspaceFailureSubtype: 'sandbox_storage_full',
+    } satisfies Partial<ExecutionError>);
     expect(deleteSandbox).not.toHaveBeenCalled();
   });
 

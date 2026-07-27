@@ -44,6 +44,18 @@ export function resolveSendAttachmentKind(
 }
 
 /**
+ * True when the send path would omit attachments from the wire while the
+ * composer still holds uploaded files — refuse that silent drop so the user
+ * can remove attachments and retry.
+ */
+export function shouldRefuseSilentAttachmentDrop(
+  kind: 'cloud' | 'remote-capable' | 'none',
+  hasAttachments: boolean
+): boolean {
+  return kind === 'none' && hasAttachments;
+}
+
+/**
  * Build remote attachment parts for a capable remote session, mapping a
  * transient presign failure to a retryable user-facing message. The caller
  * is responsible for surfacing `message` through the same toast/error surface

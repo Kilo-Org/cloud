@@ -16,6 +16,8 @@ const PROFILE_HREF = '/(app)/(tabs)/(3_profile)' as Href;
 type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
+  /** Explicit org id (e.g. deep-link `?org=`) replacing the persisted selection for this render. */
+  organizationIdOverride?: string;
 }>;
 
 /**
@@ -32,10 +34,14 @@ type OrganizationBoundaryProps = Readonly<{
  * Calls `useOrgBoundary()` itself — cheap, context/query-cache backed — so
  * callers only need to pass a `title` for full screens (sheets omit it).
  */
-export function OrganizationBoundary({ title }: OrganizationBoundaryProps = {}) {
+export function OrganizationBoundary({
+  title,
+  organizationIdOverride,
+}: OrganizationBoundaryProps = {}) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, isResolving, isError, isFetching, refetch } = useOrgBoundary();
+  const { organizationId, isResolving, isError, isFetching, refetch } =
+    useOrgBoundary(organizationIdOverride);
 
   let content: ReactNode = null;
   if (isResolving) {

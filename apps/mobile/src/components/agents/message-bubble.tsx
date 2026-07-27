@@ -24,7 +24,11 @@ type MessageBubbleProps = {
   onOpenChildSession?: OpenChildSession;
   /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
   deliveryState?: MessageDeliveryState;
+  /** Opens the message-details sheet; long-press never triggers the copy ActionSheet. */
+  onLongPressDetails?: (message: StoredMessage) => void;
 };
+
+const DETAILS_HINT = 'Long press for message details';
 
 export function MessageBubble({
   message,
@@ -34,18 +38,18 @@ export function MessageBubble({
   defaultReasoningExpanded,
   onOpenChildSession,
   deliveryState,
+  onLongPressDetails,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
 
   const handleLongPress = () => {
-    void copyMessage(message);
+    onLongPressDetails?.(message);
   };
 
-  // Long-press is an accelerator; expose the same "copy" action to
-  // accessibility tooling (VoiceOver/TalkBack rotor) since a long-press
-  // gesture isn't reliably discoverable there.
+  // Long-press opens details; keep the VoiceOver/TalkBack rotor "copy" action
+  // on the bubble so a11y tooling still reaches the existing ActionSheet path.
   const copyAccessibilityActions = [{ name: 'copy', label: 'Copy message' }];
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'copy') {
@@ -77,7 +81,7 @@ export function MessageBubble({
         className="px-4 py-1"
         accessibilityRole="text"
         accessibilityLabel="User message"
-        accessibilityHint="Long press to copy message text"
+        accessibilityHint={DETAILS_HINT}
         accessibilityActions={copyAccessibilityActions}
         onAccessibilityAction={handleAccessibilityAction}
       >
@@ -116,7 +120,7 @@ export function MessageBubble({
       onLongPress={handleLongPress}
       accessibilityRole="text"
       accessibilityLabel="Assistant message"
-      accessibilityHint="Long press to copy message text"
+      accessibilityHint={DETAILS_HINT}
       accessibilityActions={copyAccessibilityActions}
       onAccessibilityAction={handleAccessibilityAction}
     >

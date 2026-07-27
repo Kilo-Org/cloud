@@ -465,4 +465,121 @@ describe('gitlab-integration-helpers', () => {
       expect(result).toBe(true);
     });
   });
+
+  describe('fetchGitLabRepositoriesForUser', () => {
+    const buildIntegration = (overrides: Partial<PlatformIntegration> = {}): PlatformIntegration =>
+      ({
+        id: 'integration-1',
+        platform: 'gitlab',
+        integration_status: 'active',
+        suspended_at: null,
+        auth_invalid_at: null,
+        metadata: {},
+        repositories: [{ id: 1, name: 'project', full_name: 'group/project', private: false }],
+        repositories_synced_at: '2024-01-01T00:00:00Z',
+        ...overrides,
+      }) as PlatformIntegration;
+
+    it('should return cached repositories for an active integration', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([
+        { id: 1, name: 'project', fullName: 'group/project', private: false },
+      ]);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+    });
+
+    it('should return no repositories when the integration is suspended', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        })
+      );
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123');
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+    });
+
+    it('should not refresh repositories for a suspended integration even with forceRefresh', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({ integration_status: 'suspended' })
+      );
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123', true);
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchGitLabRepositoriesForOrganization', () => {
+    const buildIntegration = (overrides: Partial<PlatformIntegration> = {}): PlatformIntegration =>
+      ({
+        id: 'integration-1',
+        platform: 'gitlab',
+        integration_status: 'active',
+        suspended_at: null,
+        auth_invalid_at: null,
+        metadata: {},
+        repositories: [{ id: 1, name: 'project', full_name: 'org/project', private: false }],
+        repositories_synced_at: '2024-01-01T00:00:00Z',
+        ...overrides,
+      }) as PlatformIntegration;
+
+    it('should return cached repositories for an active integration', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(buildIntegration());
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([
+        { id: 1, name: 'project', fullName: 'org/project', private: false },
+      ]);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+    });
+
+    it('should return no repositories when the integration is suspended', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildIntegration({
+          integration_status: 'suspended',
+          suspended_at: '2026-06-25 18:00:00+00',
+        })
+      );
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123');
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+    });
+
+    it('should not refresh repositories for a suspended integration even with forceRefresh', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildIntegration({ integration_status: 'suspended' })
+      );
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123', true);
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 
+import { sortActiveSessionsByCreatedAt } from '@/lib/active-session-order';
 import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
@@ -173,7 +174,10 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     return sessions;
   }, [stored.data]);
 
-  const activeSessions = useMemo(() => active.data?.sessions ?? [], [active.data]);
+  const activeSessions = useMemo(
+    () => sortActiveSessionsByCreatedAt(active.data?.sessions ?? []),
+    [active.data]
+  );
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);
 

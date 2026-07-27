@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DEFAULT_VERCEL_PERCENTAGE,
+  DEFAULT_VERCEL_PERCENTAGE_FREE,
   NOTE_MAX_LENGTH,
   VercelRoutingPercentageSchema,
 } from '@/lib/ai-gateway/gateway-config';
@@ -22,12 +23,14 @@ export function RoutingContent() {
   const { data, isLoading } = useQuery(trpc.admin.gatewayConfig.get.queryOptions());
 
   const [inputValue, setInputValue] = useState('');
+  const [freeInputValue, setFreeInputValue] = useState('');
   const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (data) {
       setInputValue(data.vercel_routing_percentage?.toString() ?? '');
+      setFreeInputValue(data.vercel_routing_percentage_free?.toString() ?? '');
       setNoteValue('');
       setHasChanges(false);
     }
@@ -52,25 +55,37 @@ export function RoutingContent() {
     return trimmed === '' ? null : trimmed;
   }
 
+  function parsePercentage(raw: string): number | null | undefined {
+    const trimmed = raw.trim();
+    if (trimmed === '') return null;
+    const num = Number(trimmed);
+    if (!VercelRoutingPercentageSchema.safeParse(num).success) return undefined;
+    return num;
+  }
+
   function handleSave() {
-    const trimmed = inputValue.trim();
     const note = noteInput();
-    if (trimmed === '') {
-      mutation.mutate({ vercel_routing_percentage: null, note });
-    } else {
-      const num = Number(trimmed);
-      if (!VercelRoutingPercentageSchema.safeParse(num).success) {
-        toast.error(
-          'Enter a percentage between 0 and 100 with up to 3 decimal places, or leave it empty for the default.'
-        );
-        return;
-      }
-      mutation.mutate({ vercel_routing_percentage: num, note });
+    const paid = parsePercentage(inputValue);
+    const free = parsePercentage(freeInputValue);
+    if (paid === undefined || free === undefined) {
+      toast.error(
+        'Enter a percentage between 0 and 100 with up to 3 decimal places, or leave it empty for the default.'
+      );
+      return;
     }
+    mutation.mutate({
+      vercel_routing_percentage: paid,
+      vercel_routing_percentage_free: free,
+      note,
+    });
   }
 
   function handleClear() {
-    mutation.mutate({ vercel_routing_percentage: null, note: noteInput() });
+    mutation.mutate({
+      vercel_routing_percentage: null,
+      vercel_routing_percentage_free: null,
+      note: noteInput(),
+    });
   }
 
   if (isLoading) {
@@ -78,7 +93,10 @@ export function RoutingContent() {
   }
 
   const currentOverride = data?.vercel_routing_percentage;
-  const isOverrideActive = currentOverride !== null && currentOverride !== undefined;
+  const currentFreeOverride = data?.vercel_routing_percentage_free;
+  const isOverrideActive =
+    (currentOverride !== null && currentOverride !== undefined) ||
+    (currentFreeOverride !== null && currentFreeOverride !== undefined);
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -88,13 +106,18 @@ export function RoutingContent() {
           <CardDescription>
             For models available on the Vercel AI Gateway, controls the percentage of traffic routed
             to Vercel (vs OpenRouter). Models not available on Vercel always go to OpenRouter, so
-            overall traffic may still be skewed towards OpenRouter. Leave empty to use the default (
-            {DEFAULT_VERCEL_PERCENTAGE}%).
+            overall traffic may still be skewed towards OpenRouter. Paid and free models are
+            configured separately. Leave empty to use the default ({DEFAULT_VERCEL_PERCENTAGE}% for
+            paid, {DEFAULT_VERCEL_PERCENTAGE_FREE}% for free).
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
+            <Label htmlFor="routing-paid" className="w-24 shrink-0">
+              Paid models
+            </Label>
             <Input
+              id="routing-paid"
               type="number"
               min={0}
               max={100}
@@ -111,6 +134,31 @@ export function RoutingContent() {
               className="w-48"
             />
             <span className="text-muted-foreground text-sm">%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Label htmlFor="routing-free" className="w-24 shrink-0">
+              Free models
+            </Label>
+            <Input
+              id="routing-free"
+              type="number"
+              min={0}
+              max={100}
+              step={0.001}
+              placeholder={`Default: ${DEFAULT_VERCEL_PERCENTAGE_FREE}%`}
+              value={freeInputValue}
+              onChange={e => {
+                setFreeInputValue(e.target.value);
+                setHasChanges(true);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSave();
+              }}
+              className="w-48"
+            />
+            <span className="text-muted-foreground text-sm">%</span>
+          </div>
+          <div className="flex items-center gap-3">
             <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
               {mutation.isPending ? 'Saving...' : 'Save'}
             </Button>
@@ -145,8 +193,14 @@ export function RoutingContent() {
             {isOverrideActive ? (
               <p>
                 Override active:{' '}
-                <span className="text-foreground font-medium">{currentOverride}%</span> of traffic
-                goes to Vercel.
+                <span className="text-foreground font-medium">
+                  {currentOverride ?? DEFAULT_VERCEL_PERCENTAGE}%
+                </span>{' '}
+                of paid traffic and{' '}
+                <span className="text-foreground font-medium">
+                  {currentFreeOverride ?? DEFAULT_VERCEL_PERCENTAGE_FREE}%
+                </span>{' '}
+                of free traffic goes to Vercel.
                 {data?.updated_by_email && (
                   <span className="ml-1">
                     Set by {data.updated_by_email}
@@ -156,7 +210,8 @@ export function RoutingContent() {
               </p>
             ) : (
               <p>
-                No override set. Using default routing ({DEFAULT_VERCEL_PERCENTAGE}% to Vercel).
+                No override set. Using default routing ({DEFAULT_VERCEL_PERCENTAGE}% of paid and{' '}
+                {DEFAULT_VERCEL_PERCENTAGE_FREE}% of free traffic to Vercel).
               </p>
             )}
             {data?.note && (

@@ -11,6 +11,11 @@ type SessionConfigSnapshot = {
   variant?: string | null;
 };
 
+type CloudAgentModelOverrideSnapshot = {
+  model: string;
+  variant?: string;
+} | null;
+
 type ResolveSessionConfigSelectionOptions = {
   activeSessionType: ResolvedSession['type'] | null;
   fetchedData: SessionConfigSnapshot | null;
@@ -18,6 +23,8 @@ type ResolveSessionConfigSelectionOptions = {
   modelOptions: SessionModelOption[];
   selectedModel: string;
   selectedVariant: string;
+  /** Manager-held cloud-agent pick; wins over session/fetched config on non-remote. */
+  cloudAgentModelOverride?: CloudAgentModelOverrideSnapshot;
 };
 
 type UseSessionConfigSyncOptions = ResolveSessionConfigSelectionOptions;
@@ -38,9 +45,19 @@ export function resolveSessionConfigSelection({
   modelOptions,
   selectedModel,
   selectedVariant,
+  cloudAgentModelOverride = null,
 }: ResolveSessionConfigSelectionOptions): { model: string; variant: string } {
   if (activeSessionType === 'remote') {
     return { model: selectedModel, variant: selectedVariant };
+  }
+
+  // Cloud-agent in-session override must beat stored session config so the
+  // sync effect cannot revert a user pick before send.
+  if (cloudAgentModelOverride?.model) {
+    return {
+      model: cloudAgentModelOverride.model,
+      variant: cloudAgentModelOverride.variant ?? '',
+    };
   }
 
   const configuredModel = sessionConfig?.model ?? fetchedData?.model ?? '';
@@ -68,6 +85,7 @@ export function useSessionConfigSync({
   modelOptions,
   selectedModel,
   selectedVariant,
+  cloudAgentModelOverride = null,
 }: UseSessionConfigSyncOptions): UseSessionConfigSyncResult {
   const initialSelection = resolveSessionConfigSelection({
     activeSessionType,
@@ -76,6 +94,7 @@ export function useSessionConfigSync({
     modelOptions,
     selectedModel,
     selectedVariant,
+    cloudAgentModelOverride,
   });
   const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
     normalizeAgentMode(fetchedData?.mode)
@@ -98,12 +117,14 @@ export function useSessionConfigSync({
       modelOptions,
       selectedModel,
       selectedVariant,
+      cloudAgentModelOverride,
     });
     const isAutoSelectingFirstModel =
       activeSessionType === 'cloud-agent' &&
       fetchedData !== null &&
       !sessionConfig?.model &&
       !fetchedData.model &&
+      !cloudAgentModelOverride?.model &&
       selection.model === modelOptions[0]?.id;
     if (isAutoSelectingFirstModel && currentModel) {
       return;
@@ -117,6 +138,7 @@ export function useSessionConfigSync({
     modelOptions,
     selectedModel,
     selectedVariant,
+    cloudAgentModelOverride,
     currentModel,
   ]);
 

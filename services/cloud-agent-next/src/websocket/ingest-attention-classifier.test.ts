@@ -243,6 +243,7 @@ describe('dispatchCloudAgentAttentionPush', () => {
       cliSessionId: 'kilo_root',
       executionId: 'attention:req_1',
       status: 'completed',
+      category: 'attention',
       body: 'Kilo needs your input.',
       suppressIfViewingSession: true,
     });
@@ -265,6 +266,7 @@ describe('dispatchCloudAgentAttentionPush', () => {
       cliSessionId: 'kilo_root',
       executionId: 'attention:req_2',
       status: 'completed',
+      category: 'attention',
       body: 'Kilo needs your input.',
       suppressIfViewingSession: true,
     });

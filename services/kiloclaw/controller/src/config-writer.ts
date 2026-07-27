@@ -883,6 +883,13 @@ export function generateBaseConfig(
     config.plugins.entries.slack.enabled = true;
   }
 
+  // Composio Connect — a remote MCP server operated by Composio. Nothing is
+  // installed in the container: OpenClaw dials the URL over streamable HTTP
+  // and forwards the consumer key as a header, so the whole integration is
+  // this config block. Toolkit connections (Gmail, Calendar, ...) are made by
+  // the user in the Composio dashboard and never touch KiloClaw.
+  applyComposioConnectConfig(config, env.COMPOSIO_CONSUMER_KEY);
+
   // Session — default DM scope to per-channel-peer so each channel+peer
   // combination gets its own session. OpenClaw's onboard sets this for new
   // instances, but legacy instances may not have it.
@@ -1034,6 +1041,69 @@ export function generateBaseConfig(
   }
 
   return config;
+}
+
+/** Composio's hosted MCP endpoint. */
+export const COMPOSIO_CONNECT_MCP_URL = 'https://connect.composio.dev/mcp';
+/** Header Composio Connect authenticates consumer keys with. */
+export const COMPOSIO_CONNECT_HEADER = 'x-consumer-api-key';
+/** `mcp.servers` key we manage. */
+export const COMPOSIO_MCP_SERVER_NAME = 'composio';
+/**
+ * Marks the server definition as written by KiloClaw.
+ *
+ * Ownership cannot be inferred from the definition's contents: the URL and
+ * header are Composio's own published values, so a user who wired Composio
+ * Connect up by hand produces a byte-identical server. OpenClaw's
+ * McpServerSchema is `.catchall(z.unknown())`, so this extra key validates
+ * and round-trips untouched.
+ */
+export const COMPOSIO_MANAGED_MARKER = 'kiloclawManaged';
+
+/**
+ * Add, update, or remove the Composio Connect MCP server definition.
+ *
+ * Setting a consumer key hands the whole definition to KiloClaw: it is
+ * replaced outright rather than merged. Merging would carry foreign fields
+ * from a hand-rolled server into ours, and a surviving `auth: 'oauth'` is
+ * worse than untidy — OpenClaw drops the request headers entirely for OAuth
+ * servers, so the pasted key would be silently ignored.
+ *
+ * Removal on an absent key is what makes clearing the credential in Settings
+ * actually revoke access, since openclaw.json lives on the volume and
+ * survives redeploys. Only a definition we marked as ours is removed; a
+ * server the user configured themselves is left alone even when it points at
+ * the same endpoint.
+ */
+export function applyComposioConnectConfig(
+  config: ConfigObject,
+  consumerKey: string | undefined
+): void {
+  const key = consumerKey?.trim();
+
+  if (key) {
+    config.mcp = config.mcp ?? {};
+    config.mcp.servers = config.mcp.servers ?? {};
+    config.mcp.servers[COMPOSIO_MCP_SERVER_NAME] = {
+      [COMPOSIO_MANAGED_MARKER]: true,
+      transport: 'streamable-http',
+      url: COMPOSIO_CONNECT_MCP_URL,
+      headers: { [COMPOSIO_CONNECT_HEADER]: key },
+    };
+    console.log('Composio Connect MCP server configured');
+    return;
+  }
+
+  const existing = config.mcp?.servers?.[COMPOSIO_MCP_SERVER_NAME];
+  if (!existing) return;
+
+  if (existing[COMPOSIO_MANAGED_MARKER] !== true) {
+    console.log('Leaving user-managed Composio MCP server untouched');
+    return;
+  }
+
+  delete config.mcp.servers[COMPOSIO_MCP_SERVER_NAME];
+  console.log('Composio Connect MCP server removed');
 }
 
 /**

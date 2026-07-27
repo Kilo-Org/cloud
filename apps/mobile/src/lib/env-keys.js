@@ -17,4 +17,7 @@ export const ENV_KEYS = {
 export const OPTIONAL_ENV_KEYS = {
   googleWebClientId: 'GOOGLE_WEB_CLIENT_ID',
   googleIosClientId: 'GOOGLE_IOS_CLIENT_ID',
+  e2eLatencySessionMs: 'E2E_LATENCY_SESSION_MS',
+  e2eLatencyMessagesMs: 'E2E_LATENCY_MESSAGES_MS',
+  e2eLatencyWsMs: 'E2E_LATENCY_WS_MS',
 };

@@ -1,14 +1,18 @@
 import { FlashList, type FlashListRef, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from 'lucide-react-native';
-import { useCallback, useEffect, useRef } from 'react';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  shouldAnnounceOlderMessagesArrival,
+} from '@/components/agents/older-messages-a11y';
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
@@ -17,7 +21,7 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // flight. The manager dedupes too, but the UI guard keeps us from issuing
 // repeated `onStartReached` callbacks during a single drag, which would
 // otherwise spam the FlashList event log.
-const ON_START_REACHED_THRESHOLD = 0.5;
+const ON_START_REACHED_THRESHOLD = 2;
 
 type SessionMessageListProps<T> = {
   sessionId: string;
@@ -30,6 +34,15 @@ type SessionMessageListProps<T> = {
   onLoadOlderMessages: () => void;
   renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
+  /**
+   * Extra bottom padding (in dp) applied to the list's content container.
+   * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
+   * exactly, so the main session view is unaffected. Hosts that render
+   * inside a React Native `Modal` (e.g. the subagent sheet) pass a
+   * safe-area-aware value so the last row clears curved-bottom home
+   * indicators.
+   */
+  contentBottomInset?: number;
 };
 
 export function SessionMessageList<T>({
@@ -43,6 +56,7 @@ export function SessionMessageList<T>({
   onLoadOlderMessages,
   renderItem,
   ListFooterComponent,
+  contentBottomInset,
 }: Readonly<SessionMessageListProps<T>>) {
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
@@ -99,16 +113,59 @@ export function SessionMessageList<T>({
     inFlightRef.current = false;
   }, [sessionId]);
 
+  // Non-visual a11y signal for older-page arrival (visual loading skeleton
+  // was removed). Announce only when items were actually prepended.
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+  }, [sessionId]);
+  useEffect(() => {
+    const newestItem = items.at(-1);
+    const nextNewestKey = newestItem === undefined ? null : keyExtractor(newestItem);
+    const nextCount = items.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey,
+      })
+    ) {
+      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = nextNewestKey;
+  }, [items, keyExtractor]);
+
   // Defensive: the structural list ref is required by the hook but
   // downstream types may infer it as nullable.
   const listRefSafe = listRef as unknown as React.RefObject<FlashListRef<T>>;
+
+  // When the optional `contentBottomInset` is omitted we return the
+  // original module-level `listContentContainerStyle` reference so the
+  // default-prop path is behavior-identical (no allocation, no value
+  // change). When provided we extend the bottom padding to clear safe
+  // areas such as the home indicator on curved-bottom iPhones.
+  const resolvedContentContainerStyle = useMemo<ViewStyle>(
+    () =>
+      contentBottomInset
+        ? { paddingTop: 8, paddingBottom: 8 + contentBottomInset }
+        : listContentContainerStyle,
+    [contentBottomInset]
+  );
 
   return (
     <View className="flex-1">
       <FlashList<T>
         ref={listRefSafe}
         style={listStyle}
-        contentContainerStyle={listContentContainerStyle}
+        contentContainerStyle={resolvedContentContainerStyle}
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}

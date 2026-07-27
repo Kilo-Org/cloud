@@ -22,6 +22,8 @@
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { parseTimestamp } from '@/lib/utils';
+
 // GitHub's 8 review-comment reaction content values. The trpc DTO
 // exposes this as a plain `string`; we narrow to the union here so
 // the reducer and the pill row get exhaustiveness checking.
@@ -54,6 +56,8 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 export type ReviewThreadsPage = RouterOutputs['githubPrReview']['listReviewThreads'];
 export type ReviewThread = ReviewThreadsPage['threads'][number];
 export type ReviewComment = ReviewThread['comments'][number];
+/** Conversation (issue) comments share the review-comment DTO shape. */
+export type ConversationComment = ReviewThreadsPage['conversation'][number];
 
 // The shape of a single page in the cached `InfiniteData<ReviewThreadsPage>`
 // produced by `useInfiniteQuery(trpc.githubPrReview.listReviewThreads…)`.
@@ -61,6 +65,16 @@ export type ReviewThreadsInfiniteData = {
   readonly pages: readonly ReviewThreadsPage[];
   readonly pageParams: readonly unknown[];
 };
+
+/**
+ * One row in the Discussion tab's merged chronological list.
+ * Threads stay intact as single items (nested comments do not get
+ * independent outer-list positions). Conversation comments are
+ * individual rows.
+ */
+export type DiscussionListItem =
+  | { readonly kind: 'thread'; readonly thread: ReviewThread }
+  | { readonly kind: 'comment'; readonly comment: ConversationComment };
 
 /**
  * Display label for a thread's anchor. The label reflects THREE
@@ -130,28 +144,89 @@ export function selectCommentAuthorName(author: ReviewComment['author']): string
 }
 
 /**
- * Group threads by `path` for the sectioned list. Unanchored / null-path
- * threads (rare but possible) are bucketed under "(no file)". The
- * grouping is deterministic (Map insertion order = API order) so
- * snapshots are stable across renders.
+ * Sort key timestamp for a discussion list item.
+ * - Thread: first comment's `createdAt` (later replies stay nested).
+ * - Conversation comment: its own `createdAt`.
+ * Returns `null` when missing or unparseable so those items sort after
+ * every item with a usable timestamp (A2.2 total-order rule).
  */
-type ReviewThreadGroup = {
-  readonly path: string;
-  readonly threads: readonly ReviewThread[];
-};
-
-export function groupThreadsByPath(threads: readonly ReviewThread[]): readonly ReviewThreadGroup[] {
-  const byPath = new Map<string, ReviewThread[]>();
-  for (const thread of threads) {
-    const path = thread.path ?? '(no file)';
-    const bucket = byPath.get(path);
-    if (bucket) {
-      bucket.push(thread);
-    } else {
-      byPath.set(path, [thread]);
-    }
+function discussionItemTimestampMs(item: DiscussionListItem): number | null {
+  const raw =
+    item.kind === 'thread' ? (item.thread.comments[0]?.createdAt ?? null) : item.comment.createdAt;
+  if (raw == null || raw === '') {
+    return null;
   }
-  return Array.from(byPath, ([path, group]) => ({ path, threads: group }));
+  const ms = parseTimestamp(raw).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function discussionItemIdentity(item: DiscussionListItem): string {
+  return item.kind === 'thread' ? item.thread.threadId : item.comment.nodeId;
+}
+
+/**
+ * A2.2 total order over every DTO-legal input:
+ *   1. `createdAt` ascending (usable timestamps before missing/unparseable)
+ *   2. threads before conversation comments on a tie
+ *   3. stable string identity (`threadId` / `nodeId`) lexicographic
+ */
+export function compareDiscussionListItems(a: DiscussionListItem, b: DiscussionListItem): number {
+  const aMs = discussionItemTimestampMs(a);
+  const bMs = discussionItemTimestampMs(b);
+  const aHas = aMs !== null;
+  const bHas = bMs !== null;
+  if (aHas && bHas && aMs !== bMs) {
+    return aMs - bMs;
+  }
+  if (aHas !== bHas) {
+    return aHas ? -1 : 1;
+  }
+  const aKind = a.kind === 'thread' ? 0 : 1;
+  const bKind = b.kind === 'thread' ? 0 : 1;
+  if (aKind !== bKind) {
+    return aKind - bKind;
+  }
+  const aId = discussionItemIdentity(a);
+  const bId = discussionItemIdentity(b);
+  if (aId < bId) {
+    return -1;
+  }
+  if (aId > bId) {
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * Merge review threads and conversation comments into one ascending list.
+ *
+ * Full re-sort of the **entire loaded set** on every call (R4 / plan
+ * ordering rule): never rely on page arrival order (GitHub's
+ * `reviewThreads` connection has no ordering guarantee), and never sort
+ * only the newest page. A later "Load more" page can therefore insert
+ * rows mid-list; that is accepted.
+ *
+ * Conversation comments are complete after page one; callers should pass
+ * the first page's `conversation` (later pages are `[]` by contract).
+ */
+export function mergeDiscussionListItems(
+  threads: readonly ReviewThread[],
+  conversation: readonly ConversationComment[]
+): readonly DiscussionListItem[] {
+  const items: DiscussionListItem[] = [
+    ...threads.map(thread => ({ kind: 'thread' as const, thread })),
+    ...conversation.map(comment => ({ kind: 'comment' as const, comment })),
+  ];
+  items.sort(compareDiscussionListItems);
+  return items;
+}
+
+/** Empty only when neither threads nor conversation comments are present. */
+export function isDiscussionEmpty(
+  threads: readonly ReviewThread[],
+  conversation: readonly ConversationComment[]
+): boolean {
+  return threads.length === 0 && conversation.length === 0;
 }
 
 /**

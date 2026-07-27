@@ -28,8 +28,10 @@ const getStringArgument = (args: Record<string, unknown>, name: string): string 
 const isSafeToolName = (name: string): name is SafeToolName =>
   name === 'find_in_page' ||
   name === 'get_element_details' ||
+  name === 'get_memory' ||
   name === 'get_page_snapshot' ||
-  name === 'get_viewport_screenshot';
+  name === 'get_viewport_screenshot' ||
+  name === 'search_memories';
 
 const toSafeToolCallEvent = (
   toolCall: KiloGatewayToolCallRequest,
@@ -40,6 +42,7 @@ const toSafeToolCallEvent = (
   }
 
   const elementId = getStringArgument(toolCall.arguments, 'elementId');
+  const memoryId = getStringArgument(toolCall.arguments, 'memoryId');
   const query = getStringArgument(toolCall.arguments, 'query');
   const snapshotId = getStringArgument(toolCall.arguments, 'snapshotId');
 
@@ -47,6 +50,7 @@ const toSafeToolCallEvent = (
     name: toolCall.name,
     providerToolCallId: toolCall.id,
     ...(elementId === undefined ? {} : { elementId }),
+    ...(memoryId === undefined ? {} : { memoryId }),
     ...(query === undefined ? {} : { query }),
     ...(snapshotId === undefined ? {} : { snapshotId }),
     tabId: selectedTabId,

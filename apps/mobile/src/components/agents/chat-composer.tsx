@@ -45,6 +45,7 @@ import {
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { useSharePrefill } from '@/lib/share-prefill';
 import { createSubmitLock, type SubmitLock } from '@/lib/submit-lock';
 import { useVoiceInput } from '@/lib/voice-input/use-voice-input';
 import { applyVoiceDraftToInput } from '@/lib/voice-input/voice-input-draft';
@@ -91,6 +92,8 @@ type ChatComposerProps = {
   commands?: SlashCommandInfo[];
   /** Remote command state — empty for non-remote sessions. */
   commandState?: RemoteCommandState | null;
+  /** Share-gate delivery id; composer takes the payload and clears the route param. */
+  shareId?: string;
 };
 
 export function ChatComposer({
@@ -113,6 +116,7 @@ export function ChatComposer({
   activeSessionType = null,
   commands = [],
   commandState = null,
+  shareId,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -165,6 +169,23 @@ export function ChatComposer({
   const toolbarDisabled = disabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
+  function handleChangeText(value: string) {
+    textRef.current = value;
+    measure.setText(value);
+    setHasText(value.trim().length > 0);
+    setSlashCommandInput(getSlashCommandCandidate(value));
+  }
+
+  const { addCandidates, removeAttachment, retryAttachment } = upload;
+
+  useSharePrefill({
+    shareId,
+    inputRef,
+    maxLength: 4000,
+    onChangeText: handleChangeText,
+    addCandidates,
+  });
+
   const voiceInput = useVoiceInput({
     disabled: voiceDisabled,
     getDraft: () => textRef.current,
@@ -195,12 +216,8 @@ export function ChatComposer({
   const slashCommandSuggestions =
     slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commandList);
 
-  function handleChangeText(value: string) {
-    textRef.current = value;
-    measure.setText(value);
-    setHasText(value.trim().length > 0);
-    setSlashCommandInput(getSlashCommandCandidate(value));
-  }
+  // The strip must show share-prefilled files before the session resolves.
+  const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
 
   function clearDraft() {
     textRef.current = '';
@@ -323,8 +340,6 @@ export function ChatComposer({
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
-  const { addCandidates, removeAttachment, retryAttachment } = upload;
-
   const handleAddAttachment = useCallback(async () => {
     // Fire-and-forget: the upload hook owns its own progress + error toasts,
     // and the composer's send flow consults `upload.isUploading` /
@@ -362,7 +377,7 @@ export function ChatComposer({
         </Animated.View>
       ) : null}
 
-      {attachmentsEnabled ? (
+      {showAttachments ? (
         <AttachmentPreviewStrip
           attachments={upload.attachments}
           onRemove={removeAttachment}

@@ -146,9 +146,10 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 10. Stripe yearly subscriptions MUST receive an initial monthly base grant from invoice handling and later monthly base
     grants from the yearly monthly-base cron. The cron processes Stripe rows only.
 11. Base credits for a subscription and issue month MUST be issued at most once through the normal issuance path.
-12. A successful qualifying base grant MUST overwrite the user-global threshold with cumulative user usage plus the
-    configured monthly base amount. The threshold belongs to the user, not to one subscription or issuance. A later
-    qualifying base grant MAY replace an earlier threshold.
+12. A successful qualifying base grant MUST overwrite the user-global threshold with the lesser of cumulative user
+    usage plus the configured monthly base amount and total acquired credits after the grant. This keeps the effective
+    threshold reachable when the pre-grant balance is negative. The threshold belongs to the user, not to one
+    subscription or issuance. A later qualifying base grant MAY replace an earlier threshold.
 
 ### Monthly Ramp and Welcome Promo
 

@@ -713,12 +713,80 @@ export function presetToSpecialist(preset: CouncilSpecialistPreset): CouncilSpec
  */
 export type AutomatedReviewPrFacts = {
   isDraft?: boolean;
+  // The PR is authored by a bot account (GitHub `user.type === 'Bot'`, e.g. dependabot/renovate).
+  isBot?: boolean;
+  // The PR head is a fork / cross-repo branch (the author does not have write access to the base).
+  isFork?: boolean;
   labels?: string[];
   baseRef?: string;
   changedFileCount?: number;
   changedLineCount?: number;
   author?: string;
 };
+
+/**
+ * Code-owned reasons the COUNCIL review type is HARD-EXCLUDED for an automated run, regardless of
+ * config or entitlement. These are non-configurable abuse/cost floors, not customer choices:
+ * council is the expensive path, so untrusted or low-value PRs must never reach it. A hard-excluded
+ * PR still gets a `'standard'` review — this vetoes council only, it does not skip the review.
+ *
+ * - `draft`      — draft PRs are WIP; in practice the webhook handler skips them entirely before
+ *                  this runs, so this is a defensive belt-and-suspenders check.
+ * - `bot-author` — bot PRs (dependabot/renovate/etc.) are high-volume and low council value.
+ * - `fork-pr`    — fork / cross-repo PRs come from authors without base write access. On public
+ *                  repos this is the primary abuse vector: an external contributor must not be able
+ *                  to trigger the expensive council path (or spend the org's council budget) by
+ *                  opening/pushing PRs.
+ */
+export type CouncilHardExcludeReason = 'draft' | 'bot-author' | 'fork-pr';
+
+/**
+ * Returns the first hard-exclude reason that vetoes council for this PR, or `null` if none apply.
+ * Pure and code-owned (never driven by SCM-controlled input or org config); ordered cheapest and
+ * most-fundamental first. Returning the reason (not just a bool) lets callers log/surface WHY
+ * council was downgraded without re-deriving it.
+ */
+export function councilHardExcludeReason(
+  facts: AutomatedReviewPrFacts
+): CouncilHardExcludeReason | null {
+  if (facts.isDraft) return 'draft';
+  if (facts.isBot) return 'bot-author';
+  if (facts.isFork) return 'fork-pr';
+  return null;
+}
+
+/**
+ * Customer-configured selection gates that further NARROW which eligible PRs get council. Unlike
+ * the hard excludes, these are org config, not code-owned floors. Each gate can only restrict (a
+ * PR still has to be council-available and not hard-excluded first); a gate never widens who gets
+ * council and never overrides a hard exclusion.
+ */
+export type CouncilSelectionConfig = {
+  // When non-empty, council runs only for PRs carrying at least one of these labels (any-match,
+  // case-insensitive). Empty/absent = no label requirement (the gate is off).
+  requiredLabels?: string[];
+};
+
+/** Why a configured selection gate skipped council for this PR, or `null` if all gates passed. */
+export type CouncilSelectionSkipReason = 'missing-required-label';
+
+/**
+ * Returns the first configured selection gate that skips council for this PR, or `null` if every
+ * configured gate passes (or none are configured). Pure; ordered so cheaper gates fail first.
+ */
+export function councilSelectionSkipReason(
+  facts: AutomatedReviewPrFacts,
+  selection: CouncilSelectionConfig | undefined
+): CouncilSelectionSkipReason | null {
+  const required = (selection?.requiredLabels ?? [])
+    .map(label => label.trim().toLowerCase())
+    .filter(label => label.length > 0);
+  if (required.length > 0) {
+    const prLabels = new Set((facts.labels ?? []).map(label => label.trim().toLowerCase()));
+    if (!required.some(label => prLabels.has(label))) return 'missing-required-label';
+  }
+  return null;
+}
 
 /**
  * Determines the review type for an AUTOMATED (webhook) run.
@@ -731,20 +799,29 @@ export type AutomatedReviewPrFacts = {
  * - `councilEnabledForRepo` — the target repo explicitly opted in
  *   (`config.council_enabled_repository_ids`). Council is per-repo opt-in, not org-wide.
  *
- * PR-facts based gating (draft/size/labels) is intentionally NOT applied yet: every PR on an
- * opted-in repo gets a council review. `prFacts` is threaded through so that policy can be added
- * here later without re-wiring the webhook handlers. Manual runs never call this — they carry an
- * explicit user-selected review type.
+ * The decision is layered, cheapest/most-fundamental first, and any layer can fall back to
+ * `'standard'`:
+ *   1. council available (entitled + config active + repo opted in),
+ *   2. not hard-excluded (`councilHardExcludeReason`: draft/bot/fork — non-configurable floors),
+ *   3. passes every configured selection gate (`councilSelectionSkipReason`: labels, etc.).
+ * Hard excludes are evaluated before selection gates so no config can opt a PR past a floor.
+ * Manual runs never call this — they carry an explicit user-selected review type.
  */
 export function determineAutomatedReviewType(
-  _prFacts: AutomatedReviewPrFacts,
+  prFacts: AutomatedReviewPrFacts,
   options: {
     councilEntitled: boolean;
     councilConfigActive: boolean;
     councilEnabledForRepo: boolean;
+    selection?: CouncilSelectionConfig;
   }
 ): CodeReviewType {
-  const useCouncil =
+  const councilAvailable =
     options.councilEntitled && options.councilConfigActive && options.councilEnabledForRepo;
-  return useCouncil ? 'council' : 'standard';
+  if (!councilAvailable) return 'standard';
+  // Hard, code-owned vetoes win over an otherwise-available council.
+  if (councilHardExcludeReason(prFacts)) return 'standard';
+  // Customer-configured gates narrow further (no-op when unconfigured).
+  if (councilSelectionSkipReason(prFacts, options.selection)) return 'standard';
+  return 'council';
 }

@@ -4,6 +4,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import test from 'node:test';
 import { computePlan } from './plan';
+import { resolveAnnotatedValue } from './parse';
+import type { ExampleEntry } from './types';
+import { serviceUrl } from '../mobile-env';
 import { getService } from '../services';
 
 const workerDir = 'services/cloud-agent-next';
@@ -837,7 +840,7 @@ test('preserves host.docker.internal in @url defaults for useLanIp services', ()
       content.includes(`KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:${nextjsPort}`)
     );
     assert.ok(content.includes(`WORKER_URL=http://host.docker.internal:${cloudAgentPort}`));
-    // ORIGINS keys still use localhost even when example default has host.docker.internal
+    // For useLanIp services, ORIGINS keys keep the localhost entry and may also append a LAN entry.
     assert.ok(content.includes(`ALLOWED_ORIGINS=http://localhost:${nextjsPort}`));
   } finally {
     repo.cleanup();
@@ -879,4 +882,45 @@ test('preserves localhost in worker-side @url defaults for useLanIp services', (
   } finally {
     repo.cleanup();
   }
+});
+
+function originsEntry(key: string, servicesNames: string[]): ExampleEntry {
+  return {
+    key,
+    defaultValue: 'http://localhost:3000',
+    annotation: {
+      type: 'url',
+      services: servicesNames.map(name => ({ name })),
+    },
+  };
+}
+
+test('emits paired localhost and LAN origins for ORIGINS keys when serviceUsesLanIp is true', () => {
+  const entry = originsEntry('WS_ALLOWED_ORIGINS', ['nextjs', 'cloud-agent-next']);
+  const { value } = resolveAnnotatedValue(entry.key, entry, new Map(), '192.168.1.10', true);
+  const nextjsPort = getService('nextjs').port;
+  const cloudAgentPort = getService('cloud-agent-next').port;
+  const expected = [
+    `http://localhost:${nextjsPort}`,
+    serviceUrl('192.168.1.10', 'nextjs', 'http'),
+    `http://localhost:${cloudAgentPort}`,
+    serviceUrl('192.168.1.10', 'cloud-agent-next', 'http'),
+  ].join(',');
+  assert.equal(value, expected);
+});
+
+test('emits only localhost origins for ORIGINS keys when serviceUsesLanIp is false', () => {
+  const entry = originsEntry('WS_ALLOWED_ORIGINS', ['nextjs', 'cloud-agent-next']);
+  const { value } = resolveAnnotatedValue(entry.key, entry, new Map(), '192.168.1.10', false);
+  const nextjsPort = getService('nextjs').port;
+  const cloudAgentPort = getService('cloud-agent-next').port;
+  assert.equal(value, `http://localhost:${nextjsPort},http://localhost:${cloudAgentPort}`);
+});
+
+test('emits only localhost origins for ORIGINS keys when lanIp is unset', () => {
+  const entry = originsEntry('WS_ALLOWED_ORIGINS', ['nextjs', 'cloud-agent-next']);
+  const { value } = resolveAnnotatedValue(entry.key, entry, new Map(), undefined, true);
+  const nextjsPort = getService('nextjs').port;
+  const cloudAgentPort = getService('cloud-agent-next').port;
+  assert.equal(value, `http://localhost:${nextjsPort},http://localhost:${cloudAgentPort}`);
 });

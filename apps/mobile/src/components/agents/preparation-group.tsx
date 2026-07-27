@@ -6,6 +6,8 @@ import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { MonoScrollBlock } from './mono-scroll-block';
+
 export function PreparationGroup({ attempt }: { attempt: PreparationAttempt }) {
   const [expanded, setExpanded] = useState(attempt.status !== 'completed');
   const colors = useThemeColors();
@@ -139,9 +141,11 @@ function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {
               {step.outputTruncated ? (
                 <Text className="text-xs text-muted-foreground">Earlier output omitted</Text>
               ) : null}
-              <Text selectable className="rounded bg-secondary p-2 font-mono text-xs">
-                {step.outputTail}
-              </Text>
+              <MonoScrollBlock
+                content={step.outputTail}
+                containerClassName="rounded bg-secondary p-2"
+                textClassName="text-foreground"
+              />
             </>
           ) : null}
         </View>

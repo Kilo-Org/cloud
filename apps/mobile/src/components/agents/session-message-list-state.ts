@@ -1,16 +1,19 @@
 import { type OlderMessagesError } from 'cloud-agent-sdk';
 
 /**
- * Pagination header state for `SessionMessageList`. The component renders
- * exactly one of these per render: a loading skeleton, a calm inline
+ * Pagination header state for `SessionMessageList`. The state selector
+ * still emits exactly one of these per render: loading, a calm inline
  * message (with or without a Retry CTA), or nothing.
  *
  * Priority is enforced by `selectSessionMessageListHeaderState`:
  *   1. The most recent typed failure wins so the user can always act on it
  *      (or, for non-retryable terminals, sees a stable final message).
- *   2. While a page is loading, the skeleton replaces the omitted message
- *      so the two never collide visually.
- *   3. The omitted-item count only surfaces when the load path is healthy.
+ *   2. While a page is loading, the state layer still prioritizes `loading`
+ *      over `omitted`. The render model maps that loading state to the
+ *      omitted banner when omitted count > 0 (keeps the banner stable
+ *      through the load), otherwise to hidden — no transient skeleton.
+ *   3. The omitted-item count only surfaces from the state layer when the
+ *      load path is healthy (not loading and no error).
  */
 type SessionMessageListHeaderState =
   | { kind: 'hidden' }

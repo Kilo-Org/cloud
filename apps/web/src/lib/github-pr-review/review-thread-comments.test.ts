@@ -23,13 +23,41 @@ function commentNode(
     author: { login: 'octocat', avatarUrl: 'https://x/y.png' },
     // Live GitHub shape: unpaginated reactionGroups list (all group types).
     reactionGroups: reactionGroups ?? [
-      { content: 'THUMBS_UP', viewerHasReacted: false, reactors: { totalCount: 0 } },
-      { content: 'THUMBS_DOWN', viewerHasReacted: false, reactors: { totalCount: 0 } },
-      { content: 'LAUGH', viewerHasReacted: false, reactors: { totalCount: 0 } },
-      { content: 'HOORAY', viewerHasReacted: false, reactors: { totalCount: 0 } },
-      { content: 'CONFUSED', viewerHasReacted: false, reactors: { totalCount: 0 } },
-      { content: 'HEART', viewerHasReacted: false, reactors: { totalCount: 0 } },
-      { content: 'ROCKET', viewerHasReacted: false, reactors: { totalCount: 0 } },
+      {
+        content: 'THUMBS_UP',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
+      {
+        content: 'THUMBS_DOWN',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
+      {
+        content: 'LAUGH',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
+      {
+        content: 'HOORAY',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
+      {
+        content: 'CONFUSED',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
+      {
+        content: 'HEART',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
+      {
+        content: 'ROCKET',
+        viewerHasReacted: false,
+        reactors: { totalCount: 0 },
+      },
       { content: 'EYES', viewerHasReacted: false, reactors: { totalCount: 0 } },
     ],
   };
@@ -123,14 +151,46 @@ describe('fetchAllThreadComments', () => {
         pageInfo: { hasNextPage: false, endCursor: null },
         nodes: [
           commentNode(1, [
-            { content: 'THUMBS_UP', viewerHasReacted: true, reactors: { totalCount: 3 } },
-            { content: 'THUMBS_DOWN', viewerHasReacted: false, reactors: { totalCount: 0 } },
-            { content: 'LAUGH', viewerHasReacted: false, reactors: { totalCount: 0 } },
-            { content: 'HOORAY', viewerHasReacted: false, reactors: { totalCount: 0 } },
-            { content: 'CONFUSED', viewerHasReacted: false, reactors: { totalCount: 0 } },
-            { content: 'HEART', viewerHasReacted: false, reactors: { totalCount: 1 } },
-            { content: 'ROCKET', viewerHasReacted: false, reactors: { totalCount: 0 } },
-            { content: 'EYES', viewerHasReacted: false, reactors: { totalCount: 0 } },
+            {
+              content: 'THUMBS_UP',
+              viewerHasReacted: true,
+              reactors: { totalCount: 3 },
+            },
+            {
+              content: 'THUMBS_DOWN',
+              viewerHasReacted: false,
+              reactors: { totalCount: 0 },
+            },
+            {
+              content: 'LAUGH',
+              viewerHasReacted: false,
+              reactors: { totalCount: 0 },
+            },
+            {
+              content: 'HOORAY',
+              viewerHasReacted: false,
+              reactors: { totalCount: 0 },
+            },
+            {
+              content: 'CONFUSED',
+              viewerHasReacted: false,
+              reactors: { totalCount: 0 },
+            },
+            {
+              content: 'HEART',
+              viewerHasReacted: false,
+              reactors: { totalCount: 1 },
+            },
+            {
+              content: 'ROCKET',
+              viewerHasReacted: false,
+              reactors: { totalCount: 0 },
+            },
+            {
+              content: 'EYES',
+              viewerHasReacted: false,
+              reactors: { totalCount: 0 },
+            },
           ]),
         ],
       },

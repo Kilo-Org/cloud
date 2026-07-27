@@ -28,6 +28,7 @@ export default defineProject({
       'src/lib/pr-review/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/components/**/*.test.ts',
+      'src/components/pr-review/**/*.test.tsx',
     ],
   },
 });

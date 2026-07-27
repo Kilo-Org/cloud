@@ -275,23 +275,7 @@ export function ReviewAgentPageClient({
             </TabsList>
 
             <TabsContent value="config" className="mt-6 space-y-4">
-              <ReviewConfigForm
-                platform="gitlab"
-                gitlabStatusData={
-                  gitlabStatusData
-                    ? {
-                        connected: gitlabStatusData.connected,
-                        integration: gitlabStatusData.integration
-                          ? {
-                              isValid: gitlabStatusData.integration.isValid,
-                              webhookSecret: gitlabStatusData.integration.webhookSecret,
-                              instanceUrl: gitlabStatusData.integration.instanceUrl,
-                            }
-                          : undefined,
-                      }
-                    : undefined
-                }
-              />
+              <ReviewConfigForm platform="gitlab" />
             </TabsContent>
 
             <TabsContent value="jobs" className="mt-6 space-y-4">

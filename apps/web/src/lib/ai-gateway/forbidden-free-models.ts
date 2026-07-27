@@ -62,6 +62,6 @@ const forbiddenFreeModelFamilies: ReadonlySet<string> = new Set(
   [...forbiddenFreeModelIds].map(normalizeModelId)
 );
 
-export function isForbiddenFreeModelFamily(modelId: string): boolean {
+export function familyHasForbiddenFreeModel(modelId: string): boolean {
   return forbiddenFreeModelFamilies.has(normalizeModelId(modelId));
 }

@@ -1,7 +1,7 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
+  familyHasForbiddenFreeModel,
   isForbiddenFreeModel,
-  isForbiddenFreeModelFamily,
 } from '@/lib/ai-gateway/forbidden-free-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -17,7 +17,7 @@ export function getOpenRouterFreeEndpointKeys(providerModelData: ProviderModels)
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
-      if (model.endpoint?.is_free && !isForbiddenFreeModelFamily(model.slug)) {
+      if (model.endpoint?.is_free && !familyHasForbiddenFreeModel(model.slug)) {
         keys.add(`${normalizeModelId(model.slug)}:${providerId}`);
       }
     }

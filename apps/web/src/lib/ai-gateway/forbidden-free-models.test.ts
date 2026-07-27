@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  familyHasForbiddenFreeModel,
   isForbiddenFreeModel,
-  isForbiddenFreeModelFamily,
 } from '@/lib/ai-gateway/forbidden-free-models';
 
 describe('forbidden free models', () => {
@@ -11,8 +11,8 @@ describe('forbidden free models', () => {
   });
 
   test('matches normalized families for provider metadata', () => {
-    expect(isForbiddenFreeModelFamily('openai/gpt-oss-20b:free')).toBe(true);
-    expect(isForbiddenFreeModelFamily('openai/gpt-oss-20b')).toBe(true);
-    expect(isForbiddenFreeModelFamily('cohere/north-mini-code')).toBe(false);
+    expect(familyHasForbiddenFreeModel('openai/gpt-oss-20b:free')).toBe(true);
+    expect(familyHasForbiddenFreeModel('openai/gpt-oss-20b')).toBe(true);
+    expect(familyHasForbiddenFreeModel('cohere/north-mini-code')).toBe(false);
   });
 });

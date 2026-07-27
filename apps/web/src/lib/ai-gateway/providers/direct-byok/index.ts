@@ -24,6 +24,10 @@ function convertModel(
 ) {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
+  const variants = getModelVariants(id, provider.id);
+  // NVIDIA's hosted endpoints reject reasoning fields on models that do not document
+  // them, so only advertise reasoning where verified reasoning controls exist.
+  const supportsReasoning = provider.id !== 'nvidia-byok' || variants !== undefined;
   return {
     id,
     canonical_slug: id,
@@ -54,13 +58,18 @@ function convertModel(
       is_moderated: false,
     },
     per_request_limits: null,
-    supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
+    supported_parameters: [
+      'max_tokens',
+      'temperature',
+      'tools',
+      ...(supportsReasoning ? ['reasoning', 'include_reasoning'] : []),
+    ],
     default_parameters: {},
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: {
       ai_sdk_provider: getAiSdkProvider(id, provider.id) ?? provider.default_ai_sdk_provider,
-      variants: getModelVariants(id),
+      variants,
     } satisfies OpenCodeSettings,
   };
 }

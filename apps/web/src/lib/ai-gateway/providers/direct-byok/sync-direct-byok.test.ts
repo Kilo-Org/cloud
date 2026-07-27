@@ -1,4 +1,5 @@
 import {
+  parseNvidiaProviderModels,
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,
 } from './sync-direct-byok';
@@ -118,6 +119,134 @@ describe('parseModelsDevProviderModels', () => {
         context_length: undefined,
         max_completion_tokens: undefined,
         input_modalities: undefined,
+      },
+    ]);
+  });
+});
+
+describe('parseNvidiaProviderModels', () => {
+  test('keeps only live tool-capable text models with models.dev metadata', () => {
+    const live = {
+      data: [
+        { id: 'nvidia/chat' },
+        { id: 'nvidia/vision-chat' },
+        { id: 'nvidia/deprecated' },
+        { id: 'nvidia/image-output' },
+        { id: 'nvidia/embed' },
+        { id: 'nvidia/image-input-only' },
+        { id: 'nvidia/live-only' },
+      ],
+    };
+    const modelsDev = {
+      models: {
+        chat: {
+          id: 'nvidia/chat',
+          name: 'NVIDIA Chat',
+          tool_call: true,
+          modalities: { input: ['text'], output: ['text'] },
+          limit: { context: 128_000, output: 16_000 },
+        },
+        visionChat: {
+          id: 'nvidia/vision-chat',
+          name: 'NVIDIA/Vision Chat',
+          tool_call: true,
+          modalities: { input: ['text', 'image'], output: ['text'] },
+          limit: { context: 256_000, output: 32_000 },
+        },
+        deprecated: {
+          id: 'nvidia/deprecated',
+          status: 'deprecated',
+          tool_call: true,
+          modalities: { input: ['text'], output: ['text'] },
+        },
+        imageOutput: {
+          id: 'nvidia/image-output',
+          tool_call: true,
+          modalities: { input: ['text'], output: ['image'] },
+        },
+        embed: {
+          id: 'nvidia/embed',
+          tool_call: false,
+          modalities: { input: ['text'], output: ['text'] },
+        },
+        imageInputOnly: {
+          id: 'nvidia/image-input-only',
+          tool_call: true,
+          modalities: { input: ['image'], output: ['text'] },
+        },
+        metadataOnly: {
+          id: 'nvidia/metadata-only',
+          tool_call: true,
+          modalities: { input: ['text'], output: ['text'] },
+        },
+      },
+    };
+
+    expect(parseNvidiaProviderModels(live, modelsDev)).toEqual([
+      {
+        id: 'nvidia/chat',
+        name: 'NVIDIA Chat',
+        context_length: 128_000,
+        max_completion_tokens: 16_000,
+        input_modalities: ['text'],
+      },
+      {
+        id: 'nvidia/vision-chat',
+        name: 'Vision Chat',
+        context_length: 256_000,
+        max_completion_tokens: 32_000,
+        input_modalities: ['text', 'image'],
+      },
+    ]);
+  });
+
+  test('excludes models whose hosted endpoints reject agent requests', () => {
+    const live = {
+      data: [
+        { id: 'google/gemma-2-2b-it' },
+        { id: 'google/gemma-3n-e2b-it' },
+        { id: 'sarvamai/sarvam-m' },
+        { id: 'qwen/qwen3.5-397b-a17b' },
+      ],
+    };
+    const modelsDev = {
+      models: Object.fromEntries(
+        [
+          'google/gemma-2-2b-it',
+          'google/gemma-3n-e2b-it',
+          'sarvamai/sarvam-m',
+          'qwen/qwen3.5-397b-a17b',
+        ].map(id => [
+          id,
+          { id, tool_call: true, modalities: { input: ['text'], output: ['text'] } },
+        ])
+      ),
+    };
+
+    expect(parseNvidiaProviderModels(live, modelsDev)).toEqual([]);
+  });
+
+  test('applies NVIDIA hosted context limits over catalog metadata', () => {
+    const live = { data: [{ id: 'nvidia/nemotron-mini-4b-instruct' }] };
+    const modelsDev = {
+      models: {
+        mini: {
+          id: 'nvidia/nemotron-mini-4b-instruct',
+          name: 'Nemotron Mini',
+          tool_call: true,
+          modalities: { input: ['text'], output: ['text'] },
+          limit: { context: 128_000, output: 8192 },
+        },
+      },
+    };
+
+    expect(parseNvidiaProviderModels(live, modelsDev)).toEqual([
+      {
+        id: 'nvidia/nemotron-mini-4b-instruct',
+        name: 'Nemotron Mini',
+        context_length: 4096,
+        max_completion_tokens: 8192,
+        input_modalities: ['text'],
       },
     ]);
   });

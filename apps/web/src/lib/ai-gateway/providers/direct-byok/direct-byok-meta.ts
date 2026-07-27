@@ -11,6 +11,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   martian: 'Martian',
   'morph-byok': 'Morph BYOK',
   neuralwatt: 'Neuralwatt',
+  'nvidia-byok': 'NVIDIA',
   'ollama-cloud': 'Ollama Cloud',
   'opencode-go': 'OpenCode Go',
   orcarouter: 'OrcaRouter',

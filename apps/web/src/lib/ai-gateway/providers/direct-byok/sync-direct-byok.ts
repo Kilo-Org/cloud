@@ -2,6 +2,10 @@ import * as z from 'zod';
 import { type DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisClient } from '@/lib/redis';
+import {
+  getNvidiaContextLengthOverride,
+  isNvidiaSupportedModel,
+} from '@/lib/ai-gateway/providers/nvidia';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
@@ -41,6 +45,7 @@ const ModelsDevModelSchema = z.object({
       output: z.array(ModalitySchema).optional(),
     })
     .optional(),
+  tool_call: z.boolean().optional(),
 });
 
 const ModelsDevProviderSchema = z.object({
@@ -48,6 +53,10 @@ const ModelsDevProviderSchema = z.object({
 });
 
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
+
+const NvidiaModelsResponseSchema = z.object({
+  data: z.array(z.object({ id: z.string() })),
+});
 
 type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
@@ -125,6 +134,31 @@ export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
     }));
 }
 
+export function parseNvidiaProviderModels(liveEntry: unknown, modelsDevEntry: unknown): RawModel[] {
+  const liveModelIds = new Set(
+    NvidiaModelsResponseSchema.parse(liveEntry).data.map(model => model.id)
+  );
+  const provider = ModelsDevProviderSchema.parse(modelsDevEntry);
+
+  return Object.values(provider.models)
+    .filter(
+      model =>
+        liveModelIds.has(model.id) &&
+        isNvidiaSupportedModel(model.id) &&
+        model.status !== 'deprecated' &&
+        model.tool_call === true &&
+        model.modalities?.input?.includes('text') === true &&
+        model.modalities?.output?.includes('text') === true
+    )
+    .map(model => ({
+      id: model.id,
+      name: shortenDisplayName(model.name),
+      context_length: getNvidiaContextLengthOverride(model.id) ?? model.limit?.context,
+      max_completion_tokens: model.limit?.output,
+      input_modalities: model.modalities?.input,
+    }));
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   catalogKey: string
@@ -142,6 +176,29 @@ function modelsDevFetcher(
   };
 }
 
+const nvidiaFetcher: ProviderFetcher = {
+  providerId: 'nvidia-byok',
+  async fetch(ctx) {
+    const [response, catalog] = await Promise.all([
+      fetch('https://integrate.api.nvidia.com/v1/models'),
+      ctx.getModelsDevCatalog(),
+    ]);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch NVIDIA models: ${response.status} ${response.statusText}`);
+    }
+    const entry = catalog.nvidia;
+    if (!entry) {
+      throw new Error('models.dev catalog missing nvidia entry');
+    }
+    const models = parseNvidiaProviderModels(await response.json(), entry);
+    if (models.length === 0) {
+      // Throwing keeps the last successful catalog instead of publishing an empty list.
+      throw new Error('NVIDIA catalog intersection produced no supported models');
+    }
+    return models;
+  },
+};
+
 async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
   const response = await fetch('https://models.dev/api.json');
   if (!response.ok) {
@@ -158,6 +215,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
+  nvidiaFetcher,
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
     label: 'Chutes',

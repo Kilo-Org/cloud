@@ -18,6 +18,7 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { kat_coder_pro_v2_5_free_model } from '@/lib/ai-gateway/providers/streamlake';
+import { getNvidiaReasoningEfforts } from '@/lib/ai-gateway/providers/nvidia';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
@@ -80,7 +81,18 @@ export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
   ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
-export function getModelVariants(model: string): OpenCodeSettings['variants'] {
+export function getModelVariants(
+  model: string,
+  directProviderId: DirectUserByokInferenceProviderId | null = null
+): OpenCodeSettings['variants'] {
+  if (directProviderId === 'nvidia-byok') {
+    const efforts = getNvidiaReasoningEfforts(model);
+    return efforts
+      ? Object.fromEntries(
+          efforts.map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
+        )
+      : undefined;
+  }
   if (isClaudeModel(model)) {
     return REASONING_VARIANTS_CLAUDE;
   }
@@ -148,6 +160,9 @@ export function getAiSdkProvider(
     return 'openai-compatible';
   }
   if (directProviderId === 'morph-byok') {
+    return 'openai-compatible';
+  }
+  if (directProviderId === 'nvidia-byok') {
     return 'openai-compatible';
   }
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {

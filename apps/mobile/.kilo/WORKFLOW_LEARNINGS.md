@@ -142,3 +142,9 @@ Then wait event-driven with an `until grep -q EXITCODE= "$LOG"` loop that also b
 - Symptom: PR-review Files tab shows "Pull request unavailable" while Overview loads fine; nextjs logs `githubPrReview.listFiles 404`; stub request log shows every pinned endpoint hit except `/files`.
 - Cause: the stub's pinned surface (REST pull/repo/check-runs/statuses + GraphQL review ops) does not cover `GET /repos/{owner}/{repo}/pulls/{n}/files`, which `listFiles` needs.
 - Workaround (one-off): temporarily add a `/files` handler returning patched-file fixtures, restart the stub tmux session, verify, then restore `server.mjs` byte-identical. Permanent fix (teach the stub `/files` + pagination) is intentionally left out of scope; do it as a dedicated harness change when a run needs Files-tab E2E regularly.
+
+### Worktree slug hashing to port offset 2000 collides with macOS AirPlay Receiver (5000/7000)
+
+- Symptom: `pnpm dev:start` fails with `Refusing to share occupied worktree service ports: nextjs:5000` even with no other dev stack running; `lsof -iTCP:5000` shows `ControlCe` (macOS AirPlay Receiver), which also holds 7000.
+- Cause: `computePortOffset` derives the offset from the worktree slug hash; `expo-sdk57-upgrade` deterministically hashes to offset 2000, so nextjs lands on 3000+2000=5000. Any worktree whose slug buckets to 20 hits this permanently; only `dev:status` reads the offset back from the manifest, so `dev:start`/`dev:restart`/`dev:env` all recompute from the environment.
+- Fix: prefix every port-computing dev command with an explicit collision-free offset, e.g. `KILO_PORT_OFFSET=2100 pnpm dev:start ...` (2100 clears AirPlay: nextjs 5100, metro 10181, wrangler 10889+). `dev:status`/`dev:seed`/`login.sh` are manifest- or DB-driven and need no prefix. Restate the prefix rule in every device-phase handoff; a `dev:restart` without it silently recomputes ports at the hash offset and breaks the stack's URL wiring.

@@ -125,7 +125,9 @@ export const mockKiloApi = async (
     route.fulfill({ json: { organizations: options.organizations ?? [] }, status: 200 })
   );
   await context.route(
-    url => url.pathname.startsWith('/api/trpc/modelPreferences.'),
+    url =>
+      url.origin === 'https://app.kilo.ai' &&
+      url.pathname.startsWith('/api/trpc/modelPreferences.'),
     async route => {
       const requestUrl = route.request().url();
       let pathname = '';

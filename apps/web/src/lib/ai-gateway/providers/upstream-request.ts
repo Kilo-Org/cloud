@@ -22,6 +22,9 @@ type UpstreamFetchFailureFamily =
   | 'abort'
   | 'unknown';
 
+// Longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout.
+const TIMEOUT_MS = 15 * 60 * 1000;
+
 function getProviderTargetHost(apiUrl: string): string {
   try {
     return new URL(apiUrl).host;
@@ -136,8 +139,34 @@ function classifyUpstreamFetchFailure({
   }
 }
 
-function upstreamDisconnectResponse() {
-  const error = 'The upstream provider disconnected before sending a response.';
+/**
+ * The client going away also aborts our upstream fetch, so the abort has to be
+ * attributed to the client rather than reported as an upstream fault. The body
+ * is mostly for logs and observability: the client that would read it is gone.
+ * 499 mirrors the nginx convention so these cancellations do not show up as
+ * upstream 5xx failures.
+ */
+function clientDisconnectResponse() {
+  const error =
+    'The client disconnected before the upstream provider responded, so the request was cancelled. The upstream provider did not fail.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.client_disconnect,
+      message: error,
+    },
+    { status: 499 }
+  );
+}
+
+function upstreamFetchFailureResponse(failureFamily: UpstreamFetchFailureFamily) {
+  const error =
+    failureFamily === 'request_timeout' ||
+    failureFamily === 'headers_timeout' ||
+    failureFamily === 'connect_timeout' ||
+    failureFamily === 'read_timeout'
+      ? 'The upstream provider did not send response headers before the gateway timeout.'
+      : 'The upstream provider closed the connection before sending a response.';
   return NextResponse.json(
     {
       error,
@@ -178,10 +207,11 @@ export async function upstreamRequest({
 
   const targetUrl = `${provider.apiUrl}${path}${search}`;
 
-  const TIMEOUT_MS = 15 * 60 * 1000; // longer than Vercel AI Gateway's 13min timeout, shorter than Vercel Function's 30min timeout
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
-    errorExceptInTest('[upstreamRequest] timeout');
+    errorExceptInTest(
+      `[upstreamRequest] gateway timeout after ${TIMEOUT_MS}ms waiting for upstream response headers`
+    );
   };
   timeoutSignal.addEventListener('abort', onTimeoutAbort);
   after(() => {
@@ -202,6 +232,12 @@ export async function upstreamRequest({
       }),
     };
   } catch (error) {
+    // The caller passes the incoming request signal, so a client that goes away
+    // aborts this fetch as well. Those aborts are client-side cancellations and
+    // must not be reported (or alerted on) as upstream failures.
+    const clientDisconnected = signal?.aborted === true;
+    // Stays `undefined` when diagnostic enrichment below throws before classifying.
+    let failureFamily: UpstreamFetchFailureFamily | undefined;
     try {
       const cause = error instanceof Error ? error.cause : undefined;
       const errorName = getErrorName(error);
@@ -209,7 +245,7 @@ export async function upstreamRequest({
       const causeCode = getCauseCode(cause);
       const causeName = getCauseName(cause);
       const causeMessage = getCauseMessage(cause);
-      const failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
+      failureFamily = classifyUpstreamFetchFailure({ errorName, causeCode, causeName });
       const failureMetadata = {
         providerId: provider.id,
         targetHost: getProviderTargetHost(provider.apiUrl),
@@ -222,7 +258,7 @@ export async function upstreamRequest({
         ...(causeMessage && { causeMessage }),
       };
 
-      if (!(failureFamily === 'abort' && signal?.aborted)) {
+      if (!(failureFamily === 'abort' && clientDisconnected)) {
         errorExceptInTest('AI gateway upstream fetch failed', failureMetadata);
         captureException(createLoggedFetchFailure(errorName, errorMessage), {
           level: 'error',
@@ -238,7 +274,15 @@ export async function upstreamRequest({
       // Fetch failure must remain caller-visible even when diagnostic enrichment fails.
     }
 
-    return { type: 'error', response: upstreamDisconnectResponse() };
+    const causedByClientDisconnect =
+      clientDisconnected && (failureFamily === 'abort' || failureFamily === undefined);
+
+    return {
+      type: 'error',
+      response: causedByClientDisconnect
+        ? clientDisconnectResponse()
+        : upstreamFetchFailureResponse(failureFamily ?? 'unknown'),
+    };
   }
 }
 

@@ -257,12 +257,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const machineIdHeader = extractHeaderAndLimitLength(request, 'x-kilocode-machineid');
 
   const logClientDisconnect = () => {
-    console.log('AI gateway client disconnected, requested model: %s', requestedModelLowerCased, {
-      path,
-      elapsed_ms: Math.round(performance.now() - requestStartedAt),
-      client_request_id: clientRequestId,
-      session_id: taskId ?? sessionHeader,
-    });
+    // The request signal is forwarded to the upstream fetch and to the response
+    // stream reader, so this disconnect also aborts them. Any abort/cancellation
+    // logged for this request after this line is a consequence of the client
+    // going away, not an upstream provider failure.
+    console.log(
+      'AI gateway client disconnected (aborting in-flight upstream work for this request), requested model: %s',
+      requestedModelLowerCased,
+      {
+        path,
+        elapsed_ms: Math.round(performance.now() - requestStartedAt),
+        client_request_id: clientRequestId,
+        session_id: taskId ?? sessionHeader,
+      }
+    );
   };
   if (request.signal.aborted) {
     logClientDisconnect();

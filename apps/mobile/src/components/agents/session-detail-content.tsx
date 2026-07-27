@@ -29,6 +29,7 @@ import {
   SessionContextMetrics,
 } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import {
   buildRemoteAttachmentPartsWithRetryableFeedback,
@@ -141,6 +142,10 @@ export function SessionDetailContent({
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
+  const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
+    fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
+    totalCost
+  );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -230,7 +235,7 @@ export function SessionDetailContent({
   const headerRight = contextInfo ? (
     <SessionContextMetrics
       info={contextInfo}
-      totalCost={totalCost}
+      totalCostMicrodollars={totalMicrodollars}
       onPress={() => {
         setOpenContextSheetIdentity({
           sessionId,
@@ -240,7 +245,7 @@ export function SessionDetailContent({
       }}
     />
   ) : (
-    <SessionContextCostFallback totalCost={totalCost} />
+    <SessionContextCostFallback totalCostMicrodollars={totalMicrodollars} />
   );
   const sheetMountState = getContextSheetMountState(
     contextInfo,
@@ -692,7 +697,8 @@ export function SessionDetailContent({
           info={sheetMountState.info}
           modelDisplay={contextModelAndProvider.model}
           providerDisplay={contextModelAndProvider.provider}
-          totalCost={totalCost}
+          totalCostMicrodollars={totalMicrodollars}
+          breakdownCostUsd={breakdownCostUsd}
           messages={messages}
           modelOptions={modelOptions}
           onClose={() => {

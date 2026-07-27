@@ -34,7 +34,8 @@ type SessionContextSheetProps = {
   info: SessionContextInfo;
   modelDisplay: string;
   providerDisplay: string;
-  totalCost: number;
+  totalCostMicrodollars: number | null;
+  breakdownCostUsd: number;
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
   onClose: () => void;
@@ -59,18 +60,19 @@ export function SessionContextSheet({
   info,
   modelDisplay,
   providerDisplay,
-  totalCost,
+  totalCostMicrodollars,
+  breakdownCostUsd,
   messages,
   modelOptions,
   onClose,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
-  const content = getContextSheetContent(info, totalCost);
+  const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info.percentage);
   const arcFraction = getArcFraction(info.percentage);
   const breakdown = useMemo<SessionCostBreakdown>(
-    () => getSessionCostBreakdown(messages, totalCost),
-    [messages, totalCost]
+    () => getSessionCostBreakdown(messages, breakdownCostUsd),
+    [messages, breakdownCostUsd]
   );
   // Render-only filter: totals/subagent residual still use the full breakdown.
   const visibleModels = useMemo(
@@ -147,11 +149,13 @@ export function SessionContextSheet({
               <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
             </Row>
 
-            <Row label="Total cost">
-              <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.cost}
-              </Text>
-            </Row>
+            {content.cost !== null ? (
+              <Row label="Total cost">
+                <Text className="text-base font-medium text-foreground tabular-nums">
+                  {content.cost}
+                </Text>
+              </Row>
+            ) : null}
 
             <Text className="text-xs text-muted-foreground">
               Usage reflects the latest completed assistant response.

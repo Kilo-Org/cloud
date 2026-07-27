@@ -32,12 +32,23 @@ const providerRaceSchema = z.array(
   z.object({
     weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     provider: z.string().min(1),
-    isOpenWeights: z.boolean(),
+    isOpenWeights: z.boolean().nullable(),
     tokens: z.number(),
   })
 );
 
 type ProviderRace = z.infer<typeof providerRaceSchema>;
+
+// is_open_weights is maintained in the dbt model_dim seed and is NULL for
+// unmapped models (the ones bucketed as provider = 'other'). Only the explicit
+// 'true'/'false' strings map to a boolean; anything else (NULL from the SQL API,
+// or a future mapping gap) becomes null so the client can distinguish "unknown"
+// from a confirmed closed-weight lab instead of silently bucketing gaps as closed.
+function parseOpenWeights(raw: string): boolean | null {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return null;
+}
 
 function parseProviderRace(rows: string[][]): ProviderRace {
   return rows.map(row => {
@@ -51,7 +62,7 @@ function parseProviderRace(rows: string[][]): ProviderRace {
     return providerRaceSchema.element.parse({
       weekStart,
       provider,
-      isOpenWeights: rawOpenWeights === 'true' || rawOpenWeights === true,
+      isOpenWeights: parseOpenWeights(rawOpenWeights),
       tokens,
     });
   });

@@ -41,6 +41,7 @@ import {
   openRouterToVercelInferenceProviderId,
   VercelInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { applyFreeEndpointDataPolicy } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -235,6 +236,7 @@ function injectExtraProviderModels(
 
 async function syncProviders(
   providers: OpenRouterProvider[],
+  openRouterModels: Record<string, StoredModel>,
   vercelModels: Record<string, StoredModel>
 ) {
   if (providers.length === 0) {
@@ -295,6 +297,9 @@ async function syncProviders(
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
+            ...(!kfm.pricing && {
+              data_policy: { training: true, retainsPrompts: true },
+            }),
           },
         },
         provider: inferenceProvider,
@@ -312,6 +317,12 @@ async function syncProviders(
       providerData.models.splice(0, 0, extraModel.model);
     }
   }
+
+  applyFreeEndpointDataPolicy({
+    providerModelData,
+    openRouterModels,
+    kiloExclusiveModels,
+  });
 
   // Filter out providers with no models
   const filteredProviderModelData = providerModelData.filter(data => data.models.length > 0);
@@ -498,7 +509,7 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const providers = await syncProviders(openrouterProviders, vercel_data);
+  const providers = await syncProviders(openrouterProviders, openrouter_data, vercel_data);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

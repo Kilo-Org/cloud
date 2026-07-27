@@ -390,7 +390,7 @@ importers:
         specifier: 55.0.18
         version: 55.0.18(expo@55.0.27)
       expo-linear-gradient:
-        specifier: ~55.0.15
+        specifier: ~55.0.16
         version: 55.0.16(expo@55.0.27)(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-linking:
         specifier: 55.0.16

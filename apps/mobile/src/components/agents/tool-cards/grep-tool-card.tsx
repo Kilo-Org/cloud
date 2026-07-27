@@ -1,9 +1,9 @@
-import { ScrollView } from 'react-native';
 import { FileSearch } from 'lucide-react-native';
 import { type ToolPart } from 'cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
 
 function countOutputLines(output: string): number {
@@ -38,11 +38,7 @@ export function GrepToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
     >
       {output ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Text selectable className="font-mono text-xs leading-4 text-foreground">
-            {output.slice(0, 2000)}
-          </Text>
-        </ScrollView>
+        <MonoScrollBlock content={output} maxLength={2000} textClassName="text-foreground" />
       ) : null}
       {error ? (
         <Text selectable className="text-xs text-destructive">

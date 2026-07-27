@@ -56,7 +56,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -69,7 +69,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
@@ -957,16 +956,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  await handleRequestLogging({
-    clonedResponse: response.clone(),
+  const requestLogging = {
     user: maybeUser,
     organization_id: organizationId || null,
-    provider: effectiveProviderContext.provider.id,
-    model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
     vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
     request: requestBodyParsed,
-  });
+  };
 
   {
     const errorResponse = await makeErrorReadable({
@@ -977,6 +973,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
+      await logUnrewrittenResponse(
+        response,
+        effectiveModelIdLowerCased,
+        effectiveProviderContext.provider.id,
+        requestLogging
+      );
       return errorResponse;
     }
   }
@@ -986,7 +988,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
     requestBodyParsed.kind,
-    organizationId
+    requestLogging
   );
   if (rewrittenResponse) {
     return rewrittenResponse;

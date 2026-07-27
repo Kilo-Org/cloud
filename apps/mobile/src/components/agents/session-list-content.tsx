@@ -1,7 +1,15 @@
 import { useScrollToTop } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 import { Bot, Plus } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -18,6 +26,7 @@ import {
   selectSessionListBodyModel,
   type SessionListBodyModel,
 } from '@/components/agents/session-list-body-model';
+import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
@@ -62,6 +71,12 @@ type AgentSessionListContentProps = {
   onClearQuery: () => void;
   onCreateSession: () => void;
   sortBy: AgentSessionSortBy;
+  /**
+   * Pinned "Active now" tray rendered as `ListHeaderComponent` so it scrolls
+   * with history in one continuous gesture. Not a virtualized cell — Reanimated
+   * layout transitions on the tray keep working. Pass `null` when empty.
+   */
+  activeNowSection: ReactElement | null;
 };
 
 export function AgentSessionListContent({
@@ -82,6 +97,7 @@ export function AgentSessionListContent({
   onClearQuery,
   onCreateSession,
   sortBy,
+  activeNowSection,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<SectionList<StoredSession, SessionSection>>(null);
   useScrollToTop(listRef);
@@ -127,6 +143,18 @@ export function AgentSessionListContent({
         activeIsError,
       }),
     [activeIsError, hasActiveQuery, hasHistoryContent, hasPinnedActive, isError, isSearching]
+  );
+
+  const surface = useMemo(
+    () =>
+      selectSessionListContentSurface({
+        isLoading,
+        isError,
+        hasAnySessions,
+        hasPinnedActive,
+        hasHistoryContent,
+      }),
+    [hasAnySessions, hasHistoryContent, hasPinnedActive, isError, isLoading]
   );
 
   const emptyStateAction = useMemo(
@@ -201,23 +229,12 @@ export function AgentSessionListContent({
 
   const keyExtractor = useCallback((item: StoredSession) => item.session_id, []);
 
-  if (isLoading) {
-    return (
-      <Animated.View exiting={FadeOut.duration(150)}>
-        {Array.from({ length: 8 }, (_, i) => (
-          <View key={i} className="py-1.5">
-            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
-          </View>
-        ))}
-      </Animated.View>
-    );
-  }
-
   // Full-screen error only when there is nothing cached to fall back on —
   // a background refetch/search failure with stale sessions already in
   // cache (keepPreviousData) must never blank out what's already rendered.
   // A populated tray counts as "something on screen" and also suppresses.
-  if (isError && !hasAnySessions && !hasPinnedActive) {
+  // Gated on !isLoading so a cold-open load never flashes this surface.
+  if (surface.kind === 'full-screen-error') {
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
@@ -232,8 +249,9 @@ export function AgentSessionListContent({
   // The screen gates the search header on `hasAnySessions` to keep the
   // first-use "No sessions yet" empty state chrome-free, so when the user
   // has no sessions at all we skip the SectionList entirely here and just
-  // render the empty state.
-  if (!hasAnySessions) {
+  // render the empty state. Gated on !isLoading (via surface) so a cold
+  // open with an empty cache does not flash this while queries run.
+  if (surface.kind === 'first-use-empty') {
     return (
       <Animated.View
         entering={FadeIn.duration(200)}
@@ -250,8 +268,22 @@ export function AgentSessionListContent({
     );
   }
 
-  let emptyComponent: React.ReactNode = null;
-  if (bodyModel.kind !== 'render-list') {
+  // Single SectionList render site: tray stays in ListHeaderComponent across
+  // loading → rows so ActiveNowSection's local expanded state is not reset.
+  // While loading, sections are empty and skeletons fill ListEmptyComponent
+  // under the tray (active query may already have resolved).
+  let emptyComponent: ReactNode = null;
+  if (surface.listEmpty === 'loading-skeletons') {
+    emptyComponent = (
+      <Animated.View exiting={FadeOut.duration(150)}>
+        {Array.from({ length: 8 }, (_, i) => (
+          <View key={i} className="py-1.5">
+            <Skeleton className="mx-[22px] h-[76px] rounded-none" />
+          </View>
+        ))}
+      </Animated.View>
+    );
+  } else if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
     emptyComponent = (
       <BodyEmpty
         kind={bodyModel.kind}
@@ -276,6 +308,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
+        ListHeaderComponent={activeNowSection}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (

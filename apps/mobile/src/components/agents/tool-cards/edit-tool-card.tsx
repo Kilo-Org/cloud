@@ -1,11 +1,12 @@
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { Pencil } from 'lucide-react-native';
 import { type ToolPart } from 'cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 
+import { MonoScrollBlock } from '../mono-scroll-block';
 import { ToolCardShell } from '../tool-card-shell';
-import { getFilename, truncateText } from '../tool-card-utils';
+import { getFilename } from '../tool-card-utils';
 
 export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const input = part.state.input;
@@ -23,28 +24,20 @@ export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
       {hasChanges ? (
         <View className="gap-2">
           {oldString.length > 0 ? (
-            <View className="rounded bg-red-50 px-2 py-1 dark:bg-red-950">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <Text
-                  selectable
-                  className="font-mono text-xs leading-4 text-red-700 dark:text-red-400"
-                >
-                  {truncateText(oldString, 1000)}
-                </Text>
-              </ScrollView>
-            </View>
+            <MonoScrollBlock
+              content={oldString}
+              maxLength={1000}
+              containerClassName="rounded bg-red-50 px-2 py-1 dark:bg-red-950"
+              textClassName="text-red-700 dark:text-red-400"
+            />
           ) : null}
           {newString.length > 0 ? (
-            <View className="rounded bg-green-50 px-2 py-1 dark:bg-green-950">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <Text
-                  selectable
-                  className="font-mono text-xs leading-4 text-green-700 dark:text-green-400"
-                >
-                  {truncateText(newString, 1000)}
-                </Text>
-              </ScrollView>
-            </View>
+            <MonoScrollBlock
+              content={newString}
+              maxLength={1000}
+              containerClassName="rounded bg-green-50 px-2 py-1 dark:bg-green-950"
+              textClassName="text-green-700 dark:text-green-400"
+            />
           ) : null}
         </View>
       ) : null}

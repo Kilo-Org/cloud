@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Container } from '@cloudflare/containers';
 import { ContainerUsageClient } from './client';
-import { getBillingContext, setBillingContext, type BillingContextStorage } from './context';
+import {
+  getBillingContext,
+  setBillingContext,
+  updateBillingContext,
+  type BillingContextStorage,
+} from './context';
 import type { ContainerUsageRpcMethods, HeartbeatAck, RecordAck } from './contracts';
 import { BILLING_HEARTBEAT_CALLBACK, installBillingHeartbeat } from './heartbeat';
 
@@ -244,6 +249,169 @@ describe('installBillingHeartbeat', () => {
       expect(recordStop).toHaveBeenCalledWith(
         expect.objectContaining({ reason: 'runtime_signal', usageSinceLast: 9 })
       );
+      expect(await getBillingContext(storage)).toBeUndefined();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('uses the container transition time when stopped state is detected late', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+            budget: { verdict: 'continue' },
+          }),
+          recordStop,
+        },
+        { service: 'cloud-agent-next' }
+      );
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: 2_000 })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client,
+          storage,
+          stopOnStoppedState: false,
+          stoppedStateGraceSeconds: 900,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      now.mockReturnValue(10_000);
+      await controller.billingHeartbeatTick();
+      expect((await getBillingContext(storage))?.stoppedObservedAtMs).toBe(2_000);
+      now.mockReturnValue(902_000);
+      await controller.billingHeartbeatTick();
+
+      expect(recordStop).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'runtime_signal', usageSinceLast: 1 })
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('delivers a pending heartbeat before the final stop remainder', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const context = await getBillingContext(storage);
+      if (!context) throw new Error('Expected billing context');
+      await updateBillingContext(storage, {
+        ...context,
+        pendingHeartbeat: { seq: 1, usageSinceLast: 4, measuredAtMs: 5_000 },
+      });
+      const recordHeartbeat = vi.fn<ContainerUsageRpcMethods['recordHeartbeat']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+        budget: { verdict: 'continue' },
+      }));
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async input => ({
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg',
+        dedup: false,
+      }));
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat,
+          recordStop,
+        },
+        { service: 'cloud-agent-next' }
+      );
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        { client, storage, enforceBudgetStop: vi.fn() }
+      );
+
+      await controller.persistStop({ reason: 'exit', exitCode: 0 }, 7_000);
+      await controller.recordStop({ reason: 'exit', exitCode: 0 }, 7_000);
+
+      expect(recordHeartbeat).toHaveBeenCalledWith(
+        expect.objectContaining({ seq: 1, usageSinceLast: 4 })
+      );
+      expect(recordStop).toHaveBeenCalledWith(
+        expect.objectContaining({ seq: 2, usageSinceLast: 2, reason: 'exit' })
+      );
+      expect(recordHeartbeat.mock.invocationCallOrder[0]).toBeLessThan(
+        recordStop.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+      );
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('abandons a failed authoritative stop after its captured cutoff', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const storage = memoryStorage();
+      await storedContext(storage);
+      const recordStop = vi.fn<ContainerUsageRpcMethods['recordStop']>(async () => {
+        throw new Error('meter unavailable');
+      });
+      const client = new ContainerUsageClient(
+        {
+          recordStart: async () => ({
+            success: true,
+            ack: { intervalId: 'instance-1:123', durable: 'pg', dedup: false },
+          }),
+          recordHeartbeat: async () => ({
+            intervalId: 'instance-1:123',
+            durable: 'pg',
+            dedup: false,
+            budget: { verdict: 'continue' },
+          }),
+          recordStop,
+        },
+        { service: 'cloud-agent-next', retry: { attempts: 1 } }
+      );
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client,
+          storage,
+          stoppedStateAbandonSeconds: 3_600,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      await controller.persistStop({ reason: 'exit', exitCode: 1 }, 10_000);
+
+      now.mockReturnValue(3_610_000);
+      await controller.billingHeartbeatTick();
+
+      expect(recordStop).toHaveBeenCalledOnce();
       expect(await getBillingContext(storage)).toBeUndefined();
     } finally {
       now.mockRestore();

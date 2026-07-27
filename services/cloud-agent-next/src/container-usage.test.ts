@@ -118,7 +118,11 @@ type TestRuntime = MeteredSandbox & {
 function createSandbox(
   rpc = createRpc(),
   containerRunning = false,
-  sandboxClassName: 'SandboxSmallContainment' | 'SandboxDIND' = 'SandboxSmallContainment'
+  sandboxClassName:
+    | 'Sandbox'
+    | 'SandboxContainment'
+    | 'SandboxSmallContainment'
+    | 'SandboxDIND' = 'SandboxSmallContainment'
 ) {
   const storage = new MemoryStorage();
   const shadowTasks: Promise<unknown>[] = [];
@@ -129,7 +133,9 @@ function createSandbox(
     waitUntil: (promise: Promise<unknown>) => shadowTasks.push(promise),
   } as unknown as SandboxDurableObjectState;
   class TestSandbox extends MeteredSandbox {
-    protected readonly sandboxClassName = sandboxClassName;
+    protected get sandboxClassName() {
+      return sandboxClassName;
+    }
 
     setPhysicalRunning(running: boolean): void {
       if (this.ctx.container) {
@@ -226,7 +232,7 @@ describe('MeteredSandbox', () => {
 
     expect(rpc.recordStart).toHaveBeenCalledWith(
       expect.objectContaining({
-        service: 'cloud-agent-next',
+        service: 'cloud-agent-next-sandbox-dind',
         instanceId: 'dind-abcdef',
         sku: 'cloud-agent-dind-2026-07',
         subject: { type: 'org', id: 'org_1' },
@@ -237,6 +243,40 @@ describe('MeteredSandbox', () => {
           durable_object_id: 'do-id',
           origin: 'cloud-agent',
         },
+      })
+    );
+  });
+
+  it('uses distinct recorder services for standard and containment namespaces', async () => {
+    const standardRpc = createRpc();
+    const containmentRpc = createRpc();
+    const standard = createSandbox(standardRpc, false, 'Sandbox');
+    const containment = createSandbox(containmentRpc, false, 'SandboxContainment');
+    const sharedInput = {
+      sandboxId: 'usr-abcdef' as const,
+      subject: { type: 'user' as const, id: 'user_1' },
+      actor: { type: 'user' as const, id: 'user_1' },
+    };
+    await standard.sandbox.configureBilling(sharedInput);
+    await containment.sandbox.configureBilling(sharedInput);
+    standard.sandbox.mockState = { status: 'healthy' };
+    containment.sandbox.mockState = { status: 'healthy' };
+
+    await standard.sandbox.onStart();
+    await containment.sandbox.onStart();
+    await standard.flushShadowTasks();
+    await containment.flushShadowTasks();
+
+    expect(standardRpc.recordStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: 'cloud-agent-next-sandbox',
+        instanceId: 'usr-abcdef',
+      })
+    );
+    expect(containmentRpc.recordStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: 'cloud-agent-next-sandbox-containment',
+        instanceId: 'usr-abcdef',
       })
     );
   });
@@ -286,11 +326,11 @@ describe('MeteredSandbox', () => {
     await flushShadowTasks();
     const active = await getBillingContext(storage);
     if (!active) throw new Error('Expected active billing context');
-    await updateBillingContext(storage, { ...active, stoppedObservedAtMs: 10_000 });
 
     now.mockReturnValue(500_000);
     sandbox.setPhysicalRunning(false);
     sandbox.mockState = { status: 'stopped' };
+    Object.assign(sandbox.mockState, { lastChange: 10_000 });
     await sandbox.configureBilling(billingInput);
 
     expect(rpc.recordStop).toHaveBeenCalledWith(
@@ -397,6 +437,36 @@ describe('MeteredSandbox', () => {
 
     expect((await getBillingContext(storage))?.generation).toBe(first?.generation);
     expect(rpc.recordStart).toHaveBeenCalledOnce();
+  });
+
+  it('starts a running replacement after the prior pending stop is recovered', async () => {
+    const rpc = createRpc();
+    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
+    await sandbox.configureBilling(billingInput);
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    const first = await getBillingContext(storage);
+    if (!first) throw new Error('Expected first billing generation');
+
+    vi.mocked(rpc.recordStop).mockRejectedValue(new Error('meter unavailable'));
+    await sandbox.onStop({ reason: 'exit', exitCode: 1 });
+    await flushShadowTasks();
+    await sandbox.configureBilling({ ...billingInput, sessionId: 'agent_2' });
+    sandbox.mockState = { status: 'healthy' };
+    await sandbox.onStart();
+    await flushShadowTasks();
+    expect((await getBillingContext(storage))?.generation).toBe(first.generation);
+
+    vi.mocked(rpc.recordStop).mockResolvedValue(ack());
+    await sandbox.billingHeartbeatTick(first.generation);
+    await flushShadowTasks();
+    await flushShadowTasks();
+
+    const second = await getBillingContext(storage);
+    expect(second?.generation).not.toBe(first.generation);
+    expect(second?.sessionId).toBe('agent_2');
+    expect(rpc.recordStart).toHaveBeenCalledTimes(2);
   });
 
   it('does not replace an unmeasured generation when stop recovery fails', async () => {

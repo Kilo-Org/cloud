@@ -28,6 +28,7 @@ export type BillingHeartbeatDependencies = {
   stoppedStateAbandonSeconds?: number;
   beforeHeartbeatDelivery?: (context: BillingContext) => Promise<void>;
   beforeStopDelivery?: (context: BillingContext) => Promise<void>;
+  onGenerationClosed?: (context: BillingContext) => void;
   enforceBudgetStop: (
     budget: BudgetVerdict,
     expected: { generation: string; startEpochMs: number }
@@ -46,10 +47,13 @@ export type BillingHeartbeatController = {
     usageEndedAtMs?: number
   ) => Promise<RecordAck | undefined>;
   cancelHeartbeat: () => void;
-  persistStop: (params: {
-    reason: 'exit' | 'runtime_signal' | 'activity_expired';
-    exitCode?: number;
-  }) => Promise<BillingContext | undefined>;
+  persistStop: (
+    params: {
+      reason: 'exit' | 'runtime_signal' | 'activity_expired';
+      exitCode?: number;
+    },
+    usageEndedAtMs?: number
+  ) => Promise<BillingContext | undefined>;
 };
 
 function contextForHeartbeat(context: BillingContext) {
@@ -118,8 +122,17 @@ export function installBillingHeartbeat(
     return true;
   };
 
+  const contextAfterPendingHeartbeat = (context: BillingContext): BillingContext => {
+    if (!context.pendingHeartbeat) return context;
+    return {
+      ...context,
+      nextSeq: context.pendingHeartbeat.seq + 1,
+      usageMeasuredAtMs: context.pendingHeartbeat.measuredAtMs,
+      pendingHeartbeat: undefined,
+    };
+  };
+
   const computeStopSegment = (context: BillingContext, usageEndedAtMs: number) => {
-    if (context.pendingHeartbeat) return context.pendingHeartbeat;
     const elapsedMs = Math.max(0, usageEndedAtMs - context.usageMeasuredAtMs);
     const usageSinceLast = Math.floor(elapsedMs / 1_000);
     return {
@@ -127,6 +140,32 @@ export function installBillingHeartbeat(
       usageSinceLast,
       measuredAtMs: context.usageMeasuredAtMs + usageSinceLast * 1_000,
     };
+  };
+
+  const acknowledgePendingHeartbeat = async (context: BillingContext): Promise<BillingContext> => {
+    const pendingHeartbeat = context.pendingHeartbeat;
+    if (!pendingHeartbeat) return context;
+    await dependencies.beforeHeartbeatDelivery?.(context);
+    await dependencies.client.recordHeartbeat({
+      instanceId: context.instanceId,
+      startEpochMs: context.startEpochMs,
+      seq: pendingHeartbeat.seq,
+      usageSinceLast: pendingHeartbeat.usageSinceLast,
+      context: contextForHeartbeat(context),
+    });
+    const current = await getBillingContext(dependencies.storage);
+    if (!current || !isSameBillingGeneration(current, context)) return context;
+    if (
+      !current.pendingHeartbeat ||
+      current.pendingHeartbeat.seq !== pendingHeartbeat.seq ||
+      current.pendingHeartbeat.measuredAtMs !== pendingHeartbeat.measuredAtMs ||
+      current.pendingHeartbeat.usageSinceLast !== pendingHeartbeat.usageSinceLast
+    ) {
+      return current;
+    }
+    const updated = contextAfterPendingHeartbeat(current);
+    await updateBillingContext(dependencies.storage, updated);
+    return updated;
   };
 
   const recordStopForGeneration = async (
@@ -140,15 +179,17 @@ export function installBillingHeartbeat(
       return undefined;
     }
     if (!context.pendingStop) {
-      const stopSegment = computeStopSegment(context, usageEndedAtMs);
+      const stopSegment = computeStopSegment(contextAfterPendingHeartbeat(context), usageEndedAtMs);
       await updateBillingContext(dependencies.storage, {
         ...context,
+        stoppedObservedAtMs: context.stoppedObservedAtMs ?? usageEndedAtMs,
         pendingStop: { ...params, ...stopSegment },
       });
       const current = await getBillingContext(dependencies.storage);
       if (!current || !isSameBillingGeneration(current, context)) return undefined;
       context = current;
     }
+    context = await acknowledgePendingHeartbeat(context);
     const stopIntent = context.pendingStop;
     if (!stopIntent) throw new Error('Billing stop intent was not persisted');
     await dependencies.beforeStopDelivery?.(context);
@@ -165,19 +206,27 @@ export function installBillingHeartbeat(
     if (!current || !isSameBillingGeneration(current, context)) return ack;
     cancelHeartbeat();
     await clearBillingContext(dependencies.storage);
+    dependencies.onGenerationClosed?.(context);
     return ack;
   };
 
   const recordStop: BillingHeartbeatController['recordStop'] = (params, usageEndedAtMs) =>
     runLifecycleExclusive(() => recordStopForGeneration(params, undefined, usageEndedAtMs));
 
-  const persistStop: BillingHeartbeatController['persistStop'] = params =>
+  const persistStop: BillingHeartbeatController['persistStop'] = (
+    params,
+    usageEndedAtMs = Date.now()
+  ) =>
     runLifecycleExclusive(async () => {
       const context = await getBillingContext(dependencies.storage);
       if (!context) return undefined;
       if (context.pendingStop) return context;
-      const stopSegment = computeStopSegment(context, Date.now());
-      const updated = { ...context, pendingStop: { ...params, ...stopSegment } };
+      const stopSegment = computeStopSegment(contextAfterPendingHeartbeat(context), usageEndedAtMs);
+      const updated = {
+        ...context,
+        stoppedObservedAtMs: context.stoppedObservedAtMs ?? usageEndedAtMs,
+        pendingStop: { ...params, ...stopSegment },
+      };
       await updateBillingContext(dependencies.storage, updated);
       return updated;
     });
@@ -199,6 +248,7 @@ export function installBillingHeartbeat(
         ) {
           cancelHeartbeat();
           await clearBillingContext(dependencies.storage);
+          dependencies.onGenerationClosed?.(context);
           return;
         }
         await rescheduleIfCurrent(context);
@@ -219,7 +269,13 @@ export function installBillingHeartbeat(
     context = currentAfterState;
     if (state.status === 'stopped' || state.status === 'stopped_with_code') {
       if (dependencies.stopOnStoppedState === false) {
-        const stoppedObservedAtMs = context.stoppedObservedAtMs ?? Date.now();
+        const observedAtMs = Date.now();
+        const stateLastChange = Number.isFinite(state.lastChange) ? state.lastChange : observedAtMs;
+        const stoppedObservedAtMs =
+          context.stoppedObservedAtMs ??
+          (stateLastChange >= 0 && stateLastChange <= observedAtMs
+            ? stateLastChange
+            : observedAtMs);
         if (context.stoppedObservedAtMs === undefined) {
           context = { ...context, stoppedObservedAtMs };
           await updateBillingContext(dependencies.storage, context);
@@ -245,6 +301,7 @@ export function installBillingHeartbeat(
         ) {
           cancelHeartbeat();
           await clearBillingContext(dependencies.storage);
+          dependencies.onGenerationClosed?.(context);
           return;
         }
         await rescheduleIfCurrent(context);

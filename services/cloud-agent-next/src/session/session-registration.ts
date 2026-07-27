@@ -27,12 +27,7 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import {
-  generateSandboxRoutingTarget,
-  isOrgInList,
-  selectSandboxForNewSession,
-  type SandboxSelection,
-} from '../sandbox-id.js';
+import { generateSandboxRoutingTarget, isOrgInList, type SandboxSelection } from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
@@ -200,16 +195,8 @@ async function allocateNewSession(
         ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
       };
     } else {
-      const selection = await selectSandboxForNewSession({
-        env: ctx.env,
-        orgId,
-        userId: ctx.userId,
-        sessionId: cloudAgentSessionId,
-        botId: ctx.botId,
-        devcontainer: input.runtime?.devcontainer,
-      });
-      sandboxId = selection.sandboxId;
-      sandboxProvider = selection.provider;
+      sandboxId = target.sandboxId;
+      sandboxProvider = 'cloudflare';
     }
   } catch (error) {
     await recordCloudAgentSessionFailure(

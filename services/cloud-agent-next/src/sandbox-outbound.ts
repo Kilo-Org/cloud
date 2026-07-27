@@ -662,31 +662,41 @@ const managedScmOutboundHandlers = {
 };
 
 export class Sandbox extends MeteredSandbox {
-  protected readonly sandboxClassName: SandboxClassName = 'Sandbox';
+  protected get sandboxClassName(): SandboxClassName {
+    return 'Sandbox';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
 export class SandboxSmall extends MeteredSandbox {
-  protected readonly sandboxClassName: SandboxClassName = 'SandboxSmall';
+  protected get sandboxClassName(): SandboxClassName {
+    return 'SandboxSmall';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
 export class SandboxDIND extends MeteredSandbox {
-  protected readonly sandboxClassName: SandboxClassName = 'SandboxDIND';
+  protected get sandboxClassName(): SandboxClassName {
+    return 'SandboxDIND';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
 export class SandboxCodeReview extends MeteredSandbox {
-  protected readonly sandboxClassName: SandboxClassName = 'SandboxCodeReview';
+  protected get sandboxClassName(): SandboxClassName {
+    return 'SandboxCodeReview';
+  }
   enableInternet = true;
   interceptHttps = false;
 }
 
 export class SandboxContainment extends Sandbox {
-  protected override readonly sandboxClassName: SandboxClassName = 'SandboxContainment';
+  protected override get sandboxClassName(): SandboxClassName {
+    return 'SandboxContainment';
+  }
   interceptHttps = true;
 }
 // Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
@@ -695,13 +705,17 @@ export class SandboxContainment extends Sandbox {
 SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export class SandboxSmallContainment extends SandboxSmall {
-  protected override readonly sandboxClassName: SandboxClassName = 'SandboxSmallContainment';
+  protected override get sandboxClassName(): SandboxClassName {
+    return 'SandboxSmallContainment';
+  }
   interceptHttps = true;
 }
 SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export class SandboxCodeReviewContainment extends SandboxCodeReview {
-  protected override readonly sandboxClassName: SandboxClassName = 'SandboxCodeReviewContainment';
+  protected override get sandboxClassName(): SandboxClassName {
+    return 'SandboxCodeReviewContainment';
+  }
   interceptHttps = true;
 }
 SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;

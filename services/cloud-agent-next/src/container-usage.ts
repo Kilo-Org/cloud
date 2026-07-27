@@ -44,8 +44,21 @@ function startInputFromContext(context: BillingContext): ClientRecordStartInput 
   return { ...usage, startEpochMs: context.startEpochMs };
 }
 
+function usageServiceForSandboxClass(sandboxClassName: SandboxClassName): string {
+  const suffix = sandboxClassName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+  return `${SERVICE}-${suffix}`;
+}
+
+function stoppedAtFromState(state: { lastChange: number }, observedAtMs = Date.now()): number {
+  return Number.isFinite(state.lastChange) &&
+    state.lastChange >= 0 &&
+    state.lastChange <= observedAtMs
+    ? state.lastChange
+    : observedAtMs;
+}
+
 export abstract class MeteredSandbox extends StockSandbox<Env> {
-  protected abstract readonly sandboxClassName: SandboxClassName;
+  protected abstract get sandboxClassName(): SandboxClassName;
 
   private readonly usageClient: ContainerUsageClient;
   private readonly billingHeartbeat: BillingHeartbeatController;
@@ -54,19 +67,24 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
 
   constructor(ctx: SandboxDurableObjectState, env: Env) {
     super(ctx, env);
-    this.usageClient = createContainerUsageClient(env.CONTAINER_USAGE_METER, {
-      service: SERVICE,
-    });
+    this.usageClient = this.createUsageClient(env);
     this.billingHeartbeat = installBillingHeartbeat(this, {
       client: this.usageClient,
       storage: this.ctx.storage,
       stopOnStoppedState: false,
       beforeHeartbeatDelivery: context => this.ensureStartAcknowledged(context),
       beforeStopDelivery: context => this.ensureStartAcknowledged(context),
+      onGenerationClosed: () => this.schedulePendingGenerationIfRunning(),
       // The meter currently returns only `continue`; shadow mode must not enforce future verdicts.
       enforceBudgetStop: async () => {
         throw new Error('Container budget enforcement is disabled in shadow mode');
       },
+    });
+  }
+
+  private createUsageClient(env: Env): ContainerUsageClient {
+    return createContainerUsageClient(env.CONTAINER_USAGE_METER, {
+      service: usageServiceForSandboxClass(this.sandboxClassName),
     });
   }
 
@@ -96,6 +114,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
           return;
         }
         const state = await this.getState();
+        const stoppedAtMs = active.stoppedObservedAtMs ?? stoppedAtFromState(state);
         try {
           await this.billingHeartbeat.recordStop(
             {
@@ -104,7 +123,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
                 ? { exitCode: state.exitCode }
                 : {}),
             },
-            active.stoppedObservedAtMs
+            stoppedAtMs
           );
           await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {
@@ -122,6 +141,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
           await this.admitAndScheduleBestEffort(active);
           return;
         }
+        const stoppedAtMs = active.stoppedObservedAtMs ?? stoppedAtFromState(state);
         try {
           await this.billingHeartbeat.recordStop(
             {
@@ -130,7 +150,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
                 ? { exitCode: state.exitCode }
                 : {}),
             },
-            active.stoppedObservedAtMs
+            stoppedAtMs
           );
           await this.ctx.storage.delete(START_ACK_GENERATION_STORAGE_KEY);
         } catch (error) {
@@ -187,6 +207,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
   }
 
   override async onStop(params?: ContainerStopParams): Promise<void> {
+    const stoppedAtMs = Date.now();
     await super.onStop();
     const activityExpiryRequested = this.activityExpiryRequested;
     this.activityExpiryRequested = false;
@@ -196,10 +217,13 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       const requestedReason = activityExpiryRequested
         ? 'activity_expired'
         : await this.getPendingStopReason(context.generation);
-      const pending = await this.billingHeartbeat.persistStop({
-        reason: requestedReason ?? params?.reason ?? 'runtime_signal',
-        exitCode: params?.exitCode,
-      });
+      const pending = await this.billingHeartbeat.persistStop(
+        {
+          reason: requestedReason ?? params?.reason ?? 'runtime_signal',
+          exitCode: params?.exitCode,
+        },
+        stoppedAtMs
+      );
       if (!pending) return;
       await this.ensureStartAcknowledged(pending);
       await this.billingHeartbeat.recordStop({
@@ -239,6 +263,15 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       this.logShadowFailure(error, operation);
     });
     this.ctx.waitUntil(promise);
+  }
+
+  private schedulePendingGenerationIfRunning(): void {
+    this.runShadowTask('replacement generation', async () => {
+      if (this.ctx.container?.running !== true) return;
+      if (await getBillingContext(this.ctx.storage)) return;
+      const input = await this.getPendingAttribution();
+      if (input) await this.startBillingGeneration(input);
+    });
   }
 
   private async getPendingAttribution(): Promise<SandboxBillingInput | undefined> {
@@ -312,7 +345,7 @@ export abstract class MeteredSandbox extends StockSandbox<Env> {
       actor: input.actor,
       ...(input.onBehalfOf ? { onBehalfOf: input.onBehalfOf } : {}),
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-      service: SERVICE,
+      service: usageServiceForSandboxClass(this.sandboxClassName),
       instanceId: input.sandboxId,
       sku: SANDBOX_USAGE_SKUS[this.sandboxClassName],
       metadata: {

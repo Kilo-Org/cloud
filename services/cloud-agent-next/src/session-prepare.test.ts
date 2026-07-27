@@ -453,6 +453,10 @@ describe('prepareSession endpoint', () => {
   });
 
   it('registers full lazy-prep metadata in one DO call', async () => {
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'isolated',
+      sandboxId: 'crv-abcdef',
+    });
     const doStub = createMockDOStub();
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const caller = appRouter.createCaller(
@@ -544,13 +548,14 @@ describe('prepareSession endpoint', () => {
           target: { url: 'https://example.com/callback' },
         },
         workspace: {
-          sandboxId: 'sb-test-123',
+          sandboxId: 'crv-abcdef',
           sandboxProvider: 'cloudflare',
           shallow: true,
           credentialContainment: { github: true, gitlab: false, kilocode: false },
         },
       })
     );
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
   });
 
   it('rejects organization attribution when the internal caller user is not a member', async () => {
@@ -845,10 +850,6 @@ describe('prepareSession endpoint', () => {
       kind: 'isolated',
       sandboxId: 'dind-abcdef',
     });
-    selectSandboxForNewSessionMock.mockResolvedValueOnce({
-      sandboxId: 'dind-abcdef',
-      provider: 'cloudflare',
-    });
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
@@ -872,16 +873,7 @@ describe('prepareSession endpoint', () => {
         createdOnPlatform: undefined,
       }
     );
-    expect(selectSandboxForNewSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        env: expect.any(Object),
-        orgId: undefined,
-        userId: 'test-user-123',
-        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        botId: undefined,
-        devcontainer: true,
-      })
-    );
+    expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace: {

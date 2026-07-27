@@ -190,13 +190,17 @@ function getResponseReadError(error: unknown): ResponseReadError | null {
 
 async function readResponseText(
   response: Response,
-  headers: Headers
+  headers: Headers,
+  capture?: RequestLogCapture | null
 ): Promise<{ text: string } | { error: unknown; errorResponse: NextResponse }> {
   try {
     return { text: await response.text() };
   } catch (error) {
     const responseReadError = getResponseReadError(error);
     if (!responseReadError) {
+      // Settle the capture so the after() callback awaiting it does not hang
+      // and the request is still logged (without a response body).
+      capture?.setReadError(error);
       throw error;
     }
 
@@ -288,7 +292,7 @@ export async function rewriteModelResponse_ChatCompletions(
   if (headers.get('content-type')?.includes('application/json')) {
     // Read the body text once to avoid "Response body object should not be
     // disturbed or locked" errors that occur when `.clone().json()` fails.
-    const textResult = await readResponseText(response, headers);
+    const textResult = await readResponseText(response, headers, capture);
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -436,7 +440,7 @@ export async function rewriteModelResponse_Messages(
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(response, headers);
+    const textResult = await readResponseText(response, headers, capture);
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -567,7 +571,7 @@ export async function rewriteModelResponse_Responses(
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(response, headers);
+    const textResult = await readResponseText(response, headers, capture);
     if ('errorResponse' in textResult) {
       capture?.setReadError(textResult.error);
       return textResult.errorResponse;
@@ -707,5 +711,6 @@ export async function rewriteModelResponse(
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);
+  capture?.setReadError(new Error('response was not processed'));
   return null;
 }

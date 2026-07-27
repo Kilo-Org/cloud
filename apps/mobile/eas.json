@@ -11,21 +11,15 @@
     "development": {
       "extends": "base",
       "developmentClient": true,
-      "distribution": "internal",
-      "credentialsSource": "remote"
+      "distribution": "internal"
     },
     "production": {
       "extends": "base",
-      "autoIncrement": true,
-      "credentialsSource": "remote"
+      "autoIncrement": true
     },
     "preview": {
       "extends": "base",
-      "distribution": "internal",
-      "credentialsSource": "remote",
-      "ios": {
-        "simulator": false
-      }
+      "distribution": "internal"
     }
   },
   "submit": {

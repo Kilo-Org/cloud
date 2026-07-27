@@ -111,10 +111,5 @@
       "injected": true
     }
   },
-  "expo": {
-    "install": {
-      "exclude": []
-    }
-  },
   "private": true
 }

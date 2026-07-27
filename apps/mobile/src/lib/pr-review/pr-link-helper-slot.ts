@@ -11,12 +11,12 @@ type PrLinkHelperSlotInput = {
 };
 
 /**
- * Select the reserved-height helper-slot content for the PR-link entry field.
+ * Select the helper-message content for the PR-link entry field.
  *
  * Priority: active message (invalid / clipboard-empty) wins over none.
  * No active message selects none — the input placeholder already shows the
- * example URL. The slot always keeps fixed height in the UI regardless of
- * which state is selected.
+ * example URL. The UI mounts helper text only when this is not `none`
+ * (conditional mount; layout may shift when a message appears or clears).
  */
 export function selectPrLinkHelperSlotState(input: PrLinkHelperSlotInput): PrLinkHelperSlotState {
   if (input.message === 'invalid') {
@@ -26,6 +26,19 @@ export function selectPrLinkHelperSlotState(input: PrLinkHelperSlotInput): PrLin
     return 'clipboard-empty';
   }
   return 'none';
+}
+
+type PrLinkClearButtonInput = {
+  /** Whether the uncontrolled PR-link field currently has any text. */
+  readonly hasInput: boolean;
+};
+
+/**
+ * Whether the in-field clear control should render.
+ * Present only when the field has content; absent when empty.
+ */
+export function selectPrLinkClearButtonVisible(input: PrLinkClearButtonInput): boolean {
+  return input.hasInput;
 }
 
 export const PR_LINK_HELPER_INVALID_COPY = 'Not a GitHub pull request link';

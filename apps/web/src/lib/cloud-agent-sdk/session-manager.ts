@@ -152,6 +152,8 @@ type FetchedSessionData = {
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
   associatedPr: AssociatedPrData | null;
+  /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
+  createdOnPlatform?: string | null;
 };
 
 type PrepareInput = {

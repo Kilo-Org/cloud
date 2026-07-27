@@ -163,6 +163,25 @@ const config: ExpoConfig = {
       },
     ],
     ['react-native-appsflyer', { shouldUsePurchaseConnector: true }],
+    // Local wrapper: pnpm isolation + Kilo target-name collision (see plugin).
+    [
+      './plugins/withExpoShareIntent',
+      {
+        iosActivationRules: {
+          NSExtensionActivationSupportsText: true,
+          NSExtensionActivationSupportsWebURLWithMaxCount: 1,
+          NSExtensionActivationSupportsWebPageWithMaxCount: 1,
+          NSExtensionActivationSupportsImageWithMaxCount: 5,
+          NSExtensionActivationSupportsFileWithMaxCount: 5,
+        },
+        androidIntentFilters: ['text/*', '*/*'],
+        androidMultiIntentFilters: ['*/*'],
+        iosAppGroupIdentifier: 'group.com.kilocode.kiloapp',
+        // Display name "Kilo" is applied by the wrapper; target is ShareExtension
+        // because iosShareExtensionName "Kilo" collides with the main app target.
+        iosShareExtensionName: 'Kilo',
+      },
+    ],
     './plugins/withAndroidManifestFix',
     // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
     // Google OAuth clients exist.

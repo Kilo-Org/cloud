@@ -8,16 +8,8 @@ permission:
   edit: allow
   external_directory: allow
   task: deny
-  background_process: deny
   bash:
     "*": allow
-    "socat": deny
-    "socat *": deny
-    "git *commit*": deny
-    "git *push*": deny
-    "/usr/bin/git *commit*": deny
-    "/usr/bin/git *push*": deny
-    "gh pr*": deny
   maestro_*: allow
 ---
 
@@ -40,7 +32,8 @@ During verification:
 - Retryable and empty states: a meaningful message plus a CTA that performs the expected recovery or next step. Non-retryable states: a meaningful message with no CTA at all.
 - Inspect backend, session-ingest, CLI, or other service logs when a flow crosses those boundaries.
 - Capture concise evidence: screenshots, exact visible state, and bounded log excerpts. Never credentials.
-- Never create proxies, redirects, tunnels, NAT rules, or listeners to compensate for stale Expo state — with any tool, not just the denied `socat`. An unmanaged listener invalidates a `prewarm` handoff.
+- Never create proxies, redirects, tunnels, NAT rules, or listeners to compensate for stale Expo state — with any tool, `socat` included. An unmanaged listener invalidates a `prewarm` handoff.
+- Never dispatch agents, and never commit, push, or create or update a PR. Permissions restrict nothing except agent dispatch (`task`); this boundary is the instruction — the orchestrator owns all Git and PR actions.
 - Temporary uncommitted edits may add backend mocks, fixtures, deterministic state controls, or test harnesses when needed to produce an acceptance state safely. Use the smallest localized change and record every touched file.
 - Exception: LLM and agent responses are never mocked. Drive a real model call on `kilo-auto/efficient` — never `kilo-auto/free`, which is rate-limited; if an `efficient` call stalls, retry on `efficient`. Use the fake-llm server or any other LLM mock only when a real call cannot produce the required state (for example, a specific provider failure), and report each use with the mock named and justified.
 - Temporary edits must not change the behavior under test, bypass provenance or security checks, or fix or conceal a product failure. If producing a state would change the behavior being judged, report that state as blocked.

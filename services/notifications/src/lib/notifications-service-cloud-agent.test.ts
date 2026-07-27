@@ -25,6 +25,8 @@ const ALL_ON: UserNotificationPreferences = {
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
   kiloclawActivityEnabled: true,
+  balanceAlertsEnabled: true,
+  securityFindingsEnabled: true,
 };
 
 const mockDispatchPush = vi.fn(

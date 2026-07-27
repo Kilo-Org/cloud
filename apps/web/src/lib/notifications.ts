@@ -65,7 +65,7 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     id: 'legacy-upgrade-final-week-july-2026',
     title: 'Final Week: Kilo Code 5.x Support Ends July 31',
     message:
-      'This is the final week to upgrade. Support for Kilo Code extension version 5.x ends July 31, 2026. After that date, there will be no updates, bug fixes, security patches, compatibility fixes, or marketplace releases. Upgrade now to stay on a supported version.',
+      'Kilo Code strongly recommends updating to version 7.x this week. Support for Kilo Code extension version 5.x ends July 31, 2026. After that date, there will be no updates, bug fixes, security patches, compatibility fixes, or marketplace releases. Upgrade now to stay on a supported version.',
     action: {
       actionText: 'Upgrade Before July 31',
       actionURL: 'https://github.com/Kilo-Org/kilocode-legacy#legacy-ide-extensions-end-of-life',

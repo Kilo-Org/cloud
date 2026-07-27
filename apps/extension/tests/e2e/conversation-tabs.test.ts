@@ -893,7 +893,10 @@ test('conversation tab bar scrolls horizontally', async () => {
 
     await clickNewConversationTimes(sidePanel);
 
-    const tabBarState = await sidePanel.getByLabel('Conversation tabs').evaluate(element => ({
+    const tabList = sidePanel.getByLabel('Conversation tabs');
+    const newConversationButton = sidePanel.getByLabel('New conversation');
+
+    const tabBarState = await tabList.evaluate(element => ({
       clientWidth: element.clientWidth,
       overflowX: getComputedStyle(element).overflowX,
       scrollWidth: element.scrollWidth,
@@ -901,7 +904,36 @@ test('conversation tab bar scrolls horizontally', async () => {
 
     expect(tabBarState.overflowX).toBe('auto');
     expect(tabBarState.scrollWidth).toBeGreaterThan(tabBarState.clientWidth);
-    await expect(sidePanel.getByLabel('New conversation')).toBeVisible();
+
+    const assertNewConversationPinned = async (): Promise<void> => {
+      const geometry = await newConversationButton.evaluate(element => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        };
+      });
+
+      expect(geometry.left).toBeGreaterThanOrEqual(0);
+      expect(geometry.top).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+      expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    };
+
+    await assertNewConversationPinned();
+
+    await tabList.evaluate(element => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await expect.poll(() => tabList.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+
+    await assertNewConversationPinned();
+    await expect(newConversationButton).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();

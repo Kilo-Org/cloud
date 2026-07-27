@@ -12,17 +12,24 @@ type ProviderModels = Array<{
   models: OpenRouterModel[];
 }>;
 
-export function getOpenRouterFreeEndpointKeys(providerModelData: ProviderModels): Set<string> {
-  const keys = new Set<string>();
+export type OpenRouterFreeEndpoint = {
+  modelId: string;
+  providerId: string;
+};
+
+export function getOpenRouterFreeEndpoints(
+  providerModelData: ProviderModels
+): OpenRouterFreeEndpoint[] {
+  const endpoints: OpenRouterFreeEndpoint[] = [];
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
       if (model.endpoint?.is_free && !familyHasForbiddenFreeModel(model.slug)) {
-        keys.add(`${normalizeModelId(model.slug)}:${providerId}`);
+        endpoints.push({ modelId: normalizeModelId(model.slug), providerId });
       }
     }
   }
-  return keys;
+  return endpoints;
 }
 
 function dataCollectingKiloExclusiveModels(
@@ -55,11 +62,11 @@ function dataCollectingKiloExclusiveModels(
 
 export function applyFreeEndpointDataPolicy({
   providerModelData,
-  openRouterFreeEndpointKeys,
+  openRouterFreeEndpoints,
   kiloExclusiveModels,
 }: {
   providerModelData: ProviderModels;
-  openRouterFreeEndpointKeys: ReadonlySet<string>;
+  openRouterFreeEndpoints: ReadonlyArray<OpenRouterFreeEndpoint>;
   kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>;
 }): void {
   const exclusiveModels = dataCollectingKiloExclusiveModels(kiloExclusiveModels);
@@ -73,7 +80,9 @@ export function applyFreeEndpointDataPolicy({
       const restrictions = exclusiveModels.get(modelId);
       const hasFreeExclusiveEndpoint =
         exclusiveModels.has(modelId) && (restrictions === null || restrictions?.has(providerId));
-      const hasFreeOpenRouterEndpoint = openRouterFreeEndpointKeys.has(`${modelId}:${providerId}`);
+      const hasFreeOpenRouterEndpoint = openRouterFreeEndpoints.some(
+        endpoint => endpoint.modelId === modelId && endpoint.providerId === providerId
+      );
       if (!hasFreeExclusiveEndpoint && !hasFreeOpenRouterEndpoint) continue;
 
       model.endpoint.data_policy = {

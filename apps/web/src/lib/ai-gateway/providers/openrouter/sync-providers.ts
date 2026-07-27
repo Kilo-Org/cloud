@@ -43,7 +43,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   applyFreeEndpointDataPolicy,
-  getOpenRouterFreeEndpointKeys,
+  getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 
@@ -270,7 +270,7 @@ async function syncProviders(
       })
     )
   );
-  const openRouterFreeEndpointKeys = getOpenRouterFreeEndpointKeys(providerModelData);
+  const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
 
   injectExtraProviderModels(vercelModels, providerModelData);
 
@@ -325,7 +325,7 @@ async function syncProviders(
 
   applyFreeEndpointDataPolicy({
     providerModelData,
-    openRouterFreeEndpointKeys,
+    openRouterFreeEndpoints,
     kiloExclusiveModels,
   });
 

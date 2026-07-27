@@ -56,7 +56,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -69,7 +69,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
@@ -957,19 +956,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  // Request logging and response rewriting are combined so the event stream
-  // is only processed once: the capture returned here is passed to
-  // rewriteModelResponse, which records the body while processing it.
-  const requestLogCapture = await handleRequestLogging({
-    status: response.status,
+  const requestLogging = {
     user: maybeUser,
     organization_id: organizationId || null,
-    provider: effectiveProviderContext.provider.id,
-    model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
     vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
     request: requestBodyParsed,
-  });
+  };
 
   {
     const errorResponse = await makeErrorReadable({
@@ -980,39 +973,31 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
-      // The response body is not processed any further on this path, so read
-      // it here to still capture it for request logging.
-      if (requestLogCapture) {
-        try {
-          requestLogCapture.setBody(await response.text());
-        } catch (readError) {
-          requestLogCapture.setReadError(readError);
-        }
-      }
+      // The upstream response is replaced by a more readable error and is not
+      // processed further, so log its body separately.
+      await logUnrewrittenResponse(
+        response,
+        effectiveModelIdLowerCased,
+        effectiveProviderContext.provider.id,
+        requestLogging
+      );
       return errorResponse;
     }
   }
 
-  let rewrittenResponse: NextResponseType | null = null;
-  try {
-    rewrittenResponse = await rewriteModelResponse(
-      response,
-      effectiveModelIdLowerCased,
-      effectiveProviderContext.provider.id,
-      requestBodyParsed.kind,
-      organizationId,
-      requestLogCapture
-    );
-  } catch (rewriteError) {
-    requestLogCapture?.setReadError(rewriteError);
-    throw rewriteError;
-  }
+  // Request logging and response rewriting are combined so the event stream
+  // is only processed once: rewriteModelResponse captures the body for the
+  // request log while rewriting it.
+  const rewrittenResponse = await rewriteModelResponse(
+    response,
+    effectiveModelIdLowerCased,
+    effectiveProviderContext.provider.id,
+    requestBodyParsed.kind,
+    requestLogging
+  );
   if (rewrittenResponse) {
     return rewrittenResponse;
   }
 
-  // Should not happen when request logging is enabled, but make sure the
-  // capture is settled so the request is still logged (without response).
-  requestLogCapture?.setReadError(new Error('response was not processed'));
   return wrapInSafeNextResponse(response);
 }

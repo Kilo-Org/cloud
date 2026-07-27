@@ -1,11 +1,28 @@
-import { describe, test, expect, jest } from '@jest/globals';
+import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 import {
   rewriteModelResponse_ChatCompletions,
   rewriteModelResponse_Messages,
   rewriteModelResponse_Responses,
   rewriteModelResponse,
+  type RequestLogging,
 } from './rewriteModelResponse';
+import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: jest.fn(),
+}));
+
+jest.mock('@/lib/ai-gateway/request-logging-opt-ins', () => ({
+  isDynamicallyOptedIntoRequestLogging: jest.fn(async () => false),
+}));
+
+const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
+
+beforeEach(() => {
+  mockedOptIn.mockClear();
+});
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -478,6 +495,17 @@ describe('rewriteModelResponse_Responses', () => {
   });
 });
 
+function makeLogging(overrides?: Partial<RequestLogging>): RequestLogging {
+  return {
+    user: null,
+    organization_id: null,
+    session_id: null,
+    vercel_request_id: null,
+    request: { body: {} } as unknown as RequestLogging['request'],
+    ...overrides,
+  };
+}
+
 describe('rewriteModelResponse', () => {
   test('rewrites paid-model Kilo organization traffic without stripping cost', async () => {
     const result = await rewriteModelResponse(
@@ -492,7 +520,7 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      KILO_ORGANIZATION_ID
+      makeLogging({ organization_id: KILO_ORGANIZATION_ID })
     );
 
     expect(result).not.toBeNull();
@@ -511,7 +539,7 @@ describe('rewriteModelResponse', () => {
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      '00000000-0000-0000-0000-000000000000'
+      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
     );
 
     expect(result).toBeNull();
@@ -525,7 +553,8 @@ describe('rewriteModelResponse', () => {
       }),
       'google/gemma-4-26b-a4b-it:free',
       'openrouter',
-      'chat_completions'
+      'chat_completions',
+      makeLogging()
     );
 
     expect(result).not.toBeNull();
@@ -535,19 +564,17 @@ describe('rewriteModelResponse', () => {
     });
   });
 
-  test('processes responses it would normally skip when a capture is provided', async () => {
-    const capture = makeCapture();
+  test('processes responses it would normally skip when request logging is enabled', async () => {
+    mockedOptIn.mockResolvedValueOnce(true);
     const result = await rewriteModelResponse(
       jsonResponse({ model: 'openai/gpt-5' }),
       'openai/gpt-5',
       'openrouter',
       'chat_completions',
-      '00000000-0000-0000-0000-000000000000',
-      capture
+      makeLogging({ organization_id: '00000000-0000-0000-0000-000000000000' })
     );
 
     expect(result).not.toBeNull();
-    expect(capture.setBody).toHaveBeenCalledWith(JSON.stringify({ model: 'openai/gpt-5' }));
   });
 });
 

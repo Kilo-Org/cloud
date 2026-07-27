@@ -1,16 +1,152 @@
+import { api_request_log, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
-import type { RequestLogCapture } from '@/lib/ai-gateway/handleRequestLogging';
+import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
 import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
+import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
+import { db } from '@/lib/drizzle';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
+
+/**
+ * Handle passed to the response pipeline so the upstream response body can be
+ * captured for request logging while the response is being processed anyway.
+ * This way the event stream is only processed once, instead of once for
+ * logging and once for rewriting.
+ */
+export type RequestLogCapture = {
+  /** Record the full upstream response body. Called at most once. */
+  setBody(text: string): void;
+  /** Record that the upstream response body could not be read. Called at most once. */
+  setReadError(error: unknown): void;
+};
+
+/** Parameters needed to write the request to api_request_log. */
+export type RequestLogging = {
+  user: User | null;
+  organization_id: string | null;
+  session_id: string | null;
+  vercel_request_id: string | null;
+  request: GatewayRequest;
+};
+
+type CapturedResponseBody = { text: string } | { readError: string };
+
+async function isLoggingEnabledForUser(
+  user: User | null,
+  organizationId: string | null
+): Promise<boolean> {
+  if (user?.google_user_email.endsWith('@kilo.ai')) return true;
+  if (user?.google_user_email.endsWith('@kilocode.ai')) return true;
+  if (organizationId === KILO_ORGANIZATION_ID) return true;
+  return isDynamicallyOptedIntoRequestLogging({
+    accountId: user?.id ?? null,
+    organizationId,
+  });
+}
+
+async function createRequestLogCapture(
+  response: Response,
+  model: string,
+  provider: string,
+  logging: RequestLogging
+): Promise<RequestLogCapture | null> {
+  const { user, organization_id, session_id, vercel_request_id, request } = logging;
+  if (!(await isLoggingEnabledForUser(user, organization_id))) {
+    return null;
+  }
+  const status = response.status;
+
+  let resolveCaptured: (result: CapturedResponseBody) => void = () => {};
+  const captured = new Promise<CapturedResponseBody>(resolve => {
+    resolveCaptured = resolve;
+  });
+  let isSettled = false;
+  const settleOnce = (result: CapturedResponseBody) => {
+    if (!isSettled) {
+      isSettled = true;
+      resolveCaptured(result);
+    }
+  };
+
+  after(async () => {
+    // Wait until the response pipeline has processed the response body. This
+    // resolves when the response stream completes (or fails), which happens
+    // before after() callbacks are awaited.
+    const result = await captured;
+    const responseText = 'text' in result ? result.text : undefined;
+    const responseReadError = 'readError' in result ? result.readError : undefined;
+    if (responseReadError !== undefined) {
+      logExceptInTest(
+        `[rewriteModelResponse] failed to read response body (user=${user?.id}, status=${status}, model=${model}): ${responseReadError}`
+      );
+    }
+    try {
+      const error =
+        responseText !== undefined
+          ? detectToolCallArgumentErrors(responseText, request)
+          : { response_body_read_error: responseReadError };
+      const apiRequestLogId = await db
+        .insert(api_request_log)
+        .values({
+          kilo_user_id: user?.id,
+          organization_id,
+          session_id,
+          vercel_request_id,
+          status_code: status,
+          model,
+          provider,
+          request: request.body,
+          response: responseText,
+          error,
+        })
+        .returning({ id: api_request_log.id });
+      logExceptInTest(
+        '[rewriteModelResponse] Inserted into api_request_log',
+        apiRequestLogId[0].id
+      );
+    } catch (e) {
+      const cause = e instanceof Error ? e.cause : undefined;
+      logExceptInTest(
+        `[rewriteModelResponse] failed to insert api_request_log (user=${user?.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
+      );
+    }
+  });
+
+  return {
+    setBody: text => settleOnce({ text }),
+    setReadError: error => settleOnce({ readError: String(error).substring(0, 4000) }),
+  };
+}
+
+/**
+ * Logs the request and response body for paths where the upstream response is
+ * not passed through rewriteModelResponse (e.g. when an upstream error is
+ * replaced by a more readable one). Reads the response body once.
+ */
+export async function logUnrewrittenResponse(
+  response: Response,
+  model: string,
+  providerId: ProviderId,
+  logging: RequestLogging
+): Promise<void> {
+  const capture = await createRequestLogCapture(response, model, providerId, logging);
+  if (!capture) {
+    return;
+  }
+  try {
+    capture.setBody(await response.text());
+  } catch (error) {
+    capture.setReadError(error);
+  }
+}
 
 type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
@@ -555,31 +691,49 @@ export async function rewriteModelResponse(
   model: string,
   providerId: ProviderId,
   kind: GatewayRequest['kind'],
-  organizationId?: string,
-  capture?: RequestLogCapture | null
+  logging: RequestLogging
 ): Promise<NextResponse | null> {
+  const capture = await createRequestLogCapture(response, model, providerId, logging);
   const isFreeModelRequiringCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') && isKiloExclusiveFreeModel(model);
 
   // When request logging is enabled the response has to be processed anyway
   // so the body can be captured for the request log in a single pass, so the
   // rewrite is not skipped in that case.
-  if (!isFreeModelRequiringCostRemoval && organizationId !== KILO_ORGANIZATION_ID && !capture) {
+  if (!isFreeModelRequiringCostRemoval && !capture) {
     console.debug('[rewriteModelResponse] skipping rewrite for %s', model);
     return null;
   }
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
-  if (kind === 'chat_completions') {
-    return rewriteModelResponse_ChatCompletions(response, isFreeModelRequiringCostRemoval, capture);
-  }
-  if (kind === 'responses') {
-    return rewriteModelResponse_Responses(response, isFreeModelRequiringCostRemoval, capture);
-  }
-  if (kind === 'messages') {
-    return rewriteModelResponse_Messages(response, isFreeModelRequiringCostRemoval, capture);
+  try {
+    if (kind === 'chat_completions') {
+      return await rewriteModelResponse_ChatCompletions(
+        response,
+        isFreeModelRequiringCostRemoval,
+        capture
+      );
+    }
+    if (kind === 'responses') {
+      return await rewriteModelResponse_Responses(
+        response,
+        isFreeModelRequiringCostRemoval,
+        capture
+      );
+    }
+    if (kind === 'messages') {
+      return await rewriteModelResponse_Messages(
+        response,
+        isFreeModelRequiringCostRemoval,
+        capture
+      );
+    }
+  } catch (error) {
+    capture?.setReadError(error);
+    throw error;
   }
 
   console.error('[rewriteModelResponse] implementation error: unrecognized API kind %s', kind);
+  capture?.setReadError(new Error('response was not processed'));
   return null;
 }

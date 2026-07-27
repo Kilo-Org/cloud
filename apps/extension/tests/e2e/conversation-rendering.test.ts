@@ -1,6 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test */
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
 import {
@@ -9,60 +8,18 @@ import {
   setExtensionStorage,
   startFixtureServer,
 } from './extension-context-fixture';
+import {
+  createNewConversation,
+  delayConversationStoreHydration,
+  getSelectedTargetTabLabel,
+  getTargetTabOptionCount,
+  releaseConversationStoreHydration,
+  requireTwoOptionLabels,
+} from './tab-selection-e2e-helpers';
 
-const getSelectedTargetTabLabel = (sidePanel: Page): Promise<string> =>
-  sidePanel.locator('select[aria-label="Target tab"]').evaluate(element => {
-    if (!(element instanceof HTMLSelectElement)) {
-      throw new Error('Target tab select was not found.');
-    }
-
-    return element.selectedOptions[0]?.textContent?.trim() ?? '';
-  });
-
-const delayConversationStoreHydration = (sidePanel: Page): Promise<void> =>
-  sidePanel.addInitScript(() => {
-    const pageGlobal = globalThis as typeof globalThis & {
-      __resolveKiloConversationStoreHydration?: () => void;
-      browser?: {
-        storage?: {
-          local?: {
-            get: (keys: unknown) => Promise<unknown>;
-          };
-        };
-      };
-    };
-    const storageLocal = pageGlobal.browser?.storage?.local;
-
-    if (storageLocal === undefined) {
-      return;
-    }
-
-    const originalGet = storageLocal.get.bind(storageLocal);
-    let isDelayed = false;
-
-    storageLocal.get = async keys => {
-      if (!isDelayed && JSON.stringify(keys).includes('kiloAgentConversations')) {
-        isDelayed = true;
-        const { promise, resolve } = Promise.withResolvers<void>();
-
-        pageGlobal.__resolveKiloConversationStoreHydration = resolve;
-        await promise;
-      }
-
-      return originalGet(keys);
-    };
-  });
-
-const releaseConversationStoreHydration = (sidePanel: Page): Promise<void> =>
-  sidePanel.evaluate(() => {
-    (
-      globalThis as typeof globalThis & {
-        __resolveKiloConversationStoreHydration?: () => void;
-      }
-    ).__resolveKiloConversationStoreHydration?.();
-  });
-
-test('new conversation inherits the selected target tab', async () => {
+test('new conversation does not inherit the selected target tab', async () => {
+  // R3: create samples the active tab fresh; it must not copy conv1's manual pick.
+  // Probe (A9) established locator.click() leaves the content tab active.
   const firstFixture = await startFixtureServer({ title: 'First target tab' });
   const secondFixture = await startFixtureServer({ title: 'Second target tab' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -74,21 +31,38 @@ test('new conversation inherits the selected target tab', async () => {
     await firstPage.goto(firstFixture.url);
     const secondPage = await context.newPage();
     await secondPage.goto(secondFixture.url);
-    await firstPage.bringToFront();
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
     await sidePanel.reload();
 
-    const targetTabSelect = sidePanel.getByLabel('Target tab');
+    await expect.poll(() => getTargetTabOptionCount(sidePanel), { timeout: 10_000 }).toBe(2);
 
-    await targetTabSelect.selectOption({ label: 'Second target tab' });
-    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('Second target tab');
+    const { firstListed, otherLabel: nonFirstListed } = await requireTwoOptionLabels(sidePanel);
 
-    await sidePanel.getByLabel('New conversation').click();
+    // Conv1 picks first-listed so inheritance would differ from activating non-first-listed.
+    await sidePanel.getByLabel('Target tab').selectOption({ label: firstListed });
+    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe(firstListed);
 
-    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('Second target tab');
+    const pagesByLabel = new Map([
+      ['First target tab', firstPage],
+      ['Second target tab', secondPage],
+    ]);
+    const activatedPage = pagesByLabel.get(nonFirstListed);
+
+    if (activatedPage === undefined) {
+      throw new Error(`No page for label ${nonFirstListed}`);
+    }
+
+    await activatedPage.bringToFront();
+    await createNewConversation(sidePanel);
+
+    // New conversation defaults to the ACTIVATED tab — not conv1's pick (old inheritance).
+    await expect
+      .poll(() => getSelectedTargetTabLabel(sidePanel), { timeout: 10_000 })
+      .toBe(nonFirstListed);
+    expect(nonFirstListed).not.toBe(firstListed);
   } finally {
     await context.close();
     await firstFixture.close();

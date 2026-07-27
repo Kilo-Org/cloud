@@ -341,6 +341,60 @@ describe('adminCodeReviewsRouter', () => {
     expect(exportRows[0]).toHaveProperty('attempt_status');
   });
 
+  it('buckets sandbox capacity and delivery failures instead of Other', async () => {
+    const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
+
+    await db.insert(cloud_agent_code_reviews).values([
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(700),
+        terminalReason: 'workspace_capacity',
+        errorMessage: 'Workspace setup failed: sandbox storage full',
+      }),
+      // terminal_reason is authoritative and must win over the generic '%404%'
+      // branch that this admission-rejected message would otherwise match.
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(705),
+        terminalReason: 'workspace_capacity',
+        errorMessage: 'Workspace admission rejected: 404 MB available below 2048 MB threshold',
+      }),
+      // Orchestrator session-start path: reports capacity as terminal_reason
+      // 'sandbox_error' with a "(500)" message. The capacity message match must
+      // win over the generic '%500%' Upstream Server Error branch.
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(707),
+        terminalReason: 'sandbox_error',
+        errorMessage:
+          'initiate failed (500): Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup',
+      }),
+      reviewValues({
+        owner,
+        status: 'failed',
+        createdAt: timestamp(710),
+        errorMessage: 'The message could not be delivered',
+      }),
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const errors = await caller.admin.codeReviews.getErrorAnalysis(filterInput());
+
+    expect(errors.categories).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: 'Sandbox Capacity', count: 3 }),
+        expect.objectContaining({ category: 'Delivery Failure', count: 1 }),
+      ])
+    );
+    const categoryNames = errors.categories.map(category => category.category);
+    expect(categoryNames).not.toContain('Other');
+    expect(categoryNames).not.toContain('Not Found');
+    expect(categoryNames).not.toContain('Upstream Server Error');
+  });
+
   it('classifies final model-not-found outcomes as cancellations instead of failures', async () => {
     const owner = { type: 'user', id: adminUser.id } satisfies ReviewOwner;
 

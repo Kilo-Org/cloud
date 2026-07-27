@@ -2000,6 +2000,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'timeout',
   'upstream_error',
   'sandbox_error',
+  'workspace_capacity',
   'unknown',
 ] as const;
 

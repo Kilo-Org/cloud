@@ -10,7 +10,13 @@ import {
 } from './extension-context-fixture';
 
 const messageRowSelector = 'section[aria-label="Agent conversation"] [data-index]';
-const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
+const safeToolNames = [
+  'get_page_snapshot',
+  'get_element_details',
+  'find_in_page',
+  'search_memories',
+  'get_memory',
+];
 
 const startConversationGapSampler = (sidePanel: Page): Promise<void> =>
   sidePanel.evaluate(() => {
@@ -201,6 +207,8 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
         'get_page_snapshot',
         'get_element_details',
         'find_in_page',
+        'search_memories',
+        'get_memory',
         'get_viewport_screenshot',
       ],
     });

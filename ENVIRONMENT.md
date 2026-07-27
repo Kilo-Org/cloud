@@ -185,6 +185,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `WEBHOOK_AGENT_URL` - URL for the webhook agent worker. [SERVER]
 - `MODEL_EVAL_INGEST_URL` - URL for model evaluation ingest worker. [SERVER]
 - `SESSION_INGEST_WORKER_URL` - URL for the session ingest worker. [SERVER]
+- `NOTIFICATIONS_WORKER_URL` - URL for the push-notifications worker internal dispatch endpoint. [SERVER]
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
@@ -350,6 +351,11 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; used by `services/cloud-agent-next/scripts/docker-privileged-proxy.mjs`. [SERVER]
 - `DOCKER_PROXY_SOCKET` - Path to the Docker privileged proxy socket. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
+
+## Browser Extension (apps/extension)
+
+- `VITE_POSTHOG_API_KEY` - PostHog public project API key baked into extension builds; read in `apps/extension/src/shared/analytics.ts`; absent → analytics disabled. [PUBLIC]
+- `VITE_KILO_API_BASE_URL` - Selects the Kilo API base URL at build time; read in `apps/extension/src/shared/auth.ts`. [PUBLIC]
 
 ## Mobile
 

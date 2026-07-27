@@ -21,13 +21,30 @@ describe('selectSessionPaginationHeaderRenderModel', () => {
     expect(headerModel()).toEqual({ kind: 'hidden' });
   });
 
-  it('returns loading with testID and progressbar role', () => {
+  it('hides the transient loading placeholder when no omitted banner is showing', () => {
     expect(headerModel({ isLoadingOlderMessages: true })).toEqual({
-      kind: 'loading',
-      testID: 'session-pagination-header-loading',
-      accessibilityRole: 'progressbar',
-      text: null,
+      kind: 'hidden',
     });
+  });
+
+  it('keeps the omitted banner stable while a page is loading', () => {
+    expect(headerModel({ isLoadingOlderMessages: true, olderMessagesOmittedItemCount: 5 })).toEqual(
+      {
+        kind: 'omitted',
+        testID: 'session-pagination-header-omitted',
+        text: '5 earlier items from this session could not be displayed.',
+      }
+    );
+  });
+
+  it('keeps singular omitted text stable while a page is loading', () => {
+    expect(headerModel({ isLoadingOlderMessages: true, olderMessagesOmittedItemCount: 1 })).toEqual(
+      {
+        kind: 'omitted',
+        testID: 'session-pagination-header-omitted',
+        text: 'Some earlier items from this session could not be displayed.',
+      }
+    );
   });
 
   it('renders retryable text and a Retry CTA', () => {
@@ -76,14 +93,19 @@ describe('selectSessionPaginationHeaderRenderModel', () => {
 
   it('only includes a retry CTA for the retryable state', () => {
     const hidden = headerModel();
-    const loading = headerModel({ isLoadingOlderMessages: true });
+    const loadingHidden = headerModel({ isLoadingOlderMessages: true });
+    const loadingOmitted = headerModel({
+      isLoadingOlderMessages: true,
+      olderMessagesOmittedItemCount: 3,
+    });
     const invalidData = headerModel({ olderMessagesError: error('invalid_data') });
     const tooLarge = headerModel({ olderMessagesError: error('too_large') });
     const omitted = headerModel({ olderMessagesOmittedItemCount: 3 });
     const retryable = headerModel({ olderMessagesError: error('retryable') });
 
     expect('retry' in hidden).toBe(false);
-    expect('retry' in loading).toBe(false);
+    expect('retry' in loadingHidden).toBe(false);
+    expect('retry' in loadingOmitted).toBe(false);
     expect('retry' in invalidData).toBe(false);
     expect('retry' in tooLarge).toBe(false);
     expect('retry' in omitted).toBe(false);

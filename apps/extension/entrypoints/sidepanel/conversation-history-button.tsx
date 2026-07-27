@@ -54,7 +54,7 @@ export const ConversationHistoryButton = ({
   const hasMore = visibleConversations.length < conversations.length;
   const virtualizer = useVirtualizer({
     count: visibleConversations.length + (hasMore ? 1 : 0),
-    estimateSize: () => 92,
+    estimateSize: () => 105,
     getScrollElement: () => historyRef.current,
     overscan: 8,
   });
@@ -68,7 +68,7 @@ export const ConversationHistoryButton = ({
       <button
         aria-expanded={isOpen}
         aria-label="History"
-        className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+        className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
         onClick={() => {
           if (isOpen) {
             setIsOpen(false);
@@ -87,14 +87,14 @@ export const ConversationHistoryButton = ({
         <div
           aria-label="Conversation history"
           aria-modal="true"
-          className="agent-conversation-scrollbar fixed inset-0 z-30 flex flex-col overflow-y-auto bg-zinc-950"
+          className="agent-conversation-scrollbar fixed inset-0 z-30 flex flex-col overflow-y-auto bg-surface-background"
           ref={historyRef}
           role="dialog"
         >
-          <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
+          <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-4">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-zinc-100">History</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-sm font-semibold text-foreground">History</p>
+              <p className="type-label text-foreground-muted">
                 {conversations.length === 1
                   ? '1 conversation'
                   : `${conversations.length} conversations`}
@@ -102,7 +102,7 @@ export const ConversationHistoryButton = ({
             </div>
             <button
               aria-label="Close history"
-              className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+              className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
               onClick={() => {
                 setIsOpen(false);
               }}
@@ -113,7 +113,9 @@ export const ConversationHistoryButton = ({
           </div>
           <div className="px-3 py-3">
             {conversations.length === 0 ? (
-              <p className="px-1 py-8 text-center text-sm text-zinc-500">No conversations yet</p>
+              <p className="type-body px-1 py-8 text-center text-foreground-muted">
+                No conversations yet
+              </p>
             ) : (
               <div
                 className="relative w-full"
@@ -128,7 +130,7 @@ export const ConversationHistoryButton = ({
                         style={getHistoryRowStyle(virtualItem.start)}
                       >
                         <button
-                          className="h-9 w-full rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+                          className="type-label h-9 w-full rounded-md border border-border bg-surface-overlay px-3 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
                           onClick={() => {
                             setVisibleCount(count =>
                               Math.min(conversations.length, count + historyPageSize)
@@ -138,7 +140,7 @@ export const ConversationHistoryButton = ({
                         >
                           Show 100 more conversations
                         </button>
-                        <p className="mt-2 text-center text-xs text-zinc-500">
+                        <p className="type-label mt-2 text-center text-foreground-muted">
                           Showing {visibleConversations.length} of {conversations.length}
                         </p>
                       </div>
@@ -168,29 +170,32 @@ export const ConversationHistoryButton = ({
                       <div
                         className={
                           conversation.id === activeConversationId
-                            ? 'grid gap-2 rounded-md border border-[#EDFF00]/40 bg-zinc-900 p-2'
-                            : 'grid gap-2 rounded-md border border-transparent p-2 hover:border-zinc-800 hover:bg-zinc-900'
+                            ? 'grid gap-2 rounded-md border border-border-strong bg-surface-selected p-2'
+                            : 'grid gap-2 rounded-md border border-transparent p-2 hover:border-border hover:bg-surface-hover'
                         }
                       >
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="truncate text-sm font-medium text-zinc-100" title={title}>
+                            <p
+                              className="type-body truncate font-medium text-foreground"
+                              title={title}
+                            >
                               {title}
                             </p>
                             {isConversationOpen ? (
-                              <span className="rounded-sm border border-zinc-700 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-400">
+                              <span className="type-eyebrow rounded-sm border border-border px-1.5 py-0.5 text-foreground-muted">
                                 Open
                               </span>
                             ) : null}
                           </div>
-                          <p className="mt-0.5 text-xs text-zinc-500">
+                          <p className="mt-0.5 font-mono text-xs text-foreground-muted">
                             {formatHistoryUpdatedAt(conversation.updatedAt)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             aria-label={`Open ${title}`}
-                            className="h-7 rounded-md border border-zinc-700 px-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#EDFF00]/50"
+                            className="type-label h-8 rounded-md border border-border bg-surface-overlay px-2 text-foreground-on-secondary transition hover:bg-surface-hover outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
                             onClick={() => {
                               onOpenConversation(conversation.id);
                               setIsOpen(false);
@@ -201,7 +206,7 @@ export const ConversationHistoryButton = ({
                           </button>
                           <button
                             aria-label={`Delete ${title}`}
-                            className="flex size-7 items-center justify-center rounded-md border border-zinc-800 text-zinc-400 transition hover:border-red-500/70 hover:bg-red-950/30 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-400/50"
+                            className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-overlay text-foreground-on-secondary transition hover:border-status-red-500/50 hover:bg-status-red-500/10 hover:text-status-red-300 outline-none focus-visible:ring-2 focus-visible:ring-brand-primary-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-background"
                             onClick={() => {
                               onDeleteConversation(conversation.id);
                             }}
@@ -218,7 +223,7 @@ export const ConversationHistoryButton = ({
             )}
           </div>
           {hasMore ? (
-            <p className="border-t border-zinc-900 px-4 py-2 text-center text-xs text-zinc-500">
+            <p className="type-label border-t border-border px-4 py-2 text-center text-foreground-muted">
               Showing {visibleConversations.length} of {conversations.length}
             </p>
           ) : null}

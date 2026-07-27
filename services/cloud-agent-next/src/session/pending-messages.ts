@@ -19,6 +19,11 @@ import {
 export const PENDING_SESSION_MESSAGE_LIMIT = 10;
 export const PENDING_FLUSH_RETRY_BASE_DELAY_MS = 2_000;
 const SANDBOX_CONNECT_RETRY_DELAYS_MS = [5_000] as const;
+// A full workspace disk is transient backpressure: stale-workspace cleanup and
+// other reviews finishing free space within seconds to minutes. Give it a
+// longer, backed-off retry budget instead of failing the delivery after a
+// single redelivery.
+const WORKSPACE_CAPACITY_RETRY_DELAYS_MS = [10_000, 30_000, 60_000] as const;
 // Other pending delivery failures currently get one redelivery after the initial failed attempt.
 const WARM_FOLLOWUP_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
 const COLD_INIT_RETRY_DELAYS_MS = [PENDING_FLUSH_RETRY_BASE_DELAY_MS] as const;
@@ -485,6 +490,22 @@ export function shouldSkipPendingFlush(message: PendingSessionMessage, now: numb
   return message.nextFlushAttemptAt !== undefined && message.nextFlushAttemptAt > now;
 }
 
+/**
+ * Reset-eligible modes each start a fresh retry budget on entry (sandbox-connect
+ * has a short reconnect budget; sandbox-capacity has a longer backed-off budget
+ * for transient disk pressure). Alternating between them must NOT keep resetting,
+ * so callers only reset when entering one of these from a non-reset-eligible state.
+ */
+function isResetEligibleFailure(
+  code: PendingFlushFailureCode | undefined,
+  subtype: WorkspaceFailureSubtype | undefined
+): boolean {
+  return (
+    code === 'SANDBOX_CONNECT_FAILED' ||
+    (code === 'WORKSPACE_SETUP_FAILED' && subtype === 'sandbox_storage_full')
+  );
+}
+
 export async function recordPendingFlushFailure(
   storage: SessionQueueStorage,
   message: PendingSessionMessage,
@@ -535,17 +556,25 @@ export async function recordPendingFlushFailure(
     : options.code === 'WORKSPACE_SETUP_FAILED'
       ? options.safeFailureMessage
       : undefined;
+  // Reset the attempt counter only when a message ENTERS a reset-eligible
+  // transient mode (sandbox-connect or sandbox-capacity) from a state that is
+  // not itself reset-eligible, so each fresh sequence gets its full backoff
+  // budget. When failures alternate between the two reset-eligible modes the
+  // counter is NOT reset, so attempts accumulate and the message still exhausts
+  // instead of flapping between modes forever.
   const attempts =
-    flushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
-    message.lastFlushFailureCode !== 'SANDBOX_CONNECT_FAILED'
+    isResetEligibleFailure(flushFailureCode, failureSubtype) &&
+    !isResetEligibleFailure(message.lastFlushFailureCode, message.lastFlushFailureSubtype)
       ? 1
       : (message.flushAttempts ?? 0) + 1;
   const retryDelays =
     flushFailureCode === 'SANDBOX_CONNECT_FAILED'
       ? SANDBOX_CONNECT_RETRY_DELAYS_MS
-      : options.policy === 'cold-init'
-        ? COLD_INIT_RETRY_DELAYS_MS
-        : WARM_FOLLOWUP_RETRY_DELAYS_MS;
+      : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'sandbox_storage_full'
+        ? WORKSPACE_CAPACITY_RETRY_DELAYS_MS
+        : options.policy === 'cold-init'
+          ? COLD_INIT_RETRY_DELAYS_MS
+          : WARM_FOLLOWUP_RETRY_DELAYS_MS;
   const retryable = options.retryable ?? isRetryableFlushCode(flushFailureCode);
   const exhausted = !retryable || attempts > retryDelays.length;
   const retryDelay = retryDelays[attempts - 1];

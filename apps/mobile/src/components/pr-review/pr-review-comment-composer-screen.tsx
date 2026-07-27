@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 
+import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
 import { QueryError } from '@/components/query-error';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseComposerParams } from '@/lib/pr-review/comment-composer-params';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
@@ -33,6 +33,8 @@ export function PrReviewCommentComposerScreen() {
   const pendingId = parsed?.pendingId;
   const isEdit = pendingId !== undefined;
   const pendingItem = isEdit ? pending.items.find(item => item.id === pendingId) : undefined;
+  const title = isEdit ? 'Edit comment' : 'Add comment';
+  const eyebrow = parsed ? `${parsed.owner}/${parsed.repo}#${parsed.number}` : '';
 
   // Edit mode is local-only: do not fire getPullRequest and do not gate on it.
   const trpc = useTRPC();
@@ -64,11 +66,9 @@ export function PrReviewCommentComposerScreen() {
     router.back();
   };
 
-  let content: ReactNode = null;
-  if (!parsed) {
-    content = <InvalidRouteState backTo="/(app)/pr-review" />;
-  } else if (isEdit) {
-    content = pendingItem ? (
+  // Happy path: content ScrollView owns the in-scroll header.
+  if (parsed && isEdit && pendingItem) {
+    return (
       <PrReviewCommentComposer
         key={`edit:${pendingItem.id}`}
         owner={parsed.owner}
@@ -80,31 +80,16 @@ export function PrReviewCommentComposerScreen() {
         line={parsed.line}
         startLine={parsed.startLine}
         initialBody={pendingItem.body}
+        title={title}
+        eyebrow={eyebrow}
         onDismiss={dismiss}
       />
-    ) : null;
-  } else if (pr.isLoading) {
-    content = (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-      </View>
     );
-  } else if (pr.isError || !pr.data) {
-    content = (
-      <View className="flex-1">
-        <QueryError
-          variant="server"
-          title="Couldn't load the comment composer"
-          onRetry={() => {
-            void pr.refetch();
-          }}
-          isRetrying={pr.isFetching}
-        />
-      </View>
-    );
-  } else {
+  }
+
+  if (parsed && !isEdit && pr.data) {
     const createKey = [parsed.path, parsed.line, parsed.side, parsed.startLine ?? ''].join(':');
-    content = (
+    return (
       <PrReviewCommentComposer
         key={`create:${createKey}`}
         owner={parsed.owner}
@@ -115,20 +100,43 @@ export function PrReviewCommentComposerScreen() {
         side={parsed.side}
         line={parsed.line}
         startLine={parsed.startLine}
+        title={title}
+        eyebrow={eyebrow}
         onDismiss={dismiss}
       />
     );
   }
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={isEdit ? 'Edit comment' : 'Add comment'}
-        eyebrow={parsed ? `${parsed.owner}/${parsed.repo}#${parsed.number}` : ''}
-        modal
-        onBack={dismiss}
+  let body: ReactNode = null;
+  if (!parsed) {
+    body = <InvalidRouteState backTo="/(app)/pr-review" />;
+  } else if (isEdit) {
+    body = null;
+  } else if (pr.isLoading) {
+    body = (
+      <View className="flex-1 items-center justify-center py-16">
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      </View>
+    );
+  } else {
+    body = (
+      <QueryError
+        variant="server"
+        title="Couldn't load the comment composer"
+        onRetry={() => {
+          void pr.refetch();
+        }}
+        isRetrying={pr.isFetching}
       />
-      {content}
-    </View>
+    );
+  }
+
+  return (
+    <>
+      <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={dismiss} />
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="grow">
+        {body}
+      </ScrollView>
+    </>
   );
 }

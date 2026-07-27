@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveSendAttachmentKind } from '@/components/agents/session-detail-send-attachment';
+import {
+  resolveSendAttachmentKind,
+  shouldRefuseSilentAttachmentDrop,
+} from '@/components/agents/session-detail-send-attachment';
 
 describe('resolveSendAttachmentKind', () => {
   it.each([
@@ -17,6 +20,22 @@ describe('resolveSendAttachmentKind', () => {
     'returns $expected for sessionType=$activeSessionType, supports=$supports, has=$has',
     ({ activeSessionType, supports, has, expected }) => {
       expect(resolveSendAttachmentKind(activeSessionType, supports, has)).toBe(expected);
+    }
+  );
+});
+
+describe('shouldRefuseSilentAttachmentDrop', () => {
+  it.each([
+    { kind: 'none' as const, hasAttachments: true, expected: true },
+    { kind: 'none' as const, hasAttachments: false, expected: false },
+    { kind: 'cloud' as const, hasAttachments: true, expected: false },
+    { kind: 'cloud' as const, hasAttachments: false, expected: false },
+    { kind: 'remote-capable' as const, hasAttachments: true, expected: false },
+    { kind: 'remote-capable' as const, hasAttachments: false, expected: false },
+  ])(
+    'returns $expected for kind=$kind, hasAttachments=$hasAttachments',
+    ({ kind, hasAttachments, expected }) => {
+      expect(shouldRefuseSilentAttachmentDrop(kind, hasAttachments)).toBe(expected);
     }
   );
 });

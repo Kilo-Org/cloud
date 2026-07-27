@@ -368,9 +368,13 @@ function mockCreatedInfraRetryFlow(
 
 // --- Tests ---
 
-import type { POST as POSTType } from './route';
+import type {
+  POST as POSTType,
+  isWorkspaceCapacityFailure as isWorkspaceCapacityFailureType,
+} from './route';
 
 let POST: typeof POSTType;
+let isWorkspaceCapacityFailure: typeof isWorkspaceCapacityFailureType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -431,7 +435,27 @@ beforeEach(async () => {
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
-  ({ POST } = await import('./route'));
+  ({ POST, isWorkspaceCapacityFailure } = await import('./route'));
+});
+
+describe('isWorkspaceCapacityFailure', () => {
+  it('detects a full-disk failure from the structured subtype or the message', () => {
+    expect(
+      isWorkspaceCapacityFailure(undefined, 'Workspace setup failed: sandbox storage full')
+    ).toBe(true);
+    // Orchestrator session-start path reports it inside a "(500)" message.
+    expect(
+      isWorkspaceCapacityFailure(
+        undefined,
+        'initiate failed (500): Workspace admission rejected: 1036 MB available below 2048 MB threshold after cleanup'
+      )
+    ).toBe(true);
+  });
+
+  it('ignores unrelated failures', () => {
+    expect(isWorkspaceCapacityFailure(undefined, 'The message could not be delivered')).toBe(false);
+    expect(isWorkspaceCapacityFailure(undefined, undefined)).toBe(false);
+  });
 });
 
 describe('POST /api/internal/code-review-status/[reviewId]', () => {

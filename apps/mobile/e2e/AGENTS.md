@@ -196,14 +196,15 @@ Use the wrappers for all Android tooling, including the Expo/Gradle build, so th
 
 ### Launch and GPU policy
 
-Two launch attempts total, then a test-environment blocker with the emulator pane tail. Attempt 1 uses `-gpu host` (Mac GPU; fastest; software rendering competes for the CPU under parallel-workflow load). Keep `-no-snapshot-save -no-boot-anim` on every launch. Attempt 2 switches GPU only on an observed process-death signal (`pgrep -f "qemu.*<avd-name>"` empty, or the tmux pane shows the emulator exiting/erroring) → `-gpu swiftshader_indirect`. If the process is still alive but the boot envelope expired → repeat `-gpu host`. Never a third launch.
+Two launch attempts total, then a test-environment blocker with the tail of `$EMULATOR_LOG`. Attempt 1 uses `-gpu host` (Mac GPU; fastest; software rendering competes for the CPU under parallel-workflow load). Keep `-no-snapshot-save -no-boot-anim` on every launch. Attempt 2 switches GPU only on an observed process-death signal (`pgrep -f "qemu.*<avd-name>"` empty, or the log shows the emulator exiting/erroring — the pane mirrors it live but dies with the session) → `-gpu swiftshader_indirect`. If the process is still alive but the boot envelope expired → repeat `-gpu host`. Never a third launch.
 
 ```bash
 # After e2e-slot acquire (see Fresh Worktree Quickstart)
 ANDROID_SESSION="kilo-e2e-android-$(basename "$PWD")"
+EMULATOR_LOG="/tmp/${ANDROID_SESSION}.log"
 GPU_FLAG=host   # attempt 2: swiftshader_indirect only after process death; else host again
 tmux new-session -d -s "$ANDROID_SESSION" -c "$PWD" \
-  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu $GPU_FLAG"
+  "pnpm dev:mobile:android emulator -avd <avd-name> -no-snapshot-save -no-boot-anim -gpu $GPU_FLAG 2>&1 | tee \"$EMULATOR_LOG\""
 ```
 
 ### Bounded boot wait
@@ -218,7 +219,7 @@ Device visibility is not readiness. Never gate on `adb devices` output alone, an
 
 ### Failed attempt → kill hard → relaunch once
 
-On failure: `tmux kill-session -t "$ANDROID_SESSION"`, then confirm the emulator process is actually gone — `pgrep -f "qemu.*<avd-name>"` prints nothing. If it survives: with a known serial, `pnpm dev:mobile:android adb -s <serial> emu kill`; with no serial yet (process died or never became visible to adb), `pkill -f "qemu.*<avd-name>"`. Re-check `pgrep` either way — a surviving emulator holds the AVD lock and dooms any relaunch. Then relaunch once per the GPU policy with the same envelope. If the second attempt also fails to boot, stop and return a test-environment blocker with the tail of the emulator pane.
+On failure: `tmux kill-session -t "$ANDROID_SESSION" 2>/dev/null` (session may already be gone if the emulator exited), then confirm the emulator process is actually gone — `pgrep -f "qemu.*<avd-name>"` prints nothing. If it survives: with a known serial, `pnpm dev:mobile:android adb -s <serial> emu kill`; with no serial yet (process died or never became visible to adb), `pkill -f "qemu.*<avd-name>"`. Re-check `pgrep` either way — a surviving emulator holds the AVD lock and dooms any relaunch. Then relaunch once per the GPU policy with the same envelope. If the second attempt also fails to boot, stop and return a test-environment blocker with the tail of `$EMULATOR_LOG` (survives session death; never a third launch, never an early give-up).
 
 ### Claim, build, login
 
@@ -275,6 +276,7 @@ Clean up only resources you started. The remote CLI session and its disposable i
 ```bash
 tmux kill-session -t "$ANDROID_SESSION"      # if created
 rm -f "$LOGIN_LOG"                           # if created
+rm -f "$EMULATOR_LOG"                        # if created
 pnpm dev:stop                                # only if you started this worktree's stack
 xcrun simctl shutdown <udid>                 # only if you booted it
 pnpm dev:mobile:simulator release <udid>     # every simulator you claimed

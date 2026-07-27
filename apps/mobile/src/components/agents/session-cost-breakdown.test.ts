@@ -6,7 +6,7 @@ import {
   type Part,
   type StepFinishPart,
   type StoredMessage,
-} from 'cloud-agent-sdk';
+} from '@kilocode/cloud-agent-sdk';
 
 /**
  * F2 — cost breakdown helper.

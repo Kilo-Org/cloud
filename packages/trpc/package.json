@@ -10,6 +10,9 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts"
+    },
+    "./mobile": {
+      "types": "./dist/mobile.d.ts"
     }
   },
   "dependencies": {

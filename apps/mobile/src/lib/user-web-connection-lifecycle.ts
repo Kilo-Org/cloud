@@ -1,6 +1,6 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import { addEventListener, type NetInfoState } from '@react-native-community/netinfo';
-import { type ConnectionLifecycleHooks } from 'cloud-agent-sdk';
+import { type ConnectionLifecycleHooks } from '@kilocode/cloud-agent-sdk';
 
 type ConnectivityState = Pick<NetInfoState, 'isConnected' | 'isInternetReachable'>;
 

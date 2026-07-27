@@ -4,7 +4,7 @@ import { useState, useCallback, createContext, useContext, useMemo, type ReactNo
 
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { SuggestionAction } from '@/lib/cloud-agent-sdk';
+import type { SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
 // ---------------------------------------------------------------------------
 // SuggestionContext — mirrors PermissionContext pattern

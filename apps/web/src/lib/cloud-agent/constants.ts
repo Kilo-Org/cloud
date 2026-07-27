@@ -175,10 +175,7 @@ export function normalizeAttachmentExtension(extension: string | undefined | nul
   return CLOUD_AGENT_ATTACHMENT_FALLBACK_EXTENSION;
 }
 
-export type CloudAgentAttachments = {
-  path: string;
-  files: string[];
-};
+export type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 
 /**
  * Maximum prompt length (in characters) accepted by the cloud agent.

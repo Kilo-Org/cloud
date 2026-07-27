@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AlertCircle, Check, ChevronRight, Terminal } from 'lucide-react-native';
-import { type PreparationAttempt, type PreparationStepSnapshot } from 'cloud-agent-sdk';
+import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

@@ -1,6 +1,6 @@
 import { ActivityIndicator, View } from 'react-native';
 import { AlertCircle, Check } from 'lucide-react-native';
-import { type SessionStatusIndicator as SessionStatusIndicatorType } from 'cloud-agent-sdk';
+import { type SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';

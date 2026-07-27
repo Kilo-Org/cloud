@@ -2015,7 +2015,13 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   // pattern-matching the human-readable error_message in the admin router.
   // See apps/web/src/lib/code-reviews/terminal-reason-from-failure.ts.
   'assistant_failed',
+  // Rate limiting is the single largest failure bucket, and who was throttled
+  // decides whether it is actionable. Split by the provider ownership
+  // cloud-agent-next now reports; the unqualified value remains for payloads
+  // that carry no ownership.
   'assistant_rate_limited',
+  'assistant_rate_limited_byok',
+  'assistant_rate_limited_managed',
   'assistant_unavailable',
   'assistant_timeout',
   'assistant_unauthorized',
@@ -2061,6 +2067,13 @@ export const CODE_REVIEW_BENIGN_TERMINAL_REASONS = [
   // deliberately left as a system failure: under-alerting is how the Jul 2026
   // publish-rate collapse ran for three days unnoticed.
   'setup_command_failed',
+  // The customer's own provider key hit its own quota. Nothing on our side is
+  // broken and nothing on our side can fix it, so it must not page us.
+  // 'assistant_rate_limited_managed' is deliberately NOT benign: that is our
+  // key or our quota, and it is the case worth waking someone for. The
+  // unqualified 'assistant_rate_limited' also stays non-benign, since unknown
+  // ownership could be either.
+  'assistant_rate_limited_byok',
 ] as const satisfies readonly CodeReviewTerminalReason[];
 
 export type CodeReviewBenignTerminalReason = (typeof CODE_REVIEW_BENIGN_TERMINAL_REASONS)[number];

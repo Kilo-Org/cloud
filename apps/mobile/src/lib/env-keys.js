@@ -20,4 +20,5 @@ export const OPTIONAL_ENV_KEYS = {
   e2eLatencySessionMs: 'E2E_LATENCY_SESSION_MS',
   e2eLatencyMessagesMs: 'E2E_LATENCY_MESSAGES_MS',
   e2eLatencyWsMs: 'E2E_LATENCY_WS_MS',
+  sentryEnvironment: 'EXPO_PUBLIC_SENTRY_ENVIRONMENT',
 };

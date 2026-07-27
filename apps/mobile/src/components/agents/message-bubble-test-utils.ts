@@ -1,4 +1,4 @@
-import { type MessageDeliveryState, type StoredMessage } from 'cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 export function userMessage(id: string): StoredMessage {
   return {

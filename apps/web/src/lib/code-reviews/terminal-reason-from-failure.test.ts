@@ -2,8 +2,21 @@ import {
   CLOUD_AGENT_FAILURE_CODES,
   WORKSPACE_FAILURE_SUBTYPES,
 } from '@kilocode/worker-utils/cloud-agent-failure';
+import { CLOUD_AGENT_TERMINAL_REASONS } from '@kilocode/worker-utils/cloud-agent-next-client';
 import { CODE_REVIEW_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import { terminalReasonFromCloudAgentFailure } from './terminal-reason-from-failure';
+
+describe('terminal reason list parity', () => {
+  // These two lists live in separate packages that cannot import each other, so
+  // drift is only caught here. A mismatch makes the orchestrator send a reason
+  // the callback allowlist rejects, or makes the worker's zod enum silently
+  // coerce a valid reason to undefined via its `.catch(undefined)`.
+  it('keeps the db and worker-utils terminal reason lists identical', () => {
+    expect([...CLOUD_AGENT_TERMINAL_REASONS].sort()).toEqual(
+      [...CODE_REVIEW_TERMINAL_REASONS].sort()
+    );
+  });
+});
 
 describe('terminalReasonFromCloudAgentFailure', () => {
   it('returns undefined without a structured failure', () => {
@@ -79,6 +92,17 @@ describe('terminalReasonFromCloudAgentFailure', () => {
   it('leaves unclassified failures to the callers message-based inference', () => {
     expect(terminalReasonFromCloudAgentFailure({ code: 'unclassified' })).toBeUndefined();
   });
+
+  it.each(['constructor', '__proto__', 'toString', 'valueOf'])(
+    'does not resolve inherited object members for message %p',
+    message => {
+      // A plain object lookup would return a truthy Object.prototype member and
+      // write a function reference into the terminal_reason column.
+      expect(terminalReasonFromCloudAgentFailure({ code: 'assistant_error', message })).toBe(
+        'assistant_failed'
+      );
+    }
+  );
 
   it('resolves every failure code to a valid terminal reason', () => {
     const valid = new Set<string>(CODE_REVIEW_TERMINAL_REASONS);

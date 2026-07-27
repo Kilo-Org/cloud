@@ -83,14 +83,20 @@ const FAILURE_CODE_REASONS = {
  * than the current behaviour.
  *
  * KEEP IN SYNC with classifyAssistantFailure's safeMessage values.
+ *
+ * A Map rather than an object literal: the key is caller-supplied free text (the
+ * schema bounds only its length), and an object lookup for 'constructor' or
+ * '__proto__' would resolve an inherited Object.prototype member. That value is
+ * truthy, so it would defeat the fallback and write a function reference into
+ * the terminal_reason column. Map keys have no prototype chain.
  */
-const ASSISTANT_MESSAGE_REASONS: Record<string, CodeReviewTerminalReason> = {
-  'Assistant request was rate limited': 'assistant_rate_limited',
-  'Assistant service is unavailable': 'assistant_unavailable',
-  'Assistant request timed out': 'assistant_timeout',
-  'Assistant request was not authorized': 'assistant_unauthorized',
-  'Assistant request was invalid': 'assistant_invalid_request',
-};
+const ASSISTANT_MESSAGE_REASONS = new Map<string, CodeReviewTerminalReason>([
+  ['Assistant request was rate limited', 'assistant_rate_limited'],
+  ['Assistant service is unavailable', 'assistant_unavailable'],
+  ['Assistant request timed out', 'assistant_timeout'],
+  ['Assistant request was not authorized', 'assistant_unauthorized'],
+  ['Assistant request was invalid', 'assistant_invalid_request'],
+]);
 
 /**
  * Resolve a terminal reason from the structured callback failure.
@@ -113,7 +119,7 @@ export function terminalReasonFromCloudAgentFailure(
     // The projection puts the safe message on the failure; fall back to the
     // callback's errorMessage for payloads that only carry the flattened text.
     const message = (failure.message ?? errorMessage)?.trim();
-    return (message && ASSISTANT_MESSAGE_REASONS[message]) || 'assistant_failed';
+    return (message ? ASSISTANT_MESSAGE_REASONS.get(message) : undefined) ?? 'assistant_failed';
   }
 
   const reason = FAILURE_CODE_REASONS[failure.code];

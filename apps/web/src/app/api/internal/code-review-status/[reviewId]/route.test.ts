@@ -1308,6 +1308,82 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.objectContaining({ terminalReason: undefined })
       );
     });
+
+    it('derives the terminal reason from the structured failure payload', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Agent wrapper failed while processing the message',
+          failure: { stage: 'agent_activity', code: 'wrapper_error_after_activity' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'wrapper_failed' })
+      );
+    });
+
+    it('keeps rate limiting distinct from generic assistant failures', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was rate limited',
+          failure: { code: 'assistant_error', message: 'Assistant request was rate limited' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'assistant_rate_limited' })
+      );
+    });
+
+    // model_missing arrives with the generic message 'No model was selected',
+    // which the message-based model-not-found check cannot match. Without the
+    // structured path re-applying normalization the row would stay 'failed' and
+    // the customer would get generic copy instead of the actionable message.
+    it('normalizes status to cancelled for a structured model_missing failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'No model was selected',
+          failure: { stage: 'pre_dispatch', code: 'model_missing' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'cancelled', terminalReason: 'model_not_found' })
+      );
+    });
+
+    it('normalizes status to failed for a structured payment_required failure', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'interrupted',
+          errorMessage: 'Assistant request failed: insufficient credits',
+          failure: { code: 'payment_required' },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'billing' })
+      );
+    });
   });
 
   describe('attempt tracking and infra retry', () => {

@@ -118,7 +118,6 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   setup_command_failed: 'Setup Command Failure',
   timeout: 'Timeout',
   upstream_error: 'Upstream Server Error',
-  interrupted: 'Interrupted',
 };
 
 /**
@@ -155,10 +154,15 @@ function buildErrorCategoryExpr(terminalReasonColumn: PgColumn, errorMessageColu
   WHEN ${errorMessageColumn} LIKE '%parse%' OR ${errorMessageColumn} LIKE '%JSON%' OR ${errorMessageColumn} LIKE '%unexpected token%' THEN 'Parse Error'
   WHEN ${errorMessageColumn} LIKE '%could not be delivered%' THEN 'Delivery Failure'
   WHEN ${errorMessageColumn} LIKE '%repository_not_installed%' OR ${errorMessageColumn} LIKE '%app installation required%' THEN 'Action Required'
-  -- Deliberately last: 'sandbox_error' is the orchestrator's generic bucket for a
-  -- failed session start, and the patterns above refine it into the specific
-  -- cause (most often Sandbox Capacity). Matching it earlier would mask that.
+  -- Deliberately last: these two are generic buckets, not causes, and the
+  -- patterns above refine them into the specific cause. 'sandbox_error' is the
+  -- orchestrator's catch-all for a failed session start (most often Sandbox
+  -- Capacity); 'interrupted' is assigned purely from status when nothing else
+  -- classified the row, so those rows carry arbitrary error text (rate limits,
+  -- timeouts, upstream 5xx from the v1 interrupted-delivery path). Matching
+  -- either earlier would mask the specific category.
   WHEN ${terminalReasonColumn} = 'sandbox_error' THEN 'Sandbox Error'
+  WHEN ${terminalReasonColumn} = 'interrupted' THEN 'Interrupted'
   WHEN ${errorMessageColumn} IS NULL THEN 'Unknown Error'
   ELSE 'Other'
 END`;

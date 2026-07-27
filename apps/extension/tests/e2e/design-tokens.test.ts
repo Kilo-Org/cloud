@@ -227,7 +227,10 @@ const seedConversationAndReload = async (sidePanel: Page): Promise<void> => {
   await setExtensionStorage(sidePanel, { kiloAgentConversations: designTokenConversationStore });
   await sidePanel.reload();
   // Scope to the transcript pane — the tab label also mirrors the first user message.
-  await expect(conversationPane(sidePanel).getByText(UNIQUE_USER_TEXT)).toBeVisible();
+  // Generous timeout: the first reload under full-suite load can exceed the 5s default.
+  await expect(conversationPane(sidePanel).getByText(UNIQUE_USER_TEXT)).toBeVisible({
+    timeout: 30_000,
+  });
 };
 
 /** Wait until computed background settles (class transitions can leave mid-blend RGB). */

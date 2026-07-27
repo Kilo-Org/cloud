@@ -68,6 +68,10 @@ type ChatAbortObserverWindow = typeof globalThis & {
   __kiloChatCompletionAborted?: boolean;
 };
 
+const defaultModelPreferencesMutationBody = {
+  result: { data: { success: true } },
+};
+
 export const mockKiloApi = async (
   context: BrowserContext,
   options: {
@@ -80,9 +84,13 @@ export const mockKiloApi = async (
     models?: MockGatewayModel[];
     modelNameByOrganizationId?: Record<string, string>;
     modelFailuresBeforeSuccess?: number;
+    modelPreferencesFavorites?: string[];
+    modelPreferencesGetStatus?: number;
+    modelPreferencesMutationStatus?: number;
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
     seenChatBodies?: unknown[];
+    seenModelPreferencesGetUrls?: string[];
     toolNames?: string[];
     toolNamesByCall?: string[][];
     seenChatOrganizationIds?: string[];
@@ -101,6 +109,60 @@ export const mockKiloApi = async (
   );
   await context.route('https://app.kilo.ai/api/organizations', route =>
     route.fulfill({ json: { organizations: options.organizations ?? [] }, status: 200 })
+  );
+  await context.route(
+    url => url.pathname.startsWith('/api/trpc/modelPreferences.'),
+    async route => {
+      const requestUrl = route.request().url();
+      let pathname = '';
+
+      try {
+        ({ pathname } = new URL(requestUrl));
+      } catch {
+        await route.fulfill({ status: 404 });
+        return;
+      }
+
+      if (pathname.endsWith('/modelPreferences.get')) {
+        options.seenModelPreferencesGetUrls?.push(requestUrl);
+
+        if (options.modelPreferencesGetStatus !== undefined) {
+          await route.fulfill({ status: options.modelPreferencesGetStatus });
+          return;
+        }
+
+        await route.fulfill({
+          json: {
+            result: {
+              data: {
+                favorites: options.modelPreferencesFavorites ?? [],
+                lastSelected: null,
+              },
+            },
+          },
+          status: 200,
+        });
+        return;
+      }
+
+      if (
+        pathname.endsWith('/modelPreferences.addFavorite') ||
+        pathname.endsWith('/modelPreferences.removeFavorite')
+      ) {
+        if (options.modelPreferencesMutationStatus !== undefined) {
+          await route.fulfill({ status: options.modelPreferencesMutationStatus });
+          return;
+        }
+
+        await route.fulfill({
+          json: defaultModelPreferencesMutationBody,
+          status: 200,
+        });
+        return;
+      }
+
+      await route.fulfill({ status: 404 });
+    }
   );
   await context.route('https://app.kilo.ai/api/gateway/models', async route => {
     modelCalls += 1;

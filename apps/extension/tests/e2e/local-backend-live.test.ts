@@ -4,6 +4,7 @@ import type { BrowserContext, Page, Request } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
+import { expectSelectedModelId, selectModelById } from './model-picker-e2e-helpers';
 
 const localBackendUrl = 'http://localhost:3000';
 const localUserEmail = 'fl@fl.fl';
@@ -222,20 +223,7 @@ const signInWithLocalDeviceAuth = async ({
 };
 
 const selectFrontierModel = async (sidePanel: Page): Promise<void> => {
-  await expect
-    .poll(
-      () =>
-        sidePanel
-          .getByLabel('Model')
-          .locator('option')
-          .evaluateAll(options =>
-            options.map(option => (option instanceof HTMLOptionElement ? option.value : ''))
-          ),
-      { timeout: 30_000 }
-    )
-    .toContain(frontierModel);
-
-  await sidePanel.getByLabel('Model').selectOption(frontierModel);
+  await selectModelById(sidePanel, frontierModel);
 
   const thinkingValues = await sidePanel
     .getByLabel('Thinking effort')
@@ -402,7 +390,7 @@ test('live local backend keeps frontier conversations stable across modes, reloa
 
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByLabel(/Danger mode/u)).toBeVisible();
-    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expectSelectedModelId(sidePanel, frontierModel);
     await sidePanel.getByLabel(/Danger mode/u).click();
     await sidePanel.getByRole('button', { name: /^Safe/u }).click();
     await sidePanel.getByRole('tab').nth(0).click();
@@ -417,7 +405,7 @@ test('live local backend keeps frontier conversations stable across modes, reloa
 
     await sidePanel.reload();
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
-    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expectSelectedModelId(sidePanel, frontierModel);
     await expect(sidePanel.getByLabel(/Danger mode/u)).toBeVisible();
     await expect(
       getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
@@ -720,7 +708,7 @@ test('live local backend recovers after side panel reload during an active reque
       sidePanel.getByLabel('Agent conversation').getByText('LOCAL_RELOAD_ABORT')
     ).toBeVisible();
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
-    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expectSelectedModelId(sidePanel, frontierModel);
     await expect(
       getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
     ).resolves.toHaveProperty('kiloAuth');

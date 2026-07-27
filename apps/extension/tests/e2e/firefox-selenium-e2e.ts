@@ -326,6 +326,27 @@ const startKiloApiServer = async (): Promise<KiloApiHandle> => {
           return;
         }
 
+        {
+          const requestPath = (request.url ?? '').split('?')[0] ?? '';
+
+          if (requestPath.startsWith('/api/trpc/modelPreferences.')) {
+            if (requestPath.endsWith('/modelPreferences.get')) {
+              sendJson(response, {
+                result: { data: { favorites: [], lastSelected: null } },
+              });
+              return;
+            }
+
+            if (
+              requestPath.endsWith('/modelPreferences.addFavorite') ||
+              requestPath.endsWith('/modelPreferences.removeFavorite')
+            ) {
+              sendJson(response, { result: { data: { success: true } } });
+              return;
+            }
+          }
+        }
+
         if (request.url === '/api/gateway/models') {
           modelCalls += 1;
 
@@ -910,6 +931,91 @@ const getSelectText = async (driver: WebDriver, ariaLabel: string): Promise<stri
   return String(result);
 };
 
+const modelTriggerSelector = 'button[aria-label="Model"]';
+const modelDialogSelector = '[role="dialog"][aria-modal="true"][aria-label="Select model"]';
+
+const getModelTriggerText = async (driver: WebDriver): Promise<string> => {
+  const result = await driver.executeScript((selector: string) => {
+    const trigger = document.querySelector(selector);
+
+    if (!(trigger instanceof HTMLButtonElement)) {
+      return '';
+    }
+
+    return trigger.textContent?.trim() ?? '';
+  }, modelTriggerSelector);
+
+  return String(result);
+};
+
+/** Selected model id from the Model trigger (`data-model-id`). Ready for M3. */
+const getModelTriggerSelectedId = async (driver: WebDriver): Promise<string | null> => {
+  const result: unknown = await driver.executeScript((selector: string) => {
+    const trigger = document.querySelector(selector);
+
+    if (!(trigger instanceof HTMLButtonElement)) {
+      return null;
+    }
+
+    return trigger.dataset['modelId'] ?? null;
+  }, modelTriggerSelector);
+
+  if (typeof result === 'string') {
+    return result;
+  }
+
+  return null;
+};
+
+const modelOptionByIdLocator = (modelId: string): ReturnType<typeof By.xpath> =>
+  By.xpath(
+    `//*[@role="dialog" and @aria-modal="true" and @aria-label="Select model"]//button[@data-model-id=${JSON.stringify(modelId)}]`
+  );
+
+/** Select model by `data-model-id` (never by name). Mirrors Playwright helper. */
+const selectModelByIdFirefox = async (driver: WebDriver, modelId: string): Promise<void> => {
+  await waitUntil(
+    driver,
+    async () => {
+      const elements = await driver.findElements(By.css(modelTriggerSelector));
+
+      return elements.length > 0 && (await elements[0]?.isDisplayed()) === true;
+    },
+    'Timed out waiting for Model trigger'
+  );
+  await driver.findElement(By.css(modelTriggerSelector)).click();
+
+  const optionLocator = modelOptionByIdLocator(modelId);
+
+  await waitUntil(
+    driver,
+    async () => {
+      const elements = await driver.findElements(optionLocator);
+
+      return elements.length > 0 && (await elements[0]?.isDisplayed()) === true;
+    },
+    `Timed out waiting for model option ${modelId}`
+  );
+  await driver.findElement(optionLocator).click();
+
+  await waitUntil(
+    driver,
+    async () => {
+      const dialogs = await driver.findElements(By.css(modelDialogSelector));
+
+      return dialogs.length === 0;
+    },
+    `Timed out waiting for model dialog to close after selecting ${modelId}`
+  );
+};
+
+// Retain unused-until-M3 helpers without rewiring existing name-based waits.
+const modelPickerSeleniumHelpers = {
+  getModelTriggerSelectedId,
+  selectModelByIdFirefox,
+} as const;
+void modelPickerSeleniumHelpers;
+
 const getSelectOptionsText = async (driver: WebDriver, ariaLabel: string): Promise<string> => {
   const result = await driver.executeScript((label: string) => {
     const select = [...document.querySelectorAll('select')].find(
@@ -1173,9 +1279,9 @@ const waitForModel = async (driver: WebDriver, text = 'Claude Sonnet 4'): Promis
   await waitUntil(
     driver,
     async () => {
-      const selectText = await getSelectText(driver, 'Model');
+      const triggerText = await getModelTriggerText(driver);
 
-      return selectText.includes(text);
+      return triggerText.includes(text);
     },
     `Timed out waiting for model ${text}`
   );
@@ -2256,8 +2362,8 @@ const scenarios: FirefoxScenario[] = [
           await session.openSidePanel();
           await seedFirefoxAuth(session.driver);
           await session.driver.navigate().refresh();
-          assert.equal(await isControlDisabled(session.driver, 'select[aria-label="Model"]'), true);
-          assert.match(await getSelectText(session.driver, 'Model'), /Loading models/u);
+          assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
+          assert.match(await getModelTriggerText(session.driver), /Loading models/u);
           assert.equal(
             await isControlDisabled(session.driver, 'select[aria-label="Thinking effort"]'),
             true
@@ -2267,10 +2373,7 @@ const scenarios: FirefoxScenario[] = [
 
           releaseModels();
           await waitForModel(session.driver);
-          assert.equal(
-            await isControlDisabled(session.driver, 'select[aria-label="Model"]'),
-            false
-          );
+          assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), false);
           assert.equal(
             await isControlDisabled(session.driver, 'select[aria-label="Thinking effort"]'),
             false
@@ -2287,10 +2390,10 @@ const scenarios: FirefoxScenario[] = [
       withSession(context.api, { modelFailuresBeforeSuccess: 1 }, async session => {
         await openAuthenticatedPanel(session);
         await waitForText(session.driver, 'Could not load models.');
-        assert.equal(await isControlDisabled(session.driver, 'select[aria-label="Model"]'), true);
+        assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
         await clickButtonByText(session.driver, 'Retry models');
         await waitForModel(session.driver);
-        assert.equal(await isControlDisabled(session.driver, 'select[aria-label="Model"]'), false);
+        assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), false);
       }),
   },
   {
@@ -2326,11 +2429,8 @@ const scenarios: FirefoxScenario[] = [
             await setSelectByValue(session.driver, 'Credit account', 'org-2');
             await orgTwoModelsRequested;
             await clickButtonByLabel(session.driver, 'Close settings');
-            assert.equal(
-              await isControlDisabled(session.driver, 'select[aria-label="Model"]'),
-              true
-            );
-            assert.match(await getSelectText(session.driver, 'Model'), /Loading models/u);
+            assert.equal(await isControlDisabled(session.driver, modelTriggerSelector), true);
+            assert.match(await getModelTriggerText(session.driver), /Loading models/u);
             assert.equal(await isControlDisabled(session.driver, 'button[type="submit"]'), true);
             releaseOrgTwoModels();
             await waitForModel(session.driver, 'Org Two Model');
@@ -2392,7 +2492,7 @@ const scenarios: FirefoxScenario[] = [
             await new Promise(resolve => {
               setTimeout(resolve, 250);
             });
-            assert.match(await getSelectText(session.driver, 'Model'), /Org Two Model/u);
+            assert.match(await getModelTriggerText(session.driver), /Org Two Model/u);
           } finally {
             releaseOrgOneModels();
           }

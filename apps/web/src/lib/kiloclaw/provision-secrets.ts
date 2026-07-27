@@ -6,22 +6,9 @@ import {
 } from '@kilocode/kiloclaw-secret-catalog';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 
-const COMPOSIO_SECRET_FIELD_KEYS = ['composioUserApiKey', 'composioOrg'] as const;
-
-function hasComposioProvisionSecrets(secrets: Record<string, string>): boolean {
-  return COMPOSIO_SECRET_FIELD_KEYS.some(key => secrets[key] !== undefined);
-}
+const COMPOSIO_SECRET_FIELD_KEYS = ['composioConsumerKey'] as const;
 
 function validateComposioProvisionSecrets(secrets: Record<string, string>): void {
-  if (!hasComposioProvisionSecrets(secrets)) return;
-  const hasAllFields = COMPOSIO_SECRET_FIELD_KEYS.every(key => secrets[key] !== undefined);
-  if (!hasAllFields) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Composio requires all fields to be set together',
-    });
-  }
-
   for (const key of COMPOSIO_SECRET_FIELD_KEYS) {
     const value = secrets[key];
     if (value === undefined) continue;

@@ -1,6 +1,9 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
+import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
+
+export const metadata = { itunes: smartAppBannerItunes('/code-reviews') };
 
 type ReviewAgentPageProps = {
   searchParams: Promise<{ success?: string; error?: string; platform?: string }>;

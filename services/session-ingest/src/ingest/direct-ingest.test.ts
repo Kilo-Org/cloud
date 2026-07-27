@@ -330,6 +330,7 @@ describe('agent_notification direct ingest', () => {
       status: 'completed',
       body: 'All done',
       suppressIfViewingSession: true,
+      category: 'status',
     });
     expect(markAgentNotificationDispatched).not.toHaveBeenCalled();
   });

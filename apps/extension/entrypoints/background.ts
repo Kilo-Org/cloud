@@ -1,4 +1,19 @@
-import { enableActionClickSidePanel } from '@/src/shared/side-panel';
+import { storage } from '#imports';
+import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
+import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
+import {
+  ADD_TO_MEMORY_MENU_ID,
+  enableActionClickSidePanel,
+  openSidePanelInWindow,
+  registerAddToMemoryMenu,
+} from '@/src/shared/side-panel';
+import type {
+  NativeContextMenusApi,
+  NativeContextMenusOnClickData,
+  NativeContextMenusTab,
+  NativeSidePanelOpenApi,
+  NativeSidebarActionApi,
+} from '@/src/shared/side-panel';
 import {
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
@@ -22,6 +37,9 @@ import type {
 
 interface ChromeRuntimeApi {
   readonly id?: string;
+  readonly onInstalled?: {
+    readonly addListener: (listener: () => void) => void;
+  };
   readonly onMessage?: {
     readonly addListener: (
       listener: (
@@ -154,20 +172,101 @@ const handleTabDebuggerRequest = async ({
   }
 };
 
+const handleAddToMemoryClick = (
+  info: NativeContextMenusOnClickData,
+  tab: NativeContextMenusTab | undefined,
+  {
+    sidePanelOpen,
+    sidebarAction,
+  }: {
+    sidePanelOpen?: NativeSidePanelOpenApi | undefined;
+    sidebarAction?: NativeSidebarActionApi | undefined;
+  }
+): void => {
+  if (info.menuItemId !== ADD_TO_MEMORY_MENU_ID) {
+    return;
+  }
+
+  const draft = buildPendingMemoryDraft({
+    now: Date.now(),
+    pageTitle: tab?.title ?? '',
+    pageUrl: info.pageUrl ?? tab?.url ?? '',
+    selectionText: info.selectionText,
+  });
+
+  if (draft === undefined) {
+    return;
+  }
+
+  const windowId = tab?.windowId;
+  if (windowId !== undefined) {
+    // User-gesture contract: open synchronously before any await.
+    try {
+      const openResult = openSidePanelInWindow({
+        sidePanelOpen,
+        sidebarAction,
+        windowId,
+      });
+      // Fire-and-forget: must not await before storage save, and open failures are non-fatal.
+      // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- user-gesture open must not await
+      void Promise.resolve(openResult).catch((error: unknown) => {
+        console.warn('Failed to open side panel for Add to memory:', error);
+      });
+    } catch (error) {
+      console.warn('Failed to open side panel for Add to memory:', error);
+    }
+  }
+
+  // eslint-disable-next-line promise/prefer-await-to-then, promise/prefer-await-to-callbacks -- keep open/save non-blocking in the SW click path
+  void savePendingAgentMemoryDraft(storage, draft).catch((error: unknown) => {
+    console.warn('Failed to save pending agent memory draft:', error);
+  });
+};
+
 export default defineBackground(() => {
   const chromeApi = (
     globalThis as typeof globalThis & {
       chrome?: {
+        contextMenus?: NativeContextMenusApi;
         debugger?: ChromeDebuggerApi;
         runtime?: ChromeRuntimeApi;
         scripting?: BrowserScriptingApi;
-        sidePanel?: Parameters<typeof enableActionClickSidePanel>[0];
+        sidePanel?: Parameters<typeof enableActionClickSidePanel>[0] & NativeSidePanelOpenApi;
+        sidebarAction?: NativeSidebarActionApi;
         tabs?: BrowserTabsApi;
       };
     }
   ).chrome;
 
+  const browserGlobal = (
+    globalThis as typeof globalThis & {
+      browser?: {
+        contextMenus?: NativeContextMenusApi;
+        runtime?: ChromeRuntimeApi;
+        sidePanel?: NativeSidePanelOpenApi;
+        sidebarAction?: NativeSidebarActionApi;
+      };
+    }
+  ).browser;
+
+  const menusApi: NativeContextMenusApi | undefined =
+    browserGlobal?.contextMenus ?? chromeApi?.contextMenus;
+  const sidePanelOpen: NativeSidePanelOpenApi | undefined =
+    chromeApi?.sidePanel ?? browserGlobal?.sidePanel;
+  const sidebarAction: NativeSidebarActionApi | undefined =
+    browserGlobal?.sidebarAction ?? chromeApi?.sidebarAction;
+
   void enableActionClickSidePanel(chromeApi?.sidePanel);
+
+  void registerAddToMemoryMenu(menusApi);
+  const runtimeApi = browserGlobal?.runtime ?? chromeApi?.runtime;
+  runtimeApi?.onInstalled?.addListener(() => {
+    void registerAddToMemoryMenu(menusApi);
+  });
+
+  menusApi?.onClicked.addListener((info, tab) => {
+    handleAddToMemoryClick(info, tab, { sidePanelOpen, sidebarAction });
+  });
 
   chromeApi?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
     if (!isTrustedExtensionSender(sender, chromeApi?.runtime?.id)) {

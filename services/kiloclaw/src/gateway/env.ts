@@ -1,6 +1,7 @@
 import {
   ALL_SECRET_ENV_VARS,
   INTERNAL_SENSITIVE_ENV_VARS,
+  RETAINED_SENSITIVE_ENV_VARS,
 } from '@kilocode/kiloclaw-secret-catalog';
 import type { KiloClawEnv } from '../types';
 import type {
@@ -85,6 +86,7 @@ const SENSITIVE_KEYS = new Set([
   'OPENCLAW_GATEWAY_TOKEN',
   ...ALL_SECRET_ENV_VARS,
   ...INTERNAL_SENSITIVE_ENV_VARS,
+  ...RETAINED_SENSITIVE_ENV_VARS,
 ]);
 
 /**

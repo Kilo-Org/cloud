@@ -1,14 +1,17 @@
 // File-level row components for the PR diff FlashList.
 
-import { ChevronDown, ChevronRight, File, Link2 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { ChevronDown, ChevronRight, Eye, EyeOff, File, Link2 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
-import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+
+/** 36×36 visual box + 4pt hitSlop → ≥44×44 effective touch target (AC6). */
+const MARK_VIEWED_HIT_SLOP = 4;
 
 function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: boolean }) {
   const colors = useThemeColors();
@@ -19,6 +22,38 @@ function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: bool
     return <ChevronDown size={18} color={colors.mutedForeground} />;
   }
   return <ChevronRight size={18} color={colors.mutedForeground} />;
+}
+
+/** Fixed-size mark-viewed icon toggle — no path-text reflow on toggle (D9/AC6). */
+export function MarkViewedToggle({
+  path,
+  viewed,
+  onToggle,
+}: {
+  path: string;
+  viewed: boolean;
+  onToggle: () => void;
+}) {
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      onPress={() => {
+        void Haptics.selectionAsync();
+        onToggle();
+      }}
+      hitSlop={MARK_VIEWED_HIT_SLOP}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: viewed }}
+      accessibilityLabel={viewed ? `Unmark ${path} as viewed` : `Mark ${path} as viewed`}
+      className="h-9 w-9 items-center justify-center active:opacity-70"
+    >
+      {viewed ? (
+        <Eye size={18} color={colors.foreground} />
+      ) : (
+        <EyeOff size={18} color={colors.mutedForeground} />
+      )}
+    </Pressable>
+  );
 }
 
 export function TruncationBannerRow({ text }: { text: string }) {
@@ -54,38 +89,34 @@ export function FileHeaderRow({
       <View className="flex-row items-center gap-2">
         <Pressable
           onPress={hasDiff ? onToggleExpand : undefined}
-          hitSlop={8}
+          disabled={!hasDiff}
           accessibilityRole="button"
           accessibilityLabel={expanded ? 'Collapse file' : 'Expand file'}
-          accessibilityState={{ expanded }}
-          className="h-7 w-7 items-center justify-center"
+          accessibilityState={{ expanded, disabled: !hasDiff }}
+          className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
         >
-          <ExpandChevron hasDiff={hasDiff} expanded={expanded} />
+          <View className="h-7 w-7 items-center justify-center">
+            <ExpandChevron hasDiff={hasDiff} expanded={expanded} />
+          </View>
+          <StatusIcon size={14} color={colors.mutedForeground} />
+          <View className="flex-1">
+            <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
+              {pathLine}
+            </Text>
+            <View className="mt-0.5 flex-row items-center gap-2">
+              <Text variant="muted" className="text-xs">
+                {fileStatusLabel(file.status)}
+              </Text>
+              <Text variant="muted" className="text-xs">
+                +{file.additions}
+              </Text>
+              <Text variant="muted" className="text-xs">
+                -{file.deletions}
+              </Text>
+            </View>
+          </View>
         </Pressable>
-        <StatusIcon size={14} color={colors.mutedForeground} />
-        <View className="flex-1">
-          <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
-            {pathLine}
-          </Text>
-          <View className="mt-0.5 flex-row items-center gap-2">
-            <Text variant="muted" className="text-xs">
-              {fileStatusLabel(file.status)}
-            </Text>
-            <Text variant="muted" className="text-xs">
-              +{file.additions}
-            </Text>
-            <Text variant="muted" className="text-xs">
-              -{file.deletions}
-            </Text>
-          </View>
-        </View>
-        <ChoiceRow multi selected={viewed} onPress={onToggleViewed} className="min-h-9 px-1">
-          <View className="flex-row items-center gap-1.5 pr-2">
-            <Text variant="muted" className="text-xs">
-              {viewed ? 'Viewed' : 'Mark viewed'}
-            </Text>
-          </View>
-        </ChoiceRow>
+        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
       </View>
     </View>
   );
@@ -113,13 +144,7 @@ export function PatchMissingRow({
             {file.path}
           </Text>
         </View>
-        <ChoiceRow multi selected={viewed} onPress={onToggleViewed} className="min-h-9 px-1">
-          <View className="flex-row items-center gap-1.5 pr-2">
-            <Text variant="muted" className="text-xs">
-              {viewed ? 'Viewed' : 'Mark viewed'}
-            </Text>
-          </View>
-        </ChoiceRow>
+        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
       </View>
       <Pressable
         onPress={() => {

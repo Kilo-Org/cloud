@@ -56,7 +56,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
-import { rewriteFreeModelResponse } from '@/lib/rewriteModelResponse';
+import { rewriteModelResponse, logUnrewrittenResponse } from '@/lib/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -69,7 +69,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
 import {
   classifyAbuse,
   awaitClassifyAbuse,
@@ -880,9 +879,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   const response = upstreamResult.response;
   logExceptInTest(
-    'upstream response status: %s, x-vercel-id: %s',
+    'upstream response status: %s, x-vercel-id: %s, session_id: %s',
     response.status,
-    response.headers.get('x-vercel-id') || '<none>'
+    response.headers.get('x-vercel-id') || '<none>',
+    usageContext.session_id || '<none>'
   );
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
@@ -956,16 +956,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  await handleRequestLogging({
-    clonedResponse: response.clone(),
+  const requestLogging = {
     user: maybeUser,
     organization_id: organizationId || null,
-    provider: effectiveProviderContext.provider.id,
-    model: effectiveModelIdLowerCased,
     session_id: usageContext.session_id,
     vercel_request_id: extractHeaderAndLimitLength(request, 'x-vercel-id'),
     request: requestBodyParsed,
-  });
+  };
 
   {
     const errorResponse = await makeErrorReadable({
@@ -976,15 +973,22 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
+      await logUnrewrittenResponse(
+        response,
+        effectiveModelIdLowerCased,
+        effectiveProviderContext.provider.id,
+        requestLogging
+      );
       return errorResponse;
     }
   }
 
-  const rewrittenResponse = await rewriteFreeModelResponse(
+  const rewrittenResponse = await rewriteModelResponse(
     response,
     effectiveModelIdLowerCased,
     effectiveProviderContext.provider.id,
-    requestBodyParsed.kind
+    requestBodyParsed.kind,
+    requestLogging
   );
   if (rewrittenResponse) {
     return rewrittenResponse;

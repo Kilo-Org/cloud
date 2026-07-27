@@ -95,14 +95,39 @@ describe('ack store state machine', () => {
     expect(isAttentionAcked('s1', 'R2')).toBe(false);
   });
 
-  it('re-opening a session with a stale resolved ack re-pends and hides the new raise', () => {
+  it('a later successful answer re-pends a resolved ack and hides the new raise', () => {
     ackSessionAttention('s1');
     reconcileSessionAttention('s1', 'question', 'R1');
     // new raise R2 arrives and is not acked
     expect(isAttentionAcked('s1', 'R2')).toBe(false);
-    // user opens the session again → ack overwrites with pending
+    // user answers again → ack overwrites with pending
     ackSessionAttention('s1');
     expect(isAttentionAcked('s1', 'R2')).toBe(true);
+  });
+
+  it('without an ack, opening alone leaves the badge visible for any raise', () => {
+    // DEF-4: no on-mount ack — viewing a blocked session must not hide NEEDS INPUT
+    expect(isAttentionAcked('s1', 'R1')).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'question',
+        raiseId: 'R1',
+        isAcked: isAttentionAcked('s1', 'R1'),
+      })
+    ).toBe(true);
+  });
+
+  it('acking one session never suppresses a raise on a different session', () => {
+    ackSessionAttention('s1');
+    expect(isAttentionAcked('s1', 'R1')).toBe(true);
+    expect(isAttentionAcked('s2', 'R1')).toBe(false);
+    expect(
+      shouldShowNeedsInput({
+        status: 'question',
+        raiseId: 'R1',
+        isAcked: isAttentionAcked('s2', 'R1'),
+      })
+    ).toBe(true);
   });
 
   it('reconcile deletes the entry on a non-attention status, so the next raise shows', () => {
@@ -133,8 +158,8 @@ describe('ack store state machine', () => {
     expect(isAttentionAcked('s1', 'question')).toBe(false);
   });
 
-  it('frozen-return sequence: pending entry resolves via reconcile, then next raise is not absorbed', () => {
-    // raise R1 observed, then user opens the session (ack → pending)
+  it('answer-then-clear sequence: pending entry resolves via reconcile, then next raise is not absorbed', () => {
+    // user answers (ack → pending), then status still reports the same raise
     ackSessionAttention('s1');
     // reconcile resolves the pending entry to R1
     reconcileSessionAttention('s1', 'question', 'R1');
@@ -217,7 +242,7 @@ describe('revision snapshot and listener notification', () => {
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribe(listener);
 
-    // Repeated open of the same still-pending session is a no-op.
+    // Repeated successful answers while still pending is a no-op.
     ackSessionAttention('s1');
     ackSessionAttention('s1');
 

@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { GitPullRequest } from 'lucide-react-native';
+import { type Href, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { CheckCheck, GitPullRequest } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -20,9 +21,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { WEB_BASE_URL } from '@/lib/config';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useTRPC } from '@/lib/trpc';
+
+const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
 type PrReviewOverviewProps = {
   readonly owner: string;
@@ -67,8 +71,18 @@ export function PrReviewOverview({
 }: PrReviewOverviewProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const colors = useThemeColors();
 
   const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
+
+  const handleOpenReviewSubmit = useCallback(() => {
+    const href: Href = {
+      pathname: REVIEW_SUBMIT_PATH,
+      params: { owner, repo, number },
+    };
+    router.push(href);
+  }, [owner, repo, number, router]);
 
   const handleReconnect = useCallback(() => {
     // A PRECONDITION_FAILED here means the gate's authorization is no
@@ -96,6 +110,7 @@ export function PrReviewOverview({
     if (state.kind === 'not-found') {
       return (
         <EmptyState
+          placement="top"
           icon={GitPullRequest}
           title="Pull request unavailable"
           description="This PR can't be opened. It may have been deleted, the repository is private, or the Kilo GitHub App isn't installed on it."
@@ -111,6 +126,7 @@ export function PrReviewOverview({
       // Terminal — no CTA. The user has no recourse from this screen.
       return (
         <EmptyState
+          placement="top"
           icon={GitPullRequest}
           title="Access denied"
           description="You don't have permission to view this pull request."
@@ -120,6 +136,7 @@ export function PrReviewOverview({
     if (state.kind === 'reconnect') {
       return (
         <EmptyState
+          placement="top"
           icon={GitPullRequest}
           title="GitHub connection expired"
           description="Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
@@ -134,6 +151,7 @@ export function PrReviewOverview({
     // retryable
     return (
       <QueryError
+        placement="top"
         variant="server"
         title="Could not load pull request"
         onRetry={() => {
@@ -197,6 +215,18 @@ export function PrReviewOverview({
       </View>
 
       <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
+
+      <View className="gap-2">
+        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+          Review
+        </Text>
+        <Button onPress={handleOpenReviewSubmit} accessibilityLabel="Review pull request">
+          <View className="flex-row items-center gap-2">
+            <CheckCheck size={14} color={colors.primaryForeground} />
+            <Text>Review</Text>
+          </View>
+        </Button>
+      </View>
 
       <PrMergeSection
         owner={owner}

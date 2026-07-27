@@ -176,6 +176,27 @@ describe('organization review agent router: council config', () => {
     expect(cfg.council?.specialists).toHaveLength(2);
     expect(cfg.councilEnabledRepositoryIds).toEqual([123, 456]);
   });
+
+  it('round-trips the council required_labels selection gate', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'anthropic/claude-sonnet-5',
+      council: { ...activeCouncil, required_labels: ['council', 'needs-deep-review'] },
+      councilEnabledRepositoryIds: [123],
+    });
+
+    const cfg = await caller.organizations.reviewAgent.getReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+    });
+    expect(cfg.council?.required_labels).toEqual(['council', 'needs-deep-review']);
+  });
 });
 
 describe('organization review agent router: patchReviewConfig', () => {

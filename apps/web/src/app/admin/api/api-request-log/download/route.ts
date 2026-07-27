@@ -2,7 +2,7 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, type SQL } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 
@@ -67,7 +67,8 @@ function buildFilter(
   parsedStart: Date | null,
   parsedEnd: Date | null,
   model: string | null,
-  sessionId: string | null
+  sessionId: string | null,
+  errorsOnly: boolean
 ) {
   const conditions: SQL[] = [];
   if (userId) {
@@ -84,6 +85,15 @@ function buildFilter(
   }
   if (sessionId) {
     conditions.push(eq(api_request_log.session_id, sessionId));
+  }
+  if (errorsOnly) {
+    const errorsCondition = or(
+      gte(api_request_log.status_code, 400),
+      isNotNull(api_request_log.error)
+    );
+    if (errorsCondition) {
+      conditions.push(errorsCondition);
+    }
   }
   return and(...conditions);
 }
@@ -102,6 +112,7 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get('endDate');
   const model = searchParams.get('model');
   const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
+  const errorsOnly = searchParams.get('errorsOnly') === 'true';
 
   const parsedStart = startDate ? parseDate(startDate) : null;
   const parsedEnd = endDate ? parseDate(endDate + 'T23:59:59.999Z') : null;
@@ -109,7 +120,7 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
-  const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId);
+  const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId, errorsOnly);
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {
@@ -147,6 +158,13 @@ export async function GET(request: NextRequest) {
         if (responseContent) {
           archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
         }
+
+        if (row.error !== null && row.error !== undefined) {
+          const errorContent = tryFormatJson(row.error);
+          if (errorContent) {
+            archive.append(errorContent, { name: `${ts}_${id}_error.json` });
+          }
+        }
       }
 
       cursor = rows[rows.length - 1].id;
@@ -183,7 +201,8 @@ export async function GET(request: NextRequest) {
   const safeUserId = userId ? sanitize(userId) : 'all-users';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
-  const filename = `api-request-log_${safeUserId}_${startDate ?? 'any-start'}_${endDate ?? 'any-end'}${safeModel}${safeSessionId}.zip`;
+  const safeErrorsOnly = errorsOnly ? '_errors-only' : '';
+  const filename = `api-request-log_${safeUserId}_${startDate ?? 'any-start'}_${endDate ?? 'any-end'}${safeModel}${safeSessionId}${safeErrorsOnly}.zip`;
 
   return new Response(webStream, {
     headers: {

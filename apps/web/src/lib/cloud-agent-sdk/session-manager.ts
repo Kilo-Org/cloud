@@ -65,6 +65,11 @@ import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
 type SessionManagerSendPayload = SessionManagerPromptPayload | SendCommandPayload;
+/** In-session cloud-agent model pick. Separate from remoteModelOverride — no remote clear rules. */
+type CloudAgentModelOverride = {
+  model: string;
+  variant?: string;
+};
 type SessionStatusIndicator = {
   type: 'error' | 'warning' | 'info' | 'progress';
   message: string;
@@ -147,6 +152,9 @@ type FetchedSessionData = {
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
   associatedPr: AssociatedPrData | null;
+  totalCostMicrodollars?: number | null;
+  /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
+  createdOnPlatform?: string | null;
 };
 
 type PrepareInput = {
@@ -217,6 +225,8 @@ type SessionManagerAtoms = {
   remoteCommandState: W<RemoteCommandState>;
   observedModel: W<ModelSelection | null>;
   remoteModelOverride: W<RemoteModelOverride | null>;
+  /** Session-scoped cloud-agent model pick; cleared on switchSession. Not remote. */
+  cloudAgentModelOverride: W<CloudAgentModelOverride | null>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
   statusIndicator: W<SessionStatusIndicator | null>;
@@ -286,6 +296,7 @@ type SessionManager = {
     attachmentParts?: RemoteAttachmentPart[];
   }): Promise<boolean>;
   setRemoteModelOverride(override: RemoteModelOverride | null): void;
+  setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
   retryRemoteModels(): void;
   retryRemoteCommands(): void;
   createRemoteSession(): Promise<KiloSessionId>;
@@ -425,6 +436,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const remoteCommandStateAtom = atom<RemoteCommandState>(EMPTY_REMOTE_COMMAND_STATE);
   const observedModelAtom = atom<ModelSelection | null>(null);
   const remoteModelOverrideAtom = atom<RemoteModelOverride | null>(null);
+  const cloudAgentModelOverrideAtom = atom<CloudAgentModelOverride | null>(null);
   const canSendAtom = atom(false);
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
@@ -574,6 +586,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     observedModelSource = null;
     remoteHistoryReplaying = true;
     store.set(remoteModelOverrideAtom, null);
+    store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -1174,6 +1187,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onReplayComplete: () => {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
+        store.set(isLoadingAtom, false);
       },
 
       onBranchChanged: branch => {
@@ -1265,7 +1279,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onFirstActivity: () => {
         // Fallback: clear loading when events flow even if no root
         // session.created was replayed (e.g. CLI snapshot failure).
-        store.set(isLoadingAtom, false);
+        // While a remote session's initial history replay is in flight,
+        // onReplayComplete owns the clear; clearing here would flash the
+        // empty state before replayed messages land.
+        if (!(activeSessionType === 'remote' && remoteHistoryReplaying)) {
+          store.set(isLoadingAtom, false);
+        }
         if (activeSessionType === 'remote') {
           config.onRemoteSessionOpened?.({ kiloSessionId });
         }
@@ -1296,6 +1315,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         ? `/${input.payload.command}${input.payload.arguments ? ` ${input.payload.arguments}` : ''}`
         : input.payload.prompt;
     const remoteModelOverride = store.get(remoteModelOverrideAtom);
+    const cloudAgentModelOverride = store.get(cloudAgentModelOverrideAtom);
     let transportPayload: TransportSendPayload;
     if (input.payload.type === 'command') {
       transportPayload = input.payload;
@@ -1314,14 +1334,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           : {}),
       };
     } else {
+      // Prefer the in-session cloud-agent override over the payload so a stale
+      // composer model cannot bypass the manager's single source of truth.
+      const cloudModel = cloudAgentModelOverride?.model ?? input.payload.model;
+      const cloudVariant = cloudAgentModelOverride
+        ? cloudAgentModelOverride.variant
+        : input.payload.variant;
       transportPayload = {
         type: 'prompt',
         prompt: input.payload.prompt,
         ...(input.payload.mode ? { mode: input.payload.mode } : {}),
-        ...(input.payload.model
-          ? { model: { providerID: 'kilo', modelID: input.payload.model } }
-          : {}),
-        ...(input.payload.model && input.payload.variant ? { variant: input.payload.variant } : {}),
+        ...(cloudModel ? { model: { providerID: 'kilo', modelID: cloudModel } } : {}),
+        ...(cloudModel && cloudVariant ? { variant: cloudVariant } : {}),
       };
     }
 
@@ -1440,6 +1464,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(remoteModelOverrideAtom, override);
   }
 
+  function setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void {
+    store.set(cloudAgentModelOverrideAtom, override);
+  }
+
   function retryRemoteModels(): void {
     currentSession?.retryRemoteModels();
   }
@@ -1485,6 +1513,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     loadOlderMessages,
     send,
     setRemoteModelOverride,
+    setCloudAgentModelOverride,
     retryRemoteModels,
     retryRemoteCommands,
     createRemoteSession,
@@ -1511,6 +1540,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       remoteCommandState: remoteCommandStateAtom,
       observedModel: observedModelAtom,
       remoteModelOverride: remoteModelOverrideAtom,
+      cloudAgentModelOverride: cloudAgentModelOverrideAtom,
       canSend: canSendAtom,
       canInterrupt: canInterruptAtom,
       statusIndicator: statusIndicatorAtom,
@@ -1553,6 +1583,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError };
 export type {
   ActiveSessionType,
+  CloudAgentModelOverride,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,

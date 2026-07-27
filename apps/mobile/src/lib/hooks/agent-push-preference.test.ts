@@ -2,11 +2,13 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
 import {
-  applyAgentPushOptimistic,
-  DEFAULT_AGENT_PUSH_ENABLED,
+  DEFAULT_NOTIFICATION_PREFERENCE,
   deriveAgentPushEditable,
+  deriveGateSettled,
+  deriveShowEnableCta,
+  NOTIFICATION_CATEGORY_KEYS,
+  type NotificationPreferences,
   readAgentPushPreference,
-  rollbackAgentPushOptimistic,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;
@@ -15,9 +17,37 @@ function makeQueryClient(): QueryClient {
   return new QueryClient();
 }
 
-describe('DEFAULT_AGENT_PUSH_ENABLED', () => {
-  it('is true (default ON per plan §4.5)', () => {
-    expect(DEFAULT_AGENT_PUSH_ENABLED).toBe(true);
+function fullRow(overrides: Partial<NotificationPreferences> = {}): NotificationPreferences {
+  return {
+    chatMessages: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentAttention: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentUpdates: DEFAULT_NOTIFICATION_PREFERENCE,
+    sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
+    kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
+    balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
+    agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
+    ...overrides,
+  };
+}
+
+describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
+  it('is true (default ON per plan)', () => {
+    expect(DEFAULT_NOTIFICATION_PREFERENCE).toBe(true);
+  });
+});
+
+describe('NOTIFICATION_CATEGORY_KEYS', () => {
+  it('lists the categories rendered on the dedicated screen including balance and security', () => {
+    expect([...NOTIFICATION_CATEGORY_KEYS]).toEqual([
+      'chatMessages',
+      'agentAttention',
+      'agentUpdates',
+      'sessionStatus',
+      'kiloclawActivity',
+      'balanceAlerts',
+      'securityFindings',
+    ]);
   });
 });
 
@@ -39,69 +69,97 @@ describe('deriveAgentPushEditable', () => {
   });
 });
 
-describe('readAgentPushPreference', () => {
-  it('returns the default when the cache has no snapshot', () => {
-    const qc = makeQueryClient();
-    expect(readAgentPushPreference(qc, key)).toBe(DEFAULT_AGENT_PUSH_ENABLED);
+describe('deriveShowEnableCta (empty-state CTA presence)', () => {
+  it('shows the CTA when notifications are disabled (permission not granted OR no backend token)', () => {
+    expect(deriveShowEnableCta(false)).toBe(true);
   });
 
-  it('returns the cached value when present (true)', () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(key, { agentPushEnabled: true });
-    expect(readAgentPushPreference(qc, key)).toBe(true);
-  });
-
-  it('returns the cached value when present (false)', () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(key, { agentPushEnabled: false });
-    expect(readAgentPushPreference(qc, key)).toBe(false);
+  it('hides the CTA when notifications are fully enabled', () => {
+    expect(deriveShowEnableCta(true)).toBe(false);
   });
 });
 
-describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic', () => {
-  it('writes the new value and returns the previous snapshot for rollback', async () => {
-    const qc = makeQueryClient();
-    qc.setQueryData(key, { agentPushEnabled: true });
+describe('deriveGateSettled (master gate settle flap)', () => {
+  // Truth table: permissionSettled, granted, pushTokensSettled, deviceTokenSettled → result
+  const cases: [boolean, boolean, boolean, boolean, boolean, string][] = [
+    [false, false, false, false, false, 'permission loading'],
+    [false, true, true, true, false, 'permission loading ignores settled tokens'],
+    // Denied / permission-error (granted falsy): short-circuit; token flags irrelevant
+    [true, false, false, false, true, 'denied short-circuits unsettled tokens'],
+    [true, false, true, true, true, 'denied with settled tokens still true'],
+    // Granted: both token queries must settle (isFetched || isError each)
+    [true, true, false, true, false, 'granted, pushTokens in flight'],
+    [true, true, true, false, false, 'granted, deviceToken in flight'],
+    [true, true, false, false, false, 'granted, both tokens in flight'],
+    [true, true, true, true, true, 'granted, both tokens settled'],
+  ];
 
-    const { previous } = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
+  for (const [
+    permissionSettled,
+    permissionGranted,
+    pushTokensSettled,
+    deviceTokenSettled,
+    expected,
+    label,
+  ] of cases) {
+    it(label, () => {
+      expect(
+        deriveGateSettled({
+          permissionSettled,
+          permissionGranted,
+          pushTokensSettled,
+          deviceTokenSettled,
+        })
+      ).toBe(expected);
     });
+  }
+});
 
-    expect(previous).toEqual({ agentPushEnabled: true });
-    expect(qc.getQueryData(key)).toEqual({ agentPushEnabled: false });
+describe('readAgentPushPreference', () => {
+  it('returns the default for the requested category when the cache has no snapshot', () => {
+    const qc = makeQueryClient();
+    for (const category of NOTIFICATION_CATEGORY_KEYS) {
+      expect(readAgentPushPreference(qc, key, category)).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    }
   });
 
-  it('rolls back to the previous snapshot on error', async () => {
+  it('returns the cached value for each category when the full row is present', () => {
     const qc = makeQueryClient();
-    qc.setQueryData(key, { agentPushEnabled: true });
-
-    const { previous } = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
+    qc.setQueryData(key, {
+      chatMessages: true,
+      agentAttention: false,
+      agentUpdates: true,
+      sessionStatus: false,
+      kiloclawActivity: true,
+      balanceAlerts: false,
+      securityFindings: true,
+      agentPushEnabled: true,
     });
-    expect(qc.getQueryData(key)).toEqual({ agentPushEnabled: false });
-
-    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, previous });
-    expect(qc.getQueryData(key)).toEqual({ agentPushEnabled: true });
+    expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'agentAttention')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'sessionStatus')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'kiloclawActivity')).toBe(true);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
-  it('rolls back from a default-ON starting state (no prior cache entry)', async () => {
+  it('maps the legacy `agentPushEnabled` snapshot to the agentUpdates category', () => {
     const qc = makeQueryClient();
-    expect(qc.getQueryData(key)).toBeUndefined();
+    qc.setQueryData(key, { agentPushEnabled: false });
+    expect(readAgentPushPreference(qc, key, 'agentUpdates')).toBe(false);
+    // Non-agentUpdates categories fall back to the default when only the
+    // legacy field is present.
+    expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
+      DEFAULT_NOTIFICATION_PREFERENCE
+    );
+  });
 
-    const { previous } = await applyAgentPushOptimistic({
-      queryClient: qc,
-      queryKey: key,
-      next: false,
-    });
-    expect(previous).toBeUndefined();
-    expect(qc.getQueryData(key)).toEqual({ agentPushEnabled: false });
-
-    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, previous });
-    // No prior snapshot => cache restored to the absent state, not a fabricated true.
-    expect(qc.getQueryData(key)).toBeUndefined();
+  it('defaults to the agentUpdates category when no category is passed', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ agentUpdates: false }));
+    expect(readAgentPushPreference(qc, key)).toBe(false);
   });
 });

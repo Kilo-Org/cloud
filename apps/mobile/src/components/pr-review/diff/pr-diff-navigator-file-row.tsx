@@ -1,19 +1,15 @@
-// A single file row in the PR file navigator sheet. Tap to open the
-// file in the diff list (sends a `requestScrollToFile` request and
-// dismisses the sheet). A separate "Mark viewed" pressable toggles
-// the per-PR viewed set without dismissing.
-//
-// Owns no haptics — the row's tap is a navigation action, the viewed
-// toggle is a checkbox, and both flows already play the
-// system/keyboard sound the navigator sheet needs (the row tap goes
-// through the navigator which dismisses; the toggle is a deliberate
-// state change with a visible "Viewed" / "Mark viewed" label).
+// A single file row in the PR file navigator sheet. Tap the path/stats
+// cluster to open the file in the diff list (sends a
+// `requestScrollToFile` request and dismisses the sheet). A separate
+// trailing mark-viewed icon toggle flips the per-PR viewed set without
+// dismissing — non-nested sibling of the select pressable (AC6).
 
 import { Pressable, View } from 'react-native';
 
+import { MarkViewedToggle } from '@/components/pr-review/diff/pr-diff-file-rows';
 import { Text } from '@/components/ui/text';
-import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 
 function splitPath(path: string): { dir: string; basename: string } {
   const slash = path.lastIndexOf('/');
@@ -37,19 +33,19 @@ export function NavigatorFileRow({
   const colors = useThemeColors();
   const { dir, basename } = splitPath(file.path);
   return (
-    <View className="border-b border-hair-soft bg-card">
+    <View className="flex-row items-center gap-3 border-b border-hair-soft bg-card px-4 py-2.5">
       <Pressable
         onPress={onSelect}
         accessibilityRole="button"
         accessibilityLabel={`Open ${file.path}${viewed ? ' (viewed)' : ''}`}
-        className="min-h-11 flex-row items-center justify-between px-4 py-2.5 active:opacity-70"
+        className="min-h-11 min-w-0 flex-1 flex-row items-center active:opacity-70"
       >
-        <View className="flex-1 pr-3">
-          <View className="flex-row items-baseline">
+        <View className="min-w-0 flex-1">
+          <View className="min-w-0 flex-row items-baseline">
             {dir.length > 0 ? (
               <Text
                 variant="muted"
-                className="text-sm"
+                className="min-w-0 shrink text-sm"
                 // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
                 style={{ color: colors.mutedForeground }}
                 numberOfLines={1}
@@ -57,7 +53,7 @@ export function NavigatorFileRow({
                 {dir}
               </Text>
             ) : null}
-            <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+            <Text className="shrink-0 text-sm font-medium text-foreground" numberOfLines={1}>
               {basename}
             </Text>
           </View>
@@ -76,21 +72,8 @@ export function NavigatorFileRow({
           </View>
         </View>
       </Pressable>
-      <View className="flex-row items-center justify-end px-4 pb-2">
-        <Pressable
-          onPress={onToggleViewed}
-          hitSlop={10}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: viewed }}
-          accessibilityLabel={
-            viewed ? `Unmark ${file.path} as viewed` : `Mark ${file.path} as viewed`
-          }
-          className="rounded-md border border-border bg-card px-2 py-1 active:opacity-70"
-        >
-          <Text className="text-[11px] font-medium text-foreground">
-            {viewed ? 'Viewed' : 'Mark viewed'}
-          </Text>
-        </Pressable>
+      <View className="shrink-0">
+        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
       </View>
     </View>
   );

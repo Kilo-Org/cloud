@@ -57,6 +57,7 @@ import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from '@kilocode/organization-entitlement';
+import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -142,6 +143,12 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
+  integrations: z.array(
+    z.object({
+      platform: z.string(),
+      installation_count: z.number(),
+    })
+  ),
 });
 
 const OrganizationHierarchySummarySchema = z.object({
@@ -446,22 +453,38 @@ export const organizationAdminRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { organizationId } = input;
 
-      const organizationDetails = await db
-        .select({
-          id: organizations.id,
-          name: organizations.name,
-          created_at: organizations.created_at,
-          updated_at: organizations.updated_at,
-          total_microdollars_acquired: organizations.total_microdollars_acquired,
-          microdollars_used: organizations.microdollars_used,
-          created_by_kilo_user_id: organizations.created_by_kilo_user_id,
-          created_by_user_email: kilocode_users.google_user_email,
-          created_by_user_name: kilocode_users.google_user_name,
-        })
-        .from(organizations)
-        .leftJoin(kilocode_users, eq(organizations.created_by_kilo_user_id, kilocode_users.id))
-        .where(eq(organizations.id, organizationId))
-        .limit(1);
+      const [organizationDetails, integrations] = await Promise.all([
+        db
+          .select({
+            id: organizations.id,
+            name: organizations.name,
+            created_at: organizations.created_at,
+            updated_at: organizations.updated_at,
+            total_microdollars_acquired: organizations.total_microdollars_acquired,
+            microdollars_used: organizations.microdollars_used,
+            created_by_kilo_user_id: organizations.created_by_kilo_user_id,
+            created_by_user_email: kilocode_users.google_user_email,
+            created_by_user_name: kilocode_users.google_user_name,
+          })
+          .from(organizations)
+          .leftJoin(kilocode_users, eq(organizations.created_by_kilo_user_id, kilocode_users.id))
+          .where(eq(organizations.id, organizationId))
+          .limit(1),
+        db
+          .select({
+            platform: platform_integrations.platform,
+            installation_count: count(),
+          })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_organization_id, organizationId),
+              eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+            )
+          )
+          .groupBy(platform_integrations.platform)
+          .orderBy(asc(platform_integrations.platform)),
+      ]);
 
       if (!organizationDetails || organizationDetails.length === 0) {
         throw new TRPCError({
@@ -470,7 +493,7 @@ export const organizationAdminRouter = createTRPCRouter({
         });
       }
 
-      return organizationDetails[0];
+      return { ...organizationDetails[0], integrations };
     }),
 
   getHierarchy: adminProcedure

@@ -21,6 +21,9 @@ export default defineConfig({
       'cloud-agent-sdk/remote-command-catalog': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/remote-command-catalog.ts', import.meta.url)
       ),
+      'cloud-agent-sdk/part-utils': fileURLToPath(
+        new URL('../../apps/web/src/lib/cloud-agent-sdk/part-utils.ts', import.meta.url)
+      ),
       // kilocode_change - K1/C2: narrow subpaths for the `kilo remote` spawn
       // hook. These two files have a self-contained import graph (schemas,
       // base-connection, runtime, types — no `@/...` web-app-alias imports),

@@ -29,6 +29,7 @@ export {
   ALL_SECRET_ENV_VARS,
   MAX_SECRET_FIELD_LENGTH,
   INTERNAL_SENSITIVE_ENV_VARS,
+  RETAINED_SENSITIVE_ENV_VARS,
   getEntriesByCategory,
   getFieldKeysByCategory,
   // Custom secret helpers

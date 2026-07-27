@@ -18,6 +18,20 @@ export function isPlatformIntegrationHealthy(
   );
 }
 
+type PlatformIntegrationSuspensionState = Pick<
+  PlatformIntegrationHealthState,
+  'integration_status' | 'suspended_at'
+>;
+
+export function isPlatformIntegrationSuspended(
+  integration: PlatformIntegrationSuspensionState | null | undefined
+): boolean {
+  return (
+    integration?.integration_status === INTEGRATION_STATUS.SUSPENDED ||
+    integration?.suspended_at != null
+  );
+}
+
 export function platformIntegrationHealthSql(): SQL {
   return sql`
     ${platform_integrations.integration_status} = ${INTEGRATION_STATUS.ACTIVE}

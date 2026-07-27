@@ -36,7 +36,7 @@ const DESCRIPTION_MAP: Record<string, string> = {
   agentcard: 'Give your bot virtual debit cards for spending',
   onepassword: 'Look up credentials and manage vault items via the op CLI',
   'brave-search': 'Add a Brave Search API key for web search',
-  composio: 'Sign the Composio CLI into this sandbox',
+  composio: 'Connect your Composio toolkits',
 };
 
 export function getDescription(entryId: string): string {

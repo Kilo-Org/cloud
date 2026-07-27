@@ -55,11 +55,14 @@ const conversationEventSchema = z.union([
   z.object({
     elementId: z.string().optional(),
     id: z.string(),
+    memoryId: z.string().optional(),
     name: z.enum([
       'find_in_page',
       'get_element_details',
+      'get_memory',
       'get_page_snapshot',
       'get_viewport_screenshot',
+      'search_memories',
     ]),
     providerToolCallId: z.string().optional(),
     query: z.string().optional(),
@@ -177,6 +180,7 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
         events.push({
           ...(event.elementId === undefined ? {} : { elementId: event.elementId }),
           id: event.id,
+          ...(event.memoryId === undefined ? {} : { memoryId: event.memoryId }),
           name: event.name,
           ...(event.providerToolCallId === undefined
             ? {}

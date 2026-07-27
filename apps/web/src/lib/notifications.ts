@@ -55,6 +55,13 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
+    id: 'mercury-edit-2-extension-july-24',
+    title: 'Free Mercury Edit 2 access extended',
+    message: 'Free access to Mercury Edit 2 has been extended until Friday, July 24 at 12 PM ET.',
+    showIn: ['extension'],
+    expiresAt: '2026-07-24T16:00:00Z',
+  },
+  {
     id: 'legacy-upgrade-june-2026',
     title: 'Kilo Code 5.x: End of Life July 31, 2026',
     message:

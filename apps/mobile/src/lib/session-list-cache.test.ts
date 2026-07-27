@@ -25,6 +25,7 @@ function makeSession(
     updated_at: '2026-07-01 00:00:00+00',
     version: 0,
     associatedPr: null,
+    total_cost_microdollars: null,
     ...overrides,
   };
 }

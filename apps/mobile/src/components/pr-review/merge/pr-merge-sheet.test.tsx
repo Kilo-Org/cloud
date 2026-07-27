@@ -59,6 +59,8 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   Switch: 'Switch',
   Platform: { OS: 'ios' },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  useWindowDimensions: () => ({ height: 800, width: 400 }),
 }));
 
 vi.mock('expo-haptics', () => ({
@@ -90,6 +92,9 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
+  PrFormSheetHeader: 'PrFormSheetHeader',
+}));
 vi.mock('@/components/pr-review/merge/pr-merge-icons', () => ({
   defaultMergeMethodOptionFor: () => 'squash',
   mergeMethodOptionsFor: () => [
@@ -102,6 +107,7 @@ vi.mock('@/components/pr-review/merge/pr-merge-sheet-parts', () => ({
   CommitMessageField: 'CommitMessageField',
   CommitTitleField: 'CommitTitleField',
   DeleteBranchToggle: 'DeleteBranchToggle',
+  MergeSheetFormBody: 'MergeSheetFormBody',
   MethodPicker: 'MethodPicker',
 }));
 vi.mock('@/lib/pr-review/merge/merge-commit-defaults', () => ({
@@ -137,6 +143,8 @@ const baseProps = {
   repo: repoSettings,
   initialMethod: 'squash' as const,
   mode: 'merge' as const,
+  sheetTitle: 'Merge pull request',
+  eyebrow: 'octocat/hello#1',
   onRefetch: vi.fn().mockResolvedValue(undefined),
   onDismiss: vi.fn(),
 };
@@ -184,17 +192,21 @@ function findElement({ node, type, prop, value }: FindElementArgs): React.ReactE
 function pressMerge(props: typeof baseProps) {
   // eslint-disable-next-line new-cap
   const element = PrMergeSheet(props);
-  const submitButton = findElement({
+  // The submit CTA lives inside MergeSheetFormBody (mocked as a string
+  // element); the sheet wires its confirm handler as the `onConfirm` prop.
+  // Invoking it drives the same Alert → destructive-confirm → performSubmit
+  // path the production Merge button press takes.
+  const formBody = findElement({
     node: element,
-    type: 'Button',
-    prop: 'accessibilityLabel',
+    type: 'MergeSheetFormBody',
+    prop: 'submitLabel',
     value: 'Merge',
   });
-  if (!submitButton) {
-    throw new Error('Merge button not found in rendered tree');
+  if (!formBody) {
+    throw new Error('MergeSheetFormBody not found in rendered tree');
   }
-  const onPress = (submitButton.props as { onPress?: () => void }).onPress;
-  onPress?.();
+  const onConfirm = (formBody.props as { onConfirm?: () => void }).onConfirm;
+  onConfirm?.();
   return element;
 }
 

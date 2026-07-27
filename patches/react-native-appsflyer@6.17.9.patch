@@ -1,0 +1,26 @@
+diff --git a/index.d.ts b/index.d.ts
+index 3850d005682cf9a68b25967d1f972afc44ed6e17..c9d0cd5a23531ef88f68d53bbd7441339220bc77 100644
+--- a/index.d.ts
++++ b/index.d.ts
+@@ -241,7 +241,7 @@ declare module "react-native-appsflyer" {
+   }
+ 
+   export interface PurchaseConnector {
+-    create(config: PurchaseConnectorConfig): void;
++    create(config: PurchaseConnectorConfig): Promise<void>;
+     startObservingTransactions(): void;
+     stopObservingTransactions(): void;
+  
+diff --git a/index.js b/index.js
+index 03017e7d8e4eecbc6be033bbbf64da17694c814e..13d9b4ec668f8a9ab6ade5d1dee4eb2cfbf687ce 100755
+--- a/index.js
++++ b/index.js
+@@ -255,7 +255,7 @@ function create(config) {
+   if (!config) {
+     throw new MissingConfigurationException();
+   }
+-  PCAppsFlyer.create(config);
++  return PCAppsFlyer.create(config);
+ }
+ 
+ AppsFlyerPurchaseConnector.create = create;

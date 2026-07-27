@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSubmitReviewInput } from '@/lib/pr-review/build-submit-review-input';
+import {
+  buildSubmitReviewInput,
+  reviewSubmitBlockReason,
+} from '@/lib/pr-review/build-submit-review-input';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
 
 function makeItem(overrides: Partial<PendingReviewItem> = {}): PendingReviewItem {
@@ -140,5 +143,76 @@ describe('buildSubmitReviewInput', () => {
     // queue is retained because the input is built from the current items
     // without mutating them.
     expect(items).toHaveLength(2);
+  });
+});
+
+describe('reviewSubmitBlockReason', () => {
+  it('allows APPROVE with neither summary nor comments', () => {
+    expect(
+      reviewSubmitBlockReason({ event: 'APPROVE', hasSummary: false, commentCount: 0 })
+    ).toBeNull();
+  });
+
+  it('allows APPROVE with a summary and no comments', () => {
+    expect(
+      reviewSubmitBlockReason({ event: 'APPROVE', hasSummary: true, commentCount: 0 })
+    ).toBeNull();
+  });
+
+  it('blocks REQUEST_CHANGES with neither summary nor comments', () => {
+    const reason = reviewSubmitBlockReason({
+      event: 'REQUEST_CHANGES',
+      hasSummary: false,
+      commentCount: 0,
+    });
+    expect(reason).toBe('Add a summary or at least one comment to request changes.');
+  });
+
+  it('allows REQUEST_CHANGES with a summary and no comments', () => {
+    expect(
+      reviewSubmitBlockReason({
+        event: 'REQUEST_CHANGES',
+        hasSummary: true,
+        commentCount: 0,
+      })
+    ).toBeNull();
+  });
+
+  it('allows REQUEST_CHANGES with a comment and no summary', () => {
+    expect(
+      reviewSubmitBlockReason({
+        event: 'REQUEST_CHANGES',
+        hasSummary: false,
+        commentCount: 1,
+      })
+    ).toBeNull();
+  });
+
+  it('blocks COMMENT with neither summary nor comments, with distinct wording', () => {
+    const reason = reviewSubmitBlockReason({
+      event: 'COMMENT',
+      hasSummary: false,
+      commentCount: 0,
+    });
+    expect(reason).toBe('Add a summary or at least one comment to post a comment review.');
+    expect(reason).not.toBe(
+      reviewSubmitBlockReason({
+        event: 'REQUEST_CHANGES',
+        hasSummary: false,
+        commentCount: 0,
+      })
+    );
+  });
+
+  it('allows COMMENT with a summary and no comments', () => {
+    expect(
+      reviewSubmitBlockReason({ event: 'COMMENT', hasSummary: true, commentCount: 0 })
+    ).toBeNull();
+  });
+
+  it('allows COMMENT with a comment and no summary', () => {
+    expect(
+      reviewSubmitBlockReason({ event: 'COMMENT', hasSummary: false, commentCount: 1 })
+    ).toBeNull();
   });
 });
